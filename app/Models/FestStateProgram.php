@@ -19,20 +19,22 @@ class FestStateProgram extends Model
     protected $fillable = [
         'title', 'event_type', 'conduct_levels', 'academic_year',
         'registration_open', 'registration_close', 'event_start', 'event_end',
-        'venue', 'fee_type', 'fee_amount', 'level_fees', 'level_policies', 'status', 'description', 'created_by_user_id',
+        'venue', 'fee_type', 'fee_amount', 'level_fees', 'level_policies', 'level_event_settings', 'settings_version', 'status', 'description', 'created_by_user_id',
         'state_domain_id', 'state_flow_mode', 'qualifier_policy',
     ];
 
     protected $casts = [
-        'conduct_levels'    => 'array',
-        'level_fees'        => 'array',
-        'level_policies'    => 'array',
-        'qualifier_policy'  => 'array',
-        'registration_open' => 'date',
-        'registration_close'=> 'date',
-        'event_start'       => 'date',
-        'event_end'         => 'date',
-        'fee_amount'        => 'decimal:2',
+        'conduct_levels'       => 'array',
+        'level_fees'           => 'array',
+        'level_policies'       => 'array',
+        'level_event_settings' => 'array',
+        'settings_version'     => 'integer',
+        'qualifier_policy'     => 'array',
+        'registration_open'    => 'date',
+        'registration_close'   => 'date',
+        'event_start'          => 'date',
+        'event_end'            => 'date',
+        'fee_amount'           => 'decimal:2',
     ];
 
     public function propagations(): HasMany

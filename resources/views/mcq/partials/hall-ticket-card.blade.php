@@ -30,15 +30,15 @@
             @endif
             <div style="min-width:0;">
                 <p style="margin:0;font-size:{{ $titleSize }};font-weight:700;color:{{ $primary }};">{{ $examTitle }}</p>
-                <p style="margin:2px 0 0;font-size:10px;color:#64748b;">{{ $headerTitle }}</p>
+                <p style="margin:2px 0 0;font-size:11px;color:#64748b;">{{ $headerTitle }}</p>
             </div>
         </div>
         <div style="flex-shrink:0;text-align:right;">
-            <span style="font-size:9px;color:#64748b;display:block;">Reg. No.</span>
+            <span style="font-size:10.5px;color:#64748b;display:block;">Reg. No.</span>
             <div style="font-size:{{ $regSize }};font-weight:900;color:{{ $accent }};line-height:1;">{{ $examRegNo }}</div>
         </div>
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
         <tr><td style="padding:4px 0;border-bottom:1px dotted #cbd5e1;color:#64748b;width:38%;">Student name</td><td style="padding:4px 0;border-bottom:1px dotted #cbd5e1;"><strong>{{ $studentName }}</strong></td></tr>
         @if($showSchoolAdmissionNo && filled($studentRegNo))
             <tr><td style="padding:4px 0;border-bottom:1px dotted #cbd5e1;color:#64748b;">School admission no.</td><td style="padding:4px 0;border-bottom:1px dotted #cbd5e1;">{{ $studentRegNo }}</td></tr>
@@ -55,9 +55,9 @@
         @endif
     </table>
     @if($hallInstructions)
-        <p style="margin-top:8px;font-size:10px;color:#334155;"><strong>Instructions:</strong> {{ $hallInstructions }}</p>
+        <p style="margin-top:8px;font-size:11px;color:#334155;"><strong>Instructions:</strong> {{ $hallInstructions }}</p>
     @endif
     @if($footerNote)
-        <p style="margin-top:8px;font-size:10px;color:#334155;">{{ $footerNote }}</p>
+        <p style="margin-top:8px;font-size:11px;color:#334155;">{{ $footerNote }}</p>
     @endif
 </div>

@@ -16,13 +16,13 @@
                 <div style="font-size: 16px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.1;">
                     {{ $orgName ?? 'SAHODAYA SCHOOLS COMPLEX' }}
                 </div>
-                <div style="font-size: 10px; font-weight: 600; color: #475569; margin-top: 3px;">
+                <div style="font-size: 11.5px; font-weight: 600; color: #475569; margin-top: 3px;">
                     CBSE Sahodaya Inter-School Competitions & Events
                 </div>
             </td>
             @if(!empty($docTitle))
                 <td style="text-align: right; vertical-align: middle;">
-                    <div style="display: inline-block; background: #0f172a; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 9px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">
+                    <div style="display: inline-block; background: #0f172a; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 10.5px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">
                         {{ $docTitle }}
                     </div>
                 </td>

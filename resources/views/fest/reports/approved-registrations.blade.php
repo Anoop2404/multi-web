@@ -5,19 +5,19 @@
     <title>Approved Registrations — {{ $event->title }}</title>
     <style>
         @page { margin: 16px 20px; size: A4 portrait; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; color: #1e293b; line-height: 1.4; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
         .header { margin-bottom: 12px; }
         .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .table th { background: #0f172a; color: #ffffff; font-size: 9px; font-weight: bold; text-transform: uppercase; text-align: left; padding: 6px 8px; border: 1px solid #0f172a; }
-        .table td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 10px; }
+        .table th { background: #0f172a; color: #ffffff; font-size: 10.5px; font-weight: bold; text-transform: uppercase; text-align: left; padding: 6px 8px; border: 1px solid #0f172a; }
+        .table td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 11px; }
         .table tr:nth-child(even) { background-color: #f8fafc; }
         .center { text-align: center; }
-        .badge-approved { background-color: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 9px; text-transform: uppercase; }
+        .badge-approved { background-color: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 10px; text-transform: uppercase; }
         .meta-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 12px; margin-top: 8px; }
-        .meta-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .meta-table { width: 100%; border-collapse: collapse; font-size: 11px; }
         .meta-table td { padding: 2px 0; }
         .footer-sign { margin-top: 24px; border-top: 1px solid #cbd5e1; padding-top: 10px; }
-        .sign-col { float: left; width: 50%; font-size: 10px; font-weight: bold; color: #475569; }
+        .sign-col { float: left; width: 50%; font-size: 11px; font-weight: bold; color: #475569; }
         .clear { clear: both; }
     </style>
 </head>
@@ -78,18 +78,18 @@
             @forelse($rows as $idx => $r)
                 <tr>
                     <td class="center" style="color: #64748b; font-weight: bold;">{{ $idx + 1 }}</td>
-                    <td style="font-weight: bold; font-family: monospace; font-size: 11px; color: #0f172a;">
+                    <td style="font-weight: bold; font-family: monospace; font-size: 12px; color: #0f172a;">
                         {{ $r['chest_no'] ? '#'.$r['chest_no'] : '—' }}
                     </td>
                     <td style="font-weight: 600; color: #0f172a;">
                         {{ $r['participant_name'] }}
                         @if($r['is_team'])
-                            <span style="font-size: 9px; color: #4338ca; font-weight: normal;"> (Team)</span>
+                            <span style="font-size: 10px; color: #4338ca; font-weight: normal;"> (Team)</span>
                         @endif
                     </td>
-                    <td style="font-size: 9.5px; text-transform: uppercase; color: #334155;">{{ $r['school_name'] }}</td>
+                    <td style="font-size: 10.5px; text-transform: uppercase; color: #334155;">{{ $r['school_name'] }}</td>
                     <td style="font-weight: 600; color: #1e293b;">{{ $r['item_title'] }}</td>
-                    <td style="font-family: monospace; font-size: 9.5px; color: #0f3d7a;">{{ $r['fest_id'] }}</td>
+                    <td style="font-family: monospace; font-size: 10.5px; color: #0f3d7a;">{{ $r['fest_id'] }}</td>
                     <td class="center">
                         <span class="badge-approved">APPROVED</span>
                     </td>

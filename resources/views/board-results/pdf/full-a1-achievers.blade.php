@@ -9,7 +9,7 @@
         html, body {
             font-family: DejaVu Sans, Arial, sans-serif;
             color: #1a2236;
-            font-size: 8.5px;
+            font-size: 10.5px;
             margin: 0; padding: 0;
             background: #fff;
         }
@@ -50,7 +50,7 @@
             display: block;
         }
         .org-sub {
-            font-size: 7px;
+            font-size: 8.5px;
             color: rgba(255,255,255,0.5);
             text-transform: uppercase;
             letter-spacing: 1.2px;
@@ -77,7 +77,7 @@
         }
         .info-cell:last-child { border-right: none; }
         .info-lbl {
-            font-size: 6.5px;
+            font-size: 8.5px;
             text-transform: uppercase;
             letter-spacing: 0.9px;
             color: rgba(255,255,255,0.4);
@@ -85,13 +85,13 @@
             margin-bottom: 2px;
         }
         .info-val {
-            font-size: 9px;
+            font-size: 10.5px;
             font-weight: 700;
             color: #ffffff;
             display: block;
         }
         .info-val-lg {
-            font-size: 9.5px;
+            font-size: 11px;
             font-weight: 700;
             color: #7eb3ff;
             display: block;
@@ -117,7 +117,7 @@
             color: #c8d9f5;
             text-align: left;
             padding: 8px 10px;
-            font-size: 8px;
+            font-size: 9.5px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-weight: 700;
@@ -129,7 +129,7 @@
             border-bottom: 1px solid #e8edf5;
             border-right: 1px solid #eef1f8;
             vertical-align: middle;
-            font-size: 9px;
+            font-size: 10.5px;
             line-height: 1.35;
         }
         table.report-table td:last-child { border-right: none; }
@@ -137,22 +137,22 @@
         table.report-table tbody tr:nth-child(even) td { background: #f7f9fd; }
         table.report-table tbody tr:last-child      td { border-bottom: 2px solid #0b2558; }
 
-        .student-name { font-weight: 700; color: #0b2236; font-size: 9px; }
-        .roll-no { font-family: 'Courier New', monospace; font-size: 8px; color: #334155; }
-        .school-name { font-size: 8px; color: #334155; }
-        .score-col { font-weight: 700; color: #166534; text-align: center; font-size: 9.5px; }
+        .student-name { font-weight: 700; color: #0b2236; font-size: 10.5px; }
+        .roll-no { font-family: 'Courier New', monospace; font-size: 9.5px; color: #334155; }
+        .school-name { font-size: 9.5px; color: #334155; }
+        .score-col { font-weight: 700; color: #166534; text-align: center; font-size: 11px; }
 
         .page-footer {
             margin-top: 10px;
             padding-top: 5px;
             border-top: 1px solid #d0daf0;
-            font-size: 7.5px; color: #8898b4;
+            font-size: 9px; color: #8898b4;
             width: 100%; display: table;
         }
         .footer-left  { display: table-cell; text-align: left; }
         .footer-right { display: table-cell; text-align: right; }
 
-        .empty-state { text-align: center; color: #8898b4; padding: 40px 20px; font-size: 10px; }
+        .empty-state { text-align: center; color: #8898b4; padding: 40px 20px; font-size: 11.5px; }
     </style>
 </head>
 <body>

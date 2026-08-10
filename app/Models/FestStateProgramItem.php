@@ -20,7 +20,7 @@ class FestStateProgramItem extends Model
         'competition_format', 'sport_discipline', 'duration_minutes', 'criteria_json',
         'participant_type', 'gender', 'class_group', 'age_group', 'kids_band',
         'max_per_school', 'min_group_size', 'max_group_size', 'qualify_count', 'display_order',
-        'fee_amount',
+        'fee_amount', 'advancement_mode',
     ];
 
     protected $casts = [
@@ -57,6 +57,7 @@ class FestStateProgramItem extends Model
             'qualify_count'      => $this->qualify_count,
             'display_order'      => $this->display_order,
             'fee_amount'         => $this->fee_amount,
+            'advancement_mode'   => $this->advancement_mode ?? 'normal',
             'owner_level'        => 'state',
             'state_program_item_id'=> $this->id,
         ];

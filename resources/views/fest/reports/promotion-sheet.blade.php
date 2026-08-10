@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Promotions</title>
-<style>body{font-family:DejaVu Sans,sans-serif;font-size:10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px}th{background:#f3f4f6}</style>
+<style>body{font-family:DejaVu Sans,sans-serif;font-size:11.5px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:5px 6px;font-size:11px}th{background:#f3f4f6;font-size:11.5px}</style>
 </head><body>
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 

@@ -5,15 +5,16 @@
     <title>{{ $exam->title }} — Class-Wise Fee & Due Report</title>
     <style>
         @page { margin: 15mm 12mm 15mm 12mm; }
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; color: #1e293b; margin: 0; padding: 0; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 11.5px; color: #1e293b; margin: 0; padding: 0; }
         .header { margin-bottom: 15px; border-bottom: 2.5px solid #0f3d7a; padding-bottom: 10px; }
         .logo { max-height: 48px; float: right; }
-        .title { font-size: 16px; font-weight: bold; color: #0f172a; margin: 0 0 4px; }
-        .subtitle { font-size: 11px; color: #475569; margin: 0; font-weight: bold; }
-        .meta { font-size: 9px; color: #64748b; margin-top: 4px; }
+        .title { font-size: 17px; font-weight: bold; color: #0f172a; margin: 0 0 4px; }
+        .subtitle { font-size: 12px; color: #475569; margin: 0; font-weight: bold; }
+        .meta { font-size: 10.5px; color: #64748b; margin-top: 4px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #cbd5e1; padding: 6px 8px; }
-        th { background-color: #0f3d7a; color: #ffffff; font-size: 9px; text-transform: uppercase; text-align: left; }
+        th { background-color: #0f3d7a; color: #ffffff; font-size: 10.5px; text-transform: uppercase; text-align: left; }
+        td { font-size: 11px; }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .font-bold { font-weight: bold; }

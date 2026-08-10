@@ -2,10 +2,9 @@
 
 namespace App\Models\State;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class StateFestParticipant extends Model
+class StateFestParticipant extends StateModel
 {
     protected $table = 'state_fest_participants';
 

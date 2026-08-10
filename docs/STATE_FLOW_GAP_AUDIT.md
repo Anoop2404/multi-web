@@ -1,7 +1,9 @@
 # State Flow Gap Audit
 
 **Date:** July 2026  
-**Status:** Pre-implementation baseline
+**Status:** Historical pre-implementation baseline — not the governing plan
+
+> **Authority notice (10 August 2026):** This remains a historical gap snapshot. Use [`STATE_KALOTSAV_MASTER_IMPLEMENTATION_PLAN.md`](STATE_KALOTSAV_MASTER_IMPLEMENTATION_PLAN.md) for current architecture, policies, event topology, external Sahodaya flow, manual State nomination and separate Sahodaya/State settings.
 
 ## What Exists
 

@@ -2,10 +2,9 @@
 
 namespace App\Models\State;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class StateQualifierEntry extends Model
+class StateQualifierEntry extends StateModel
 {
     protected $fillable = [
         'intake_id', 'source_registration_id', 'source_participant_id',

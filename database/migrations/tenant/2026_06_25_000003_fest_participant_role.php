@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('fest_participants', function (Blueprint $table) {
-            $table->enum('participant_role', ['performer', 'standby'])->default('performer')->after('participant_type');
+            $table->string('participant_role', 20)->default('performer')->after('participant_type');
         });
     }
 

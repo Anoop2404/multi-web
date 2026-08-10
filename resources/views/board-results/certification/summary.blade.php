@@ -4,21 +4,21 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>Result Summary & Proof — Certification</title>
     <style>
-        body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 12px; color: #333; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 12.5px; color: #333; }
         .header { text-align: center; border-bottom: 2px solid #0b2558; padding-bottom: 15px; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 10px; }
-        .title { font-size: 18px; font-weight: bold; color: #0b2558; margin: 0; text-transform: uppercase; }
-        .subtitle { font-size: 14px; font-weight: bold; color: #555; margin: 5px 0 0 0; }
-        .meta { font-size: 11px; color: #777; margin-top: 5px; }
+        .title { font-size: 19px; font-weight: bold; color: #0b2558; margin: 0; text-transform: uppercase; }
+        .subtitle { font-size: 14.5px; font-weight: bold; color: #555; margin: 5px 0 0 0; }
+        .meta { font-size: 12px; color: #777; margin-top: 5px; }
         .school-info { text-align: center; margin-bottom: 25px; }
-        .school-name { font-size: 16px; font-weight: bold; color: #000; }
+        .school-name { font-size: 17px; font-weight: bold; color: #000; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f8fafc; font-weight: bold; color: #475569; font-size: 11px; text-transform: uppercase; }
-        td { font-size: 13px; }
+        th { background-color: #f8fafc; font-weight: bold; color: #475569; font-size: 12px; text-transform: uppercase; }
+        td { font-size: 13.5px; }
         .value { font-weight: bold; color: #0f172a; text-align: right; }
-        .ref-box { margin-top: 25px; border: 1px dashed #94a3b8; padding: 10px; font-size: 10px; color: #64748b; }
-        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 9px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+        .ref-box { margin-top: 25px; border: 1px dashed #94a3b8; padding: 10px; font-size: 11px; color: #64748b; }
+        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 10.5px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
         .page-number:before { content: "Page " counter(page); }
     </style>
 </head>

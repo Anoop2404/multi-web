@@ -32,6 +32,22 @@ return [
 
     'connections' => [
 
+        'state' => [
+            'driver' => env('STATE_DB_DRIVER', env('DB_DRIVER', 'pgsql')),
+            'url' => env('STATE_DB_URL'),
+            'host' => env('STATE_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('STATE_DB_PORT', env('DB_PORT', '5432')),
+            'database' => env('STATE_DB_DATABASE', env('DB_DRIVER', 'pgsql') === 'sqlite' ? env('DB_DATABASE', ':memory:') : 'state_kalotsav'),
+            'username' => env('STATE_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('STATE_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('STATE_DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('STATE_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+        ],
+
         'central' => [
             'driver' => env('DB_DRIVER', 'pgsql'),
             'url' => env('DB_URL'),

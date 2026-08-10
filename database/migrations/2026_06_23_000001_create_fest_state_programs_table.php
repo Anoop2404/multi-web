@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('fest_state_programs', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('title');
-            $table->enum('event_type', ['kalolsavam', 'sports', 'kids_fest', 'teacher_fest', 'custom'])->default('kalolsavam');
+            $table->string('event_type', 40)->default('kalolsavam');
             $table->json('conduct_levels')->nullable();
             $table->string('academic_year')->nullable();
             $table->date('registration_open')->nullable();

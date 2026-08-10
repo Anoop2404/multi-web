@@ -5,10 +5,12 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\FestStateProgram;
 use App\Models\FestStateProgramPropagation;
+use App\Models\State\StateFestEvent;
 use App\Models\Tenant;
 use App\Support\AcademicYear;
 use App\Support\FestConductLevels;
 use App\Support\TenancyDatabase;
+use Illuminate\Support\Str;
 
 class FestStateProgramService
 {
@@ -27,6 +29,23 @@ class FestStateProgramService
             throw new \InvalidArgumentException('Select at least one conduct level before publishing.');
         }
 
+        // Publish/version State event to the dedicated State operational connection
+        try {
+            StateFestEvent::updateOrCreate(
+                ['state_program_id' => $program->id],
+                [
+                    'name'      => $program->title,
+                    'slug'      => Str::slug($program->title),
+                    'status'    => 'published',
+                    'starts_on' => $program->event_start,
+                    'ends_on'   => $program->event_end,
+                    'settings'  => $program->level_event_settings['state'] ?? [],
+                ]
+            );
+        } catch (\Throwable $e) {
+            logger()->warning('Could not deploy StateFestEvent on state connection: ' . $e->getMessage());
+        }
+
         $propagated = 0;
         $skipped = 0;
         $errors = [];
@@ -40,6 +59,16 @@ class FestStateProgramService
         foreach ($sahodayas as $sahodaya) {
             foreach ($levels as $level) {
                 if (! FestConductLevels::isAllowed($level, $program->event_type)) {
+                    continue;
+                }
+
+                // The State final lives only in the State operational database (master plan
+                // §26.2/26.3) — never as a tenant-local placeholder FestEvent. Creating one here
+                // was the root cause of the parent-event ambiguity bugs fixed earlier: a locked,
+                // uneditable "state" event sitting next to the real "sahodaya" event with almost
+                // the same title/date, which schools could get silently mis-parented to. Skipping
+                // it outright removes the whole bug class instead of working around it.
+                if ($level === 'state') {
                     continue;
                 }
 

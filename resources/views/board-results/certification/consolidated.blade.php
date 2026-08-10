@@ -4,30 +4,30 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>School-Certified Result Package</title>
     <style>
-        body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 11px; color: #333; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 12px; color: #333; }
         .header { text-align: center; border-bottom: 2px solid #0b2558; padding-bottom: 15px; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 10px; }
         .title { font-size: 18px; font-weight: bold; color: #0b2558; margin: 0; text-transform: uppercase; }
         .subtitle { font-size: 13px; font-weight: bold; color: #555; margin: 5px 0 0 0; }
-        .meta { font-size: 10px; color: #777; margin-top: 5px; }
+        .meta { font-size: 11.5px; color: #777; margin-top: 5px; }
         .school-name { font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 4px; }
-        .school-meta { font-size: 11px; text-align: center; color: #555; margin-bottom: 18px; }
-        h3.section { font-size: 12px; color: #fff; background: #0b2558; padding: 6px 10px; margin: 20px 0 8px; text-transform: uppercase; letter-spacing: .04em; }
+        .school-meta { font-size: 11.5px; text-align: center; color: #555; margin-bottom: 18px; }
+        h3.section { font-size: 12.5px; color: #fff; background: #0b2558; padding: 6px 10px; margin: 20px 0 8px; text-transform: uppercase; letter-spacing: .04em; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
         th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
-        th { background-color: #f8fafc; font-weight: bold; color: #475569; font-size: 10px; text-transform: uppercase; }
-        td { font-size: 10.5px; }
+        th { background-color: #f8fafc; font-weight: bold; color: #475569; font-size: 11px; text-transform: uppercase; }
+        td { font-size: 11.5px; }
         .num { text-align: right; }
         .value { font-weight: bold; color: #0f172a; text-align: right; }
-        .status-pill { font-size: 9px; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; }
+        .status-pill { font-size: 10px; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; }
         .status-accepted { background: #dcfce7; color: #166534; }
         .status-other { background: #fef3c7; color: #92400e; }
-        .declaration { font-size: 11px; line-height: 1.7; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; margin-top: 10px; }
+        .declaration { font-size: 12px; line-height: 1.7; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; margin-top: 10px; }
         .sig-row { display: table; width: 100%; margin-top: 40px; }
         .sig-col { display: table-cell; width: 50%; vertical-align: top; }
-        .sig-line { border-top: 1px solid #333; margin-top: 50px; padding-top: 6px; width: 80%; font-size: 10px; }
-        .ref-box { margin-top: 20px; border: 1px dashed #94a3b8; padding: 10px; font-size: 10px; color: #64748b; }
-        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 9px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+        .sig-line { border-top: 1px solid #333; margin-top: 50px; padding-top: 6px; width: 80%; font-size: 11px; }
+        .ref-box { margin-top: 20px; border: 1px dashed #94a3b8; padding: 10px; font-size: 10.5px; color: #64748b; }
+        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
         .page-number:before { content: "Page " counter(page); }
     </style>
 </head>

@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Judge Sheet</title>
-<style>body{font-family:DejaVu Sans,sans-serif;font-size:10px}h1{font-size:14px;text-align:center}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#023e8a;color:#fff;padding:5px 4px;font-size:9px}td{border:1px solid #aaa;padding:5px 4px;min-height:30px}.score-cell{min-height:30px}</style>
+<style>body{font-family:DejaVu Sans,sans-serif;font-size:11.5px}h1{font-size:16px;text-align:center}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#023e8a;color:#fff;padding:6px 5px;font-size:10.5px}td{border:1px solid #aaa;padding:6px 5px;font-size:11px;min-height:30px}.score-cell{min-height:30px}</style>
 </head><body>
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h1>Judge Sheet — {{ $item->title }}</h1>
-<p style="text-align:center;font-size:10px;color:#444">
+<p style="text-align:center;font-size:11px;color:#444">
 @if($schedule) {{ $schedule->scheduled_at?->format('d M Y H:i') }} · Stage: {{ $schedule->stage ?? '—' }} @else Schedule TBA @endif
 @if(($audience ?? 'staff') === 'public') · Public copy (chest/reg only) @endif
 </p>
@@ -28,5 +28,5 @@
 </tr>
 @endforeach
 </tbody></table>
-<p style="margin-top:24px;font-size:10px">Judge: _________________ Signature: _________________ Date: _________</p>
+<p style="margin-top:24px;font-size:11.5px">Judge: _________________ Signature: _________________ Date: _________</p>
 </body></html>

@@ -45,3 +45,31 @@
 |------|--------|----------|
 | 1 | Submit same qualifier batch twice | Same `idempotency_key` returns existing intake |
 | 2 | Outbox duplicate enqueue | No duplicate pending rows |
+
+## 6. Region-scoped report reporting/security (added for docs/REGION_PHASE_EVENT_REPORTING_REMEDIATION_PLAN.md)
+
+Extends scenario 2 (MCS multi-region) with the report-isolation matrix from that plan's
+§11. Use the same two-region sentinel fixture pattern as
+`tests/Feature/SahodayaAdmin/RegionAdminReportContainmentTest.php` (named sentinel
+schools/students per region) so a leak is obvious in the UI, not just in test
+assertions.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 1 | Full parent admin opens hub Reports Hub, Registration Register, Overall Ranking | Combined totals include both regions; no region selector forced |
+| 2 | Full parent admin adds `?region_id=<Region A>` on Registration Register and Overall Ranking | Only Region A rows/rankings; filename/heading identifies Region A |
+| 3 | Full parent admin adds `?region_id=<Region B>` | Only Region B rows/rankings; no Region A identifiers anywhere in the response |
+| 4 | Region A admin (assigned on the hub, region_id=Region A) opens the hub Reports Hub URL directly | Transparently resolved to the Region A child (`ResolveRegionScopedReportEvent`) — page shows Region A data only, `event.id` in the page props is the child's id, not the hub's |
+| 5 | Region A admin appends `?region_id=<Region B>` on any report under the hub | 403, not a redirect to Region B data |
+| 6 | Region A admin appends `?school_id=<a Region B school>` on Registration Register | 403 |
+| 7 | Region admin with a `region_admin` FestEventStaff row that has `region_id = null` | 403 on every report route under that hub (fail-closed — see `EnsureSahodayaAdmin::matchesRegionScope()`) |
+| 8 | Compare browser XLS/PDF/CSV export vs on-screen totals for Registration Register, under both a region filter and no filter | Row counts and totals match exactly |
+| 9 | Run `php artisan fest:audit-event-topology --sahodaya=<id> --format=table` against the fixture tenant | No `region_admin_missing_region` / `region_admin_on_combined_hub` / `operational_rows_on_partitioned_parent` findings for a clean fixture; each finding type reproducible by deliberately breaking the fixture |
+| 10 | Dry-run `php artisan fest:repair-partitioned-parent-operational-rows --sahodaya=<id> --event=<hub id>` against a hub with registrations still on the parent | Reports what it would move, writes nothing without `--apply` |
+
+Not yet covered by this scenario (see the implementation's final status report for why):
+Combined vs Region-wise Result reconciling against a real published scoreboard with
+marks; named competition phase gating (`competition_phase_id`); Sports season/sport/
+region reconciliation; and any report beyond Registration Register and Overall Ranking
+being scoped through `FestReportScopeResolver` rather than just event-substitution
+containment.

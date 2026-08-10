@@ -11,6 +11,11 @@ class TenantRequestResolver
     public static function initializeFromHost(string $host): void
     {
         $host = strtolower($host);
+        $stateDomain = strtolower((string) config('state.domain', 'state.localhost'));
+
+        if ($stateDomain && $host === $stateDomain) {
+            return;
+        }
 
         $domain = Domain::where('domain', $host)->first();
         if ($domain?->tenant) {

@@ -598,11 +598,7 @@ class FestReportService
 
     private function cumulativePdf(): \Symfony\Component\HttpFoundation\Response
     {
-        return $this->renderPdf('fest.reports.cumulative', [
-            'event'   => $this->event,
-            'schools' => $this->schoolRankingRows(),
-            ...$this->brandingData(),
-        ], $this->slug().'-cumulative.pdf');
+        return $this->overallRankingPdf();
     }
 
     private function dayWisePdf(Request $request): \Symfony\Component\HttpFoundation\Response

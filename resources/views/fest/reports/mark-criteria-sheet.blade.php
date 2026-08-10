@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Digital Sum Sheet</title>
-<style>body{font-family:DejaVu Sans,sans-serif;font-size:10px}h2{text-align:center;font-size:14px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #999;padding:4px}th{background:#0f3d7a;color:#fff;font-size:9px}td.num{text-align:right}tfoot td{font-weight:bold}</style>
+<style>body{font-family:DejaVu Sans,sans-serif;font-size:11.5px}h2{text-align:center;font-size:15px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #999;padding:5px 6px;font-size:11px}th{background:#0f3d7a;color:#fff;font-size:10.5px}td.num{text-align:right}tfoot td{font-weight:bold}</style>
 </head><body>
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 

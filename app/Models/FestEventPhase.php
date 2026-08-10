@@ -10,6 +10,7 @@ class FestEventPhase extends Model
 {
     protected $fillable = [
         'event_id',
+        'source_phase_id',
         'name',
         'code',
         'sort_order',
@@ -52,5 +53,17 @@ class FestEventPhase extends Model
     public function items(): HasMany
     {
         return $this->hasMany(FestEventItem::class, 'phase_id');
+    }
+
+    /** The hub/root phase this one was cloned from, if this is a region-child phase. */
+    public function sourcePhase(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_phase_id');
+    }
+
+    /** Region-child phases cloned from this one, if this is a source/parent phase. */
+    public function childPhases(): HasMany
+    {
+        return $this->hasMany(self::class, 'source_phase_id');
     }
 }

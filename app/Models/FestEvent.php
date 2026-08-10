@@ -29,7 +29,7 @@ class FestEvent extends Model
     protected $fillable = [
         'tenant_id', 'academic_year_id', 'title', 'event_type', 'conductor_level',
         'conduct_levels', 'level_round', 'state_program_id', 'conducting_school_id',
-        'is_cascaded', 'parent_event_id',         'cluster_key', 'cluster_label', 'cloned_from_event_id',
+        'is_cascaded', 'parent_event_id', 'root_event_id',         'cluster_key', 'cluster_label', 'cloned_from_event_id',
         'conduct_mode', 'combine_regions_at_finale', 'partition_role', 'partition_key', 'region_id', 'aggregation_config', 'scoring_preset',
         'registration_open', 'registration_close', 'event_start', 'event_end', 'sports_age_cutoff_date', 'venue',
         'fee_type', 'fee_amount', 'fee_settings', 'numbering_settings', 'status', 'nav_hidden', 'results_published', 'description',
@@ -398,6 +398,104 @@ class FestEvent extends Model
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * The season/program root of this event's topology. For every non-partitioned,
+     * non-child event this is just $this. Added for FestReportScopeResolver
+     * (remediation plan §4.2) — reportableEventIds() intentionally stays untouched for
+     * existing non-report callers.
+     *
+     * Prefers the indexed root_event_id column (Phase 7, §7.1) when it's set, falling
+     * back to walking parent_event_id — root_event_id may be null for rows created
+     * before that backfill ran, or in test fixtures that don't set it explicitly.
+     */
+    public function rootEvent(): self
+    {
+        if ($this->root_event_id && (int) $this->root_event_id !== (int) $this->id) {
+            $root = self::find($this->root_event_id);
+            if ($root) {
+                return $root;
+            }
+        }
+
+        $event = $this;
+        $seen = [];
+
+        while ($event->parent_event_id && ! in_array($event->parent_event_id, $seen, true)) {
+            $seen[] = $event->parent_event_id;
+            $parent = self::find($event->parent_event_id);
+            if (! $parent) {
+                break;
+            }
+            $event = $parent;
+        }
+
+        return $event;
+    }
+
+    /** @return \Illuminate\Support\Collection<int, self> Root-first ancestry, excluding $this. */
+    public function ancestors(): \Illuminate\Support\Collection
+    {
+        $chain = [];
+        $event = $this;
+        $seen = [];
+
+        while ($event->parent_event_id && ! in_array($event->parent_event_id, $seen, true)) {
+            $seen[] = $event->parent_event_id;
+            $parent = self::find($event->parent_event_id);
+            if (! $parent) {
+                break;
+            }
+            $chain[] = $parent;
+            $event = $parent;
+        }
+
+        return collect(array_reverse($chain));
+    }
+
+    /**
+     * Immediate children matching one or more partition_role values (e.g. ['region'],
+     * ['finale'], ['sports_discipline']) — the role-aware replacement for blindly taking
+     * every immediate child, which is exactly gap G2 in reportableEventIds().
+     *
+     * @param  list<string>  $roles
+     * @return \Illuminate\Database\Eloquent\Collection<int, self>
+     */
+    public function childrenForRoles(array $roles): \Illuminate\Database\Eloquent\Collection
+    {
+        return self::where('parent_event_id', $this->id)
+            ->whereIn('partition_role', $roles)
+            ->get();
+    }
+
+    /** The single region-partition child matching a given region, if any. */
+    public function regionalChild(int $regionId): ?self
+    {
+        return self::where('parent_event_id', $this->id)
+            ->where('partition_role', 'region')
+            ->where('region_id', $regionId)
+            ->first();
+    }
+
+    /**
+     * Operational leaves for a report family: this event's own id when it has no
+     * matching children of the given roles (a standard event, or a role-less leaf),
+     * otherwise the matching children themselves (never the hub, which only holds
+     * shared configuration — plan §3.2).
+     *
+     * @param  list<string>  $roles
+     * @return list<int>
+     */
+    public function operationalLeaves(array $roles = ['region']): array
+    {
+        $children = $this->childrenForRoles($roles);
+
+        if ($children->isEmpty()) {
+            return [(int) $this->id];
+        }
+
+        return $children->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
     }
 
     /** Fest program types that are unique (one per Sahodaya per academic year). */

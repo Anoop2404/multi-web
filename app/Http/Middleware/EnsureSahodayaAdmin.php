@@ -122,6 +122,15 @@ class EnsureSahodayaAdmin
      * the hub can reach any of the hub's children for their own region without needing
      * a separate FestEventStaff row per child event.
      *
+     * A scope directly on a hub/root event (no parent_event_id of its own) must carry a
+     * region_id. Without this check, a FestEventStaff row with duty=region_admin,
+     * event_id=<hub>, region_id=null would satisfy the very first comparison below
+     * regardless of region — granting full, unscoped access to every child/region under
+     * that hub. That is gap G1 in docs/REGION_PHASE_EVENT_REPORTING_REMEDIATION_PLAN.md:
+     * a region admin assigned on a parent hub could open the hub itself, and parent
+     * reports then aggregate every child. A scope on a genuine leaf/child event has
+     * nothing further under it to leak, so it's allowed on its own.
+     *
      * @param  list<array{event_id: int, region_id: ?int}>  $allowedRegionScopes
      */
     private function matchesRegionScope(int $requestedEventId, array $allowedRegionScopes): bool
@@ -134,8 +143,14 @@ class EnsureSahodayaAdmin
             return false;
         }
 
+        $requestedIsHub = $requestedEvent->parent_event_id === null;
+
         foreach ($allowedRegionScopes as $scope) {
             if ($scope['event_id'] === (int) $requestedEvent->id) {
+                if ($requestedIsHub && $scope['region_id'] === null) {
+                    continue;
+                }
+
                 return true;
             }
 

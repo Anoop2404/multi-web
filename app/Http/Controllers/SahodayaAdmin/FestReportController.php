@@ -8,6 +8,7 @@ use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestParticipationPolicyService;
 use App\Services\Events\FestRegistrationRegisterService;
 use App\Services\Events\FestReportService;
+use App\Services\Events\Reports\FestReportScopeResolver;
 use App\Support\FestPageActivity;
 use App\Support\FestReportCatalog;
 use App\Support\FestEventMeta;
@@ -181,15 +182,36 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
-    public function overallRanking(string $tenantId, FestEvent $event)
+    /**
+     * Phase 3 demonstration of FestReportScopeResolver-backed Combined vs Region-wise
+     * Result selection (plan §3.4). $event has already been transparently narrowed to a
+     * region-locked admin's own child by ResolveRegionScopedReportEvent, so the default
+     * (no region_id) path below is unchanged for them — this only adds the ability for a
+     * full/unrestricted admin to explicitly request one region's own ranking from the
+     * hub route, via ?region_id=. Other results/ranking pages (medal tally,
+     * championship, house-detailed, etc.) are not yet retrofitted this way — see the
+     * Phase 3 checklist in the final status report.
+     */
+    public function overallRanking(Request $request, string $tenantId, FestEvent $event, FestReportScopeResolver $scopeResolver)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($event);
+        $regionId = $request->integer('region_id') ?: null;
+        $targetEvent = $event;
+
+        if ($regionId !== null) {
+            $scope = $scopeResolver->resolve($event, $request->user(), ['mode' => 'region', 'region_id' => $regionId]);
+            abort_if($scope->isEmpty(), 404, 'No results available for that region.');
+            $targetEvent = FestEvent::findOrFail($scope->eventIds[0]);
+        }
+
+        $service = new FestReportService($targetEvent);
 
         return $this->inertia('Sahodaya/Events/Reports/OverallRanking', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
-            'rankings' => $service->schoolRankingRows()->values(),
-            'pdfUrl'   => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/overall-ranking",
+            'rankings'       => $service->schoolRankingRows()->values(),
+            'resultMode'     => $regionId !== null ? 'region' : 'combined',
+            'filterRegionId' => $regionId,
+            'pdfUrl'         => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/overall-ranking".($regionId ? "?region_id={$regionId}" : ''),
         ])));
     }
 
@@ -412,40 +434,104 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
-    public function registrationRegister(Request $request, string $tenantId, FestEvent $event, FestRegistrationRegisterService $register)
+    public function registrationRegister(Request $request, string $tenantId, FestEvent $event, FestRegistrationRegisterService $register, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $schoolId = $request->input('school_id');
-        $regionId = $request->integer('region_id') ?: null;
+        $scope = $this->resolveRegistrationRegisterScope($request, $event, $register);
 
-        $schoolIds = null;
-        if ($regionId && !$schoolId) {
-            $schoolIds = \App\Models\SchoolRegionAssignment::forTenant($this->sahodaya->id)
-                ->where('region_id', $regionId)
-                ->pluck('school_id')
-                ->all();
-        }
+        $data = $register->build($event, $scope['schoolId'], null, 50, null, null, $scope['schoolIds']);
 
-        $data = $register->build($event, $schoolId ?: null, null, 50, null, null, $schoolIds);
+        $audit->festEvent($event, FestPageActivity::REPORTS, 'fest.report.scope_resolved', 'Registration register viewed', [
+            'report'    => 'registration-register',
+            'region_id' => $scope['regionId'],
+            'school_id' => $scope['schoolId'],
+        ]);
 
         return $this->inertia('Sahodaya/Events/Reports/RegistrationRegister', $this->reportProps($tenantId, $event, [
             'rows'            => $data['rows'],
             'schoolSummaries' => $data['school_summaries'],
             'totals'          => $data['totals'],
             'schools'         => $register->schools($event),
-            'filterSchoolId'  => $schoolId,
-            'filterRegionId'  => $regionId,
+            'filterSchoolId'  => $scope['schoolId'],
+            'filterRegionId'  => $scope['regionId'],
             'feesUrl'         => "/sahodaya-admin/{$tenantId}/events/{$event->id}/fees",
             'activityLogs'    => $this->pageActivityLogs($event, FestPageActivity::REPORTS),
         ]));
     }
 
-    public function exportRegistrationRegister(Request $request, string $tenantId, FestEvent $event, FestRegistrationRegisterService $register)
+    public function exportRegistrationRegister(Request $request, string $tenantId, FestEvent $event, FestRegistrationRegisterService $register, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        return $register->exportCsv($event, $request->input('school_id'));
+        $scope = $this->resolveRegistrationRegisterScope($request, $event, $register);
+
+        $audit->festEvent($event, FestPageActivity::REPORTS, 'fest.report.exported', 'Registration register exported', [
+            'report'    => 'registration-register',
+            'region_id' => $scope['regionId'],
+            'school_id' => $scope['schoolId'],
+        ]);
+
+        return $register->exportCsv($event, $scope['schoolId'], $scope['schoolIds'], $scope['regionId']);
+    }
+
+    /**
+     * Resolve the school-id scope shared by the Registration Register browser view and
+     * its export, so both read exactly the same rows (gap G3) and a region-locked admin
+     * is narrowed to their assigned region(s) on both paths even if no region_id/school_id
+     * was supplied, using active-year SchoolRegionAssignment data (gap G5). Tampered
+     * region_id/school_id values outside the admin's assigned region(s) are rejected.
+     *
+     * @return array{schoolId: ?string, schoolIds: ?list<string>, regionId: ?int}
+     */
+    private function resolveRegistrationRegisterScope(Request $request, FestEvent $event, FestRegistrationRegisterService $register): array
+    {
+        $schoolId = $request->input('school_id') ?: null;
+        $regionId = $request->integer('region_id') ?: null;
+
+        $regionScopes = $request->attributes->get('regionAdminScopes');
+
+        if (! empty($regionScopes)) {
+            $allowedRegionIds = collect($regionScopes)->pluck('region_id')->filter()->unique()->values()->all();
+            abort_if($allowedRegionIds === [], 403, 'No region is assigned to your account.');
+            abort_if($regionId !== null && ! in_array($regionId, $allowedRegionIds, true), 403, 'You are not assigned to that region.');
+
+            if ($schoolId) {
+                abort_unless(in_array($schoolId, $this->regionScopedSchoolIds([$schoolId]), true), 403, "You are not assigned to that school's region.");
+
+                return ['schoolId' => $schoolId, 'schoolIds' => null, 'regionId' => $regionId ?? $allowedRegionIds[0]];
+            }
+
+            // Lock to the admin's single region automatically; with more than one assigned
+            // region and none specified, still resolve the full set below rather than
+            // falling through to build()'s unfiltered (null $schoolIds) "every school" path.
+            $regionId ??= count($allowedRegionIds) === 1 ? $allowedRegionIds[0] : null;
+
+            $candidateSchoolIds = $regionId
+                ? \App\Models\SchoolRegionAssignment::forTenant($this->sahodaya->id)
+                    ->forYear(\App\Support\AcademicYear::forSahodaya($this->sahodaya->id))
+                    ->where('region_id', $regionId)
+                    ->pluck('school_id')
+                    ->all()
+                : array_keys($register->schools($event));
+
+            return [
+                'schoolId'  => null,
+                'schoolIds' => $this->regionScopedSchoolIds($candidateSchoolIds),
+                'regionId'  => $regionId,
+            ];
+        }
+
+        $schoolIds = null;
+        if ($regionId && ! $schoolId) {
+            $schoolIds = \App\Models\SchoolRegionAssignment::forTenant($this->sahodaya->id)
+                ->forYear(\App\Support\AcademicYear::forSahodaya($this->sahodaya->id))
+                ->where('region_id', $regionId)
+                ->pluck('school_id')
+                ->all();
+        }
+
+        return ['schoolId' => $schoolId, 'schoolIds' => $schoolIds, 'regionId' => $regionId];
     }
 
     public function assignmentCompleteness(string $tenantId, FestEvent $event)
@@ -583,10 +669,60 @@ class FestReportController extends SahodayaAdminController
         abort_unless(is_array($catalog), 404, 'Unknown report export.');
         $phase = $catalog['phase'] ?? 'before';
 
+        $this->enforceReportLifecyclePhase($event, $phase, $request);
+
+        // Phase 6 (partial — see final status report for what's NOT wired): an
+        // 'after'-phase export additionally filtered to one named competition phase
+        // (?competition_phase_id=) must respect that phase's own results_published flag,
+        // not just the event's — plan §6.4: "A phase's After-event reports remain
+        // unavailable until that phase's results are published."
+        if ($phase === 'after' && $event->phase_mode_enabled && ($catalog['supports_competition_phase'] ?? false)) {
+            $competitionPhaseId = $request->integer('competition_phase_id') ?: null;
+            if ($competitionPhaseId !== null) {
+                $lifecycle = app(\App\Services\Events\FestPhaseLifecycleService::class)
+                    ->effectiveLifecycleForPhase($event, $competitionPhaseId);
+                abort_unless($lifecycle->results_published || $request->user()?->can('fest.reports.lifecycle_override'), 403,
+                    'Results for that competition phase are not published yet.');
+            }
+        }
+
         $audit->festEvent($event, FestPageActivity::reportsPhase($phase), 'fest.report.exported', "Report exported: {$exportType}", [
             'export_type' => $exportType,
         ]);
 
         return (new FestReportService($event))->export($exportType, $request);
+    }
+
+    /**
+     * Phase 4 (plan §4.5, gap G6): the Downloads UI already filters exports to
+     * EventLifecycleGate::allowedReportPhases($event), but until this check every export
+     * endpoint served the file regardless — a direct URL to a Before/During/After export
+     * bypassed the UI's own gate entirely. Enforced here at the generic export()
+     * dispatcher (the ~50 FestReportCatalog exports) so it can't be bypassed by guessing
+     * the URL. Not applied to the small number of report-specific export methods
+     * (exportRegistrationRegister, exportAssignmentCompleteness, exportNumberingRegister,
+     * exportPendingApprovals) — every one of those is catalogued as phase='before', which
+     * is always in allowedReportPhases() regardless of event lifecycle, so the check
+     * would be a permanent no-op for them today. Revisit if any of those four ever gets a
+     * during/after catalog phase.
+     *
+     * fest.reports.lifecycle_override is a dedicated permission (not yet granted to any
+     * role by a seeder — this only wires the check, per plan §4.5: "do not treat ordinary
+     * staff access as an implicit override"). Granting it to specific roles/users is an
+     * operational decision, not something this change makes for you.
+     */
+    private function enforceReportLifecyclePhase(FestEvent $event, string $phase, Request $request): void
+    {
+        $allowed = EventLifecycleGate::allowedReportPhases($event);
+
+        if (in_array($phase, $allowed, true)) {
+            return;
+        }
+
+        if ($request->user()?->can('fest.reports.lifecycle_override')) {
+            return;
+        }
+
+        abort(403, 'This report is not available yet for the current event lifecycle.');
     }
 }

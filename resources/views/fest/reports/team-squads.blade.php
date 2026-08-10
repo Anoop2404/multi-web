@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Team Squads</title>
-<style>body{font-family:DejaVu Sans,sans-serif;font-size:10px}h3{margin:12px 0 4px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #ccc;padding:4px}th{background:#f3f4f6}</style>
+<style>body{font-family:DejaVu Sans,sans-serif;font-size:11.5px}h3{margin:12px 0 4px;font-size:13px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #ccc;padding:5px 6px;font-size:11px}th{background:#f3f4f6;font-size:11.5px}</style>
 </head><body>
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 

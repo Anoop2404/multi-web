@@ -4,19 +4,19 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>Full A1 Achievers — Certification</title>
     <style>
-        body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 11px; color: #333; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 12px; color: #333; }
         .header { text-align: center; border-bottom: 2px solid #0b2558; padding-bottom: 15px; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 10px; }
-        .title { font-size: 17px; font-weight: bold; color: #0b2558; margin: 0; text-transform: uppercase; }
-        .subtitle { font-size: 13px; font-weight: bold; color: #555; margin: 5px 0 0 0; }
-        .meta { font-size: 10px; color: #777; margin-top: 5px; }
-        .school-name { font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 15px; }
+        .title { font-size: 18px; font-weight: bold; color: #0b2558; margin: 0; text-transform: uppercase; }
+        .subtitle { font-size: 13.5px; font-weight: bold; color: #555; margin: 5px 0 0 0; }
+        .meta { font-size: 11.5px; color: #777; margin-top: 5px; }
+        .school-name { font-size: 16px; font-weight: bold; text-align: center; margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
         th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
-        th { background-color: #f8fafc; font-weight: bold; color: #475569; font-size: 10px; text-transform: uppercase; }
-        td { font-size: 10.5px; }
-        .ref-box { margin-top: 20px; border: 1px dashed #94a3b8; padding: 10px; font-size: 10px; color: #64748b; }
-        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 9px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+        th { background-color: #f8fafc; font-weight: bold; color: #475569; font-size: 11px; text-transform: uppercase; }
+        td { font-size: 11.5px; }
+        .ref-box { margin-top: 20px; border: 1px dashed #94a3b8; padding: 10px; font-size: 10.5px; color: #64748b; }
+        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
         .page-number:before { content: "Page " counter(page); }
     </style>
 </head>

@@ -1,8 +1,10 @@
 # State-Level Kalolsavam Rollout Plan
 
 **Date:** 31 Jul 2026
-**Status:** Pre-rollout plan — Sahodaya conduct starts next week
+**Status:** Superseded for implementation and approval decisions
 **Scope:** How to run the state Kalolsavam (state items + Sahodaya items + school items, cascading down; qualifiers cascading back up) across the 6 tenant-managed Sahodayas plus outside Sahodayas/schools that aren't tenants in this system.
+
+> **Authority notice (10 August 2026):** Use [`STATE_KALOTSAV_MASTER_IMPLEMENTATION_PLAN.md`](STATE_KALOTSAV_MASTER_IMPLEMENTATION_PLAN.md) as the governing plan. In particular, it replaces this document's school-event cascade, lightweight external winner-entry, automatic mark-to-State qualification, unresolved State database, and shared-rule assumptions. The approved target uses direct School → Sahodaya registration, separate Sahodaya/State settings and fees, combined Regional-winner candidate pools, manual certified Sahodaya nomination, and payment-proof verification.
 
 This is not a from-scratch design — most of the mechanism already exists (built for the MCS multi-region rollout and the state qualifier pipeline). This doc maps that existing machinery onto the actual rollout and specifies the one genuinely missing piece: intake for Sahodayas/schools outside the 6 managed tenants.
 

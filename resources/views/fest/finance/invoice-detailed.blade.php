@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Fest Payment Demand — {{ $invoice->invoice_number }}</title>
 <style>
-body{font-family:DejaVu Sans,sans-serif;font-size:11px;color:#111;line-height:1.45}
+body{font-family:DejaVu Sans,sans-serif;font-size:12px;color:#111;line-height:1.45}
 .header{border-bottom:3px double #1d3557;padding-bottom:12px;margin-bottom:16px}
-.meta td{padding:4px 8px;vertical-align:top}
+.meta td{padding:4px 8px;vertical-align:top;font-size:12px}
 table.data{width:100%;border-collapse:collapse;margin-top:12px}
-table.data th,table.data td{border:1px solid #ccc;padding:8px}
-table.data th{background:#1d3557;color:#fff;text-align:left}
-.total-box{margin-top:16px;border:2px solid #1d3557;padding:12px;text-align:right}
+table.data th,table.data td{border:1px solid #ccc;padding:8px;font-size:11.5px}
+table.data th{background:#1d3557;color:#fff;text-align:left;font-size:12px}
+.total-box{margin-top:16px;border:2px solid #1d3557;padding:12px;text-align:right;font-size:13px}
 .signatures{margin-top:40px;display:table;width:100%}
-.sig{display:table-cell;width:33%;text-align:center;padding-top:40px;border-top:1px solid #999}
+.sig{display:table-cell;width:33%;text-align:center;padding-top:40px;border-top:1px solid #999;font-size:11.5px}
 </style>
 </head><body>
 @php
@@ -96,7 +96,7 @@ table.data th{background:#1d3557;color:#fff;text-align:left}
         <br><strong style="color:#0a7a4d">Credit owed to school: ₹{{ number_format((float) $schoolCredit, 2) }}</strong>
     @endif
 </div>
-<p style="margin-top:20px;font-size:10px;color:#444">
+<p style="margin-top:20px;font-size:11px;color:#444">
     Please remit payment to the Sahodaya account and upload proof via your school fest portal.
     This is a computer-generated demand notice.
 </p>

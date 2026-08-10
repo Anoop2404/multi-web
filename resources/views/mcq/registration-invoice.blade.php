@@ -5,19 +5,19 @@
     <title>Invoice {{ $invoiceNo }}</title>
     <style>
         @page { margin: 36px 42px; }
-        body { font-family: DejaVu Sans, sans-serif; font-size: 11px; color: #0f2744; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #0f2744; }
         .header { border-bottom: 2px solid #0f2744; padding-bottom: 10px; margin-bottom: 16px; }
         .header table { width: 100%; }
         .logo { width: 48px; height: 48px; object-fit: contain; }
-        .org { font-size: 15px; font-weight: 700; }
-        .tag { font-size: 8px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
-        .title { font-size: 14px; font-weight: 700; margin: 12px 0 4px; }
-        .meta p { margin: 3px 0; }
+        .org { font-size: 16px; font-weight: 700; }
+        .tag { font-size: 9.5px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+        .title { font-size: 15.5px; font-weight: 700; margin: 12px 0 4px; }
+        .meta p { margin: 3px 0; font-size: 11.5px; }
         table.lines { width: 100%; border-collapse: collapse; margin-top: 14px; }
-        table.lines th { background: #0f2744; color: #fff; text-align: left; padding: 8px; font-size: 9px; text-transform: uppercase; }
-        table.lines td { border: 1px solid #cbd5e1; padding: 8px; }
-        .total { text-align: right; font-size: 13px; font-weight: 700; margin-top: 12px; }
-        .muted { color: #64748b; font-size: 9px; margin-top: 24px; }
+        table.lines th { background: #0f2744; color: #fff; text-align: left; padding: 8px; font-size: 10.5px; text-transform: uppercase; }
+        table.lines td { border: 1px solid #cbd5e1; padding: 8px; font-size: 11.5px; }
+        .total { text-align: right; font-size: 14.5px; font-weight: 700; margin-top: 12px; }
+        .muted { color: #64748b; font-size: 10.5px; margin-top: 24px; }
     </style>
 </head>
 <body>

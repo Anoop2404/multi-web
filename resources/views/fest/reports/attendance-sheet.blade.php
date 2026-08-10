@@ -23,7 +23,7 @@
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
-            font-size: 10px;
+            font-size: 11.5px;
             color: #0f172a;
             margin: 0;
             padding: 0;
@@ -36,7 +36,7 @@
         .event-context-bar {
             display: table;
             width: 100%;
-            font-size: 9px;
+            font-size: 10.5px;
             color: #334155;
             margin-top: 2px;
         }
@@ -54,7 +54,7 @@
             border-top: 1px solid #cbd5e1;
             padding-top: 4px;
             margin-top: 16px;
-            font-size: 8px;
+            font-size: 9.5px;
             color: #64748b;
         }
         .footer-container .footer-left {
@@ -85,7 +85,7 @@
         th {
             background: #f1f5f9;
             color: #334155;
-            font-size: 9px;
+            font-size: 10.5px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.04em;
@@ -96,7 +96,7 @@
         td {
             padding: 8px 7px;
             border: 1px solid #cbd5e1;
-            font-size: 9px;
+            font-size: 10.5px;
             color: #1e293b;
             vertical-align: middle;
         }
@@ -109,18 +109,18 @@
         .chest-no {
             font-weight: bold;
             color: #0f172a;
-            font-size: 10px;
+            font-size: 11.5px;
         }
         .school-name {
             text-transform: uppercase;
             color: #334155;
-            font-size: 8px;
+            font-size: 9.5px;
         }
         .team-divider td {
             background: #f1f5f9;
             color: #0f172a;
             font-weight: bold;
-            font-size: 9px;
+            font-size: 10.5px;
             padding: 4px 6px;
             border-top: 2px solid #cbd5e1;
             border-bottom: 1px solid #cbd5e1;
@@ -134,7 +134,7 @@
             display: inline-block;
             background: #dbeafe;
             color: #1e40af;
-            font-size: 7px;
+            font-size: 8.5px;
             font-weight: bold;
             padding: 1px 4px;
             border-radius: 3px;
@@ -156,7 +156,7 @@
             border-radius: 50%;
             background: #e2e8f0;
             color: #64748b;
-            font-size: 8px;
+            font-size: 9.5px;
             font-weight: bold;
             display: inline-block;
             text-align: center;
@@ -166,7 +166,7 @@
             background: #0f172a;
             color: #ffffff;
             padding: 6px 10px;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: bold;
             border-radius: 4px;
             text-transform: uppercase;
@@ -178,7 +178,7 @@
             float: right;
             background: #334155;
             color: #f8fafc;
-            font-size: 9px;
+            font-size: 10px;
             padding: 2px 8px;
             border-radius: 10px;
             font-weight: normal;
@@ -225,7 +225,7 @@
             text-transform: uppercase;
         }
         .brand-cell-table .org-context {
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 600;
             color: #475569;
             margin-top: 3px;
@@ -241,20 +241,20 @@
             color: #ffffff;
             padding: 4px 10px;
             border-radius: 4px;
-            font-size: 9px;
+            font-size: 10px;
             font-weight: bold;
             letter-spacing: 0.3px;
         }
         .foot-cell-table .foot-left {
             text-align: left;
-            font-size: 7px;
+            font-size: 8.5px;
             color: #64748b;
             border-top: 1px solid #cbd5e1;
             padding-top: 3px;
         }
         .foot-cell-table .foot-right {
             text-align: right;
-            font-size: 7px;
+            font-size: 8.5px;
             color: #64748b;
             white-space: nowrap;
             border-top: 1px solid #cbd5e1;

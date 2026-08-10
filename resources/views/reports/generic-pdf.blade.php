@@ -9,7 +9,7 @@
         html, body {
             font-family: DejaVu Sans, Arial, sans-serif;
             color: #1a2236;
-            font-size: 11px;
+            font-size: 12px;
             margin: 0; padding: 0;
             background: #fff;
         }
@@ -50,7 +50,7 @@
             display: block;
         }
         .org-sub {
-            font-size: 9px;
+            font-size: 10.5px;
             color: rgba(255,255,255,0.7);
             text-transform: uppercase;
             letter-spacing: 1.2px;
@@ -77,7 +77,7 @@
         }
         .info-cell:last-child { border-right: none; }
         .info-lbl {
-            font-size: 8px;
+            font-size: 9.5px;
             text-transform: uppercase;
             letter-spacing: 0.9px;
             color: rgba(255,255,255,0.6);
@@ -85,13 +85,13 @@
             margin-bottom: 2px;
         }
         .info-val {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
             color: #ffffff;
             display: block;
         }
         .info-val-lg {
-            font-size: 11.5px;
+            font-size: 12.5px;
             font-weight: 700;
             color: #7eb3ff;
             display: block;
@@ -117,7 +117,7 @@
             color: #ffffff;
             text-align: left;
             padding: 8px 10px;
-            font-size: 10.5px;
+            font-size: 11.5px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-weight: 700;
@@ -129,7 +129,7 @@
             border-bottom: 1px solid #e8edf5;
             border-right: 1px solid #eef1f8;
             vertical-align: middle;
-            font-size: 10.5px;
+            font-size: 11.5px;
             line-height: 1.4;
         }
         table.report-table td:last-child { border-right: none; }
@@ -141,13 +141,13 @@
             margin-top: 12px;
             padding-top: 6px;
             border-top: 1px solid #d0daf0;
-            font-size: 7.5px; color: #8898b4;
+            font-size: 9px; color: #8898b4;
             width: 100%; display: table;
         }
         .footer-left  { display: table-cell; text-align: left; }
         .footer-right { display: table-cell; text-align: right; }
 
-        .empty-state { text-align: center; color: #8898b4; padding: 50px 20px; font-size: 11px; }
+        .empty-state { text-align: center; color: #8898b4; padding: 50px 20px; font-size: 12px; }
     </style>
 </head>
 <body>

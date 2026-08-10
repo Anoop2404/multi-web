@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Registration Register</title>
 <style>
-body{font-family:DejaVu Sans,sans-serif;font-size:9px;color:#111}
+body{font-family:DejaVu Sans,sans-serif;font-size:11.5px;color:#111}
 h2{text-align:center;margin:0 0 4px}
-.meta{text-align:center;font-size:10px;color:#555;margin-bottom:12px}
-.summary{margin-bottom:10px;padding:8px;background:#f8fafc;border:1px solid #e2e8f0}
+.meta{text-align:center;font-size:11px;color:#555;margin-bottom:12px}
+.summary{margin-bottom:10px;padding:8px;background:#f8fafc;border:1px solid #e2e8f0;font-size:11px}
 table{width:100%;border-collapse:collapse}
-th,td{border:1px solid #cbd5e1;padding:3px 4px;vertical-align:top}
-th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
+th,td{border:1px solid #cbd5e1;padding:4px 5px;vertical-align:top;font-size:10.5px}
+th{background:#f1f5f9;font-size:10px;text-transform:uppercase}
 </style>
 </head><body>
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])

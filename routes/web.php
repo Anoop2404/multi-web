@@ -1223,36 +1223,46 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/participants/{participant}/reinstate', [FestAppealController::class, 'reinstate'])->name('participants.reinstate');
             Route::get('/{event}/catering', [FestCateringController::class, 'index'])->name('catering.index');
             Route::put('/{event}/catering/{order}', [FestCateringController::class, 'updateStatus'])->name('catering.update');
-            Route::get('/{event}/reports/downloads/{phase}', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'downloads'])
-                ->where('phase', 'before|during|after')
-                ->name('reports.downloads');
-            Route::get('/{event}/reports', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'index'])->name('reports.index');
-            Route::get('/{event}/reports/by-head', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'byHead'])->name('reports.by-head');
-            Route::post('/{event}/reports/participation-rules', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'storeRule'])->name('reports.rules.store');
-            Route::get('/{event}/reports/school-detailed', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'schoolDetailed'])->name('reports.school-detailed');
-            Route::get('/{event}/reports/overall-ranking', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'overallRanking'])->name('reports.overall-ranking');
-            Route::get('/{event}/reports/house-detailed', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'houseDetailed'])->name('reports.house-detailed');
-            Route::get('/{event}/reports/participation-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'participationCounts'])->name('reports.participation-counts');
-            Route::get('/{event}/reports/mark-entry-status', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'markEntryStatus'])->name('reports.mark-entry-status');
-            Route::get('/{event}/reports/schedule-clashes', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'scheduleClashes'])->name('reports.schedule-clashes');
-            Route::get('/{event}/reports/item-schedule', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemSchedule'])->name('reports.item-schedule');
-            Route::get('/{event}/reports/item-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemCounts'])->name('reports.item-counts');
-            Route::get('/{event}/reports/discipline-registration', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'disciplineRegistration'])->name('reports.discipline-registration');
-            Route::get('/{event}/reports/head-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'headWiseParticipants'])->name('reports.head-wise-participants');
-            Route::get('/{event}/reports/area-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'areaWiseParticipants'])->name('reports.area-wise-participants');
-            Route::get('/{event}/reports/age-group-matrix', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'ageGroupMatrix'])->name('reports.age-group-matrix');
-            Route::get('/{event}/reports/fee-collection', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'feeCollection'])->name('reports.fee-collection');
-            Route::get('/{event}/reports/registration-register', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'registrationRegister'])->name('reports.registration-register');
-            Route::get('/{event}/reports/registration-register/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportRegistrationRegister'])->name('reports.registration-register.export');
-            Route::get('/{event}/reports/assignment-completeness', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'assignmentCompleteness'])->name('reports.assignment-completeness');
-            Route::get('/{event}/reports/assignment-completeness/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportAssignmentCompleteness'])->name('reports.assignment-completeness.export');
-            Route::get('/{event}/reports/numbering-register', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'numberingRegister'])->name('reports.numbering-register');
-            Route::get('/{event}/reports/numbering-register/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportNumberingRegister'])->name('reports.numbering-register.export');
-            Route::get('/{event}/reports/pending-approvals', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'pendingApprovals'])->name('reports.pending-approvals');
-            Route::get('/{event}/reports/pending-approvals/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportPendingApprovals'])->name('reports.pending-approvals.export');
-            Route::get('/{event}/reports/student-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'studentWise'])->name('reports.student-wise');
-            Route::get('/{event}/reports/item-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemWise'])->name('reports.item-wise');
-            Route::get('/{event}/reports/export/{exportType}', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'export'])->name('reports.export');
+            // Wrapped with region.report.scope (ResolveRegionScopedReportEvent) — see that
+            // middleware's docblock and remediation plan §3.6/Phase 1. A region-locked
+            // admin who is only assigned on a hub gets the bound {event} transparently
+            // swapped for their own regional child before any of these methods run, so
+            // reportableEventIds()/reportableItemIds() naturally resolve to just that
+            // child instead of the whole hub. Kept as its own middleware group rather than
+            // widened to the whole 'events' prefix — deliberately conservative in scope
+            // for Phase 1; see docs/REGION_PHASE_EVENT_REPORTING_REMEDIATION_PLAN.md.
+            Route::middleware(['region.report.scope'])->group(function () {
+                Route::get('/{event}/reports/downloads/{phase}', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'downloads'])
+                    ->where('phase', 'before|during|after')
+                    ->name('reports.downloads');
+                Route::get('/{event}/reports', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'index'])->name('reports.index');
+                Route::get('/{event}/reports/by-head', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'byHead'])->name('reports.by-head');
+                Route::post('/{event}/reports/participation-rules', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'storeRule'])->name('reports.rules.store');
+                Route::get('/{event}/reports/school-detailed', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'schoolDetailed'])->name('reports.school-detailed');
+                Route::get('/{event}/reports/overall-ranking', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'overallRanking'])->name('reports.overall-ranking');
+                Route::get('/{event}/reports/house-detailed', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'houseDetailed'])->name('reports.house-detailed');
+                Route::get('/{event}/reports/participation-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'participationCounts'])->name('reports.participation-counts');
+                Route::get('/{event}/reports/mark-entry-status', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'markEntryStatus'])->name('reports.mark-entry-status');
+                Route::get('/{event}/reports/schedule-clashes', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'scheduleClashes'])->name('reports.schedule-clashes');
+                Route::get('/{event}/reports/item-schedule', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemSchedule'])->name('reports.item-schedule');
+                Route::get('/{event}/reports/item-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemCounts'])->name('reports.item-counts');
+                Route::get('/{event}/reports/discipline-registration', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'disciplineRegistration'])->name('reports.discipline-registration');
+                Route::get('/{event}/reports/head-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'headWiseParticipants'])->name('reports.head-wise-participants');
+                Route::get('/{event}/reports/area-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'areaWiseParticipants'])->name('reports.area-wise-participants');
+                Route::get('/{event}/reports/age-group-matrix', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'ageGroupMatrix'])->name('reports.age-group-matrix');
+                Route::get('/{event}/reports/fee-collection', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'feeCollection'])->name('reports.fee-collection');
+                Route::get('/{event}/reports/registration-register', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'registrationRegister'])->name('reports.registration-register');
+                Route::get('/{event}/reports/registration-register/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportRegistrationRegister'])->name('reports.registration-register.export');
+                Route::get('/{event}/reports/assignment-completeness', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'assignmentCompleteness'])->name('reports.assignment-completeness');
+                Route::get('/{event}/reports/assignment-completeness/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportAssignmentCompleteness'])->name('reports.assignment-completeness.export');
+                Route::get('/{event}/reports/numbering-register', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'numberingRegister'])->name('reports.numbering-register');
+                Route::get('/{event}/reports/numbering-register/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportNumberingRegister'])->name('reports.numbering-register.export');
+                Route::get('/{event}/reports/pending-approvals', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'pendingApprovals'])->name('reports.pending-approvals');
+                Route::get('/{event}/reports/pending-approvals/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportPendingApprovals'])->name('reports.pending-approvals.export');
+                Route::get('/{event}/reports/student-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'studentWise'])->name('reports.student-wise');
+                Route::get('/{event}/reports/item-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemWise'])->name('reports.item-wise');
+                Route::get('/{event}/reports/export/{exportType}', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'export'])->name('reports.export');
+            });
         });
 
         Route::prefix('display-screens')->name('display-screens.')->group(function () {
@@ -1666,3 +1676,7 @@ Route::prefix('state/external')->name('state.external.')->middleware(['web', 'th
     Route::post('/school/{code}/entries', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'store'])->name('school.entries.store');
     Route::delete('/school/{code}/entries/{entry}', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'destroy'])->name('school.entries.destroy');
 });
+
+Route::get('/state/results', [\App\Http\Controllers\Public\StatePublicResultsController::class, 'index'])
+    ->middleware(['web', 'throttle:60,1'])
+    ->name('state.public-results');

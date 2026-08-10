@@ -2,10 +2,9 @@
 
 namespace App\Models\State;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class StateFestEvent extends Model
+class StateFestEvent extends StateModel
 {
     protected $table = 'state_fest_events';
 

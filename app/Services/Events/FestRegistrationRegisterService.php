@@ -123,7 +123,12 @@ class FestRegistrationRegisterService
                 <=> [$b['school_name'], $b['participant_name'], $b['item_title']];
         });
 
-        $schoolSummaries = $this->schoolSummaries($event, $schoolFees, $feeRequired, $schoolId);
+        // $schoolIds (region scope) must narrow the summary tiles the same way it narrows
+        // the participant rows above — previously this only received $schoolId (the single
+        // school-dropdown filter), so a region_id filter left the "Total schools"/fee
+        // summary showing every school while the row list above was already scoped
+        // correctly. Same bug shape as G3 (browser/export parity), just within one page.
+        $schoolSummaries = $this->schoolSummaries($event, $schoolFees, $feeRequired, $schoolId, $schoolIds);
 
         $totals = [
             'participants'   => count($rows),
@@ -176,13 +181,26 @@ class FestRegistrationRegisterService
             ->all();
     }
 
-    public function exportCsv(FestEvent $event, ?string $schoolId = null): StreamedResponse
+    /**
+     * @param  ?list<string>  $schoolIds  Pre-resolved region scope from
+     *                                    FestReportController::resolveRegistrationRegisterScope()
+     *                                    — kept in sync with the browser view so both read
+     *                                    exactly the same rows (gap G3).
+     */
+    public function exportCsv(FestEvent $event, ?string $schoolId = null, ?array $schoolIds = null, ?int $regionId = null): StreamedResponse
     {
-        $data = $this->build($event, $schoolId);
+        $data = $this->build($event, $schoolId, null, 50, null, null, $schoolIds);
         $slug = str($event->title)->slug('-');
+
+        $regionSuffix = '';
+        if ($regionId) {
+            $regionCode = \App\Models\Region::find($regionId)?->code;
+            $regionSuffix = '-region-'.str($regionCode ?: (string) $regionId)->slug('-');
+        }
+
         $filename = $schoolId
             ? "{$slug}-registration-register-{$schoolId}.csv"
-            : "{$slug}-registration-register.csv";
+            : "{$slug}-registration-register{$regionSuffix}.csv";
 
         return response()->streamDownload(function () use ($data) {
             $out = fopen('php://output', 'w');
@@ -212,14 +230,19 @@ class FestRegistrationRegisterService
 
     /**
      * @param  \Illuminate\Support\Collection<string, array{total_due: float, status: string, receipt_no: ?string}>  $schoolFees
+     * @param  ?list<string>  $scopedSchoolIds  Region scope from build()'s $schoolIds param —
+     *                                          named distinctly here to avoid colliding with
+     *                                          this method's own local $schoolIds (the query
+     *                                          result, a different collection).
      * @return \Illuminate\Support\Collection<int, array<string, mixed>>
      */
-    private function schoolSummaries(FestEvent $event, $schoolFees, bool $feeRequired, ?string $schoolId)
+    private function schoolSummaries(FestEvent $event, $schoolFees, bool $feeRequired, ?string $schoolId, ?array $scopedSchoolIds = null)
     {
         $eventIds = $event->reportableEventIds();
 
         $schoolIds = FestRegistration::whereIn('event_id', $eventIds)
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->when($scopedSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $scopedSchoolIds))
             ->whereNotIn('status', ['withdrawn', 'rejected'])
             ->distinct()
             ->pluck('school_id');

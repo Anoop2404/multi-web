@@ -3,8 +3,10 @@
 namespace App\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
+use App\Services\Events\FestPhaseLifecycleService;
 use App\Support\FestReportCatalog;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -18,6 +20,48 @@ class EventLifecycleGate
 
         if (! $event->isRegistrationOpen()) {
             throw new HttpException(422, 'Registration is not open for this event.');
+        }
+    }
+
+    /**
+     * Phase 6 (plan §6.3 item 1) — item-aware variant. Deliberately NOT wired into any
+     * existing call site: allowRegistration($event) above is used by
+     * FestRegistrationCreateService, the school registration API, and
+     * FestRegistrationController today, all live paths real schools depend on, and this
+     * change has not been run against the test suite (no PHP runtime available in the
+     * environment this was written in — see the implementation's final status report).
+     * Swapping those call sites to this method is a follow-up once that's been verified,
+     * not something to do blind.
+     *
+     * When $event->phase_mode_enabled is true and $item is supplied, this additionally
+     * enforces the item's own named-phase registration window via
+     * FestPhaseLifecycleService instead of (not in addition to) the event-level check —
+     * an item's phase is authoritative once phase mode is on (plan §6.3: "If phase mode
+     * is on, use the item's phase lifecycle"). Falls back to allowRegistration($event)
+     * when phase mode is off or no item is given, so behavior is unchanged for every
+     * event that hasn't opted into phase mode (which, per the audit at the time this was
+     * written, is every existing event — phase_mode_enabled defaults false).
+     */
+    public static function allowRegistrationForItem(FestEvent $event, ?FestEventItem $item = null): void
+    {
+        if (! $event->phase_mode_enabled || ! $item) {
+            self::allowRegistration($event);
+
+            return;
+        }
+
+        $lifecycle = app(FestPhaseLifecycleService::class)->effectiveLifecycleForItem($item);
+
+        if ($lifecycle->registration_locked) {
+            throw new HttpException(422, 'Registration is locked for this item\'s competition phase.');
+        }
+
+        $now = now();
+        if ($lifecycle->registration_open && $now->lt($lifecycle->registration_open)) {
+            throw new HttpException(422, 'Registration has not opened yet for this item\'s competition phase.');
+        }
+        if ($lifecycle->registration_close && $now->gt($lifecycle->registration_close)) {
+            throw new HttpException(422, 'Registration has closed for this item\'s competition phase.');
         }
     }
 
@@ -70,6 +114,28 @@ class EventLifecycleGate
 
         if (! in_array($event->status, ['ongoing', 'registration_open', 'published'], true)) {
             throw new HttpException(422, 'Mark entry is not allowed in the current event phase.');
+        }
+    }
+
+    /**
+     * Phase 6 (plan §6.3 item 4) — item-aware variant, same not-yet-wired-in status as
+     * allowRegistrationForItem() above: allowMarkEntry($event) has six live call sites
+     * today (judge portal, mark coordinator, marks import, sahodaya mark entry) and this
+     * hasn't been run against the test suite. Available for those call sites to adopt
+     * once verified.
+     */
+    public static function allowMarkEntryForItem(FestEvent $event, ?FestEventItem $item = null): void
+    {
+        if (! $event->phase_mode_enabled || ! $item) {
+            self::allowMarkEntry($event);
+
+            return;
+        }
+
+        $lifecycle = app(FestPhaseLifecycleService::class)->effectiveLifecycleForItem($item);
+
+        if ($lifecycle->scoring_locked) {
+            throw new HttpException(422, 'Scoring is locked for this item\'s competition phase.');
         }
     }
 

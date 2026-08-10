@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Fest Invoice {{ $invoice->invoice_number }}</title>
 <style>
-body{font-family:DejaVu Sans,sans-serif;font-size:11px;color:#111}
+body{font-family:DejaVu Sans,sans-serif;font-size:12px;color:#111}
 .header{text-align:center;margin-bottom:20px}
-.meta{margin-bottom:16px}
+.meta{margin-bottom:16px;font-size:12px}
 table{width:100%;border-collapse:collapse;margin-top:12px}
-th,td{border:1px solid #ccc;padding:8px;text-align:left}
-th{background:#1d3557;color:#fff}
-.total{font-size:14px;font-weight:bold;text-align:right;margin-top:12px}
-.muted{color:#666;font-size:10px}
+th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:11.5px}
+th{background:#1d3557;color:#fff;font-size:12px}
+.total{font-size:15px;font-weight:bold;text-align:right;margin-top:12px}
+.muted{color:#666;font-size:11px}
 </style>
 </head><body>
 @php

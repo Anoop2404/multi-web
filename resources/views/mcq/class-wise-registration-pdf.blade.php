@@ -9,7 +9,7 @@
         html, body {
             font-family: DejaVu Sans, Arial, sans-serif;
             color: #1a2236;
-            font-size: 8.5px;
+            font-size: 10.5px;
             margin: 0; padding: 0;
             background: #fff;
         }
@@ -57,7 +57,7 @@
             display: block;
         }
         .org-sub {
-            font-size: 7px;
+            font-size: 8.5px;
             color: rgba(255,255,255,0.5);
             text-transform: uppercase;
             letter-spacing: 1.2px;
@@ -86,7 +86,7 @@
         }
         .info-cell:last-child { border-right: none; }
         .info-lbl {
-            font-size: 6.5px;
+            font-size: 8.5px;
             text-transform: uppercase;
             letter-spacing: 0.9px;
             color: rgba(255,255,255,0.4);
@@ -94,13 +94,13 @@
             margin-bottom: 2px;
         }
         .info-val {
-            font-size: 9px;
+            font-size: 10.5px;
             font-weight: 700;
             color: #ffffff;
             display: block;
         }
         .info-val-lg {
-            font-size: 9.5px;
+            font-size: 11px;
             font-weight: 700;
             color: #7eb3ff;
             display: block;
@@ -126,8 +126,8 @@
             padding: 5px 12px;
             margin-bottom: 8px;
         }
-        .cls-name  { font-size: 10px; font-weight: 700; color: #fff; }
-        .cls-count { font-size: 8px; color: #a8c0e8; }
+        .cls-name  { font-size: 11.5px; font-weight: 700; color: #fff; }
+        .cls-count { font-size: 9.5px; color: #a8c0e8; }
 
         /* ── TABLE ── */
         table.report-table {
@@ -139,7 +139,7 @@
             color: #c8d9f5;
             text-align: left;
             padding: 5px 6px;
-            font-size: 7.5px;
+            font-size: 9.5px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-weight: 700;
@@ -151,6 +151,7 @@
             border-bottom: 1px solid #e8edf5;
             border-right: 1px solid #eef1f8;
             vertical-align: middle;
+            font-size: 10.5px;
         }
         table.report-table td:last-child { border-right: none; }
         table.report-table tbody tr:nth-child(odd)  td { background: #fff; }
@@ -178,14 +179,14 @@
             text-align: center; display: block; margin: 0 auto;
         }
 
-        .student-name { font-weight: 700; color: #0b2236; font-size: 9px; }
-        .mono         { font-family: 'Courier New', monospace; font-size: 8px; color: #334155; }
-        .ticket-val   { font-family: 'Courier New', monospace; font-size: 8.5px; font-weight: 700; color: #1e40af; }
+        .student-name { font-weight: 700; color: #0b2236; font-size: 10.5px; }
+        .mono         { font-family: 'Courier New', monospace; font-size: 9.5px; color: #334155; }
+        .ticket-val   { font-family: 'Courier New', monospace; font-size: 10px; font-weight: 700; color: #1e40af; }
 
         .badge {
             display: inline-block;
             padding: 2px 7px;
-            font-size: 7px; font-weight: 700;
+            font-size: 9px; font-weight: 700;
             border-radius: 20px;
             text-transform: uppercase; letter-spacing: 0.3px;
         }
@@ -202,13 +203,13 @@
             margin-top: 8px;
             padding-top: 5px;
             border-top: 1px solid #d0daf0;
-            font-size: 7.5px; color: #8898b4;
+            font-size: 9px; color: #8898b4;
             width: 100%; display: table;
         }
         .footer-left  { display: table-cell; text-align: left; }
         .footer-right { display: table-cell; text-align: right; }
 
-        .empty-state { text-align: center; color: #8898b4; padding: 40px 20px; font-size: 10px; }
+        .empty-state { text-align: center; color: #8898b4; padding: 40px 20px; font-size: 11.5px; }
     </style>
 </head>
 <body>

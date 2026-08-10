@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Item List</title>
 <style>
-body{font-family:DejaVu Sans,sans-serif;font-size:9px}
+body{font-family:DejaVu Sans,sans-serif;font-size:11.5px}
 h2{text-align:center;margin:0 0 4px}
-.meta{text-align:center;color:#555;margin-bottom:10px}
-table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:3px 4px}th{background:#f3f4f6}
+.meta{text-align:center;color:#555;margin-bottom:10px;font-size:11px}
+table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px 5px;font-size:10.5px}th{background:#f3f4f6;font-size:11px}
 </style>
 </head><body>
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])

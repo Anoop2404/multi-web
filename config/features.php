@@ -13,4 +13,22 @@ return [
     */
     'website_enabled' => env('WEBSITE_ENABLED', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Region/phase event reporting remediation (rollout controls)
+    |--------------------------------------------------------------------------
+    |
+    | docs/REGION_PHASE_EVENT_REPORTING_REMEDIATION_PLAN.md §12. These are global
+    | booleans, not per-tenant flags — this codebase has no dynamic/per-tenant flag
+    | infrastructure (no Laravel Pennant, no DB-backed flags table) as of this change.
+    | A tenant-scoped rollout as described in the plan's rollout order would need that
+    | infrastructure built first; until then, treat these as env-gated kill switches
+    | for the whole install, not a way to pilot with one tenant while others are
+    | unaffected.
+    |
+    */
+    'fest_scoped_reports_v2' => env('FEST_SCOPED_REPORTS_V2', false),
+    'fest_named_phase_lifecycle' => env('FEST_NAMED_PHASE_LIFECYCLE', false),
+    'fest_sports_region_tree' => env('FEST_SPORTS_REGION_TREE', false),
+
 ];

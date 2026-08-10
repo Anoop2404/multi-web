@@ -92,9 +92,16 @@ class EnsureSahodayaAdminApi
                         ->select(['id', 'parent_event_id', 'region_id'])
                         ->find($requestedEventId);
 
-                    $allowed = $requestedEvent && collect($allowedRegionScopes)->contains(function (array $scope) use ($requestedEvent) {
+                    $requestedIsHub = $requestedEvent && $requestedEvent->parent_event_id === null;
+
+                    // Mirrors EnsureSahodayaAdmin::matchesRegionScope() (web middleware) — see
+                    // that method's docblock for why a hub-level scope with no region_id must
+                    // not grant access (gap G1). Kept in sync deliberately: §10.1 of the
+                    // remediation plan requires API and web middleware to produce equivalent
+                    // results.
+                    $allowed = $requestedEvent && collect($allowedRegionScopes)->contains(function (array $scope) use ($requestedEvent, $requestedIsHub) {
                         if ($scope['event_id'] === (int) $requestedEvent->id) {
-                            return true;
+                            return ! ($requestedIsHub && $scope['region_id'] === null);
                         }
 
                         return $requestedEvent->parent_event_id

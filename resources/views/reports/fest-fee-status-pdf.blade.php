@@ -10,7 +10,7 @@
         }
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            font-size: 10px;
+            font-size: 11.5px;
             color: #1e293b;
             line-height: 1.35;
             background: #fff;
@@ -38,27 +38,27 @@
             padding-left: 10px;
         }
         .header-title h1 {
-            font-size: 17px;
+            font-size: 18px;
             margin: 0 0 2px 0;
             color: #0f3d7a;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         .header-title h2 {
-            font-size: 12px;
+            font-size: 13px;
             margin: 0 0 3px 0;
             color: #334155;
             font-weight: 600;
         }
         .header-title p {
-            font-size: 9.5px;
+            font-size: 10.5px;
             margin: 0;
             color: #64748b;
         }
         .header-meta {
             text-align: right;
             vertical-align: top;
-            font-size: 9.5px;
+            font-size: 10.5px;
             color: #475569;
         }
         .summary-box {
@@ -78,7 +78,7 @@
             border-right: none;
         }
         .summary-label {
-            font-size: 8.5px;
+            font-size: 9.5px;
             text-transform: uppercase;
             color: #64748b;
             font-weight: bold;
@@ -86,7 +86,7 @@
             margin-bottom: 2px;
         }
         .summary-value {
-            font-size: 13px;
+            font-size: 14.5px;
             font-weight: bold;
             color: #0f172a;
         }
@@ -97,14 +97,14 @@
         .data-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 9.5px;
+            font-size: 11px;
         }
         .data-table th {
             background: #0f3d7a;
             color: #ffffff;
             font-weight: bold;
             text-transform: uppercase;
-            font-size: 8.5px;
+            font-size: 10px;
             letter-spacing: 0.4px;
             padding: 6px 7px;
             border: 1px solid #0f3d7a;
@@ -123,7 +123,7 @@
         .font-bold { font-weight: bold; }
 
         .item-list-sub {
-            font-size: 8.5px;
+            font-size: 9.5px;
             color: #475569;
             margin-top: 3px;
             line-height: 1.25;
@@ -131,7 +131,7 @@
         }
         .receipt-pill {
             display: block;
-            font-size: 8.5px;
+            font-size: 9.5px;
             color: #1e293b;
             line-height: 1.25;
             margin-bottom: 2px;
@@ -141,7 +141,7 @@
             display: inline-block;
             padding: 2px 5px;
             border-radius: 3px;
-            font-size: 8px;
+            font-size: 9.5px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.3px;
@@ -159,7 +159,7 @@
         }
         .footer-notes td {
             vertical-align: top;
-            font-size: 9px;
+            font-size: 10.5px;
             color: #64748b;
         }
         .sign-box {

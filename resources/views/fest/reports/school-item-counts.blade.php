@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Item Registration Counts</title>
 <style>
-body{font-family:DejaVu Sans,sans-serif;font-size:9px}
-h2{text-align:center;margin:0} .meta{text-align:center;color:#555;margin-bottom:10px}
+body{font-family:DejaVu Sans,sans-serif;font-size:11.5px}
+h2{text-align:center;margin:0} .meta{text-align:center;color:#555;margin-bottom:10px;font-size:11px}
 table{width:100%;border-collapse:collapse;margin-bottom:12px}
-th,td{border:1px solid #ccc;padding:3px 4px} th{background:#f3f4f6}
-.section{font-weight:bold;margin:8px 0 4px}
+th,td{border:1px solid #ccc;padding:4px 5px;font-size:10.5px} th{background:#f3f4f6;font-size:11px}
+.section{font-weight:bold;margin:8px 0 4px;font-size:11.5px}
 </style></head><body>
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
@@ -50,7 +50,7 @@ th,td{border:1px solid #ccc;padding:3px 4px} th{background:#f3f4f6}
 </tr>
 @endforeach
 </tbody></table>
-<p style="text-align:right;font-size:9px">
+<p style="text-align:right;font-size:11px">
     Total registrations: {{ $totals['registrations'] ?? 0 }} · Estimated fee: ₹{{ $totals['estimated_fee'] ?? 0 }}
 </p>
 </body></html>

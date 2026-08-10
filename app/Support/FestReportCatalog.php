@@ -72,10 +72,93 @@ class FestReportCatalog
         ];
 
         return array_map(
-            fn (array $exp) => array_merge($exp, ['href' => "{$base}/{$exp['id']}"]),
+            fn (array $exp) => array_merge($exp, self::scopeMetadata($exp['id']), ['href' => "{$base}/{$exp['id']}"]),
             $exports,
         );
     }
+
+    /**
+     * Report-scope metadata per remediation plan §4.3: dataset/report family, which
+     * FestReportScope modes each export supports, and whether it accepts a named
+     * competition-phase filter. Deliberately kept separate from the exports() list
+     * above rather than inlined into every row, so FestReportCatalogMetadataTest can
+     * assert every catalog id has an entry here (§4.3: "unknown or incomplete metadata
+     * must fail a catalog contract test") without a 51-line diff every time a label or
+     * href changes.
+     *
+     * Dataset families follow the §3.5 table:
+     *   registration — registration/participants/attendance/numbering
+     *   schedule     — schedule/mark-entry status
+     *   results      — results/ranking/medal tally
+     *   finance      — fee/payment
+     *   catering     — food/catering
+     *   audit        — audit/volunteer extracts
+     *   catalog      — item/catalog configuration, not registration rows
+     *
+     * @return array{dataset: string, supported_scopes: list<string>, supports_competition_phase: bool}
+     */
+    public static function scopeMetadata(string $exportId): array
+    {
+        return self::SCOPE_METADATA[$exportId] ?? [
+            // Deliberately absent from SCOPE_METADATA rather than defaulted here — an
+            // export id missing below should fail FestReportCatalogMetadataTest, not
+            // silently get a guessed dataset.
+        ];
+    }
+
+    /** @var array<string, array{dataset: string, supported_scopes: list<string>, supports_competition_phase: bool}> */
+    private const SCOPE_METADATA = [
+        'registration-list'            => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'registrations'                 => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'category-wise-students'        => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'item-participants'             => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'student-wise-report'           => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'results'                        => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'school-wise'                   => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'overall-ranking'               => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'house-wise'                    => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'item-list'                      => ['dataset' => 'catalog', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'item-wise'                     => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'cumulative'                    => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'day-wise'                      => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'item-schedule'                 => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'item-schedule-pdf'             => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'item-order-public'             => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'green-room-list'                => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => true],
+        'attendance-sheet'               => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'attendance-sheet-school'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => true],
+        'judge-sheet'                   => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => true],
+        'mark-entry-sheet'              => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => true],
+        'mark-entered-summary'          => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'mark-entry-status'             => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'clashes'                        => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'clashes-school'                => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => false],
+        'promotions'                    => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'promotions-pdf'                => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'fees'                           => ['dataset' => 'finance', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'fee-breakdown'                 => ['dataset' => 'finance', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'student-event-registrations'   => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'certificate-counts'            => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'catering'                      => ['dataset' => 'catering', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'catering-by-school'            => ['dataset' => 'catering', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => false],
+        'volunteer-roster'              => ['dataset' => 'audit', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'id-cards-by-head'              => ['dataset' => 'registration', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => false],
+        'audit-log-extract'             => ['dataset' => 'audit', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'students'                       => ['dataset' => 'catalog', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'admit-cards'                    => ['dataset' => 'registration', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => false],
+        'sahodaya-ranking'              => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined'], 'supports_competition_phase' => false],
+        'student-participation'         => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'discipline-registration'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'age-group-matrix'              => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'fee-pending-schools'           => ['dataset' => 'finance', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'head-wise-participants'        => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'area-wise-participants'        => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'team-squad-sheets'             => ['dataset' => 'registration', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => true],
+        'assignment-completeness'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'numbering-register'            => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'pending-approvals'             => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'medal-tally'                   => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+    ];
 
     /** @return list<array<string, string>> */
     public static function interactivePages(string $tenantId, int $eventId, ?string $eventType = null): array
