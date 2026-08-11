@@ -43,23 +43,49 @@ class FestClassCategoryScheme extends Model
      */
     public static function ensureDefaultsForTenant(string $tenantId): void
     {
-        if (self::forTenant($tenantId)->exists()) {
-            return;
-        }
-
         $sahodayaDefaultKey = SahodayaProfile::where('tenant_id', $tenantId)->value('fest_class_group_scheme') ?: 'cbse';
 
         $legacyClassNumbers = [
+            'kalotsav_category' => ['category_1' => [3, 4], 'category_2' => [5, 6, 7], 'category_3' => [8, 9, 10], 'category_4' => [11, 12]],
             'cbse' => ['lp' => [3, 4], 'up' => [5, 6, 7], 'hs' => [8, 9, 10], 'hss' => [11, 12]],
             'sahodaya' => ['lp' => [1, 2, 3, 4], 'up' => [5, 6, 7], 'hs' => [8, 9, 10], 'hss' => [11, 12]],
         ];
+
+        // 1. Ensure State Kalotsav (Category 1–4) exists for every tenant
+        if (! self::forTenant($tenantId)->where('name', 'like', '%State Kalotsav%')->exists()) {
+            $scheme = self::create([
+                'tenant_id' => $tenantId,
+                'name' => 'State Kalotsav (Category 1–4)',
+                'is_default' => $sahodayaDefaultKey === 'kalotsav_category',
+                'sort_order' => 0,
+            ]);
+
+            $groupSortOrder = 0;
+            foreach (config('fest_class_group_schemes.schemes.kalotsav_category.groups', []) as $groupKey => $label) {
+                if ($groupKey === 'open') {
+                    continue;
+                }
+
+                $scheme->groups()->create([
+                    'tenant_id' => $tenantId,
+                    'key' => $groupKey,
+                    'label' => $label,
+                    'classes' => $legacyClassNumbers['kalotsav_category'][$groupKey] ?? [],
+                    'sort_order' => $groupSortOrder++,
+                ]);
+            }
+        }
+
+        if (self::forTenant($tenantId)->where('name', '!=', 'State Kalotsav (Category 1–4)')->exists()) {
+            return;
+        }
 
         $starters = [
             'cbse' => 'CBSE Kerala (Category I–IV)',
             'sahodaya' => 'Sahodaya standard (LP–HSS)',
         ];
 
-        $sortOrder = 0;
+        $sortOrder = 1;
         foreach ($starters as $key => $name) {
             $scheme = self::create([
                 'tenant_id' => $tenantId,
@@ -71,7 +97,7 @@ class FestClassCategoryScheme extends Model
             $groupSortOrder = 0;
             foreach (config("fest_class_group_schemes.schemes.{$key}.groups", []) as $groupKey => $label) {
                 if ($groupKey === 'open') {
-                    continue; // 'open' is always an implicit catch-all, never a stored row
+                    continue;
                 }
 
                 $scheme->groups()->create([
