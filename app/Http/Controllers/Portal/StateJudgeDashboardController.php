@@ -10,6 +10,7 @@ use App\Models\State\StateJudgeScore;
 use App\Services\State\StateEventLifecycleGate;
 use App\Services\State\StateJudgeScoreService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * State Event Conduct, Phase 3 (docs/STATE_EVENT_CONDUCT_PLAN.md) — mirrors
@@ -39,7 +40,10 @@ class StateJudgeDashboardController extends Controller
                 ->where('state_event_id', $eventId)
                 ->where('item_id', $itemId)
                 ->where('status', 'approved'))
-                ->pluck('id');
+                ->get()
+                ->groupBy('registration_id')
+                ->map(fn ($participants) => $participants->min('id'))
+                ->values();
 
             $marked = StateJudgeScore::where('state_event_id', $eventId)
                 ->where('item_id', $itemId)
@@ -84,6 +88,12 @@ class StateJudgeDashboardController extends Controller
             ->orderBy('item_code')
             ->get();
 
+        // A team/group is one competitive result. Keep every roster member in State
+        // for attendance, but present only the first member as the scoring target.
+        $registrations->each(function ($registration) {
+            $registration->setRelation('participants', $registration->participants->take(1)->values());
+        });
+
         $marks = collect(app(StateJudgeScoreService::class)->scoresForJudge($event, $user->id, $itemIds ?: null));
 
         return inertia('Portal/StateJudge/MarkEntry', [
@@ -104,11 +114,11 @@ class StateJudgeDashboardController extends Controller
             ->all();
 
         $data = $request->validate([
-            'participant_id' => 'required|integer|exists:state_fest_participants,id',
+            'participant_id' => ['required', 'integer', Rule::exists('state.state_fest_participants', 'id')],
             'item_id'        => 'required|uuid',
             'item_code'      => 'nullable|string|max:64',
             'grade'          => 'nullable|in:A,A+,B,C',
-            'score'          => 'nullable|numeric|min:0',
+            'score'          => 'nullable|numeric|min:0|max:100',
             'notes'          => 'nullable|string|max:2000',
         ]);
 

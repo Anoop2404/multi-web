@@ -102,5 +102,20 @@ class FestProgramVersionAndTopologyTest extends TestCase
         $this->assertEquals('state', $stateEvent->getConnectionName());
         $this->assertEquals('Kerala State Kalotsavam 2026', $stateEvent->name);
         $this->assertEquals('published', $stateEvent->status);
+
+        $stateEvent->update(['results_published' => true, 'status' => 'completed']);
+        $program->update([
+            'title' => 'Kerala State Kalotsavam 2026 — Revised',
+            'event_start' => '2026-11-01',
+            'level_event_settings' => ['state' => ['max_total_per_student' => 2]],
+        ]);
+        $service->publish($program->fresh());
+
+        $stateEvent->refresh();
+        $this->assertSame(1, StateFestEvent::where('state_program_id', $program->id)->count());
+        $this->assertSame('Kerala State Kalotsavam 2026 — Revised', $stateEvent->name);
+        $this->assertSame('2026-11-01', $stateEvent->starts_on->toDateString());
+        $this->assertSame(2, $stateEvent->settings['max_total_per_student']);
+        $this->assertSame('completed', $stateEvent->status);
     }
 }

@@ -11,7 +11,9 @@ class StatePublicResultsController extends Controller
 {
     public function index(Request $request, StatePublicResultsProjectionService $service)
     {
-        $event = StateFestEvent::latest()->first();
+        $event = StateFestEvent::where('results_published', true)
+            ->latest('updated_at')
+            ->first();
 
         $results = $event ? $service->getPublicResults($event) : [];
 

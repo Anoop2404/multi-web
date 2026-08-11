@@ -14,10 +14,23 @@ class FestStudentClassResolver
         }
 
         $name = trim($className);
-        if (preg_match('/^(?:class\s*)?(\d{1,2})\b/i', $name, $m)) {
-            $n = (int) $m[1];
 
-            return ($n >= 1 && $n <= 12) ? $n : null;
+        if (preg_match('/(?:class|std|standard|grade)?\s*(\d{1,2})\b/i', $name, $m)) {
+            $n = (int) $m[1];
+            if ($n >= 1 && $n <= 12) {
+                return $n;
+            }
+        }
+
+        $romanMap = [
+            'XII' => 12, 'XI' => 11, 'X' => 10, 'IX' => 9, 'VIII' => 8,
+            'VII' => 7, 'VI' => 6, 'V' => 5, 'IV' => 4, 'III' => 3, 'II' => 2, 'I' => 1,
+        ];
+
+        foreach ($romanMap as $roman => $num) {
+            if (preg_match('/\b'.preg_quote($roman, '/').'\b/i', $name)) {
+                return $num;
+            }
         }
 
         return null;

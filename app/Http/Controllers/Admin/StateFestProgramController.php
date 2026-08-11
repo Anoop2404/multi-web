@@ -76,7 +76,7 @@ class StateFestProgramController extends Controller
         ]);
     }
 
-    public function update(Request $request, FestStateProgram $stateProgram)
+    public function update(Request $request, FestStateProgram $stateProgram, FestStateProgramService $service)
     {
         if ($stateProgram->status === 'published') {
             $data = $this->validateProgram($request);
@@ -88,6 +88,15 @@ class StateFestProgramController extends Controller
         }
 
         $stateProgram->update($data);
+
+        if ($stateProgram->status === 'published') {
+            $result = $service->publish($stateProgram->fresh());
+            if ($result['errors'] !== []) {
+                return back()->with('warning', 'Program saved, but some deployments could not be updated: '.implode('; ', $result['errors']));
+            }
+
+            return back()->with('success', "State program updated and synced to {$result['updated']} existing Sahodaya event(s).");
+        }
 
         return back()->with('success', 'State program updated.');
     }
@@ -112,12 +121,16 @@ class StateFestProgramController extends Controller
             $stateProgram,
             [
                 'propagated' => $result['propagated'],
+                'updated'    => $result['updated'],
                 'skipped'    => $result['skipped'],
                 'errors'     => $result['errors'],
             ],
         );
 
         $message = "Published to {$result['propagated']} Sahodaya event(s).";
+        if ($result['updated'] > 0) {
+            $message .= " {$result['updated']} existing event(s) re-synced.";
+        }
         if ($result['skipped'] > 0) {
             $message .= " {$result['skipped']} already existed.";
         }
@@ -145,13 +158,18 @@ class StateFestProgramController extends Controller
         return back()->with('success', 'State item added (optional — publish to push to Sahodayas).');
     }
 
-    public function destroyItem(FestStateProgram $stateProgram, FestStateProgramItem $item)
+    public function destroyItem(FestStateProgram $stateProgram, FestStateProgramItem $item, FestItemSyncService $syncService)
     {
         abort_if($item->state_program_id !== $stateProgram->id, 404);
 
+        $itemId = $item->id;
         $item->delete();
 
-        return back()->with('success', 'State item removed. Re-publish or add replacements to update Sahodayas.');
+        $affected = $stateProgram->status === 'published'
+            ? $syncService->removeProgramItemFromAllPropagations($stateProgram, $itemId)
+            : 0;
+
+        return back()->with('success', "State item removed; {$affected} propagated item copy/copies were removed or disabled.");
     }
 
     /** @return array<string, mixed> */
@@ -167,7 +185,7 @@ class StateFestProgramController extends Controller
             'sport_discipline'   => 'nullable|string|max:40',
             'participant_type'   => 'nullable|in:individual,pair,trio,group,team',
             'gender'             => 'nullable|in:male,female,mixed,open',
-            'class_group'        => 'nullable|in:lp,up,hs,hss,open',
+            'class_group'        => 'nullable|alpha_dash|max:60',
             'age_group'          => 'nullable|in:u8,u10,u11,u12,u14,u17,u19,open',
             'kids_band'          => 'nullable|in:pre_kg,lkg,ukg,class1,class2,open',
             'max_per_school'     => 'nullable|integer|min:1',
@@ -195,7 +213,8 @@ class StateFestProgramController extends Controller
             'fee_type'           => 'nullable|in:none,flat_school,per_participant,per_item',
             'fee_amount'         => 'nullable|numeric|min:0',
             'level_fees'         => 'nullable|array',
-            'level_fees.*.fee_model' => 'nullable|in:none,cksc_tiered,item_catalog,flat_school,per_item',
+            'level_fees.*.fee_model' => ['nullable', Rule::in(array_keys(config('fest_fees.fee_models', [])))],
+            'level_fees.state.individual_amount' => 'nullable|numeric|min:0',
             'level_fees.*.class_group_scheme' => 'nullable|in:cbse,sahodaya',
             'level_fees.*.first_item' => 'nullable|numeric|min:0',
             'level_fees.*.additional_item' => 'nullable|numeric|min:0',

@@ -5,6 +5,7 @@ namespace Tests\Feature\Public;
 use App\Models\State\StateFestEvent;
 use App\Models\State\StateFestParticipant;
 use App\Models\State\StateFestRegistration;
+use App\Models\State\StateFestMark;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -24,7 +25,8 @@ class StatePublicResultsViewTest extends TestCase
         $event = StateFestEvent::create([
             'state_program_id' => '019fea66-9b8d-7361-9828-1f6bbacaf36e',
             'name'             => 'State Final Kalotsavam 2026',
-            'status'           => 'published',
+            'status'           => 'completed',
+            'results_published'=> true,
         ]);
 
         $reg = StateFestRegistration::create([
@@ -35,11 +37,22 @@ class StatePublicResultsViewTest extends TestCase
             'status'         => 'approved',
         ]);
 
-        StateFestParticipant::create([
+        $participant = StateFestParticipant::create([
+            'state_event_id'  => $event->id,
             'registration_id' => $reg->id,
             'student_name'    => 'Public Winner',
             'chest_number'    => '105',
-            'meta'            => ['position' => 1, 'grade' => 'A'],
+            'meta'            => ['qualifier_position' => 2, 'qualifier_grade' => 'B'],
+        ]);
+
+        StateFestMark::create([
+            'state_event_id' => $event->id,
+            'registration_id' => $reg->id,
+            'participant_id' => $participant->id,
+            'score' => 91,
+            'grade' => 'A',
+            'position' => 1,
+            'status' => 'published',
         ]);
 
         $response = $this->get(route('state.public-results'));
@@ -49,5 +62,20 @@ class StatePublicResultsViewTest extends TestCase
         $response->assertSee('Public Winner');
         $response->assertSee('Model HSS');
         $response->assertSee('105');
+    }
+
+    public function test_public_page_never_exposes_unpublished_state_results(): void
+    {
+        StateFestEvent::create([
+            'state_program_id' => '019fea66-9b8d-7361-9828-1f6bbacaf36e',
+            'name' => 'Unpublished State Final',
+            'status' => 'published',
+            'results_published' => false,
+        ]);
+
+        $this->get(route('state.public-results'))
+            ->assertOk()
+            ->assertDontSee('Unpublished State Final')
+            ->assertSee('No certified public results published yet.');
     }
 }

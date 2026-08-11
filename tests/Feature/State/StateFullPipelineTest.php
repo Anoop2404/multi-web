@@ -6,6 +6,7 @@ use App\Models\FestStateProgram;
 use App\Models\State\StateFestEvent;
 use App\Models\State\StateFestParticipant;
 use App\Models\State\StateFestRegistration;
+use App\Models\State\StateFestMark;
 use App\Models\State\StateQualifierIntake;
 use App\Models\Tenant;
 use App\Models\User;
@@ -16,6 +17,7 @@ use App\Services\State\StatePublicResultsProjectionService;
 use App\Services\State\StateQualifierIntakeService;
 use App\Services\State\StateQualifierMaterializationService;
 use App\Services\State\StateRemittanceService;
+use App\Services\State\StateResultPublicationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
@@ -104,12 +106,26 @@ class StateFullPipelineTest extends TestCase
         $assigned = $conductService->assignChestNumbers($stateEvent);
         $this->assertEquals(1, $assigned);
 
-        // 7. Public Results Projection (WP-08)
+        // 7. Enter State-final marks and publish calculated State results.
+        $stateRegistration = StateFestRegistration::where('state_event_id', $stateEvent->id)->firstOrFail();
+        $stateParticipant = $stateRegistration->participants()->firstOrFail();
+        StateFestMark::create([
+            'state_event_id' => $stateEvent->id,
+            'registration_id' => $stateRegistration->id,
+            'participant_id' => $stateParticipant->id,
+            'score' => 82,
+            'grade' => 'A',
+            'status' => 'draft',
+        ]);
+        app(StateResultPublicationService::class)->publish($stateEvent);
+
+        // 8. Public Results Projection reads State marks only (WP-08)
         $publicService = new StatePublicResultsProjectionService();
-        $publicRows = $publicService->getPublicResults($stateEvent);
+        $publicRows = $publicService->getPublicResults($stateEvent->fresh());
 
         $this->assertCount(1, $publicRows);
         $this->assertEquals('Jane Doe', $publicRows[0]['student_name']);
         $this->assertEquals('101', $publicRows[0]['chest_number']);
+        $this->assertEquals(1, $publicRows[0]['position']);
     }
 }

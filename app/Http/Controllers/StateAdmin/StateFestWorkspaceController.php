@@ -12,7 +12,10 @@ use App\Models\User;
 use App\Services\State\StateConductService;
 use App\Services\State\StateEventLifecycleGate;
 use App\Services\State\StateJudgeScoreService;
+use App\Services\State\StatePublicResultsProjectionService;
+use App\Services\State\StateResultPublicationService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class StateFestWorkspaceController extends Controller
@@ -20,6 +23,11 @@ class StateFestWorkspaceController extends Controller
     public function index()
     {
         $events = StateFestEvent::orderByDesc('starts_on')->paginate(20);
+        $routePrefix = request()->routeIs('state.portal.*') ? 'state.portal' : 'admin.state';
+        $events->getCollection()->each(fn (StateFestEvent $event) => $event->setAttribute(
+            'show_url',
+            route("{$routePrefix}.fest.show", $event, false),
+        ));
 
         return Inertia::render('StateAdmin/Fest/Index', [
             'events' => $events,
@@ -40,8 +48,14 @@ class StateFestWorkspaceController extends Controller
         return redirect()->route('admin.state.fest.show', $event)->with('success', 'State fest event created.');
     }
 
-    public function show(StateFestEvent $event)
+    public function show(
+        Request $request,
+        StateFestEvent $event,
+        StatePublicResultsProjectionService $publicResults,
+        StateResultPublicationService $resultPublication,
+    )
     {
+        $routePrefix = $request->routeIs('state.portal.*') ? 'state.portal' : 'admin.state';
         $approvedQualifiers = StateQualifierEntry::where('status', 'approved')
             ->whereHas('intake', fn ($q) => $q->where('state_program_id', $event->state_program_id))
             ->orderBy('item_code')
@@ -49,7 +63,7 @@ class StateFestWorkspaceController extends Controller
             ->get();
 
         $registrations = StateFestRegistration::where('state_event_id', $event->id)
-            ->with('participants')
+            ->with('participants.mark')
             ->orderBy('item_code')
             ->limit(200)
             ->get();
@@ -64,6 +78,15 @@ class StateFestWorkspaceController extends Controller
             'approvedQualifiers' => $approvedQualifiers,
             'registrations'      => $registrations,
             'judgeAssignments'   => $judgeAssignments,
+            'publishedResults'   => $publicResults->getPublicResults($event),
+            'schoolRankings'     => $resultPublication->schoolRankings($event),
+            'actionUrls'         => [
+                'attendance' => route("{$routePrefix}.fest.attendance.index", $event, false),
+                'chestNumbers' => route("{$routePrefix}.fest.assign-chest-numbers", $event, false),
+                'judges' => route("{$routePrefix}.fest.judges.assign", $event, false),
+                'marks' => route("{$routePrefix}.fest.marks.enter", $event, false),
+                'publishResults' => route("{$routePrefix}.fest.results.publish", $event, false),
+            ],
         ]);
     }
 
@@ -75,7 +98,12 @@ class StateFestWorkspaceController extends Controller
     public function assignJudge(Request $request, StateFestEvent $event)
     {
         $data = $request->validate([
-            'item_id'    => 'required|uuid',
+            'item_id'    => [
+                'required',
+                'uuid',
+                Rule::exists('state.state_fest_registrations', 'item_id')
+                    ->where(fn ($query) => $query->where('state_event_id', $event->id)),
+            ],
             'item_code'  => 'nullable|string|max:64',
             'user_email' => 'required|email',
         ]);
@@ -115,19 +143,25 @@ class StateFestWorkspaceController extends Controller
         StateEventLifecycleGate::allowMarkEntry($event);
 
         $data = $request->validate([
-            'participant_id' => 'required|integer|exists:state_fest_participants,id',
+            'participant_id' => ['required', 'integer', Rule::exists('state.state_fest_participants', 'id')],
             'grade'          => 'nullable|in:A,A+,B,C',
-            'score'          => 'nullable|numeric|min:0',
+            'score'          => 'nullable|numeric|min:0|max:100',
         ]);
 
         $participant = StateFestParticipant::with('registration')->findOrFail($data['participant_id']);
         abort_if($participant->registration->state_event_id !== $event->id, 403);
+        abort_if(
+            $participant->registration->participants()->min('id') !== $participant->id,
+            422,
+            'Enter one result for the registration using its first listed participant.',
+        );
 
         \App\Models\State\StateFestMark::updateOrCreate(
-            ['participant_id' => $participant->id],
+            ['registration_id' => $participant->registration_id],
             [
                 'state_event_id'  => $event->id,
                 'registration_id' => $participant->registration_id,
+                'participant_id'  => $participant->id,
                 'score'           => $data['score'] ?? null,
                 'grade'           => $data['grade'] ?? null,
                 'status'          => 'draft',
@@ -136,6 +170,13 @@ class StateFestWorkspaceController extends Controller
         );
 
         return back()->with('success', "Mark saved for {$participant->student_name}.");
+    }
+
+    public function publishResults(StateFestEvent $event, StateResultPublicationService $service)
+    {
+        $result = $service->publish($event);
+
+        return back()->with('success', "Published {$result['marks']} State result(s) across {$result['items']} item(s).");
     }
 
     /**

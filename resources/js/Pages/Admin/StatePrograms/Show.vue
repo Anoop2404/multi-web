@@ -179,10 +179,12 @@
                                 <option value="">Age Group</option>
                                 <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
                             </select>
-                            <select v-else v-model="itemForm.class_group" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                <option value="">Class Category</option>
-                                <option v-for="(label, key) in taxonomy.class_group" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <div v-else>
+                                <input v-model="itemForm.class_group" list="state-class-groups" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="Class category key (e.g. hs)">
+                                <datalist id="state-class-groups">
+                                    <option v-for="(label, key) in taxonomy.class_group" :key="key" :value="key">{{ label }}</option>
+                                </datalist>
+                            </div>
 
                             <select v-model="itemForm.participant_type" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
                                 <option value="individual">Individual</option>
@@ -277,6 +279,17 @@
                                     <input v-model.number="form.level_fees[lvl].additional_item" type="number" min="0" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div v-if="form.conduct_levels.includes('state')" class="p-5 rounded-2xl bg-indigo-50 border border-indigo-200 space-y-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-indigo-950 uppercase tracking-wider">State remittance rate</h3>
+                            <p class="text-xs text-indigo-700">Charged to each Sahodaya for every qualifier accepted into the State event.</p>
+                        </div>
+                        <div class="max-w-sm">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Fee per accepted nominee/team (₹)</label>
+                            <input v-model.number="form.level_fees.state.individual_amount" type="number" min="0" class="w-full px-3.5 py-2 rounded-xl border border-indigo-200 text-sm font-medium">
                         </div>
                     </div>
 
@@ -416,9 +429,16 @@ const tabs = computed(() => [
 
 function buildLevelFees(program, conductLevels) {
     const fees = {};
-    for (const lvl of (conductLevels ?? []).filter(l => l !== 'state')) {
+    for (const lvl of (conductLevels ?? [])) {
         const existing = program.level_fees?.[lvl];
         const defaults = props.levelDefaults?.[lvl] ?? { fee_model: 'none' };
+        if (lvl === 'state') {
+            fees.state = {
+                fee_model: 'per_student',
+                individual_amount: existing?.individual_amount ?? existing?.per_student_amount ?? 500,
+            };
+            continue;
+        }
         const scheme = existing?.class_group_scheme ?? 'cbse';
         fees[lvl] = {
             fee_model: existing?.fee_model ?? defaults.fee_model ?? 'none',

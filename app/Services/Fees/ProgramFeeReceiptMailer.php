@@ -75,11 +75,21 @@ class ProgramFeeReceiptMailer
             'paymentsUrl'    => EmailBranding::schoolAdminUrl($sahodaya, $school, 'payments'),
         ];
 
-        $attachments = [[
-            'content' => $receiptHtml,
-            'name'    => 'fee-receipt-'.$receiptNo.'.html',
-            'mime'    => 'text/html',
-        ]];
+        try {
+            $pdfContent = \App\Support\PdfGenerator::render($receiptHtml);
+            $attachments = [[
+                'content' => $pdfContent,
+                'name'    => 'fee-receipt-'.$receiptNo.'.pdf',
+                'mime'    => 'application/pdf',
+            ]];
+        } catch (\Throwable $e) {
+            Log::warning('Program fee receipt PDF rendering failed, sending HTML fallback', ['error' => $e->getMessage()]);
+            $attachments = [[
+                'content' => $receiptHtml,
+                'name'    => 'fee-receipt-'.$receiptNo.'.html',
+                'mime'    => 'text/html',
+            ]];
+        }
 
         try {
             SahodayaMailer::for($sahodaya->id)->sendViewToManyWithAttachments(

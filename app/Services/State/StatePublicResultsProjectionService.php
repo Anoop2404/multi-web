@@ -3,7 +3,7 @@
 namespace App\Services\State;
 
 use App\Models\State\StateFestEvent;
-use App\Models\State\StateFestRegistration;
+use App\Models\State\StateFestMark;
 
 class StatePublicResultsProjectionService
 {
@@ -14,27 +14,34 @@ class StatePublicResultsProjectionService
      */
     public function getPublicResults(StateFestEvent $event): array
     {
-        $registrations = StateFestRegistration::where('state_event_id', $event->id)
-            ->where('status', 'approved')
-            ->with('participants')
-            ->get();
-
-        $publicRows = [];
-
-        foreach ($registrations as $registration) {
-            foreach ($registration->participants as $participant) {
-                $publicRows[] = [
-                    'item_code'      => $registration->item_code,
-                    'student_name'   => $participant->student_name,
-                    'school_name'    => $registration->school_name ?: 'Participating School',
-                    'chest_number'   => $participant->chest_number,
-                    'position'       => $participant->meta['position'] ?? null,
-                    'grade'          => $participant->meta['grade'] ?? null,
-                    'published_at'   => now()->toIso8601String(),
-                ];
-            }
+        if (! $event->results_published) {
+            return [];
         }
 
-        return $publicRows;
+        return StateFestMark::where('state_event_id', $event->id)
+            ->where('status', 'published')
+            ->whereHas('registration', fn ($query) => $query->where('status', 'approved'))
+            ->with(['registration.participants', 'participant'])
+            ->orderBy('registration_id')
+            ->orderBy('position')
+            ->get()
+            ->map(function (StateFestMark $mark) use ($event) {
+                $participants = $mark->registration?->participants ?? collect();
+
+                return [
+                    'item_code' => $mark->registration?->item_code,
+                    'student_name' => $participants->pluck('student_name')->filter()->implode(', ')
+                        ?: $mark->participant?->student_name
+                        ?: 'Participant',
+                    'school_name' => $mark->registration?->school_name ?: 'Participating School',
+                    'chest_number' => $participants->pluck('chest_number')->filter()->implode(', ')
+                        ?: $mark->participant?->chest_number,
+                    'position' => $mark->position,
+                    'grade' => $mark->grade,
+                    'score' => $mark->score,
+                    'published_at' => $event->updated_at?->toIso8601String(),
+                ];
+            })
+            ->all();
     }
 }

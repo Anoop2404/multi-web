@@ -348,26 +348,12 @@ class FestEvent extends Model
     {
         $ids = [(int) $this->id];
 
-        if ($this->parent_event_id) {
-            $ids[] = (int) $this->parent_event_id;
-        }
-
         $childIds = self::where('parent_event_id', $this->id)->pluck('id')->map(fn ($id) => (int) $id)->all();
         if (! empty($childIds)) {
             $ids = array_merge($ids, $childIds);
             $grandChildIds = self::whereIn('parent_event_id', $childIds)->pluck('id')->map(fn ($id) => (int) $id)->all();
             if (! empty($grandChildIds)) {
                 $ids = array_merge($ids, $grandChildIds);
-            }
-        }
-
-        if ($this->parent_event_id) {
-            $siblingIds = self::where('parent_event_id', $this->parent_event_id)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-            if (! empty($siblingIds)) {
-                $ids = array_merge($ids, $siblingIds);
             }
         }
 

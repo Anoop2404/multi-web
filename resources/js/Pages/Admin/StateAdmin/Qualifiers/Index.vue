@@ -7,7 +7,7 @@
                     <p class="font-medium">{{ intake.source_tenant_id }} → program {{ intake.state_program_id }}</p>
                     <p class="text-sm text-slate-500">{{ intake.entries_count }} entries · {{ intake.status }}</p>
                 </div>
-                <Link :href="`/admin/state-workspace/qualifiers/${intake.id}`" class="link-brand text-sm">Review</Link>
+                <Link :href="intake.review_url" class="link-brand text-sm">Review</Link>
             </div>
         </div>
     </AdminLayout>

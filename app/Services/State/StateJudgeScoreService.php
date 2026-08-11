@@ -29,6 +29,11 @@ class StateJudgeScoreService
         $participant = StateFestParticipant::with('registration')->findOrFail($data['participant_id']);
         abort_if($participant->registration->state_event_id !== $event->id, 403);
         abort_if(in_array($participant->registration->status, ['rejected', 'withdrawn'], true), 422, 'Scores cannot be entered for a withdrawn or rejected registration.');
+        abort_if(
+            $participant->registration->participants()->min('id') !== $participant->id,
+            422,
+            'Score the team or group once using its first listed participant.',
+        );
 
         $assigned = StateJudgeAssignment::where('state_event_id', $event->id)
             ->where('item_id', $data['item_id'])
@@ -90,10 +95,11 @@ class StateJudgeScoreService
         $participant = StateFestParticipant::with('registration')->find($participantId);
 
         StateFestMark::updateOrCreate(
-            ['participant_id' => $participantId],
+            ['registration_id' => $participant?->registration_id],
             [
                 'state_event_id'  => $event->id,
                 'registration_id' => $participant?->registration_id,
+                'participant_id'  => $participantId,
                 'score'           => $avgScore,
                 'grade'           => $grade,
                 'status'          => 'draft',

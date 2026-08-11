@@ -5,11 +5,11 @@ namespace App\Services\State;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
+use App\Models\FestRegistration;
 use App\Models\FestStateNominationBatch;
 use App\Models\FestStateProgram;
 use App\Models\FestStateSubmissionOutbox;
 use App\Services\Events\FestPartitionService;
-use Illuminate\Support\Str;
 
 class FestStateQualifierPayloadBuilder
 {
@@ -26,9 +26,9 @@ class FestStateQualifierPayloadBuilder
         return [
             'state_program_id' => $program->id,
             'source_tenant_id' => $sourceTenantId,
-            'source_event_id'  => $sourceEvent->id,
-            'submitted_at'     => now()->toIso8601String(),
-            'entries'          => $entries,
+            'source_event_id' => $sourceEvent->id,
+            'submitted_at' => now()->toIso8601String(),
+            'entries' => $entries,
         ];
     }
 
@@ -65,20 +65,26 @@ class FestStateQualifierPayloadBuilder
                 continue;
             }
 
+            $registration = $selection->registration_id
+                ? FestRegistration::with(['participants.student', 'item'])->find($selection->registration_id)
+                : null;
+
             $entries[] = [
                 'source_registration_id' => (string) ($selection->registration_id ?? ''),
-                'source_participant_id'  => (string) ($selection->participant_id ?? ''),
-                'school_id'              => $selection->school_id,
-                'item_id'                => $selection->item_id,
-                'item_code'              => $selection->item_code,
-                'item_name'              => $selection->item_title,
-                'student_name'           => $selection->student_name ?? 'Participant',
-                'class_name'             => $selection->class_name,
-                'position'               => $selection->source_position,
-                'grade'                  => $selection->grade,
-                'points'                 => $selection->score ?? 0,
-                'partition_key'          => $selection->partition_key,
-                'qualifier_type'         => 'state_nominated',
+                'source_participant_id' => (string) ($selection->participant_id ?? ''),
+                'school_id' => $selection->school_id,
+                'item_id' => $selection->item_id,
+                'item_code' => $selection->item_code,
+                'item_name' => $selection->item_title,
+                'student_name' => $selection->student_name ?? 'Participant',
+                'class_name' => $selection->class_name,
+                'position' => $selection->source_position,
+                'grade' => $selection->grade,
+                'points' => $selection->score ?? 0,
+                'partition_key' => $selection->partition_key,
+                'qualifier_type' => 'state_nominated',
+                'participant_type' => $registration?->item?->participant_type,
+                'participants' => $this->participantRoster($registration),
             ];
         }
 
@@ -121,7 +127,10 @@ class FestStateQualifierPayloadBuilder
                     ->orderBy('position')
                     ->get();
 
-                foreach ($marks as $mark) {
+                // A team/group has several participant rows but one competitive entry.
+                // Send one qualifier entry per registration and carry the full roster
+                // inside it for State attendance and identity checks.
+                foreach ($marks->unique(fn (FestMark $mark) => $mark->participant?->registration_id) as $mark) {
                     $participant = $mark->participant;
                     $registration = $participant?->registration;
                     if (! $participant || ! $registration) {
@@ -132,26 +141,28 @@ class FestStateQualifierPayloadBuilder
 
                     $entries[] = [
                         'source_registration_id' => (string) $registration->id,
-                        'source_participant_id'  => (string) $participant->id,
-                        'school_id'              => $registration->school_id,
+                        'source_participant_id' => (string) $participant->id,
+                        'school_id' => $registration->school_id,
                         // The canonical State catalog item UUID (FestStateProgramItem.id), not this
                         // Sahodaya's own tenant-local FestEventItem.id — that integer is only unique
                         // within this one tenant database and means nothing at State level. State's
                         // item_id columns store the catalog UUID; item_code is the human-readable tie.
-                        'item_id'                => $item->state_program_item_id,
-                        'item_code'              => $item->item_code,
-                        'item_name'              => $item->title,
-                        'student_name'           => $student?->name ?? $participant->display_name ?? 'Participant',
-                        'class_name'             => $student?->class_name,
-                        'position'               => $mark->position,
-                        'grade'                  => $mark->grade,
-                        'points'                 => $mark->score ?? 0,
-                        'partition_key'          => $this->partitions->partitionKey($event),
-                        'qualifier_type'         => match (true) {
+                        'item_id' => $item->state_program_item_id,
+                        'item_code' => $item->item_code,
+                        'item_name' => $item->title,
+                        'student_name' => $student?->name ?? $participant->display_name ?? 'Participant',
+                        'class_name' => $student?->class_name,
+                        'position' => $mark->position,
+                        'grade' => $mark->grade,
+                        'points' => $mark->score ?? 0,
+                        'partition_key' => $this->partitions->partitionKey($event),
+                        'qualifier_type' => match (true) {
                             $role === 'finale' => 'district_winner',
                             in_array($role, ['region', 'cluster'], true) => 'regional_winner',
                             default => 'sahodaya_winner',
                         },
+                        'participant_type' => $item->participant_type,
+                        'participants' => $this->participantRoster($registration),
                     ];
                 }
             }
@@ -191,12 +202,12 @@ class FestStateQualifierPayloadBuilder
             ['idempotency_key' => $idempotencyKey],
             [
                 'state_program_id' => $program->id,
-                'source_event_id'  => $sourceEvent->id,
-                'submission_type'  => 'qualifier_batch',
-                'payload'          => $payload,
-                'payload_hash'     => $hash,
-                'status'           => 'pending',
-                'submitted_by'     => $submittedBy,
+                'source_event_id' => $sourceEvent->id,
+                'submission_type' => 'qualifier_batch',
+                'payload' => $payload,
+                'payload_hash' => $hash,
+                'status' => 'pending',
+                'submitted_by' => $submittedBy,
             ]
         );
     }
@@ -247,5 +258,24 @@ class FestStateQualifierPayloadBuilder
 
         return ($criteria['mcs_only'] ?? false) === true
             || ($criteria['state_eligible'] ?? true) === false;
+    }
+
+    /** @return list<array{source_participant_id: string, student_name: string, class_name: ?string}> */
+    private function participantRoster(?FestRegistration $registration): array
+    {
+        if (! $registration) {
+            return [];
+        }
+
+        $registration->loadMissing('participants.student');
+
+        return $registration->participants
+            ->map(fn ($participant) => [
+                'source_participant_id' => (string) $participant->id,
+                'student_name' => $participant->student?->name ?? $participant->display_name ?? 'Participant',
+                'class_name' => $participant->student?->class_name,
+            ])
+            ->values()
+            ->all();
     }
 }

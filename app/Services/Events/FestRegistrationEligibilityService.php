@@ -193,7 +193,7 @@ class FestRegistrationEligibilityService
     private function validateCategory(Student $student, FestEvent $event, FestEventItem $item): ?string
     {
         return match ($event->event_type) {
-            'kalolsavam' => $this->validateKalolsav($student, $item),
+            'kalolsavam' => $this->validateKalolsav($student, $item, $event),
             'kids_fest' => $this->validateKidsFest($student, $item),
             'sports' => $this->validateSports($student, $event, $item),
             'custom' => $this->validateCustomClassGroup($student, $item, $event),
@@ -203,7 +203,7 @@ class FestRegistrationEligibilityService
         };
     }
 
-    private function validateKalolsav(Student $student, FestEventItem $item): ?string
+    private function validateKalolsav(Student $student, FestEventItem $item, FestEvent $event): ?string
     {
         $classNum = FestStudentClassResolver::classNumberFromStudent($student);
 
@@ -211,12 +211,12 @@ class FestRegistrationEligibilityService
             return 'Classes 1–2 cannot register for Kalotsav — use Kids Fest.';
         }
 
-        $studentGroup = FestStudentClassResolver::kalolsavClassGroupForStudent($student);
+        $studentGroup = FestStudentClassResolver::classGroupForStudent($student, $event);
         if ($studentGroup === null) {
             return 'class could not be mapped to a Kalotsav category (Classes 3–12 only).';
         }
 
-        return $this->validateItemClassGroup($studentGroup, $item, $item->event);
+        return $this->validateItemClassGroup($studentGroup, $item, $event);
     }
 
     private function validateCustomClassGroup(Student $student, FestEventItem $item, FestEvent $event): ?string

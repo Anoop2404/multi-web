@@ -377,12 +377,20 @@ class MembershipNotifier
 
         $attachments = [];
         if ($receiptHtml) {
-            $filename = 'membership-receipt-'.($receiptNo ?: $membershipNo).'.html';
-            $attachments[] = [
-                'content' => $receiptHtml,
-                'name'    => $filename,
-                'mime'    => 'text/html',
-            ];
+            try {
+                $pdfContent = \App\Support\PdfGenerator::render($receiptHtml);
+                $attachments[] = [
+                    'content' => $pdfContent,
+                    'name'    => 'membership-receipt-'.($receiptNo ?: $membershipNo).'.pdf',
+                    'mime'    => 'application/pdf',
+                ];
+            } catch (\Throwable $e) {
+                $attachments[] = [
+                    'content' => $receiptHtml,
+                    'name'    => 'membership-receipt-'.($receiptNo ?: $membershipNo).'.html',
+                    'mime'    => 'text/html',
+                ];
+            }
         }
 
         $this->notifySchoolAdminsWithAttachments(

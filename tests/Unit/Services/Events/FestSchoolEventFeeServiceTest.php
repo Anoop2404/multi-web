@@ -403,6 +403,16 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(5000.0, $normalized['school_fee_cap']);
     }
 
+    public function test_state_level_fee_is_normalized_as_a_per_student_remittance_rate(): void
+    {
+        $normalized = app(FestEventFeeResolver::class)->normalizeLevelFees([
+            'state' => ['individual_amount' => 650],
+        ], ['state']);
+
+        $this->assertSame('per_student', $normalized['state']['fee_model']);
+        $this->assertSame(650.0, $normalized['state']['individual_amount']);
+    }
+
     public function test_id_cards_require_item_for_students(): void
     {
         $service = app(FestIdCardService::class);

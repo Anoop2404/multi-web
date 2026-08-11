@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\StateAdminDashboardController;
 use App\Http\Controllers\StateAdmin\StateBoardResultsController;
 use App\Http\Controllers\StateAdmin\StateFestWorkspaceController;
+use App\Http\Controllers\StateAdmin\StateAttendanceController;
 use App\Http\Controllers\StateAdmin\StateQualifierReviewController;
 use Illuminate\Support\Facades\Route;
 
@@ -39,12 +40,20 @@ Route::domain(config('state.domain'))
             Route::get('/', [StateQualifierReviewController::class, 'index'])->name('index');
             Route::get('/{intake}', [StateQualifierReviewController::class, 'show'])->name('show');
             Route::post('/{intake}/approve', [StateQualifierReviewController::class, 'approve'])->name('approve');
+            Route::post('/{intake}/entries/{entry}/review', [StateQualifierReviewController::class, 'reviewEntry'])->name('entries.review');
         });
 
         Route::prefix('fest')->name('fest.')->group(function () {
             Route::get('/', [StateFestWorkspaceController::class, 'index'])->name('index');
             Route::post('/', [StateFestWorkspaceController::class, 'store'])->name('store');
             Route::get('/{event}', [StateFestWorkspaceController::class, 'show'])->name('show');
+            Route::post('/{event}/assign-chest-numbers', [StateFestWorkspaceController::class, 'assignChestNumbers'])->name('assign-chest-numbers');
+            Route::get('/{event}/attendance', [StateAttendanceController::class, 'index'])->name('attendance.index');
+            Route::post('/{event}/attendance', [StateAttendanceController::class, 'store'])->name('attendance.store');
+            Route::post('/{event}/judges', [StateFestWorkspaceController::class, 'assignJudge'])->name('judges.assign');
+            Route::delete('/{event}/judges/{assignment}', [StateFestWorkspaceController::class, 'unassignJudge'])->name('judges.unassign');
+            Route::post('/{event}/marks', [StateFestWorkspaceController::class, 'enterMark'])->name('marks.enter');
+            Route::post('/{event}/publish-results', [StateFestWorkspaceController::class, 'publishResults'])->name('results.publish');
         });
 
         Route::get('/board-results', [StateBoardResultsController::class, 'index'])->name('board-results');

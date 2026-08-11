@@ -179,6 +179,12 @@ class FestEventFeeResolver
 
         foreach ($conductLevels as $level) {
             if ($level === 'state') {
+                $row = $input[$level] ?? [];
+                $normalized[$level] = [
+                    'fee_model' => 'per_student',
+                    'individual_amount' => (float) ($row['individual_amount'] ?? $row['per_student_amount'] ?? 500),
+                ];
+
                 continue;
             }
 

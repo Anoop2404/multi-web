@@ -7,8 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Wraps the state_fest_marks table (created in migration
  * 2026_07_20_000001_state_fest_tables.php, but nothing modeled/wrote to it until State Event
- * Conduct Phase 4 — docs/STATE_EVENT_CONDUCT_PLAN.md). One row per (registration, participant)
- * — item context comes via registration->item_code, there's no item_id column here directly.
+ * Conduct Phase 4 — docs/STATE_EVENT_CONDUCT_PLAN.md). One canonical result row per
+ * registration (including one row for a whole team/group); participant_id points to the
+ * first roster member used as the score-entry target. Item context comes via registration.
  */
 class StateFestMark extends StateModel
 {

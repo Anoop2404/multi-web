@@ -315,4 +315,21 @@ class RegionAdminReportContainmentTest extends TestCase
                 ->component('Sahodaya/Events/Reports/Hub', false)
                 ->where('event.id', $f['childA']->id));
     }
+
+    public function test_region_participation_report_does_not_reexpand_child_scope_to_siblings(): void
+    {
+        $f = $this->twoRegionFixture();
+        $admin = $this->regionAdmin($f['sahodaya'], $f['hub'], $f['regionA']);
+
+        $this->actingAs($admin)
+            ->get(route('sahodaya.events.reports.participation-counts', [
+                'tenantId' => $f['sahodaya']->id,
+                'event' => $f['hub']->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Sahodaya/Events/Reports/ParticipationCounts', false)
+                ->where('event.id', $f['childA']->id)
+                ->where('used.total', 1));
+    }
 }

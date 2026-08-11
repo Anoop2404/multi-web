@@ -115,6 +115,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::get('/qualifiers', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'index'])->name('qualifiers.index');
             Route::get('/qualifiers/{intake}', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'show'])->name('qualifiers.show');
             Route::post('/qualifiers/{intake}/approve', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'approve'])->name('qualifiers.approve');
+            Route::post('/qualifiers/{intake}/entries/{entry}/review', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'reviewEntry'])->name('qualifiers.entries.review');
             Route::get('/fest', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'index'])->name('fest.index');
             Route::post('/fest', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'store'])->name('fest.store');
             Route::get('/fest/{event}', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'show'])->name('fest.show');
@@ -126,6 +127,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::post('/fest/{event}/judges', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'assignJudge'])->name('fest.judges.assign');
             Route::delete('/fest/{event}/judges/{assignment}', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'unassignJudge'])->name('fest.judges.unassign');
             Route::post('/fest/{event}/marks', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'enterMark'])->name('fest.marks.enter');
+            Route::post('/fest/{event}/publish-results', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'publishResults'])->name('fest.results.publish');
         });
 
         Route::get('/sports', [\App\Http\Controllers\Admin\SportsResultsController::class, 'index'])->name('sports.index');

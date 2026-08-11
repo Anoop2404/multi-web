@@ -72,6 +72,42 @@ class FestItemSyncService
         return $total;
     }
 
+    public function removeProgramItemFromAllPropagations(FestStateProgram $program, string $stateProgramItemId): int
+    {
+        $affected = 0;
+        $propagations = FestStateProgramPropagation::query()
+            ->where('state_program_id', $program->id)
+            ->whereNotNull('tenant_event_id')
+            ->with('sahodaya')
+            ->get();
+
+        foreach ($propagations as $propagation) {
+            if (! $propagation->sahodaya) {
+                continue;
+            }
+
+            try {
+                $affected += (int) TenancyDatabase::runWhenDatabaseReady($propagation->sahodaya, function () use ($stateProgramItemId) {
+                    $count = 0;
+                    foreach (FestEventItem::where('state_program_item_id', $stateProgramItemId)->get() as $item) {
+                        if ($item->registrations()->exists()) {
+                            $item->update(['is_enabled' => false]);
+                        } else {
+                            $item->delete();
+                        }
+                        $count++;
+                    }
+
+                    return $count;
+                });
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $affected;
+    }
+
     /**
      * Copy inherited items (state + sahodaya) from a cluster event into a school event.
      *

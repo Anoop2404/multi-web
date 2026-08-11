@@ -15,7 +15,7 @@ class StateQualifierMaterializationService
     /** @return array{event: StateFestEvent, registrations: int, participants: int} */
     public function materializeApprovedIntake(StateQualifierIntake $intake): array
     {
-        return DB::transaction(function () use ($intake) {
+        return DB::connection('state')->transaction(function () use ($intake) {
             $event = $this->stateEventFor($intake);
             $registrations = 0;
             $participants = 0;
@@ -45,26 +45,42 @@ class StateQualifierMaterializationService
                             ],
                         );
 
-                        $participant = StateFestParticipant::updateOrCreate(
-                            ['registration_id' => $registration->id],
-                            [
+                        $roster = collect($entry->meta['participants'] ?? [])->filter(fn ($row) => is_array($row));
+                        if ($roster->isEmpty()) {
+                            $roster = collect([[
+                                'source_participant_id' => $entry->source_participant_id,
                                 'student_name' => $entry->student_name,
                                 'class_name' => $entry->class_name,
-                                'meta' => [
-                                    'source_participant_id' => $entry->source_participant_id,
-                                    'position' => $entry->position,
-                                    'grade' => $entry->grade,
-                                    'points' => $entry->points,
-                                    'partition_key' => $entry->partition_key,
+                            ]]);
+                        }
+
+                        foreach ($roster as $member) {
+                            $sourceParticipantId = (string) ($member['source_participant_id'] ?? $entry->source_participant_id ?? '');
+                            $participant = StateFestParticipant::updateOrCreate(
+                                [
+                                    'registration_id' => $registration->id,
+                                    'student_name' => $member['student_name'] ?? $entry->student_name,
                                 ],
-                            ],
-                        );
+                                [
+                                    'state_event_id' => $event->id,
+                                    'class_name' => $member['class_name'] ?? $entry->class_name,
+                                    'meta' => [
+                                        'source_participant_id' => $sourceParticipantId,
+                                        'qualifier_position' => $entry->position,
+                                        'qualifier_grade' => $entry->grade,
+                                        'qualifier_points' => $entry->points,
+                                        'partition_key' => $entry->partition_key,
+                                    ],
+                                ],
+                            );
+
+                            if ($participant->wasRecentlyCreated) {
+                                $participants++;
+                            }
+                        }
 
                         if ($registration->wasRecentlyCreated) {
                             $registrations++;
-                        }
-                        if ($participant->wasRecentlyCreated) {
-                            $participants++;
                         }
                     }
                 });

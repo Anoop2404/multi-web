@@ -40,17 +40,24 @@ class SahodayaMailer
         }
 
         if ($this->isConfigured() && $this->usesZeptoMailApi()) {
-            [$fromAddress, $fromName] = $this->fromAddress();
-            $this->zeptoClient()->send(
-                $fromAddress ?? '',
-                $fromName,
-                [['address' => $to]],
-                $subject,
-                nl2br(e($body)),
-                $body,
-            );
+            try {
+                [$fromAddress, $fromName] = $this->fromAddress();
+                $this->zeptoClient()->send(
+                    $fromAddress ?? '',
+                    $fromName,
+                    [['address' => $to]],
+                    $subject,
+                    nl2br(e($body)),
+                    $body,
+                );
 
-            return;
+                return;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('ZeptoMail API send failed, falling back to default SMTP mailer', [
+                    'to'    => $to,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $mailer = $this->resolveMailerName();
@@ -59,8 +66,11 @@ class SahodayaMailer
         Mail::mailer($mailer)->raw($body, function ($message) use ($to, $subject, $fromAddress, $fromName) {
             $message->to($to)->subject($subject);
 
-            if ($fromAddress) {
-                $message->from($fromAddress, $fromName);
+            $actualFrom = $fromAddress ?: config('mail.from.address');
+            $actualName = $fromName ?: config('mail.from.name');
+
+            if ($actualFrom) {
+                $message->from($actualFrom, $actualName);
             }
         });
     }
@@ -78,9 +88,16 @@ class SahodayaMailer
         }
 
         if ($this->isConfigured() && $this->usesZeptoMailApi()) {
-            $this->sendHtmlViaApi($to, $subject, $view, $data, $attachments);
+            try {
+                $this->sendHtmlViaApi($to, $subject, $view, $data, $attachments);
 
-            return;
+                return;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('ZeptoMail API send failed, falling back to default SMTP mailer', [
+                    'to'    => $to,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $this->sendViaSmtpMailer($to, $subject, $view, $data, $attachments);
@@ -124,9 +141,16 @@ class SahodayaMailer
     public function sendVerification(User $user): void
     {
         if ($this->isConfigured() && $this->usesZeptoMailApi()) {
-            (new \App\Notifications\PortalVerifyEmail)->deliverVia($this, $user);
+            try {
+                (new \App\Notifications\PortalVerifyEmail)->deliverVia($this, $user);
 
-            return;
+                return;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('ZeptoMail API verification email failed, falling back to default SMTP mailer', [
+                    'user_id' => $user->id,
+                    'error'   => $e->getMessage(),
+                ]);
+            }
         }
 
         $this->withSahodayaMailer(function () use ($user) {
@@ -137,9 +161,16 @@ class SahodayaMailer
     public function sendPasswordReset(User $user, string $token): void
     {
         if ($this->isConfigured() && $this->usesZeptoMailApi()) {
-            (new \App\Notifications\PortalResetPassword($token))->deliverVia($this, $user);
+            try {
+                (new \App\Notifications\PortalResetPassword($token))->deliverVia($this, $user);
 
-            return;
+                return;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('ZeptoMail API password reset failed, falling back to default SMTP mailer', [
+                    'user_id' => $user->id,
+                    'error'   => $e->getMessage(),
+                ]);
+            }
         }
 
         $this->withSahodayaMailer(function () use ($user, $token) {
@@ -216,8 +247,11 @@ class SahodayaMailer
         Mail::mailer($mailer)->send($view, $this->viewData($data), function ($message) use ($to, $subject, $fromAddress, $fromName, $attachments) {
             $message->to($to)->subject($subject);
 
-            if ($fromAddress) {
-                $message->from($fromAddress, $fromName);
+            $actualFrom = $fromAddress ?: config('mail.from.address');
+            $actualName = $fromName ?: config('mail.from.name');
+
+            if ($actualFrom) {
+                $message->from($actualFrom, $actualName);
             }
 
             foreach ($attachments as $attachment) {

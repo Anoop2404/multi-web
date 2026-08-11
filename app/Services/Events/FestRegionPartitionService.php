@@ -125,6 +125,13 @@ class FestRegionPartitionService
             ? FestEvent::find($event->parent_event_id) ?? $event
             : $event;
 
+        // Sports uses a nested season -> discipline -> region topology. Running the
+        // generic one-level synchronizer here corrupts that shape by placing regions
+        // directly under the season.
+        if ($hub->event_type === 'sports') {
+            return;
+        }
+
         if (! $this->regionsApply($hub->tenant_id)) {
             return;
         }
@@ -230,6 +237,7 @@ class FestRegionPartitionService
     public function syncPartitionsFromRegions(FestEvent $hub): array
     {
         abort_if($hub->parent_event_id, 422, 'Sync regions on the hub event, not a partition.');
+        abort_if($hub->event_type === 'sports', 422, 'Sports regions must be synced below each sport discipline.');
 
         $regions = Region::forTenant($hub->tenant_id)->active()->orderBy('sort_order')->orderBy('name')->get();
         abort_if($regions->isEmpty(), 422, 'No active regions configured for this Sahodaya.');

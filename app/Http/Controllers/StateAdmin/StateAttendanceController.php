@@ -9,6 +9,7 @@ use App\Models\State\StateFestParticipant;
 use App\Services\State\StateEventLifecycleGate;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Validation\Rule;
 
 /**
  * State Event Conduct, Phase 2 (docs/STATE_EVENT_CONDUCT_PLAN.md) — item-scoped attendance,
@@ -21,6 +22,7 @@ class StateAttendanceController extends Controller
 {
     public function index(StateFestEvent $event)
     {
+        $routePrefix = request()->routeIs('state.portal.*') ? 'state.portal' : 'admin.state';
         $registrations = $event->registrations()
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->with('participants')
@@ -35,6 +37,10 @@ class StateAttendanceController extends Controller
             'event'         => $event,
             'registrations' => $registrations,
             'attendance'    => $attendance,
+            'actionUrls'    => [
+                'workspace' => route("{$routePrefix}.fest.show", $event, false),
+                'store' => route("{$routePrefix}.fest.attendance.store", $event, false),
+            ],
         ]);
     }
 
@@ -48,7 +54,7 @@ class StateAttendanceController extends Controller
 
         $data = $request->validate([
             'item_id'        => 'required|uuid',
-            'participant_id' => 'required|integer|exists:state_fest_participants,id',
+            'participant_id' => ['required', 'integer', Rule::exists('state.state_fest_participants', 'id')],
             'status'         => 'required|in:present,absent',
         ]);
 
@@ -80,7 +86,7 @@ class StateAttendanceController extends Controller
         $data = $request->validate([
             'item_id'            => 'required|uuid',
             'participant_ids'    => 'required|array|min:1',
-            'participant_ids.*'  => 'integer|exists:state_fest_participants,id',
+            'participant_ids.*'  => ['integer', Rule::exists('state.state_fest_participants', 'id')],
             'status'             => 'required|in:present,absent',
         ]);
 

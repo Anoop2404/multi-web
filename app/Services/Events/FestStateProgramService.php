@@ -17,7 +17,7 @@ class FestStateProgramService
     /**
      * Publish a state program to all active Sahodaya clusters.
      *
-     * @return array{propagated: int, skipped: int, errors: list<string>}
+     * @return array{propagated: int, updated: int, skipped: int, errors: list<string>}
      */
     public function publish(FestStateProgram $program): array
     {
@@ -29,26 +29,34 @@ class FestStateProgramService
             throw new \InvalidArgumentException('Select at least one conduct level before publishing.');
         }
 
-        // Publish/version State event to the dedicated State operational connection
-        try {
-            StateFestEvent::updateOrCreate(
-                ['state_program_id' => $program->id],
-                [
+        $propagated = 0;
+        $updated = 0;
+        $skipped = 0;
+        $errors = [];
+
+        // A State-capable program is not successfully published unless its operational
+        // event exists. Keep the failure visible in the propagation result instead of
+        // logging and marking the central program published anyway.
+        if (in_array('state', $levels, true)) {
+            try {
+                $stateEvent = StateFestEvent::firstOrNew(['state_program_id' => $program->id]);
+                $stateEvent->fill([
                     'name'      => $program->title,
                     'slug'      => Str::slug($program->title),
-                    'status'    => 'published',
+                    'status'    => $stateEvent->results_published ? 'completed' : 'published',
                     'starts_on' => $program->event_start,
                     'ends_on'   => $program->event_end,
                     'settings'  => $program->level_event_settings['state'] ?? [],
-                ]
-            );
-        } catch (\Throwable $e) {
-            logger()->warning('Could not deploy StateFestEvent on state connection: ' . $e->getMessage());
+                    'scoring_preset' => $program->event_type === 'kalolsavam' ? 'confed_kalotsav' : null,
+                ])->save();
+            } catch (\Throwable $e) {
+                $errors[] = 'State operational database: '.$e->getMessage();
+                logger()->error('Could not deploy StateFestEvent on state connection', [
+                    'state_program_id' => $program->id,
+                    'exception' => $e,
+                ]);
+            }
         }
-
-        $propagated = 0;
-        $skipped = 0;
-        $errors = [];
 
         $sahodayas = Tenant::query()
             ->sahodayas()
@@ -78,15 +86,19 @@ class FestStateProgramService
                     ->where('level_round', $level)
                     ->first();
 
-                if ($existing?->tenant_event_id) {
-                    $skipped++;
-
-                    continue;
-                }
-
                 try {
-                    TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($program, $sahodaya, $level, &$propagated) {
-                        $event = $this->createTenantEvent($program, $sahodaya, $level);
+                    TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($program, $sahodaya, $level, $existing, &$propagated, &$updated, &$skipped) {
+                        $event = $existing?->tenant_event_id
+                            ? FestEvent::query()->find($existing->tenant_event_id)
+                            : null;
+
+                        if ($event) {
+                            $this->syncTenantEvent($event, $program, $level);
+                            $updated++;
+                        } else {
+                            $event = $this->createTenantEvent($program, $sahodaya, $level);
+                            $propagated++;
+                        }
 
                         app(FestItemSyncService::class)->syncProgramToEvent($program, $event);
 
@@ -98,8 +110,6 @@ class FestStateProgramService
                             ],
                             ['tenant_event_id' => $event->id]
                         );
-
-                        $propagated++;
                     });
                 } catch (\Throwable $e) {
                     $errors[] = "{$sahodaya->name} ({$level}): {$e->getMessage()}";
@@ -107,11 +117,11 @@ class FestStateProgramService
             }
         }
 
-        if ($program->status !== 'published') {
+        if ($errors === [] && $program->status !== 'published') {
             $program->update(['status' => 'published']);
         }
 
-        return compact('propagated', 'skipped', 'errors');
+        return compact('propagated', 'updated', 'skipped', 'errors');
     }
 
     public function createTenantEvent(FestStateProgram $program, Tenant $sahodaya, string $levelRound): FestEvent
@@ -160,6 +170,30 @@ class FestStateProgramService
         app(FestParticipationPolicyService::class)->copyFromStateProgram($event, $program);
 
         return $event;
+    }
+
+    public function syncTenantEvent(FestEvent $event, FestStateProgram $program, string $levelRound): FestEvent
+    {
+        $fee = app(FestEventFeeResolver::class)->resolveForProgram($program, $levelRound);
+        $feeModel = $fee['fee_model'] ?? 'none';
+
+        $event->update([
+            'title'              => $program->title,
+            'conduct_levels'     => FestConductLevels::normalize($program->conduct_levels ?? [], $program->event_type),
+            'registration_open'  => $program->registration_open,
+            'registration_close' => $program->registration_close,
+            'event_start'        => $program->event_start,
+            'event_end'          => $program->event_end,
+            'venue'              => $program->venue,
+            'fee_type'           => $feeModel === 'none' ? 'none' : 'per_item',
+            'fee_amount'         => null,
+            'description'        => $program->description,
+            'scoring_preset'     => $program->event_type === 'kalolsavam' ? 'confed_kalotsav' : $event->scoring_preset,
+        ]);
+
+        app(FestParticipationPolicyService::class)->copyFromStateProgram($event, $program);
+
+        return $event->fresh();
     }
 
     /**

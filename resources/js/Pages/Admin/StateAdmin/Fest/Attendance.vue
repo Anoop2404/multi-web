@@ -1,7 +1,7 @@
 <template>
     <AdminLayout :title="`${event.name} — Attendance`">
         <div class="max-w-5xl mx-auto space-y-4">
-            <Link :href="`/admin/state-workspace/fest/${event.id}`" class="text-sm text-indigo-600">← {{ event.name }}</Link>
+            <Link :href="actionUrls.workspace" class="text-sm text-indigo-600">← {{ event.name }}</Link>
             <h1 class="text-xl font-semibold">Attendance — {{ event.name }}</h1>
             <p class="text-sm text-slate-500">Mark present/absent per item. Marking one team member marks the whole team.</p>
 
@@ -52,6 +52,7 @@ const props = defineProps({
     event: Object,
     registrations: { type: Array, default: () => [] },
     attendance: { type: Object, default: () => ({}) },
+    actionUrls: { type: Object, required: true },
 });
 
 const form = useForm({});
@@ -77,7 +78,7 @@ function mark(row, status) {
         item_id: row.registration.item_id,
         participant_id: row.participant.id,
         status,
-    })).post(`/admin/state-workspace/fest/${props.event.id}/attendance`, {
+    })).post(props.actionUrls.store, {
         preserveScroll: true,
         onSuccess: () => { row.status = status; },
     });

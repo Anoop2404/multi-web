@@ -31,4 +31,9 @@ class StateFestEvent extends StateModel
     {
         return $this->hasMany(StateAttendance::class, 'state_event_id');
     }
+
+    public function marks(): HasMany
+    {
+        return $this->hasMany(StateFestMark::class, 'state_event_id');
+    }
 }

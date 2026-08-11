@@ -4,7 +4,11 @@
             <h1 class="text-xl font-semibold">{{ event.name }}</h1>
             <p class="text-sm text-slate-500">Program {{ event.state_program_id }} · {{ event.status }}</p>
 
-            <Link :href="`/admin/state-workspace/fest/${event.id}/attendance`" class="inline-block text-sm text-indigo-600">Mark attendance →</Link>
+            <div v-if="event.results_published" class="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50 text-sm text-emerald-900">
+                Results are published and scoring is locked. The public result page now reads these State-final marks.
+            </div>
+
+            <Link :href="actionUrls.attendance" class="inline-block text-sm text-indigo-600">Mark attendance →</Link>
 
             <div class="p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 flex items-center justify-between gap-3">
                 <p class="text-xs text-amber-900">
@@ -56,21 +60,46 @@
                         <td class="p-2">{{ registration.status }}</td>
                         <td class="p-2" v-if="registration.participants?.[0]">
                             <form class="flex items-center gap-1" @submit.prevent="enterMark(registration.participants[0])">
-                                <input v-model="markForms[registration.participants[0].id].score" type="number" step="0.01" min="0" placeholder="Score" class="field !py-1 !text-xs w-16">
-                                <select v-model="markForms[registration.participants[0].id].grade" class="field !py-1 !text-xs w-16">
+                                <input v-model="markForms[registration.participants[0].id].score" type="number" step="0.01" min="0" placeholder="Score" class="field !py-1 !text-xs w-16" :disabled="event.scoring_locked">
+                                <select v-model="markForms[registration.participants[0].id].grade" class="field !py-1 !text-xs w-16" :disabled="event.scoring_locked">
                                     <option value="">Grade</option>
                                     <option value="A+">A+</option>
                                     <option value="A">A</option>
                                     <option value="B">B</option>
                                     <option value="C">C</option>
                                 </select>
-                                <button type="submit" class="btn-secondary !py-1 !px-2 text-xs">Save</button>
+                                <button type="submit" class="btn-secondary !py-1 !px-2 text-xs" :disabled="event.scoring_locked">Save</button>
                             </form>
                         </td>
                     </tr>
                 </tbody>
             </table>
             <p v-else class="text-sm text-slate-400">No materialized state registrations yet. Approve a qualifier intake to populate this event.</p>
+
+            <div class="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="section-title !mb-0">State-final results</h2>
+                        <p class="text-xs text-slate-500">Positions are calculated from State marks only. Publishing permanently locks scoring.</p>
+                    </div>
+                    <button v-if="!event.results_published" type="button" class="btn-primary text-xs" :disabled="publishForm.processing" @click="publishResults">
+                        Calculate & publish results
+                    </button>
+                    <a v-else href="/state/results" target="_blank" rel="noopener" class="btn-secondary text-xs">Open public results</a>
+                </div>
+
+                <table v-if="publishedResults?.length" class="w-full text-xs border">
+                    <thead><tr class="bg-slate-50 text-left"><th class="p-2">Item</th><th class="p-2">Position</th><th class="p-2">Participant</th><th class="p-2">School</th><th class="p-2">Grade</th></tr></thead>
+                    <tbody><tr v-for="row in publishedResults" :key="`${row.item_code}-${row.chest_number}`" class="border-t"><td class="p-2">{{ row.item_code }}</td><td class="p-2 font-bold">{{ row.position }}</td><td class="p-2">{{ row.student_name }}</td><td class="p-2">{{ row.school_name }}</td><td class="p-2">{{ row.grade || '—' }}</td></tr></tbody>
+                </table>
+            </div>
+
+            <div v-if="schoolRankings?.length" class="p-4 rounded-xl border border-slate-200 bg-white space-y-2">
+                <h2 class="section-title !mb-0">Top schools / Sahodaya final ranking</h2>
+                <ol class="text-sm divide-y divide-slate-100">
+                    <li v-for="(row, index) in schoolRankings" :key="row.school_id" class="py-2 flex justify-between"><span><strong>#{{ index + 1 }}</strong> {{ row.school_name }}</span><span class="font-bold">{{ row.points }} points</span></li>
+                </ol>
+            </div>
 
             <h2 class="section-title">Approved qualifiers</h2>
             <ul class="text-sm space-y-1">
@@ -90,25 +119,29 @@ const props = defineProps({
     approvedQualifiers: Array,
     registrations: Array,
     judgeAssignments: { type: Array, default: () => [] },
+    publishedResults: { type: Array, default: () => [] },
+    schoolRankings: { type: Array, default: () => [] },
+    actionUrls: { type: Object, required: true },
 });
 
 const chestForm = useForm({});
+const publishForm = useForm({});
 const judgeForm = useForm({ item_id: '', item_code: '', user_email: '' });
 
 const markForms = reactive({});
 for (const registration of props.registrations || []) {
     const p = registration.participants?.[0];
     if (p) {
-        markForms[p.id] = { score: '', grade: '' };
+        markForms[p.id] = { score: p.mark?.score ?? '', grade: p.mark?.grade ?? '' };
     }
 }
 
 function assignChestNumbers() {
-    chestForm.post(`/admin/state-workspace/fest/${props.event.id}/assign-chest-numbers`, { preserveScroll: true });
+    chestForm.post(props.actionUrls.chestNumbers, { preserveScroll: true });
 }
 
 function assignJudge() {
-    judgeForm.post(`/admin/state-workspace/fest/${props.event.id}/judges`, {
+    judgeForm.post(props.actionUrls.judges, {
         preserveScroll: true,
         onSuccess: () => judgeForm.reset(),
     });
@@ -116,14 +149,19 @@ function assignJudge() {
 
 function unassignJudge(assignment) {
     if (!confirm('Remove this judge assignment?')) return;
-    router.delete(`/admin/state-workspace/fest/${props.event.id}/judges/${assignment.id}`, { preserveScroll: true });
+    router.delete(`${props.actionUrls.judges}/${assignment.id}`, { preserveScroll: true });
 }
 
 function enterMark(participant) {
-    router.post(`/admin/state-workspace/fest/${props.event.id}/marks`, {
+    router.post(props.actionUrls.marks, {
         participant_id: participant.id,
         score: markForms[participant.id].score || null,
         grade: markForms[participant.id].grade || null,
     }, { preserveScroll: true });
+}
+
+function publishResults() {
+    if (!confirm('Calculate positions from State-final marks and publish? Scoring will be locked.')) return;
+    publishForm.post(props.actionUrls.publishResults, { preserveScroll: true });
 }
 </script>

@@ -761,6 +761,11 @@ class FestEventSettingsController extends SahodayaAdminController
     {
         abort_if($classCategoryScheme->tenant_id !== $this->sahodaya->id, 403);
 
+        $inUse = FestEvent::forTenant($this->sahodaya->id)
+            ->where('fee_settings->class_group_scheme', (string) $classCategoryScheme->id)
+            ->exists();
+        abort_if($inUse, 422, 'This category scheme is used by one or more events. Reassign those events before deleting it.');
+
         $name = $classCategoryScheme->name;
         $classCategoryScheme->delete();
 
@@ -819,6 +824,13 @@ class FestEventSettingsController extends SahodayaAdminController
     {
         abort_if($classCategoryScheme->tenant_id !== $this->sahodaya->id, 403);
         abort_if($classCategorySchemeGroup->scheme_id !== $classCategoryScheme->id, 404);
+
+        $inUse = \App\Models\FestEventItem::where('class_group', $classCategorySchemeGroup->key)
+            ->whereHas('event', fn ($query) => $query
+                ->where('tenant_id', $this->sahodaya->id)
+                ->where('fee_settings->class_group_scheme', (string) $classCategoryScheme->id))
+            ->exists();
+        abort_if($inUse, 422, 'This category is used by one or more event items. Reassign those items before deleting it.');
 
         $classCategorySchemeGroup->delete();
 
