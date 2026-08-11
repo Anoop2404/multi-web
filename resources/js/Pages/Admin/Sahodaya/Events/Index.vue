@@ -163,10 +163,16 @@
                                     </button>
                                 </td>
                                 <td>{{ event.items_count }}</td>
-                                <td class="text-right">
+                                <td class="text-right whitespace-nowrap">
                                     <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}`" class="link-brand font-bold">
                                         Manage →
                                     </Link>
+                                    <button v-if="!event.registrations_count && !event.state_program_id"
+                                            type="button"
+                                            class="ml-3 text-xs font-semibold text-rose-600 hover:text-rose-800"
+                                            @click="deleteEvent(event)">
+                                        Delete
+                                    </button>
                                 </td>
                             </tr>
 
@@ -193,10 +199,16 @@
                                     </button>
                                 </td>
                                 <td class="text-xs text-slate-600">{{ child.items_count ?? 0 }}</td>
-                                <td class="text-right">
+                                <td class="text-right whitespace-nowrap">
                                     <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${child.id}`" class="text-xs font-bold text-indigo-700 hover:underline">
                                         Manage Region →
                                     </Link>
+                                    <button v-if="!child.registrations_count && !child.state_program_id"
+                                            type="button"
+                                            class="ml-3 text-xs font-semibold text-rose-600 hover:text-rose-800"
+                                            @click="deleteEvent(child)">
+                                        Delete
+                                    </button>
                                 </td>
                             </tr>
                         </template>
@@ -311,5 +323,12 @@ function createEvent() {
 
 function toggleNavHidden(event) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}/toggle-nav-hidden`, {}, { preserveScroll: true });
+}
+
+function deleteEvent(event) {
+    if (!window.confirm(`Delete "${event.title}"? This cannot be undone. Any sub-regions under it will be deleted too.`)) {
+        return;
+    }
+    router.delete(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}`, { preserveScroll: true });
 }
 </script>
