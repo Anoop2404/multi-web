@@ -624,6 +624,12 @@ class FestRegistrationController extends SchoolAdminController
         ?\App\Services\Events\FestHeadItemNavigationService $navService = null,
     ): FestEvent {
         $navService ??= app(\App\Services\Events\FestHeadItemNavigationService::class);
+        if ($event->parent_event_id && $event->parentEvent) {
+            app(\App\Services\Events\FestItemSyncService::class)
+                ->copyItemsToPartition($event->parentEvent, $event, $event->partition_role ?? 'region');
+            $event->unsetRelation('items');
+            $event->load('items');
+        }
         $limitService = new FestParticipationLimitService($event);
         $usage = $limitService->usageForSchool($this->school->id);
         $schedule = $feeService->resolveSchedule($event);

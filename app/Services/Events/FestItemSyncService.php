@@ -222,15 +222,12 @@ class FestItemSyncService
             return in_array($partitionRole, (array) $roles, true);
         }
 
-        // For sports meets and non-Kalotsav fests, conduct the complete catalogue in each
-        // region. Do not inherit Kalotsav's implicit off-stage/on-stage split.
-        if (in_array($hub->event_type, ['sports', 'english_fest', 'science_fest', 'kids_fest', 'teacher_fest'], true)) {
-            return in_array($partitionRole, ['region', 'cluster'], true);
+        // Conduct the complete catalogue in each region/cluster partition by default.
+        if (in_array($partitionRole, ['region', 'cluster'], true)) {
+            return true;
         }
 
         return match ($partitionRole) {
-            'region', 'cluster' => ($item->stage_type ?? '') === 'off_stage'
-                && ! in_array($item->participant_type, ['group', 'team'], true),
             'finale' => ($item->stage_type ?? '') === 'on_stage'
                 || in_array($item->participant_type, ['group', 'team'], true),
             default => true,
