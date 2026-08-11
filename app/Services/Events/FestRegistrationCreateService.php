@@ -367,8 +367,11 @@ class FestRegistrationCreateService
 
             // Editing the approved roster is a material change — send it back through
             // Sahodaya review rather than silently keeping the old approval.
-            if ($registration->status === 'approved') {
-                $registration->update(['status' => 'submitted', 'submitted_at' => now()]);
+            if ($registration->status === 'submitted' || $registration->status === 'approved') {
+                $newStatus = ($item->head?->requiresManualApproval() || $event->requiresManualApproval())
+                    ? 'submitted'
+                    : 'approved';
+                $registration->update(['status' => $newStatus, 'submitted_at' => now()]);
             }
 
             app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));

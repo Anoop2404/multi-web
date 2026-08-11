@@ -112,6 +112,9 @@ class FestRegistrationController extends SchoolAdminController
         $approvalService = app(\App\Services\Events\FestRegistrationApprovalService::class);
         foreach ($events as $eventToPromote) {
             $approvalService->promoteAllEligibleWaitlisted($eventToPromote);
+            if (! $eventToPromote->requiresManualApproval()) {
+                $approvalService->approveSchoolEvent($eventToPromote, $this->school->id);
+            }
         }
 
         $registrations = FestRegistration::where('school_id', $this->school->id)
@@ -361,7 +364,11 @@ class FestRegistrationController extends SchoolAdminController
             $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
         }
 
-        app(\App\Services\Events\FestRegistrationApprovalService::class)->promoteAllEligibleWaitlisted($event);
+        $approvalService = app(\App\Services\Events\FestRegistrationApprovalService::class);
+        $approvalService->promoteAllEligibleWaitlisted($event);
+        if (! $event->requiresManualApproval()) {
+            $approvalService->approveSchoolEvent($event, $this->school->id);
+        }
 
         $registrations = FestRegistration::where('school_id', $this->school->id)
             ->whereIn('event_id', $this->registrationEventIdsForSchoolView(collect([$event])))
