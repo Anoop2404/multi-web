@@ -421,7 +421,13 @@
                                     <option value="single">👤 Single</option>
                                     <option value="group">👥 Group</option>
                                 </select>
-                                <button v-if="itemSearch[event.id] || itemCategoryFilter[event.id] || itemStageFilter[event.id] || itemGroupFilter[event.id]"
+                                <select v-model="itemSort[event.id]" class="field text-xs !py-1.5 rounded-lg border-indigo-200 bg-indigo-50/50 font-medium text-indigo-900 min-w-[9.5rem]">
+                                    <option value="">Sort: Default</option>
+                                    <option value="category">Sort by Category (Cat 1 → 5)</option>
+                                    <option value="stage">Sort by Stage (On-stage first)</option>
+                                    <option value="name">Sort by Item Name (A → Z)</option>
+                                </select>
+                                <button v-if="itemSearch[event.id] || itemCategoryFilter[event.id] || itemStageFilter[event.id] || itemGroupFilter[event.id] || itemSort[event.id]"
                                         type="button" class="btn-ghost text-xs !py-1 text-slate-600 hover:text-slate-900"
                                         @click="clearItemFilters(event.id)">
                                     Clear
@@ -960,6 +966,7 @@ const itemSearch = reactive({});
 const itemCategoryFilter = reactive({});
 const itemStageFilter = reactive({});
 const itemGroupFilter = reactive({});
+const itemSort = reactive({});
 
 function allItemsStatic(event) {
     return event?.items ?? [];
@@ -984,6 +991,7 @@ for (const e of props.events) {
     itemCategoryFilter[e.id] = '';
     itemStageFilter[e.id] = '';
     itemGroupFilter[e.id] = '';
+    itemSort[e.id] = '';
     for (const item of allItemsStatic(e)) {
         itemForms[itemFormKey(e.id, item.id)] = {
             team_name: '',
@@ -1004,6 +1012,7 @@ function clearItemFilters(eventId) {
     itemCategoryFilter[eventId] = '';
     itemStageFilter[eventId] = '';
     itemGroupFilter[eventId] = '';
+    itemSort[eventId] = '';
 }
 
 function allItems(event) {
@@ -1019,46 +1028,75 @@ function filteredAllItems(event) {
     const catFilter = itemCategoryFilter[eventId] ?? '';
     const stageFilter = itemStageFilter[eventId] ?? '';
     const groupFilter = itemGroupFilter[eventId] ?? '';
+    const sortMode = itemSort[eventId] ?? '';
 
-    if (!query && !catFilter && !stageFilter && !groupFilter) {
-        return rawItems;
+    let items = rawItems;
+
+    if (query || catFilter || stageFilter || groupFilter) {
+        items = rawItems.filter((item) => {
+            if (query) {
+                const title = String(item.clean_title || item.title || item.name || '').toLowerCase();
+                const code = String(item.item_code || '').toLowerCase();
+                if (!title.includes(query) && !code.includes(query)) {
+                    return false;
+                }
+            }
+
+            if (catFilter) {
+                const grp = normalizedClassGroup(item.class_group);
+                if (catFilter === 'category1' && !['lp', 'category1', 'cat1', 'cc1'].includes(grp)) return false;
+                if (catFilter === 'category2' && !['up', 'category2', 'cat2', 'cc2'].includes(grp)) return false;
+                if (catFilter === 'category3' && !['hs', 'category3', 'cat3', 'cc3'].includes(grp)) return false;
+                if (catFilter === 'category4' && !['hss', 'category4', 'cat4', 'cc4'].includes(grp)) return false;
+                if (catFilter === 'open' && grp !== 'open' && !['category5', 'cat5', 'cc5'].includes(grp)) return false;
+            }
+
+            if (stageFilter) {
+                const sm = String(item.stage_mode || '').toLowerCase();
+                const title = String(item.title || item.name || '').toLowerCase();
+                const isOn = sm.includes('on') || item.is_onstage === true;
+                const isOff = sm.includes('off') || item.is_onstage === false || title.includes('offstage') || title.includes('off stage') || title.includes('painting') || title.includes('drawing') || title.includes('essay');
+                if (stageFilter === 'on_stage' && isOff && !isOn) return false;
+                if (stageFilter === 'off_stage' && isOn && !isOff) return false;
+            }
+
+            if (groupFilter) {
+                const isGrp = ['group', 'team'].includes(item.participant_type);
+                if (groupFilter === 'group' && !isGrp) return false;
+                if (groupFilter === 'single' && isGrp) return false;
+            }
+
+            return true;
+        });
+    } else {
+        items = [...rawItems];
     }
 
-    return rawItems.filter((item) => {
-        if (query) {
-            const title = String(item.clean_title || item.title || item.name || '').toLowerCase();
-            const code = String(item.item_code || '').toLowerCase();
-            if (!title.includes(query) && !code.includes(query)) {
-                return false;
-            }
+    if (sortMode) {
+        items = [...items];
+        if (sortMode === 'category') {
+            const catOrder = { lp: 1, category1: 1, cat1: 1, cc1: 1, up: 2, category2: 2, cat2: 2, cc2: 2, hs: 3, category3: 3, cat3: 3, cc3: 3, hss: 4, category4: 4, cat4: 4, cc4: 4, open: 5, category5: 5, cat5: 5, cc5: 5 };
+            items.sort((a, b) => {
+                const orderA = catOrder[normalizedClassGroup(a.class_group)] ?? 99;
+                const orderB = catOrder[normalizedClassGroup(b.class_group)] ?? 99;
+                return orderA - orderB;
+            });
+        } else if (sortMode === 'stage') {
+            items.sort((a, b) => {
+                const smA = String(a.stage_mode || '').toLowerCase().includes('on') || a.is_onstage === true ? 1 : 2;
+                const smB = String(b.stage_mode || '').toLowerCase().includes('on') || b.is_onstage === true ? 1 : 2;
+                return smA - smB;
+            });
+        } else if (sortMode === 'name') {
+            items.sort((a, b) => {
+                const titleA = String(a.clean_title || a.title || a.name || '').toLowerCase();
+                const titleB = String(b.clean_title || b.title || b.name || '').toLowerCase();
+                return titleA.localeCompare(titleB);
+            });
         }
+    }
 
-        if (catFilter) {
-            const grp = normalizedClassGroup(item.class_group);
-            if (catFilter === 'category1' && !['lp', 'category1', 'cat1', 'cc1'].includes(grp)) return false;
-            if (catFilter === 'category2' && !['up', 'category2', 'cat2', 'cc2'].includes(grp)) return false;
-            if (catFilter === 'category3' && !['hs', 'category3', 'cat3', 'cc3'].includes(grp)) return false;
-            if (catFilter === 'category4' && !['hss', 'category4', 'cat4', 'cc4'].includes(grp)) return false;
-            if (catFilter === 'open' && grp !== 'open' && !['category5', 'cat5', 'cc5'].includes(grp)) return false;
-        }
-
-        if (stageFilter) {
-            const sm = String(item.stage_mode || '').toLowerCase();
-            const title = String(item.title || item.name || '').toLowerCase();
-            const isOn = sm.includes('on') || item.is_onstage === true;
-            const isOff = sm.includes('off') || item.is_onstage === false || title.includes('offstage') || title.includes('off stage') || title.includes('painting') || title.includes('drawing') || title.includes('essay');
-            if (stageFilter === 'on_stage' && isOff && !isOn) return false;
-            if (stageFilter === 'off_stage' && isOn && !isOff) return false;
-        }
-
-        if (groupFilter) {
-            const isGrp = ['group', 'team'].includes(item.participant_type);
-            if (groupFilter === 'group' && !isGrp) return false;
-            if (groupFilter === 'single' && isGrp) return false;
-        }
-
-        return true;
-    });
+    return items;
 }
 
 function formatMoney(value) {
