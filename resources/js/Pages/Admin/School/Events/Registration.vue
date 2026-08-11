@@ -1049,11 +1049,11 @@ function requireVerifiedForEvent(event) {
 }
 
 const GROUP_ALIASES = {
-    lp: ['lp', 'category1', 'categoryi', 'cat1', 'cati', 'category_1'],
-    up: ['up', 'category2', 'categoryii', 'cat2', 'catii', 'category_2'],
-    hs: ['hs', 'category3', 'categoryiii', 'cat3', 'catiii', 'category_3'],
-    hss: ['hss', 'category4', 'categoryiv', 'cat4', 'cativ', 'category_4'],
-    open: ['open', 'category5', 'categoryv', 'cat5', 'catv', 'category_5'],
+    lp: ['lp', 'category1', 'categoryi', 'cat1', 'cati', 'category_1', 'cc1'],
+    up: ['up', 'category2', 'categoryii', 'cat2', 'catii', 'category_2', 'cc2'],
+    hs: ['hs', 'category3', 'categoryiii', 'cat3', 'catiii', 'category_3', 'cc3'],
+    hss: ['hss', 'category4', 'categoryiv', 'cat4', 'cativ', 'category_4', 'cc4'],
+    open: ['open', 'category5', 'categoryv', 'cat5', 'catv', 'category_5', 'cc5'],
 };
 
 function normalizedClassGroup(value) {

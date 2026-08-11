@@ -27,11 +27,11 @@ class FestClassGroupScheme
         $compact = strtolower((string) preg_replace('/[^a-z0-9]+/i', '', $trimmed));
 
         return match ($compact) {
-            'lp', 'category1', 'categoryi', 'cat1', 'cati' => 'lp',
-            'up', 'category2', 'categoryii', 'cat2', 'catii' => 'up',
-            'hs', 'category3', 'categoryiii', 'cat3', 'catiii' => 'hs',
-            'hss', 'category4', 'categoryiv', 'cat4', 'cativ' => 'hss',
-            'open', 'category5', 'categoryv', 'cat5', 'catv' => 'open',
+            'lp', 'category1', 'categoryi', 'cat1', 'cati', 'cc1' => 'lp',
+            'up', 'category2', 'categoryii', 'cat2', 'catii', 'cc2' => 'up',
+            'hs', 'category3', 'categoryiii', 'cat3', 'catiii', 'cc3' => 'hs',
+            'hss', 'category4', 'categoryiv', 'cat4', 'cativ', 'cc4' => 'hss',
+            'open', 'category5', 'categoryv', 'cat5', 'catv', 'cc5' => 'open',
             default => $trimmed,
         };
     }
