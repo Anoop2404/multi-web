@@ -122,6 +122,10 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             // State Event Conduct, Phase 2 (docs/STATE_EVENT_CONDUCT_PLAN.md)
             Route::get('/fest/{event}/attendance', [\App\Http\Controllers\StateAdmin\StateAttendanceController::class, 'index'])->name('fest.attendance.index');
             Route::post('/fest/{event}/attendance', [\App\Http\Controllers\StateAdmin\StateAttendanceController::class, 'store'])->name('fest.attendance.store');
+            // State Event Conduct, Phase 3 + 4 (docs/STATE_EVENT_CONDUCT_PLAN.md)
+            Route::post('/fest/{event}/judges', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'assignJudge'])->name('fest.judges.assign');
+            Route::delete('/fest/{event}/judges/{assignment}', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'unassignJudge'])->name('fest.judges.unassign');
+            Route::post('/fest/{event}/marks', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'enterMark'])->name('fest.marks.enter');
         });
 
         Route::get('/sports', [\App\Http\Controllers\Admin\SportsResultsController::class, 'index'])->name('sports.index');
@@ -1551,6 +1555,17 @@ Route::prefix('portal/judge/{tenantId}')
         Route::get('/', [JudgeDashboardController::class, 'index'])->name('dashboard');
         Route::get('/events/{event}/marks', [JudgeDashboardController::class, 'marks'])->name('marks');
         Route::post('/events/{event}/marks', [JudgeDashboardController::class, 'storeMark'])->name('marks.store');
+    });
+
+// State Event Conduct, Phase 3 (docs/STATE_EVENT_CONDUCT_PLAN.md) — no {tenantId}/tenancy
+// initialization, State isn't a tenant.
+Route::prefix('portal/state-judge')
+    ->name('portal.state-judge.')
+    ->middleware(['web', 'auth', 'password.change', 'state.judge.portal'])
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\Portal\StateJudgeDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/events/{event}/marks', [\App\Http\Controllers\Portal\StateJudgeDashboardController::class, 'marks'])->name('marks');
+        Route::post('/events/{event}/marks', [\App\Http\Controllers\Portal\StateJudgeDashboardController::class, 'storeMark'])->name('marks.store');
     });
 
 Route::prefix('portal/fest-coordinator/{tenantId}')

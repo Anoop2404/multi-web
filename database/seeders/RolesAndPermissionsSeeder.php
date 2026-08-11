@@ -43,6 +43,7 @@ class RolesAndPermissionsSeeder extends Seeder
         Role::firstOrCreate(['name' => 'mark_entry_admin',       'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'mark_entry_coordinator', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'judge',                  'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'state_judge',             'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'student',                'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'teacher',                'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'exam_controller',        'guard_name' => 'web']);
