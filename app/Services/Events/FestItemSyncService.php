@@ -22,12 +22,21 @@ class FestItemSyncService
         $count = 0;
 
         foreach ($program->items()->orderBy('display_order')->get() as $stateItem) {
+            $existing = FestEventItem::where('event_id', $event->id)
+                ->where('state_program_item_id', $stateItem->id)
+                ->first();
+
+            $attrs = $stateItem->toTenantAttributes();
+            if ($existing) {
+                unset($attrs['is_enabled']);
+            }
+
             FestEventItem::updateOrCreate(
                 [
                     'event_id'              => $event->id,
                     'state_program_item_id' => $stateItem->id,
                 ],
-                $stateItem->toTenantAttributes()
+                $attrs
             );
             $count++;
         }
