@@ -102,7 +102,7 @@ const isStateStaff = computed(() => userRoles.value.includes('state_staff'));
 const isSuperAdmin = computed(() => userRoles.value.includes('superadmin'));
 const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
 
-// State admin sees a limited nav
+// State admin sees full state workspace nav
 const stateNavGroups = computed(() => [
     {
         label: 'Overview',
@@ -111,9 +111,17 @@ const stateNavGroups = computed(() => [
         ],
     },
     {
-        label: 'State Programs',
+        label: 'State Workspace',
         items: [
-            { href: '/admin/kalotsav', icon: '🎭', label: 'Kalotsav' },
+            { href: '/admin/state-workspace/qualifiers', icon: '📥', label: 'Qualifier Intakes' },
+            { href: '/admin/state-workspace/fest',       icon: '🏆', label: 'State Finals' },
+            { href: '/admin/kalotsav',                 icon: '🎭', label: 'Cross-Cluster View' },
+        ],
+    },
+    {
+        label: 'State Configuration',
+        items: [
+            { href: '/admin/state-programs', icon: '📋', label: 'State Programs' },
         ],
     },
     {
