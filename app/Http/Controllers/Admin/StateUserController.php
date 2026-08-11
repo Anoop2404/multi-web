@@ -78,6 +78,9 @@ class StateUserController extends Controller
             \App\Models\PlatformRole::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
         }
         $user->syncRoles($data['roles']);
+        if ($centralUser = \App\Models\User::find($user->id)) {
+            $centralUser->syncRoles($data['roles']);
+        }
 
         $audit->userCreated($user);
 
@@ -86,7 +89,7 @@ class StateUserController extends Controller
 
     public function update(Request $request, PlatformUser $user, PlatformAuditLogger $audit)
     {
-        abort_unless($user->tenant_id === null && $user->hasAnyRole(['state_admin', 'state_staff']), 404);
+        abort_unless($user->tenant_id === null && ($user->hasAnyRole(['state_admin', 'state_staff']) || $user->isStateUser()), 404);
 
         $roles = ['state_admin', 'state_staff'];
 
@@ -113,6 +116,9 @@ class StateUserController extends Controller
             \App\Models\PlatformRole::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
         }
         $user->syncRoles($data['roles']);
+        if ($centralUser = \App\Models\User::find($user->id)) {
+            $centralUser->syncRoles($data['roles']);
+        }
 
         $audit->userUpdated($user);
 
@@ -121,7 +127,7 @@ class StateUserController extends Controller
 
     public function destroy(PlatformUser $user, PlatformAuditLogger $audit)
     {
-        abort_unless($user->tenant_id === null && $user->hasAnyRole(['state_admin', 'state_staff']), 404);
+        abort_unless($user->tenant_id === null && ($user->hasAnyRole(['state_admin', 'state_staff']) || $user->isStateUser()), 404);
         abort_if($user->id === auth()->id(), 403, 'You cannot delete your own account.');
 
         $audit->userDeleted($user);

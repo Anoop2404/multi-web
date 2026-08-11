@@ -71,6 +71,52 @@ class PlatformUser extends Authenticatable implements MustVerifyEmail
             ->exists();
     }
 
+    public function isStateUser(): bool
+    {
+        if ($this->tenant_id !== null) {
+            return false;
+        }
+
+        try {
+            if ($this->hasAnyRole(['state_admin', 'state_staff'])) {
+                return true;
+            }
+        } catch (\Throwable) {
+        }
+
+        return \Illuminate\Support\Facades\DB::connection(config('tenancy.database.central_connection', 'central'))
+            ->table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->whereIn('roles.name', ['state_admin', 'state_staff'])
+            ->where('roles.guard_name', $this->guard_name)
+            ->where('model_has_roles.model_id', $this->id)
+            ->whereIn('model_has_roles.model_type', [self::class, User::class])
+            ->exists();
+    }
+
+    public function hasStateStaffRole(): bool
+    {
+        if ($this->tenant_id !== null) {
+            return false;
+        }
+
+        try {
+            if ($this->hasRole('state_staff')) {
+                return true;
+            }
+        } catch (\Throwable) {
+        }
+
+        return \Illuminate\Support\Facades\DB::connection(config('tenancy.database.central_connection', 'central'))
+            ->table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('roles.name', 'state_staff')
+            ->where('roles.guard_name', $this->guard_name)
+            ->where('model_has_roles.model_id', $this->id)
+            ->whereIn('model_has_roles.model_type', [self::class, User::class])
+            ->exists();
+    }
+
     public function getRoleClass(): string
     {
         return PlatformRole::class;

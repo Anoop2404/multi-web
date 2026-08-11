@@ -375,7 +375,7 @@ class AuthController extends Controller
             return route('admin.dashboard');
         }
 
-        if ($user->hasAnyRole(['state_admin', 'state_staff'])) {
+        if ($user->hasAnyRole(['state_admin', 'state_staff']) || (method_exists($user, 'isStateUser') && $user->isStateUser())) {
             return route('admin.state.dashboard');
         }
 
@@ -495,7 +495,7 @@ class AuthController extends Controller
             if ($user->isSuperAdmin()) {
                 return null;
             }
-            if ($user->hasAnyRole(['state_admin', 'state_staff'])) {
+            if ($user->hasAnyRole(['state_admin', 'state_staff']) || (method_exists($user, 'isStateUser') && $user->isStateUser())) {
                 return null; // state admins log in at the central domain
             }
             if ($user->hasAnyRole(array_merge(

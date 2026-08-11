@@ -23,14 +23,19 @@ class EnsureStateAdmin
             return $next($request);
         }
 
-        if (! $user->hasAnyRole(['state_admin', 'state_staff'])) {
+        $isStateUser = $user->hasAnyRole(['state_admin', 'state_staff'])
+            || (method_exists($user, 'isStateUser') && $user->isStateUser());
+
+        if (! $isStateUser) {
             abort(403, 'State admin access required.');
         }
 
-        $request->attributes->set('isStateStaff', $user->hasRole('state_staff'));
+        $isStaff = $user->hasRole('state_staff')
+            || (method_exists($user, 'hasStateStaffRole') && $user->hasStateStaffRole());
 
-        if ($user->hasRole('state_staff')
-            && ! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
+        $request->attributes->set('isStateStaff', $isStaff);
+
+        if ($isStaff && ! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
             abort(403, 'View-only access. Contact your state administrator.');
         }
 

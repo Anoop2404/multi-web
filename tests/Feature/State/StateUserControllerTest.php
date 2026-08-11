@@ -110,4 +110,26 @@ class StateUserControllerTest extends TestCase
         $this->assertDatabaseHas('users', ['email' => 'autorole@test.com']);
         $this->assertDatabaseHas('roles', ['name' => 'state_admin', 'guard_name' => 'web']);
     }
+
+    public function test_created_state_user_can_login_and_access_dashboard(): void
+    {
+        $superadmin = PlatformUser::where('email', 'admin@sahodaya.test')->first();
+
+        $this->actingAs($superadmin)->post('/admin/state-users', [
+            'name'     => 'State Admin Login Test',
+            'email'    => 'statelogin@test.com',
+            'password' => 'password123',
+            'roles'    => ['state_admin'],
+        ]);
+
+        $this->post('/logout');
+
+        $loginResponse = $this->post('/login', [
+            'email'    => 'statelogin@test.com',
+            'password' => 'password123',
+        ]);
+
+        $loginResponse->assertRedirect(route('admin.state.dashboard'));
+        $this->assertAuthenticated();
+    }
 }
