@@ -452,7 +452,7 @@ class FestEventController extends SahodayaAdminController
         $data = $request->validate($rules);
 
         if ($event->isStateProgram()) {
-            unset($data['title'], $data['event_type']);
+            unset($data['event_type']);
         }
 
         if (isset($data['conduct_levels'])) {
