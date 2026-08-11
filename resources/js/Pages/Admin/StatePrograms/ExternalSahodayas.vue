@@ -16,7 +16,7 @@
                     <input v-model="form.name" class="field sm:col-span-2" placeholder="Sahodaya name" required>
                     <input v-model="form.contact_name" class="field" placeholder="Contact name (optional)">
                     <input v-model="form.contact_phone" class="field" placeholder="Contact phone (optional)">
-                    <input v-model="form.contact_email" class="field sm:col-span-2" type="email" placeholder="Contact email (optional)">
+                    <input v-model="form.contact_email" class="field sm:col-span-2" type="email" placeholder="Contact email — strongly recommended, enables the OTP sign-in check">
                     <button class="btn-primary sm:col-span-2" :disabled="form.processing">Add Sahodaya</button>
                 </form>
 
@@ -34,6 +34,8 @@
                             <p class="text-xs mt-1">
                                 <span class="font-mono font-semibold text-indigo-700">{{ s.access_code }}</span>
                                 <a :href="`${portalUrl}/${s.access_code}`" target="_blank" class="ml-2 text-indigo-600 hover:underline">Open portal ↗</a>
+                                <span v-if="s.contact_email" class="ml-2 text-emerald-600" title="OTP verification active">🔒 OTP on</span>
+                                <span v-else class="ml-2 text-amber-600" title="No email on file — access-code-only">⚠ code-only</span>
                             </p>
                         </div>
                         <button type="button" @click="toggleStatus(s)" class="text-xs px-3 py-1.5 rounded-lg border"

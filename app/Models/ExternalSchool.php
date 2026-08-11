@@ -21,9 +21,22 @@ class ExternalSchool extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'external_sahodaya_id', 'name', 'contact_name', 'contact_phone',
-        'access_code', 'status',
+        'external_sahodaya_id', 'name', 'contact_name', 'contact_phone', 'contact_email',
+        'access_code', 'status', 'otp_code_hash', 'otp_expires_at', 'otp_last_sent_at', 'otp_attempts',
     ];
+
+    protected $casts = [
+        'otp_expires_at'   => 'datetime',
+        'otp_last_sent_at' => 'datetime',
+    ];
+
+    protected $hidden = ['otp_code_hash'];
+
+    /** See ExternalSahodaya::requiresOtp() — same fallback rationale. */
+    public function requiresOtp(): bool
+    {
+        return filled($this->contact_email);
+    }
 
     public function sahodaya(): BelongsTo
     {

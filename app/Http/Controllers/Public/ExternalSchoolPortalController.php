@@ -6,12 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\ExternalSchool;
 use App\Models\FestStateProgramItem;
 use App\Models\State\StateQualifierEntry;
+use App\Services\External\ExternalPortalOtpService;
 use App\Services\State\ExternalIntakeService;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 
 /**
- * Code-gated school portal — a school under an outside Sahodaya enters its own qualified
- * students directly. See docs/STATE_LEVEL_KALOTSAV_ROLLOUT_PLAN.md §2.1.
+ * Code-gated school portal, now with an email+OTP checkpoint on top of the access code (P-02,
+ * see ExternalPortalOtpService). A school added before contact_email was captured falls back
+ * to access-code-only rather than being locked out.
  */
 class ExternalSchoolPortalController extends Controller
 {
@@ -69,7 +72,50 @@ class ExternalSchoolPortalController extends Controller
         return back()->with('success', 'Entry removed.');
     }
 
-    private function resolve(string $code): ExternalSchool
+    public function showVerify(string $code)
+    {
+        $school = $this->find($code);
+
+        if (! $school->requiresOtp() || app(ExternalPortalOtpService::class)->isSessionVerified($school)) {
+            return redirect()->route('state.external.school.show', $school->access_code);
+        }
+
+        return view('external.verify-otp', [
+            'portalType'  => 'school',
+            'name'        => $school->name,
+            'email'       => $school->contact_email,
+            'code'        => $school->access_code,
+            'sendRoute'   => route('state.external.school.verify.send', $school->access_code),
+            'checkRoute'  => route('state.external.school.verify.check', $school->access_code),
+            'hasPending'  => filled($school->otp_code_hash) && $school->otp_expires_at?->isFuture(),
+        ]);
+    }
+
+    public function sendOtp(string $code, ExternalPortalOtpService $otp)
+    {
+        $school = $this->find($code);
+        $otp->issue($school);
+
+        return back()->with('success', "Code sent to {$this->maskEmail($school->contact_email)}.");
+    }
+
+    public function checkOtp(Request $request, string $code, ExternalPortalOtpService $otp)
+    {
+        $school = $this->find($code);
+
+        $data = $request->validate(['otp' => 'required|string|max:6']);
+
+        if (! $otp->verify($school, $data['otp'])) {
+            return back()->withErrors(['otp' => 'That code is incorrect or has expired.']);
+        }
+
+        $otp->markSessionVerified($school);
+
+        return redirect()->route('state.external.school.show', $school->access_code);
+    }
+
+    /** Lookup + active checks only — no OTP gate. Used by the verify screen itself. */
+    private function find(string $code): ExternalSchool
     {
         $school = ExternalSchool::where('access_code', strtoupper($code))->first();
 
@@ -78,5 +124,30 @@ class ExternalSchoolPortalController extends Controller
         abort_unless($school->sahodaya?->isActive(), 403, 'Your Sahodaya\'s access has been disabled. Contact the State Kalolsavam office.');
 
         return $school;
+    }
+
+    /** Lookup + active checks + OTP gate. Used by every real portal action. */
+    private function resolve(string $code): ExternalSchool
+    {
+        $school = $this->find($code);
+
+        if ($school->requiresOtp() && ! app(ExternalPortalOtpService::class)->isSessionVerified($school)) {
+            throw new HttpResponseException(
+                redirect()->route('state.external.school.verify.show', $school->access_code)
+            );
+        }
+
+        return $school;
+    }
+
+    private function maskEmail(?string $email): string
+    {
+        if (! $email || ! str_contains($email, '@')) {
+            return 'your registered email';
+        }
+
+        [$local, $domain] = explode('@', $email, 2);
+
+        return substr($local, 0, 2).str_repeat('*', max(strlen($local) - 2, 1)).'@'.$domain;
     }
 }

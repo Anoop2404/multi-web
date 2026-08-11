@@ -121,7 +121,13 @@
             </div>
         </div>
 
-        <p class="portal-footer-note">Keep this link and your access code ({{ $school->access_code }}) safe.</p>
+        <p class="portal-footer-note">
+            @if($school->requiresOtp())
+                Keep this link safe. Even so, we also verify the code emailed to {{ $school->contact_email }} on every new sign-in.
+            @else
+                Keep this link and your access code ({{ $school->access_code }}) safe. Ask your Sahodaya coordinator to add a contact email for your school to enable a second verification step.
+            @endif
+        </p>
     </div>
 </div>
 @endsection

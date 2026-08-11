@@ -1681,10 +1681,18 @@ Route::prefix('state/external')->name('state.external.')->middleware(['web', 'th
     Route::get('/{code}', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'show'])->name('sahodaya.show');
     Route::post('/{code}/schools', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'storeSchool'])->name('sahodaya.schools.store');
     Route::post('/{code}/submit', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'submit'])->name('sahodaya.submit');
+    // P-02 email+OTP checkpoint (docs/STATE_KALOTSAV_MASTER_IMPLEMENTATION_PLAN.md §23) — tighter
+    // throttle than the portal itself since this is where a code-guessing attack would land.
+    Route::get('/{code}/verify', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'showVerify'])->name('sahodaya.verify.show');
+    Route::post('/{code}/verify/send', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'sendOtp'])->name('sahodaya.verify.send')->middleware('throttle:6,1');
+    Route::post('/{code}/verify/check', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'checkOtp'])->name('sahodaya.verify.check')->middleware('throttle:10,1');
 
     Route::get('/school/{code}', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'show'])->name('school.show');
     Route::post('/school/{code}/entries', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'store'])->name('school.entries.store');
     Route::delete('/school/{code}/entries/{entry}', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'destroy'])->name('school.entries.destroy');
+    Route::get('/school/{code}/verify', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'showVerify'])->name('school.verify.show');
+    Route::post('/school/{code}/verify/send', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'sendOtp'])->name('school.verify.send')->middleware('throttle:6,1');
+    Route::post('/school/{code}/verify/check', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'checkOtp'])->name('school.verify.check')->middleware('throttle:10,1');
 });
 
 Route::get('/state/results', [\App\Http\Controllers\Public\StatePublicResultsController::class, 'index'])
