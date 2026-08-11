@@ -397,6 +397,42 @@
                 <!-- ── KALOTSAV / KIDS FEST / TEACHER FEST / ENGLISH FEST / SCIENCE FEST: generic flat table ── -->
                 <form v-else v-show="getTab(event.id) === 'items'" :id="`item-registration-${event.id}`" class="mt-4 space-y-4" @submit.prevent>
                     <div class="rounded-xl border border-gray-100 overflow-hidden bg-white shadow-sm">
+                        <!-- 3-Type Quick Tabs (On-stage Individual, On-stage Group, Off-stage) -->
+                        <div class="px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 flex flex-wrap gap-2 text-xs font-semibold">
+                            <button type="button" @click="itemTypeTab[event.id] = 'all'"
+                                    class="px-3 py-1.5 rounded-lg transition flex items-center gap-1.5"
+                                    :class="itemTypeTab[event.id] === 'all' ? 'bg-[#0f3d7a] text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-200/70 border border-slate-200'">
+                                <span>All Items</span>
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px]" :class="itemTypeTab[event.id] === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'">
+                                    {{ itemCountsByCompetitionType(event).all }}
+                                </span>
+                            </button>
+                            <button type="button" @click="itemTypeTab[event.id] = 'on_stage_single'"
+                                    class="px-3 py-1.5 rounded-lg transition flex items-center gap-1.5"
+                                    :class="itemTypeTab[event.id] === 'on_stage_single' ? 'bg-indigo-700 text-white shadow-sm' : 'bg-white text-indigo-900 hover:bg-indigo-50 border border-indigo-200'">
+                                <span>🎭 On-stage Individual</span>
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px]" :class="itemTypeTab[event.id] === 'on_stage_single' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'">
+                                    {{ itemCountsByCompetitionType(event).on_stage_single }}
+                                </span>
+                            </button>
+                            <button type="button" @click="itemTypeTab[event.id] = 'on_stage_group'"
+                                    class="px-3 py-1.5 rounded-lg transition flex items-center gap-1.5"
+                                    :class="itemTypeTab[event.id] === 'on_stage_group' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-white text-emerald-900 hover:bg-emerald-50 border border-emerald-200'">
+                                <span>👥 On-stage Group</span>
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px]" :class="itemTypeTab[event.id] === 'on_stage_group' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'">
+                                    {{ itemCountsByCompetitionType(event).on_stage_group }}
+                                </span>
+                            </button>
+                            <button type="button" @click="itemTypeTab[event.id] = 'off_stage'"
+                                    class="px-3 py-1.5 rounded-lg transition flex items-center gap-1.5"
+                                    :class="itemTypeTab[event.id] === 'off_stage' ? 'bg-amber-700 text-white shadow-sm' : 'bg-white text-amber-900 hover:bg-amber-50 border border-amber-200'">
+                                <span>🎨 Off-stage</span>
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px]" :class="itemTypeTab[event.id] === 'off_stage' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900'">
+                                    {{ itemCountsByCompetitionType(event).off_stage }}
+                                </span>
+                            </button>
+                        </div>
+
                         <!-- Search & Filter Controls Bar -->
                         <div class="px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap gap-2.5 items-center justify-between">
                             <div class="flex flex-wrap gap-2 items-center flex-1 min-w-[280px]">
@@ -967,6 +1003,7 @@ const itemCategoryFilter = reactive({});
 const itemStageFilter = reactive({});
 const itemGroupFilter = reactive({});
 const itemSort = reactive({});
+const itemTypeTab = reactive({});
 
 function allItemsStatic(event) {
     return event?.items ?? [];
@@ -992,6 +1029,7 @@ for (const e of props.events) {
     itemStageFilter[e.id] = '';
     itemGroupFilter[e.id] = '';
     itemSort[e.id] = '';
+    itemTypeTab[e.id] = 'all';
     for (const item of allItemsStatic(e)) {
         itemForms[itemFormKey(e.id, item.id)] = {
             team_name: '',
@@ -1013,6 +1051,30 @@ function clearItemFilters(eventId) {
     itemStageFilter[eventId] = '';
     itemGroupFilter[eventId] = '';
     itemSort[eventId] = '';
+    itemTypeTab[eventId] = 'all';
+}
+
+function itemCompetitionType(item) {
+    const sm = String(item.stage_mode || '').toLowerCase();
+    const title = String(item.title || item.name || '').toLowerCase();
+    const isGrp = ['group', 'team'].includes(item.participant_type);
+    const isOff = sm.includes('off') || item.is_onstage === false || title.includes('offstage') || title.includes('off stage') || title.includes('painting') || title.includes('drawing') || title.includes('essay') || title.includes('story') || title.includes('versification') || title.includes('quiz') || title.includes('carrom') || title.includes('chess');
+
+    if (isOff) return 'off_stage';
+    if (isGrp) return 'on_stage_group';
+    return 'on_stage_single';
+}
+
+function itemCountsByCompetitionType(event) {
+    const items = event?.items ?? [];
+    const counts = { all: items.length, on_stage_single: 0, on_stage_group: 0, off_stage: 0 };
+    for (const item of items) {
+        const type = itemCompetitionType(item);
+        if (counts[type] !== undefined) {
+            counts[type]++;
+        }
+    }
+    return counts;
 }
 
 function allItems(event) {
@@ -1029,11 +1091,16 @@ function filteredAllItems(event) {
     const stageFilter = itemStageFilter[eventId] ?? '';
     const groupFilter = itemGroupFilter[eventId] ?? '';
     const sortMode = itemSort[eventId] ?? '';
+    const activeTab = itemTypeTab[eventId] ?? 'all';
 
     let items = rawItems;
 
+    if (activeTab !== 'all') {
+        items = items.filter(item => itemCompetitionType(item) === activeTab);
+    }
+
     if (query || catFilter || stageFilter || groupFilter) {
-        items = rawItems.filter((item) => {
+        items = items.filter((item) => {
             if (query) {
                 const title = String(item.clean_title || item.title || item.name || '').toLowerCase();
                 const code = String(item.item_code || '').toLowerCase();
