@@ -140,6 +140,10 @@ class FestCompetitionTypeRegistry
             $keys = array_keys(config('fest_competition_types', []));
         }
 
+        if (array_intersect(['kalotsav', 'kalotsavam', 'kalolsavam'], $keys)) {
+            $keys = array_unique(array_merge($keys, ['kalotsav', 'kalotsavam', 'kalolsavam']));
+        }
+
         return Rule::in($keys);
     }
 
