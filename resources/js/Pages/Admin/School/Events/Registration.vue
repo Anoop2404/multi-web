@@ -239,18 +239,33 @@
 
                 <div class="p-5">
                 <!-- Kalotsav-style participation quotas -->
-                <div v-if="event.quotas && eventType === 'kalolsavam'" class="grid sm:grid-cols-3 gap-2 mb-4">
-                    <div class="bg-gray-50 border rounded-lg px-3 py-2 text-xs">
-                        <span class="text-gray-500">On-stage</span>
-                        <p class="font-semibold">{{ event.quotas.used.on_stage }}/{{ limitLabel(event.quotas.limits?.max_onstage_per_student) }}</p>
+                <div v-if="event.quotas && eventType === 'kalolsavam'" class="grid sm:grid-cols-3 gap-3 mb-4">
+                    <div class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs flex items-center justify-between">
+                        <div>
+                            <span class="font-semibold text-indigo-900 block">🎭 On-stage Individual Quota</span>
+                            <span class="text-[11px] text-indigo-700/80">Max items allowed per student</span>
+                        </div>
+                        <span class="font-bold text-xs px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-900 border border-indigo-200 shrink-0">
+                            {{ limitLabel(event.quotas.limits?.max_onstage_per_student) }} max / student
+                        </span>
                     </div>
-                    <div class="bg-gray-50 border rounded-lg px-3 py-2 text-xs">
-                        <span class="text-gray-500">Off-stage</span>
-                        <p class="font-semibold">{{ event.quotas.used.off_stage }}/{{ limitLabel(event.quotas.limits?.max_offstage_per_student) }}</p>
+                    <div class="bg-amber-50/60 border border-amber-100 rounded-xl p-3 text-xs flex items-center justify-between">
+                        <div>
+                            <span class="font-semibold text-amber-900 block">🎨 Off-stage Quota</span>
+                            <span class="text-[11px] text-amber-700/80">Max items allowed per student</span>
+                        </div>
+                        <span class="font-bold text-xs px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-200 shrink-0">
+                            {{ limitLabel(event.quotas.limits?.max_offstage_per_student) }} max / student
+                        </span>
                     </div>
-                    <div class="bg-gray-50 border rounded-lg px-3 py-2 text-xs">
-                        <span class="text-gray-500">Group</span>
-                        <p class="font-semibold">{{ event.quotas.used.group }}/{{ limitLabel(event.quotas.limits?.max_group_per_student) }}</p>
+                    <div class="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3 text-xs flex items-center justify-between">
+                        <div>
+                            <span class="font-semibold text-emerald-900 block">👥 Group Items Quota</span>
+                            <span class="text-[11px] text-emerald-700/80">Max group items allowed per student</span>
+                        </div>
+                        <span class="font-bold text-xs px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-200 shrink-0">
+                            {{ limitLabel(event.quotas.limits?.max_group_per_student) }} max / student
+                        </span>
                     </div>
                 </div>
 
@@ -434,43 +449,49 @@
                         </div>
 
                         <!-- Search & Filter Controls Bar -->
-                        <div class="px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap gap-2.5 items-center justify-between">
-                            <div class="flex flex-wrap gap-2 items-center flex-1 min-w-[280px]">
-                                <input v-model="itemSearch[event.id]" type="search"
-                                       class="field flex-1 min-w-[10rem] !py-1.5 text-xs rounded-lg border-slate-300"
-                                       placeholder="Search items by name or code..." autocomplete="off">
-                                <select v-model="itemCategoryFilter[event.id]" class="field text-xs !py-1.5 rounded-lg border-slate-300 min-w-[9rem]">
-                                    <option value="">All Categories</option>
-                                    <option value="category1">Category 1 (Classes 3 & 4)</option>
-                                    <option value="category2">Category 2 (Classes 5, 6 & 7)</option>
-                                    <option value="category3">Category 3 (Classes 8–10)</option>
-                                    <option value="category4">Category 4 (Classes 11 & 12)</option>
-                                    <option value="open">Category 5 / Open</option>
-                                </select>
-                                <select v-model="itemStageFilter[event.id]" class="field text-xs !py-1.5 rounded-lg border-slate-300 min-w-[7.5rem]">
-                                    <option value="">All Stage Modes</option>
-                                    <option value="on_stage">🎭 On-stage</option>
-                                    <option value="off_stage">🎨 Off-stage</option>
-                                </select>
-                                <select v-model="itemGroupFilter[event.id]" class="field text-xs !py-1.5 rounded-lg border-slate-300 min-w-[7rem]">
-                                    <option value="">All Types</option>
-                                    <option value="single">👤 Single</option>
-                                    <option value="group">👥 Group</option>
-                                </select>
-                                <select v-model="itemSort[event.id]" class="field text-xs !py-1.5 rounded-lg border-indigo-200 bg-indigo-50/50 font-medium text-indigo-900 min-w-[9.5rem]">
-                                    <option value="">Sort: Default</option>
-                                    <option value="category">Sort by Category (Cat 1 → 5)</option>
-                                    <option value="stage">Sort by Stage (On-stage first)</option>
-                                    <option value="name">Sort by Item Name (A → Z)</option>
-                                </select>
-                                <button v-if="itemSearch[event.id] || itemCategoryFilter[event.id] || itemStageFilter[event.id] || itemGroupFilter[event.id] || itemSort[event.id]"
-                                        type="button" class="btn-ghost text-xs !py-1 text-slate-600 hover:text-slate-900"
-                                        @click="clearItemFilters(event.id)">
-                                    Clear
-                                </button>
+                        <div class="px-4 py-3 bg-slate-50/80 border-b border-slate-200 space-y-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 items-center">
+                                <div class="md:col-span-2">
+                                    <input v-model="itemSearch[event.id]" type="search"
+                                           class="field w-full !py-1.5 text-xs rounded-lg border-slate-300"
+                                           placeholder="Search items by name or code..." autocomplete="off">
+                                </div>
+                                <div>
+                                    <select v-model="itemCategoryFilter[event.id]" class="field w-full text-xs !py-1.5 rounded-lg border-slate-300">
+                                        <option value="">All Categories</option>
+                                        <option value="category1">Category 1 (Classes 3 & 4)</option>
+                                        <option value="category2">Category 2 (Classes 5, 6 & 7)</option>
+                                        <option value="category3">Category 3 (Classes 8–10)</option>
+                                        <option value="category4">Category 4 (Classes 11 & 12)</option>
+                                        <option value="open">Category 5 / Open</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <select v-model="itemStageFilter[event.id]" class="field w-full text-xs !py-1.5 rounded-lg border-slate-300">
+                                        <option value="">All Stage Modes</option>
+                                        <option value="on_stage">🎭 On-stage</option>
+                                        <option value="off_stage">🎨 Off-stage</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <select v-model="itemSort[event.id]" class="field w-full text-xs !py-1.5 rounded-lg border-indigo-200 bg-indigo-50/50 font-medium text-indigo-900">
+                                        <option value="">Sort: Default</option>
+                                        <option value="category">Sort by Category (Cat 1 → 5)</option>
+                                        <option value="stage">Sort by Stage (On-stage first)</option>
+                                        <option value="name">Sort by Item Name (A → Z)</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="text-xs font-medium text-slate-500">
-                                Showing <strong class="text-slate-800">{{ filteredAllItems(event).length }}</strong> of {{ (event.items || []).length }} items
+
+                            <div class="flex items-center justify-between text-xs text-slate-500 font-medium pt-1">
+                                <span>
+                                    Showing <strong class="text-slate-800">{{ filteredAllItems(event).length }}</strong> of {{ (event.items || []).length }} items
+                                </span>
+                                <button v-if="itemSearch[event.id] || itemCategoryFilter[event.id] || itemStageFilter[event.id] || itemGroupFilter[event.id] || itemSort[event.id]"
+                                        type="button" class="btn-ghost text-xs !py-0.5 text-indigo-700 font-semibold hover:underline"
+                                        @click="clearItemFilters(event.id)">
+                                    Clear all filters
+                                </button>
                             </div>
                         </div>
 
