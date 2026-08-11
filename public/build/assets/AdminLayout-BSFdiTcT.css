@@ -1,0 +1,1 @@
+.staff-readonly[data-v-0c8c2cbd] button[type=submit]:not(.staff-allow),.staff-readonly[data-v-0c8c2cbd] input:not([type=hidden]):not([readonly]),.staff-readonly[data-v-0c8c2cbd] select,.staff-readonly[data-v-0c8c2cbd] textarea{pointer-events:none;opacity:.65}
