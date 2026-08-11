@@ -421,7 +421,11 @@ class MembershipNotifier
         array $viewData,
         array $attachments = [],
     ): void {
-        $admins = User::where('tenant_id', $school->id)->get();
+        $admins = User::where('tenant_id', $school->id)
+            ->whereNotNull('email')
+            ->where('email', 'not like', '%@portal.local')
+            ->whereDoesntHave('roles', fn ($q) => $q->where('name', 'student'))
+            ->get();
         $recipients = $admins->pluck('email')->all();
 
         $email = $this->schoolContactEmail($school);

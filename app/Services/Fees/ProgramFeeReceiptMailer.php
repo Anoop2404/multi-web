@@ -110,6 +110,8 @@ class ProgramFeeReceiptMailer
         $recipients = User::query()
             ->where('tenant_id', $school->id)
             ->whereNotNull('email')
+            ->where('email', 'not like', '%@portal.local')
+            ->whereDoesntHave('roles', fn ($q) => $q->where('name', 'student'))
             ->pluck('email')
             ->all();
 

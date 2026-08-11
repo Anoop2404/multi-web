@@ -11,6 +11,7 @@ use App\Models\McqRegistration;
 use App\Models\MembershipPayment;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\PlatformUser;
 use App\Support\AuditLogCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -98,21 +99,21 @@ class PlatformAuditLogger
         };
     }
 
-    public function userCreated(User $user): AuditLog
+    public function userCreated(User|PlatformUser $user): AuditLog
     {
         return $this->log('user.created', "User created: {$user->email}", $user, [
             'roles' => $user->getRoleNames()->values()->all(),
         ]);
     }
 
-    public function userUpdated(User $user): AuditLog
+    public function userUpdated(User|PlatformUser $user): AuditLog
     {
         return $this->log('user.updated', "User updated: {$user->email}", $user, [
             'roles' => $user->getRoleNames()->values()->all(),
         ]);
     }
 
-    public function userDeleted(User $user): AuditLog
+    public function userDeleted(User|PlatformUser $user): AuditLog
     {
         return $this->log('user.deleted', "User deleted: {$user->email}", $user, [
             'roles' => $user->getRoleNames()->values()->all(),
@@ -264,7 +265,7 @@ class PlatformAuditLogger
         ], $properties), category: 'training');
     }
 
-    public function portalProvisioned(User $user, string $role, string $tenantId): AuditLog
+    public function portalProvisioned(User|PlatformUser $user, string $role, string $tenantId): AuditLog
     {
         return $this->log(
             'portal.provisioned',

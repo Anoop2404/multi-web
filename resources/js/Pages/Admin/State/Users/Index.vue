@@ -7,19 +7,36 @@
 
             <form @submit.prevent="createUser" class="card space-y-3">
                 <h3 class="font-semibold text-sm">New state user</h3>
+
+                <div v-if="Object.keys(form.errors).length > 0" class="p-3 text-xs bg-red-50 text-red-700 rounded-lg border border-red-200">
+                    <ul class="list-disc pl-4 space-y-0.5">
+                        <li v-for="(err, key) in form.errors" :key="key">{{ err }}</li>
+                    </ul>
+                </div>
+
                 <div class="grid sm:grid-cols-2 gap-3">
-                    <input v-model="form.name" class="field" placeholder="Full name" required>
-                    <input v-model="form.email" type="email" class="field" placeholder="Email" required>
-                    <input v-model="form.password" type="password" class="field sm:col-span-2" placeholder="Password (min 8)" minlength="8" required>
+                    <div>
+                        <input v-model="form.name" class="field w-full" placeholder="Full name" required>
+                        <p v-if="form.errors.name" class="text-xs text-red-600 mt-1">{{ form.errors.name }}</p>
+                    </div>
+                    <div>
+                        <input v-model="form.email" type="email" class="field w-full" placeholder="Email" required>
+                        <p v-if="form.errors.email" class="text-xs text-red-600 mt-1">{{ form.errors.email }}</p>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <input v-model="form.password" type="password" class="field w-full" placeholder="Password (min 8)" minlength="8" required>
+                        <p v-if="form.errors.password" class="text-xs text-red-600 mt-1">{{ form.errors.password }}</p>
+                    </div>
                 </div>
                 <div>
-                    <p class="text-xs font-semibold text-gray-500 mb-1">Roles</p>
+                    <p class="text-xs font-semibold text-gray-500 mb-1">Roles <span class="text-red-500">*</span></p>
                     <div class="flex flex-wrap gap-2">
-                        <label v-for="r in assignableRoles" :key="r.value" class="text-xs flex items-center gap-1 border rounded-lg px-2 py-1">
+                        <label v-for="r in assignableRoles" :key="r.value" class="text-xs flex items-center gap-1 border rounded-lg px-2 py-1 cursor-pointer hover:bg-gray-50">
                             <input type="checkbox" :value="r.value" v-model="form.roles">
                             {{ r.label }}
                         </label>
                     </div>
+                    <p v-if="form.errors.roles" class="text-xs text-red-600 mt-1">{{ form.errors.roles }}</p>
                 </div>
                 <button class="btn-primary" :disabled="form.processing">Create user</button>
             </form>
@@ -55,11 +72,18 @@
         <div v-if="editing" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="editing = null">
             <form @submit.prevent="saveEdit" class="bg-white rounded-xl p-5 w-full max-w-md space-y-3 shadow-xl">
                 <h3 class="font-semibold">Edit {{ editing.name }}</h3>
-                <input v-model="editForm.name" class="field" placeholder="Full name" required>
-                <input v-model="editForm.email" type="email" class="field" placeholder="Email" required>
-                <input v-model="editForm.password" type="password" class="field" placeholder="New password (leave blank to keep)">
+
+                <div v-if="Object.keys(editForm.errors).length > 0" class="p-3 text-xs bg-red-50 text-red-700 rounded-lg border border-red-200">
+                    <ul class="list-disc pl-4 space-y-0.5">
+                        <li v-for="(err, key) in editForm.errors" :key="key">{{ err }}</li>
+                    </ul>
+                </div>
+
+                <input v-model="editForm.name" class="field w-full" placeholder="Full name" required>
+                <input v-model="editForm.email" type="email" class="field w-full" placeholder="Email" required>
+                <input v-model="editForm.password" type="password" class="field w-full" placeholder="New password (leave blank to keep)">
                 <div class="flex flex-wrap gap-2">
-                    <label v-for="r in assignableRoles" :key="r.value" class="text-xs flex items-center gap-1 border rounded-lg px-2 py-1">
+                    <label v-for="r in assignableRoles" :key="r.value" class="text-xs flex items-center gap-1 border rounded-lg px-2 py-1 cursor-pointer hover:bg-gray-50">
                         <input type="checkbox" :value="r.value" v-model="editForm.roles">
                         {{ r.label }}
                     </label>
@@ -80,12 +104,15 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 
 const props = defineProps({ users: Array, assignableRoles: Array });
 
-const form = useForm({ name: '', email: '', password: '', roles: [] });
+const form = useForm({ name: '', email: '', password: '', roles: ['state_admin'] });
 const editing = ref(null);
 const editForm = useForm({ name: '', email: '', password: '', roles: [] });
 
 function createUser() {
-    form.post('/admin/state-users', { preserveScroll: true, onSuccess: () => form.reset() });
+    form.post('/admin/state-users', {
+        preserveScroll: true,
+        onSuccess: () => form.reset('name', 'email', 'password'),
+    });
 }
 
 function openEdit(user) {
@@ -94,6 +121,7 @@ function openEdit(user) {
     editForm.email = user.email;
     editForm.password = '';
     editForm.roles = [...user.roles];
+    editForm.clearErrors();
 }
 
 function saveEdit() {
@@ -108,4 +136,3 @@ function remove(user) {
     router.delete(`/admin/state-users/${user.id}`, { preserveScroll: true });
 }
 </script>
-

@@ -17,16 +17,34 @@ class StateUserController extends Controller
 
         $users = PlatformUser::query()
             ->whereNull('tenant_id')
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', $roles))
-            ->with('roles', 'permissions')
+            ->where(function ($query) use ($roles) {
+                $query->whereHas('roles', fn ($q) => $q->whereIn('name', $roles))
+                    ->orWhereIn('id', function ($sub) use ($roles) {
+                        $sub->select('model_id')
+                            ->from('model_has_roles')
+                            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                            ->whereIn('roles.name', $roles);
+                    });
+            })
             ->orderBy('name')
             ->get()
-            ->map(fn (PlatformUser $u) => [
-                'id'    => $u->id,
-                'name'  => $u->name,
-                'email' => $u->email,
-                'roles' => $u->getRoleNames()->values()->all(),
-            ]);
+            ->map(function (PlatformUser $u) use ($roles) {
+                $userRoles = \Illuminate\Support\Facades\DB::table('model_has_roles')
+                    ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                    ->where('model_has_roles.model_id', $u->id)
+                    ->whereIn('roles.name', $roles)
+                    ->pluck('roles.name')
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                return [
+                    'id'    => $u->id,
+                    'name'  => $u->name,
+                    'email' => $u->email,
+                    'roles' => $userRoles,
+                ];
+            });
 
         return inertia('State/Users/Index', [
             'users'           => $users,

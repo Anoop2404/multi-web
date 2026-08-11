@@ -60,6 +60,8 @@ class OfflineProgramFeeOrchestrator
             $recipients = User::query()
                 ->where('tenant_id', $school->id)
                 ->whereNotNull('email')
+                ->where('email', 'not like', '%@portal.local')
+                ->whereDoesntHave('roles', fn ($q) => $q->where('name', 'student'))
                 ->get();
 
             if ($recipients->isEmpty()) {
