@@ -10,31 +10,35 @@ class StateKalotsavProgramSeeder extends Seeder
 {
     public function run(): void
     {
-        $program = FestStateProgram::firstOrCreate(
-            ['title' => 'Kerala State Kalotsavam 2026'],
-            [
-                'event_type'          => 'kalotsavam',
-                'academic_year'       => '2026-2027',
-                'conduct_levels'      => ['sahodaya', 'state'],
-                'status'              => 'published',
-                'description'         => 'Official Confederation Sahodaya Kalotsav 2026 Master State Program.',
-                'level_event_settings' => [
-                    'sahodaya' => ['max_total_per_student' => 5, 'max_onstage_per_student' => 3],
-                    'state'    => ['max_total_per_student' => 3],
-                ],
-                'level_fees'          => [
-                    'sahodaya' => [
-                        'fee_model'       => 'cksc_tiered',
-                        'first_item'      => 350,
-                        'additional_item' => 100,
+        $programs = FestStateProgram::where('event_type', 'kalotsavam')->get();
+
+        if ($programs->isEmpty()) {
+            $programs = collect([
+                FestStateProgram::create([
+                    'title'               => 'Kerala State Kalotsavam 2026',
+                    'event_type'          => 'kalotsavam',
+                    'academic_year'       => '2026-2027',
+                    'conduct_levels'      => ['sahodaya', 'state'],
+                    'status'              => 'published',
+                    'description'         => 'Official Confederation Sahodaya Kalotsav 2026 Master State Program.',
+                    'level_event_settings' => [
+                        'sahodaya' => ['max_total_per_student' => 5, 'max_onstage_per_student' => 3],
+                        'state'    => ['max_total_per_student' => 3],
                     ],
-                    'state' => [
-                        'fee_model'         => 'per_item',
-                        'individual_amount' => 500,
+                    'level_fees'          => [
+                        'sahodaya' => [
+                            'fee_model'       => 'cksc_tiered',
+                            'first_item'      => 350,
+                            'additional_item' => 100,
+                        ],
+                        'state' => [
+                            'fee_model'         => 'per_item',
+                            'individual_amount' => 500,
+                        ],
                     ],
-                ],
-            ]
-        );
+                ]),
+            ]);
+        }
 
         $items = [
             ['item_code' => '101', 'title' => 'Recitation-Malayalam', 'category' => 'music', 'class_group' => 'category_1', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'gender' => 'open', 'min_group_size' => 1, 'max_group_size' => 1, 'qualify_count' => 2],
@@ -179,14 +183,17 @@ class StateKalotsavProgramSeeder extends Seeder
             ['item_code' => '511', 'title' => 'Duffmutt', 'category' => 'dance', 'class_group' => 'category_5', 'stage_type' => 'on_stage', 'participant_type' => 'group', 'gender' => 'male', 'min_group_size' => 6, 'max_group_size' => 10, 'qualify_count' => 1],
         ];
 
-        foreach ($items as $index => $itemData) {
-            $program->items()->updateOrCreate(
-                ['item_code' => $itemData['item_code']],
-                array_merge($itemData, ['display_order' => $index + 1])
-            );
-        }
+        foreach ($programs as $program) {
+            foreach ($items as $index => $itemData) {
+                $program->items()->updateOrCreate(
+                    ['item_code' => $itemData['item_code']],
+                    array_merge($itemData, ['display_order' => $index + 1])
+                );
+            }
 
-        // Publish program to populate State event and Sahodaya hub events
-        app(FestStateProgramService::class)->publish($program);
+            if ($program->status === 'published') {
+                app(FestStateProgramService::class)->publish($program);
+            }
+        }
     }
 }
