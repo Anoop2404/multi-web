@@ -25,6 +25,7 @@ class FestPrimaryEventResolver
             ->primaryHub()
             ->when($yearId !== null, fn ($q) => $q->where('academic_year_id', $yearId))
             ->orderByRaw("CASE WHEN state_program_id IS NOT NULL THEN 0 WHEN level_round = 'sahodaya' THEN 1 ELSE 2 END")
+            ->orderByRaw("CASE WHEN (SELECT COUNT(*) FROM fest_event_items WHERE event_id = fest_events.id) > 0 THEN 0 ELSE 1 END")
             ->orderByDesc('id')
             ->first();
     }

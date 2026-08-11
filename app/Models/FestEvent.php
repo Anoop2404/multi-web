@@ -258,6 +258,10 @@ class FestEvent extends Model
 
     public function scopeOfType($q, string $type)
     {
+        if (in_array($type, ['kalotsav', 'kalotsavam', 'kalolsavam'], true)) {
+            return $q->whereIn('event_type', ['kalotsav', 'kalotsavam', 'kalolsavam']);
+        }
+
         return $q->where('event_type', $type);
     }
 
