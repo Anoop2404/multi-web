@@ -57,7 +57,9 @@ class FestStudentClassResolver
 
     public static function clusterClassGroupForStudent(Student $student): ?string
     {
-        $student->loadMissing('schoolClass');
+        if (! $student->relationLoaded('schoolClass') && $student->exists) {
+            $student->loadMissing('schoolClass');
+        }
         $categoryId = (int) ($student->schoolClass?->class_category_id ?? 0);
 
         return $categoryId > 0 ? FestClassGroupScheme::clusterKey($categoryId) : null;

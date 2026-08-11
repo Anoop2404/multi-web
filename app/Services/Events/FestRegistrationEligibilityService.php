@@ -136,6 +136,7 @@ class FestRegistrationEligibilityService
                 'dob' => $student->dob?->toDateString() ?? $student->dob,
                 'academic_year_id' => $student->academic_year_id,
                 'class_name' => $student->schoolClass?->name,
+                'class_category_id' => $student->schoolClass?->class_category_id,
                 'class_number' => $classNum,
                 'is_verified' => $student->isVerified(),
                 'verified_at' => $student->verified_at?->toIso8601String(),
@@ -156,9 +157,27 @@ class FestRegistrationEligibilityService
     public function filterEligibleForItem(Collection $annotatedStudents, FestEvent $event, FestEventItem $item): Collection
     {
         return $annotatedStudents->filter(function (array $row) use ($event, $item) {
-            $student = new Student($row);
+            $student = new Student([
+                'id'               => $row['id'],
+                'name'             => $row['name'] ?? '',
+                'reg_no'           => $row['reg_no'] ?? null,
+                'admission_number' => $row['admission_number'] ?? null,
+                'roll_number'      => $row['roll_number'] ?? null,
+                'gender'           => $row['gender'] ?? null,
+                'dob'              => $row['dob'] ?? null,
+                'academic_year_id' => $row['academic_year_id'] ?? null,
+                'verified_at'      => $row['verified_at'] ?? null,
+            ]);
             $student->id = $row['id'];
-            $student->setRelation('schoolClass', (object) ['name' => $row['class_name'] ?? '']);
+            $student->exists = true;
+
+            $schoolClass = new \App\Models\SchoolClass([
+                'name' => $row['class_name'] ?? '',
+                'class_category_id' => $row['class_category_id'] ?? null,
+            ]);
+            $schoolClass->exists = true;
+
+            $student->setRelation('schoolClass', $schoolClass);
 
             return $this->validateStudent($student, $event, $item) === [];
         })->values();

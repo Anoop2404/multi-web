@@ -31,7 +31,7 @@ class FestClassGroupScheme
             'up', 'category2', 'categoryii', 'cat2', 'catii' => 'up',
             'hs', 'category3', 'categoryiii', 'cat3', 'catiii' => 'hs',
             'hss', 'category4', 'categoryiv', 'cat4', 'cativ' => 'hss',
-            'open' => 'open',
+            'open', 'category5', 'categoryv', 'cat5', 'catv' => 'open',
             default => $trimmed,
         };
     }
