@@ -396,7 +396,42 @@
 
                 <!-- ── KALOTSAV / KIDS FEST / TEACHER FEST / ENGLISH FEST / SCIENCE FEST: generic flat table ── -->
                 <form v-else v-show="getTab(event.id) === 'items'" :id="`item-registration-${event.id}`" class="mt-4 space-y-4" @submit.prevent>
-                    <div class="rounded-xl border border-gray-100 overflow-hidden">
+                    <div class="rounded-xl border border-gray-100 overflow-hidden bg-white shadow-sm">
+                        <!-- Search & Filter Controls Bar -->
+                        <div class="px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap gap-2.5 items-center justify-between">
+                            <div class="flex flex-wrap gap-2 items-center flex-1 min-w-[280px]">
+                                <input v-model="itemSearch[event.id]" type="search"
+                                       class="field flex-1 min-w-[10rem] !py-1.5 text-xs rounded-lg border-slate-300"
+                                       placeholder="Search items by name or code..." autocomplete="off">
+                                <select v-model="itemCategoryFilter[event.id]" class="field text-xs !py-1.5 rounded-lg border-slate-300 min-w-[9rem]">
+                                    <option value="">All Categories</option>
+                                    <option value="category1">Category 1 (Classes 3 & 4)</option>
+                                    <option value="category2">Category 2 (Classes 5, 6 & 7)</option>
+                                    <option value="category3">Category 3 (Classes 8–10)</option>
+                                    <option value="category4">Category 4 (Classes 11 & 12)</option>
+                                    <option value="open">Category 5 / Open</option>
+                                </select>
+                                <select v-model="itemStageFilter[event.id]" class="field text-xs !py-1.5 rounded-lg border-slate-300 min-w-[7.5rem]">
+                                    <option value="">All Stage Modes</option>
+                                    <option value="on_stage">🎭 On-stage</option>
+                                    <option value="off_stage">🎨 Off-stage</option>
+                                </select>
+                                <select v-model="itemGroupFilter[event.id]" class="field text-xs !py-1.5 rounded-lg border-slate-300 min-w-[7rem]">
+                                    <option value="">All Types</option>
+                                    <option value="single">👤 Single</option>
+                                    <option value="group">👥 Group</option>
+                                </select>
+                                <button v-if="itemSearch[event.id] || itemCategoryFilter[event.id] || itemStageFilter[event.id] || itemGroupFilter[event.id]"
+                                        type="button" class="btn-ghost text-xs !py-1 text-slate-600 hover:text-slate-900"
+                                        @click="clearItemFilters(event.id)">
+                                    Clear
+                                </button>
+                            </div>
+                            <div class="text-xs font-medium text-slate-500">
+                                Showing <strong class="text-slate-800">{{ filteredAllItems(event).length }}</strong> of {{ (event.items || []).length }} items
+                            </div>
+                        </div>
+
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
                                 <thead class="bg-gray-50 border-b border-gray-100">
@@ -413,7 +448,7 @@
                                 </thead>
                                 <tbody class="divide-y divide-gray-50">
                                     <FestRegistrationItemRow
-                                        v-for="item in allItems(event)"
+                                        v-for="item in filteredAllItems(event)"
                                         :key="item.id"
                                         :row-id="itemRowId(event.id, item.id)"
                                         :item="item"
@@ -921,6 +956,10 @@ const headPaymentRefs = reactive({});
 const headPaymentBanks = reactive({});
 const headPaymentAmounts = reactive({});
 const editingRegistrationId = reactive({});
+const itemSearch = reactive({});
+const itemCategoryFilter = reactive({});
+const itemStageFilter = reactive({});
+const itemGroupFilter = reactive({});
 
 function allItemsStatic(event) {
     return event?.items ?? [];
@@ -941,6 +980,10 @@ for (const e of props.events) {
     sportsSearch[e.id] = '';
     sportsAgeFilter[e.id] = '';
     sportsItemFilter[e.id] = '';
+    itemSearch[e.id] = '';
+    itemCategoryFilter[e.id] = '';
+    itemStageFilter[e.id] = '';
+    itemGroupFilter[e.id] = '';
     for (const item of allItemsStatic(e)) {
         itemForms[itemFormKey(e.id, item.id)] = {
             team_name: '',
@@ -955,8 +998,67 @@ for (const e of props.events) {
     }
 }
 
+function clearItemFilters(eventId) {
+    if (!eventId) return;
+    itemSearch[eventId] = '';
+    itemCategoryFilter[eventId] = '';
+    itemStageFilter[eventId] = '';
+    itemGroupFilter[eventId] = '';
+}
+
 function allItems(event) {
     return event?.items ?? [];
+}
+
+function filteredAllItems(event) {
+    const rawItems = event?.items ?? [];
+    const eventId = event?.id;
+    if (!eventId) return rawItems;
+
+    const query = String(itemSearch[eventId] ?? '').trim().toLowerCase();
+    const catFilter = itemCategoryFilter[eventId] ?? '';
+    const stageFilter = itemStageFilter[eventId] ?? '';
+    const groupFilter = itemGroupFilter[eventId] ?? '';
+
+    if (!query && !catFilter && !stageFilter && !groupFilter) {
+        return rawItems;
+    }
+
+    return rawItems.filter((item) => {
+        if (query) {
+            const title = String(item.clean_title || item.title || item.name || '').toLowerCase();
+            const code = String(item.item_code || '').toLowerCase();
+            if (!title.includes(query) && !code.includes(query)) {
+                return false;
+            }
+        }
+
+        if (catFilter) {
+            const grp = normalizedClassGroup(item.class_group);
+            if (catFilter === 'category1' && !['lp', 'category1', 'cat1', 'cc1'].includes(grp)) return false;
+            if (catFilter === 'category2' && !['up', 'category2', 'cat2', 'cc2'].includes(grp)) return false;
+            if (catFilter === 'category3' && !['hs', 'category3', 'cat3', 'cc3'].includes(grp)) return false;
+            if (catFilter === 'category4' && !['hss', 'category4', 'cat4', 'cc4'].includes(grp)) return false;
+            if (catFilter === 'open' && grp !== 'open' && !['category5', 'cat5', 'cc5'].includes(grp)) return false;
+        }
+
+        if (stageFilter) {
+            const sm = String(item.stage_mode || '').toLowerCase();
+            const title = String(item.title || item.name || '').toLowerCase();
+            const isOn = sm.includes('on') || item.is_onstage === true;
+            const isOff = sm.includes('off') || item.is_onstage === false || title.includes('offstage') || title.includes('off stage') || title.includes('painting') || title.includes('drawing') || title.includes('essay');
+            if (stageFilter === 'on_stage' && isOff && !isOn) return false;
+            if (stageFilter === 'off_stage' && isOn && !isOff) return false;
+        }
+
+        if (groupFilter) {
+            const isGrp = ['group', 'team'].includes(item.participant_type);
+            if (groupFilter === 'group' && !isGrp) return false;
+            if (groupFilter === 'single' && isGrp) return false;
+        }
+
+        return true;
+    });
 }
 
 function formatMoney(value) {

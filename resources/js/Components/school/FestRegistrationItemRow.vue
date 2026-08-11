@@ -94,6 +94,15 @@
         <td class="px-3 py-2">
             <div class="flex flex-wrap items-center gap-1.5">
                 <p class="font-medium text-gray-900 text-sm">{{ displayTitle }}</p>
+                <span v-if="stageModeLabel"
+                      class="inline-flex shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border"
+                      :class="stageModeLabel === 'On-stage' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-amber-50 text-amber-800 border-amber-200'">
+                    {{ stageModeLabel === 'On-stage' ? '🎭 On-stage' : '🎨 Off-stage' }}
+                </span>
+                <span class="inline-flex shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border"
+                      :class="isGroup ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'">
+                    {{ participantTypeBadge }}
+                </span>
                 <span v-if="statusLabel"
                       class="inline-flex shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border"
                       :class="statusClass">
@@ -280,6 +289,30 @@ const displayTitle = computed(() => {
 });
 
 const isGroup = computed(() => ['group', 'team'].includes(props.item.participant_type));
+
+const stageModeLabel = computed(() => {
+    if (props.item.stage_mode) {
+        const sm = String(props.item.stage_mode).toLowerCase();
+        if (sm.includes('on')) return 'On-stage';
+        if (sm.includes('off')) return 'Off-stage';
+    }
+    if (props.item.is_onstage === true) return 'On-stage';
+    if (props.item.is_onstage === false) return 'Off-stage';
+    const title = String(props.item.title || props.item.name || '').toLowerCase();
+    if (title.includes('offstage') || title.includes('off stage') || title.includes('painting') || title.includes('drawing') || title.includes('essay') || title.includes('story') || title.includes('versification') || title.includes('quiz') || title.includes('carrom') || title.includes('chess')) return 'Off-stage';
+    return null;
+});
+
+const participantTypeBadge = computed(() => {
+    if (isGroup.value) {
+        const min = props.item.min_group_size || props.item.min_participants;
+        const max = props.item.max_group_size || props.item.max_participants;
+        if (min && max && min !== max) return `Group (${min}-${max})`;
+        if (max) return `Group (Max ${max})`;
+        return 'Group';
+    }
+    return 'Single';
+});
 
 // Default "Team N" for this school's Nth entry under this item — pre-filled so registering
 // a team is one direct action (pick athletes, confirm) instead of also requiring a typed name.
