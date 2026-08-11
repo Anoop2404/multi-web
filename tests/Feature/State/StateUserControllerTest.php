@@ -131,5 +131,11 @@ class StateUserControllerTest extends TestCase
 
         $loginResponse->assertRedirect(route('admin.state.dashboard'));
         $this->assertAuthenticated();
+
+        $dashboardResponse = $this->get('/admin/state-dashboard');
+        $dashboardResponse->assertOk();
+        $dashboardResponse->assertInertia(fn ($page) => $page
+            ->where('auth.user.roles', ['state_admin'])
+        );
     }
 }

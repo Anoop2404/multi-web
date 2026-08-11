@@ -28,7 +28,19 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => fn () => $request->user() ? array_merge(
                     $request->user()->only('id', 'name', 'email', 'email_verified_at'),
-                    ['roles' => $request->user()->getRoleNames()->values()->all()]
+                    [
+                        'roles' => $request->user()->tenant_id === null
+                            ? \Illuminate\Support\Facades\DB::connection(config('tenancy.database.central_connection', 'central'))
+                                ->table('model_has_roles')
+                                ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                                ->where('model_has_roles.model_id', $request->user()->id)
+                                ->whereIn('model_has_roles.model_type', [\App\Models\User::class, \App\Models\PlatformUser::class])
+                                ->pluck('roles.name')
+                                ->unique()
+                                ->values()
+                                ->all()
+                            : $request->user()->getRoleNames()->values()->all(),
+                    ]
                 ) : null,
             ],
             'features' => [
