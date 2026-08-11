@@ -4,6 +4,8 @@
             <h1 class="text-xl font-semibold">{{ event.name }}</h1>
             <p class="text-sm text-slate-500">Program {{ event.state_program_id }} · {{ event.status }}</p>
 
+            <Link :href="`/admin/state-workspace/fest/${event.id}/attendance`" class="inline-block text-sm text-indigo-600">Mark attendance →</Link>
+
             <div class="p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 flex items-center justify-between gap-3">
                 <p class="text-xs text-amber-900">
                     Assign chest numbers (101+) to every approved registration's participants who don't have one yet. Safe to run again later — already-numbered participants are skipped.
@@ -49,7 +51,7 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({ event: Object, approvedQualifiers: Array, registrations: Array });
 

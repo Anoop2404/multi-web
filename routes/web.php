@@ -119,6 +119,9 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::post('/fest', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'store'])->name('fest.store');
             Route::get('/fest/{event}', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'show'])->name('fest.show');
             Route::post('/fest/{event}/assign-chest-numbers', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'assignChestNumbers'])->name('fest.assign-chest-numbers');
+            // State Event Conduct, Phase 2 (docs/STATE_EVENT_CONDUCT_PLAN.md)
+            Route::get('/fest/{event}/attendance', [\App\Http\Controllers\StateAdmin\StateAttendanceController::class, 'index'])->name('fest.attendance.index');
+            Route::post('/fest/{event}/attendance', [\App\Http\Controllers\StateAdmin\StateAttendanceController::class, 'store'])->name('fest.attendance.store');
         });
 
         Route::get('/sports', [\App\Http\Controllers\Admin\SportsResultsController::class, 'index'])->name('sports.index');
