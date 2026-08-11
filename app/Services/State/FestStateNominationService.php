@@ -10,6 +10,7 @@ use App\Models\FestStateNominationSelection;
 use App\Models\FestStateProgram;
 use App\Models\FestStateProgramItem;
 use App\Models\User;
+use App\Services\Events\FestPartitionService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -22,52 +23,73 @@ class FestStateNominationService
     /**
      * Build the eligible candidate pool from combined Region/Finale certified results.
      *
+     * Previously only read marks off $hubEvent itself — for a partitioned hub (region-wise
+     * Sahodaya without a re-competing Finale, per P-14) that silently excluded every winner
+     * from every Region child event, since results for a partitioned hub live on the
+     * partition events, not the hub. Fixed to expand to every partition, same as
+     * FestStateQualifierPayloadBuilder::sourceEvents() already does for the direct-submission
+     * path — the nomination path and the direct path must see the same candidate universe.
+     *
      * @return array<int, array<string, mixed>>
      */
     public function candidatePool(FestStateProgram $program, FestEvent $hubEvent): array
     {
         $candidates = [];
+        $partitions = app(FestPartitionService::class);
 
-        $items = FestEventItem::where('event_id', $hubEvent->id)->get();
+        foreach ($this->sourceEvents($hubEvent, $partitions) as $event) {
+            $items = FestEventItem::where('event_id', $event->id)->get();
 
-        foreach ($items as $item) {
-            if (! $item->state_program_item_id) {
-                continue;
-            }
-
-            $marks = FestMark::where('event_id', $hubEvent->id)
-                ->where('item_id', $item->id)
-                ->whereNotNull('position')
-                ->with(['participant.registration', 'participant.student'])
-                ->orderBy('position')
-                ->get();
-
-            foreach ($marks as $mark) {
-                $participant = $mark->participant;
-                if (! $participant || ! $participant->registration) {
+            foreach ($items as $item) {
+                if (! $item->state_program_item_id) {
                     continue;
                 }
 
-                $candidates[] = [
-                    'mark_id'          => $mark->id,
-                    'source_event_id'  => $hubEvent->id,
-                    'registration_id'  => $participant->registration->id,
-                    'participant_id'   => $participant->id,
-                    'item_id'          => $item->state_program_item_id,
-                    'item_code'        => $item->item_code,
-                    'item_title'       => $item->title,
-                    'school_id'        => $participant->registration->school_id,
-                    'student_name'     => $participant->student?->name ?? 'Participant',
-                    'class_name'       => $participant->student?->class_name ?? null,
-                    'source_position'  => $mark->position,
-                    'grade'            => $mark->grade,
-                    'score'            => $mark->score,
-                    'is_eligible'      => true,
-                ];
+                $marks = FestMark::where('event_id', $event->id)
+                    ->where('item_id', $item->id)
+                    ->whereNotNull('position')
+                    ->with(['participant.registration', 'participant.student'])
+                    ->orderBy('position')
+                    ->get();
+
+                foreach ($marks as $mark) {
+                    $participant = $mark->participant;
+                    if (! $participant || ! $participant->registration) {
+                        continue;
+                    }
+
+                    $candidates[] = [
+                        'mark_id'          => $mark->id,
+                        'source_event_id'  => $event->id,
+                        'registration_id'  => $participant->registration->id,
+                        'participant_id'   => $participant->id,
+                        'item_id'          => $item->state_program_item_id,
+                        'item_code'        => $item->item_code,
+                        'item_title'       => $item->title,
+                        'school_id'        => $participant->registration->school_id,
+                        'student_name'     => $participant->student?->name ?? 'Participant',
+                        'class_name'       => $participant->student?->class_name ?? null,
+                        'source_position'  => $mark->position,
+                        'grade'            => $mark->grade,
+                        'score'            => $mark->score,
+                        'partition_key'    => $partitions->partitionKey($event),
+                        'is_eligible'      => true,
+                    ];
+                }
             }
         }
 
         return $candidates;
+    }
+
+    /** @return list<FestEvent> */
+    private function sourceEvents(FestEvent $hubEvent, FestPartitionService $partitions): array
+    {
+        if ($partitions->isPartitionedHub($hubEvent)) {
+            return $partitions->partitions($hubEvent)->all();
+        }
+
+        return [$hubEvent];
     }
 
     /** Get or create the open nomination batch for this hub event + program. */
