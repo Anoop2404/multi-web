@@ -505,6 +505,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
         }
         if (canNav('users')) {
             settingsItems.push({ label: 'Sidebar visibility', href: `${base}/settings/nav-visibility`, icon: 'layers' });
+            settingsItems.push({ label: 'Failed email queue', href: `${base}/settings/failed-mails`, icon: 'inbox' });
             settingsItems.push({ label: 'Portal users', href: `${base}/users`, icon: 'users' });
             // Not gated on websiteEnabled/publicWebsiteEnabled — this is a
             // communications setting, not part of the public website/CMS module.

@@ -2,6 +2,7 @@
 
 namespace App\Services\Mail;
 
+use App\Models\FailedEmailLog;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Models\User;
@@ -39,46 +40,15 @@ class SahodayaMailer
             return;
         }
 
-        if ($this->isConfigured() && $this->usesZeptoMailApi()) {
-            try {
-                [$fromAddress, $fromName] = $this->fromAddress();
-                $this->zeptoClient()->send(
-                    $fromAddress ?? '',
-                    $fromName,
-                    [['address' => $to]],
-                    $subject,
-                    nl2br(e($body)),
-                    $body,
-                );
-
-                return;
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('ZeptoMail API send failed, falling back to default SMTP mailer', [
-                    'to'    => $to,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
         try {
-            $mailer = $this->resolveMailerName();
-            [$fromAddress, $fromName] = $this->fromAddress();
-
-            Mail::mailer($mailer)->raw($body, function ($message) use ($to, $subject, $fromAddress, $fromName) {
-                $message->to($to)->subject($subject);
-
-                $actualFrom = $fromAddress ?: config('mail.from.address');
-                $actualName = $fromName ?: config('mail.from.name');
-
-                if ($actualFrom) {
-                    $message->from($actualFrom, $actualName);
-                }
-            });
+            $this->attemptSendRaw($to, $subject, $body);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('SMTP fallback raw mail send failed', [
+            \Illuminate\Support\Facades\Log::error('Failed to send raw mail, queueing failed log', [
                 'to'    => $to,
                 'error' => $e->getMessage(),
             ]);
+
+            $this->logFailedMail($to, $subject, 'raw', null, ['body' => $body], $e->getMessage());
         }
     }
 
@@ -94,26 +64,15 @@ class SahodayaMailer
             return;
         }
 
-        if ($this->isConfigured() && $this->usesZeptoMailApi()) {
-            try {
-                $this->sendHtmlViaApi($to, $subject, $view, $data, $attachments);
-
-                return;
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('ZeptoMail API send failed, falling back to default SMTP mailer', [
-                    'to'    => $to,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
         try {
-            $this->sendViaSmtpMailer($to, $subject, $view, $data, $attachments);
+            $this->attemptSendView($to, $subject, $view, $data, $attachments);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('SMTP fallback view mail send failed', [
+            \Illuminate\Support\Facades\Log::error('Failed to send view mail, queueing failed log', [
                 'to'    => $to,
                 'error' => $e->getMessage(),
             ]);
+
+            $this->logFailedMail($to, $subject, 'view', $view, ['data' => $data], $e->getMessage());
         }
     }
 
@@ -154,6 +113,189 @@ class SahodayaMailer
 
     public function sendVerification(User $user): void
     {
+        try {
+            $this->attemptSendVerification($user);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to send verification email, queueing failed log', [
+                'user_id' => $user->id,
+                'email'   => $user->email,
+                'error'   => $e->getMessage(),
+            ]);
+
+            $this->logFailedMail(
+                $user->email,
+                'Verify Your Email Address',
+                'verification',
+                null,
+                ['user_id' => $user->id],
+                $e->getMessage(),
+                $user->name,
+            );
+        }
+    }
+
+    public function sendPasswordReset(User $user, string $token): void
+    {
+        try {
+            $this->attemptSendPasswordReset($user, $token);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to send password reset email, queueing failed log', [
+                'user_id' => $user->id,
+                'email'   => $user->email,
+                'error'   => $e->getMessage(),
+            ]);
+
+            $this->logFailedMail(
+                $user->email,
+                'Reset Password Notification',
+                'password_reset',
+                null,
+                ['user_id' => $user->id, 'token' => $token],
+                $e->getMessage(),
+                $user->name,
+            );
+        }
+    }
+
+    public function retryFailedMail(FailedEmailLog $log): bool
+    {
+        $log->increment('attempts');
+        $log->update(['last_attempted_at' => now()]);
+
+        try {
+            $to = $log->recipient_email;
+            $subject = $log->subject;
+            $payload = $log->payload ?? [];
+
+            switch ($log->mail_type) {
+                case 'raw':
+                    $this->attemptSendRaw($to, $subject, $payload['body'] ?? '');
+                    break;
+                case 'verification':
+                    if (isset($payload['user_id']) && $user = User::find($payload['user_id'])) {
+                        $this->attemptSendVerification($user);
+                    } else {
+                        throw new \RuntimeException('User for verification email not found.');
+                    }
+                    break;
+                case 'password_reset':
+                    if (isset($payload['user_id'], $payload['token']) && $user = User::find($payload['user_id'])) {
+                        $this->attemptSendPasswordReset($user, $payload['token']);
+                    } else {
+                        throw new \RuntimeException('User or token for password reset email not found.');
+                    }
+                    break;
+                case 'view':
+                default:
+                    $view = $log->mail_view ?? 'emails.generic';
+                    $this->attemptSendView($to, $subject, $view, $payload['data'] ?? [], $payload['attachments'] ?? []);
+                    break;
+            }
+
+            $log->update([
+                'status'        => 'retry_success',
+                'sent_at'       => now(),
+                'error_message' => null,
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            $log->update([
+                'status'        => 'retry_failed',
+                'error_message' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    public function logFailedMail(
+        string $to,
+        string $subject,
+        string $mailType,
+        ?string $view = null,
+        array $payload = [],
+        string $errorMessage = '',
+        ?string $recipientName = null,
+    ): FailedEmailLog {
+        return FailedEmailLog::create([
+            'sahodaya_id'       => $this->sahodayaId,
+            'recipient_email'   => $to,
+            'recipient_name'    => $recipientName,
+            'subject'           => $subject,
+            'mail_type'         => $mailType,
+            'mail_view'         => $view,
+            'payload'           => $payload,
+            'error_message'     => $errorMessage,
+            'status'            => 'pending',
+            'attempts'          => 1,
+            'last_attempted_at'  => now(),
+        ]);
+    }
+
+    private function attemptSendRaw(string $to, string $subject, string $body): void
+    {
+        if ($this->isConfigured() && $this->usesZeptoMailApi()) {
+            try {
+                [$fromAddress, $fromName] = $this->fromAddress();
+                $this->zeptoClient()->send(
+                    $fromAddress ?? '',
+                    $fromName,
+                    [['address' => $to]],
+                    $subject,
+                    nl2br(e($body)),
+                    $body,
+                );
+
+                return;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('ZeptoMail API send failed, falling back to default SMTP mailer', [
+                    'to'    => $to,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $mailer = $this->resolveMailerName();
+        [$fromAddress, $fromName] = $this->fromAddress();
+
+        Mail::mailer($mailer)->raw($body, function ($message) use ($to, $subject, $fromAddress, $fromName) {
+            $message->to($to)->subject($subject);
+
+            $actualFrom = $fromAddress ?: config('mail.from.address');
+            $actualName = $fromName ?: config('mail.from.name');
+
+            if ($actualFrom) {
+                $message->from($actualFrom, $actualName);
+            }
+        });
+    }
+
+    private function attemptSendView(
+        string $to,
+        string $subject,
+        string $view,
+        array $data = [],
+        array $attachments = [],
+    ): void {
+        if ($this->isConfigured() && $this->usesZeptoMailApi()) {
+            try {
+                $this->sendHtmlViaApi($to, $subject, $view, $data, $attachments);
+
+                return;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('ZeptoMail API send failed, falling back to default SMTP mailer', [
+                    'to'    => $to,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $this->sendViaSmtpMailer($to, $subject, $view, $data, $attachments);
+    }
+
+    private function attemptSendVerification(User $user): void
+    {
         if ($this->isConfigured() && $this->usesZeptoMailApi()) {
             try {
                 (new \App\Notifications\PortalVerifyEmail)->deliverVia($this, $user);
@@ -167,19 +309,12 @@ class SahodayaMailer
             }
         }
 
-        try {
-            $this->withSahodayaMailer(function () use ($user) {
-                $user->sendEmailVerificationNotification();
-            });
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('SMTP fallback verification email failed', [
-                'user_id' => $user->id,
-                'error'   => $e->getMessage(),
-            ]);
-        }
+        $this->withSahodayaMailer(function () use ($user) {
+            $user->sendEmailVerificationNotification();
+        });
     }
 
-    public function sendPasswordReset(User $user, string $token): void
+    private function attemptSendPasswordReset(User $user, string $token): void
     {
         if ($this->isConfigured() && $this->usesZeptoMailApi()) {
             try {
@@ -194,16 +329,9 @@ class SahodayaMailer
             }
         }
 
-        try {
-            $this->withSahodayaMailer(function () use ($user, $token) {
-                $user->notify(new \App\Notifications\PortalResetPassword($token));
-            });
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('SMTP fallback password reset email failed', [
-                'user_id' => $user->id,
-                'error'   => $e->getMessage(),
-            ]);
-        }
+        $this->withSahodayaMailer(function () use ($user, $token) {
+            $user->notify(new \App\Notifications\PortalResetPassword($token));
+        });
     }
 
     /**

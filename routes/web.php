@@ -652,6 +652,14 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/settings/nav-visibility', [\App\Http\Controllers\SahodayaAdmin\NavVisibilityController::class, 'edit'])->name('settings.nav-visibility');
         Route::put('/settings/nav-visibility', [\App\Http\Controllers\SahodayaAdmin\NavVisibilityController::class, 'update'])->name('settings.nav-visibility.update');
 
+        Route::prefix('settings/failed-mails')->name('settings.failed-mails.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\SahodayaAdmin\FailedMailQueueController::class, 'index'])->name('index');
+            Route::post('/bulk-retry', [\App\Http\Controllers\SahodayaAdmin\FailedMailQueueController::class, 'bulkRetry'])->name('bulk-retry');
+            Route::post('/{failedMail}/retry', [\App\Http\Controllers\SahodayaAdmin\FailedMailQueueController::class, 'retry'])->name('retry');
+            Route::post('/{failedMail}/cancel', [\App\Http\Controllers\SahodayaAdmin\FailedMailQueueController::class, 'cancel'])->name('cancel');
+            Route::delete('/{failedMail}', [\App\Http\Controllers\SahodayaAdmin\FailedMailQueueController::class, 'destroy'])->name('destroy');
+        });
+
         // ── Academic Year Management (Phase 8) ────────────────────────────────
         Route::prefix('academic-years')->name('academic-years.')->group(function () {
             Route::get('/',                                        [AcademicYearController::class, 'index'])->name('index');
