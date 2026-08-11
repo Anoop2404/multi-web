@@ -10,7 +10,7 @@ class StateKalotsavProgramSeeder extends Seeder
 {
     public function run(): void
     {
-        $programs = FestStateProgram::where('event_type', 'kalotsavam')->get();
+        $programs = FestStateProgram::all();
 
         if ($programs->isEmpty()) {
             $programs = collect([
