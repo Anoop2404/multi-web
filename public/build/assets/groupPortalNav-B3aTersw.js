@@ -1,1 +1,0 @@
-function e(e){let t=`/portal/group/${e}`;return[{href:t,label:`Dashboard`,exact:!0},{href:`${t}/students`,label:`Students`},{href:`${t}/fest/registrations`,label:`Fest registrations`},{href:`${t}/fest/schedule`,label:`Fest schedule`},{href:`${t}/fest/clashes`,label:`Clashes`},{href:`${t}/fest/admit-cards`,label:`Admit cards`}]}export{e as t};
