@@ -91,4 +91,23 @@ class StateUserControllerTest extends TestCase
         $response->assertRedirect();
         $this->assertDatabaseMissing('users', ['id' => $user->id]);
     }
+
+    public function test_create_state_user_auto_creates_missing_role(): void
+    {
+        $superadmin = PlatformUser::where('email', 'admin@sahodaya.test')->first();
+
+        // Delete state_admin role from DB if present
+        PlatformRole::where('name', 'state_admin')->delete();
+
+        $response = $this->actingAs($superadmin)->post('/admin/state-users', [
+            'name'     => 'Auto Role Test',
+            'email'    => 'autorole@test.com',
+            'password' => 'password123',
+            'roles'    => ['state_admin'],
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('users', ['email' => 'autorole@test.com']);
+        $this->assertDatabaseHas('roles', ['name' => 'state_admin', 'guard_name' => 'web']);
+    }
 }

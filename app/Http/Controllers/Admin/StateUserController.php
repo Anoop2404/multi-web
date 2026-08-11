@@ -74,6 +74,9 @@ class StateUserController extends Controller
             'email_verified_at' => now(),
             'tenant_id'         => null,
         ]);
+        foreach ($data['roles'] as $roleName) {
+            \App\Models\PlatformRole::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+        }
         $user->syncRoles($data['roles']);
 
         $audit->userCreated($user);
@@ -105,6 +108,10 @@ class StateUserController extends Controller
         }
 
         $user->save();
+
+        foreach ($data['roles'] as $roleName) {
+            \App\Models\PlatformRole::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+        }
         $user->syncRoles($data['roles']);
 
         $audit->userUpdated($user);
