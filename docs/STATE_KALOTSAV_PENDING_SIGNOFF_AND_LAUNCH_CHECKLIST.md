@@ -1,9 +1,91 @@
 # State Kalotsavam — Pending Sign-off & Launch Checklist
 
-Generated 2026-08-10. Companion to `STATE_KALOTSAV_MASTER_IMPLEMENTATION_PLAN.md` §23
-(policy register) and §29 (work packages). This file exists because the remaining pending
+Generated 2026-08-10, updated 2026-08-11. Companion to `STATE_KALOTSAV_MASTER_IMPLEMENTATION_PLAN.md`
+§23 (policy register) and §29 (work packages). This file exists because the remaining pending
 items are things code alone can't finish: they need either a few clicks in the live admin UI,
 or a human/policy decision. Each section below is written so you can act on it directly.
+
+## 0. Full gap reconciliation (2026-08-11)
+
+A more thorough 9-category audit was supplied and checked against the code. It's accurate —
+one item (candidate-pool aggregation, 2.2 below) was verified as a real bug and fixed on the
+spot. This section is now the authoritative "what's actually left" list; §§1–5 below still
+stand but are narrower slices of the same picture. Legend: ✅ done, 🟡 partial, ⬜ not started,
+🚫 not code (infra/policy/pilot).
+
+**1. State infrastructure**
+- ⬜ `state_kalotsav` database doesn't exist locally / `state:health` fails — this can only be
+  fixed on your machine (`state:migrate`, then check the DB connection in `.env`); I have no
+  live DB access from this sandbox to diagnose further.
+- 🚫 Production domain, DNS/TLS, session handling across the state domain, queues, storage,
+  backups — all real infrastructure work, not buildable here.
+
+**2. Regional nominations**
+- ✅ *(fixed just now, commit `1f5323b`)* Candidate pool only read marks off the hub event
+  itself — for a region-wise Sahodaya without a re-competing Finale, every Region child
+  event's winners were silently excluded. Now expands to all partitions, same as the direct
+  qualifier-submission path already did.
+- 🟡 Direct raw-mark submission when no certified nomination exists — this is an intentional
+  fallback (`FestStateQualifierPayloadBuilder::entriesFromCertifiedNomination()` returns null
+  when no batch exists, direct-mark path takes over), not a bug, but it does mean nomination
+  isn't actually *mandatory* the way P-14 implies it should be end-state. Worth a decision:
+  keep permissive (what let registration open without waiting on this feature) or make
+  nomination a hard gate once every Sahodaya has adopted the workspace.
+- ⬜ State eligibility / per-student cap enforcement — only the per-item quota is enforced
+  today (`FestStateNominationService::select()`); a student nominated twice across different
+  items isn't caught.
+- ⬜ Withdrawal/replacement/revision workflow — `unselect()` marks a row withdrawn but there's
+  no "promote a reserve to primary" or "replace after certification" flow yet.
+
+**3. External Sahodaya flow**
+- ✅ OTP added (this session).
+- ⬜ No named user/membership model — OTP proves email ownership per-request, it doesn't
+  create a persisted login/account.
+- ⬜ No real external student registry, individual/team registration tables, or payment-proof
+  workflow — schools still enter qualifier-level details directly (name/item/position/grade)
+  rather than registering as students first, per §2.2's original design tradeoff.
+- ⬜ No Region/Phase conduct, marks, results, or appeals for external orgs.
+- 🟡 Records without email still fall back to access-code-only — this is the deliberate
+  non-breaking default (see P-02 row below), not an oversight, but worth tracking how many
+  outside Sahodayas actually have an email on file.
+
+**4. Qualifier API and scrutiny**
+- ⬜ Signed body/timestamp/batch-revision contract — the outbox (`FestStateSubmissionOutbox`)
+  has an idempotency key and content hash, but no request signing or replay-window contract.
+- ⬜ Shallow validation, no mixed per-entry accept/reject/return — `StateQualifierReviewController::approve()`
+  approves the whole intake at once; there's no per-entry decision UI.
+- ⬜ Correction/supersession/evidence-review lifecycle — not built.
+
+**5. Team handling**
+- ⬜ Full roster (leader/members/standby) isn't preserved through nomination or materialization
+  — `FestStateNominationSelection` and `StateFestParticipant` both model one participant per
+  row, no team-roster structure.
+
+**6. State event conduct**
+- ⬜ Scheduling, venues, stages, judge panels, attendance, double-verified mark entry,
+  provisional results, appeals, final certification/points/trophies, certificates, official
+  reports — none of this exists yet. `StateConductService` currently only does chest-number
+  assignment; `state_fest_marks` table exists in the schema but nothing writes to it.
+
+**7. Payments**
+- 🟡 `StateRemittanceService::calculateDemand()` takes a manually-supplied accepted-count,
+  it doesn't query real accepted State entries itself — flagged in §3 below as deliberately
+  not wired blind (grouping schools under the right Sahodaya for a financial figure needs a
+  live DB to verify against).
+- ⬜ Team/item fee breakdown, partial payments, adjustments, credits, immutable proof history
+  — the existing `Admin\StateRemittanceController` handles single lump-sum demands with
+  proof upload/verify/reject; it doesn't itemize or track partial payment history.
+
+**8. Region and Phase**
+- ⬜ `advancement_mode` exists on the program model but registration routing still uses
+  stage/team heuristics rather than reading it directly.
+- ⬜ Region→Finale promotion incomplete.
+- ⬜ Phase lifecycle (`FestPhaseLifecycleService`, added by the other session) isn't wired
+  into the conduct pipeline — its own docblock says this is deliberately future work.
+
+**9. Production approval**
+- 🚫 Policy sign-off, managed/external pilot, security/load/concurrency testing, backup and
+  restore rehearsal, finance/privacy/State-authority approval — all human process, not code.
 
 ## 1. Policy sign-off (§23, P-01–P-15) — condensed
 
