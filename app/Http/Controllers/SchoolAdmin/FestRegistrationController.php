@@ -120,7 +120,7 @@ class FestRegistrationController extends SchoolAdminController
             ->get();
 
         $studentCount = Student::where('tenant_id', $this->school->id)->active()->count();
-        $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 300);
+        $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 10000);
         $lazyStudents = $studentCount > $lazyThreshold;
         $focusEventId = $request->query('event') ? (int) $request->query('event') : null;
 
@@ -342,7 +342,7 @@ class FestRegistrationController extends SchoolAdminController
         $hydrated = $this->hydrateEventForSchoolRegistration($event, $feeService);
 
         $studentCount = Student::where('tenant_id', $this->school->id)->active()->count();
-        $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 300);
+        $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 10000);
         $lazyStudents = $studentCount > $lazyThreshold;
 
         // Same fix as index() above — see docs/SCALE_AND_PAGINATION_PLAN.md §6. Below

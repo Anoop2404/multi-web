@@ -132,7 +132,7 @@ class McqController extends SchoolAdminController
         // eager load: ship an empty list and let the frontend fetch a 50-row page on
         // demand via eligibleStudents() below.
         $studentTotalCount = Student::where('tenant_id', $this->school->id)->active()->count();
-        $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 300);
+        $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 10000);
         $lazyStudents = $allowsStudents && $studentTotalCount > $lazyThreshold;
 
         if ($allowsStudents && ! $lazyStudents) {
