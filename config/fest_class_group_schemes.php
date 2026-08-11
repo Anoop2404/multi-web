@@ -10,6 +10,7 @@ return [
     'default' => 'cbse',
 
     'options' => [
+        'kalotsav_category' => 'Kalotsavam Categories (Category 1–5)',
         'cbse' => 'CBSE Kerala (Category I–IV)',
         'sahodaya' => 'Sahodaya standard (LP–HSS)',
         'cluster' => 'Class master (your CATEGORY1–4 setup)',
@@ -17,6 +18,22 @@ return [
     ],
 
     'schemes' => [
+        'kalotsav_category' => [
+            'groups' => [
+                'category_1' => 'Category 1 — Classes 3 & 4',
+                'category_2' => 'Category 2 — Classes 5, 6 & 7',
+                'category_3' => 'Category 3 — Classes 8, 9 & 10',
+                'category_4' => 'Category 4 — Classes 11 & 12',
+                'category_5' => 'Category 5 — Group Items (Open)',
+            ],
+            'default_fees' => [
+                'category_1' => 100,
+                'category_2' => 150,
+                'category_3' => 200,
+                'category_4' => 250,
+                'category_5' => 200,
+            ],
+        ],
         'cbse' => [
             'groups' => [
                 'lp' => 'Category 1 — Classes 3 & 4',
