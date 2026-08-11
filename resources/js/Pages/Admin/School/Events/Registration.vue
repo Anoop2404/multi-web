@@ -1076,7 +1076,7 @@ function clearItemFilters(eventId) {
 }
 
 function itemCompetitionType(item) {
-    const sm = String(item.stage_mode || '').toLowerCase();
+    const sm = String(item.stage_mode || item.stage_type || '').toLowerCase();
     const title = String(item.title || item.name || '').toLowerCase();
     const isGrp = ['group', 'team'].includes(item.participant_type);
     const isOff = sm.includes('off') || item.is_onstage === false || title.includes('offstage') || title.includes('off stage') || title.includes('painting') || title.includes('drawing') || title.includes('essay') || title.includes('story') || title.includes('versification') || title.includes('quiz') || title.includes('carrom') || title.includes('chess');
@@ -1140,7 +1140,7 @@ function filteredAllItems(event) {
             }
 
             if (stageFilter) {
-                const sm = String(item.stage_mode || '').toLowerCase();
+                const sm = String(item.stage_mode || item.stage_type || '').toLowerCase();
                 const title = String(item.title || item.name || '').toLowerCase();
                 const isOn = sm.includes('on') || item.is_onstage === true;
                 const isOff = sm.includes('off') || item.is_onstage === false || title.includes('offstage') || title.includes('off stage') || title.includes('painting') || title.includes('drawing') || title.includes('essay');
@@ -1156,8 +1156,6 @@ function filteredAllItems(event) {
 
             return true;
         });
-    } else {
-        items = [...rawItems];
     }
 
     if (sortMode) {
@@ -1171,8 +1169,8 @@ function filteredAllItems(event) {
             });
         } else if (sortMode === 'stage') {
             items.sort((a, b) => {
-                const smA = String(a.stage_mode || '').toLowerCase().includes('on') || a.is_onstage === true ? 1 : 2;
-                const smB = String(b.stage_mode || '').toLowerCase().includes('on') || b.is_onstage === true ? 1 : 2;
+                const smA = String(a.stage_mode || a.stage_type || '').toLowerCase().includes('on') || a.is_onstage === true ? 1 : 2;
+                const smB = String(b.stage_mode || b.stage_type || '').toLowerCase().includes('on') || b.is_onstage === true ? 1 : 2;
                 return smA - smB;
             });
         } else if (sortMode === 'name') {
