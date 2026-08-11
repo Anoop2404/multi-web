@@ -117,9 +117,10 @@ class FestRegistrationEligibilityService
                 ->all();
         }
 
-        $eventType = $event->event_type ?? 'kalolsavam';
+        $eventType = strtolower((string) ($event->event_type ?? 'kalolsavam'));
         $isSports = $eventType === 'sports';
-        $isKalolsav = in_array($eventType, ['kalolsavam', 'custom', 'english_fest', 'science_fest'], true);
+        $isKalolsav = in_array($eventType, ['kalolsavam', 'kalotsav', 'kalolsav', 'custom', 'english_fest', 'science_fest'], true)
+            || str_contains($eventType, 'kalotsav') || str_contains($eventType, 'kalolsav');
         $isKidsFest = $eventType === 'kids_fest';
 
         return $students->map(function (Student $student) use ($event, $eventRegByStudent, $isSports, $isKalolsav, $isKidsFest) {

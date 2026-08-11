@@ -1045,14 +1045,15 @@ function studentsForEvent(eventId) {
 }
 
 function requireVerifiedForEvent(event) {
-    return event?.require_verified_students !== false;
+    return event?.require_verified_students === true;
 }
 
 const GROUP_ALIASES = {
-    lp: ['lp', 'category1', 'categoryi', 'cat1', 'cati'],
-    up: ['up', 'category2', 'categoryii', 'cat2', 'catii'],
-    hs: ['hs', 'category3', 'categoryiii', 'cat3', 'catiii'],
-    hss: ['hss', 'category4', 'categoryiv', 'cat4', 'cativ'],
+    lp: ['lp', 'category1', 'categoryi', 'cat1', 'cati', 'category_1'],
+    up: ['up', 'category2', 'categoryii', 'cat2', 'catii', 'category_2'],
+    hs: ['hs', 'category3', 'categoryiii', 'cat3', 'catiii', 'category_3'],
+    hss: ['hss', 'category4', 'categoryiv', 'cat4', 'cativ', 'category_4'],
+    open: ['open', 'category5', 'categoryv', 'cat5', 'catv', 'category_5'],
 };
 
 function normalizedClassGroup(value) {
@@ -1077,11 +1078,11 @@ function studentMatchesItem(student, event, item, { skipVerification = false } =
     if (!skipVerification && requireVerifiedForEvent(event) && student.is_verified === false) {
         return false;
     }
-    if (event?.academic_year_id && student.academic_year_id && event.academic_year_id !== student.academic_year_id) {
+    if (event?.academic_year_id && student.academic_year_id && Number(event.academic_year_id) !== Number(student.academic_year_id)) {
         return false;
     }
-    if (['kalolsavam', 'custom', 'english_fest', 'science_fest'].includes(props.eventType)) {
-        if (props.eventType === 'kalolsavam' && student.eligible_kalolsav === false) return false;
+    if (['kalolsavam', 'kalotsav', 'custom', 'english_fest', 'science_fest'].includes(props.eventType) || String(props.eventType ?? '').includes('kalotsav')) {
+        if (['kalolsavam', 'kalotsav'].includes(props.eventType) && student.eligible_kalolsav === false) return false;
         if (item.class_group && item.class_group !== 'open') {
             if (!matchesClassGroup(student.kalolsav_class_group, item.class_group)) return false;
         }
