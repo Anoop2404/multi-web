@@ -268,13 +268,23 @@ class MemberSchoolsController extends SahodayaAdminController
             $payload['updated_at'] = now()->toIso8601String();
             $school->update(['application_payload' => $payload]);
 
+            $emailSent = true;
             if ($loginUser) {
                 $loginUser->forceFill([
                     'email' => $newEmail,
                     'email_verified_at' => null,
                 ])->save();
 
-                SahodayaMailer::for($school->parent_id)->sendVerification($loginUser->fresh());
+                try {
+                    SahodayaMailer::for($school->parent_id)->sendVerification($loginUser->fresh());
+                } catch (\Throwable $e) {
+                    $emailSent = false;
+                    \Illuminate\Support\Facades\Log::error('Failed to send verification email for school email update', [
+                        'school_id' => $school->id,
+                        'email'     => $newEmail,
+                        'error'     => $e->getMessage(),
+                    ]);
+                }
             }
 
             app(DataChangeLogger::class)->updated(
@@ -295,7 +305,11 @@ class MemberSchoolsController extends SahodayaAdminController
                 ['updated_by_user_id' => $request->user()?->id, 'email' => $newEmail],
             );
 
-            return back()->with('success', "School email updated for {$school->name}.");
+            $message = $emailSent
+                ? "School email updated for {$school->name}."
+                : "School email updated for {$school->name} (Note: Verification email delivery failed — please check ZeptoMail/SMTP credentials).";
+
+            return back()->with('success', $message);
         });
     }
 

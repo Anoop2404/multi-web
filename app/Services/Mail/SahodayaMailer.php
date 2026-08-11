@@ -60,19 +60,26 @@ class SahodayaMailer
             }
         }
 
-        $mailer = $this->resolveMailerName();
-        [$fromAddress, $fromName] = $this->fromAddress();
+        try {
+            $mailer = $this->resolveMailerName();
+            [$fromAddress, $fromName] = $this->fromAddress();
 
-        Mail::mailer($mailer)->raw($body, function ($message) use ($to, $subject, $fromAddress, $fromName) {
-            $message->to($to)->subject($subject);
+            Mail::mailer($mailer)->raw($body, function ($message) use ($to, $subject, $fromAddress, $fromName) {
+                $message->to($to)->subject($subject);
 
-            $actualFrom = $fromAddress ?: config('mail.from.address');
-            $actualName = $fromName ?: config('mail.from.name');
+                $actualFrom = $fromAddress ?: config('mail.from.address');
+                $actualName = $fromName ?: config('mail.from.name');
 
-            if ($actualFrom) {
-                $message->from($actualFrom, $actualName);
-            }
-        });
+                if ($actualFrom) {
+                    $message->from($actualFrom, $actualName);
+                }
+            });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('SMTP fallback raw mail send failed', [
+                'to'    => $to,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /** @param  list<array{content: string, name: string, mime?: string}>  $attachments */
@@ -100,7 +107,14 @@ class SahodayaMailer
             }
         }
 
-        $this->sendViaSmtpMailer($to, $subject, $view, $data, $attachments);
+        try {
+            $this->sendViaSmtpMailer($to, $subject, $view, $data, $attachments);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('SMTP fallback view mail send failed', [
+                'to'    => $to,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /** @param  list<string>  $recipients  @param  array<string, mixed>  $data  @param  list<array{content: string, name: string, mime?: string}>  $attachments */
@@ -153,9 +167,16 @@ class SahodayaMailer
             }
         }
 
-        $this->withSahodayaMailer(function () use ($user) {
-            $user->sendEmailVerificationNotification();
-        });
+        try {
+            $this->withSahodayaMailer(function () use ($user) {
+                $user->sendEmailVerificationNotification();
+            });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('SMTP fallback verification email failed', [
+                'user_id' => $user->id,
+                'error'   => $e->getMessage(),
+            ]);
+        }
     }
 
     public function sendPasswordReset(User $user, string $token): void
@@ -173,9 +194,16 @@ class SahodayaMailer
             }
         }
 
-        $this->withSahodayaMailer(function () use ($user, $token) {
-            $user->notify(new \App\Notifications\PortalResetPassword($token));
-        });
+        try {
+            $this->withSahodayaMailer(function () use ($user, $token) {
+                $user->notify(new \App\Notifications\PortalResetPassword($token));
+            });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('SMTP fallback password reset email failed', [
+                'user_id' => $user->id,
+                'error'   => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
