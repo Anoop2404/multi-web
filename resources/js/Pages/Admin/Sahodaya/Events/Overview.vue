@@ -142,7 +142,7 @@
                         <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">1. Basic Info &amp; Lifecycle Phase</h4>
                         <FormGrid>
                             <FormField label="Event Title" class-extra="sm:col-span-2" required>
-                                <input v-model="form.title" class="field" :disabled="!!event.state_program_id" required>
+                                <input v-model="form.title" class="field" required>
                             </FormField>
                             <FormField label="Lifecycle Phase Status" class-extra="sm:col-span-2">
                                 <select v-model="form.status" class="field font-medium">

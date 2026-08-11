@@ -373,7 +373,7 @@
                                 <tr v-for="ev in events" :key="ev.id">
                                     <td class="font-medium text-slate-900">
                                         {{ ev.title }}
-                                        <span v-if="ev.state_program_id" class="ml-1 text-xs text-amber-700 font-semibold">(state)</span>
+                                        <span v-if="ev.state_program_id" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200/80 uppercase tracking-wider">State Linked</span>
                                     </td>
                                     <td class="text-xs">{{ levelLabels[ev.level_round] ?? ev.level_round }}</td>
                                     <td>

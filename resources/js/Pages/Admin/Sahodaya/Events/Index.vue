@@ -146,7 +146,7 @@
                                         <span v-else-if="event.conduct_mode === 'partitioned'" class="text-[10px] uppercase font-bold bg-sky-50 text-sky-800 px-1.5 py-0.5 rounded border border-sky-100">
                                             Main Hub (Region-wise)
                                         </span>
-                                        <span v-if="event.state_program_id" class="ml-1 text-xs text-amber-700">(state)</span>
+                                        <span v-if="event.state_program_id" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200/80 uppercase tracking-wider">State Linked</span>
                                     </div>
                                 </td>
                                 <td>{{ eventTypes[event.event_type] ?? event.event_type }}</td>
