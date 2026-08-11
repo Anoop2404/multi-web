@@ -95,6 +95,11 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::post('/{stateProgram}/items', [StateFestProgramController::class, 'storeItem'])->name('items.store');
             Route::delete('/{stateProgram}/items/{item}', [StateFestProgramController::class, 'destroyItem'])->name('items.destroy');
 
+            Route::post('/{stateProgram}/sahodaya/{sahodaya}/toggle', [StateFestProgramController::class, 'toggleSahodaya'])->name('sahodaya.toggle');
+            Route::get('/{stateProgram}/sahodaya/{sahodaya}/items', [StateFestProgramController::class, 'sahodayaItems'])->name('sahodaya.items');
+            Route::post('/{stateProgram}/sahodaya/{sahodaya}/items/item/{item}/toggle', [StateFestProgramController::class, 'toggleSahodayaItem'])->name('sahodaya.items.toggle');
+            Route::post('/{stateProgram}/sahodaya/{sahodaya}/items/bulk-toggle', [StateFestProgramController::class, 'bulkToggleSahodayaItems'])->name('sahodaya.items.bulk-toggle');
+
             // Outside-Sahodaya intake (docs/STATE_LEVEL_KALOTSAV_ROLLOUT_PLAN.md §2.1) — Sahodayas
             // that aren't platform tenants. State admin creates the record + code here; the
             // Sahodaya/school-facing side lives at the public /state/external routes below.

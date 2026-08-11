@@ -60,20 +60,25 @@
                 <form @submit.prevent="save" class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-5">
                     <h2 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">Program Identity & Level Conducts</h2>
 
-                    <div v-if="program.status !== 'published'" class="grid sm:grid-cols-2 gap-4">
+                    <div class="grid sm:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Program Title *</label>
                             <input v-model="form.title" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm font-medium" required>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Competition Event Type *</label>
-                            <select v-model="form.event_type" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm font-medium">
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Program Status *</label>
+                            <select v-model="form.status" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm font-medium">
+                                <option value="published">🟢 Published / Active</option>
+                                <option value="draft">🟡 Draft (Setup mode)</option>
+                                <option value="inactive">🔴 Inactive (Disabled)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Event Type *</label>
+                            <select v-model="form.event_type" :disabled="program.status === 'published'" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm font-medium">
                                 <option v-for="(label, key) in eventTypes" :key="key" :value="key">{{ label }}</option>
                             </select>
                         </div>
-                    </div>
-                    <div v-else class="p-4 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-800 text-xs font-medium">
-                        🔒 Published program title and competition type are locked to preserve cluster integrity. You can update dates, venue, and description.
                     </div>
 
                     <div>
@@ -331,12 +336,15 @@
                 </form>
             </div>
 
-            <!-- TAB 4: Cluster Propagation Log -->
+            <!-- TAB 4: Cluster Propagation & Sahodaya Item Visibility Controls -->
             <div v-show="activeTab === 'clusters'" class="space-y-6">
                 <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
                     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <h2 class="text-base font-bold text-slate-900">Sahodaya Cluster Propagation Log</h2>
-                        <span class="text-xs font-bold text-slate-500">{{ program.propagations?.length || 0 }} cluster(s) deployed</span>
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900">Sahodaya Cluster Controls & Item Visibility</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Control program status and enable/hide specific state items per Sahodaya complex.</p>
+                        </div>
+                        <span class="text-xs font-bold text-slate-500">{{ allSahodayas.length }} cluster(s) available</span>
                     </div>
 
                     <div class="overflow-x-auto">
@@ -344,31 +352,38 @@
                             <thead>
                                 <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-100">
                                     <th class="py-3 px-4">Sahodaya Complex</th>
-                                    <th class="py-3 px-4">Level Round</th>
-                                    <th class="py-3 px-4 font-mono">Tenant Event ID</th>
-                                    <th class="py-3 px-4 text-right">Status</th>
+                                    <th class="py-3 px-4">Deployment Status</th>
+                                    <th class="py-3 px-4">Program Status</th>
+                                    <th class="py-3 px-4 text-right">State Item Visibility Controls</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 text-slate-700">
-                                <tr v-for="row in program.propagations" :key="row.id" class="hover:bg-slate-50/50 transition-colors">
+                                <tr v-for="cluster in allSahodayas" :key="cluster.id" class="hover:bg-slate-50/50 transition-colors">
                                     <td class="py-3.5 px-4 font-bold text-slate-900">
-                                        {{ row.sahodaya?.name ?? row.sahodaya_id }}
+                                        {{ cluster.name }}
+                                        <span v-if="cluster.subdomain" class="block font-mono text-xs font-normal text-slate-400">{{ cluster.subdomain }}.truecampus.in</span>
                                     </td>
-                                    <td class="py-3.5 px-4 font-medium capitalize">
-                                        {{ levelLabels[row.level_round] ?? row.level_round }}
-                                    </td>
-                                    <td class="py-3.5 px-4 font-mono text-xs text-slate-500">
-                                        {{ row.tenant_event_id ?? '—' }}
-                                    </td>
-                                    <td class="py-3.5 px-4 text-right">
-                                        <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
+                                    <td class="py-3.5 px-4">
+                                        <span v-if="cluster.deployed" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
                                             ● Deployed
                                         </span>
+                                        <span v-else class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium border border-slate-200">
+                                            ○ Not Deployed
+                                        </span>
                                     </td>
-                                </tr>
-                                <tr v-if="!program.propagations?.length">
-                                    <td colspan="4" class="py-8 text-center text-slate-400">
-                                        Not published yet. Click "Publish to all Sahodayas" to deploy hub events to Sahodaya complexes.
+                                    <td class="py-3.5 px-4">
+                                        <button v-if="cluster.is_enabled" type="button" @click="toggleSahodaya(cluster, false)" class="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition">
+                                            🟢 Active — Click to Disable
+                                        </button>
+                                        <button v-else type="button" @click="toggleSahodaya(cluster, true)" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition">
+                                            🔴 Disabled — Click to Enable
+                                        </button>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-right">
+                                        <button v-if="cluster.deployed" type="button" @click="openSahodayaItemModal(cluster)" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition">
+                                            🎯 Manage Sahodaya Items →
+                                        </button>
+                                        <span v-else class="text-xs text-slate-400 font-medium">Publish program first</span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -389,6 +404,60 @@
                               class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition">
                             Manage Credentials & Codes →
                         </Link>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sahodaya Item Visibility Modal -->
+            <div v-if="sahodayaModalOpen" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+                    <div class="p-5 bg-slate-900 text-white flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-base">🎯 {{ activeSahodaya?.name }} — Item Visibility Matrix</h3>
+                            <p class="text-xs text-slate-300">Enable or hide specific state items for this Sahodaya complex.</p>
+                        </div>
+                        <button type="button" @click="sahodayaModalOpen = false" class="text-slate-400 hover:text-white text-xl font-bold px-2">✕</button>
+                    </div>
+
+                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                        <input v-model="itemSearch" placeholder="Search state items by title or code..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs font-medium w-full sm:w-64">
+                        <div class="flex items-center gap-2">
+                            <button type="button" @click="bulkToggleItemsForSahodaya(true)" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition">
+                                Enable All Items
+                            </button>
+                            <button type="button" @click="bulkToggleItemsForSahodaya(false)" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition">
+                                Hide All Items
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-5">
+                        <div v-if="loadingItems" class="text-center py-12 text-slate-500 text-sm font-medium">
+                            ⏳ Loading Sahodaya items...
+                        </div>
+                        <div v-else-if="!filteredSahodayaItems.length" class="text-center py-12 text-slate-400 text-sm">
+                            No matching items found.
+                        </div>
+                        <div v-else class="grid sm:grid-cols-2 gap-3">
+                            <div v-for="item in filteredSahodayaItems" :key="item.id" class="p-3.5 rounded-xl border transition flex items-center justify-between gap-3" :class="item.is_enabled ? 'bg-white border-slate-200' : 'bg-rose-50/40 border-rose-200/60 opacity-75'">
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <span v-if="item.item_code" class="font-mono text-[10px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">{{ item.item_code }}</span>
+                                        <p class="font-bold text-xs text-slate-900 truncate">{{ item.title }}</p>
+                                    </div>
+                                    <p class="text-[10px] text-slate-500 capitalize mt-0.5">{{ item.category || 'General' }} · {{ item.class_group || 'Open' }}</p>
+                                </div>
+                                <button type="button" @click="toggleItemForSahodaya(item, !item.is_enabled)" class="px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap" :class="item.is_enabled ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-rose-100 text-rose-800 hover:bg-rose-200'">
+                                    {{ item.is_enabled ? '✓ Enabled' : '✕ Hidden' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+                        <button type="button" @click="sahodayaModalOpen = false" class="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800">
+                            Done
+                        </button>
                     </div>
                 </div>
             </div>
@@ -413,11 +482,56 @@ const props = defineProps({
     defaultAgeGroupFees: Object,
     participationPresets: Object,
     taxonomy: Object,
-    stateDomains: Array,
-    defaultQualifierPolicy: Object,
+    allSahodayas: { type: Array, default: () => [] },
 });
 
 const activeTab = ref('general');
+const sahodayaModalOpen = ref(false);
+const activeSahodaya = ref(null);
+const sahodayaItems = ref([]);
+const loadingItems = ref(false);
+const itemSearch = ref('');
+
+function toggleSahodaya(cluster, enabled) {
+    router.post(`/admin/state-programs/${props.program.id}/sahodaya/${cluster.id}/toggle`, {
+        enabled: enabled,
+    }, { preserveScroll: true });
+}
+
+async function openSahodayaItemModal(cluster) {
+    activeSahodaya.value = cluster;
+    sahodayaModalOpen.value = true;
+    loadingItems.value = true;
+    try {
+        const res = await fetch(`/admin/state-programs/${props.program.id}/sahodaya/${cluster.id}/items`);
+        const json = await res.json();
+        sahodayaItems.value = json.items || [];
+    } catch (e) {
+        sahodayaItems.value = [];
+    } finally {
+        loadingItems.value = false;
+    }
+}
+
+function toggleItemForSahodaya(item, enabled) {
+    item.is_enabled = enabled;
+    router.post(`/admin/state-programs/${props.program.id}/sahodaya/${activeSahodaya.value.id}/items/item/${item.id}/toggle`, {
+        enabled: enabled,
+    }, { preserveScroll: true });
+}
+
+function bulkToggleItemsForSahodaya(enabled) {
+    sahodayaItems.value.forEach(i => i.is_enabled = enabled);
+    router.post(`/admin/state-programs/${props.program.id}/sahodaya/${activeSahodaya.value.id}/items/bulk-toggle`, {
+        enabled: enabled,
+    }, { preserveScroll: true });
+}
+
+const filteredSahodayaItems = computed(() => {
+    if (!itemSearch.value) return sahodayaItems.value;
+    const term = itemSearch.value.toLowerCase();
+    return sahodayaItems.value.filter(i => (i.title || '').toLowerCase().includes(term) || (i.item_code || '').toLowerCase().includes(term));
+});
 
 const tabs = computed(() => [
     { id: 'general', icon: '📋', label: 'Blueprint & Handoff' },
@@ -471,6 +585,7 @@ function buildLevelPolicies(program, conductLevels) {
 
 const form = useForm({
     title: props.program.title,
+    status: props.program.status ?? 'draft',
     event_type: props.program.event_type,
     conduct_levels: [...(props.program.conduct_levels ?? [])].filter(
         (l) => props.program.event_type !== 'sports' || l !== 'state'

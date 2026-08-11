@@ -50,18 +50,36 @@ class StateFestProgramController extends Controller
     {
         $stateProgram->load(['propagations.sahodaya:id,name', 'items', 'stateDomain']);
 
+        $allSahodayas = \App\Models\Tenant::query()
+            ->sahodayas()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'domain', 'subdomain'])
+            ->map(function ($s) use ($stateProgram) {
+                $prop = $stateProgram->propagations->firstWhere('sahodaya_id', $s->id);
+                return [
+                    'id'              => $s->id,
+                    'name'            => $s->name,
+                    'subdomain'       => $s->subdomain,
+                    'deployed'        => filled($prop?->tenant_event_id),
+                    'tenant_event_id' => $prop?->tenant_event_id,
+                    'is_enabled'      => (bool) ($prop?->is_enabled ?? true),
+                ];
+            });
+
         return inertia('StatePrograms/Show', [
-            'program'    => $stateProgram,
-            'eventTypes' => $this->eventTypes(),
-            'levelLabels'=> FestStateProgram::levelLabels(),
-            'feeTypes'   => config('fest_fees.fee_models'),
+            'program'      => $stateProgram,
+            'allSahodayas' => $allSahodayas,
+            'eventTypes'   => $this->eventTypes(),
+            'levelLabels'  => FestStateProgram::levelLabels(),
+            'feeTypes'     => config('fest_fees.fee_models'),
             'levelDefaults' => config('fest_fees.level_defaults'),
             'classGroupLabels' => config('fest_class_group_schemes.schemes.cbse.groups'),
             'classGroupSchemeOptions' => FestClassGroupScheme::options(),
             'ageGroupLabels' => FestSportsAgeGroup::labels(),
             'defaultAgeGroupFees' => FestSportsAgeGroup::defaultFees(),
             'participationPresets' => config('fest_participation_presets'),
-            'taxonomy'   => config('fest_item_taxonomy'),
+            'taxonomy'     => config('fest_item_taxonomy'),
             'stateDomains' => StateDomain::query()
                 ->where('status', 'active')
                 ->orderBy('name')
@@ -69,22 +87,75 @@ class StateFestProgramController extends Controller
             'defaultQualifierPolicy' => config('fest_conduct_presets.mcs_kalotsav.qualifier_policy', [
                 'regional' => ['positions' => [1]],
                 'district' => ['positions' => [1, 2]],
-                // Non-partitioned Sahodayas (the common case): manual General Rules #15 — top 2 always.
                 'standard' => ['positions' => [1, 2]],
                 'skip_item_flags' => ['mcs_only'],
             ]),
         ]);
     }
 
+    public function sahodayaItems(FestStateProgram $stateProgram, \App\Models\Tenant $sahodaya)
+    {
+        $items = \App\Support\TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($stateProgram, $sahodaya) {
+            $event = \App\Models\FestEvent::where('tenant_id', $sahodaya->id)
+                ->where('state_program_id', $stateProgram->id)
+                ->first();
+
+            if (! $event) {
+                return [];
+            }
+
+            return \App\Models\FestEventItem::where('event_id', $event->id)
+                ->orderBy('display_order')
+                ->get(['id', 'title', 'item_code', 'category', 'class_group', 'is_enabled', 'state_program_item_id']);
+        });
+
+        return response()->json([
+            'sahodaya' => ['id' => $sahodaya->id, 'name' => $sahodaya->name],
+            'items'    => $items,
+        ]);
+    }
+
+    public function toggleSahodayaItem(Request $request, FestStateProgram $stateProgram, \App\Models\Tenant $sahodaya, \App\Models\FestEventItem $item)
+    {
+        $enabled = $request->boolean('enabled');
+
+        \App\Support\TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($item, $enabled) {
+            $item->update(['is_enabled' => $enabled]);
+        });
+
+        return back()->with('success', 'Item visibility updated.');
+    }
+
+    public function bulkToggleSahodayaItems(Request $request, FestStateProgram $stateProgram, \App\Models\Tenant $sahodaya)
+    {
+        $enabled = $request->boolean('enabled');
+        $itemIds = $request->input('item_ids', []);
+
+        \App\Support\TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($stateProgram, $sahodaya, $itemIds, $enabled) {
+            $event = \App\Models\FestEvent::where('tenant_id', $sahodaya->id)
+                ->where('state_program_id', $stateProgram->id)
+                ->first();
+
+            if ($event) {
+                $q = \App\Models\FestEventItem::where('event_id', $event->id);
+                if (! empty($itemIds)) {
+                    $q->whereIn('id', $itemIds);
+                }
+                $q->update(['is_enabled' => $enabled]);
+            }
+        });
+
+        $statusStr = $enabled ? 'enabled' : 'hidden';
+        return back()->with('success', "Selected items {$statusStr} for {$sahodaya->name}.");
+    }
+
     public function update(Request $request, FestStateProgram $stateProgram, FestStateProgramService $service)
     {
+        $data = $this->validateProgram($request);
+        $data = $this->attachStateDomainConfig($request, $data);
+
         if ($stateProgram->status === 'published') {
-            $data = $this->validateProgram($request);
-            unset($data['title'], $data['event_type'], $data['conduct_levels']);
-            $data = $this->attachStateDomainConfig($request, $data);
-        } else {
-            $data = $this->validateProgram($request);
-            $data = $this->attachStateDomainConfig($request, $data);
+            unset($data['event_type']);
         }
 
         $stateProgram->update($data);
@@ -201,6 +272,7 @@ class StateFestProgramController extends Controller
     {
         $data = $request->validate([
             'title'              => 'required|string|max:255',
+            'status'             => 'nullable|in:draft,published,inactive',
             'event_type'         => ['required', \Illuminate\Validation\Rule::in(array_keys(config('fest_competition_types', [])))],
             'conduct_levels'     => 'required|array|min:1',
             'conduct_levels.*'   => Rule::in(['state', 'sahodaya', 'school']),
