@@ -12,7 +12,7 @@ class FestRegistration extends Model
     use BelongsToCentralTenant;
 
     /** Registrations that count toward reports and billing (excludes withdrawn/rejected). */
-    public const ACTIVE_STATUSES = ['submitted', 'approved'];
+    public const ACTIVE_STATUSES = ['submitted', 'proof_uploaded', 'pending_proof', 'partial', 'approved'];
 
     protected $fillable = [
         'event_id', 'item_id', 'school_id', 'mode', 'status',

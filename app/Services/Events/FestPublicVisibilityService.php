@@ -170,11 +170,15 @@ class FestPublicVisibilityService
         $showSchool = ! $public || $this->showSchoolName($event);
 
         $teamName = $participant->group?->team_name ?? $participant->registration?->team_name;
+        $schoolName = $participant->registration?->school?->name;
+        if (! $schoolName && $participant->registration?->school_id) {
+            $schoolName = Tenant::find($participant->registration->school_id)?->name;
+        }
 
         return [
             'reference' => $this->publicReference($event, $participant),
             'name'      => $showName ? ($participant->student?->name ?? $participant->teacher?->name) : null,
-            'school'    => $showSchool ? ($participant->registration?->school?->name ?? '') : null,
+            'school'    => $showSchool ? ($schoolName ?? '') : null,
             'order'     => $schedule?->sort_order,
             'item'      => $participant->registration?->item?->title,
             'team_name' => $showName ? $teamName : null,
