@@ -86,7 +86,7 @@ class DataChangeLogger
         return DataChangeLog::create([
             'school_id'       => $schoolId,
             'log_name'        => $logName ?? $this->inferLogName($subject),
-            'action'          => $action,
+            'action'          => Str::limit($action, 27, ''),   // column is varchar(30)
             'description'     => $description,
             'subject_type'    => $subject?->getMorphClass(),
             'subject_id'      => $subject?->getKey(),
