@@ -944,11 +944,7 @@ class FestIdCardService
      */
     private function constrainRegistrationStatus($query, array $filters): void
     {
-        if ($filters['school_downloads'] ?? false) {
-            $query->whereNotIn('status', ['rejected', 'withdrawn']);
-        } else {
-            $query->where('status', 'approved');
-        }
+        $query->whereNotIn('status', ['rejected', 'withdrawn']);
     }
 
     /**
