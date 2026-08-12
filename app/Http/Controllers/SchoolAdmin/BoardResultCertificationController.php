@@ -28,9 +28,21 @@ class BoardResultCertificationController extends SchoolAdminController
         $service = app(BoardResultCertificationService::class);
         $package = $report->package;
 
+        // Auto-advance: allow Principal/VP to click "Generate Report PDF" directly
+        // without having to first click "Send for Leadership Review" separately.
+        // Draft → request_leadership_review → begin_report_signatures (two hops).
+        if ($package->status === BoardResultCertificationPackage::STATUS_DRAFT) {
+            $service->requestLeadershipReview(
+                $boardResult,
+                $request->user()
+            );
+            $package->refresh();
+        }
+
         if ($package->status === BoardResultCertificationPackage::STATUS_AWAITING_LEADERSHIP_REVIEW) {
             $service->beginReportSignatures($package, $request->user());
         }
+
         abort_unless(
             $package->fresh()->status === BoardResultCertificationPackage::STATUS_AWAITING_REPORT_SIGNATURES,
             422,
