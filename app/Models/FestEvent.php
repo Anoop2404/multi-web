@@ -376,8 +376,10 @@ class FestEvent extends Model
         $parentEvent = $this->parent_event_id ? self::find($seasonId) : $this;
         $parentTitle = $parentEvent?->title ?? '';
 
-        $query = self::where('parent_event_id', $seasonId)
-            ->orWhere('id', $seasonId)
+        $query = self::where(function ($q) use ($seasonId) {
+            $q->where('parent_event_id', $seasonId)
+              ->orWhere('id', $seasonId);
+        })
             ->ofType('sports')
             ->orderBy('sort_order')
             ->orderBy('title');
