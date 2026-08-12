@@ -90,7 +90,14 @@
                         Regenerate PDF
                     </button>
 
-                    <!-- Step 2: Download to print & sign -->
+                    <!-- Step 2: Preview & Download to print & sign -->
+                    <a
+                        v-if="report.generated_pdf_path"
+                        :href="reportPdfUrl(report) + '?preview=true'" target="_blank"
+                        class="btn-primary text-xs"
+                    >
+                        👁️ Preview PDF
+                    </a>
                     <a
                         v-if="report.generated_pdf_path"
                         :href="reportPdfUrl(report)" target="_blank"
@@ -109,10 +116,17 @@
                     <!-- View signed copy -->
                     <a
                         v-if="report.signed_pdf_path"
+                        :href="reportSignedPdfUrl(report) + '?preview=true'" target="_blank"
+                        class="btn-primary text-xs"
+                    >
+                        👁️ Preview Signed Copy
+                    </a>
+                    <a
+                        v-if="report.signed_pdf_path"
                         :href="reportSignedPdfUrl(report)" target="_blank"
                         class="btn-secondary text-xs"
                     >
-                        👁️ View Signed Copy
+                        ⬇️ Download Signed Copy
                     </a>
 
                     <!-- Step 4: Accept -->
