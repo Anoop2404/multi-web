@@ -30,7 +30,13 @@ class FestCmsAutoPush
                 $config['fest_event_id'] = $event->id;
                 $config['kalotsav_event_id'] = $event->id;
                 $config['event_title'] = $event->title;
-                $config['results_published'] = true;
+                // LIFE-08 fix (functional audit, 2026-08-11/12): this used to hardcode
+                // `true` regardless of the event's actual state, so a homepage section
+                // pushed once at publish-time could never be told results were later
+                // unpublished — FestResultsController::unpublish() now calls
+                // pushScoreboard() too, and needs this to reflect the live flag instead
+                // of re-asserting "published" on every call.
+                $config['results_published'] = (bool) $event->results_published;
                 $config['scoreboard'] = $scoreboard;
                 $section->update(['config' => $config]);
             });

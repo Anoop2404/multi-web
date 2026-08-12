@@ -592,8 +592,10 @@ class FestReportController extends SahodayaAdminController
             abort_if($allowedRegionIds === [], 403, 'No region is assigned to your account.');
             abort_if($regionId !== null && ! in_array($regionId, $allowedRegionIds, true), 403, 'You are not assigned to that region.');
 
+            $eventYear = $event->academicYear?->label;
+
             if ($schoolId) {
-                abort_unless(in_array($schoolId, $this->regionScopedSchoolIds([$schoolId]), true), 403, "You are not assigned to that school's region.");
+                abort_unless(in_array($schoolId, $this->regionScopedSchoolIds([$schoolId], $eventYear), true), 403, "You are not assigned to that school's region.");
 
                 return ['schoolId' => $schoolId, 'schoolIds' => null, 'regionId' => $regionId ?? $allowedRegionIds[0]];
             }
@@ -603,9 +605,15 @@ class FestReportController extends SahodayaAdminController
             // falling through to build()'s unfiltered (null $schoolIds) "every school" path.
             $regionId ??= count($allowedRegionIds) === 1 ? $allowedRegionIds[0] : null;
 
+            // REG-06 fix (functional audit, 2026-08-11/12): use $event's own
+            // academic year, not always "today's" — see the identical fix and
+            // full rationale in FestReportScopeResolver::regionScope(). A
+            // region-locked admin opening this register for a PAST event must
+            // see the region's roster as it stood that year, not as it stands
+            // today.
             $candidateSchoolIds = $regionId
                 ? \App\Models\SchoolRegionAssignment::forTenant($this->sahodaya->id)
-                    ->forYear(\App\Support\AcademicYear::forSahodaya($this->sahodaya->id))
+                    ->forYear($event->academicYear?->label ?? \App\Support\AcademicYear::forSahodaya($this->sahodaya->id))
                     ->where('region_id', $regionId)
                     ->pluck('school_id')
                     ->all()
@@ -613,15 +621,16 @@ class FestReportController extends SahodayaAdminController
 
             return [
                 'schoolId'  => null,
-                'schoolIds' => $this->regionScopedSchoolIds($candidateSchoolIds),
+                'schoolIds' => $this->regionScopedSchoolIds($candidateSchoolIds, $eventYear),
                 'regionId'  => $regionId,
             ];
         }
 
         $schoolIds = null;
         if ($regionId && ! $schoolId) {
+            // REG-06 fix — see the comment on the equivalent branch above.
             $schoolIds = \App\Models\SchoolRegionAssignment::forTenant($this->sahodaya->id)
-                ->forYear(\App\Support\AcademicYear::forSahodaya($this->sahodaya->id))
+                ->forYear($event->academicYear?->label ?? \App\Support\AcademicYear::forSahodaya($this->sahodaya->id))
                 ->where('region_id', $regionId)
                 ->pluck('school_id')
                 ->all();

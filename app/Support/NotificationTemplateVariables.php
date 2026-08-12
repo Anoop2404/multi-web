@@ -40,6 +40,15 @@ class NotificationTemplateVariables
             'fest.chest_numbers.revealed'  => ['participant_name', 'event_title'],
             'sports.winners.received'      => ['school_name', 'count', 'event_title'],
 
+            // LIFE-08/09/10/11 fix (functional audit, 2026-08-11/12): the *_admin slugs
+            // are Sahodaya-side notifications, same undocumented-by-default pattern as
+            // the existing fest.registration.withdrawn_admin — no seeded default text,
+            // an admin opts in by creating the template from this editor.
+            'fest.results.unpublished'             => ['event_title', 'competition_label'],
+            'fest.registration.needs_reapproval'   => ['event_title', 'item_title', 'competition_label'],
+            'fest.registration.needs_reapproval_admin' => ['event_title', 'item_title', 'school_name', 'competition_label'],
+            'fest.registration.submitted_admin'    => ['event_title', 'item_title', 'school_name', 'competition_label'],
+
             'training.registration.confirmed' => ['program_title'],
             'training.pending_school.linked'  => ['pending_school_name', 'school_name', 'program_title'],
             'training.pending_school.rejected'=> ['pending_school_name', 'program_title', 'reason'],

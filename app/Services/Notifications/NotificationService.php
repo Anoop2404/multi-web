@@ -159,6 +159,20 @@ class NotificationService
             return;
         }
 
+        try {
+            if ($user->hasRole('student') || str_contains(strtolower($user->email), '@portal.local')) {
+                $this->logWriter->skipped($user, $title, 'Student email skipped by policy', $templateKey, $body);
+
+                return;
+            }
+        } catch (\Throwable) {
+            if (str_contains(strtolower($user->email), '@portal.local')) {
+                $this->logWriter->skipped($user, $title, 'Student email skipped by policy', $templateKey, $body);
+
+                return;
+            }
+        }
+
         $log = $this->logWriter->queued($user, $title, $templateKey, $user->email, $body);
 
         try {

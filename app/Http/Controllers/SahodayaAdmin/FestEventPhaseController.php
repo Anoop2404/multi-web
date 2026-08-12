@@ -59,11 +59,27 @@ class FestEventPhaseController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($phase->event_id !== $event->id, 403);
 
+        // LIFE-05 fix (functional audit, 2026-08-11/12): these lifecycle
+        // fields previously had no request/service write path at all — see
+        // FestEventPhaseService::updatePhase(). 'status' is deliberately
+        // NOT accepted here; it goes through quickStatus() below so it's
+        // always guarded by StatusTransitionGuard.
         $data = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'code' => 'nullable|string|max:64',
             'sort_order' => 'nullable|integer',
             'is_default' => 'nullable|boolean',
+            'starts_at' => 'nullable|date',
+            'ends_at' => 'nullable|date',
+            'registration_open' => 'nullable|date',
+            'registration_close' => 'nullable|date',
+            'registration_locked' => 'nullable|boolean',
+            'food_cutoff_at' => 'nullable|date',
+            'scoring_locked' => 'nullable|boolean',
+            'schedule_published' => 'nullable|boolean',
+            'results_published' => 'nullable|boolean',
+            'appeals_open' => 'nullable|boolean',
+            'appeal_deadline_at' => 'nullable|date',
         ]);
 
         $updated = $service->updatePhase($phase, $data);
@@ -73,6 +89,31 @@ class FestEventPhaseController extends SahodayaAdminController
         ]);
 
         return back()->with('success', "Phase '{$updated->name}' updated.");
+    }
+
+    /**
+     * LIFE-05 fix (functional audit, 2026-08-11/12): dedicated status
+     * transition endpoint for phases, mirroring
+     * FestEventController::quickStatus() — previously no endpoint could ever
+     * change a phase's status at all.
+     */
+    public function quickStatus(Request $request, string $tenantId, FestEvent $event, FestEventPhase $phase, FestEventPhaseService $service, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($phase->event_id !== $event->id, 403);
+
+        $data = $request->validate([
+            'status' => 'required|in:draft,published,registration_open,ongoing,completed,cancelled',
+        ]);
+
+        $updated = $service->transitionStatus($phase, $data['status']);
+
+        $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.phase.status_changed', "Phase {$updated->name} status → {$data['status']}", [
+            'phase_id' => $updated->id,
+            'status' => $data['status'],
+        ]);
+
+        return back()->with('success', "Phase status updated to \"{$data['status']}\".");
     }
 
     public function destroy(Request $request, string $tenantId, FestEvent $event, FestEventPhase $phase, FestEventPhaseService $service, PlatformAuditLogger $audit)

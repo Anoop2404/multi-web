@@ -41,7 +41,6 @@ class ExternalIntakeService
             'name'          => $data['name'],
             'contact_name'  => $data['contact_name'] ?? null,
             'contact_phone' => $data['contact_phone'] ?? null,
-            'contact_email' => $data['contact_email'] ?? null,
             'access_code'   => ExternalSchool::generateAccessCode(),
             'status'        => 'active',
         ]);

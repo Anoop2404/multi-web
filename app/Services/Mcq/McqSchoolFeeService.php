@@ -153,7 +153,11 @@ class McqSchoolFeeService
                 );
             }
 
-            app(McqExamNotifier::class)->schoolBatchFeeApproved($schoolFee->fresh(['exam', 'school']));
+            try {
+                app(McqExamNotifier::class)->schoolBatchFeeApproved($schoolFee->fresh(['exam', 'school']));
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
 
             return $count;
         });

@@ -7,13 +7,14 @@ use App\Models\FestEventStaff;
 use App\Models\User;
 
 /**
- * First policy class in this codebase (app/Policies didn't exist before — authorization
- * has historically lived in middleware, see EnsureSahodayaAdmin). Scoped narrowly to
- * report access per docs/REGION_PHASE_EVENT_REPORTING_REMEDIATION_PLAN.md §4.1, rather
- * than converting the rest of the app's ad hoc checks. Not auto-discovered/registered
- * via Laravel's policy map (no Eloquent model this maps 1:1 to) — call its methods
- * directly from report code, the same way EnsureSahodayaAdmin::matchesRegionScope() and
- * FestReportScopeResolver are called directly rather than through $user->can().
+ * PERM-01 (functional audit, 2026-08-11/12): DEAD CODE. `grep -rn FestReportPolicy app/`
+ * has zero call sites outside this file, and it's never registered via Gate::policy()/
+ * Gate::define(). The docblock this replaces claimed its methods were "called directly
+ * from report code, the same way EnsureSahodayaAdmin::matchesRegionScope() is called" —
+ * that was never true; actual enforcement runs entirely through
+ * EnsureSahodayaAdmin.php + ResolveRegionScopedReportEvent.php instead. Safe to delete
+ * outright (kept only because this sandbox has no file-deletion capability — flagged to
+ * the user to remove this file manually).
  */
 class FestReportPolicy
 {

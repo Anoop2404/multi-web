@@ -15,11 +15,13 @@
                             <label class="form-label mb-1.5">Phone *</label>
                             <input v-model="form.phone" type="tel" required
                                    class="field">
+                            <InputError :message="form.errors.phone" class="mt-1" />
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Email *</label>
                             <input v-model="form.email" type="email" required
                                    class="field">
+                            <InputError :message="form.errors.email" class="mt-1" />
                         </div>
                     </div>
 
@@ -27,6 +29,7 @@
                         <label class="form-label mb-1.5">Address *</label>
                         <textarea v-model="form.address" rows="3" required
                                   class="field resize-none"></textarea>
+                        <InputError :message="form.errors.address" class="mt-1" />
                     </div>
 
                     <div class="grid sm:grid-cols-2 gap-4">
@@ -34,11 +37,13 @@
                             <label class="form-label mb-1.5">City / Town</label>
                             <input v-model="form.city" type="text"
                                    class="field">
+                            <InputError :message="form.errors.city" class="mt-1" />
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Pincode</label>
                             <input v-model="form.pincode" type="text"
                                    class="field">
+                            <InputError :message="form.errors.pincode" class="mt-1" />
                         </div>
                     </div>
 
@@ -47,6 +52,7 @@
                         <input v-model="form.map_url" type="url" placeholder="https://maps.google.com/?q=..."
                                class="field font-mono">
                         <p class="text-xs text-gray-400 mt-1">Paste the full Google Maps embed src URL to show a map on the contact page.</p>
+                        <InputError :message="form.errors.map_url" class="mt-1" />
                     </div>
                 </div>
 
@@ -59,11 +65,13 @@
                             <label class="form-label mb-1.5">Weekdays</label>
                             <input v-model="form.weekday_hours" type="text" placeholder="Mon–Fri: 8:00 AM – 3:30 PM"
                                    class="field">
+                            <InputError :message="form.errors.weekday_hours" class="mt-1" />
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Saturday</label>
                             <input v-model="form.saturday_hours" type="text" placeholder="Sat: 8:00 AM – 12:30 PM"
                                    class="field">
+                            <InputError :message="form.errors.saturday_hours" class="mt-1" />
                         </div>
                     </div>
                 </div>
@@ -82,6 +90,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import InputError from '@/Components/ui/InputError.vue';
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 

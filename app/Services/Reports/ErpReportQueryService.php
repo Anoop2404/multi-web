@@ -4,6 +4,7 @@ namespace App\Services\Reports;
 
 use App\Models\AgeCategory;
 use App\Models\AuditLog;
+use App\Models\BoardResult;
 use App\Models\DataChangeLog;
 use App\Models\FeeReceipt;
 use App\Models\FestEvent;
@@ -21,6 +22,7 @@ use App\Models\FestRegistration;
 use App\Models\Tenant;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
+use App\Models\User;
 use App\Services\Portal\StudentPortalProvisioner;
 use App\Services\Reports\Concerns\QueriesExtendedReports;
 use App\Support\AcademicYear;
@@ -81,12 +83,14 @@ class ErpReportQueryService
                 'RPT-AUTH-002' => $this->teacherLoginReport($sahodayaId, $filters),
                 'RPT-AUTH-003' => $this->neverLoggedInStudents($sahodayaId, $filters),
                 'RPT-AUTH-004' => $this->neverLoggedInTeachers($sahodayaId, $filters),
-                'RPT-AUTH-005' => $this->failedLoginAttempts($filters),
+                'RPT-AUTH-005' => $this->failedLoginAttempts($sahodayaId, $filters),
                 'RPT-DOC-003' => $this->expiringDocuments($sahodayaId),
                 'RPT-DOC-004' => $this->rejectedDocuments($sahodayaId),
                 'RPT-DSH-001' => $this->sahodayaKpiSnapshot($sahodayaId),
                 'RPT-DSH-003' => $this->financeDashboardSnapshot($sahodayaId),
                 'RPT-DSH-005' => $this->registrationFunnel($sahodayaId),
+                'RPT-DSH-006' => $this->approvalTurnaroundTime($sahodayaId),
+                'RPT-DSH-007' => $this->myPendingApprovals($sahodayaId, $filters),
                 'RPT-TRN-003' => $this->trainingEligibilityRejections($sahodayaId),
                 'RPT-TRN-009' => $this->trainingCapacityUtilization($sahodayaId),
                 'RPT-TRN-010' => $this->trainingFinancialPending($sahodayaId),
@@ -555,6 +559,15 @@ class ErpReportQueryService
 
         return AuditLog::query()
             ->where('category', 'mcq')
+            // RPT-01/RPT-03 fix: previously scanned up to 3,000 AuditLog rows
+            // across every tenant on the platform before filtering down to
+            // this Sahodaya's exams in PHP — both a cross-tenant exposure (an
+            // admin with a very active platform elsewhere could silently push
+            // this Sahodaya's own rows out of the 3,000-row window) and a
+            // silent-truncation risk. The mcq() logger helper always stores
+            // the exam's own tenant_id (which is this Sahodaya's id), so this
+            // can now be pushed down to the database.
+            ->where('tenant_id', $sahodayaId)
             ->whereBetween('created_at', [now()->subMonths(3), now()])
             ->orderByDesc('created_at')
             ->limit(3000)
@@ -681,13 +694,18 @@ class ErpReportQueryService
     }
 
     /** @param  array<string, mixed>  $filters */
-    private function failedLoginAttempts(array $filters): Collection
+    private function failedLoginAttempts(string $sahodayaId, array $filters): Collection
     {
+        // RPT-01 fix: previously queried every failed-login attempt on the
+        // whole platform with no tenant filter — any Sahodaya admin could see
+        // every other federation's failed-login usernames/IPs. Scoped to this
+        // Sahodaya + its schools, same as every other report in this class.
         $from = $filters['from'] ?? now()->subDays(30)->toDateString();
         $to = $filters['to'] ?? now()->toDateString();
 
         return AuditLog::query()
             ->where('action', 'login.failed')
+            ->whereIn('tenant_id', $this->auditLogTenantScope($sahodayaId))
             ->whereBetween('created_at', [$from, $to.' 23:59:59'])
             ->orderByDesc('created_at')
             ->limit(2000)
@@ -792,6 +810,150 @@ class ErpReportQueryService
                 'payment_status'      => $payment?->status ?? 'none',
             ];
         })->values();
+    }
+
+    /**
+     * RPT-DSH-006 (functional audit 2026-08-11/12, action-plan item 11): aggregate
+     * submission -> decision turnaround per approval workflow. No dedicated "decision
+     * made at" column exists for Fest registrations or School documents beyond what's
+     * listed here, so those two use updated_at/reviewed_at as the decision timestamp —
+     * an honest proxy (the row's last update while in a terminal approved/rejected
+     * status), not a purpose-built audit trail. Training registrations were left out:
+     * TrainingRegistration has no decision timestamp at all (only status + updated_at,
+     * and updated_at is used for far more than approval there), so a turnaround number
+     * for it would be more misleading than useful.
+     */
+    private function approvalTurnaroundTime(string $sahodayaId): Collection
+    {
+        $schoolIds = $this->schoolIds($sahodayaId);
+
+        $workflows = [
+            'Membership payment verification' => MembershipPayment::whereIn('school_id', $schoolIds)
+                ->where('status', 'verified')
+                ->whereNotNull('verified_at')
+                ->get(['created_at', 'verified_at'])
+                ->map(fn ($m) => [$m->created_at, $m->verified_at]),
+
+            'Fest registration decision' => FestRegistration::whereIn('school_id', $schoolIds)
+                ->whereIn('status', ['approved', 'rejected'])
+                ->whereNotNull('submitted_at')
+                ->get(['submitted_at', 'updated_at'])
+                ->map(fn ($r) => [$r->submitted_at, $r->updated_at]),
+
+            'School document review' => SchoolDocument::whereIn('school_id', $schoolIds)
+                ->whereIn('status', ['approved', 'rejected'])
+                ->whereNotNull('reviewed_at')
+                ->get(['created_at', 'reviewed_at'])
+                ->map(fn ($d) => [$d->created_at, $d->reviewed_at]),
+
+            'Board results verification' => BoardResult::whereIn('tenant_id', $schoolIds)
+                ->whereNotNull('submitted_at')
+                ->whereNotNull('verified_at')
+                ->get(['submitted_at', 'verified_at'])
+                ->map(fn ($b) => [$b->submitted_at, $b->verified_at]),
+
+            'MCQ registration approval' => McqRegistration::whereIn('school_id', $schoolIds)
+                ->whereNotNull('approved_at')
+                ->get(['created_at', 'approved_at'])
+                ->map(fn ($m) => [$m->created_at, $m->approved_at]),
+        ];
+
+        return collect($workflows)->map(function (Collection $pairs, string $workflow) {
+            $hours = $pairs
+                ->filter(fn ($pair) => $pair[0] && $pair[1])
+                ->map(fn ($pair) => $pair[0]->diffInMinutes($pair[1]) / 60)
+                ->filter(fn ($h) => $h >= 0);
+
+            if ($hours->isEmpty()) {
+                return [
+                    'workflow'  => $workflow,
+                    'count'     => 0,
+                    'avg_hours' => null,
+                    'min_hours' => null,
+                    'max_hours' => null,
+                ];
+            }
+
+            return [
+                'workflow'  => $workflow,
+                'count'     => $hours->count(),
+                'avg_hours' => round($hours->avg(), 1),
+                'min_hours' => round($hours->min(), 1),
+                'max_hours' => round($hours->max(), 1),
+            ];
+        })->values();
+    }
+
+    /**
+     * RPT-DSH-007 (functional audit 2026-08-11/12, action-plan item 14): "my pending
+     * approvals" queue. There's no per-item assignee column anywhere in this schema, so
+     * "mine" is interpreted as "everything my role can actually act on" — see
+     * ErpReportController, which injects filters['_current_user_id'] for this report ID
+     * specifically (and only this one) before calling into ReportRunner, since preview()/
+     * export() don't otherwise carry the acting user down to the query layer. A missing
+     * or unresolvable user falls back to showing everything, matching how every OTHER
+     * report in this hub already behaves (role gating happens once, up front, in
+     * ReportRunner::authorize() — this report just adds a second, finer-grained pass).
+     */
+    private function myPendingApprovals(string $sahodayaId, array $filters): Collection
+    {
+        $user = isset($filters['_current_user_id']) ? User::find($filters['_current_user_id']) : null;
+
+        $canSeeFinance = ! $user || $user->hasAnyRole(['sahodaya_admin', 'sahodaya_finance']);
+        $canSeeOperational = ! $user || $user->hasAnyRole(['sahodaya_admin', 'sahodaya_staff']);
+
+        $schoolIds = $this->schoolIds($sahodayaId);
+        $schoolNames = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
+        $rows = collect();
+
+        $pushRow = function (string $workflow, ?string $schoolId, string $reference, $submittedAt) use (&$rows, $schoolNames) {
+            $rows->push([
+                'workflow'      => $workflow,
+                'school'        => $schoolId ? ($schoolNames[$schoolId] ?? $schoolId) : '—',
+                'reference'     => $reference,
+                'submitted_at'  => $submittedAt?->toDateTimeString(),
+                'waiting_hours' => $submittedAt ? round($submittedAt->diffInHours(now()), 1) : null,
+            ]);
+        };
+
+        if ($canSeeFinance) {
+            MembershipPayment::whereIn('school_id', $schoolIds)
+                ->where('status', 'submitted')
+                ->get(['school_id', 'amount', 'created_at'])
+                ->each(fn ($p) => $pushRow('Membership payment', $p->school_id, '₹'.number_format((float) $p->amount, 2), $p->created_at));
+        }
+
+        if ($canSeeOperational) {
+            FestRegistration::whereIn('school_id', $schoolIds)
+                ->where('status', 'submitted')
+                ->whereNotNull('submitted_at')
+                ->with('event:id,title')
+                ->get(['id', 'event_id', 'school_id', 'submitted_at'])
+                ->each(fn ($r) => $pushRow('Fest registration', $r->school_id, $r->event?->title ?? "Event #{$r->event_id}", $r->submitted_at));
+
+            SchoolDocument::whereIn('school_id', $schoolIds)
+                ->where('status', 'pending')
+                ->get(['school_id', 'document_type_id', 'created_at'])
+                ->each(fn ($d) => $pushRow('School document', $d->school_id, 'Document review', $d->created_at));
+
+            BoardResult::whereIn('tenant_id', $schoolIds)
+                ->whereIn('status', [BoardResult::STATUS_SUBMITTED, BoardResult::STATUS_VERIFIED])
+                ->get(['tenant_id', 'class', 'examination_type', 'submitted_at'])
+                ->each(fn ($b) => $pushRow('Board result verification', $b->tenant_id, "Class {$b->class} — {$b->examination_type}", $b->submitted_at));
+
+            McqRegistration::whereIn('school_id', $schoolIds)
+                ->whereNull('approved_at')
+                ->whereNull('cancelled_at')
+                ->get(['id', 'exam_id', 'school_id', 'created_at'])
+                ->each(fn ($m) => $pushRow('MCQ registration', $m->school_id, "Exam #{$m->exam_id}", $m->created_at));
+        }
+
+        // Oldest-waiting-first — the whole point of a pending queue is surfacing what's
+        // been sitting longest, not a stable/arbitrary DB order. Capped rather than
+        // truncated-then-sorted: sort happens on the full in-memory set first, so the cap
+        // never silently hides the oldest items (contrast with the limit()-before-filter
+        // pattern flagged elsewhere in this audit).
+        return $rows->sortByDesc('waiting_hours')->take(300)->values();
     }
 
     private function trainingEligibilityRejections(string $sahodayaId): Collection

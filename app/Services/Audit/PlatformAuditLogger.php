@@ -27,9 +27,11 @@ class PlatformAuditLogger
         array $properties = [],
         ?int $userId = null,
         ?string $category = null,
+        ?string $tenantId = null,
     ): AuditLog {
         return AuditLog::create([
             'user_id'      => $userId ?? auth()->id(),
+            'tenant_id'    => $this->resolveTenantId($tenantId, $subject, $properties),
             'category'     => $category ?? AuditLogCatalog::categoryForAction($action),
             'action'       => $action,
             'description'  => $description,
@@ -38,6 +40,40 @@ class PlatformAuditLogger
             'ip_address'   => $this->request?->ip(),
             'properties'   => $properties ?: null,
         ]);
+    }
+
+    // RPT-01 fix (functional audit, 2026-08-11/12): audit_logs is a shared,
+    // central-connection table, so every write needs an explicit tenant/school
+    // attribution or reporting can't scope it — see the migration that added
+    // this column for the full story. Priority order: an explicit caller-passed
+    // tenant id wins; then whatever the caller already put in $properties
+    // (several call sites already carry 'tenant_id' or 'school_id'); then the
+    // subject model's own tenant_id if it has one (most models in this app are
+    // tenant-scoped); then the currently authenticated user's tenant_id. If
+    // none of those resolve, the row is written with a null tenant_id and will
+    // simply be invisible to every tenant-scoped report — fail closed, not
+    // fail open.
+    private function resolveTenantId(?string $tenantId, ?Model $subject, array $properties): ?string
+    {
+        if ($tenantId !== null) {
+            return $tenantId;
+        }
+
+        if (! empty($properties['tenant_id']) && is_scalar($properties['tenant_id'])) {
+            return (string) $properties['tenant_id'];
+        }
+
+        if ($subject !== null && isset($subject->tenant_id) && is_scalar($subject->tenant_id)) {
+            return (string) $subject->tenant_id;
+        }
+
+        if (! empty($properties['school_id']) && is_scalar($properties['school_id'])) {
+            return (string) $properties['school_id'];
+        }
+
+        $authTenantId = auth()->user()?->tenant_id ?? null;
+
+        return $authTenantId !== null ? (string) $authTenantId : null;
     }
 
     // $email is nullable throughout this group of methods: accounts created via

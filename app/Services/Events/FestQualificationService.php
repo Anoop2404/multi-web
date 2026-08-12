@@ -280,7 +280,26 @@ class FestQualificationService
 
     $registration = $this->findPromotedRegistration($qual);
     if ($registration) {
-      app(FestRegistrationService::class)->cancel($registration, $registration->event, notify: false);
+      try {
+        app(FestRegistrationService::class)->cancel($registration, $registration->event, notify: false);
+      } catch (\Throwable $e) {
+        // The downstream (promoted) registration can't be cancelled — most
+        // commonly because its own event's results are already published
+        // (e.g. a school-level entry is rejected after the state round it
+        // was promoted to has already concluded). Don't let that block
+        // unwinding the qualification link itself: the source registration
+        // is still being rejected/cancelled either way, and leaving a
+        // FestQualification row pointing at a now-invalid source is worse
+        // than leaving an already-completed downstream registration as a
+        // historical record. Surface this via the audit log rather than
+        // silently swallowing it.
+        app(\App\Services\Audit\PlatformAuditLogger::class)->log(
+          action: 'fest.qualification.revoke_registration_cancel_failed',
+          description: "Could not cancel downstream registration #{$registration->id} while revoking qualification — {$e->getMessage()}",
+          subject: $registration,
+          properties: ['qualification_id' => $qual->id, 'registration_id' => $registration->id],
+        );
+      }
     }
 
     FestQualification::where('event_id', $qual->event_id)
@@ -292,6 +311,44 @@ class FestQualificationService
     if (FestQualification::where('id', $qual->id)->exists()) {
       $qual->delete();
     }
+  }
+
+  /**
+   * LIFE-06 fix (functional audit, 2026-08-11/12): rejecting or cancelling a
+   * registration that had already produced a downstream qualification (the
+   * participant won and was promoted to the next level before the original
+   * entry was rejected/cancelled) previously left the qualification and the
+   * promoted next-level registration completely untouched — the participant
+   * kept showing as "qualified"/registered at the next level with no link
+   * back to the now-invalid source. This finds every FestQualification tied
+   * to the registration's own participants and revokes each one (which
+   * itself cancels the downstream promoted registration, recursively
+   * unwinding any further promotions — e.g. school → region → state — since
+   * each revokeQualification() call deletes the row it acted on before
+   * returning, so the recursion has nothing left to find on a repeat pass).
+   *
+   * Call this from every place that can move a registration to a closed
+   * status (reject, cancel, cancelWithRefund, bulk reject) — see
+   * FestRegistrationService::cancel()/cancelWithRefund(),
+   * FestRegistrationReviewController::reject(), and
+   * FestRegistrationBulkService::rejectMany().
+   *
+   * @return int number of qualifications revoked
+   */
+  public function revokeQualificationsForRegistration(FestRegistration $registration): int
+  {
+    $participantIds = $registration->participants()->pluck('id');
+    if ($participantIds->isEmpty()) {
+      return 0;
+    }
+
+    $qualifications = FestQualification::whereIn('participant_id', $participantIds)->get();
+
+    foreach ($qualifications as $qualification) {
+      $this->revokeQualification($qualification);
+    }
+
+    return $qualifications->count();
   }
 
   private function ensurePromotedRegistration(FestEvent $event, FestEventItem $item, FestRegistration $source): void

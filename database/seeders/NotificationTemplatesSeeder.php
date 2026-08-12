@@ -91,6 +91,21 @@ class NotificationTemplatesSeeder extends Seeder
                 'body_template' => 'Results for {{event_title}} are now published.',
             ],
             [
+                // LIFE-08/09 fix (functional audit, 2026-08-11/12): symmetric counterpart
+                // to fest.results.published — see FestResultsController::unpublish().
+                'slug'          => 'fest.results.unpublished',
+                'title'         => 'Event results unpublished',
+                'body_template' => 'Results for {{event_title}} have been unpublished and are being revised. They will be re-published once corrected.',
+            ],
+            [
+                // LIFE-10 fix (functional audit, 2026-08-11/12): fires when a school's own
+                // roster edit drops an already-approved registration back to submitted —
+                // see FestRegistrationCreateService::notifyIfRosterEditRevokedApproval().
+                'slug'          => 'fest.registration.needs_reapproval',
+                'title'         => 'Registration needs re-approval',
+                'body_template' => 'Your roster change for {{event_title}} ({{item_title}}) has sent this registration back for Sahodaya approval.',
+            ],
+            [
                 'slug'          => 'fest.promotion.completed',
                 'title'         => 'Winners promoted to next level',
                 'body_template' => '{{count}} participant(s) from {{from_title}} have been promoted to {{event_title}}.',

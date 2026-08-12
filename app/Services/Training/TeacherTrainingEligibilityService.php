@@ -7,6 +7,7 @@ use App\Models\Teacher;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
 use App\Services\Teachers\TeacherVerificationGate;
+use App\Support\AcademicYear;
 use App\Support\Training\TrainingProgramEligibilityConfig;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -120,11 +121,24 @@ class TeacherTrainingEligibilityService
         return $query->exists();
     }
 
-    /** @param  list<int>  $regionIds */
+    /**
+     * REG-05 fix (functional audit, 2026-08-11/12): this previously had no
+     * academic-year scope at all — every other caller of SchoolRegionAssignment
+     * in the codebase (RegionController, FestRegionPartitionService,
+     * SahodayaAdminController::regionScopedSchoolIds, FestReportScopeResolver)
+     * filters by ->forYear(...), since the table is deliberately one row per
+     * school per academic year so region history survives a reassignment.
+     * Without a year filter this matched "was the school EVER in this region,
+     * in any year," which could incorrectly grant or deny a teacher's
+     * training eligibility based on stale region history rather than the
+     * school's current region.
+     *
+     * @param  list<int>  $regionIds
+     */
     private function schoolInRegions(string $schoolId, string $sahodayaId, array $regionIds): bool
     {
-        return SchoolRegionAssignment::query()
-            ->where('tenant_id', $sahodayaId)
+        return SchoolRegionAssignment::forTenant($sahodayaId)
+            ->forYear(AcademicYear::forSahodaya($sahodayaId))
             ->where('school_id', $schoolId)
             ->whereIn('region_id', $regionIds)
             ->exists();

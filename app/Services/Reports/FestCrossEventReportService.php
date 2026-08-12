@@ -80,7 +80,15 @@ class FestCrossEventReportService
     {
         return match ($reportId) {
             'RPT-SPT-024' => $this->registrationWindowStatus($sahodayaId, 'sports', $filters),
-            'RPT-SPT-037' => collect([['event' => '—', 'participant' => 'Gate log not configured', 'school' => '—', 'scanned_at' => '—']]),
+            // RPT-SPT-037 "Gate entry log" (functional audit 2026-08-11/12, "fix stub
+            // reports" item): unlike RPT-SPT-038, there is genuinely no gate-scanning
+            // feature anywhere in this codebase (no model, no scan endpoint, no UI) —
+            // this isn't a query bug to fix, the underlying feature was never built.
+            // Previously returned one hard-coded row that LOOKED like a real data row
+            // ('event' => '—', 'participant' => 'Gate log not configured', ...),
+            // which is misleading — a genuinely empty report (no rows) is the honest
+            // shape until gate scanning actually exists.
+            'RPT-SPT-037' => collect(),
             default       => $this->sportsRowsBySuffix((int) substr($reportId, -3), $sahodayaId, $eventIds, $filters),
         };
     }
@@ -154,7 +162,7 @@ class FestCrossEventReportService
             7, 22   => $this->schoolPointsRanking($eventIds),
             8, 33   => $this->appealsRegister($eventIds),
             9       => $this->scheduleByStage($eventIds, $filters),
-            10, 36  => $this->teamRoster($eventIds, $filters),
+            10      => $this->teamRoster($eventIds, $filters),
             11      => $this->feeCollection($eventIds),
             12      => $this->unpublishedResults($eventIds),
             13, 34, 35 => $this->certificateLog($eventIds),
@@ -169,7 +177,28 @@ class FestCrossEventReportService
             28      => $this->substitutionLog($eventIds),
             30      => $this->stateSyncLog($sahodayaId),
             32      => $this->judgeLoginActivity($eventIds),
-            37, 38, 39, 40, 41, 42, 43, 44, 45 => $this->eventMetrics($eventIds, $suffix),
+            // Functional audit 2026-08-11/12, action-plan item — RPT-KAL-036..045
+            // previously fell through to eventMetrics(), a generic fallback that just
+            // relabelled the event's total registration count 9 different ways ("Report
+            // KAL-37", "Report KAL-38", ...) rather than being distinct reports. Real
+            // labels/intent taken from docs/erp/REPORT_CATALOGUE.md; 036 was ALSO
+            // silently misrouted to teamRoster() (meant for 10, "Group item
+            // participants" — 036 is "Fee pending schools", an unrelated report) — fixed
+            // alongside these while touching this method.
+            36      => $this->feePendingSchools($eventIds),
+            37      => $this->registrationApprovalQueue($eventIds),
+            38      => $this->itemCapacityUtilization($eventIds),
+            39      => $this->venueUtilization($eventIds), // "Time slot occupancy"
+            40      => $this->schoolPointsDetail($eventIds, $filters), // "School trophy detail" — documented alias
+            41      => $this->gradeWiseResults($eventIds),
+            42      => $this->publicResultExport($eventIds, $filters),
+            // 43/44 ("Legacy tabulation alias A/B") are documented, intentional
+            // duplicates of RPT-KAL-005 pending post-UAT consolidation — see
+            // REPORT_CATALOGUE.md's "Legacy duplicates ... remain until post-UAT
+            // consolidation" note. Aliasing to the real tabulation sheet is correct
+            // here, not a bug to "fix away".
+            43, 44  => $this->tabulationSheet($eventIds),
+            45      => $this->fullRegistrationDump($eventIds, $filters),
             default => $this->registrationsByItem($eventIds, $filters),
         };
     }
@@ -239,6 +268,8 @@ class FestCrossEventReportService
                     'cert_type'    => $c->cert_type,
                     'generated_at' => $c->generated_at?->format('j M Y'),
                 ]),
+            'RPT-FST-008' => $this->phaseBottleneck($sahodayaId, $filters),
+            'RPT-FST-009' => $this->regionPerformanceComparison($sahodayaId, $filters),
             default => FestEvent::where('tenant_id', $sahodayaId)->get()->map(fn (FestEvent $e) => [
                 'event'             => $e->title,
                 'type'              => $e->event_type,
@@ -246,6 +277,86 @@ class FestCrossEventReportService
                 'export_count_note' => 'Open event workspace → Reports for full exports',
             ]),
         };
+    }
+
+    /**
+     * RPT-FST-008 (functional audit 2026-08-11/12, action-plan item 12): "how long has
+     * this phase been sitting in its current, non-completed status" — a live-bottleneck
+     * view. FestEventPhase has no status-transition history table, so this is
+     * necessarily built from updated_at (last write to the row), not a true
+     * time-in-status log; see the doc comment on ErpReportMeta's RPT-FST-008 entry.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function phaseBottleneck(string $sahodayaId, array $filters): Collection
+    {
+        $events = FestEvent::where('tenant_id', $sahodayaId)
+            ->where('phase_mode_enabled', true)
+            ->when(! empty($filters['event_id']), fn ($q) => $q->where('id', $filters['event_id']))
+            ->pluck('title', 'id');
+
+        if ($events->isEmpty()) {
+            return collect();
+        }
+
+        return \App\Models\FestEventPhase::whereIn('event_id', $events->keys())
+            ->where('status', '!=', 'completed')
+            ->withCount('items')
+            ->get()
+            ->map(fn ($phase) => [
+                'event'                    => $events[$phase->event_id] ?? (string) $phase->event_id,
+                'phase'                    => $phase->name,
+                'status'                   => $phase->status,
+                'items_assigned'           => $phase->items_count,
+                'hours_in_current_status'  => $phase->updated_at ? round($phase->updated_at->diffInHours(now()), 1) : null,
+            ])
+            ->sortByDesc('hours_in_current_status')
+            ->values();
+    }
+
+    /**
+     * RPT-FST-009 (functional audit 2026-08-11/12, action-plan item 13): side-by-side
+     * region comparison for partitioned hubs, distinct from the per-event region tiles
+     * that already exist inside a single hub's own workspace. Optional event_id filter
+     * narrows to one hub; without it, every partitioned hub for this Sahodaya is
+     * included so the report stays meaningfully browsable from the general Reports Hub
+     * (see ErpReportMeta::scope() — this is cross_event, not event-scoped).
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function regionPerformanceComparison(string $sahodayaId, array $filters): Collection
+    {
+        $hubs = FestEvent::where('tenant_id', $sahodayaId)
+            ->where('conduct_mode', 'partitioned')
+            ->whereNull('parent_event_id')
+            ->when(! empty($filters['event_id']), fn ($q) => $q->where('id', $filters['event_id']))
+            ->get(['id', 'title']);
+
+        $rows = collect();
+
+        foreach ($hubs as $hub) {
+            $regions = FestEvent::where('parent_event_id', $hub->id)
+                ->where('partition_role', 'region')
+                ->get(['id', 'title']);
+
+            foreach ($regions as $region) {
+                $schoolPoints = \App\Models\FestResult::where('event_id', $region->id)->whereNull('item_id')->pluck('total_points');
+                $registrations = FestRegistration::where('event_id', $region->id)
+                    ->whereNotIn('status', ['withdrawn', 'rejected'])
+                    ->count();
+
+                $rows->push([
+                    'event'                  => $hub->title,
+                    'region'                 => $region->title,
+                    'schools_participating'  => $schoolPoints->count(),
+                    'registrations'          => $registrations,
+                    'total_points'           => round((float) $schoolPoints->sum(), 2),
+                    'avg_points_per_school'  => $schoolPoints->isEmpty() ? 0 : round((float) $schoolPoints->avg(), 2),
+                ]);
+            }
+        }
+
+        return $rows;
     }
 
     /** @param  Collection<int, int|string>  $eventIds */
@@ -824,15 +935,27 @@ class FestCrossEventReportService
             ]);
     }
 
+    /**
+     * RPT-SPT-038 "Food coupon distribution" (functional audit 2026-08-11/12, "fix
+     * stub reports" item): previously a hard-coded single row regardless of what's in
+     * the database. FestFoodBill is the real per-school running food tab for an event
+     * ("accumulates FestFoodOrderItem lines as the school orders" — see that model's
+     * class doc); orderItems() is the actual order line count, not a separate/
+     * disconnected table.
+     */
     /** @param  Collection<int, int|string>  $eventIds */
     private function cateringSummary(Collection $eventIds): Collection
     {
-        return collect([[
-            'event'  => FestEvent::find($eventIds->first())?->title ?? '—',
-            'school' => '—',
-            'orders' => 0,
-            'amount' => 0,
-        ]]);
+        return \App\Models\FestFoodBill::whereIn('event_id', $eventIds)
+            ->withCount('orderItems')
+            ->with(['event:id,title', 'school:id,name'])
+            ->get()
+            ->map(fn ($bill) => [
+                'event'  => $bill->event?->title,
+                'school' => $bill->school?->name,
+                'orders' => $bill->order_items_count,
+                'amount' => (float) $bill->amount_total,
+            ]);
     }
 
     /** @param  Collection<int, int|string>  $eventIds */
@@ -1043,15 +1166,134 @@ class FestCrossEventReportService
             ]);
     }
 
+    /** RPT-KAL-036 "Fee pending schools" — see kalRowsBySuffix()'s doc for why this was misrouted before. */
     /** @param  Collection<int, int|string>  $eventIds */
-    private function eventMetrics(Collection $eventIds, int $suffix): Collection
+    private function feePendingSchools(Collection $eventIds): Collection
     {
-        return FestEvent::whereIn('id', $eventIds)->get()->map(fn (FestEvent $e) => [
-            'event'  => $e->title,
-            'metric' => 'Report KAL-'.$suffix,
-            'value'  => FestRegistration::where('event_id', $e->id)
-                ->whereNotIn('status', ['withdrawn', 'rejected'])
-                ->count(),
-        ]);
+        return FestSchoolEventFee::whereIn('event_id', $eventIds)
+            ->forAmountAggregation()
+            ->whereNotIn('status', ['approved', 'waived'])
+            ->with(['event:id,title', 'school:id,name'])
+            ->get()
+            ->map(fn (FestSchoolEventFee $f) => [
+                'event'  => $f->event?->title,
+                'school' => $f->school?->name,
+                'amount' => (float) $f->total_due,
+                'status' => $f->status,
+            ]);
+    }
+
+    /** RPT-KAL-037 "Registration approval queue" — registrations currently awaiting a decision. */
+    /** @param  Collection<int, int|string>  $eventIds */
+    private function registrationApprovalQueue(Collection $eventIds): Collection
+    {
+        return FestRegistration::whereIn('event_id', $eventIds)
+            ->whereIn('status', ['submitted', 'pending_approval'])
+            ->with(['event:id,title', 'school:id,name', 'item:id,title'])
+            ->orderBy('submitted_at')
+            ->get()
+            ->map(fn (FestRegistration $r) => [
+                'event'        => $r->event?->title,
+                'school'       => $r->school?->name,
+                'item'         => $r->item?->title,
+                'status'       => $r->status,
+                'submitted_at' => $r->submitted_at?->format('j M Y H:i'),
+            ]);
+    }
+
+    /**
+     * RPT-KAL-038 "Item capacity utilization". max_per_school is the only real
+     * per-item capacity concept in this schema (there is no overall item headcount
+     * cap) — utilization is computed against schools-registered x max_per_school as
+     * the effective ceiling, so it's null (not 0% or 100%) for items with no cap set.
+     */
+    /** @param  Collection<int, int|string>  $eventIds */
+    private function itemCapacityUtilization(Collection $eventIds): Collection
+    {
+        return FestEventItem::whereIn('event_id', $eventIds)
+            ->withCount(['registrations' => fn ($q) => $q->whereNotIn('status', ['withdrawn', 'rejected'])])
+            ->get()
+            ->map(function (FestEventItem $item) {
+                $schoolCount = FestRegistration::where('item_id', $item->id)
+                    ->whereNotIn('status', ['withdrawn', 'rejected'])
+                    ->distinct()
+                    ->count('school_id');
+                $ceiling = ($item->max_per_school && $schoolCount > 0) ? $item->max_per_school * $schoolCount : null;
+
+                return [
+                    'event'              => FestEvent::find($item->event_id)?->title,
+                    'item'               => $item->title,
+                    'max_per_school'     => $item->max_per_school,
+                    'registered_schools' => $schoolCount,
+                    'registrations'      => $item->registrations_count,
+                    'utilization_pct'    => $ceiling ? round(($item->registrations_count / $ceiling) * 100, 1) : null,
+                ];
+            });
+    }
+
+    /** RPT-KAL-041 "Grade-wise results" — count of marks per event/item/grade. */
+    /** @param  Collection<int, int|string>  $eventIds */
+    private function gradeWiseResults(Collection $eventIds): Collection
+    {
+        return FestMark::whereIn('event_id', $eventIds)
+            ->whereNotNull('grade')
+            ->with(['event:id,title', 'item:id,title'])
+            ->get()
+            ->groupBy(fn (FestMark $m) => $m->event_id.'|'.$m->item_id.'|'.$m->grade)
+            ->map(function ($group) {
+                $first = $group->first();
+
+                return [
+                    'event' => $first->event?->title,
+                    'item'  => $first->item?->title,
+                    'grade' => $first->grade,
+                    'count' => $group->count(),
+                ];
+            })
+            ->values();
+    }
+
+    /** RPT-KAL-042 "Public result export" — marks for items whose results are actually published. */
+    /** @param  Collection<int, int|string>  $eventIds */
+    /** @param  array<string, mixed>  $filters */
+    private function publicResultExport(Collection $eventIds, array $filters): Collection
+    {
+        return FestMark::whereIn('event_id', $eventIds)
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at'))
+            ->when(! empty($filters['school_id']), fn ($q) => $q->whereHas('participant.registration', fn ($q2) => $q2->where('school_id', $filters['school_id'])))
+            ->with(['event:id,title', 'item:id,title', 'participant.registration.school:id,name', 'participant.student:id,name'])
+            ->orderBy('item_id')
+            ->orderBy('position')
+            ->get()
+            ->map(fn (FestMark $m) => [
+                'event'       => $m->event?->title,
+                'item'        => $m->item?->title,
+                'school'      => $m->participant?->registration?->school?->name,
+                'participant' => $m->participant?->student?->name,
+                'mark'        => $m->score,
+                'rank'        => $m->position,
+            ]);
+    }
+
+    /**
+     * RPT-KAL-045 "Full fest registration dump" — every registration regardless of
+     * status, distinct from registrationsByItem() (RPT-KAL-001) which deliberately
+     * excludes withdrawn/rejected rows.
+     */
+    /** @param  Collection<int, int|string>  $eventIds */
+    /** @param  array<string, mixed>  $filters */
+    private function fullRegistrationDump(Collection $eventIds, array $filters): Collection
+    {
+        return FestRegistration::whereIn('event_id', $eventIds)
+            ->when(! empty($filters['school_id']), fn ($q) => $q->where('school_id', $filters['school_id']))
+            ->with(['event:id,title', 'school:id,name', 'item:id,title', 'participants'])
+            ->get()
+            ->map(fn (FestRegistration $r) => [
+                'event'        => $r->event?->title,
+                'school'       => $r->school?->name,
+                'item'         => $r->item?->title,
+                'participants' => $r->participants->count(),
+                'status'       => $r->status,
+            ]);
     }
 }

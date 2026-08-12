@@ -7,6 +7,9 @@ use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestLevelRegistration;
 use App\Models\FestParticipant;
 use App\Models\FestSubstitutionRequest;
+use App\Models\McqAttendanceCorrectionRequest;
+use App\Models\McqCertificate;
+use App\Models\McqMark;
 use App\Models\McqRegistration;
 use App\Models\SiteSection;
 use App\Models\Student;
@@ -287,12 +290,27 @@ class TenantController extends Controller
                     return 0;
                 }
 
+                // WF-05 fix (functional audit, 2026-08-11/12): mcq_registrations
+                // is hard-deleted below, and three tables cascadeOnDelete() off
+                // its id (mcq_marks, mcq_certificates,
+                // mcq_attendance_correction_requests) — previously none of the
+                // three were captured here, so a "restored" student came back
+                // with their MCQ registration row but permanently lost their
+                // scored marks, issued certificates, and attendance-correction
+                // history, despite the UI promising this action is reversible.
+                // Must be captured BEFORE McqRegistration::...->delete() runs,
+                // since that delete is what triggers the DB-level cascade.
+                $registrationIds = McqRegistration::whereIn('student_id', $studentIds)->pluck('id');
+
                 // Snapshot everything that will be deleted or nulled-out below,
                 // so restoreErasedStudents() can put it all back exactly as-is.
                 $snapshot = [
                     'students'                             => Student::withTrashed()->whereIn('id', $studentIds)->get()->map->getAttributes()->all(),
                     'fest_participants'                    => FestParticipant::whereIn('student_id', $studentIds)->get()->map->getAttributes()->all(),
                     'mcq_registrations'                    => McqRegistration::whereIn('student_id', $studentIds)->get()->map->getAttributes()->all(),
+                    'mcq_marks'                             => McqMark::whereIn('registration_id', $registrationIds)->get()->map->getAttributes()->all(),
+                    'mcq_certificates'                      => McqCertificate::whereIn('registration_id', $registrationIds)->get()->map->getAttributes()->all(),
+                    'mcq_attendance_correction_requests'    => McqAttendanceCorrectionRequest::whereIn('registration_id', $registrationIds)->get()->map->getAttributes()->all(),
                     'student_edit_change_requests'         => StudentEditChangeRequest::whereIn('student_id', $studentIds)->get()->map->getAttributes()->all(),
                     'fest_substitution_replacement_links'  => FestSubstitutionRequest::whereIn('replacement_student_id', $studentIds)
                         ->get(['id', 'replacement_student_id'])->map(fn ($r) => ['id' => $r->id, 'replacement_student_id' => $r->replacement_student_id])->all(),
@@ -304,6 +322,9 @@ class TenantController extends Controller
                 ];
 
                 FestParticipant::whereIn('student_id', $studentIds)->delete();
+                // mcq_marks / mcq_certificates / mcq_attendance_correction_requests
+                // cascade-delete here automatically (DB-level cascadeOnDelete) —
+                // already captured in the snapshot above.
                 McqRegistration::whereIn('student_id', $studentIds)->delete();
                 StudentEditChangeRequest::whereIn('student_id', $studentIds)->delete();
                 FestSubstitutionRequest::whereIn('replacement_student_id', $studentIds)
@@ -411,6 +432,17 @@ class TenantController extends Controller
             }
             foreach (($snapshot['mcq_registrations'] ?? []) as $row) {
                 DB::table('mcq_registrations')->updateOrInsert(['id' => $row['id']], $row);
+            }
+            // WF-05 fix: must run after mcq_registrations is restored above,
+            // since these three FK-reference registration_id.
+            foreach (($snapshot['mcq_marks'] ?? []) as $row) {
+                DB::table('mcq_marks')->updateOrInsert(['id' => $row['id']], $row);
+            }
+            foreach (($snapshot['mcq_certificates'] ?? []) as $row) {
+                DB::table('mcq_certificates')->updateOrInsert(['id' => $row['id']], $row);
+            }
+            foreach (($snapshot['mcq_attendance_correction_requests'] ?? []) as $row) {
+                DB::table('mcq_attendance_correction_requests')->updateOrInsert(['id' => $row['id']], $row);
             }
             foreach (($snapshot['student_edit_change_requests'] ?? []) as $row) {
                 DB::table('student_edit_change_requests')->updateOrInsert(['id' => $row['id']], $row);

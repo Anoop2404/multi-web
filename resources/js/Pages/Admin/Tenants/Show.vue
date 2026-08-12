@@ -644,7 +644,7 @@ const eraseStudentsConfirmMatches = computed(() =>
 
 function eraseStudents() {
     if (! eraseStudentsConfirmMatches.value) return;
-    if (! confirm(`Permanently erase EVERY student record for "${props.tenant.name}"? This cannot be undone.`)) {
+    if (! confirm(`Permanently erase EVERY student record for "${props.tenant.name}"? This can be restored afterwards from the Danger zone if needed, but the data will not be visible anywhere until it is.`)) {
         return;
     }
 

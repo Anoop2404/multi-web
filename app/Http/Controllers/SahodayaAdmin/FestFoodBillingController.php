@@ -62,8 +62,12 @@ class FestFoodBillingController extends SahodayaAdminController
                 'paid' => (float) $bills->sum('amount_paid'),
                 'balance' => (float) $bills->sum(fn (FestFoodBill $b) => $b->balanceDue()),
             ],
+            // REG-06 fix (functional audit, 2026-08-11/12): scope by this
+            // event's own academic year, not always "today's" — see the full
+            // rationale in FestReportScopeResolver::regionScope().
             'schoolOptions' => Tenant::whereIn('id', $this->regionScopedSchoolIds(
-                Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id')->all()
+                Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id')->all(),
+                $event->academicYear?->label,
             ))
                 ->orderBy('name')
                 ->get(['id', 'name']),
@@ -82,7 +86,8 @@ class FestFoodBillingController extends SahodayaAdminController
             ],
         ]);
 
-        abort_if($this->regionScopedSchoolIds([$data['school_id']]) === [], 403, 'This school is outside your assigned region.');
+        // REG-06 fix — see the comment on the equivalent scope in index() above.
+        abort_if($this->regionScopedSchoolIds([$data['school_id']], $event->academicYear?->label) === [], 403, 'This school is outside your assigned region.');
 
         $bill = FestFoodBill::firstOrCreateForSchool($event, $data['school_id']);
 

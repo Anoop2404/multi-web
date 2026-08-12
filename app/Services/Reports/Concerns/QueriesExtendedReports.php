@@ -161,11 +161,11 @@ trait QueriesExtendedReports
             'RPT-EML-002' => $this->rptFailedEmails($filters),
             'RPT-EML-003' => $this->rptReceiptEmailStatus($sahodayaId, $filters),
 
-            'RPT-AUD-001' => $this->rptAuditTrail($filters),
-            'RPT-AUD-002' => $this->rptAuthEventsSummary($filters),
-            'RPT-AUD-003' => $this->rptFinanceAudit($filters),
-            'RPT-AUD-004' => $this->rptExportActivityLog($filters),
-            'RPT-AUD-005' => $this->failedLoginAttempts($filters),
+            'RPT-AUD-001' => $this->rptAuditTrail($sahodayaId, $filters),
+            'RPT-AUD-002' => $this->rptAuthEventsSummary($sahodayaId, $filters),
+            'RPT-AUD-003' => $this->rptFinanceAudit($sahodayaId, $filters),
+            'RPT-AUD-004' => $this->rptExportActivityLog($sahodayaId, $filters),
+            'RPT-AUD-005' => $this->failedLoginAttempts($sahodayaId, $filters),
 
             'RPT-DOC-001' => $this->rptDocumentReviewQueue($sahodayaId),
             'RPT-DOC-002' => $this->rptDocumentTypeConfig($sahodayaId),
@@ -262,25 +262,33 @@ trait QueriesExtendedReports
     /** @param  array<string, mixed>  $filters */
     protected function rptSchoolActivity(string $sahodayaId, array $filters): Collection
     {
+        // RPT-01 fix: this query's tenant scope was always correctly written,
+        // it was just querying a column (audit_logs.tenant_id) that didn't
+        // exist yet — see the migration that added it. Confirmed working now
+        // that the column is real. Also batches the school-name lookup
+        // instead of calling Tenant::find() once per row.
         $schoolIds = $this->schoolIds($sahodayaId)->all();
         $from = $filters['from'] ?? now()->subDays(14)->toDateString();
         $to = $filters['to'] ?? now()->toDateString();
 
-        return AuditLog::query()
+        $logs = AuditLog::query()
             ->whereBetween('created_at', [$from, $to.' 23:59:59'])
             ->where(function ($q) use ($schoolIds, $sahodayaId) {
                 $q->whereIn('tenant_id', $schoolIds)->orWhere('tenant_id', $sahodayaId);
             })
             ->orderByDesc('created_at')
             ->limit(1000)
-            ->get()
-            ->map(fn (AuditLog $log) => [
-                'school'      => Tenant::find($log->tenant_id)?->name ?? '—',
-                'action'      => $log->action,
-                'description' => $log->description,
-                'user'        => $log->properties['user'] ?? '—',
-                'created_at'  => $log->created_at?->toDateTimeString(),
-            ]);
+            ->get();
+
+        $tenantNames = Tenant::whereIn('id', $logs->pluck('tenant_id')->filter()->unique())->pluck('name', 'id');
+
+        return $logs->map(fn (AuditLog $log) => [
+            'school'      => $tenantNames[$log->tenant_id] ?? '—',
+            'action'      => $log->action,
+            'description' => $log->description,
+            'user'        => $log->properties['user'] ?? '—',
+            'created_at'  => $log->created_at?->toDateTimeString(),
+        ]);
     }
 
     protected function rptPendingSchoolApplications(string $sahodayaId): Collection
@@ -1638,56 +1646,125 @@ trait QueriesExtendedReports
             ]);
     }
 
+    // RPT-01 fix (functional audit, 2026-08-11/12): audit_logs is a shared
+    // central-connection table (see App\Models\AuditLog), so every one of the
+    // five report builders below previously queried it with zero tenant
+    // filter — any Sahodaya admin/staff/finance user could see every other
+    // federation's audit trail, auth events, finance audit, and export log.
+    // All five now scope to the requesting Sahodaya's own tenant id plus its
+    // child schools, the same scope every other report in this file uses.
+    //
+    // @return list<string>
+    private function auditLogTenantScope(string $sahodayaId): array
+    {
+        return array_merge([$sahodayaId], $this->schoolIds($sahodayaId)->all());
+    }
+
+    /**
+     * Functional audit 2026-08-11/12, "fix silent-truncation limit()-before-filter
+     * pattern" item: RPT-01 already fixed the cross-tenant leak in the four AUD
+     * builders below by scoping to the requesting Sahodaya BEFORE the limit(500) —
+     * but within that correctly-scoped result set, a single busy Sahodaya can still
+     * have more than 500 matching rows in its default 30-day window, and nothing told
+     * the user their report was silently cut off at row 500. Each builder now runs one
+     * cheap COUNT against the same scoped/filtered query before capping, and appends a
+     * single synthetic trailing row naming exactly how many rows exist and how to see
+     * the rest, rather than truncating without any indication. Deliberately still caps
+     * at 500 rather than returning everything — removing the cap entirely would be its
+     * own risk (an unbounded query on a report page) for the busiest tenants.
+     *
+     * @param  array<string, mixed>  $noticeRow
+     */
+    private function withTruncationNotice(Collection $rows, int $totalCount, int $limit, array $noticeRow): Collection
+    {
+        if ($totalCount <= $limit) {
+            return $rows;
+        }
+
+        return $rows->push($noticeRow);
+    }
+
     /** @param  array<string, mixed>  $filters */
-    protected function rptAuditTrail(array $filters): Collection
+    protected function rptAuditTrail(string $sahodayaId, array $filters): Collection
     {
         $from = $filters['from'] ?? now()->subDays(30)->toDateString();
         $to = $filters['to'] ?? now()->toDateString();
+        $tenantScope = $this->auditLogTenantScope($sahodayaId);
+        $range = [$from, $to.' 23:59:59'];
 
-        return AuditLog::whereBetween('created_at', [$from, $to.' 23:59:59'])
+        $total = AuditLog::whereIn('tenant_id', $tenantScope)->whereBetween('created_at', $range)->count();
+
+        $rows = AuditLog::whereIn('tenant_id', $tenantScope)->whereBetween('created_at', $range)
             ->orderByDesc('created_at')->limit(500)->get()
             ->map(fn (AuditLog $l) => [
                 'action' => $l->action, 'description' => $l->description,
                 'user' => $l->properties['user'] ?? '—', 'created_at' => $l->created_at?->toDateTimeString(),
             ]);
+
+        return $this->withTruncationNotice($rows, $total, 500, [
+            'action' => '⚠ Truncated', 'description' => "Showing the newest 500 of {$total} matching rows — narrow the date range to see the rest.",
+            'user' => '—', 'created_at' => null,
+        ]);
     }
 
     /** @param  array<string, mixed>  $filters */
-    protected function rptAuthEventsSummary(array $filters): Collection
+    protected function rptAuthEventsSummary(string $sahodayaId, array $filters): Collection
     {
         $from = $filters['from'] ?? now()->subDays(30)->toDateString();
         $to = $filters['to'] ?? now()->toDateString();
+        $tenantScope = $this->auditLogTenantScope($sahodayaId);
+        $range = [$from, $to.' 23:59:59'];
 
-        return AuditLog::where('category', 'auth')->whereBetween('created_at', [$from, $to.' 23:59:59'])
+        $total = AuditLog::where('category', 'auth')->whereIn('tenant_id', $tenantScope)->whereBetween('created_at', $range)->count();
+
+        $rows = AuditLog::where('category', 'auth')->whereIn('tenant_id', $tenantScope)->whereBetween('created_at', $range)
             ->orderByDesc('created_at')->limit(500)->get()
             ->map(fn (AuditLog $l) => [
                 'action' => $l->action,
                 'username' => $l->properties['username'] ?? $l->properties['email'] ?? '—',
                 'ip_address' => $l->ip_address, 'created_at' => $l->created_at?->toDateTimeString(),
             ]);
+
+        return $this->withTruncationNotice($rows, $total, 500, [
+            'action' => '⚠ Truncated', 'username' => "Showing the newest 500 of {$total} matching rows — narrow the date range to see the rest.",
+            'ip_address' => '—', 'created_at' => null,
+        ]);
     }
 
     /** @param  array<string, mixed>  $filters */
-    protected function rptFinanceAudit(array $filters): Collection
+    protected function rptFinanceAudit(string $sahodayaId, array $filters): Collection
     {
         $from = $filters['from'] ?? now()->subDays(30)->toDateString();
         $to = $filters['to'] ?? now()->toDateString();
+        $tenantScope = $this->auditLogTenantScope($sahodayaId);
+        $range = [$from, $to.' 23:59:59'];
 
-        return AuditLog::where('category', 'finance')->whereBetween('created_at', [$from, $to.' 23:59:59'])
+        $total = AuditLog::where('category', 'finance')->whereIn('tenant_id', $tenantScope)->whereBetween('created_at', $range)->count();
+
+        $rows = AuditLog::where('category', 'finance')->whereIn('tenant_id', $tenantScope)->whereBetween('created_at', $range)
             ->orderByDesc('created_at')->limit(500)->get()
             ->map(fn (AuditLog $l) => [
                 'action' => $l->action, 'description' => $l->description,
                 'amount' => $l->properties['amount'] ?? '—', 'created_at' => $l->created_at?->toDateTimeString(),
             ]);
+
+        return $this->withTruncationNotice($rows, $total, 500, [
+            'action' => '⚠ Truncated', 'description' => "Showing the newest 500 of {$total} matching rows — narrow the date range to see the rest.",
+            'amount' => '—', 'created_at' => null,
+        ]);
     }
 
     /** @param  array<string, mixed>  $filters */
-    protected function rptExportActivityLog(array $filters): Collection
+    protected function rptExportActivityLog(string $sahodayaId, array $filters): Collection
     {
         $from = $filters['from'] ?? now()->subDays(30)->toDateString();
         $to = $filters['to'] ?? now()->toDateString();
+        $tenantScope = $this->auditLogTenantScope($sahodayaId);
+        $range = [$from, $to.' 23:59:59'];
 
-        return AuditLog::where('action', 'report.downloaded')->whereBetween('created_at', [$from, $to.' 23:59:59'])
+        $total = AuditLog::where('action', 'report.downloaded')->whereIn('tenant_id', $tenantScope)->whereBetween('created_at', $range)->count();
+
+        $rows = AuditLog::where('action', 'report.downloaded')->whereIn('tenant_id', $tenantScope)->whereBetween('created_at', $range)
             ->orderByDesc('created_at')->limit(500)->get()
             ->map(fn (AuditLog $l) => [
                 'report' => $l->properties['report'] ?? '—',
@@ -1695,6 +1772,11 @@ trait QueriesExtendedReports
                 'filters' => json_encode($l->properties['filters'] ?? []),
                 'downloaded_at' => $l->created_at?->toDateTimeString(),
             ]);
+
+        return $this->withTruncationNotice($rows, $total, 500, [
+            'report' => '⚠ Truncated', 'user' => "Showing the newest 500 of {$total} matching rows — narrow the date range to see the rest.",
+            'filters' => '—', 'downloaded_at' => null,
+        ]);
     }
 
     protected function rptDocumentReviewQueue(string $sahodayaId): Collection

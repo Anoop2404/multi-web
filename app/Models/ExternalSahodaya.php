@@ -23,25 +23,8 @@ class ExternalSahodaya extends Model
 
     protected $fillable = [
         'state_program_id', 'name', 'contact_name', 'contact_phone', 'contact_email',
-        'access_code', 'status', 'otp_code_hash', 'otp_expires_at', 'otp_last_sent_at', 'otp_attempts',
+        'access_code', 'status',
     ];
-
-    protected $casts = [
-        'otp_expires_at'   => 'datetime',
-        'otp_last_sent_at' => 'datetime',
-    ];
-
-    protected $hidden = ['otp_code_hash'];
-
-    /**
-     * Whether this record requires OTP verification before granting portal access. Records
-     * created before contact_email was captured (or that never set one) fall back to
-     * access-code-only rather than being locked out — see migration 2026_08_11_000001.
-     */
-    public function requiresOtp(): bool
-    {
-        return filled($this->contact_email);
-    }
 
     public function program(): BelongsTo
     {

@@ -88,11 +88,35 @@ class TenantUserCatalog
         return ['school_principal', 'school_vice_principal', 'school_admin'];
     }
 
-    /** School roles subject to Spatie write-permission checks (non-leadership). */
-    /** @return list<string> */
+    /**
+     * School roles subject to Spatie write-permission checks (non-leadership).
+     *
+     * PERM-03 fix (functional audit, 2026-08-11/12): the five module
+     * coordinator roles (finance/mcq/training/sports/kalotsavam) were
+     * previously missing from this list, even though
+     * defaultPermissionsForRole() already defines correctly module-scoped
+     * permissions for every one of them (e.g. school_finance_coordinator →
+     * ['finance.view','fest.finance'] only) and school user provisioning
+     * already assigns those permissions at creation time
+     * (TenantUserProvisioner::defaultPermissionsForRoles()). Because these
+     * roles were absent here, EnsureSchoolAdmin never set isSchoolStaff=true
+     * for them, so SchoolAdminController's write-permission gate never ran —
+     * a school_finance_coordinator was, in write-access terms,
+     * indistinguishable from a full school_admin for every non-GET request
+     * in the school-admin panel, with only client-side nav hiding the other
+     * modules. Adding them here starts enforcing the permissions that were
+     * already being assigned, rather than changing what those permissions
+     * are.
+     *
+     * @return list<string>
+     */
     public static function schoolWriteGatedRoles(): array
     {
-        return ['school_staff', 'group_admin', 'house_admin'];
+        return [
+            'school_staff', 'group_admin', 'house_admin',
+            'school_finance_coordinator', 'school_mcq_coordinator', 'school_training_coordinator',
+            'school_sports_coordinator', 'school_kalotsavam_coordinator',
+        ];
     }
 
     /** Event coordinators manage assigned fest/MCQ routes — not read-only staff. */

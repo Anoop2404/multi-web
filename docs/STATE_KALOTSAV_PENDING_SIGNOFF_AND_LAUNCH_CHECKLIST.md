@@ -38,16 +38,13 @@ stand but are narrower slices of the same picture. Legend: ✅ done, 🟡 partia
   no "promote a reserve to primary" or "replace after certification" flow yet.
 
 **3. External Sahodaya flow**
-- ✅ OTP added (this session).
-- ⬜ No named user/membership model — OTP proves email ownership per-request, it doesn't
-  create a persisted login/account.
+- 🚫 OTP checkpoint added then reverted same day (2026-08-11) — decided code-only per P-02.
+- ⬜ No named user/membership model — access code alone identifies the record, no persisted
+  login/account, no second factor.
 - ⬜ No real external student registry, individual/team registration tables, or payment-proof
   workflow — schools still enter qualifier-level details directly (name/item/position/grade)
   rather than registering as students first, per §2.2's original design tradeoff.
 - ⬜ No Region/Phase conduct, marks, results, or appeals for external orgs.
-- 🟡 Records without email still fall back to access-code-only — this is the deliberate
-  non-breaking default (see P-02 row below), not an oversight, but worth tracking how many
-  outside Sahodayas actually have an email on file.
 
 **4. Qualifier API and scrutiny**
 - ⬜ Signed body/timestamp/batch-revision contract — the outbox (`FestStateSubmissionOutbox`)
@@ -96,7 +93,7 @@ built yet (so it's a real open decision) versus where there's a conflict worth k
 | # | Topic | Status | Note |
 |---|---|---|---|
 | P-01 | School→Sahodaya, no school event | **Already built as Option A** | `level_round=school` disabled for this rollout; direct registration confirmed working. |
-| P-02 | Auth: named accounts + MFA vs code-only | **Mostly resolved** | Email+OTP checkpoint added 2026-08-11 (`ExternalPortalOtpService`) — access code alone no longer grants entry when a contact email is on file; a 6-digit code is required too. Not full "named accounts" (still no persisted external-user login), and any record with no email on file still falls back to code-only — make sure State captures emails for every outside Sahodaya/school going forward. |
+| P-02 | Auth: named accounts + MFA vs code-only | **Decided: code-only** | Email+OTP checkpoint (`ExternalPortalOtpService`, added 2026-08-11) was reverted 2026-08-11 — access code alone is the credential again, same shape as the manual's own "Sahodaya heads get a password" process. No persisted external-user login, no second factor. Accepts the P-02 risk (URL is a bearer credential) for a fast pilot rather than holding external intake on named accounts. |
 | P-03 | Sahodaya/school verification | Open | State manually creates external Sahodaya/school records today (a form of Option A), but no automated duplicate checks or spot-verification exist. |
 | P-04 | Student identity & guardian consent | **Open — needs you** | No consent-capture workflow exists yet for external students. Real gap if external intake scales up. |
 | P-05 | External conduct mode | Partially built | Offline-conduct service exists in code but isn't wired to any screen yet (see §3 below, item on External* services). |
@@ -187,11 +184,7 @@ trusting any of it:
 - [ ] Open a Sahodaya event's **Review & Nominate for State** page, select a candidate as
       primary, certify with a *different* logged-in user than whoever selected
 - [ ] On a State fest event with approved registrations, click **Assign chest numbers**
-- [ ] Open an external Sahodaya/school portal link for a record that has a contact email —
-      confirm it redirects to the new verify screen, sends a real email, and only opens the
-      portal after entering the correct code (and that a wrong code is rejected, expires
-      after 10 minutes, and locks out after 5 wrong attempts)
-- [ ] Open one for a record with **no** email on file — confirm it still opens directly
-      (access-code-only fallback), so no already-onboarded org gets locked out
+- [ ] Open an external Sahodaya/school portal link with a valid access code — confirm it opens
+      directly (access-code-only, no OTP step, per the 2026-08-11 P-02 reversal)
 - [ ] `php artisan test --filter=FestStateNomination` and
       `--filter=StateConductAndRemittance` to confirm nothing regressed

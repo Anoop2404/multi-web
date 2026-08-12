@@ -59,7 +59,11 @@ class McqRegistrationApprovalService
             $registration = app(McqHallTicketService::class)
                 ->issueForRegistration($registration->fresh(['exam', 'student']));
 
-            app(McqExamNotifier::class)->registrationApproved($registration);
+            try {
+                app(McqExamNotifier::class)->registrationApproved($registration);
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
 
             app(PlatformAuditLogger::class)->mcqRegistration(
                 $registration,

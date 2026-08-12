@@ -209,6 +209,94 @@ class FestEventNotifier
     }
 
     /**
+     * LIFE-11 fix (functional audit, 2026-08-11/12): previously the only admin-facing
+     * registration notifier was registrationWithdrawnAdmin() — a brand-new submission
+     * that needs review surfaced nowhere except an admin manually opening the review
+     * queue. Mirrors registrationWithdrawnAdmin()'s withSahodayaUsers() pattern. Only
+     * fires for statuses that actually need someone to act (submitted/pending_approval)
+     * — an item that auto-approved or landed on the waitlist has nothing for an admin
+     * to review yet, so notifying them would just be noise.
+     */
+    public function registrationSubmittedAdmin(FestRegistration $registration): void
+    {
+        if (! in_array($registration->status, ['submitted', 'pending_approval'], true)) {
+            return;
+        }
+
+        $registration->loadMissing(['event', 'item']);
+        $event = $registration->event;
+        if (! $event) {
+            return;
+        }
+
+        $replacements = [
+            'event_title'        => $event->title,
+            'item_title'         => $registration->item?->title ?? 'General',
+            'school_name'        => '', // resolved later per-user context
+            'competition_label'  => $this->competitionLabel($event),
+        ];
+
+        $this->withSahodayaUsers($event->tenant_id, ['sahodaya_admin', 'sahodaya_staff'], function ($users) use ($replacements, $event) {
+            $service = app(NotificationService::class);
+            $url = "/sahodaya-admin/{$event->tenant_id}/programs/kalotsav/registration";
+            foreach ($users as $user) {
+                $service->notifyFromTemplate($user, 'fest.registration.submitted_admin', $replacements, $url);
+            }
+        });
+    }
+
+    /**
+     * LIFE-10 fix (functional audit, 2026-08-11/12): FestRegistrationCreateService
+     * silently drops an already-approved registration back to 'submitted' when a school
+     * edits its roster (see updateStudentRegistration()/updateTeacherRegistration()) —
+     * previously neither side heard about it. This half tells the school their approval
+     * was revoked by their own edit; registrationNeedsReapprovalAdmin() below tells
+     * admins a new approval is now needed.
+     */
+    public function registrationNeedsReapproval(FestRegistration $registration): void
+    {
+        $registration->load(['event', 'item']);
+        $head = $this->resolveHeadForEvent($registration->event);
+        if ($this->suppressed($head, $registration->event, 'registration_approved')) {
+            return;
+        }
+
+        $slug = $this->resolveTemplateSlug($registration->event, 'fest.registration.needs_reapproval');
+        $replacements = [
+            'event_title'        => $registration->event->title,
+            'item_title'         => $registration->item?->title ?? 'General',
+            'competition_label'  => $this->competitionLabel($registration->event),
+        ];
+        $this->notifySchool($registration->school_id, $slug, $replacements);
+        $this->notifyHeadExtras($head, $slug, $replacements);
+    }
+
+    /** Admin half of registrationNeedsReapproval() — see that method's doc. */
+    public function registrationNeedsReapprovalAdmin(FestRegistration $registration): void
+    {
+        $registration->loadMissing(['event', 'item']);
+        $event = $registration->event;
+        if (! $event) {
+            return;
+        }
+
+        $replacements = [
+            'event_title'        => $event->title,
+            'item_title'         => $registration->item?->title ?? 'General',
+            'school_name'        => '',
+            'competition_label'  => $this->competitionLabel($event),
+        ];
+
+        $this->withSahodayaUsers($event->tenant_id, ['sahodaya_admin', 'sahodaya_staff'], function ($users) use ($replacements, $event) {
+            $service = app(NotificationService::class);
+            $url = "/sahodaya-admin/{$event->tenant_id}/programs/kalotsav/registration";
+            foreach ($users as $user) {
+                $service->notifyFromTemplate($user, 'fest.registration.needs_reapproval_admin', $replacements, $url);
+            }
+        });
+    }
+
+    /**
      * Distinct from registrationWithdrawn() — fired only for FestRegistrationService::
      * cancelWithRefund(), where a Sahodaya admin cancels a registration that already had an
      * approved payment. Carries the admin's required reason and, when a credit was actually
@@ -431,6 +519,40 @@ class FestEventNotifier
             ->pluck('school_id');
 
         $slug = $this->resolveTemplateSlug($event, 'fest.results.published');
+        $replacements = [
+            'event_title' => $event->title,
+            'competition_label' => $this->competitionLabel($event),
+        ];
+
+        foreach ($schoolIds as $schoolId) {
+            $this->notifySchool($schoolId, $slug, $replacements);
+            $this->notifyEventParticipants($event, $schoolId, $slug, $replacements);
+        }
+        $this->notifyHeadExtras($head, $slug, $replacements);
+    }
+
+    /**
+     * LIFE-09 fix (functional audit, 2026-08-11/12): resultsPublished() above has always
+     * notified schools/participants; the symmetric "actually, hold on" case — an admin
+     * unpublishing results after schools may already have seen them — previously fired
+     * nothing at all, so a school could be left believing stale results are still final.
+     * Reuses the 'results_published' trigger for suppression (same setting a Sahodaya/
+     * head admin already uses to control result notifications generally — adding a
+     * second, separate toggle just for the unpublish direction would be a new setting
+     * nobody asked for and nothing in the UI currently exposes).
+     */
+    public function resultsUnpublished(FestEvent $event): void
+    {
+        $head = $this->resolveHeadForEvent($event);
+        if ($this->suppressed($head, $event, 'results_published')) {
+            return;
+        }
+
+        $schoolIds = FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->distinct()
+            ->pluck('school_id');
+
+        $slug = $this->resolveTemplateSlug($event, 'fest.results.unpublished');
         $replacements = [
             'event_title' => $event->title,
             'competition_label' => $this->competitionLabel($event),

@@ -5,6 +5,7 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestEventPhase;
+use App\Support\StatusTransitionGuard;
 use Illuminate\Support\Collection;
 
 class FestEventPhaseService
@@ -47,12 +48,63 @@ class FestEventPhaseService
             $this->clearOtherDefaults($phase->event, $phase->id);
         }
 
-        $phase->update([
+        // LIFE-05 fix (functional audit, 2026-08-11/12): this method previously
+        // only ever wrote name/code/sort_order/is_default — every lifecycle
+        // column added by the 2026_09_17_000001 migration (status,
+        // registration_open/close, registration_locked, scoring_locked,
+        // schedule_published, results_published, appeals_open,
+        // appeal_deadline_at, starts_at/ends_at, food_cutoff_at) had no write
+        // path anywhere in the app, so every phase's lifecycle was
+        // permanently stuck at its migration default the moment
+        // phase_mode_enabled was turned on for an event — see
+        // FestPhaseLifecycleService, which reads these columns but nothing
+        // ever set them. 'status' is guarded by the same transition matrix
+        // FestEvent uses (identical vocabulary: draft/published/
+        // registration_open/ongoing/completed/cancelled) via
+        // transitionStatus() below, NOT here — this method only writes the
+        // other lifecycle fields, so a caller can't bypass the guard by
+        // slipping 'status' into a plain updatePhase() call.
+        $lifecycleFields = [
+            'starts_at', 'ends_at', 'registration_open', 'registration_close',
+            'registration_locked', 'food_cutoff_at', 'scoring_locked',
+            'schedule_published', 'results_published', 'appeals_open', 'appeal_deadline_at',
+        ];
+
+        $payload = [
             'name' => $data['name'] ?? $phase->name,
             'code' => array_key_exists('code', $data) ? $data['code'] : $phase->code,
             'sort_order' => $data['sort_order'] ?? $phase->sort_order,
             'is_default' => $isDefault,
-        ]);
+        ];
+
+        foreach ($lifecycleFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $payload[$field] = $data[$field];
+            }
+        }
+
+        $phase->update($payload);
+
+        return $phase->fresh();
+    }
+
+    /**
+     * Transition a phase's status through the same guarded state machine
+     * FestEvent uses (see StatusTransitionGuard::FEST_EVENT_TRANSITIONS) —
+     * the dedicated write path that was entirely missing before the LIFE-05
+     * fix. Mirrors FestEventController::quickStatus()'s pattern: a
+     * lightweight, single-field transition separate from the general-purpose
+     * updatePhase() above.
+     */
+    public function transitionStatus(FestEventPhase $phase, string $newStatus): FestEventPhase
+    {
+        StatusTransitionGuard::assert(
+            $phase,
+            $newStatus,
+            StatusTransitionGuard::FEST_EVENT_TRANSITIONS,
+        );
+
+        $phase->update(['status' => $newStatus]);
 
         return $phase->fresh();
     }

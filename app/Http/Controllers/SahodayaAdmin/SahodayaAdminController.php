@@ -54,10 +54,23 @@ abstract class SahodayaAdminController extends Controller
      *
      * See docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.4, Phase 3.
      *
+     * REG-06 fix (functional audit, 2026-08-11/12): this previously always
+     * resolved "today's" active academic year, regardless of which year the
+     * data being scoped actually belongs to — for a caller looking at a past
+     * record (a specific event's report, a prior year's payment), that
+     * silently applied the CURRENT region roster instead of the roster as it
+     * stood when the record was created, so a region_admin's access to old
+     * data could be wrongly narrowed or widened whenever someone edits a
+     * current-year region assignment. Callers that have a specific record to
+     * scope by (an event, a payment, a food order) should now pass that
+     * record's own academic year via $year; the default (current year) is
+     * preserved for callers that are genuinely about "right now" operational
+     * queues rather than a specific historical record.
+     *
      * @param  list<string>  $schoolIds
      * @return list<string>
      */
-    protected function regionScopedSchoolIds(array $schoolIds): array
+    protected function regionScopedSchoolIds(array $schoolIds, ?string $year = null): array
     {
         $scopes = request()->attributes->get('regionAdminScopes');
         if (empty($scopes)) {
@@ -70,7 +83,7 @@ abstract class SahodayaAdminController extends Controller
             return [];
         }
 
-        $year = \App\Support\AcademicYear::forSahodaya($this->sahodaya->id);
+        $year ??= \App\Support\AcademicYear::forSahodaya($this->sahodaya->id);
 
         $regionSchoolIds = \App\Models\SchoolRegionAssignment::forTenant($this->sahodaya->id)
             ->forYear($year)

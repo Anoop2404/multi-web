@@ -219,6 +219,12 @@ class ReportRegistry
             self::row('RPT-FST-004', 'Certificate search', 'fest', 'retain', "{$base}/events/certificates/search"),
             self::row('RPT-FST-005', 'Event reports hub', 'fest', 'retain', $events, 'Open event → Reports'),
             self::row('RPT-FST-006', 'Area-wise participants', 'fest', 'new', $events, 'Non-sports event → Area-wise participants'),
+            // Functional audit 2026-08-11/12, action-plan items 12/13 — see the doc
+            // comments on RPT-FST-008/009 in ErpReportMeta for what these actually
+            // compute. Both are cross_event (see ErpReportMeta::scope()), so they get a
+            // runnerHref like RPT-FST-001..004 rather than an event-workspace link-out.
+            self::row('RPT-FST-008', 'Phase duration / bottleneck', 'fest', 'new', self::runnerHref($base, 'RPT-FST-008'), null, true),
+            self::row('RPT-FST-009', 'Region performance comparison', 'fest', 'new', self::runnerHref($base, 'RPT-FST-009'), null, true),
         ];
     }
 
@@ -265,7 +271,11 @@ class ReportRegistry
             self::row('RPT-SPT-034', 'School championship rank', 'sports', 'retain', $events, 'Event → Overall ranking'),
             self::row('RPT-SPT-035', 'Participant count by gender/item', 'sports', 'alias', $events, 'Event → Participation counts'),
             self::row('RPT-SPT-036', 'Schedule daily bulletin', 'sports', 'retain', $events, 'Event → Day-wise schedule'),
-            self::row('RPT-SPT-037', 'Gate entry log', 'sports', 'retain', $events),
+            // 'new' + note reflects reality: no gate-scanning feature exists in this app
+            // yet (see FestCrossEventReportService's doc on RPT-SPT-037) — this used to
+            // be marked 'retain' with no note, implying it was a working, kept-as-is
+            // report, which it never was.
+            self::row('RPT-SPT-037', 'Gate entry log', 'sports', 'new', $events, 'Not yet implemented — no gate-scanning feature exists in this app.'),
             self::row('RPT-SPT-038', 'Food coupon distribution', 'sports', 'retain', $events, 'Event → Catering export'),
             self::row('RPT-SPT-039', 'Item fee configuration', 'sports', 'retain', $hub),
             self::row('RPT-SPT-040', 'Registration approval pending', 'sports', 'retain', $events, 'Event → Pending approvals'),
@@ -335,14 +345,35 @@ class ReportRegistry
             );
         }
 
-        for ($i = 36; $i <= 45; $i++) {
+        // Functional audit 2026-08-11/12, "fix stub reports" item — these 10 used to be
+        // a generic loop ("Kalotsav operational report N") all pointing at the events
+        // index with no real query behind them. Real labels from
+        // docs/erp/REPORT_CATALOGUE.md; 036-042/045 are now runnable (see
+        // FestCrossEventReportService for the real query each one runs). 043/044 stay
+        // as event-workspace link-outs — documented, intentional duplicates of
+        // RPT-KAL-005, not reports that need their own runnable card.
+        $kal036to045 = [
+            ['RPT-KAL-036', 'Fee pending schools', true],
+            ['RPT-KAL-037', 'Registration approval queue', true],
+            ['RPT-KAL-038', 'Item capacity utilization', true],
+            ['RPT-KAL-039', 'Time slot occupancy', true],
+            ['RPT-KAL-040', 'School trophy detail', true],
+            ['RPT-KAL-041', 'Grade-wise results', true],
+            ['RPT-KAL-042', 'Public result export', true],
+            ['RPT-KAL-043', 'Legacy tabulation alias A', false],
+            ['RPT-KAL-044', 'Legacy tabulation alias B', false],
+            ['RPT-KAL-045', 'Full fest registration dump', true],
+        ];
+
+        foreach ($kal036to045 as [$id, $label, $runnable]) {
             $rows[] = self::row(
-                sprintf('RPT-KAL-%03d', $i),
-                'Kalotsav operational report '.$i,
+                $id,
+                $label,
                 'kalotsav',
-                $i <= 40 ? 'retain' : 'new',
-                $events,
-                'Open event → Reports',
+                'new',
+                $runnable ? self::runnerHref($base, $id) : $events,
+                $runnable ? null : 'Kalotsav event → Reports',
+                $runnable,
             );
         }
 
@@ -475,6 +506,9 @@ class ReportRegistry
             self::row('RPT-DSH-003', 'Finance dashboard export', 'dashboard', 'new', self::runnerHref($base, 'RPT-DSH-003'), null, true),
             self::row('RPT-DSH-004', 'Event ops daily brief', 'dashboard', 'new', "{$base}/events"),
             self::row('RPT-DSH-005', 'Registration funnel export', 'dashboard', 'new', self::runnerHref($base, 'RPT-DSH-005'), null, true),
+            // Functional audit 2026-08-11/12, action-plan items 11/14.
+            self::row('RPT-DSH-006', 'Approval turnaround time', 'dashboard', 'new', self::runnerHref($base, 'RPT-DSH-006'), null, true),
+            self::row('RPT-DSH-007', 'My pending approvals', 'dashboard', 'new', self::runnerHref($base, 'RPT-DSH-007'), null, true),
         ];
     }
 }

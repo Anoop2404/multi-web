@@ -277,6 +277,16 @@ class FestRegistrationReviewController extends SahodayaAdminController
         // reportableEventIds() correctly; this brings the individual actions in line.
         abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
 
+        // LIFE-03 fix (functional audit, 2026-08-11/12): this endpoint had no
+        // guard against the registration's current status — unlike
+        // FestRegistrationBulkService::approveMany(), which only ever targets
+        // 'submitted' rows, a repeat click (or a stale/replayed request)
+        // against an already-approved/rejected/withdrawn/waitlisted
+        // registration would silently re-run approval side effects (chest
+        // number re-assignment, a second "approved" notification/audit
+        // entry). Matches the bulk service's scope exactly.
+        abort_unless($registration->status === 'submitted', 422, 'This registration is not awaiting approval — it is already '.$registration->status.'.');
+
         EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
 
         $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
@@ -333,6 +343,25 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'This registration already has an approved payment — use "Cancel & refund" instead, which requires a reason and credits the school.'
         );
 
+        // LIFE-03 fix (functional audit, 2026-08-11/12): the payment check
+        // above only ever covered the approved-and-paid case; it did not stop
+        // this endpoint from re-rejecting an already-rejected/withdrawn/
+        // waitlisted registration, silently overwriting rejection_reason/
+        // rejected_at/rejected_by_user_id and re-firing the rejection
+        // notification and audit log. Matches
+        // FestRegistrationBulkService::rejectMany()'s 'submitted'-only scope.
+        abort_unless($registration->status === 'submitted', 422, 'This registration is not awaiting approval — it is already '.$registration->status.'.');
+
+        // Note on LIFE-04 (functional audit, 2026-08-11/12): a results-published
+        // guard is deliberately NOT duplicated here — EventLifecycleGate::
+        // allowRegistrationReview() above already blocks this once results are
+        // published, unless the caller explicitly passes override_lifecycle
+        // (an intentional admin escape hatch for late corrections). Adding an
+        // unconditional check here would silently remove that override
+        // capability. FestRegistrationService::cancel() has no equivalent
+        // override concept, so it gets its own unconditional guard instead —
+        // see the comment there.
+
         $data = $request->validate(['rejection_reason' => 'required|string|max:500']);
         $reason = $data['rejection_reason'];
 
@@ -361,6 +390,9 @@ class FestRegistrationReviewController extends SahodayaAdminController
         if ($headId) {
             app(FestRegistrationApprovalService::class)->promoteNextWaitlisted($event, (int) $headId);
         }
+
+        // LIFE-06 fix — see FestQualificationService::revokeQualificationsForRegistration().
+        app(\App\Services\Events\FestQualificationService::class)->revokeQualificationsForRegistration($registration);
 
         app(FestEventNotifier::class)->registrationRejected($registration, $reason);
         $audit->festRegistrationRejected($registration);

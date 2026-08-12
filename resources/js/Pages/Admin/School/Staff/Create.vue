@@ -12,11 +12,13 @@
                             <label class="form-label mb-1.5">Full Name *</label>
                             <input v-model="form.name" type="text" required
                                    class="field">
+                            <InputError :message="form.errors.name" class="mt-1" />
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Designation *</label>
                             <input v-model="form.designation" type="text" required placeholder="PGT Mathematics"
                                    class="field">
+                            <InputError :message="form.errors.designation" class="mt-1" />
                         </div>
                     </div>
 
@@ -25,11 +27,13 @@
                             <label class="form-label mb-1.5">Department</label>
                             <input v-model="form.department" type="text" placeholder="Science, Arts, Admin..."
                                    class="field">
+                            <InputError :message="form.errors.department" class="mt-1" />
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Qualification</label>
                             <input v-model="form.qualification" type="text" placeholder="M.Sc., B.Ed."
                                    class="field">
+                            <InputError :message="form.errors.qualification" class="mt-1" />
                         </div>
                     </div>
 
@@ -43,12 +47,14 @@
                                 <span class="text-sm font-medium capitalize">{{ type }}</span>
                             </label>
                         </div>
+                        <InputError :message="form.errors.type" class="mt-1" />
                     </div>
 
                     <div>
                         <label class="form-label mb-1.5">Photo</label>
                         <input type="file" accept="image/*" @change="form.photo = $event.target.files[0]"
                                class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700">
+                        <InputError :message="form.errors.photo" class="mt-1" />
                     </div>
                 </div>
 
@@ -66,6 +72,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import InputError from '@/Components/ui/InputError.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({ school: Object });

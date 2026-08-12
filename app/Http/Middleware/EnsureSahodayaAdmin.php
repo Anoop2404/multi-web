@@ -3,8 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Middleware\Concerns\RedirectsUnauthenticated;
-use App\Models\FestEvent;
-use App\Models\FestEventStaff;
+use App\Support\EventRegionAdminScope;
 use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -66,39 +65,17 @@ class EnsureSahodayaAdmin
         $hasRegionAdmin = $user->hasRole('region_admin') && ! $user->hasRole('sahodaya_admin');
 
         if ($hasEventAdmin || $hasRegionAdmin) {
-            $allowedEventIds = [];
-            $allowedRegionScopes = [];
+            $scopes = EventRegionAdminScope::resolve($user, $hasEventAdmin, $hasRegionAdmin);
+            $allowedEventIds = $scopes['eventIds'];
+            $allowedRegionScopes = $scopes['regionScopes'];
 
-            if ($hasEventAdmin) {
-                $allowedEventIds = FestEventStaff::query()
-                    ->where('user_id', $user->id)
-                    ->where('duty', 'event_admin')
-                    ->pluck('event_id')
-                    ->map(fn ($id) => (int) $id)
-                    ->values()
-                    ->all();
-            }
-
-            if ($hasRegionAdmin) {
-                $allowedRegionScopes = FestEventStaff::query()
-                    ->where('user_id', $user->id)
-                    ->where('duty', 'region_admin')
-                    ->get(['event_id', 'region_id'])
-                    ->map(fn ($row) => [
-                        'event_id'  => (int) $row->event_id,
-                        'region_id' => $row->region_id !== null ? (int) $row->region_id : null,
-                    ])
-                    ->values()
-                    ->all();
-            }
-
-            $requestedEventId = $this->resolveRouteEventId($request);
+            $requestedEventId = EventRegionAdminScope::resolveRouteEventId($request);
 
             if ($requestedEventId !== null) {
                 $allowed = in_array($requestedEventId, $allowedEventIds, true);
 
                 if (! $allowed && $allowedRegionScopes !== []) {
-                    $allowed = $this->matchesRegionScope($requestedEventId, $allowedRegionScopes);
+                    $allowed = EventRegionAdminScope::matchesRegionScope($requestedEventId, $allowedRegionScopes);
                 }
 
                 if (! $allowed) {
@@ -113,71 +90,5 @@ class EnsureSahodayaAdmin
         }
 
         return $next($request);
-    }
-
-    /**
-     * True when the requested event is either (a) a region-partition child directly
-     * matching one of the admin's (event_id, region_id) scopes, or (b) that same child
-     * reached via a scope granted on its parent hub — i.e. a region admin assigned on
-     * the hub can reach any of the hub's children for their own region without needing
-     * a separate FestEventStaff row per child event.
-     *
-     * A scope directly on a hub/root event (no parent_event_id of its own) must carry a
-     * region_id. Without this check, a FestEventStaff row with duty=region_admin,
-     * event_id=<hub>, region_id=null would satisfy the very first comparison below
-     * regardless of region — granting full, unscoped access to every child/region under
-     * that hub. That is gap G1 in docs/REGION_PHASE_EVENT_REPORTING_REMEDIATION_PLAN.md:
-     * a region admin assigned on a parent hub could open the hub itself, and parent
-     * reports then aggregate every child. A scope on a genuine leaf/child event has
-     * nothing further under it to leak, so it's allowed on its own.
-     *
-     * @param  list<array{event_id: int, region_id: ?int}>  $allowedRegionScopes
-     */
-    private function matchesRegionScope(int $requestedEventId, array $allowedRegionScopes): bool
-    {
-        $requestedEvent = FestEvent::query()
-            ->select(['id', 'parent_event_id', 'region_id'])
-            ->find($requestedEventId);
-
-        if (! $requestedEvent) {
-            return false;
-        }
-
-        $requestedIsHub = $requestedEvent->parent_event_id === null;
-
-        foreach ($allowedRegionScopes as $scope) {
-            if ($scope['event_id'] === (int) $requestedEvent->id) {
-                if ($requestedIsHub && $scope['region_id'] === null) {
-                    continue;
-                }
-
-                return true;
-            }
-
-            if ($requestedEvent->parent_event_id
-                && $scope['event_id'] === (int) $requestedEvent->parent_event_id
-                && $scope['region_id'] !== null
-                && $requestedEvent->region_id !== null
-                && $scope['region_id'] === (int) $requestedEvent->region_id) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function resolveRouteEventId(Request $request): ?int
-    {
-        $raw = $request->route('event');
-
-        if ($raw === null) {
-            return null;
-        }
-
-        if (is_object($raw)) {
-            return isset($raw->id) ? (int) $raw->id : null;
-        }
-
-        return is_numeric($raw) ? (int) $raw : null;
     }
 }

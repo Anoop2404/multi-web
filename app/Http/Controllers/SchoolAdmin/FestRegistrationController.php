@@ -28,6 +28,7 @@ use App\Services\Events\FestSchoolEventFeeService;
 use App\Services\Events\FestRegistrationService;
 use App\Services\Events\FestRegistrationImportService;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestEventNotifier;
 use App\Http\Controllers\SchoolAdmin\Concerns\BuildsSchoolFestEventContext;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestSportsAgeGroup;
@@ -860,6 +861,12 @@ class FestRegistrationController extends SchoolAdminController
         }
 
         app(PlatformAuditLogger::class)->festRegistrationSubmitted($registration->fresh(['event', 'item']));
+
+        // LIFE-11 fix (functional audit, 2026-08-11/12): previously admins only found out
+        // about a new submission by opening the review queue themselves — see
+        // FestEventNotifier::registrationSubmittedAdmin() for the status gating (only
+        // submitted/pending_approval need a review at all).
+        app(FestEventNotifier::class)->registrationSubmittedAdmin($registration->fresh(['event', 'item']));
 
         $label = $event->event_type === 'teacher_fest' ? 'Teacher registration' : 'Registration';
         $message = match ($registration->status) {

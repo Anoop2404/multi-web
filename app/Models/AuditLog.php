@@ -11,7 +11,7 @@ class AuditLog extends Model
     use CentralConnection;
 
     protected $fillable = [
-        'user_id', 'category', 'action', 'description',
+        'user_id', 'tenant_id', 'category', 'action', 'description',
         'subject_type', 'subject_id', 'ip_address', 'properties',
     ];
 

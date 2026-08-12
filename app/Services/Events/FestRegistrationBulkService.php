@@ -151,6 +151,9 @@ class FestRegistrationBulkService
                 }
             });
 
+            // LIFE-06 fix — see FestQualificationService::revokeQualificationsForRegistration().
+            app(FestQualificationService::class)->revokeQualificationsForRegistration($registration);
+
             $notifier->registrationRejected($registration, $reason);
             $audit->festRegistrationRejected($registration);
             $rejected++;

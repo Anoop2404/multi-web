@@ -11,6 +11,7 @@
                         <label class="form-label mb-1.5">Title *</label>
                         <input v-model="form.title" type="text" required
                                class="field">
+                        <InputError :message="form.errors.title" class="mt-1" />
                     </div>
 
                     <div class="grid sm:grid-cols-2 gap-4">
@@ -18,11 +19,13 @@
                             <label class="form-label mb-1.5">Category</label>
                             <input v-model="form.category" type="text"
                                    class="field">
+                            <InputError :message="form.errors.category" class="mt-1" />
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Publish Date</label>
                             <input v-model="form.published_at" type="datetime-local"
                                    class="field">
+                            <InputError :message="form.errors.published_at" class="mt-1" />
                         </div>
                     </div>
 
@@ -30,6 +33,7 @@
                         <label class="form-label mb-1.5">Content *</label>
                         <textarea v-model="form.body" rows="12" required
                                   class="field resize-y"></textarea>
+                        <InputError :message="form.errors.body" class="mt-1" />
                     </div>
 
                     <div v-if="news.image" class="flex items-center gap-3 text-sm text-gray-500">
@@ -41,6 +45,7 @@
                         <label class="form-label mb-1.5">Replace Image</label>
                         <input type="file" accept="image/*" @change="form.image = $event.target.files[0]"
                                class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <InputError :message="form.errors.image" class="mt-1" />
                     </div>
 
                     <div class="flex items-center gap-2">
@@ -63,6 +68,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import InputError from '@/Components/ui/InputError.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({ school: Object, news: Object });

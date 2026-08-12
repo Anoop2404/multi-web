@@ -248,6 +248,26 @@ class FestResultsController extends SahodayaAdminController
             'status'            => 'ongoing',
         ]);
 
+        // LIFE-08 fix (functional audit, 2026-08-11/12): publish() above cascades to
+        // region/finale children, pushes the CMS scoreboard, and notifies schools —
+        // unpublish() previously only flipped the two columns on the hub itself, leaving
+        // every region/finale child (and the public homepage scoreboard) stuck showing
+        // "results published" indefinitely. Mirrors publish()'s cascade with the inverse
+        // fields. Certificates already generated are deliberately left alone: there is no
+        // revoke/invalidate concept anywhere in FestCertificateService, and retroactively
+        // clawing back a certificate a school may have already downloaded is a materially
+        // different (and much larger) feature than "undo a publish click" — out of scope
+        // for this symmetric-cascade fix.
+        app(\App\Services\Events\FestRegionPartitionService::class)->cascadeLifecycleToChildren($event, [
+            'results_published' => false,
+            'status'            => 'ongoing',
+        ], includeFinale: true);
+
+        app(\App\Services\Events\FestCmsAutoPush::class)->pushScoreboard($event);
+        app(\App\Services\Events\FestEventNotifier::class)->resultsUnpublished($event);
+
+        FestScoreboardUpdated::dispatch($event->fresh());
+
         $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.unpublished', 'Results unpublished');
 
         return back()->with('success', 'Results unpublished.');

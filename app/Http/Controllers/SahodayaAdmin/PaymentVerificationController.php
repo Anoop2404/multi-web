@@ -120,7 +120,12 @@ class PaymentVerificationController extends SahodayaAdminController
     public function verify(Request $request, string $tenantId, MembershipPayment $payment, MembershipNotifier $notifier, PlatformAuditLogger $audit)
     {
         abort_if($payment->school->parent_id !== $this->sahodaya->id, 403);
-        abort_if($this->regionScopedSchoolIds([$payment->school_id]) === [], 403, 'This school is outside your assigned region.');
+        // REG-06 fix (functional audit, 2026-08-11/12): scope by the payment's
+        // own academic_year, not always "today's" — a region_admin verifying
+        // a prior-year payment must be judged against that school's region
+        // assignment for the year the payment actually belongs to, not
+        // whichever region the school happens to be in today.
+        abort_if($this->regionScopedSchoolIds([$payment->school_id], $payment->academic_year) === [], 403, 'This school is outside your assigned region.');
         abort_unless($payment->status === 'submitted', 403);
 
         $data = $request->validate([

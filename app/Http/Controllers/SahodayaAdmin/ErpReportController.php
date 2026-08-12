@@ -17,6 +17,7 @@ class ErpReportController extends SahodayaAdminController
         abort_if(! $definition, 404);
 
         $filters = $this->validatedFilters($request, $runner, $reportId);
+        $filters = $this->withCurrentUserFilter($request, $reportId, $filters);
         $meta = $runner->meta($reportId);
         $preview = $runner->preview($this->sahodaya->id, $reportId, $filters, (int) $request->integer('page', 1));
 
@@ -41,6 +42,7 @@ class ErpReportController extends SahodayaAdminController
         abort_unless($runner->authorize($request->user(), $reportId), 403);
 
         $filters = $this->validatedFilters($request, $runner, $reportId);
+        $filters = $this->withCurrentUserFilter($request, $reportId, $filters);
         $format = strtolower($request->string('format')->toString());
 
         if ($format === 'pdf' || $request->has('pdf')) {
@@ -68,6 +70,28 @@ class ErpReportController extends SahodayaAdminController
         }
 
         return $runner->export($request->user(), $this->sahodaya->id, $reportId, $filters);
+    }
+
+    /**
+     * RPT-DSH-007 (functional audit 2026-08-11/12, action-plan item 14): the only report
+     * in this hub that needs the ACTING user, not just the sahodaya, to compute its rows
+     * (see ErpReportQueryService::myPendingApprovals()) — every other report is
+     * sahodaya-scoped only. Injected here rather than widening ReportRunner::preview()/
+     * export()'s signature for every other report's sake. Deliberately overwrites any
+     * client-supplied '_current_user_id' — validatedFilters() above never lets that key
+     * through anyway (it's not in this report's meta filters), but this is the one spot
+     * that would matter if that ever changed.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function withCurrentUserFilter(Request $request, string $reportId, array $filters): array
+    {
+        if ($reportId === 'RPT-DSH-007') {
+            $filters['_current_user_id'] = $request->user()?->id;
+        }
+
+        return $filters;
     }
 
     /** @return array<string, mixed> */

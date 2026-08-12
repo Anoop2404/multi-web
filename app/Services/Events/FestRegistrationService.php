@@ -26,6 +26,14 @@ class FestRegistrationService
             422,
             'This registration\'s fee has already been paid and approved — it can no longer be cancelled.',
         );
+        // LIFE-04 fix (functional audit, 2026-08-11/12): this guard previously
+        // only existed in canAdminCancel() — a caller (like the direct reject/
+        // cancel controller actions) that didn't check that method first could
+        // cancel a registration after its event's results were already
+        // published. Moved into the method that actually performs the
+        // mutation so it can't be bypassed by a caller forgetting the
+        // separate check.
+        abort_if($event->results_published, 422, 'Results have already been published for this event — this registration can no longer be cancelled.');
 
         $registration->loadMissing('item', 'participants');
         $headId = $registration->item?->head_id;
@@ -61,6 +69,11 @@ class FestRegistrationService
         if ($headId) {
             app(FestRegistrationApprovalService::class)->promoteNextWaitlisted($event, (int) $headId);
         }
+
+        // LIFE-06 fix: unwind any downstream qualification this registration
+        // had already produced (participant won and was promoted before this
+        // cancellation) — see FestQualificationService::revokeQualificationsForRegistration().
+        app(FestQualificationService::class)->revokeQualificationsForRegistration($registration);
 
         if ($notify) {
             app(FestEventNotifier::class)->registrationWithdrawn($registration);
@@ -201,6 +214,9 @@ class FestRegistrationService
         if ($headId) {
             app(FestRegistrationApprovalService::class)->promoteNextWaitlisted($event, (int) $headId);
         }
+
+        // LIFE-06 fix — see cancel() above.
+        app(FestQualificationService::class)->revokeQualificationsForRegistration($registration);
 
         app(PlatformAuditLogger::class)->festRegistrationCancelled($registration);
 

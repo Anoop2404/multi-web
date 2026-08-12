@@ -115,7 +115,19 @@ class FestReportScopeResolver
             return $this->emptyScope($requestedEvent, $root, 'region', $regionId, $phaseId, $restricted);
         }
 
-        $year = AcademicYear::forSahodaya($root->tenant_id);
+        // REG-06 fix (functional audit, 2026-08-11/12): this used to always
+        // resolve "today's" active academic year via AcademicYear::forSahodaya(),
+        // regardless of which year $root (the event actually being reported
+        // on) ran in. SchoolRegionAssignment is correctly year-keyed (one row
+        // per school per academic_year, see 2026_07_21_000001_create_regions_tables.php)
+        // specifically so a school's region history is preserved across
+        // reassignment — but a query that ignores the record's own year and
+        // always asks for "current" defeats that: viewing a region-filtered
+        // report for a PAST event silently returned the region's school list
+        // as it stands today, not as it stood when that event actually ran.
+        // Falls back to the live current year only if the event predates
+        // academic_year_id being populated (older historical events).
+        $year = $root->academicYear?->label ?? AcademicYear::forSahodaya($root->tenant_id);
         $schoolIds = SchoolRegionAssignment::forTenant($root->tenant_id)
             ->forYear($year)
             ->where('region_id', $regionId)

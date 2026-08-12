@@ -78,11 +78,6 @@
                             <label class="portal-label" for="contact_phone">Contact phone <span class="portal-optional">(optional)</span></label>
                             <input id="contact_phone" name="contact_phone" type="tel" value="{{ old('contact_phone') }}" class="portal-input">
                         </div>
-                        <div class="field-span-2">
-                            <label class="portal-label" for="contact_email">Contact email <span class="portal-optional">(recommended — enables the school's login code)</span></label>
-                            <input id="contact_email" name="contact_email" type="email" value="{{ old('contact_email') }}" class="portal-input @error('contact_email') is-error @enderror">
-                            @error('contact_email')<p class="portal-error">{{ $message }}</p>@enderror
-                        </div>
                     </div>
                     <div class="portal-form-actions">
                         <span></span>
@@ -140,11 +135,7 @@
         </div>
 
         <p class="portal-footer-note">
-            @if($sahodaya->requiresOtp())
-                Keep this link safe. Even so, we also verify the code emailed to {{ $sahodaya->contact_email }} on every new sign-in.
-            @else
-                Keep this link and your access code ({{ $sahodaya->access_code }}) safe — anyone with it can manage your submission. Add a contact email above to enable a second verification step.
-            @endif
+            Keep this link and your access code ({{ $sahodaya->access_code }}) safe — anyone with it can manage your submission.
         </p>
     </div>
 </div>

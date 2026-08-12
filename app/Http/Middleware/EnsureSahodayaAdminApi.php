@@ -2,8 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\FestEvent;
-use App\Models\FestEventStaff;
+use App\Support\EventRegionAdminScope;
 use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -54,62 +53,21 @@ class EnsureSahodayaAdminApi
         $hasRegionAdmin = $user->hasRole('region_admin') && ! $user->hasRole('sahodaya_admin');
 
         if ($hasEventAdmin || $hasRegionAdmin) {
-            $allowedEventIds = [];
-            $allowedRegionScopes = [];
+            // Delegates to EventRegionAdminScope (App\Support) so this stays byte-for-byte
+            // in sync with EnsureSahodayaAdmin (web middleware) — see that class's docblock
+            // for the gap-G1 rationale (§10.1 of the remediation plan requires API and web
+            // middleware to produce equivalent allow/deny decisions).
+            $scopes = EventRegionAdminScope::resolve($user, $hasEventAdmin, $hasRegionAdmin);
+            $allowedEventIds = $scopes['eventIds'];
+            $allowedRegionScopes = $scopes['regionScopes'];
 
-            if ($hasEventAdmin) {
-                $allowedEventIds = FestEventStaff::query()
-                    ->where('user_id', $user->id)
-                    ->where('duty', 'event_admin')
-                    ->pluck('event_id')
-                    ->map(fn ($id) => (int) $id)
-                    ->values()
-                    ->all();
-            }
-
-            if ($hasRegionAdmin) {
-                $allowedRegionScopes = FestEventStaff::query()
-                    ->where('user_id', $user->id)
-                    ->where('duty', 'region_admin')
-                    ->get(['event_id', 'region_id'])
-                    ->map(fn ($row) => [
-                        'event_id'  => (int) $row->event_id,
-                        'region_id' => $row->region_id !== null ? (int) $row->region_id : null,
-                    ])
-                    ->values()
-                    ->all();
-            }
-
-            $raw = $request->route('event');
-            $requestedEventId = is_object($raw) ? ($raw->id ?? null) : (is_numeric($raw) ? (int) $raw : null);
-            $requestedEventId = $requestedEventId !== null ? (int) $requestedEventId : null;
+            $requestedEventId = EventRegionAdminScope::resolveRouteEventId($request);
 
             if ($requestedEventId !== null) {
                 $allowed = in_array($requestedEventId, $allowedEventIds, true);
 
                 if (! $allowed && $allowedRegionScopes !== []) {
-                    $requestedEvent = FestEvent::query()
-                        ->select(['id', 'parent_event_id', 'region_id'])
-                        ->find($requestedEventId);
-
-                    $requestedIsHub = $requestedEvent && $requestedEvent->parent_event_id === null;
-
-                    // Mirrors EnsureSahodayaAdmin::matchesRegionScope() (web middleware) — see
-                    // that method's docblock for why a hub-level scope with no region_id must
-                    // not grant access (gap G1). Kept in sync deliberately: §10.1 of the
-                    // remediation plan requires API and web middleware to produce equivalent
-                    // results.
-                    $allowed = $requestedEvent && collect($allowedRegionScopes)->contains(function (array $scope) use ($requestedEvent, $requestedIsHub) {
-                        if ($scope['event_id'] === (int) $requestedEvent->id) {
-                            return ! ($requestedIsHub && $scope['region_id'] === null);
-                        }
-
-                        return $requestedEvent->parent_event_id
-                            && $scope['event_id'] === (int) $requestedEvent->parent_event_id
-                            && $scope['region_id'] !== null
-                            && $requestedEvent->region_id !== null
-                            && $scope['region_id'] === (int) $requestedEvent->region_id;
-                    });
+                    $allowed = EventRegionAdminScope::matchesRegionScope($requestedEventId, $allowedRegionScopes);
                 }
 
                 if (! $allowed) {

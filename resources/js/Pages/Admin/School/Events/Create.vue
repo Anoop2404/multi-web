@@ -11,6 +11,7 @@
                         <label class="form-label mb-1.5">Event Title *</label>
                         <input v-model="form.title" type="text" required
                                class="field">
+                        <InputError :message="form.errors.title" class="mt-1" />
                     </div>
 
                     <div class="grid sm:grid-cols-2 gap-4">
@@ -18,11 +19,13 @@
                             <label class="form-label mb-1.5">Start Date *</label>
                             <input v-model="form.start_date" type="date" required
                                    class="field">
+                            <InputError :message="form.errors.start_date" class="mt-1" />
                         </div>
                         <div>
                             <label class="form-label mb-1.5">End Date</label>
                             <input v-model="form.end_date" type="date"
                                    class="field">
+                            <InputError :message="form.errors.end_date" class="mt-1" />
                         </div>
                     </div>
 
@@ -30,18 +33,21 @@
                         <label class="form-label mb-1.5">Venue</label>
                         <input v-model="form.venue" type="text" placeholder="School Auditorium, Thrissur, etc."
                                class="field">
+                        <InputError :message="form.errors.venue" class="mt-1" />
                     </div>
 
                     <div>
                         <label class="form-label mb-1.5">Description</label>
                         <textarea v-model="form.description" rows="5"
                                   class="field resize-none"></textarea>
+                        <InputError :message="form.errors.description" class="mt-1" />
                     </div>
 
                     <div>
                         <label class="form-label mb-1.5">Event Image</label>
                         <input type="file" accept="image/*" @change="form.image = $event.target.files[0]"
                                class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                        <InputError :message="form.errors.image" class="mt-1" />
                     </div>
                 </div>
 
@@ -59,6 +65,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import InputError from '@/Components/ui/InputError.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({ school: Object });

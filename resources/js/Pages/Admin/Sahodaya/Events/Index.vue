@@ -223,6 +223,7 @@
 import { computed, ref } from 'vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import InputError from '@/Components/ui/InputError.vue';
 import { PROGRAM_SLUGS, SAHODAYA_PROGRAMS, sahodayaProgramHref } from '@/support/sahodayaPrograms.js';
 import { isNavProgramVisible } from '@/support/sahodayaAdminNav.js';
 

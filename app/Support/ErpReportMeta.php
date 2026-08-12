@@ -39,7 +39,27 @@ class ErpReportMeta
     {
         $id = self::resolveId($reportId);
 
-        if (in_array($id, ['RPT-SPT-024', 'RPT-KAL-015', 'RPT-FST-001', 'RPT-FST-002', 'RPT-FST-003', 'RPT-FST-004'], true)) {
+        // RPT-FST-008/009 (functional audit 2026-08-11/12, action-plan items 12/13):
+        // phase-duration/bottleneck and region-performance-comparison are both
+        // deliberately cross_event — they compare ACROSS events/regions rather than
+        // reporting on one pre-selected event, so (like RPT-FST-001..004) they belong
+        // in the general Reports Hub, not gated behind picking an event first. IDs
+        // 006/007 were already taken by existing catalog-only entries (see
+        // ReportRegistry::festHubReports()), hence starting at 008.
+        //
+        // RPT-KAL-036..042/045 (same audit, "fix stub reports" item): these used to
+        // resolve through a generic per-event fallback and were scope=event (gated out
+        // of this hub entirely, so genuinely unreachable). Now that
+        // FestCrossEventReportService gives each one real, distinct query logic (see
+        // that class), they're promoted to cross_event so the fix is actually usable
+        // from the Reports Hub rather than correct-but-unreachable. 043/044 stay
+        // scope=event on purpose — they're documented, intentional duplicates of
+        // RPT-KAL-005 pending post-UAT consolidation, not reports that need their own
+        // hub card.
+        if (in_array($id, [
+            'RPT-SPT-024', 'RPT-KAL-015', 'RPT-FST-001', 'RPT-FST-002', 'RPT-FST-003', 'RPT-FST-004', 'RPT-FST-008', 'RPT-FST-009',
+            'RPT-KAL-036', 'RPT-KAL-037', 'RPT-KAL-038', 'RPT-KAL-039', 'RPT-KAL-040', 'RPT-KAL-041', 'RPT-KAL-042', 'RPT-KAL-045',
+        ], true)) {
             return 'cross_event';
         }
 
@@ -225,6 +245,16 @@ class ErpReportMeta
             'RPT-FST-003' => ['columns' => ['event', 'school', 'item', 'status', 'created_at'], 'filters' => ['event_id', 'school_id']],
             'RPT-FST-004' => ['columns' => ['event', 'school', 'participant', 'cert_type', 'generated_at'], 'filters' => ['event_id']],
             'RPT-FST-005' => ['columns' => ['event', 'type', 'status', 'export_count_note']],
+            // LIFE audit action-plan item 12: FestEventPhase tracks current status but no
+            // history of when it entered that status — this reports "how long has this
+            // phase been sitting in its current (non-completed) status", a live-bottleneck
+            // view, not full historical duration analytics (that would need a phase
+            // status-transition log this app doesn't have).
+            'RPT-FST-008' => ['columns' => ['event', 'phase', 'status', 'items_assigned', 'hours_in_current_status'], 'filters' => ['event_id']],
+            // Action-plan item 13: side-by-side region comparison for partitioned hubs —
+            // distinct from the existing per-event region tiles (which show one hub at a
+            // time inside its own workspace).
+            'RPT-FST-009' => ['columns' => ['event', 'region', 'schools_participating', 'registrations', 'total_points', 'avg_points_per_school'], 'filters' => ['event_id']],
 
             // Sports (cross-event summaries)
             'RPT-SPT-001' => ['columns' => $festCols, 'filters' => $festFilters],
@@ -260,6 +290,8 @@ class ErpReportMeta
             'RPT-SPT-033' => ['columns' => ['event', 'item', 'participant', 'school', 'mark', 'rank'], 'filters' => $festFilters],
             'RPT-SPT-034' => ['columns' => ['event', 'school', 'rank', 'points'], 'filters' => ['event_id']],
             'RPT-SPT-036' => ['columns' => ['event', 'date', 'item', 'stage', 'time'], 'filters' => ['event_id', 'from']],
+            // Always empty — see FestCrossEventReportService's doc on RPT-SPT-037; no
+            // gate-scanning feature exists in this app yet.
             'RPT-SPT-037' => ['columns' => ['event', 'participant', 'school', 'scanned_at'], 'filters' => ['event_id']],
             'RPT-SPT-038' => ['columns' => ['event', 'school', 'orders', 'amount'], 'filters' => ['event_id']],
             'RPT-SPT-039' => ['columns' => ['event', 'item', 'fee_amount', 'participant_type'], 'filters' => ['event_id']],
@@ -302,16 +334,21 @@ class ErpReportMeta
             'RPT-KAL-033' => ['columns' => ['event', 'school', 'item', 'status', 'outcome', 'resolved_at']],
             'RPT-KAL-034' => ['columns' => ['event', 'school', 'participant', 'cert_type', 'generated_at']],
             'RPT-KAL-035' => ['columns' => ['event', 'school', 'participant', 'cert_type', 'generated_at']],
-            'RPT-KAL-036' => ['columns' => ['event', 'item', 'school', 'participants'], 'filters' => $festFilters],
-            'RPT-KAL-037' => ['columns' => ['event', 'school', 'registrations'], 'filters' => ['event_id']],
-            'RPT-KAL-038' => ['columns' => ['event', 'item', 'mark', 'rank'], 'filters' => $festFilters],
-            'RPT-KAL-039' => ['columns' => ['event', 'school', 'points'], 'filters' => ['event_id']],
-            'RPT-KAL-040' => ['columns' => ['event', 'item', 'pending_approvals'], 'filters' => ['event_id']],
-            'RPT-KAL-041' => ['columns' => ['event', 'metric', 'value'], 'filters' => ['event_id']],
-            'RPT-KAL-042' => ['columns' => ['event', 'metric', 'value'], 'filters' => ['event_id']],
-            'RPT-KAL-043' => ['columns' => ['event', 'metric', 'value'], 'filters' => ['event_id']],
-            'RPT-KAL-044' => ['columns' => ['event', 'metric', 'value'], 'filters' => ['event_id']],
-            'RPT-KAL-045' => ['columns' => ['event', 'metric', 'value'], 'filters' => ['event_id']],
+            // RPT-KAL-036..045 (functional audit 2026-08-11/12, "fix stub reports" item):
+            // real column shapes matching FestCrossEventReportService's actual dispatch
+            // (kalRowsBySuffix()) — the previous defs here didn't even match what
+            // eventMetrics() actually returned (['event','metric','value']), let alone a
+            // real report. See docs/erp/REPORT_CATALOGUE.md for each label's origin.
+            'RPT-KAL-036' => ['columns' => ['event', 'school', 'amount', 'status'], 'filters' => ['event_id']], // Fee pending schools
+            'RPT-KAL-037' => ['columns' => ['event', 'school', 'item', 'status', 'submitted_at'], 'filters' => ['event_id']], // Registration approval queue
+            'RPT-KAL-038' => ['columns' => ['event', 'item', 'max_per_school', 'registered_schools', 'registrations', 'utilization_pct'], 'filters' => ['event_id']], // Item capacity utilization
+            'RPT-KAL-039' => ['columns' => ['event', 'stage', 'slots', 'hours'], 'filters' => ['event_id']], // Time slot occupancy
+            'RPT-KAL-040' => ['columns' => ['event', 'item', 'school', 'participant', 'mark', 'rank'], 'filters' => $festFilters], // School trophy detail (alias of school points detail)
+            'RPT-KAL-041' => ['columns' => ['event', 'item', 'grade', 'count'], 'filters' => ['event_id']], // Grade-wise results
+            'RPT-KAL-042' => ['columns' => ['event', 'item', 'school', 'participant', 'mark', 'rank'], 'filters' => $festFilters], // Public result export
+            'RPT-KAL-043' => ['columns' => ['event', 'item', 'participants', 'avg_mark'], 'filters' => ['event_id']], // Legacy tabulation alias A (= RPT-KAL-005)
+            'RPT-KAL-044' => ['columns' => ['event', 'item', 'participants', 'avg_mark'], 'filters' => ['event_id']], // Legacy tabulation alias B (= RPT-KAL-005)
+            'RPT-KAL-045' => ['columns' => ['event', 'school', 'item', 'participants', 'status'], 'filters' => ['event_id']], // Full fest registration dump
 
             // MCQ
             'RPT-MCQ-001' => ['columns' => ['exam', 'school', 'registered', 'approved'], 'filters' => ['exam_id']],
@@ -396,6 +433,16 @@ class ErpReportMeta
             'RPT-DSH-003' => ['columns' => ['metric', 'value']],
             'RPT-DSH-004' => ['columns' => ['event', 'status', 'registrations_today', 'pending_marks', 'pending_payments']],
             'RPT-DSH-005' => ['columns' => ['school', 'registration_status', 'students', 'teachers', 'payment_status']],
+            // Action-plan item 11: turnaround time (submission -> decision) per approval
+            // workflow, aggregated since no per-workflow SLA analytics existed anywhere.
+            'RPT-DSH-006' => ['columns' => ['workflow', 'count', 'avg_hours', 'min_hours', 'max_hours']],
+            // Action-plan item 14: personalized "my pending approvals" queue. There is no
+            // per-item assignee column anywhere in this schema, so "mine" is interpreted as
+            // "everything my role is actually allowed to act on" (finance-only sees
+            // membership payments; admin/staff see the operational queues) rather than a
+            // literal assigned_to filter — see ErpReportController for how the acting
+            // user is threaded into this report specifically.
+            'RPT-DSH-007' => ['columns' => ['workflow', 'school', 'reference', 'submitted_at', 'waiting_hours']],
         ];
 
         return $defs;

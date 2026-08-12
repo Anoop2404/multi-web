@@ -27,6 +27,12 @@ class LogAuthEventJob implements ShouldQueue
     {
         AuditLog::create([
             'user_id'      => $this->userId,
+            // RPT-01 fix: AuthController::auditContext() already puts the
+            // resolved host tenant's id into $context['tenant_id'] for every
+            // login/logout/failed-login event — this job just needs to persist
+            // it, same as PlatformAuditLogger::log() does for the synchronous
+            // (non-queued) path.
+            'tenant_id'    => $this->context['tenant_id'] ?? null,
             'category'     => 'auth',
             'action'       => $this->action,
             'description'  => $this->description,

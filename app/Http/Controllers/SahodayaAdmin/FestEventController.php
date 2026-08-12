@@ -468,6 +468,25 @@ class FestEventController extends SahodayaAdminController
         $data = FestEventPayload::applyDefaults($data);
 
         $newStatus = $data['status'] ?? $event->status;
+
+        // LIFE-01 fix (functional audit, 2026-08-11/12): this endpoint (the
+        // main "Edit Event" settings-form save) is one of two code paths that
+        // can change $event->status — quickStatus() below already enforces
+        // StatusTransitionGuard's transition matrix, but this one didn't, so
+        // a stale/replayed form submission could push the event through a
+        // transition quickStatus() would have rejected (e.g. completed →
+        // draft, or completed → ongoing). Enforcing the same guard here
+        // closes that gap; it throws a ValidationException, which Laravel
+        // converts into the usual redirect-back-with-errors response for a
+        // web request — same as quickStatus() relies on below. It's a no-op
+        // when $newStatus equals the event's current status (the common case
+        // of saving the form without touching the status field).
+        \App\Support\StatusTransitionGuard::assert(
+            $event,
+            $newStatus,
+            \App\Support\StatusTransitionGuard::FEST_EVENT_TRANSITIONS,
+        );
+
         if (in_array($newStatus, ['published', 'registration_open'], true)
             && ! in_array($event->status, ['published', 'registration_open', 'ongoing', 'completed'], true)) {
             try {

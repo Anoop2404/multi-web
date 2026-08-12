@@ -272,8 +272,19 @@ class FestRegistrationCreateService
             ]);
         }
 
+        // LIFE-10 fix (functional audit, 2026-08-11/12): captured before either branch below
+        // mutates $registration in place, so this reflects the status the school actually
+        // saw before submitting this edit — used after the transaction commits (never
+        // inside it: a mid-transaction notification would still go out even if the fee-
+        // decrease guard further down rolls the whole edit back) to tell both sides an
+        // already-approved registration just lost that approval.
+        $wasApproved = $registration->status === 'approved';
+
         if ($event->event_type === 'teacher_fest') {
-            return $this->updateTeacherRegistration($registration, $event, $item, $school, $performerIds, $feeService, $dueBefore);
+            $updated = $this->updateTeacherRegistration($registration, $event, $item, $school, $performerIds, $feeService, $dueBefore);
+            $this->notifyIfRosterEditRevokedApproval($wasApproved, $updated);
+
+            return $updated;
         }
 
         $standbyIds = array_values(array_unique($standbyIds));
@@ -308,7 +319,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['student_ids' => implode(' ', $eligibilityErrors)]);
         }
 
-        return DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $feeService, $dueBefore) {
+        $updated = DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $feeService, $dueBefore) {
             $eventRegService = app(FestEventRegistrationService::class);
             foreach (array_merge($performerIds, $standbyIds) as $studentId) {
                 if ($eventRegService->requireEventRegistration($event) && $event->event_type !== 'sports') {
@@ -366,7 +377,9 @@ class FestRegistrationCreateService
             }
 
             // Editing the approved roster is a material change — send it back through
-            // Sahodaya review rather than silently keeping the old approval.
+            // Sahodaya review rather than silently keeping the old approval. See
+            // notifyIfRosterEditRevokedApproval() (LIFE-10) — the actual notification for
+            // this fires after the transaction commits, not here.
             if ($registration->status === 'submitted' || $registration->status === 'approved') {
                 $newStatus = ($item->head?->requiresManualApproval() || $event->requiresManualApproval())
                     ? 'submitted'
@@ -393,6 +406,23 @@ class FestRegistrationCreateService
 
             return $registration->fresh(['participants.student', 'item']);
         });
+
+        $this->notifyIfRosterEditRevokedApproval($wasApproved, $updated);
+
+        return $updated;
+    }
+
+    /**
+     * Shared tail for updateForSchool()'s two branches — see the LIFE-10 comment on
+     * $wasApproved above for why this runs after the transaction, not inside it.
+     */
+    private function notifyIfRosterEditRevokedApproval(bool $wasApproved, FestRegistration $updated): void
+    {
+        if ($wasApproved && $updated->status === 'submitted') {
+            $notifier = app(FestEventNotifier::class);
+            $notifier->registrationNeedsReapproval($updated);
+            $notifier->registrationNeedsReapprovalAdmin($updated);
+        }
     }
 
     /**
