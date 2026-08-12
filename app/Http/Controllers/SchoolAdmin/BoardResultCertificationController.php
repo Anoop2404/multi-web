@@ -101,7 +101,7 @@ class BoardResultCertificationController extends SchoolAdminController
             BoardResultCertificationReport::STATUS_CHANGES_REQUESTED,
         ], true), 422, 'Generate the report before uploading a signed copy.');
 
-        $request->validate(['signed_pdf' => 'required|file|mimes:pdf|max:20480']);
+        $request->validate(['signed_pdf' => 'required|file|mimes:pdf,jpg,jpeg,png,webp|max:20480']);
 
         $file = $request->file('signed_pdf');
         $disk = TenantStorage::uploadDisk();

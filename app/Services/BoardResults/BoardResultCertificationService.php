@@ -77,9 +77,8 @@ class BoardResultCertificationService
      */
     public function requiredReportDefinitions(BoardResult $boardResult): array
     {
-        $defs = [
-            ['report_type' => BoardResultCertificationReport::TYPE_SUMMARY, 'stream_id' => null, 'label' => 'Result Summary & Proof'],
-        ];
+        // Only School Toppers and Full A1 Achievers are required — no summary report.
+        $defs = [];
 
         if ((int) $boardResult->class !== 12) {
             $defs[] = ['report_type' => BoardResultCertificationReport::TYPE_OVERALL_TOPPERS, 'stream_id' => null, 'label' => 'School Overall Toppers'];

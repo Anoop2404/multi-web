@@ -36,6 +36,22 @@
             <p class="text-xs text-emerald-600 mt-1">Submitted on {{ formatDate(package.submitted_at) }}. Sahodaya is now reviewing the certified package.</p>
         </div>
 
+        <!-- Changes requested — returned by Sahodaya -->
+        <div v-if="package.status === 'leadership_changes_requested'" class="bg-rose-50 border border-rose-200 rounded-2xl p-5 mb-6">
+            <p class="text-sm font-bold text-rose-700">📋 Correction Required</p>
+            <p class="text-xs text-rose-600 mt-1">{{ package.return_reason || 'Sahodaya has requested corrections. Fix the data and re-submit.' }}</p>
+            <p class="text-xs text-gray-500 mt-2">Go to the result entry page, fix the data, then click the button below to re-submit for verification.</p>
+            <div class="flex gap-2 mt-3 flex-wrap">
+                <Link
+                    :href="`/school-admin/${school.id}/board-results?class=${boardResult.class}&academic_year=${encodeURIComponent(boardResult.academic_year || '')}`"
+                    class="btn-secondary text-xs"
+                >✏️ Fix Data</Link>
+                <button type="button" class="btn-primary text-xs" :disabled="busy" @click="resubmitAfterCorrection">
+                    🔄 Re-submit for Verification
+                </button>
+            </div>
+        </div>
+
         <!-- Individual Reports -->
         <div v-if="activeReports.length" class="space-y-4 mb-8">
             <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Individual Reports</h2>
@@ -290,6 +306,13 @@ function reportPillClass(status) {
 function formatDate(value) {
     if (!value) return '—';
     return new Date(value).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function resubmitAfterCorrection() {
+    busy.value = true;
+    router.post(`${base.value}/request-leadership-review`, {}, {
+        onFinish: () => { busy.value = false; },
+    });
 }
 
 function generateReport(report) {

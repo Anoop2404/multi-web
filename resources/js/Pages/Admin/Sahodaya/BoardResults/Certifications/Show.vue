@@ -8,12 +8,58 @@
             </template>
         </PageHeader>
 
-        <div v-if="pkg.status !== 'submitted_to_sahodaya'" class="card !p-4 mb-4 border-amber-200 bg-amber-50">
-            <p class="text-sm text-amber-800">
-                This package's current status is <strong>{{ statusLabel(pkg.status) }}</strong>. Verify / return / approve / publish actions live on the
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification`" class="underline font-semibold">legacy verification screen</Link>,
-                which now keeps this certification package's status in sync automatically.
-            </p>
+        <!-- Action Panel -->
+        <div class="card !p-5 mb-4">
+            <h3 class="text-sm font-bold text-slate-800 mb-3">Actions</h3>
+
+            <!-- Submitted — can Verify or Return -->
+            <div v-if="pkg.status === 'submitted_to_sahodaya'" class="flex flex-wrap gap-2">
+                <form :action="`/sahodaya-admin/${sahodaya.id}/board-results/${pkg.board_result_id}/verify`" method="POST">
+                    <input type="hidden" name="_token" :value="csrf">
+                    <button type="submit" class="btn-primary text-sm">✅ Verify Package</button>
+                </form>
+                <button type="button" class="btn-secondary text-sm text-rose-600" @click="showReturnModal = true">↩️ Return for Correction</button>
+            </div>
+
+            <!-- Verified — can Approve or Return -->
+            <div v-else-if="pkg.status === 'sahodaya_verified'" class="flex flex-wrap gap-2">
+                <form :action="`/sahodaya-admin/${sahodaya.id}/board-results/${pkg.board_result_id}/approve`" method="POST">
+                    <input type="hidden" name="_token" :value="csrf">
+                    <button type="submit" class="btn-primary text-sm">✅ Approve Package</button>
+                </form>
+                <button type="button" class="btn-secondary text-sm text-rose-600" @click="showReturnModal = true">↩️ Return for Correction</button>
+            </div>
+
+            <!-- Approved — can Publish or Return -->
+            <div v-else-if="pkg.status === 'approved'" class="flex flex-wrap gap-2">
+                <form :action="`/sahodaya-admin/${sahodaya.id}/board-results/${pkg.board_result_id}/publish`" method="POST">
+                    <input type="hidden" name="_token" :value="csrf">
+                    <button type="submit" class="btn-primary text-sm">🌐 Publish Result</button>
+                </form>
+                <button type="button" class="btn-secondary text-sm text-rose-600" @click="showReturnModal = true">↩️ Return for Correction</button>
+            </div>
+
+            <!-- Published / Returned / Other -->
+            <div v-else>
+                <span class="text-sm text-slate-500">Status: <strong>{{ statusLabel(pkg.status) }}</strong> — no further actions available on this package.</span>
+            </div>
+        </div>
+
+        <!-- Return for Correction Modal -->
+        <div v-if="showReturnModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" @click.self="showReturnModal = false">
+            <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+                <h3 class="text-sm font-bold text-gray-900 mb-2">Return for Correction</h3>
+                <p class="text-xs text-gray-500 mb-3">Provide a clear reason so the school knows what to fix.</p>
+                <textarea v-model="returnReason" rows="4" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300" placeholder="Reason for returning..."></textarea>
+                <div class="flex justify-end gap-2 mt-3">
+                    <button type="button" class="btn-secondary text-xs" @click="showReturnModal = false">Cancel</button>
+                    <form :action="`/sahodaya-admin/${sahodaya.id}/board-results/${pkg.board_result_id}/reject`" method="POST">
+                        <input type="hidden" name="_token" :value="csrf">
+                        <input type="hidden" name="rejection_reason" :value="returnReason">
+                        <button type="submit" class="btn-primary text-xs bg-rose-600 hover:bg-rose-700" :disabled="!returnReason.trim()">↩️ Return</button>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <div class="card !p-5 mb-4">
@@ -66,6 +112,13 @@
             <p class="text-[11px] text-slate-400 mt-3 font-mono">Package data hash: {{ pkg.data_hash }}</p>
         </div>
 
+        <!-- Consolidated Certification section — skipped in simplified flow -->
+        <div class="card !p-5 mb-4">
+            <h3 class="text-sm font-bold text-slate-800 mb-2">Individual Report Proof</h3>
+            <p class="text-xs text-slate-500 mb-3">Each individual report above has been signed by the Principal/VP. A separate consolidated PDF is not required.</p>
+            <p class="text-[11px] text-slate-400 font-mono">Package data hash: {{ pkg.data_hash }}</p>
+        </div>
+
         <div v-if="history.length" class="card !p-5">
             <h3 class="text-sm font-bold text-slate-800 mb-2">Prior Versions</h3>
             <table class="w-full text-sm">
@@ -85,6 +138,7 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
@@ -99,6 +153,11 @@ const props = defineProps({
 });
 
 const pkg = props.package;
+const showReturnModal = ref(false);
+const returnReason = ref('');
+
+// Get CSRF token from meta tag
+const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
 function reportLabel(report) {
     const names = { summary: 'Result Summary & Proof', overall_toppers: 'School Topper(s)', subject_toppers: 'Subject-wise Toppers', full_a1: 'Full A1 Achievers' };
