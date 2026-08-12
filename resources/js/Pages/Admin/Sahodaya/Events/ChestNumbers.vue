@@ -17,6 +17,18 @@
         <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="chest-numbers" :event="event" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="chest-numbers" class="mb-4" />
 
+        <!-- Sport Event / Region Switcher -->
+        <div v-if="event.event_type === 'sports' && childEvents.length" class="card mb-4 !py-3">
+            <div class="flex flex-wrap gap-3 items-center">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Sport Event / Region:</label>
+                <select :value="event.id" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
+                    <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
+                        {{ ev.short_title || ev.title }}
+                    </option>
+                </select>
+            </div>
+        </div>
+
         <ReportHeadItemNavigator :groups="headItemGroups"
                                  :base-url="base"
                                  :selected-head-id="selectedHeadId"
@@ -148,7 +160,12 @@ const props = defineProps({
     includePending: { type: Boolean, default: false },
     view: String,
     activityLogs: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
+
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/chest-numbers`);
+}
 
 const showGreen = ref(props.view === 'green-room');
 const hasTeamRows = computed(() => props.participants.some((p) => p.is_team));

@@ -54,6 +54,7 @@ class FestChestNumberController extends SahodayaAdminController
             'greenRoom'      => $greenRoom,
             'includePending' => $includePending,
             'view'           => $request->query('view') === 'green-room' ? 'green-room' : null,
+            'childEvents'    => $event->sportEventDropdownOptions(),
         ])));
     }
 

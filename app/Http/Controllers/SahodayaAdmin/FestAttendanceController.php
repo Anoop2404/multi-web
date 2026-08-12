@@ -71,6 +71,7 @@ class FestAttendanceController extends SahodayaAdminController
             'event' => $event,
             'participants' => $participants,
             'attendance' => $attendance,
+            'childEvents' => $event->sportEventDropdownOptions(),
         ]));
     }
 

@@ -32,6 +32,18 @@
                            :event="event" active="attendance" class="mb-4" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="attendance" class="mb-4" />
 
+        <!-- Sport Event / Region Switcher -->
+        <div v-if="event.event_type === 'sports' && childEvents.length" class="card mb-4 !py-3">
+            <div class="flex flex-wrap gap-3 items-center">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Sport Event / Region:</label>
+                <select :value="event.id" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
+                    <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
+                        {{ ev.short_title || ev.title }}
+                    </option>
+                </select>
+            </div>
+        </div>
+
         <!-- Main Card Section -->
         <div class="card !p-4 space-y-4">
             
@@ -206,7 +218,12 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, participants: Array, attendance: Object,
     activityLogs: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
+
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/attendance`);
+}
 
 // Attendance, chest numbers, and marks are always entered per competition
 // item — there's no meaningful "mark everyone present across every item at
