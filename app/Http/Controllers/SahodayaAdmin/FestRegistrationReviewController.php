@@ -131,16 +131,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 ->get(['id', 'name']);
         }
 
-        $childEvents = [];
-        if ($event->event_type === 'sports') {
-            $seasonId = $event->parent_event_id ?? $event->id;
-            $childEvents = FestEvent::where('parent_event_id', $seasonId)
-                ->orWhere('id', $seasonId)
-                ->ofType('sports')
-                ->orderBy('title')
-                ->get(['id', 'title', 'parent_event_id'])
-                ->all();
-        }
+        $childEvents = $event->sportEventDropdownOptions();
 
         return $this->inertia('Sahodaya/Events/Registrations', $this->withEventActivity($event, FestPageActivity::REGISTRATIONS, [
             'event'                => $event,

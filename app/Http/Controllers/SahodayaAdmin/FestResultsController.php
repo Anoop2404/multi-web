@@ -67,16 +67,7 @@ class FestResultsController extends SahodayaAdminController
                 'suggested'   => $suggestedNext?->id === $e->id,
             ]);
 
-        $childEvents = [];
-        if ($event->event_type === 'sports') {
-            $seasonId = $event->parent_event_id ?? $event->id;
-            $childEvents = FestEvent::where('parent_event_id', $seasonId)
-                ->orWhere('id', $seasonId)
-                ->ofType('sports')
-                ->orderBy('title')
-                ->get(['id', 'title', 'parent_event_id'])
-                ->all();
-        }
+        $childEvents = $event->sportEventDropdownOptions();
 
         return $this->inertia('Sahodaya/Events/Results', $this->withEventActivity($event, FestPageActivity::RESULTS, array_merge($ctx, [
             'event'             => $event,

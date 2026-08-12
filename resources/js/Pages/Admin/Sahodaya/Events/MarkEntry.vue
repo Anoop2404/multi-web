@@ -64,9 +64,9 @@
             <!-- Child Event Selector for Sports -->
             <div v-if="isSports && childEvents.length" class="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Sport Event:</label>
-                <select :value="event.id" @change="switchSportEvent" class="field text-xs !py-1 w-64">
+                <select :value="event.id" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
                     <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
-                        {{ ev.title }} {{ ev.parent_event_id === null ? '(Season Hub)' : '' }}
+                        {{ ev.short_title || ev.title }}
                     </option>
                 </select>
             </div>

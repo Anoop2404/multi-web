@@ -14,9 +14,9 @@
             <div class="flex flex-wrap gap-3 items-center">
                 <div>
                     <label class="text-xs font-semibold text-slate-600">Select Sport Event</label>
-                    <select :value="event.id" @change="switchSportEvent" class="field text-sm mt-1 w-64">
+                    <select :value="event.id" @change="switchSportEvent" class="field text-sm mt-1 w-64 font-semibold">
                         <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
-                            {{ ev.title }} {{ ev.parent_event_id === null ? '(Season Hub)' : '' }}
+                            {{ ev.short_title || ev.title }}
                         </option>
                     </select>
                 </div>

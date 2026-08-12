@@ -361,6 +361,68 @@ class FestEvent extends Model
     }
 
     /**
+     * Clean list of sport event / region dropdown options for UI selectors.
+     * Removes redundant parent title prefixes and excludes unneeded intermediate containers.
+     *
+     * @return list<array{id: int, title: string, short_title: string, parent_event_id: ?int, is_hub: bool}>
+     */
+    public function sportEventDropdownOptions(): array
+    {
+        if ($this->event_type !== 'sports') {
+            return [];
+        }
+
+        $seasonId = $this->parent_event_id ?? $this->id;
+        $parentEvent = $this->parent_event_id ? self::find($seasonId) : $this;
+        $parentTitle = $parentEvent?->title ?? '';
+
+        $query = self::where('parent_event_id', $seasonId)
+            ->orWhere('id', $seasonId)
+            ->ofType('sports')
+            ->orderBy('sort_order')
+            ->orderBy('title');
+
+        $events = $query->get(['id', 'title', 'parent_event_id', 'partition_role']);
+
+        // Check if region partitions exist
+        $hasRegions = $events->contains(fn ($e) => $e->partition_role === 'region');
+
+        $options = [];
+        foreach ($events as $ev) {
+            // If region partitions exist, skip intermediate non-region child events
+            if ($hasRegions && $ev->parent_event_id !== null && $ev->partition_role !== 'region') {
+                continue;
+            }
+
+            $isHub = $ev->parent_event_id === null;
+            $rawTitle = $ev->title;
+
+            // Strip redundant parent title prefix
+            $shortTitle = $rawTitle;
+            if (! empty($parentTitle) && str_contains($rawTitle, $parentTitle)) {
+                $shortTitle = trim(str_replace([$parentTitle.' — ', $parentTitle.' - ', $parentTitle], '', $rawTitle));
+            }
+
+            if ($isHub) {
+                $displayTitle = "{$parentTitle} (Season Hub — All Regions)";
+                $shortTitle = "All Regions (Season Hub)";
+            } else {
+                $displayTitle = $shortTitle;
+            }
+
+            $options[] = [
+                'id'              => $ev->id,
+                'title'           => $displayTitle,
+                'short_title'     => $shortTitle,
+                'parent_event_id' => $ev->parent_event_id,
+                'is_hub'          => $isHub,
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
      * Resolve source item ids to every equivalent copied item inside this event's
      * report topology. Partition children copy hub items, so filtering only by the
      * hub item id would otherwise exclude every regional registration.

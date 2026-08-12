@@ -29,7 +29,7 @@
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Sport Event / Region:</label>
                 <select :value="event.id" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
                     <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
-                        {{ ev.title }} {{ ev.parent_event_id === null ? '(Season Hub)' : '' }}
+                        {{ ev.short_title || ev.title }}
                     </option>
                 </select>
             </div>
