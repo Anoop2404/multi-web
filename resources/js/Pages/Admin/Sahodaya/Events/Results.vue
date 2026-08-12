@@ -13,9 +13,9 @@
         <div v-if="isSports && childEvents.length" class="card mb-4">
             <div class="flex flex-wrap gap-3 items-center">
                 <div>
-                    <label class="text-xs font-semibold text-slate-600">Select Sport Event</label>
-                    <select :value="event.id" @change="switchSportEvent" class="field text-sm mt-1 w-64 font-semibold">
-                        <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
+                    <label class="text-xs font-semibold text-slate-600">Select Sport Event / Region</label>
+                    <select :value="String(event.id)" @change="switchSportEvent" class="field text-sm mt-1 w-64 font-semibold">
+                        <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
                             {{ ev.short_title || ev.title }}
                         </option>
                     </select>

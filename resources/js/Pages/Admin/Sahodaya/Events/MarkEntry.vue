@@ -63,9 +63,9 @@
         <div class="card !p-4 space-y-3 mb-5">
             <!-- Child Event Selector for Sports -->
             <div v-if="isSports && childEvents.length" class="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
-                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Sport Event:</label>
-                <select :value="event.id" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
-                    <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Sport Event / Region:</label>
+                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
+                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
                         {{ ev.short_title || ev.title }}
                     </option>
                 </select>
