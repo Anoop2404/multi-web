@@ -251,7 +251,7 @@ class FestChestNumberController extends SahodayaAdminController
         $isGroupItem = $item && app(FestNumberingService::class)->isGroupItem($item);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('item_id', $itemId)
             ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->with(['registration.school', 'registration', 'student', 'teacher', 'group'])
@@ -320,7 +320,7 @@ class FestChestNumberController extends SahodayaAdminController
         $isGroupItem = $item && app(FestNumberingService::class)->isGroupItem($item);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('item_id', $itemId)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->whereHas('item', fn ($i) => $i->where('stage_type', 'on_stage')))
@@ -366,7 +366,7 @@ class FestChestNumberController extends SahodayaAdminController
     private function chestNumberRows(FestEvent $event, ?int $itemId = null)
     {
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId)))
             ->with(['registration.item', 'registration.school', 'student', 'teacher', 'group'])

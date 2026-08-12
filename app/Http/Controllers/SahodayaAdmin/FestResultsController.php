@@ -50,7 +50,7 @@ class FestResultsController extends SahodayaAdminController
             ? $resultsService->resultRowsForItem($event, $itemId)
             : [];
 
-        $qualifications = FestQualification::where('event_id', $event->id)
+        $qualifications = FestQualification::whereIn('event_id', $event->reportableEventIds())
             ->with(['participant.student', 'participant.teacher', 'item', 'nextLevelEvent'])
             ->latest('promoted_at')
             ->get();

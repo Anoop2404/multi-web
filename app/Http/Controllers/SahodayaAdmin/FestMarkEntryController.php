@@ -59,16 +59,18 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $itemIds = $itemId ? [$itemId] : [];
 
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $eventIds = $event->reportableEventIds();
+
+        $registrations = FestRegistration::whereIn('event_id', $eventIds)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($itemIds !== [], fn ($q) => $q->whereIn('item_id', $itemIds))
             ->when($itemIds === [], fn ($q) => $q->whereRaw('1 = 0'))
             ->with(['item', 'school', 'participants.student', 'participants.teacher', 'participants.group'])
             ->get();
 
-        $marks = FestMark::where('event_id', $event->id)->get()->keyBy('participant_id');
+        $marks = FestMark::whereIn('event_id', $eventIds)->get()->keyBy('participant_id');
 
-        $attendance = FestAttendance::where('event_id', $event->id)
+        $attendance = FestAttendance::whereIn('event_id', $eventIds)
             ->get()
             ->mapWithKeys(fn (FestAttendance $row) => [
                 "{$row->item_id}-{$row->participant_id}" => ['status' => $row->status],
@@ -257,7 +259,7 @@ class FestMarkEntryController extends SahodayaAdminController
         $isGroup = $numbering->isGroupItem($item);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $event->reportableEventIds())
                 ->where('item_id', $item->id)
                 ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->where('participant_role', '!=', 'standby')
