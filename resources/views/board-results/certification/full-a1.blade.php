@@ -16,6 +16,15 @@
         th { background-color: #f8fafc; font-weight: bold; color: #475569; font-size: 11px; text-transform: uppercase; }
         td { font-size: 11.5px; }
         .ref-box { margin-top: 20px; border: 1px dashed #94a3b8; padding: 10px; font-size: 10.5px; color: #64748b; }
+        .signature-section { margin-top: 40px; page-break-inside: avoid; }
+        .signature-row { display: table; width: 100%; }
+        .signature-col { display: table-cell; width: 50%; vertical-align: top; padding: 0 10px; }
+        .sig-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .sig-line { border-bottom: 1.5px solid #334155; min-height: 36px; margin-bottom: 6px; }
+        .sig-name { font-size: 12px; font-weight: bold; color: #1e293b; }
+        .sig-designation { font-size: 11px; color: #475569; }
+        .sig-date { font-size: 11px; color: #64748b; margin-top: 4px; }
+        .seal-box { border: 1.5px dashed #94a3b8; height: 80px; text-align: center; padding-top: 28px; font-size: 10px; color: #94a3b8; letter-spacing: 0.3px; }
         .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
         .page-number:before { content: "Page " counter(page); }
     </style>
@@ -53,6 +62,24 @@
             </table>
         @endforeach
     @endif
+
+    {{-- Signature Section --}}
+    <div class="signature-section">
+        <div class="signature-row">
+            <div class="signature-col">
+                <div class="sig-label">Signature &amp; School Seal</div>
+                <div class="seal-box">Affix School Seal Here</div>
+            </div>
+            <div class="signature-col">
+                <div class="sig-label">Authorized Signatory</div>
+                <div class="sig-line"></div>
+                <div class="sig-name">________________________________</div>
+                <div class="sig-designation">Principal / Vice Principal</div>
+                <div class="sig-date">Name: ___________________________</div>
+                <div class="sig-date">Date: &nbsp;&nbsp;___________________________</div>
+            </div>
+        </div>
+    </div>
 
     <div class="ref-box">
         Report reference: FULLA1-{{ $report->id }} · Package v{{ $report->package->version ?? '—' }} · Data hash: {{ $report->data_hash }}
