@@ -106,8 +106,8 @@
                             </select>
                         </div>
                         <div>
-                            <label class="form-label mb-1 text-xs text-gray-600">Marksheet / Proof (PDF or Image)</label>
-                            <input type="file" ref="marksheetFileInput" accept="image/*,application/pdf" class="field text-xs py-1.5 bg-white cursor-pointer" :disabled="!canEdit" @change="onFormFileChange">
+                            <label class="form-label mb-1 text-xs text-gray-600">Marksheet / Proof (PDF or Image) *</label>
+                            <input type="file" ref="marksheetFileInput" accept="image/*,application/pdf" :required="!editingId" class="field text-xs py-1.5 bg-white cursor-pointer" :disabled="!canEdit" @change="onFormFileChange">
                         </div>
                     </div>
 
@@ -488,6 +488,10 @@ function saveStudent() {
     }
     if (props.boardResult.class === 12 && !form.value.stream) {
         formError.value = 'Select a stream for this Class XII student.';
+        return;
+    }
+    if (!editingId.value && !formMarksheetFile.value) {
+        formError.value = 'Marksheet / Proof document (PDF or Image) is required.';
         return;
     }
 
