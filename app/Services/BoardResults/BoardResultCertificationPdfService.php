@@ -122,7 +122,6 @@ class BoardResultCertificationPdfService
                 $q->where('stream_id', $streamId);
                 if ($stream) {
                     $q->orWhere('stream', $stream->label)
-                      ->orWhere('stream', $stream->slug)
                       ->orWhere('stream', strtolower($stream->label));
                 }
             });
@@ -182,7 +181,6 @@ class BoardResultCertificationPdfService
                 $q->where('stream_id', $streamId);
                 if ($stream) {
                     $q->orWhere('stream', $stream->label)
-                      ->orWhere('stream', $stream->slug)
                       ->orWhere('stream', strtolower($stream->label));
                 }
             });

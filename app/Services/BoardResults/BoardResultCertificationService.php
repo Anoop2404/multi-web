@@ -102,8 +102,7 @@ class BoardResultCertificationService
                 $q->orWhereIn('id', $streamIds);
             }
             if ($streamNames->isNotEmpty()) {
-                $q->orWhereIn('slug', $streamNames->map(fn ($s) => strtolower($s)))
-                  ->orWhereIn('label', $streamNames);
+                $q->orWhereIn('label', $streamNames);
             }
         })->orderBy('sort_order')->get();
 
