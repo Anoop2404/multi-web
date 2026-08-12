@@ -19,13 +19,14 @@ class FestEventFeesController extends SahodayaAdminController
 
         $feeService = app(FestSchoolEventFeeService::class);
         $schedule = $feeService->resolveSchedule($event);
+        $feeOwnerEvent = $feeService->feeOwnerEvent($event);
 
         FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->distinct()
             ->pluck('school_id')
             ->each(fn (string $schoolId) => $feeService->recalculate($event, $schoolId));
 
-        $schoolFees = FestSchoolEventFee::where('event_id', $event->id)
+        $schoolFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)
             ->forAmountAggregation()
             ->with(['school', 'feeReceipt', 'receipts.attachments', 'head'])
             ->orderBy('school_id')
@@ -34,7 +35,7 @@ class FestEventFeesController extends SahodayaAdminController
                 $regs = FestRegistration::whereIn('event_id', $event->reportableEventIds())
                     ->where('school_id', $fee->school_id)
                     ->whereIn('status', ['submitted', 'approved'])
-                    ->with(['item', 'participants'])
+                    ->with(['item', 'participants.student', 'participants.teacher'])
                     ->get();
 
                 $teamRegs = $regs->filter(fn ($r) => $r->item?->isTeamItem());
@@ -55,6 +56,18 @@ class FestEventFeesController extends SahodayaAdminController
                     'indiv_count' => $indivCount,
                 ] : null;
 
+                $registeredStudents = $regs->flatMap(function ($r) {
+                    return $r->participants->map(function ($p) use ($r) {
+                        return [
+                            'registration_id' => $r->id,
+                            'item_title'      => $r->item?->title ?? 'Item',
+                            'name'            => $p->student?->name ?? $p->teacher?->name ?? '—',
+                            'reg_no'          => $p->student?->reg_no ?? '',
+                            'role'            => $p->participant_role ?? 'performer',
+                        ];
+                    });
+                })->values();
+
                 $pendingReceipt = $fee->receipts->first(function ($r) {
                     return !empty($r->file_path) && !in_array($r->status, ['approved', 'rejected', 'superseded', 'reversed'], true);
                 });
@@ -68,13 +81,6 @@ class FestEventFeesController extends SahodayaAdminController
                     $effectiveStatus = 'proof_uploaded';
                 }
 
-                // is_system_credit rows are the placeholder FeeReceipt created by
-                // FestSchoolEventFeeService::applyAvailableCredit() when an existing fee
-                // credit auto-offsets part of this balance — file_path is a fake
-                // 'system://...' marker, not something the school uploaded. Flagged here
-                // (and proof_url nulled) so the UI can tell "school submitted a proof" apart
-                // from "a credit was applied" instead of counting/linking both the same way.
-                // See docs/CROSS_SYSTEM_FLOW_GAP_AUDIT.md — "Proofs N" badge investigation.
                 $allReceipts = $fee->receipts->sortByDesc('id')->values()->map(function ($r) use ($event, $fee) {
                     return [
                         'id'                => $r->id,
@@ -89,8 +95,6 @@ class FestEventFeesController extends SahodayaAdminController
                         'proof_url'         => ($r->file_path && ! $r->is_system_credit)
                             ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/school-fees/{$fee->id}/proofs/{$r->id}"
                             : null,
-                        // Extra evidence images for this SAME payment (multi-image upload
-                        // feature) — not additional receipts, just more views of one payment.
                         'attachments'       => $r->attachments->map(fn ($a) => [
                             'id'  => $a->id,
                             'url' => "/sahodaya-admin/{$this->sahodaya->id}/finance/payments/attachments/{$a->id}",
@@ -114,10 +118,9 @@ class FestEventFeesController extends SahodayaAdminController
                     'fee_receipt' => $primaryReceipt,
                     'all_receipts' => $allReceipts,
                     'items' => $regs->map(fn ($r) => $r->item?->title)->filter()->values(),
+                    'registered_students' => $registeredStudents,
                     'sports_participation' => $sportsParticipation,
                     'available_credit' => $fee->outstandingCredit(),
-                    // Only ever non-empty for item_catalog/per_item billing — see
-                    // FestSchoolEventFeeService::itemPaymentAllocation() §9.3.
                     'item_allocation' => in_array($schedule['fee_model'] ?? null, ['item_catalog', 'per_item'], true)
                         ? $feeService->itemPaymentAllocation($event, $fee->school_id)
                         : [],
@@ -129,9 +132,6 @@ class FestEventFeesController extends SahodayaAdminController
 
         $summary = [
             'total_due'  => round((float) $schoolFees->sum('total_due'), 2),
-            // Keep gross receipts separate from the amount actually settled against the
-            // current bill. A cancellation or fee reduction can make amount_paid exceed
-            // total_due; calling that "103% settled" hides money owed back to the school.
             'total_paid' => round((float) $schoolFees->sum('amount_paid'), 2),
             'total_settled' => round((float) $schoolFees->sum(
                 fn (array $row) => min((float) ($row['total_due'] ?? 0), (float) ($row['amount_paid'] ?? 0))
@@ -150,6 +150,8 @@ class FestEventFeesController extends SahodayaAdminController
             2,
         );
 
+        $childEvents = $event->sportEventDropdownOptions();
+
         return $this->inertia('Sahodaya/Events/Fees', $this->withEventActivity($event, FestPageActivity::FEES, [
             'event' => $event,
             'rows'  => $schoolFees->values(),
@@ -157,6 +159,7 @@ class FestEventFeesController extends SahodayaAdminController
             'levelLabel' => config("fest_fees.level_labels.{$event->level_round}", $event->level_round),
             'feeSchedule' => $schedule,
             'feeConfigSource' => $feeService->feeConfigSource($event),
+            'childEvents' => $childEvents,
         ]));
     }
 

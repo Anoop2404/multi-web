@@ -295,11 +295,12 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
         $feeService = app(FestSchoolEventFeeService::class);
 
-        if (($policy['require_fee_before_approval'] ?? true) && $feeService->feeRequired($event)) {
+        if (! $request->boolean('override_lifecycle') && ($policy['require_fee_before_approval'] ?? true) && $feeService->feeRequired($event)) {
+            $feeLabel = $feeService->usesPerHeadBilling($event) ? 'Event Head fee' : 'Event fee';
             abort_unless(
                 $feeService->isPaidForRegistration($event, $registration),
                 422,
-                'The Event Head fee for this registration must be approved before registration approval.'
+                "The {$feeLabel} for this registration must be paid and approved before registration approval."
             );
         }
 

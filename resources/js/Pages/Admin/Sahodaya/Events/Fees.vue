@@ -32,6 +32,18 @@
                            :event="event" active="fees" class="mb-4" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="fees" class="mb-4" />
 
+        <!-- Sport Event / Region Switcher -->
+        <div v-if="event.event_type === 'sports' && childEvents.length" class="card mb-4 !py-3">
+            <div class="flex flex-wrap gap-3 items-center">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Sport Event / Region:</label>
+                <select :value="event.id" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
+                    <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
+                        {{ ev.short_title || ev.title }}
+                    </option>
+                </select>
+            </div>
+        </div>
+
         <!-- Guidance Banner Card -->
         <div class="mb-5 rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-4 text-xs text-indigo-950 shadow-xs space-y-1.5">
             <div class="flex flex-wrap items-center justify-between gap-2">
@@ -198,6 +210,21 @@
                                         {{ row.participation_item_count }} item(s) registered
                                     </span>
                                 </template>
+
+                                <!-- Expandable Student Details List -->
+                                <details v-if="row.registered_students?.length" class="mt-1.5">
+                                    <summary class="text-[10px] font-bold text-indigo-700 cursor-pointer select-none">
+                                        View {{ row.registered_students.length }} athlete(s)
+                                    </summary>
+                                    <div class="mt-1 space-y-0.5 max-h-36 overflow-y-auto pr-1">
+                                        <div v-for="(st, stIdx) in row.registered_students" :key="stIdx"
+                                             class="text-[11px] text-slate-700 flex flex-wrap items-center gap-1">
+                                            <span class="font-semibold text-slate-800">• {{ st.name }}</span>
+                                            <span v-if="st.reg_no" class="text-slate-400">({{ st.reg_no }})</span>
+                                            <span class="text-[9px] text-indigo-600 bg-indigo-50 px-1 rounded">{{ st.item_title }}</span>
+                                        </div>
+                                    </div>
+                                </details>
                             </td>
                             <td class="p-3.5">
                                 <div v-if="row.breakdown?.items?.length" class="space-y-1">
@@ -528,7 +555,12 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, rows: Array, summary: Object, levelLabel: String, feeSchedule: Object,
     activityLogs: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
+
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/fees`);
+}
 
 const search = ref('');
 const activeProofModalRow = ref(null);
