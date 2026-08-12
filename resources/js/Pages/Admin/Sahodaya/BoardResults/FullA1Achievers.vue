@@ -28,7 +28,7 @@
                     <p class="text-[11px] font-bold uppercase tracking-widest text-amber-300 mb-1">Academic Results · Excellence Register</p>
                     <h1 class="text-2xl sm:text-3xl font-extrabold">Full A1 Achievers</h1>
                     <p class="text-sm text-blue-100 mt-1.5 max-w-xl">
-                        Students who scored A1 (91–100) in <strong class="text-white">every subject</strong> they were entered for — Class X & Class XII, all streams.
+                        Students who scored A1 in <strong class="text-white">every subject</strong> they were entered for — Class X & Class XII, all streams.
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">

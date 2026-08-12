@@ -30,7 +30,7 @@
             Class {{ $boardResult->class }} • {{ $boardResult->examination_type }} • {{ $boardResult->academic_year }}
             @if(!empty($snapshot['stream_label'])) • {{ $snapshot['stream_label'] }} Stream @endif
         </h2>
-        <p class="meta">Generated: {{ $generatedAt }} · Every subject mark shown is 91–100.</p>
+        <p class="meta">Generated: {{ $generatedAt }} · Full A1 achiever subject marks register.</p>
     </div>
 
     <div class="school-name">{{ $school->name }}</div>

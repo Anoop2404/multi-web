@@ -51,8 +51,8 @@ class BoardResultCertificationValidator
         $fullA1 = $boardResult->toppers()->fullA1Entries()->with('subjectMarks')->get();
         foreach ($fullA1 as $topper) {
             foreach ($topper->subject_marks as $subject => $marks) {
-                if ($marks < 91 || $marks > 100) {
-                    $errors[] = "Full A1 entry \"{$topper->name}\" has {$subject} = {$marks}, which is outside the 91-100 range.";
+                if ($marks < 0 || $marks > 100) {
+                    $errors[] = "Full A1 entry \"{$topper->name}\" has {$subject} = {$marks}, which is outside the valid 0-100 mark range.";
                 }
             }
         }

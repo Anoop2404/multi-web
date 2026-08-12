@@ -47,7 +47,7 @@
             <div class="card p-5">
                 <p class="text-2xl mb-2">🌟</p>
                 <h3 class="font-bold text-slate-800">Full A1 Achievers</h3>
-                <p class="text-xs text-slate-500 mt-1 mb-4">Students who scored A1 (91-100) in every subject entered, Class X & XII, all streams.</p>
+                <p class="text-xs text-slate-500 mt-1 mb-4">Students who scored A1 in every subject entered, Class X & XII, all streams.</p>
                 <div class="flex flex-wrap gap-2">
                     <Link :href="fullA1Href" class="btn-secondary text-xs">Open report →</Link>
                     <button type="button" class="btn-secondary text-xs" @click="openPreview('full-a1', 'Full A1 Achievers — PDF Preview')">👁 Preview</button>

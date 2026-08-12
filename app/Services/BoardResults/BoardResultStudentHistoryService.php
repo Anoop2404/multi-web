@@ -108,18 +108,22 @@ class BoardResultStudentHistoryService
                     $allSubjectMarks->put($sm->subject_label, $sm);
                 }
 
-                $formattedMarks = $allSubjectMarks->values()->map(function ($sm) use ($br) {
+                $formattedMarks = $allSubjectMarks->values()->map(function ($sm) use ($br, $entryTypes) {
                     $class = $br ? (int) $br->class : 10;
                     $code = $class === 10
                         ? CbseSubjectCodes::forClass10Label($sm->subject_label)
                         : CbseSubjectCodes::forClass12Label($sm->subject_label);
 
                     $marksVal = (float) $sm->marks;
+                    $grade = in_array(Topper::ENTRY_FULL_A1, $entryTypes, true)
+                        ? 'A1'
+                        : ($marksVal >= 91 ? 'A1' : ($marksVal >= 81 ? 'A2' : ($marksVal >= 71 ? 'B1' : 'B2')));
+
                     return [
                         'subject_label' => (string) $sm->subject_label,
                         'subject_code' => $code,
                         'marks' => $marksVal,
-                        'grade' => $marksVal >= 91 ? 'A1' : ($marksVal >= 81 ? 'A2' : ($marksVal >= 71 ? 'B1' : 'B2')),
+                        'grade' => $grade,
                     ];
                 })->all();
 

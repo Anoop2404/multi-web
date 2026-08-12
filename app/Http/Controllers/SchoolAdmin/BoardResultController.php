@@ -790,10 +790,10 @@ class BoardResultController extends SchoolAdminController
 
     /**
      * Full A1 Achievers (#161): a dedicated page where a school enters one
-     * student's marks for every subject in a single form. Every subject mark
-     * must be 91-100 or the whole submission is rejected server-side — see
-     * storeFullA1AchieversBatch(). Separate from Subject-Wise Toppers so this
-     * list is always exactly "students confirmed Full A1", nothing else.
+     * student's marks for every subject in a single form. Based on CBSE A1 rules
+     * (top 1/8th percentile of all candidates), any mark entered by the school for
+     * a Full A1 student is accepted as A1. Separate from Subject-Wise Toppers so
+     * this list is always exactly "students confirmed Full A1", nothing else.
      */
     public function fullA1Achievers(Request $request, string $tenantId)
     {
@@ -864,8 +864,7 @@ class BoardResultController extends SchoolAdminController
 
     /**
      * Save one or more students' full subject-mark sets from the Full A1
-     * Achievers form. Rejects the entire submission (no partial save) if any
-     * entered mark is below 91, naming exactly which student/subject failed.
+     * Achievers form. Validates that required student details and duplicate subjects are handled.
      */
     public function storeFullA1AchieversBatch(Request $request, string $tenantId, BoardResult $boardResult)
     {
@@ -917,9 +916,6 @@ class BoardResultController extends SchoolAdminController
                 $seenSubjects[$key] = true;
 
                 $marks = (float) $entry['marks'];
-                if ($marks < 91) {
-                    $failures[] = 'Row '.($i + 1).": {$row['name']} scored {$marks} in {$label} — Full A1 requires 91-100 in every subject.";
-                }
                 $subjectMap[$label] = $marks;
             }
 

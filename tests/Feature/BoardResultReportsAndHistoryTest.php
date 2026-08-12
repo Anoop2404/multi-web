@@ -47,6 +47,7 @@ class BoardResultReportsAndHistoryTest extends TestCase
             'roll_no' => '10001',
             'admission_no' => 'ADM101',
             'gender' => 'male',
+            'verification_status' => 'verified',
         ]);
 
         TopperSubjectMark::create([
@@ -295,6 +296,66 @@ class BoardResultReportsAndHistoryTest extends TestCase
         $this->assertDatabaseHas('toppers', [
             'board_result_id' => $br->id,
             'roll_no' => '24162991',
+            'entry_type' => Topper::ENTRY_FULL_A1,
+        ]);
+    }
+
+    public function test_full_a1_achievers_batch_accepts_marks_below_91_based_on_cbse_percentile_rule()
+    {
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'name' => 'Test Sahodaya',
+            'type' => 'sahodaya',
+        ]);
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'name' => 'Test School',
+            'type' => 'school',
+            'parent_id' => $sahodaya->id,
+        ]);
+
+        \Spatie\Permission\Models\Role::findOrCreate('school_admin');
+
+        $schoolAdmin = User::create([
+            'id' => (string) Str::uuid(),
+            'name' => 'School Admin User',
+            'email' => 'school_admin_a1@example.com',
+            'password' => bcrypt('password'),
+            'tenant_id' => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $schoolAdmin->assignRole('school_admin');
+
+        $br = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 10,
+            'academic_year' => '2025-26',
+            'examination_type' => 'AISSE',
+            'status' => BoardResult::STATUS_DRAFT,
+        ]);
+
+        // Save a student in Full A1 Achievers batch with marks below 91 (e.g. 85, 88)
+        $response = $this->actingAs($schoolAdmin)
+            ->post("/school-admin/{$school->id}/board-results/{$br->id}/full-a1-achievers/batch", [
+                'rows' => [
+                    [
+                        'name' => 'Student A1 Percentile',
+                        'gender' => 'female',
+                        'roll_no' => '99887766',
+                        'subject_marks' => [
+                            ['subject' => 'English', 'marks' => 88],
+                            ['subject' => 'Science', 'marks' => 85],
+                        ],
+                    ],
+                ],
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('toppers', [
+            'board_result_id' => $br->id,
+            'roll_no' => '99887766',
             'entry_type' => Topper::ENTRY_FULL_A1,
         ]);
     }

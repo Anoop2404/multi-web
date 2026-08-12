@@ -186,7 +186,7 @@ class BoardResultReportController extends SahodayaAdminController
                 [
                     'key' => 'full-a1-achievers',
                     'title' => 'Full A1 Achievers — Class X & XII',
-                    'description' => 'Students who scored A1 (91-100) in every subject entered, all streams.',
+                    'description' => 'Students who scored A1 in every subject entered, all streams.',
                     'href' => "{$base}/board-results/reports/full-a1-achievers?academic_year={$yearQ}",
                     'pdfUrl' => "{$base}/board-results/reports/full-a1-achievers/pdf?academic_year={$yearQ}",
                     'excelUrl' => "{$base}/reports/RPT-BRD-004/export?academic_year={$yearQ}&format=xlsx",

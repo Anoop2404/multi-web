@@ -12,9 +12,8 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Full A1 Achievers report (#161): students entered on the school-side Full A1
- * Achievers page, where every subject mark was already required to be >= 91
- * at save time (BoardResultController::storeFullA1AchieversBatch()). This
- * service just lists them Sahodaya-wide, filterable by year/class/stream —
+ * Achievers page (based on CBSE A1 top 1/8th percentile rules). This
+ * service lists them Sahodaya-wide, filterable by year/class/stream —
  * same shape and read pattern as SubjectMeritRegisterService.
  */
 class FullA1AchieversReportService
@@ -130,7 +129,7 @@ class FullA1AchieversReportService
                     'subject_label' => (string) $m->subject_label,
                     'subject_code' => $code,
                     'marks' => (float) $m->marks,
-                    'grade' => $m->marks >= 91 ? 'A1' : ($m->marks >= 81 ? 'A2' : ($m->marks >= 71 ? 'B1' : 'B2')),
+                    'grade' => 'A1',
                 ];
             })->values()->all();
 

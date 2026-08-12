@@ -24,7 +24,7 @@
                     Full A1 Achievers
                 </h1>
                 <p class="text-xs text-gray-500 mt-0.5">
-                    Add every student who scored A1 (91-100) in <strong>every</strong> subject. Saved here separately from
+                    Add every student who scored A1 in <strong>every</strong> subject. Saved here separately from
                     Subject-Wise Toppers so this list is always exactly "confirmed Full A1", nothing else.
                 </p>
             </div>
@@ -72,7 +72,7 @@
                     <h3 class="font-bold text-gray-900 text-base">
                         {{ editingId ? 'Edit Achiever' : 'Add a Full A1 Achiever' }}
                     </h3>
-                    <p class="text-xs text-gray-500 mt-0.5">Enter this student's marks for every subject they were examined in — all must be 91-100.</p>
+                    <p class="text-xs text-gray-500 mt-0.5">Enter this student's marks for every subject they were examined in (CBSE A1 top 1/8th percentile).</p>
                 </div>
 
                 <div v-if="formError" class="rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-xs text-red-700 font-semibold whitespace-pre-line">
@@ -110,7 +110,7 @@
                     <!-- SUBJECT-WISE MARKS FOR THIS STUDENT -->
                     <div>
                         <div class="flex items-center justify-between mb-2">
-                            <label class="form-label text-xs text-gray-600">Subject-wise Marks (all must be 91-100)</label>
+                            <label class="form-label text-xs text-gray-600">Subject-wise Marks (A1)</label>
                             <button type="button" class="text-xs font-bold text-indigo-600 hover:text-indigo-800" :disabled="!canEdit" @click="addSubjectRow">+ Add Subject</button>
                         </div>
 
@@ -413,17 +413,17 @@ function isDuplicateRow(rowIndex) {
 
 function markClass(marks) {
     if (marks === '' || marks === null || marks === undefined) return 'text-gray-600';
-    return Number(marks) >= 91 ? 'text-emerald-700' : 'text-red-600 border-red-400';
+    return (Number(marks) >= 0 && Number(marks) <= 100) ? 'text-emerald-700' : 'text-red-600 border-red-400';
 }
 
 function gradeLabel(marks) {
     if (marks === '' || marks === null || marks === undefined) return '—';
-    return Number(marks) >= 91 ? 'A1' : 'Not A1';
+    return 'A1';
 }
 
 function gradeBadgeClass(marks) {
     if (marks === '' || marks === null || marks === undefined) return 'bg-gray-100 text-gray-500';
-    return Number(marks) >= 91 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600';
+    return (Number(marks) >= 0 && Number(marks) <= 100) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600';
 }
 
 function resetForm() {
@@ -498,10 +498,10 @@ function saveStudent() {
         return;
     }
 
-    const belowA1 = subjectMarks.filter(({ marks }) => marks < 91 || marks > 100);
-    if (belowA1.length) {
-        formError.value = belowA1
-            .map(({ subject, marks }) => `${subject}: ${marks} — Full A1 requires 91-100.`)
+    const invalidMarks = subjectMarks.filter(({ marks }) => isNaN(marks) || marks < 0 || marks > 100);
+    if (invalidMarks.length) {
+        formError.value = invalidMarks
+            .map(({ subject, marks }) => `${subject}: ${marks} — Marks must be between 0 and 100.`)
             .join('\n');
         return;
     }
