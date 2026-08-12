@@ -346,9 +346,14 @@ class FestEvent extends Model
      */
     public function reportableEventIds(): array
     {
-        $ids = [(int) $this->id];
+        $rawParentId = $this->getRawOriginal('parent_event_id')
+            ?: ($this->id ? self::where('id', $this->id)->value('parent_event_id') : null);
+        $rootId = (int) ($rawParentId ?: ($this->parent_event_id ?: $this->id));
+        $root = self::find($rootId) ?: $this;
 
-        $childIds = self::where('parent_event_id', $this->id)->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $ids = [(int) $root->id];
+
+        $childIds = self::where('parent_event_id', $root->id)->pluck('id')->map(fn ($id) => (int) $id)->all();
         if (! empty($childIds)) {
             $ids = array_merge($ids, $childIds);
             $grandChildIds = self::whereIn('parent_event_id', $childIds)->pluck('id')->map(fn ($id) => (int) $id)->all();
