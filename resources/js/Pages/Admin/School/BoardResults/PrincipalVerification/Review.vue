@@ -233,7 +233,7 @@ const declarations = ref({ figures: false, details: false, seal: false });
 
 const declarationsComplete = computed(() => declarations.value.figures && declarations.value.details && declarations.value.seal);
 
-const showReports = computed(() => !['draft'].includes(props.package.status) && props.package.reports?.length);
+const showReports = computed(() => Boolean(props.package?.reports?.length));
 const showFinalCertification = computed(() => !['draft', 'leadership_changes_requested'].includes(props.package.status));
 
 const base = computed(() => `/school-admin/${props.school.id}/board-results/${props.boardResult.id}`);
