@@ -372,8 +372,10 @@ class FestEvent extends Model
             return [];
         }
 
-        $seasonId = $this->parent_event_id ?? $this->id;
-        $parentEvent = $this->parent_event_id ? self::find($seasonId) : $this;
+        $rawParentId = $this->getRawOriginal('parent_event_id')
+            ?: ($this->id ? self::where('id', $this->id)->value('parent_event_id') : null);
+        $seasonId = (int) ($rawParentId ?: ($this->parent_event_id ?: $this->id));
+        $parentEvent = self::find($seasonId) ?: $this;
         $parentTitle = $parentEvent?->title ?? '';
 
         $query = self::where(function ($q) use ($seasonId) {
