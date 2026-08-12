@@ -85,14 +85,16 @@ class FestNumberingService
             $settings = $this->settings($event);
             $start = (int) ($item->chest_no_start ?? $settings['chest_no_start'] ?? 100);
             $headScope = $this->chestHeadScope($event, $item);
+            $eventIds = $event->reportableEventIds();
+            $itemIds = $event->reportableItemIds([$item->id]);
 
-            $max = FestParticipant::where('event_id', $event->id)
+            $max = FestParticipant::whereIn('event_id', $eventIds)
                 ->where('chest_head_id', $headScope)
                 ->whereNotNull('chest_no')
                 ->max('chest_no');
 
-            $groupMax = FestGroup::where('event_id', $event->id)
-                ->whereHas('registration', fn ($q) => $q->where('item_id', $item->id))
+            $groupMax = FestGroup::whereIn('event_id', $eventIds)
+                ->whereHas('registration', fn ($q) => $q->whereIn('item_id', $itemIds))
                 ->whereNotNull('chest_no')
                 ->max('chest_no');
 
@@ -140,8 +142,9 @@ class FestNumberingService
         }
 
         $headScope = $this->chestHeadScope($event, $item);
+        $eventIds = $event->reportableEventIds();
 
-        $query = FestParticipant::where('event_id', $event->id)
+        $query = FestParticipant::whereIn('event_id', $eventIds)
             ->where('chest_head_id', $headScope)
             ->whereNotNull('chest_no');
 
