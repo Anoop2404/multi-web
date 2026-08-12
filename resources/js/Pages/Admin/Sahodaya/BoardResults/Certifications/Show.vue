@@ -97,24 +97,9 @@
             </table>
         </div>
 
+        <!-- Individual Report Proof — consolidated PDF not required in simplified flow -->
         <div class="card !p-5 mb-4">
-            <h3 class="text-sm font-bold text-slate-800 mb-2">Consolidated Certification</h3>
-            <div class="flex items-center gap-4 text-sm">
-                <span class="text-slate-500">Signed by</span>
-                <span class="font-semibold">{{ pkg.signed_by?.name ?? '—' }} <span v-if="pkg.signer_role" class="text-slate-400">({{ pkg.signer_role }})</span></span>
-                <span class="text-slate-500">on</span>
-                <span class="font-semibold">{{ formatDate(pkg.signed_at) }}</span>
-            </div>
-            <div class="mt-3 flex gap-3">
-                <a v-if="pkg.generated_pdf_path" :href="consolidatedPdfUrl(false)" target="_blank" class="btn-secondary text-xs">Unsigned Consolidated PDF</a>
-                <a v-if="pkg.signed_pdf_path" :href="consolidatedPdfUrl(true)" target="_blank" class="btn-secondary text-xs">Signed Consolidated PDF</a>
-            </div>
-            <p class="text-[11px] text-slate-400 mt-3 font-mono">Package data hash: {{ pkg.data_hash }}</p>
-        </div>
-
-        <!-- Consolidated Certification section — skipped in simplified flow -->
-        <div class="card !p-5 mb-4">
-            <h3 class="text-sm font-bold text-slate-800 mb-2">Individual Report Proof</h3>
+            <h3 class="text-sm font-bold text-slate-800 mb-2">Certification Proof</h3>
             <p class="text-xs text-slate-500 mb-3">Each individual report above has been signed by the Principal/VP. A separate consolidated PDF is not required.</p>
             <p class="text-[11px] text-slate-400 font-mono">Package data hash: {{ pkg.data_hash }}</p>
         </div>

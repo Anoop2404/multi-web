@@ -41,11 +41,12 @@ class BoardResultCertificationValidator
             $errors[] = 'Distinctions and first-class counts together cannot exceed total passed.';
         }
 
-        $expectedPassPercent = (int) $boardResult->total_appeared > 0
-            ? round(((int) $boardResult->pass_count / (int) $boardResult->total_appeared) * 100, 2)
-            : 0.0;
-        if (abs((float) $boardResult->pass_percent - $expectedPassPercent) > 0.05) {
-            $errors[] = "Pass percentage ({$boardResult->pass_percent}%) does not match appeared/passed counts (expected {$expectedPassPercent}%). Re-save the result to recompute it.";
+        // Only check pass_percent consistency when we have actual figures
+        if ((int) $boardResult->total_appeared > 0) {
+            $expectedPassPercent = round(((int) $boardResult->pass_count / (int) $boardResult->total_appeared) * 100, 2);
+            if (abs((float) $boardResult->pass_percent - $expectedPassPercent) > 0.05) {
+                $errors[] = "Pass percentage ({$boardResult->pass_percent}%) does not match appeared/passed counts (expected {$expectedPassPercent}%). Re-save the result to recompute it.";
+            }
         }
 
         $overallToppers = $boardResult->toppers()->overallEntries()->get();
