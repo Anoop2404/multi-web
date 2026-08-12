@@ -83,16 +83,12 @@ class BoardResultCertificationService
 
         if ((int) $boardResult->class !== 12) {
             $defs[] = ['report_type' => BoardResultCertificationReport::TYPE_OVERALL_TOPPERS, 'stream_id' => null, 'label' => 'School Overall Toppers'];
-            $defs[] = ['report_type' => BoardResultCertificationReport::TYPE_SUBJECT_TOPPERS, 'stream_id' => null, 'label' => 'Subject-wise Toppers'];
             $defs[] = ['report_type' => BoardResultCertificationReport::TYPE_FULL_A1, 'stream_id' => null, 'label' => 'Full A1 Achievers'];
 
             return $defs;
         }
 
-        // Class XII: subject-wise toppers stays a single combined report;
-        // overall/full-A1 toppers are per configured stream.
-        $defs[] = ['report_type' => BoardResultCertificationReport::TYPE_SUBJECT_TOPPERS, 'stream_id' => null, 'label' => 'Subject-wise Toppers'];
-
+        // Class XII: overall & full-A1 toppers per configured stream.
         $topperStreams = $boardResult->toppers()
             ->whereIn('entry_type', [Topper::ENTRY_OVERALL, Topper::ENTRY_FULL_A1])
             ->get();
@@ -144,6 +140,12 @@ class BoardResultCertificationService
     public function syncReportRecords(BoardResultCertificationPackage $package): void
     {
         $boardResult = $package->boardResult ?? BoardResult::findOrFail($package->board_result_id);
+
+        // Delete un-signed subject_toppers reports if no longer required in verification flow
+        $package->reports()
+            ->where('report_type', BoardResultCertificationReport::TYPE_SUBJECT_TOPPERS)
+            ->where('status', BoardResultCertificationReport::STATUS_PENDING)
+            ->delete();
 
         foreach ($this->requiredReportDefinitions($boardResult) as $def) {
             BoardResultCertificationReport::firstOrCreate(
