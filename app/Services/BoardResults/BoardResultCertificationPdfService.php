@@ -117,9 +117,17 @@ class BoardResultCertificationPdfService
     {
         $query = $boardResult->toppers()->overallEntries()->with(['subjectMarks', 'examStream']);
         if ($streamId) {
-            $query->where('stream_id', $streamId);
+            $stream = ExamStream::find($streamId);
+            $query->where(function ($q) use ($streamId, $stream) {
+                $q->where('stream_id', $streamId);
+                if ($stream) {
+                    $q->orWhere('stream', $stream->label)
+                      ->orWhere('stream', $stream->slug)
+                      ->orWhere('stream', strtolower($stream->label));
+                }
+            });
         } elseif ((int) $boardResult->class === 12) {
-            $query->whereNull('stream_id');
+            $query->whereNull('stream_id')->where(fn ($q) => $q->whereNull('stream')->orWhere('stream', ''));
         }
 
         $toppers = $query->orderBy('rank')->get();
@@ -157,7 +165,7 @@ class BoardResultCertificationPdfService
                         'roll_no' => $t->roll_no,
                         'gender' => $t->gender,
                         'marks' => $t->subject_marks[array_key_first($t->subject_marks) ?? ''] ?? null,
-                        'stream_label' => $t->examStream?->label,
+                        'stream_label' => $t->examStream?->label ?? $t->stream,
                     ])->values()->all(),
             ];
         })->values()->all();
@@ -169,9 +177,17 @@ class BoardResultCertificationPdfService
     {
         $query = $boardResult->toppers()->fullA1Entries()->with(['subjectMarks', 'examStream']);
         if ($streamId) {
-            $query->where('stream_id', $streamId);
+            $stream = ExamStream::find($streamId);
+            $query->where(function ($q) use ($streamId, $stream) {
+                $q->where('stream_id', $streamId);
+                if ($stream) {
+                    $q->orWhere('stream', $stream->label)
+                      ->orWhere('stream', $stream->slug)
+                      ->orWhere('stream', strtolower($stream->label));
+                }
+            });
         } elseif ((int) $boardResult->class === 12) {
-            $query->whereNull('stream_id');
+            $query->whereNull('stream_id')->where(fn ($q) => $q->whereNull('stream')->orWhere('stream', ''));
         }
 
         $toppers = $query->orderBy('name')->get();

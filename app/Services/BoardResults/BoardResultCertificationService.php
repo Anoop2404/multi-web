@@ -93,21 +93,33 @@ class BoardResultCertificationService
         // overall/full-A1 toppers are per configured stream.
         $defs[] = ['report_type' => BoardResultCertificationReport::TYPE_SUBJECT_TOPPERS, 'stream_id' => null, 'label' => 'Subject-wise Toppers'];
 
-        $streams = $boardResult->toppers()
+        $topperStreams = $boardResult->toppers()
             ->whereIn('entry_type', [Topper::ENTRY_OVERALL, Topper::ENTRY_FULL_A1])
-            ->whereNotNull('stream_id')
-            ->with('examStream')
-            ->get()
-            ->pluck('examStream')
-            ->filter()
-            ->unique('id')
-            ->sortBy('sort_order');
+            ->get();
+
+        $streamIds = $topperStreams->pluck('stream_id')->filter()->unique();
+        $streamNames = $topperStreams->pluck('stream')->filter()->unique();
+
+        $sahodayaId = (string) ($boardResult->tenant?->parent_id ?: $boardResult->tenant_id);
+        $streams = \App\Models\ExamStream::where(function ($q) use ($streamIds, $streamNames) {
+            if ($streamIds->isNotEmpty()) {
+                $q->orWhereIn('id', $streamIds);
+            }
+            if ($streamNames->isNotEmpty()) {
+                $q->orWhereIn('slug', $streamNames->map(fn ($s) => strtolower($s)))
+                  ->orWhereIn('label', $streamNames);
+            }
+        })->orderBy('sort_order')->get();
+
+        if ($streams->isEmpty()) {
+            $streams = \App\Models\ExamStream::forSahodaya($sahodayaId)->orderBy('sort_order')->get();
+        }
 
         foreach ($streams as $stream) {
             $defs[] = [
                 'report_type' => BoardResultCertificationReport::TYPE_OVERALL_TOPPERS,
                 'stream_id' => $stream->id,
-                'label' => "School Topper — {$stream->label}",
+                'label' => "School Topper(s) — {$stream->label}",
             ];
         }
 
