@@ -485,35 +485,57 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/payments/credit-notes/{type}/{creditId}', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'creditNote'])->name('payments.credit-note');
     Route::get('/payments/attachments/{attachment}', [\App\Http\Controllers\SchoolAdmin\FeeReceiptAttachmentController::class, 'show'])->name('payments.attachment');
 
+    // Board Results
+    Route::get('/board-results',                                   [BoardResultController::class, 'index'])->name('board-results.index');
+    Route::get('/board-results/reports',                           [BoardResultController::class, 'reports'])->name('board-results.reports');
+    Route::get('/board-results/reports/summary/pdf',               [BoardResultController::class, 'summaryPdf'])->name('board-results.reports.summary.pdf');
+    Route::get('/board-results/reports/toppers/pdf',               [BoardResultController::class, 'toppersPdf'])->name('board-results.reports.toppers.pdf');
+    Route::get('/board-results/rank-report',                       [BoardResultController::class, 'rankReport'])->name('board-results.rank-report');
+    Route::get('/board-results/subject-toppers',                   [BoardResultController::class, 'subjectToppers'])->name('board-results.subject-toppers');
+    Route::get('/board-results/full-a1-achievers',                 [BoardResultController::class, 'fullA1Achievers'])->name('board-results.full-a1-achievers');
+    Route::get('/board-results/student-history',                   [\App\Http\Controllers\BoardResultStudentHistoryController::class, 'schoolHistory'])->name('board-results.student-history');
+    Route::post('/board-results/{boardResult}/full-a1-achievers/batch', [BoardResultController::class, 'storeFullA1AchieversBatch'])->name('board-results.full-a1-achievers.batch');
+    Route::post('/board-results',                                  [BoardResultController::class, 'store'])->name('board-results.store');
+    Route::put('/board-results/{boardResult}',                     [BoardResultController::class, 'update'])->name('board-results.update');
+    Route::post('/board-results/{boardResult}/submit',             [BoardResultController::class, 'submit'])->name('board-results.submit');
+    Route::post('/board-results/{boardResult}/upload-pdf',         [BoardResultController::class, 'uploadPdf'])->name('board-results.upload-pdf');
+    Route::delete('/board-results/{boardResult}',                  [BoardResultController::class, 'destroy'])->name('board-results.destroy');
+    Route::get('/board-results/{boardResult}/toppers',             [BoardResultController::class, 'toppers'])->name('board-results.toppers');
+    Route::post('/board-results/{boardResult}/toppers',            [BoardResultController::class, 'storeTopper'])->name('board-results.toppers.store');
+    Route::post('/board-results/{boardResult}/toppers/single',     [BoardResultController::class, 'storeTopper'])->name('board-results.toppers.single');
+    Route::post('/board-results/{boardResult}/toppers/batch',      [BoardResultController::class, 'storeToppersBatch'])->name('board-results.toppers.batch');
+    Route::post('/board-results/{boardResult}/subject-toppers/batch', [BoardResultController::class, 'storeSubjectToppersBatch'])->name('board-results.subject-toppers.batch');
+    Route::put('/board-results/{boardResult}/toppers/{topper}',    [BoardResultController::class, 'updateTopper'])->name('board-results.toppers.update');
+    Route::delete('/board-results/{boardResult}/toppers/{topper}', [BoardResultController::class, 'destroyTopper'])->name('board-results.toppers.destroy');
+    Route::post('/board-results/{boardResult}/toppers/{topper}/marksheet', [BoardResultController::class, 'uploadTopperMarksheet'])->name('board-results.toppers.upload-marksheet');
+    Route::delete('/board-results/{boardResult}/toppers/{topper}/marksheet', [BoardResultController::class, 'deleteTopperMarksheet'])->name('board-results.toppers.delete-marksheet');
+
+    // Board Results — Principal Verification (docs/BOARD_RESULTS_PRINCIPAL_VERIFICATION_PLAN.md)
+    Route::prefix('board-results')->name('board-results.')->group(function () {
+        Route::get('/principal-verification', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'dashboard'])->name('principal-verification.dashboard');
+        Route::get('/{boardResult}/principal-verification', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'show'])->name('principal-verification.show');
+        Route::post('/{boardResult}/request-leadership-review', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'requestReview'])->name('request-leadership-review');
+
+        Route::post('/{boardResult}/certification/reports/{report}/generate', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'generateReport'])->name('certification.reports.generate');
+        Route::get('/{boardResult}/certification/reports/{report}/pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadReportPdf'])->name('certification.reports.pdf');
+        Route::get('/{boardResult}/certification/reports/{report}/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadSignedReportPdf'])->name('certification.reports.signed-pdf.download');
+        Route::post('/{boardResult}/certification/reports/{report}/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'uploadSignedReport'])->name('certification.reports.signed-pdf.upload');
+        Route::post('/{boardResult}/certification/reports/{report}/accept', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'acceptReport'])->name('certification.reports.accept');
+        Route::post('/{boardResult}/certification/reports/{report}/return', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'returnReport'])->name('certification.reports.return');
+
+        Route::post('/{boardResult}/certification/consolidated/generate', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'generateConsolidated'])->name('certification.consolidated.generate');
+        Route::get('/{boardResult}/certification/consolidated/pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadConsolidatedPdf'])->name('certification.consolidated.pdf');
+        Route::get('/{boardResult}/certification/consolidated/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadSignedConsolidatedPdf'])->name('certification.consolidated.signed-pdf.download');
+        Route::post('/{boardResult}/certification/consolidated/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'uploadSignedConsolidated'])->name('certification.consolidated.signed-pdf.upload');
+        Route::post('/{boardResult}/certification/submit', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'submit'])->name('certification.submit');
+    });
+
     // Website & CMS (disabled until WEBSITE_ENABLED=true)
     Route::middleware('website.enabled')->group(function () {
     Route::get('/settings',   [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings',  [SettingsController::class, 'update'])->name('settings.update');
 
     Route::middleware('public.website.admin.cms')->group(function () {
-    Route::get('/site-builder', [SiteBuilderController::class, 'index'])->name('site-builder');
-    Route::get('/site-builder/section-types', [SiteBuilderController::class, 'sectionTypes'])->name('site-builder.section-types');
-
-    Route::prefix('site-builder/api')->name('site-builder.api.')->group(function () {
-        Route::get('/sections', [SiteBuilderApiController::class, 'sections'])->name('sections.index');
-        Route::post('/sections', [SiteBuilderApiController::class, 'storeSection'])->name('sections.store');
-        Route::patch('/sections/{sectionId}', [SiteBuilderApiController::class, 'updateSection'])->name('sections.update');
-        Route::delete('/sections/{sectionId}', [SiteBuilderApiController::class, 'deleteSection'])->name('sections.delete');
-        Route::post('/sections/{sectionId}/toggle', [SiteBuilderApiController::class, 'toggleSection'])->name('sections.toggle');
-        Route::post('/sections/reorder', [SiteBuilderApiController::class, 'reorderSections'])->name('sections.reorder');
-        Route::post('/sections/{sectionId}/publish', [SiteBuilderApiController::class, 'publishSection'])->name('sections.publish');
-        Route::get('/sections/{sectionId}/versions', [SiteBuilderApiController::class, 'sectionVersions'])->name('sections.versions');
-        Route::post('/sections/{sectionId}/versions/{versionId}/restore', [SiteBuilderApiController::class, 'restoreSectionVersion'])->name('sections.versions.restore');
-        Route::get('/nav', [SiteBuilderApiController::class, 'getNav'])->name('nav.get');
-        Route::post('/nav', [SiteBuilderApiController::class, 'saveNav'])->name('nav.save');
-        Route::get('/footer', [SiteBuilderApiController::class, 'getFooter'])->name('footer.get');
-        Route::post('/footer', [SiteBuilderApiController::class, 'saveFooter'])->name('footer.save');
-        Route::post('/portal-links', [SiteBuilderApiController::class, 'ensurePortalLinks'])->name('portal-links.ensure');
-        Route::post('/default-nav', [SiteBuilderApiController::class, 'ensureDefaultNav'])->name('default-nav.ensure');
-        Route::get('/public-website', [SiteBuilderApiController::class, 'getPublicWebsite'])->name('public-website.get');
-        Route::post('/public-website', [SiteBuilderApiController::class, 'savePublicWebsite'])->name('public-website.save');
-    });
-
     // News
     Route::get('/news',                  [NewsController::class, 'index'])->name('news.index');
     Route::get('/news/create',           [NewsController::class, 'create'])->name('news.create');
@@ -565,51 +587,6 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/job-vacancies',                   [JobVacancyController::class, 'store'])->name('job-vacancies.store');
     Route::put('/job-vacancies/{vacancy}',          [JobVacancyController::class, 'update'])->name('job-vacancies.update');
     Route::delete('/job-vacancies/{vacancy}',       [JobVacancyController::class, 'destroy'])->name('job-vacancies.destroy');
-
-    // Board Results
-    Route::get('/board-results',                                   [BoardResultController::class, 'index'])->name('board-results.index');
-    Route::get('/board-results/reports',                           [BoardResultController::class, 'reports'])->name('board-results.reports');
-    Route::get('/board-results/reports/summary/pdf',               [BoardResultController::class, 'summaryPdf'])->name('board-results.reports.summary.pdf');
-    Route::get('/board-results/reports/toppers/pdf',               [BoardResultController::class, 'toppersPdf'])->name('board-results.reports.toppers.pdf');
-    Route::get('/board-results/rank-report',                       [BoardResultController::class, 'rankReport'])->name('board-results.rank-report');
-    Route::get('/board-results/subject-toppers',                   [BoardResultController::class, 'subjectToppers'])->name('board-results.subject-toppers');
-    Route::get('/board-results/full-a1-achievers',                 [BoardResultController::class, 'fullA1Achievers'])->name('board-results.full-a1-achievers');
-    Route::get('/board-results/student-history',                   [\App\Http\Controllers\BoardResultStudentHistoryController::class, 'schoolHistory'])->name('board-results.student-history');
-    Route::post('/board-results/{boardResult}/full-a1-achievers/batch', [BoardResultController::class, 'storeFullA1AchieversBatch'])->name('board-results.full-a1-achievers.batch');
-    Route::post('/board-results',                                  [BoardResultController::class, 'store'])->name('board-results.store');
-    Route::put('/board-results/{boardResult}',                     [BoardResultController::class, 'update'])->name('board-results.update');
-    Route::post('/board-results/{boardResult}/submit',             [BoardResultController::class, 'submit'])->name('board-results.submit');
-    Route::post('/board-results/{boardResult}/upload-pdf',         [BoardResultController::class, 'uploadPdf'])->name('board-results.upload-pdf');
-    Route::delete('/board-results/{boardResult}',                  [BoardResultController::class, 'destroy'])->name('board-results.destroy');
-    Route::get('/board-results/{boardResult}/toppers',             [BoardResultController::class, 'toppers'])->name('board-results.toppers');
-    Route::post('/board-results/{boardResult}/toppers',            [BoardResultController::class, 'storeTopper'])->name('board-results.toppers.store');
-    Route::post('/board-results/{boardResult}/toppers/single',     [BoardResultController::class, 'storeTopper'])->name('board-results.toppers.single');
-    Route::post('/board-results/{boardResult}/toppers/batch',      [BoardResultController::class, 'storeToppersBatch'])->name('board-results.toppers.batch');
-    Route::post('/board-results/{boardResult}/subject-toppers/batch', [BoardResultController::class, 'storeSubjectToppersBatch'])->name('board-results.subject-toppers.batch');
-    Route::put('/board-results/{boardResult}/toppers/{topper}',    [BoardResultController::class, 'updateTopper'])->name('board-results.toppers.update');
-    Route::delete('/board-results/{boardResult}/toppers/{topper}', [BoardResultController::class, 'destroyTopper'])->name('board-results.toppers.destroy');
-    Route::post('/board-results/{boardResult}/toppers/{topper}/marksheet', [BoardResultController::class, 'uploadTopperMarksheet'])->name('board-results.toppers.upload-marksheet');
-    Route::delete('/board-results/{boardResult}/toppers/{topper}/marksheet', [BoardResultController::class, 'deleteTopperMarksheet'])->name('board-results.toppers.delete-marksheet');
-
-    // Board Results — Principal Verification (docs/BOARD_RESULTS_PRINCIPAL_VERIFICATION_PLAN.md)
-    Route::prefix('board-results')->name('board-results.')->group(function () {
-        Route::get('/principal-verification', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'dashboard'])->name('principal-verification.dashboard');
-        Route::get('/{boardResult}/principal-verification', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'show'])->name('principal-verification.show');
-        Route::post('/{boardResult}/request-leadership-review', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'requestReview'])->name('request-leadership-review');
-
-        Route::post('/{boardResult}/certification/reports/{report}/generate', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'generateReport'])->name('certification.reports.generate');
-        Route::get('/{boardResult}/certification/reports/{report}/pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadReportPdf'])->name('certification.reports.pdf');
-        Route::get('/{boardResult}/certification/reports/{report}/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadSignedReportPdf'])->name('certification.reports.signed-pdf.download');
-        Route::post('/{boardResult}/certification/reports/{report}/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'uploadSignedReport'])->name('certification.reports.signed-pdf.upload');
-        Route::post('/{boardResult}/certification/reports/{report}/accept', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'acceptReport'])->name('certification.reports.accept');
-        Route::post('/{boardResult}/certification/reports/{report}/return', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'returnReport'])->name('certification.reports.return');
-
-        Route::post('/{boardResult}/certification/consolidated/generate', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'generateConsolidated'])->name('certification.consolidated.generate');
-        Route::get('/{boardResult}/certification/consolidated/pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadConsolidatedPdf'])->name('certification.consolidated.pdf');
-        Route::get('/{boardResult}/certification/consolidated/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadSignedConsolidatedPdf'])->name('certification.consolidated.signed-pdf.download');
-        Route::post('/{boardResult}/certification/consolidated/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'uploadSignedConsolidated'])->name('certification.consolidated.signed-pdf.upload');
-        Route::post('/{boardResult}/certification/submit', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'submit'])->name('certification.submit');
-    });
 
     // Alumni
     Route::get('/alumni',                         [AlumniController::class, 'index'])->name('alumni.index');
