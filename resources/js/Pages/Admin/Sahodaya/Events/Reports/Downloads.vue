@@ -7,6 +7,18 @@
 
             <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" :active="phase" />
 
+            <!-- Sport Event / Region Switcher -->
+            <div v-if="event.event_type === 'sports' && childEvents.length" class="card mb-4 !py-3">
+                <div class="flex flex-wrap gap-3 items-center">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Sport Event / Region:</label>
+                    <select :value="event.id" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
+                        <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
+                            {{ ev.short_title || ev.title }}
+                        </option>
+                    </select>
+                </div>
+            </div>
+
             <!-- =============================================================
                  PARTITIONED PARENT: inline region sections + combined
                  ============================================================= -->
@@ -169,6 +181,7 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
@@ -191,7 +204,12 @@ const props = defineProps({
     isPartitionedParent: { type: Boolean, default: false },
     regionChildren: { type: Array, default: () => [] },
     regionChildrenWithExports: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
+
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports/downloads/${props.phase}`);
+}
 
 const categoryMeta = REPORT_CATEGORIES;
 const searchQuery = ref('');

@@ -98,6 +98,7 @@ class FestReportController extends SahodayaAdminController
             'regions'             => $regions,
             'isPartitionedParent' => $isPartitionedParent,
             'regionChildren'      => $regionChildren,
+            'childEvents'         => $event->sportEventDropdownOptions(),
         ], $headContext, $extra);
     }
 
