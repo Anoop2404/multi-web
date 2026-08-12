@@ -319,62 +319,69 @@ class FestHeadItemNavigationService
     /** @return array<int, array{participant_count: int, chest_assigned: int, item_reg_assigned: int}> */
     private function participantStatsByItem(FestEvent $event, ?string $schoolId): array
     {
+        $eventIds = $event->reportableEventIds();
+
         $items = FestEventItem::query()
             ->where('event_id', $event->id)
-            ->get(['id', 'participant_type']);
-
-        $multiPersonItemIds = $items->filter(fn ($i) => \App\Support\FestTeamSquadRules::isMultiPerson($i->participant_type))->pluck('id')->all();
+            ->where('is_enabled', true)
+            ->get(['id', 'participant_type', 'inherited_from_item_id']);
 
         $map = [];
 
-        // Individual items count student rows
-        $indivRows = FestParticipant::query()
-            ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
-            ->leftJoin('fest_groups', 'fest_participants.group_id', '=', 'fest_groups.id')
-            ->where('fest_registrations.event_id', $event->id)
-            ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
-            ->whereNotNull('fest_registrations.item_id')
-            ->when(! empty($multiPersonItemIds), fn ($q) => $q->whereNotIn('fest_registrations.item_id', $multiPersonItemIds))
-            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
-            ->groupBy('fest_registrations.item_id')
-            ->select([
-                'fest_registrations.item_id',
-                DB::raw('COUNT(*) as participant_count'),
-                DB::raw('SUM(CASE WHEN fest_participants.chest_no IS NOT NULL OR fest_groups.chest_no IS NOT NULL OR EXISTS (SELECT 1 FROM fest_participants fp2 WHERE fp2.event_id = fest_registrations.event_id AND fp2.student_id = fest_participants.student_id AND fp2.student_id IS NOT NULL AND fp2.chest_no IS NOT NULL) THEN 1 ELSE 0 END) as chest_assigned'),
-                DB::raw('SUM(CASE WHEN fest_participants.item_registration_number IS NOT NULL THEN 1 ELSE 0 END) as item_reg_assigned'),
-            ])
-            ->get();
+        foreach ($items as $item) {
+            $itemIds = $event->reportableItemIds([$item->id]);
+            $isMultiPerson = \App\Support\FestTeamSquadRules::isMultiPerson($item->participant_type);
 
-        foreach ($indivRows as $row) {
-            $map[(int) $row->item_id] = [
-                'participant_count'  => (int) $row->participant_count,
-                'chest_assigned'     => (int) $row->chest_assigned,
-                'item_reg_assigned'  => (int) $row->item_reg_assigned,
-            ];
-        }
+            if ($isMultiPerson) {
+                $teamCount = \App\Models\FestGroup::query()
+                    ->join('fest_registrations', 'fest_groups.registration_id', '=', 'fest_registrations.id')
+                    ->whereIn('fest_registrations.event_id', $eventIds)
+                    ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
+                    ->whereIn('fest_registrations.item_id', $itemIds)
+                    ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+                    ->count();
 
-        // Team / group items count team squads (FestGroup)
-        if (! empty($multiPersonItemIds)) {
-            $teamRows = \App\Models\FestGroup::query()
-                ->join('fest_registrations', 'fest_groups.registration_id', '=', 'fest_registrations.id')
-                ->where('fest_registrations.event_id', $event->id)
-                ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
-                ->whereIn('fest_registrations.item_id', $multiPersonItemIds)
-                ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
-                ->groupBy('fest_registrations.item_id')
-                ->select([
-                    'fest_registrations.item_id',
-                    DB::raw('COUNT(*) as participant_count'),
-                    DB::raw('SUM(CASE WHEN fest_groups.chest_no IS NOT NULL THEN 1 ELSE 0 END) as chest_assigned'),
-                    DB::raw('SUM(CASE WHEN fest_groups.chest_no IS NOT NULL THEN 1 ELSE 0 END) as item_reg_assigned'),
-                ])
-                ->get();
+                $chestAssigned = \App\Models\FestGroup::query()
+                    ->join('fest_registrations', 'fest_groups.registration_id', '=', 'fest_registrations.id')
+                    ->whereIn('fest_registrations.event_id', $eventIds)
+                    ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
+                    ->whereIn('fest_registrations.item_id', $itemIds)
+                    ->whereNotNull('fest_groups.chest_no')
+                    ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+                    ->count();
 
-            foreach ($teamRows as $row) {
-                $map[(int) $row->item_id] = [
-                    'participant_count'  => (int) $row->participant_count,
-                    'chest_assigned'     => (int) $row->chest_assigned,
-                    'item_reg_assigned'  => (int) $row->item_reg_assigned,
+                $map[$item->id] = [
+                    'participant_count' => $teamCount,
+                    'chest_assigned'    => $chestAssigned,
+                    'item_reg_assigned' => $chestAssigned,
+                ];
+            } else {
+                $indivCount = FestParticipant::query()
+                    ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
+                    ->whereIn('fest_registrations.event_id', $eventIds)
+                    ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
+                    ->whereIn('fest_registrations.item_id', $itemIds)
+                    ->where('fest_participants.participant_role', '!=', 'standby')
+                    ->where(fn ($q) => $q->whereNotNull('fest_participants.student_id')->orWhereNotNull('fest_participants.teacher_id'))
+                    ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+                    ->count();
+
+                $chestAssigned = FestParticipant::query()
+                    ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
+                    ->leftJoin('fest_groups', 'fest_participants.group_id', '=', 'fest_groups.id')
+                    ->whereIn('fest_registrations.event_id', $eventIds)
+                    ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
+                    ->whereIn('fest_registrations.item_id', $itemIds)
+                    ->where('fest_participants.participant_role', '!=', 'standby')
+                    ->where(fn ($q) => $q->whereNotNull('fest_participants.student_id')->orWhereNotNull('fest_participants.teacher_id'))
+                    ->where(fn ($q) => $q->whereNotNull('fest_participants.chest_no')->orWhereNotNull('fest_groups.chest_no'))
+                    ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+                    ->count();
+
+                $map[$item->id] = [
+                    'participant_count' => $indivCount,
+                    'chest_assigned'    => $chestAssigned,
+                    'item_reg_assigned' => $chestAssigned,
                 ];
             }
         }

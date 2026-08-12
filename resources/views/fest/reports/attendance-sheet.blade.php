@@ -264,7 +264,6 @@
 </head>
 <body>
 
-@if(!empty($isPreview))
 <div class="report-header">
     @include('partials.pdf-branding-header', [
         'orgName' => $sahodaya->name ?? 'SAHODAYA',
@@ -279,12 +278,6 @@
         @endif
     </div>
 </div>
-
-<div class="footer-container">
-    <span class="footer-left">{{ $sahodaya->name ?? 'SAHODAYA' }} &bull; {{ $event->title }} &bull; Generated {{ now()->format('d M Y, h:i A') }}</span>
-    <span class="footer-right"></span>
-</div>
-@endif
 
 <main>
 @php
