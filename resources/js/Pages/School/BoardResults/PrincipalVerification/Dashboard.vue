@@ -52,12 +52,14 @@
                         <span class="font-medium text-gray-700">{{ formatDate(card.package.submitted_at) }}</span>
                     </div>
 
-                    <Link
-                        :href="`/school-admin/${school.id}/board-results/${card.board_result_id}/principal-verification`"
-                        class="btn-primary w-full justify-center mt-2"
+                    <button
+                        type="button"
+                        @click="openAndStartReview(card)"
+                        class="btn-primary w-full justify-center mt-2 flex items-center gap-2 cursor-pointer"
+                        :disabled="submittingId === card.board_result_id"
                     >
-                        {{ card.primary_action }}
-                    </Link>
+                        <span>📄</span> {{ submittingId === card.board_result_id ? 'Preparing Reports...' : (!card.package || card.package.status === 'draft' ? 'Open & Review Reports' : card.primary_action) }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -65,7 +67,8 @@
 </template>
 
 <script setup>
-import { Link, router } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 
 const props = defineProps({
@@ -76,6 +79,20 @@ const props = defineProps({
     selectedClass: { type: Number, default: null },
     filters: Object,
 });
+
+const submittingId = ref(null);
+
+function openAndStartReview(card) {
+    if (card.package && card.package.status !== 'draft') {
+        router.get(`/school-admin/${props.school.id}/board-results/${card.board_result_id}/principal-verification`);
+        return;
+    }
+
+    submittingId.value = card.board_result_id;
+    router.post(`/school-admin/${props.school.id}/board-results/${card.board_result_id}/request-leadership-review`, {}, {
+        onFinish: () => { submittingId.value = null; },
+    });
+}
 
 function switchYear(year) {
     router.get(`/school-admin/${props.school.id}/board-results/principal-verification`, { academic_year: year }, { preserveState: true });

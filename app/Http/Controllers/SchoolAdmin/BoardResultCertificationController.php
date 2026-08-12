@@ -274,9 +274,9 @@ class BoardResultCertificationController extends SchoolAdminController
     {
         $user = $request->user();
         abort_unless(
-            $user->isSuperAdmin() || $user->hasAnyRole(['school_principal', 'school_vice_principal']),
+            $user->isSuperAdmin() || $user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal']),
             403,
-            'Only the Principal or an authorized Vice Principal may sign and submit certification documents.'
+            'Only the Principal, Vice Principal or School Admin may sign and submit certification documents.'
         );
 
         return $user;

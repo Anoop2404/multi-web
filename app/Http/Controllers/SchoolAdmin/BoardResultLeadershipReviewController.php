@@ -134,6 +134,6 @@ class BoardResultLeadershipReviewController extends SchoolAdminController
     {
         $user = $request->user();
 
-        return $user->isSuperAdmin() || $user->hasAnyRole(['school_principal', 'school_vice_principal']);
+        return $user->isSuperAdmin() || $user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal']);
     }
 }
