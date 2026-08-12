@@ -43,10 +43,9 @@ class McqExamPayload
         $fee = (float) ($data['fee_amount'] ?? 0);
 
         return PersistDefaults::coalesce($data, [
-            'exam_type'           => 'assessment',
-            'delivery_mode'       => 'offline',
-            'fee_type'            => $fee > 0 ? 'flat' : 'none',
-            'next_hall_ticket_no' => 100,
+            'exam_type'     => 'assessment',
+            'delivery_mode' => 'offline',
+            'fee_type'      => $fee > 0 ? 'flat' : 'none',
         ]);
     }
 

@@ -213,9 +213,14 @@ class McqExamOpsController extends SahodayaAdminController
         ]);
 
         if (array_key_exists('next_hall_ticket_no', $data) && $data['next_hall_ticket_no'] !== null) {
-            $data['next_hall_ticket_no'] = McqExamPayload::nextHallTicketNo($data['next_hall_ticket_no']);
+            $newNextHallTicketNo = McqExamPayload::nextHallTicketNo($data['next_hall_ticket_no']);
             $hasTickets = McqRegistration::where('exam_id', $exam->id)->whereNotNull('hall_ticket_no')->exists();
-            abort_if($hasTickets, 422, 'Starting reg. no. cannot be changed after hall tickets are issued.');
+            if ($hasTickets) {
+                abort_if($newNextHallTicketNo !== (int) $exam->next_hall_ticket_no, 422, 'Starting reg. no. cannot be changed after hall tickets are issued.');
+                unset($data['next_hall_ticket_no']);
+            } else {
+                $data['next_hall_ticket_no'] = $newNextHallTicketNo;
+            }
         }
 
         $current = McqHallTicketDesign::fromExam($exam);
