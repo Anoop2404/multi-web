@@ -21,8 +21,16 @@ class BoardResultCertificationValidator
             $errors[] = 'Upload the result proof document before sending for Principal Verification.';
         }
 
-        if ((int) $boardResult->total_appeared <= 0) {
-            $errors[] = 'Total appeared must be greater than zero.';
+        $appeared = (int) $boardResult->total_appeared;
+        if ($appeared <= 0) {
+            $topperCount = $boardResult->toppers()->count();
+            if ($topperCount > 0) {
+                $appeared = $topperCount;
+            }
+        }
+
+        if ($appeared <= 0) {
+            $errors[] = 'Total appeared must be greater than zero. Fill summary figures or add toppers.';
         }
 
         if ((int) $boardResult->pass_count > (int) $boardResult->total_appeared) {

@@ -19,11 +19,19 @@
         <!-- Draft: not yet sent for review -->
         <div v-if="package.status === 'draft'" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
             <h2 class="text-base font-bold text-gray-900 mb-2">Send for Leadership Review</h2>
-            <div v-if="validationErrors.length" class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-4">
-                <p class="text-xs font-bold text-rose-700 mb-2">Fix these before sending for review:</p>
-                <ul class="list-disc pl-5 space-y-1 text-xs text-rose-700">
-                    <li v-for="(err, i) in validationErrors" :key="i">{{ err }}</li>
-                </ul>
+            <div v-if="validationErrors.length" class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-4 space-y-3">
+                <div>
+                    <p class="text-xs font-bold text-rose-700 mb-2">Fix these before sending for review:</p>
+                    <ul class="list-disc pl-5 space-y-1 text-xs text-rose-700">
+                        <li v-for="(err, i) in validationErrors" :key="i">{{ err }}</li>
+                    </ul>
+                </div>
+                <Link
+                    :href="`/school-admin/${school.id}/board-results?class=${boardResult.class}&academic_year=${encodeURIComponent(boardResult.academic_year || '')}`"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-700 bg-white border border-rose-300 hover:bg-rose-100/50 transition shadow-2xs"
+                >
+                    <span>✏️</span> Fill Missing Data for Class {{ boardResult.class }} ({{ boardResult.academic_year }}) →
+                </Link>
             </div>
             <p v-else class="text-sm text-gray-500 mb-4">
                 The result looks complete. Sending for review freezes the current figures and toppers so the Principal/Vice Principal can generate and sign each report.
