@@ -24,11 +24,12 @@ class BoardResultLeadershipReviewController extends SchoolAdminController
         $status = $request->string('status')->toString() ?: null;
 
         $yearService = app(BoardResultAcademicYearService::class);
-        $academicYearOptions = $yearService->activeOrPopulatedYearOptions((string) $this->school->parent_id);
+        $sahodayaId = (string) ($this->school->parent_id ?: $this->school->id);
+        $academicYearOptions = $yearService->activeOrPopulatedYearOptions($sahodayaId);
 
         if (! $academicYear) {
             $configuredOpenYear = collect($academicYearOptions)
-                ->first(fn (array $year) => $year['entry_configured'] && $year['entry_status'] === 'open');
+                ->first(fn (array $year) => ($year['entry_configured'] ?? false) && ($year['entry_status'] ?? '') === 'open');
             $openYear = $configuredOpenYear ?? collect($academicYearOptions)->firstWhere('entry_status', 'open');
             $academicYear = $openYear['label'] ?? ((date('Y') - 1).'-'.substr((string) date('Y'), 2));
         }
