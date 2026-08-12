@@ -83,15 +83,7 @@ const props = defineProps({
 const submittingId = ref(null);
 
 function openAndStartReview(card) {
-    if (card.package && card.package.status !== 'draft') {
-        router.get(`/school-admin/${props.school.id}/board-results/${card.board_result_id}/principal-verification`);
-        return;
-    }
-
-    submittingId.value = card.board_result_id;
-    router.post(`/school-admin/${props.school.id}/board-results/${card.board_result_id}/request-leadership-review`, {}, {
-        onFinish: () => { submittingId.value = null; },
-    });
+    router.get(`/school-admin/${props.school.id}/board-results/${card.board_result_id}/principal-verification`);
 }
 
 function switchYear(year) {
