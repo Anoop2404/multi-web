@@ -1,1 +1,0 @@
-function e(e){let t=`/portal/house-admin/${e}`;return[{href:t,label:`Dashboard`,exact:!0},{href:`${t}/students`,label:`Students`},{href:`${t}/registrations`,label:`Registrations`},{href:`${t}/ranking`,label:`House ranking`}]}export{e as t};

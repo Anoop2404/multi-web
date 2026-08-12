@@ -1,1 +1,0 @@
-function e(e,t=null){let n=`/portal/judge/${e}`,r=[{href:n,label:`Dashboard`,exact:!t}];return t&&r.push({href:`${n}/events/${t}/marks`,label:`Mark entry`}),r}export{e as t};
