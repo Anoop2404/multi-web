@@ -233,7 +233,17 @@ const usesClassEligibility = computed(() =>
 const filteredParticipants = computed(() => {
     let list = props.participants ?? [];
     if (itemFilter.value) {
-        list = list.filter(p => p.registration?.item_id == itemFilter.value);
+        list = list.filter(p => {
+            const regItemId = p.registration?.item_id;
+            const inheritedId = p.registration?.item?.inherited_from_item_id;
+            const selectedItemObj = selectedItem.value;
+
+            if (regItemId == itemFilter.value) return true;
+            if (inheritedId && inheritedId == itemFilter.value) return true;
+            if (selectedItemObj && selectedItemObj.inherited_from_item_id && regItemId == selectedItemObj.inherited_from_item_id) return true;
+
+            return false;
+        });
     }
     return list;
 });

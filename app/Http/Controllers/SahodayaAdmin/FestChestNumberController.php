@@ -249,10 +249,11 @@ class FestChestNumberController extends SahodayaAdminController
     {
         $item = FestEventItem::find($itemId);
         $isGroupItem = $item && app(FestNumberingService::class)->isGroupItem($item);
+        $itemIds = $event->reportableItemIds([$itemId]);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $event->reportableEventIds())
-            ->where('item_id', $itemId)
+            ->whereIn('item_id', $itemIds)
             ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->with(['registration.school', 'registration', 'student', 'teacher', 'group'])
             ->get();
@@ -318,10 +319,11 @@ class FestChestNumberController extends SahodayaAdminController
     {
         $item = FestEventItem::find($itemId);
         $isGroupItem = $item && app(FestNumberingService::class)->isGroupItem($item);
+        $itemIds = $event->reportableItemIds([$itemId]);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $event->reportableEventIds())
-            ->where('item_id', $itemId)
+            ->whereIn('item_id', $itemIds)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->whereHas('item', fn ($i) => $i->where('stage_type', 'on_stage')))
             ->with(['registration.school', 'student', 'teacher', 'group'])
@@ -365,10 +367,12 @@ class FestChestNumberController extends SahodayaAdminController
     /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
     private function chestNumberRows(FestEvent $event, ?int $itemId = null)
     {
+        $itemIds = $itemId ? $event->reportableItemIds([$itemId]) : null;
+
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $event->reportableEventIds())
             ->whereNotIn('status', ['rejected', 'withdrawn'])
-            ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId)))
+            ->when($itemIds, fn ($q2) => $q2->whereIn('item_id', $itemIds)))
             ->with(['registration.item', 'registration.school', 'student', 'teacher', 'group'])
             ->get();
 

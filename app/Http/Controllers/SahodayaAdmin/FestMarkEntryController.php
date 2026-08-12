@@ -57,7 +57,7 @@ class FestMarkEntryController extends SahodayaAdminController
             $itemId = $fallbackQuery->orderBy('id')->value('id');
         }
 
-        $itemIds = $itemId ? [$itemId] : [];
+        $itemIds = $itemId ? $event->reportableItemIds([$itemId]) : [];
 
         $eventIds = $event->reportableEventIds();
 
