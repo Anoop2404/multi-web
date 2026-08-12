@@ -105,6 +105,10 @@
                                 <option v-for="(label, key) in streamOptions" :key="key" :value="label">{{ label }}</option>
                             </select>
                         </div>
+                        <div>
+                            <label class="form-label mb-1 text-xs text-gray-600">Marksheet / Proof (PDF or Image)</label>
+                            <input type="file" ref="marksheetFileInput" accept="image/*,application/pdf" class="field text-xs py-1.5 bg-white cursor-pointer" :disabled="!canEdit" @change="onFormFileChange">
+                        </div>
                     </div>
 
                     <!-- SUBJECT-WISE MARKS FOR THIS STUDENT -->
@@ -426,15 +430,30 @@ function gradeBadgeClass(marks) {
     return (Number(marks) >= 0 && Number(marks) <= 100) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600';
 }
 
+const formMarksheetFile = ref(null);
+const marksheetFileInput = ref(null);
+
+function onFormFileChange(e) {
+    formMarksheetFile.value = e.target.files?.[0] || null;
+}
+
 function resetForm() {
     form.value = blankForm();
     editingId.value = null;
     formError.value = '';
+    formMarksheetFile.value = null;
+    if (marksheetFileInput.value) {
+        marksheetFileInput.value.value = '';
+    }
 }
 
 function editStudent(t) {
     editingId.value = t.id;
     formError.value = '';
+    formMarksheetFile.value = null;
+    if (marksheetFileInput.value) {
+        marksheetFileInput.value.value = '';
+    }
     const subjectMarks = t.subject_marks || {};
     const entries = Array.isArray(subjectMarks)
         ? subjectMarks.map(s => [s.subject_label || s.subject, s.marks])
@@ -507,19 +526,40 @@ function saveStudent() {
     }
 
     isSubmitting.value = true;
+    const targetRollNo = form.value.roll_no.trim();
 
     router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/full-a1-achievers/batch`, {
         rows: [{
             topper_id: editingId.value,
             name: form.value.name.trim(),
             gender: form.value.gender,
-            roll_no: form.value.roll_no.trim(),
+            roll_no: targetRollNo,
             stream: props.boardResult.class === 12 ? form.value.stream : null,
             subject_marks: subjectMarks,
         }],
     }, {
         preserveScroll: true,
-        onSuccess: () => resetForm(),
+        onSuccess: (page) => {
+            if (formMarksheetFile.value) {
+                const toppers = page.props.boardResult?.toppers ?? props.boardResult?.toppers ?? [];
+                const saved = toppers.find((t) => t.roll_no === targetRollNo || t.name === form.value.name.trim());
+                if (saved) {
+                    const formData = new FormData();
+                    formData.append('marksheet', formMarksheetFile.value);
+                    router.post(
+                        `/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${saved.id}/marksheet`,
+                        formData,
+                        {
+                            preserveScroll: true,
+                            onSuccess: () => resetForm(),
+                            onFinish: () => { isSubmitting.value = false; },
+                        }
+                    );
+                    return;
+                }
+            }
+            resetForm();
+        },
         onError: (errors) => {
             formError.value = Object.values(errors).flat().join('\n') || 'Could not save — check the form.';
         },
