@@ -48,6 +48,22 @@ return new class extends Migration
                   AND properties IS NOT NULL
                   AND json_extract(properties, '$.school_id') IS NOT NULL
             SQL);
+        } elseif ($driver === 'pgsql') {
+            DB::statement(<<<'SQL'
+                UPDATE audit_logs
+                SET tenant_id = properties->>'tenant_id'
+                WHERE tenant_id IS NULL
+                  AND properties IS NOT NULL
+                  AND properties->>'tenant_id' IS NOT NULL
+            SQL);
+
+            DB::statement(<<<'SQL'
+                UPDATE audit_logs
+                SET tenant_id = properties->>'school_id'
+                WHERE tenant_id IS NULL
+                  AND properties IS NOT NULL
+                  AND properties->>'school_id' IS NOT NULL
+            SQL);
         } else {
             DB::statement(<<<'SQL'
                 UPDATE audit_logs

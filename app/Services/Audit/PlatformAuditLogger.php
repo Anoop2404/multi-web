@@ -29,7 +29,7 @@ class PlatformAuditLogger
         ?string $category = null,
         ?string $tenantId = null,
     ): AuditLog {
-        return AuditLog::create([
+        $data = [
             'user_id'      => $userId ?? auth()->id(),
             'tenant_id'    => $this->resolveTenantId($tenantId, $subject, $properties),
             'category'     => $category ?? AuditLogCatalog::categoryForAction($action),
@@ -39,7 +39,20 @@ class PlatformAuditLogger
             'subject_id'   => $subject ? (string) $subject->getKey() : null,
             'ip_address'   => $this->request?->ip(),
             'properties'   => $properties ?: null,
-        ]);
+        ];
+
+        try {
+            return AuditLog::create($data);
+        } catch (\Throwable $e) {
+            // Fallback for production databases before `tenant_id` migration runs
+            unset($data['tenant_id']);
+            try {
+                return AuditLog::create($data);
+            } catch (\Throwable $e2) {
+                \Illuminate\Support\Facades\Log::warning('PlatformAuditLogger write failed: '.$e2->getMessage());
+                return new AuditLog($data);
+            }
+        }
     }
 
     // RPT-01 fix (functional audit, 2026-08-11/12): audit_logs is a shared,
