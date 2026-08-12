@@ -1,10 +1,9 @@
 <template>
     <SchoolAdminLayout title="Principal Verification" :school="school" :show-header-title="false">
+        <!-- Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
-                <div class="flex items-center gap-2">
-                    <Link :href="`/school-admin/${school.id}/board-results/principal-verification`" class="text-xs text-gray-400 hover:text-gray-600">&larr; Back</Link>
-                </div>
+                <Link :href="`/school-admin/${school.id}/board-results/principal-verification`" class="text-xs text-gray-400 hover:text-gray-600">&larr; Back</Link>
                 <h1 class="text-2xl font-bold text-gray-900 tracking-tight mt-1">
                     Class {{ boardResult.class }} · {{ boardResult.examination_type }} — {{ boardResult.academic_year }}
                 </h1>
@@ -16,107 +15,113 @@
             </div>
         </div>
 
-        <!-- Draft: not yet sent for review -->
-        <div v-if="package.status === 'draft'" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
-            <h2 class="text-base font-bold text-gray-900 mb-2">Send for Leadership Review</h2>
-            <div v-if="validationErrors.length" class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-4 space-y-3">
-                <div>
-                    <p class="text-xs font-bold text-rose-700 mb-2">Fix these before sending for review:</p>
-                    <ul class="list-disc pl-5 space-y-1 text-xs text-rose-700">
-                        <li v-for="(err, i) in validationErrors" :key="i">{{ err }}</li>
-                    </ul>
-                </div>
-                <Link
-                    :href="`/school-admin/${school.id}/board-results?class=${boardResult.class}&academic_year=${encodeURIComponent(boardResult.academic_year || '')}`"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-700 bg-white border border-rose-300 hover:bg-rose-100/50 transition shadow-2xs"
-                >
-                    <span>✏️</span> Fill Missing Data for Class {{ boardResult.class }} ({{ boardResult.academic_year }}) →
-                </Link>
-            </div>
-            <p v-else class="text-sm text-gray-500 mb-4">
-                The result looks complete. Sending for review freezes the current figures and toppers so the Principal/Vice Principal can generate and sign each report.
-            </p>
-            <button
-                type="button"
-                class="btn-primary"
-                :disabled="validationErrors.length > 0 || sendingReview"
-                @click="sendForReview"
+        <!-- Data incomplete warning (when total_appeared = 0 etc.) -->
+        <div v-if="validationErrors.length" class="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 space-y-3">
+            <p class="text-sm font-bold text-amber-800">⚠️ Some data is missing — reports may be empty</p>
+            <ul class="list-disc pl-5 space-y-1 text-xs text-amber-700">
+                <li v-for="(err, i) in validationErrors" :key="i">{{ err }}</li>
+            </ul>
+            <Link
+                :href="`/school-admin/${school.id}/board-results?class=${boardResult.class}&academic_year=${encodeURIComponent(boardResult.academic_year || '')}`"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-700 bg-white border border-amber-300 hover:bg-amber-50 transition"
             >
-                Send for Leadership Review
-            </button>
+                ✏️ Fill Missing Data →
+            </Link>
         </div>
 
-        <!-- Changes requested by leadership -->
-        <div v-if="package.status === 'leadership_changes_requested'" class="bg-rose-50 border border-rose-200 rounded-2xl p-5 mb-6">
-            <p class="text-sm font-bold text-rose-700">Changes requested</p>
-            <p class="text-xs text-rose-600 mt-1">{{ package.return_reason }}</p>
-            <p class="text-xs text-gray-500 mt-2">Correct the result on the data entry screen, then send it for review again.</p>
+        <!-- Already submitted banner -->
+        <div v-if="['submitted_to_sahodaya','sahodaya_verified','approved','published'].includes(package.status)"
+             class="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6">
+            <p class="text-sm font-bold text-emerald-800">✅ Submitted to Sahodaya</p>
+            <p class="text-xs text-emerald-600 mt-1">Submitted on {{ formatDate(package.submitted_at) }}. Sahodaya is now reviewing the certified package.</p>
         </div>
 
-        <!-- Report checklist -->
-        <div v-if="showReports" class="space-y-4 mb-8">
+        <!-- Individual Reports -->
+        <div v-if="activeReports.length" class="space-y-4 mb-8">
             <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Individual Reports</h2>
-            <div v-for="report in package.reports.filter(r => r.status !== 'superseded')" :key="report.id" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+
+            <div v-for="report in activeReports" :key="report.id"
+                 class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div class="flex items-center justify-between mb-3">
                     <div>
-                        <h3 class="text-sm font-bold text-gray-900">
-                            {{ reportLabel(report) }}
-                        </h3>
-                        <p class="text-[11px] text-gray-400">{{ report.row_count ?? 0 }} row(s) captured at generation</p>
+                        <h3 class="text-sm font-bold text-gray-900">{{ reportLabel(report) }}</h3>
+                        <p class="text-[11px] text-gray-400">
+                            <span v-if="report.row_count !== null">{{ report.row_count }} row(s) captured</span>
+                            <span v-else>Not yet generated</span>
+                        </p>
                     </div>
                     <span class="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full" :class="reportPillClass(report.status)">
-                        {{ report.status.replace('_', ' ') }}
+                        {{ reportStatusLabel(report.status) }}
                     </span>
                 </div>
 
-                <div v-if="report.review_notes && report.status === 'changes_requested'" class="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2 mb-3">
+                <!-- Step indicator -->
+                <div class="flex items-center gap-2 mb-4 text-[10px] text-gray-400">
+                    <span :class="report.status !== 'pending' ? 'text-emerald-600 font-semibold' : 'font-semibold text-gray-700'">1. Generate</span>
+                    <span>→</span>
+                    <span :class="['signed_uploaded','accepted'].includes(report.status) ? 'text-emerald-600 font-semibold' : 'text-gray-400'">2. Print & Sign</span>
+                    <span>→</span>
+                    <span :class="report.status === 'accepted' ? 'text-emerald-600 font-semibold' : 'text-gray-400'">3. Upload Signed Copy</span>
+                    <span>→</span>
+                    <span :class="report.status === 'accepted' ? 'text-emerald-600 font-semibold' : 'text-gray-400'">4. ✓ Accepted</span>
+                </div>
+
+                <div v-if="report.review_notes && report.status === 'changes_requested'"
+                     class="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2 mb-3">
                     Returned: {{ report.review_notes }}
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
+                    <!-- Step 1: Generate -->
                     <button
-                        v-if="['pending'].includes(report.status)"
-                        type="button" class="btn-secondary text-xs" :disabled="busy"
+                        v-if="['pending', 'changes_requested'].includes(report.status)"
+                        type="button" class="btn-primary text-xs" :disabled="busy"
                         @click="generateReport(report)"
                     >
-                        Generate Report PDF
+                        🖨️ Generate Report PDF
                     </button>
 
-                    <a
-                        v-if="report.generated_pdf_path"
-                        :href="reportPdfUrl(report)" target="_blank"
-                        class="btn-secondary text-xs"
-                    >
-                        Download Unsigned PDF
-                    </a>
-
+                    <!-- Regenerate -->
                     <button
-                        v-if="['generated'].includes(report.status)"
+                        v-if="report.status === 'generated'"
                         type="button" class="btn-secondary text-xs" :disabled="busy"
                         @click="generateReport(report)"
                     >
                         Regenerate PDF
                     </button>
 
-                    <label v-if="canSign && ['generated', 'changes_requested'].includes(report.status)" class="btn-secondary text-xs cursor-pointer">
-                        Upload Signed Copy
-                        <input type="file" accept="application/pdf" class="hidden" @change="uploadSigned(report, $event)">
+                    <!-- Step 2: Download to print & sign -->
+                    <a
+                        v-if="report.generated_pdf_path"
+                        :href="reportPdfUrl(report)" target="_blank"
+                        class="btn-secondary text-xs"
+                    >
+                        ⬇️ Download & Print
+                    </a>
+
+                    <!-- Step 3: Upload signed copy -->
+                    <label v-if="canSign && ['generated', 'changes_requested'].includes(report.status)"
+                           class="btn-primary text-xs cursor-pointer">
+                        📤 Upload Signed Copy
+                        <input type="file" accept="application/pdf,image/*" class="hidden" @change="uploadSigned(report, $event)">
                     </label>
 
+                    <!-- View signed copy -->
                     <a
                         v-if="report.signed_pdf_path"
                         :href="reportSignedPdfUrl(report)" target="_blank"
                         class="btn-secondary text-xs"
                     >
-                        View Signed Copy
+                        👁️ View Signed Copy
                     </a>
 
+                    <!-- Step 4: Accept -->
                     <button
                         v-if="canSign && report.status === 'signed_uploaded'"
                         type="button" class="btn-primary text-xs" :disabled="busy"
                         @click="acceptReport(report)"
                     >
-                        Verify &amp; Accept
+                        ✅ Verify & Accept
                     </button>
 
                     <button
@@ -126,77 +131,56 @@
                     >
                         Return for Correction
                     </button>
+
+                    <!-- Accepted badge -->
+                    <span v-if="report.status === 'accepted'" class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+                        ✓ Signed & Accepted
+                    </span>
                 </div>
             </div>
         </div>
 
-        <!-- Final certification -->
-        <div v-if="showFinalCertification" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h2 class="text-base font-bold text-gray-900 mb-1">Final Certification</h2>
-            <p class="text-xs text-gray-500 mb-4">
-                Once every required report is signed and accepted, generate the all-types consolidated report, sign it, and submit the certified package.
-            </p>
+        <!-- Submit to Sahodaya -->
+        <div v-if="showSubmitSection" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h2 class="text-base font-bold text-gray-900 mb-1">Submit to Sahodaya</h2>
 
-            <div v-if="!allReportsAccepted && !['awaiting_consolidated_signature', 'school_certified', 'submitted_to_sahodaya', 'sahodaya_verified', 'approved', 'published'].includes(package.status)" class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                Every individual report above must be signed and accepted before the consolidated report can be generated.
+            <div v-if="!allReportsAccepted" class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                All reports above must be signed and accepted before you can submit.
+                <br><span class="font-semibold">{{ acceptedCount }}/{{ activeReports.length }} reports accepted.</span>
             </div>
 
             <div v-else class="space-y-4">
-                <div class="flex flex-wrap items-center gap-2">
-                    <button
-                        v-if="['awaiting_report_signatures', 'individual_reports_signed'].includes(package.status)"
-                        type="button" class="btn-secondary text-xs" :disabled="busy"
-                        @click="generateConsolidated"
-                    >
-                        Generate Consolidated PDF
-                    </button>
+                <p class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                    ✅ All {{ activeReports.length }} reports are signed and accepted. You can now submit to Sahodaya.
+                </p>
 
-                    <a v-if="package.generated_pdf_path" :href="consolidatedPdfUrl" target="_blank" class="btn-secondary text-xs">
-                        Download Unsigned Consolidated PDF
-                    </a>
-
-                    <a v-if="package.signed_pdf_path" :href="consolidatedSignedPdfUrl" target="_blank" class="btn-secondary text-xs">
-                        View Signed Consolidated PDF
-                    </a>
-                </div>
-
-                <div v-if="canSign && package.status === 'awaiting_consolidated_signature'" class="border border-dashed border-gray-300 rounded-xl p-4 space-y-3">
-                    <p class="text-xs font-bold text-gray-700">Upload Signed Consolidated Report &amp; Declare</p>
+                <div class="border border-dashed border-gray-300 rounded-xl p-4 space-y-3">
+                    <p class="text-xs font-bold text-gray-700">Declaration before submitting</p>
                     <label class="flex items-start gap-2 text-xs text-gray-600">
                         <input v-model="declarations.figures" type="checkbox" class="mt-0.5">
-                        I have checked the figures against the official board result.
+                        I have verified the figures against the official board result.
                     </label>
                     <label class="flex items-start gap-2 text-xs text-gray-600">
                         <input v-model="declarations.details" type="checkbox" class="mt-0.5">
-                        The topper, subject-wise, stream-wise, and Full A1 details are correct.
+                        The topper and Full A1 details are correct and complete.
                     </label>
                     <label class="flex items-start gap-2 text-xs text-gray-600">
                         <input v-model="declarations.seal" type="checkbox" class="mt-0.5">
-                        The uploaded document bears the authorized signature and school seal.
+                        All uploaded signed documents bear the authorized signature and school seal.
                     </label>
-                    <input ref="consolidatedFileRef" type="file" accept="application/pdf" class="text-xs">
-                    <div>
-                        <button type="button" class="btn-primary text-xs" :disabled="busy || !declarationsComplete" @click="uploadSignedConsolidated">
-                            Sign-off &amp; Upload
-                        </button>
-                    </div>
                 </div>
 
                 <button
-                    v-if="canSign && package.status === 'school_certified'"
-                    type="button" class="btn-primary" :disabled="busy"
+                    v-if="canSign"
+                    type="button" class="btn-primary" :disabled="busy || !declarationsComplete"
                     @click="submitPackage"
                 >
-                    Submit Certified Package to Sahodaya
+                    📨 Submit Certified Package to Sahodaya
                 </button>
-
-                <div v-if="['submitted_to_sahodaya','sahodaya_verified','approved','published'].includes(package.status)" class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                    Submitted to Sahodaya on {{ formatDate(package.submitted_at) }}.
-                </div>
             </div>
         </div>
 
-        <!-- Return report modal (simple inline reason prompt) -->
+        <!-- Return report modal -->
         <div v-if="returnTarget" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" @click.self="returnTarget = null">
             <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
                 <h3 class="text-sm font-bold text-gray-900 mb-2">Return report for correction</h3>
@@ -225,20 +209,26 @@ const props = defineProps({
 });
 
 const busy = ref(false);
-const sendingReview = ref(false);
 const returnTarget = ref(null);
 const returnReason = ref('');
-const consolidatedFileRef = ref(null);
 const declarations = ref({ figures: false, details: false, seal: false });
 
 const declarationsComplete = computed(() => declarations.value.figures && declarations.value.details && declarations.value.seal);
 
-const showReports = computed(() => Boolean(props.package?.reports?.length));
-const showFinalCertification = computed(() => !['draft', 'leadership_changes_requested'].includes(props.package.status));
+const activeReports = computed(() =>
+    (props.package?.reports ?? []).filter(r => r.status !== 'superseded')
+);
+
+const acceptedCount = computed(() =>
+    activeReports.value.filter(r => r.status === 'accepted').length
+);
+
+const showSubmitSection = computed(() => {
+    const nonTerminal = !['submitted_to_sahodaya', 'sahodaya_verified', 'approved', 'published'].includes(props.package.status);
+    return nonTerminal && activeReports.value.length > 0;
+});
 
 const base = computed(() => `/school-admin/${props.school.id}/board-results/${props.boardResult.id}`);
-const consolidatedPdfUrl = computed(() => `${base.value}/certification/consolidated/pdf`);
-const consolidatedSignedPdfUrl = computed(() => `${base.value}/certification/consolidated/signed-pdf`);
 
 function reportPdfUrl(report) {
     return `${base.value}/certification/reports/${report.id}/pdf`;
@@ -248,7 +238,12 @@ function reportSignedPdfUrl(report) {
 }
 
 function reportLabel(report) {
-    const names = { summary: 'Result Summary & Proof', overall_toppers: 'School Topper(s)', subject_toppers: 'Subject-wise Toppers', full_a1: 'Full A1 Achievers' };
+    const names = {
+        summary: 'Result Summary & Proof',
+        overall_toppers: 'School Topper(s)',
+        subject_toppers: 'Subject-wise Toppers',
+        full_a1: 'Full A1 Achievers',
+    };
     let label = names[report.report_type] || report.report_type;
     if (report.stream) label += ` — ${report.stream.label}`;
     return label;
@@ -256,6 +251,18 @@ function reportLabel(report) {
 
 function statusLabel(status) {
     return (status || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function reportStatusLabel(status) {
+    const labels = {
+        pending: 'Pending',
+        generated: 'Generated',
+        signed_uploaded: 'Signed — Awaiting Acceptance',
+        accepted: 'Accepted',
+        changes_requested: 'Changes Requested',
+        superseded: 'Superseded',
+    };
+    return labels[status] || status;
 }
 
 function reportPillClass(status) {
@@ -269,13 +276,6 @@ function reportPillClass(status) {
 function formatDate(value) {
     if (!value) return '—';
     return new Date(value).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
-function sendForReview() {
-    sendingReview.value = true;
-    router.post(`${base.value}/request-leadership-review`, {}, {
-        onFinish: () => { sendingReview.value = false; },
-    });
 }
 
 function generateReport(report) {
@@ -316,30 +316,6 @@ function confirmReturnReport() {
     router.post(`${base.value}/certification/reports/${returnTarget.value.id}/return`, { reason: returnReason.value }, {
         preserveScroll: true,
         onFinish: () => { busy.value = false; returnTarget.value = null; },
-    });
-}
-
-function generateConsolidated() {
-    busy.value = true;
-    router.post(`${base.value}/certification/consolidated/generate`, {}, {
-        preserveScroll: true,
-        onFinish: () => { busy.value = false; },
-    });
-}
-
-function uploadSignedConsolidated() {
-    const file = consolidatedFileRef.value?.files?.[0];
-    if (!file || !declarationsComplete.value) return;
-    busy.value = true;
-    router.post(`${base.value}/certification/consolidated/signed-pdf`, {
-        signed_pdf: file,
-        declaration_figures_checked: declarations.value.figures,
-        declaration_details_correct: declarations.value.details,
-        declaration_signature_seal: declarations.value.seal,
-    }, {
-        forceFormData: true,
-        preserveScroll: true,
-        onFinish: () => { busy.value = false; },
     });
 }
 

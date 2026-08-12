@@ -79,19 +79,39 @@ class BoardResultLeadershipReviewController extends SchoolAdminController
         $service = app(BoardResultCertificationService::class);
         $package = $service->getOrCreatePackage($boardResult);
 
-        if (in_array($package->status, [BoardResultCertificationPackage::STATUS_DRAFT, BoardResultCertificationPackage::STATUS_LEADERSHIP_CHANGES_REQUESTED], true)) {
-            $service->syncReportRecords($package);
+        // Auto-advance: Principal just opens the page and sees reports directly.
+        // No manual "Send for Leadership Review" step needed.
+        if ($package->status === BoardResultCertificationPackage::STATUS_DRAFT) {
+            $errors = app(BoardResultCertificationValidator::class)->errorsBeforeLeadershipReview($boardResult);
+            if (empty($errors)) {
+                // Data is complete — auto-advance to awaiting_leadership_review
+                $package = $service->requestLeadershipReview($boardResult, $request->user());
+            }
         }
 
+        if ($package->status === BoardResultCertificationPackage::STATUS_AWAITING_LEADERSHIP_REVIEW) {
+            $service->beginReportSignatures($package, $request->user());
+            $package->refresh();
+        }
+
+        // Always sync report records so all required reports exist
+        $service->syncReportRecords($package);
+
         $package->load(['reports.stream', 'reports.signedBy', 'signedBy', 'submittedBy']);
+
+        // Validation errors to show when data is incomplete (package stays draft)
+        $validationErrors = in_array($package->status, [
+            BoardResultCertificationPackage::STATUS_DRAFT,
+            BoardResultCertificationPackage::STATUS_LEADERSHIP_CHANGES_REQUESTED,
+        ], true)
+            ? app(BoardResultCertificationValidator::class)->errorsBeforeLeadershipReview($boardResult)
+            : [];
 
         return $this->inertia('School/BoardResults/PrincipalVerification/Review', [
             'boardResult' => $boardResult,
             'package' => $package,
             'canSign' => $this->userCanSign($request),
-            'validationErrors' => $package->status === BoardResultCertificationPackage::STATUS_DRAFT
-                ? app(BoardResultCertificationValidator::class)->errorsBeforeLeadershipReview($boardResult)
-                : [],
+            'validationErrors' => $validationErrors,
             'allReportsAccepted' => $service->allRequiredReportsAccepted($package),
         ]);
     }
