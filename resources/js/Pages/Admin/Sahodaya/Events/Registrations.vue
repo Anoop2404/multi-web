@@ -23,8 +23,29 @@
             <Link :href="competitionUrl" class="font-semibold underline ml-1">Back to item listing</Link>
         </p>
 
+        <!-- Sport Event / Region Switcher -->
+        <div v-if="event.event_type === 'sports' && childEvents.length" class="card mb-4 !py-3">
+            <div class="flex flex-wrap gap-3 items-center">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Sport Event / Region:</label>
+                <select :value="event.id" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
+                    <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
+                        {{ ev.title }} {{ ev.parent_event_id === null ? '(Season Hub)' : '' }}
+                    </option>
+                </select>
+            </div>
+        </div>
+
         <div class="card mb-4 space-y-3">
             <div class="flex flex-wrap gap-2 items-end">
+                <div v-if="regionOptions.length">
+                    <label class="text-xs font-semibold text-gray-600">Filter by region</label>
+                    <select v-model="form.region_id" class="field text-sm mt-1 w-44" @change="applyFilters">
+                        <option value="">All regions</option>
+                        <option v-for="reg in regionOptions" :key="reg.id" :value="String(reg.id)">
+                            {{ reg.name }}
+                        </option>
+                    </select>
+                </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by school</label>
                     <select v-model="form.school_id" class="field text-sm mt-1" @change="applyFilters">
@@ -355,10 +376,12 @@ const props = defineProps({
     registerSchoolId: { type: [String, Number], default: '' },
     eventItems: { type: Array, default: () => [] },
     schoolRegions: { type: Object, default: () => ({}) },
-    filters: { type: Object, default: () => ({ search: '', school_id: '', status: '' }) },
+    filters: { type: Object, default: () => ({ search: '', school_id: '', status: '', region_id: '' }) },
     selectedHeadId: { type: [String, Number], default: null },
     selectedItemId: { type: [Number, String], default: null },
     competitionUrl: { type: String, default: null },
+    regionOptions: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
 
 const filterDescription = computed(() => {
@@ -375,6 +398,10 @@ const filterDescription = computed(() => {
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/registrations`);
+}
+
 // Server-driven filters — school_id/item_id/status now run as real query constraints
 // (see FestRegistrationReviewController::index()), not just an in-memory slice of an
 // eagerly-loaded list. item_id defaults from selectedItemId so a link from the
@@ -384,12 +411,14 @@ const form = reactive({
     item_id: props.selectedItemId ? String(props.selectedItemId) : '',
     status: props.filters?.status ?? '',
     search: props.filters?.search ?? '',
+    region_id: props.filters?.region_id ?? '',
 });
 
 const approvedPdfUrl = computed(() => {
     const p = new URLSearchParams();
     if (form.school_id) p.set('school_id', form.school_id);
     if (form.item_id) p.set('item_id', form.item_id);
+    if (form.region_id) p.set('region_id', form.region_id);
     if (form.search) p.set('search', form.search);
     const query = p.toString();
     return `${base}/registrations/approved-pdf${query ? '?' + query : ''}`;
@@ -401,6 +430,7 @@ function applyFilters() {
         school_id: form.school_id || undefined,
         item_id: form.item_id || undefined,
         status: form.status || undefined,
+        region_id: form.region_id || undefined,
     }, { preserveScroll: true, preserveState: true, replace: true });
 }
 

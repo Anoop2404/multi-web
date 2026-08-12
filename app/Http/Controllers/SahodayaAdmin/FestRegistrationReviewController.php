@@ -131,6 +131,17 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 ->get(['id', 'name']);
         }
 
+        $childEvents = [];
+        if ($event->event_type === 'sports') {
+            $seasonId = $event->parent_event_id ?? $event->id;
+            $childEvents = FestEvent::where('parent_event_id', $seasonId)
+                ->orWhere('id', $seasonId)
+                ->ofType('sports')
+                ->orderBy('title')
+                ->get(['id', 'title', 'parent_event_id'])
+                ->all();
+        }
+
         return $this->inertia('Sahodaya/Events/Registrations', $this->withEventActivity($event, FestPageActivity::REGISTRATIONS, [
             'event'                => $event,
             'registrations'        => $registrations,
@@ -138,6 +149,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'schools'            => $schools,
             'schoolRegions'      => $schoolRegions,
             'regionOptions'      => $regionOptions,
+            'childEvents'        => $childEvents,
             'feeRequired'        => $feeService->feeRequired($event),
             'registerStudents'   => $registerStudents,
             'registerSchoolId'   => $registerSchoolId,
@@ -589,8 +601,19 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $schoolId = $request->input('school_id') ?: null;
         $itemId = $request->integer('item_id') ?: null;
         $search = $request->input('search');
+        $filterRegionId = $request->input('region_id') ?: null;
 
-        $registrations = $this->scopedRegistrationsQuery($event, $itemId ? [$itemId] : null, $schoolId, $search)
+        $regionSchoolIds = null;
+        if ($filterRegionId) {
+            $year = AcademicYear::forSahodaya($this->sahodaya->id);
+            $regionSchoolIds = SchoolRegionAssignment::forTenant($this->sahodaya->id)
+                ->forYear($year)
+                ->where('region_id', $filterRegionId)
+                ->pluck('school_id')
+                ->all();
+        }
+
+        $registrations = $this->scopedRegistrationsQuery($event, $itemId ? [$itemId] : null, $schoolId, $search, $regionSchoolIds)
             ->where('status', 'approved')
             ->with(['item', 'participants.student', 'participants.teacher', 'participants.group', 'school'])
             ->latest()
