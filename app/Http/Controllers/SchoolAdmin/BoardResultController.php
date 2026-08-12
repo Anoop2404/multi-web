@@ -119,16 +119,23 @@ class BoardResultController extends SchoolAdminController
             ->limit(75)
             ->get(['id', 'action', 'description', 'log_name', 'subject_type', 'subject_id', 'changes', 'created_at', 'causer_user_id']);
 
-        // Class + Academic Year "search" — looks up the matching result from what's already
-        // loaded above (no extra query) so the aggregate form + topper entry can live inline.
+        $academicYearOptions = $yearService->activeOrPopulatedYearOptions((string) ($this->school->parent_id ?: $this->school->id));
         $academicYear = $request->string('academic_year')->toString() ?: null;
-        $activeResult = ($class && $academicYear)
+
+        if (! $academicYear) {
+            $configuredOpenYear = collect($academicYearOptions)
+                ->first(fn (array $year) => ($year['entry_configured'] ?? false) && ($year['entry_status'] ?? '') === 'open');
+            $openYear = $configuredOpenYear ?? collect($academicYearOptions)->firstWhere('entry_status', 'open');
+            $academicYear = $openYear['label'] ?? ($results->first()?->academic_year ?? ((date('Y') - 1).'-'.substr((string) date('Y'), 2)));
+        }
+
+        $activeResult = $class
             ? $results->first(fn (BoardResult $r) => $r->academic_year === $academicYear)
             : null;
 
         return $this->inertia('School/BoardResults/Index', array_merge([
             'results' => $results,
-            'academicYearOptions' => $yearService->activeOrPopulatedYearOptions((string) $this->school->parent_id),
+            'academicYearOptions' => $academicYearOptions,
             'statuses' => [
                 BoardResult::STATUS_DRAFT,
                 BoardResult::STATUS_SUBMITTED,
