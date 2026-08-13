@@ -53,6 +53,17 @@
                         <span class="portal-action-arrow">→</span>
                     </a>
 
+                    <a href="{{ $portalCta['portal_login_url'] ?? '/portal/login' }}" class="portal-action portal-action-secondary">
+                        <div class="portal-action-icon">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        </div>
+                        <span class="portal-action-body">
+                            <span class="portal-action-title">{{ $portalCta['portal_login_label'] ?? 'Portal Login' }}</span>
+                            <span class="portal-action-desc">Teacher, student, exam &amp; coordinator portal access</span>
+                        </span>
+                        <span class="portal-action-arrow">→</span>
+                    </a>
+
                     @if($isSahodaya)
                     <a href="{{ $portalCta['admin_login_url'] ?? '/login' }}" class="portal-action portal-action-ghost">
                         <span class="portal-action-body">

@@ -16,16 +16,18 @@ class PortalNavLinks
     public static function portalCtaDefaults(): array
     {
         return [
-            'show_in_navbar'    => true,
-            'show_in_menu'      => false,
-            'portal_label'      => 'Login',
-            'portal_url'        => self::PORTAL_URL,
-            'register_label'    => 'School Registration',
-            'register_url'      => self::REGISTER_URL,
-            'login_label'       => 'School Login',
-            'login_url'         => self::SCHOOL_LOGIN_URL,
-            'admin_login_label' => 'Sahodaya Admin Login',
-            'admin_login_url'   => self::LOGIN_URL,
+            'show_in_navbar'     => true,
+            'show_in_menu'       => false,
+            'portal_label'       => 'Login',
+            'portal_url'         => self::PORTAL_URL,
+            'register_label'     => 'School Registration',
+            'register_url'       => self::REGISTER_URL,
+            'login_label'        => 'School Login',
+            'login_url'          => self::SCHOOL_LOGIN_URL,
+            'portal_login_label' => 'Portal Login',
+            'portal_login_url'   => '/portal/login',
+            'admin_login_label'  => 'Sahodaya Admin Login',
+            'admin_login_url'    => self::LOGIN_URL,
         ];
     }
 
