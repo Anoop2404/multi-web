@@ -208,7 +208,7 @@ class LedgerPostingTest extends TestCase
         $this->assertEquals(600, (float) LedgerTransaction::where('entry_type', 'credit')->sum('amount'));
 
         $credit = LedgerTransaction::where('entry_type', 'credit')->first();
-        $this->assertStringContainsString('Batch School', $credit->description);
+        $this->assertStringContainsString('BATCH SCHOOL', $credit->description);
         $this->assertStringContainsString('District MCQ', $credit->description);
     }
 
@@ -265,7 +265,7 @@ class LedgerPostingTest extends TestCase
         $this->assertEquals(1200, (float) LedgerTransaction::where('entry_type', 'credit')->sum('amount'));
 
         $credit = LedgerTransaction::where('entry_type', 'credit')->first();
-        $this->assertStringContainsString('Fest Fee School', $credit->description);
+        $this->assertStringContainsString('FEST FEE SCHOOL', $credit->description);
         $this->assertStringContainsString('District Sports Meet', $credit->description);
     }
 

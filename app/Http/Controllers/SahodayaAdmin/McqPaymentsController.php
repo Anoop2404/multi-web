@@ -13,13 +13,22 @@ class McqPaymentsController extends SahodayaAdminController
     public function index(Request $request)
     {
         $status = $request->query('status', 'pending');
+        $search = trim((string) $request->query('search', ''));
 
         $base = McqSchoolFee::query()
             ->whereHas('exam', fn ($q) => $q->where('tenant_id', $this->sahodaya->id))
-            ->with(['exam:id,title,exam_level,scheduled_at', 'school:id,name', 'feeReceipt']);
+            ->with(['exam:id,title,exam_level,scheduled_at', 'school:id,name', 'feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with('reviewedBy:id,name')]);
+
+        if ($search !== '') {
+            $base->where(function ($q) use ($search) {
+                $q->whereHas('exam', fn ($eq) => $eq->where('title', 'like', "%{$search}%"))
+                    ->orWhereHas('school', fn ($sq) => $sq->where('name', 'like', "%{$search}%"));
+            });
+        }
 
         $counts = [
             'pending'  => (clone $base)->whereIn('status', ['proof_uploaded'])->whereHas('feeReceipt', fn ($q) => $q->where('status', 'uploaded'))->count(),
+            'partial'  => (clone $base)->where('status', 'partial')->count(),
             'approved' => (clone $base)->where('status', 'approved')->count(),
             'rejected' => (clone $base)->whereHas('feeReceipt', fn ($q) => $q->where('status', 'rejected'))->count(),
             'all'      => (clone $base)->count(),
@@ -29,6 +38,8 @@ class McqPaymentsController extends SahodayaAdminController
         if ($status === 'pending') {
             $query->whereIn('status', ['proof_uploaded'])
                 ->whereHas('feeReceipt', fn ($q) => $q->where('status', 'uploaded'));
+        } elseif ($status === 'partial') {
+            $query->where('status', 'partial');
         } elseif ($status === 'approved') {
             $query->where('status', 'approved');
         } elseif ($status === 'rejected') {
@@ -43,6 +54,7 @@ class McqPaymentsController extends SahodayaAdminController
             'fees'         => $fees,
             'activeStatus' => $status,
             'statusCounts' => $counts,
+            'search'       => $search,
         ]);
     }
 
@@ -51,7 +63,7 @@ class McqPaymentsController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         $schoolFees = McqSchoolFee::where('exam_id', $exam->id)
-            ->with(['school', 'feeReceipt'])
+            ->with(['school', 'feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with('reviewedBy:id,name')])
             ->orderBy('school_id')
             ->get()
             ->map(fn (McqSchoolFee $sf) => $this->mapFeeRow($sf));
@@ -141,6 +153,7 @@ class McqPaymentsController extends SahodayaAdminController
             'school_name'    => $sf->school?->name,
             'student_count'  => $sf->student_count,
             'total_due'      => (float) $sf->total_due,
+            'amount_paid'    => (float) $sf->amount_paid,
             'status'         => $sf->status,
             'updated_at'     => $sf->updated_at?->format('j M Y, g:i A'),
             'fee_receipt'    => $sf->feeReceipt ? [
@@ -155,8 +168,41 @@ class McqPaymentsController extends SahodayaAdminController
                     ? "/sahodaya-admin/{$this->sahodaya->id}/mcq/payments/{$sf->id}/proof"
                     : null,
             ] : null,
+            'receipts_history' => $this->mapReceiptsHistory($sf),
             'exam_url'       => "/sahodaya-admin/{$this->sahodaya->id}/mcq-exams/{$sf->exam_id}",
             'payments_url'   => "/sahodaya-admin/{$this->sahodaya->id}/mcq-exams/{$sf->exam_id}/payments",
         ];
+    }
+
+    /**
+     * Every proof a school has uploaded for this batch fee, newest first — a batch fee can
+     * collect several receipts over time as partial installments (see TracksPartialPayments),
+     * and only the latest one is otherwise surfaced via `feeReceipt`.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function mapReceiptsHistory(McqSchoolFee $sf): array
+    {
+        $receipts = $sf->relationLoaded('receipts') ? $sf->receipts : $sf->receipts()->latest('id')->with('reviewedBy:id,name')->get();
+
+        return $receipts->map(fn ($r) => [
+            'id'               => $r->id,
+            'status'           => $r->status,
+            'amount'           => (float) $r->amount,
+            'receipt_number'   => $r->receipt_number,
+            'transaction_ref'  => $r->transaction_ref,
+            'payment_date'     => $r->payment_date?->format('Y-m-d'),
+            'uploaded_at'      => $r->created_at?->format('j M Y, g:i A'),
+            'reviewed_at'      => $r->reviewed_at?->format('j M Y, g:i A'),
+            'reviewed_by'      => $r->reviewedBy?->name,
+            'rejection_reason' => $r->rejection_reason,
+            'reversal_reason'  => $r->reversal_reason,
+            'proof_url'        => ($r->file_path && ! $r->isSystemCredit())
+                ? "/sahodaya-admin/{$this->sahodaya->id}/finance/payments/receipts/{$r->id}/proof"
+                : null,
+            'receipt_url'      => in_array($r->status, ['approved', 'reversed'], true)
+                ? "/sahodaya-admin/{$this->sahodaya->id}/finance/payments/receipts/{$r->id}"
+                : null,
+        ])->values()->all();
     }
 }

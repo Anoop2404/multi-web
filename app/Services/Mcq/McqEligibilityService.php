@@ -404,6 +404,7 @@ class McqEligibilityService
             return 'Level 2 qualifier list is not locked yet.';
         }
 
+        $parentExamId = (int) $exam->parent_exam_id;
         $registrationKey = $parentExamId.':'.$student->id;
         if (! array_key_exists($registrationKey, $this->parentRegistrationCache)) {
             $this->parentRegistrationCache[$registrationKey] = McqRegistration::where('exam_id', $parentExamId)

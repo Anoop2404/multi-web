@@ -322,9 +322,9 @@ class TenantController extends Controller
                 ];
 
                 FestParticipant::whereIn('student_id', $studentIds)->delete();
-                // mcq_marks / mcq_certificates / mcq_attendance_correction_requests
-                // cascade-delete here automatically (DB-level cascadeOnDelete) —
-                // already captured in the snapshot above.
+                McqMark::whereIn('registration_id', $registrationIds)->delete();
+                McqCertificate::whereIn('registration_id', $registrationIds)->delete();
+                McqAttendanceCorrectionRequest::whereIn('registration_id', $registrationIds)->delete();
                 McqRegistration::whereIn('student_id', $studentIds)->delete();
                 StudentEditChangeRequest::whereIn('student_id', $studentIds)->delete();
                 FestSubstitutionRequest::whereIn('replacement_student_id', $studentIds)

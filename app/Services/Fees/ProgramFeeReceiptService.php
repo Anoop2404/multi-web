@@ -27,7 +27,7 @@ class ProgramFeeReceiptService
         $sahodaya = Tenant::find($schoolFee->school?->parent_id);
         abort_unless($sahodaya, 422, 'School Sahodaya not found.');
 
-        return $this->issueOnApprove($receipt, $sahodaya, 'Talent Search', function (string $receiptNo) use ($schoolFee, $receipt, $sahodaya) {
+        return $this->issueOnApprove($receipt, $sahodaya, 'MCQ', function (string $receiptNo) use ($schoolFee, $receipt, $sahodaya) {
             return View::make('receipts.program-fee-official', $this->buildViewData(
                 receipt: $receipt,
                 sahodaya: $sahodaya,
@@ -50,7 +50,7 @@ class ProgramFeeReceiptService
         $sahodaya = Tenant::find($registration->school?->parent_id);
         abort_unless($sahodaya, 422, 'School Sahodaya not found.');
 
-        return $this->issueOnApprove($receipt, $sahodaya, 'Talent Search', function (string $receiptNo) use ($registration, $receipt, $sahodaya) {
+        return $this->issueOnApprove($receipt, $sahodaya, 'MCQ', function (string $receiptNo) use ($registration, $receipt, $sahodaya) {
             return View::make('receipts.program-fee-official', $this->buildViewData(
                 receipt: $receipt,
                 sahodaya: $sahodaya,
