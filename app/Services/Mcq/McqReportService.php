@@ -15,6 +15,7 @@ class McqReportService
     public function registrationRows(McqExam $exam, ?string $schoolId = null, ?string $selectedClass = null): array
     {
         $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
             ->with(['student.schoolClass', 'teacher', 'school', 'mark', 'feeReceipt']);
 
         if ($schoolId) {
