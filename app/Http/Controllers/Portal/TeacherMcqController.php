@@ -6,14 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\McqQuestion;
 use App\Models\McqQuestionBank;
 use App\Models\SchoolClass;
+use App\Models\Subject;
 use App\Models\Tenant;
-use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class TeacherMcqController extends Controller
 {
-    public function banks(Request $request, string $tenantId, EffectiveMasterDataResolver $resolver)
+    public function banks(Request $request, string $tenantId)
     {
         $teacher = $request->attributes->get('portalTeacher');
         $school = Tenant::findOrFail($tenantId);
@@ -46,7 +46,18 @@ class TeacherMcqController extends Controller
             ]);
         }
 
-        $masterSubjects = $resolver->subjects($school->parent_id);
+        $masterSubjects = Subject::query()
+            ->forSahodaya($school->parent_id)
+            ->active()
+            ->orderBy('label')
+            ->get(['id', 'code', 'label']);
+
+        if ($masterSubjects->isEmpty()) {
+            $masterSubjects = Subject::query()
+                ->forSahodaya($school->parent_id)
+                ->orderBy('label')
+                ->get(['id', 'code', 'label']);
+        }
 
         return inertia('Portal/Teacher/QuestionBanks', [
             'school'   => $school->only('id', 'name'),

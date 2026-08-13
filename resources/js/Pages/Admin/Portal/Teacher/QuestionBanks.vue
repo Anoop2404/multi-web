@@ -19,10 +19,12 @@
                 <FormField label="Bank Title" required :error="form.errors.title">
                     <input v-model="form.title" class="field" placeholder="e.g. Class 10 Science Practice MCQs" required>
                 </FormField>
-                <FormField label="Subject (from Master)" required :error="form.errors.subject">
+                <FormField label="Subject (CBSE Board Subject Master)" required :error="form.errors.subject">
                     <select v-model="form.subject" class="field" required>
                         <option value="">Select subject…</option>
-                        <option v-for="s in subjects" :key="s.id || s.label" :value="s.label || s.name">{{ s.label || s.name }}</option>
+                        <option v-for="s in subjects" :key="s.id || s.label" :value="s.label">
+                            {{ s.label }}{{ s.code ? ` (${s.code})` : '' }}
+                        </option>
                     </select>
                 </FormField>
                 <FormField label="Class / Standard (optional)" :error="form.errors.class_group">
