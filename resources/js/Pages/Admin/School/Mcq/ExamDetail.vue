@@ -336,24 +336,47 @@
             <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <div>
                     <h3 class="section-title !mb-0">Registered students</h3>
-                    <p class="text-xs text-slate-500 mt-1">{{ filteredRegisteredStudents.length }} student(s) registered for this exam.</p>
+                    <p class="text-xs text-slate-500 mt-1">
+                        {{ filteredRegisteredStudents.length }} student(s) registered for this exam ·
+                        <span class="text-emerald-600 font-semibold">{{ schoolPaidCount }} paid</span> ·
+                        <span class="text-amber-600 font-semibold">{{ schoolUnpaidCount }} unpaid</span>
+                    </p>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <select v-model="registeredClassFilter" class="field text-xs bg-slate-50 border-slate-300 py-2 rounded-lg">
+                        <option value="">All classes</option>
+                        <option v-for="c in classOptions" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+                    </select>
+                    <select v-model="registeredPaymentFilter" class="field text-xs bg-slate-50 border-slate-300 py-2 rounded-lg">
+                        <option value="">All payment status</option>
+                        <option value="paid">Paid</option>
+                        <option value="unpaid">Unpaid</option>
+                    </select>
                     <input v-model="registeredSearchQuery" type="text" placeholder="Search name, adm no, hall ticket..." class="field text-xs min-w-[240px] bg-slate-50 border-slate-300 py-2 rounded-lg" />
                 </div>
             </div>
+            <p class="text-xs text-slate-500 -mt-1">
+                "Mark paid" is a school-side checklist only, for cross-verifying your physical/offline collection against this roster — it does not affect Sahodaya fee approval.
+            </p>
             <div class="overflow-x-auto">
                 <table class="data-table w-full">
-                    <thead><tr><th class="w-12">#</th><th>Student</th><th>Approval</th><th>Exam reg. no.</th><th>Seat</th><th>Status</th><th class="text-right">Action</th></tr></thead>
+                    <thead><tr><th class="w-12">#</th><th>Student</th><th>Class</th><th>Approval</th><th>Exam reg. no.</th><th>Seat</th><th>Status</th><th>Payment</th><th class="text-right">Action</th></tr></thead>
                     <tbody>
                         <tr v-for="(r, i) in paginatedRegisteredStudents" :key="r.id">
                             <td class="text-xs font-bold text-slate-400">{{ (registeredPage - 1) * registeredPageSize + i + 1 }}</td>
                             <td class="font-bold text-slate-900">{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</td>
+                            <td class="text-xs">{{ r.student?.class_name || '—' }}</td>
                             <td><span class="text-xs capitalize">{{ r.approval_status_label || r.approval_status }}</span></td>
                             <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
                             <td>{{ r.seat_no || '—' }}</td>
                             <td class="text-xs">
                                 <span class="font-semibold" :class="lifecycleTone(r.lifecycle_status?.tone)">{{ r.lifecycle_status?.label || r.status }}</span>
+                            </td>
+                            <td class="text-xs">
+                                <span v-if="r.school_paid" class="inline-flex items-center gap-1 text-emerald-700 font-semibold">✓ Paid
+                                    <button type="button" class="text-slate-400 hover:text-slate-600 font-normal underline" @click="unmarkPaid(r)">undo</button>
+                                </span>
+                                <button v-else type="button" class="text-xs font-semibold text-indigo-600 hover:underline" @click="markPaid(r)">Mark paid</button>
                             </td>
                             <td class="text-right whitespace-nowrap space-x-2">
                                 <a v-if="examHasFee" :href="`${base}/registrations/${r.id}/invoice`" target="_blank" class="text-xs font-semibold text-indigo-600 hover:underline">Invoice</a>
@@ -1143,6 +1166,8 @@ const props = defineProps({
     classOptions: { type: Array, default: () => [] },
     registeredStudentIds: { type: Array, default: () => [] },
     ticketsIssuedCount: { type: Number, default: 0 },
+    schoolPaidCount: { type: Number, default: 0 },
+    schoolUnpaidCount: { type: Number, default: 0 },
     registerStats: { type: Object, default: () => ({}) },
     registrationGate: { type: Object, default: () => ({ blocked: false }) },
     downloadGate: { type: Object, default: () => ({ blocked: false }) },
@@ -1201,15 +1226,25 @@ const paginatedReportRows = computed(() => {
 
 // Registered students tab search & pagination
 const registeredSearchQuery = ref('');
+const registeredClassFilter = ref('');
+const registeredPaymentFilter = ref('');
 const registeredPage = ref(1);
 const registeredPageSize = ref(50);
 
-watch(registeredSearchQuery, () => {
+watch([registeredSearchQuery, registeredClassFilter, registeredPaymentFilter], () => {
     registeredPage.value = 1;
 });
 
 const filteredRegisteredStudents = computed(() => {
     let list = props.registrations || [];
+    if (registeredClassFilter.value) {
+        list = list.filter(r => String(r.student?.school_class_id ?? '') === registeredClassFilter.value);
+    }
+    if (registeredPaymentFilter.value === 'paid') {
+        list = list.filter(r => r.school_paid);
+    } else if (registeredPaymentFilter.value === 'unpaid') {
+        list = list.filter(r => !r.school_paid);
+    }
     if (registeredSearchQuery.value.trim()) {
         const q = registeredSearchQuery.value.trim().toLowerCase();
         list = list.filter(r => {
@@ -1670,6 +1705,14 @@ function registerSelected() {
 function cancelStudent(id, name) {
     if (!window.confirm(`Cancel registration for ${name}? You can re-add them later.`)) return;
     router.post(`${base.value}/cancel`, { student_id: id }, { preserveScroll: true });
+}
+
+function markPaid(registration) {
+    router.post(`${base.value}/registrations/${registration.id}/mark-paid`, {}, { preserveScroll: true });
+}
+
+function unmarkPaid(registration) {
+    router.post(`${base.value}/registrations/${registration.id}/unmark-paid`, {}, { preserveScroll: true });
 }
 
 function uploadBatchFee() {

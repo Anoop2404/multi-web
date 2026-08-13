@@ -1,0 +1,219 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\QuestionPaper;
+use App\Models\SchoolClass;
+use App\Models\Subject;
+use App\Models\Teacher;
+use App\Models\Tenant;
+use App\Models\User;
+use App\Services\Students\SchoolClassProvisioner;
+use Database\Seeders\RolesAndPermissionsSeeder;
+use Database\Seeders\SahodayaMasterDataSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
+use Tests\TestCase;
+
+class QuestionPaperModuleTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Tenant $school;
+
+    private User $admin;
+
+    private SchoolClass $schoolClass;
+
+    private Subject $subject;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $this->seed(SahodayaMasterDataSeeder::class);
+        Storage::fake('shared');
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Question Paper Sahodaya',
+            'domain' => 'question-paper-sahodaya.test',
+            'is_active' => true,
+        ]);
+
+        $this->school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Question Paper School',
+            'domain' => 'question-paper-school.test',
+            'parent_id' => $sahodaya->id,
+            'membership_status' => 'approved',
+            'is_active' => true,
+        ]);
+
+        $this->admin = User::factory()->create([
+            'tenant_id' => $this->school->id,
+            'email_verified_at' => now(),
+            'must_change_password' => false,
+        ]);
+        $this->admin->assignRole('school_admin');
+
+        app(SchoolClassProvisioner::class)->ensureForSchool($this->school);
+        $this->schoolClass = SchoolClass::where('tenant_id', $this->school->id)->where('name', '8')->firstOrFail();
+        $this->subject = Subject::where('code', 'MAT')->firstOrFail();
+    }
+
+    public function test_teacher_can_upload_and_edit_only_their_own_question_paper(): void
+    {
+        [$teacherUser, $teacher] = $this->makeTeacher('first.teacher@example.com');
+        [$otherUser] = $this->makeTeacher('other.teacher@example.com');
+
+        $this->actingAs($teacherUser)
+            ->post(route('portal.teacher.question-papers.store', ['tenantId' => $this->school->id]), [
+                'title' => 'First Term Mathematics',
+                'school_class_id' => $this->schoolClass->id,
+                'subject_id' => $this->subject->id,
+                'academic_year' => '2026-27',
+                'exam_name' => 'First Term',
+                'file' => UploadedFile::fake()->create('mathematics.pdf', 120, 'application/pdf'),
+            ])
+            ->assertSessionHas('success');
+
+        $paper = QuestionPaper::firstOrFail();
+        $this->assertSame($teacher->id, $paper->teacher_id);
+        $this->assertSame($this->school->id, $paper->school_id);
+        $this->assertSame('Mathematics', $paper->subject_name);
+        Storage::disk('shared')->assertExists($paper->file_path);
+
+        $this->actingAs($teacherUser)
+            ->put(route('portal.teacher.question-papers.update', ['tenantId' => $this->school->id, 'paper' => $paper->id]), [
+                'title' => 'Revised First Term Mathematics',
+                'school_class_id' => $this->schoolClass->id,
+                'subject_id' => $this->subject->id,
+                'academic_year' => '2026-27',
+                'exam_name' => 'First Term',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('question_papers', [
+            'id' => $paper->id,
+            'title' => 'Revised First Term Mathematics',
+        ]);
+
+        $this->actingAs($otherUser)
+            ->put(route('portal.teacher.question-papers.update', ['tenantId' => $this->school->id, 'paper' => $paper->id]), [
+                'title' => 'Unauthorized change',
+                'school_class_id' => $this->schoolClass->id,
+                'subject_id' => $this->subject->id,
+                'academic_year' => '2026-27',
+            ])
+            ->assertNotFound();
+
+        $this->actingAs($otherUser)
+            ->get(route('portal.teacher.question-papers.download', ['tenantId' => $this->school->id, 'paper' => $paper->id]))
+            ->assertNotFound();
+    }
+
+    public function test_school_admin_can_view_and_download_all_school_question_papers(): void
+    {
+        [, $teacher] = $this->makeTeacher('library.teacher@example.com');
+        $path = UploadedFile::fake()->create('science.docx', 80, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+            ->store("schools/{$this->school->id}/question-papers/{$teacher->id}", 'shared');
+
+        $paper = QuestionPaper::create([
+            'school_id' => $this->school->id,
+            'teacher_id' => $teacher->id,
+            'school_class_id' => $this->schoolClass->id,
+            'class_name' => $this->schoolClass->name,
+            'subject_id' => $this->subject->id,
+            'subject_name' => $this->subject->label,
+            'academic_year' => '2026-27',
+            'title' => 'Admin Library Paper',
+            'exam_name' => 'Annual Exam',
+            'file_path' => $path,
+            'storage_disk' => 'shared',
+            'original_name' => 'science.docx',
+            'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'file_size' => 81920,
+            'uploaded_by_user_id' => $teacher->user_id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('school.question-papers.index', [
+                'tenantId' => $this->school->id,
+                'school_class_id' => $this->schoolClass->id,
+                'subject_id' => $this->subject->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('School/QuestionPapers/Index', false)
+                ->has('papers.data', 1)
+                ->where('papers.data.0.id', $paper->id)
+                ->where('papers.data.0.teacher.name', $teacher->name));
+
+        $this->actingAs($this->admin)
+            ->get(route('school.question-papers.download', ['tenantId' => $this->school->id, 'paper' => $paper->id]))
+            ->assertOk()
+            ->assertDownload('science.docx');
+    }
+
+    public function test_teacher_cannot_upload_for_an_unassigned_subject(): void
+    {
+        [$teacherUser] = $this->makeTeacher('restricted.teacher@example.com');
+        $otherSubject = Subject::where('code', 'PHY')->firstOrFail();
+
+        $this->actingAs($teacherUser)
+            ->post(route('portal.teacher.question-papers.store', ['tenantId' => $this->school->id]), [
+                'title' => 'Physics Paper',
+                'school_class_id' => $this->schoolClass->id,
+                'subject_id' => $otherSubject->id,
+                'academic_year' => '2026-27',
+                'file' => UploadedFile::fake()->create('physics.pdf', 50, 'application/pdf'),
+            ])
+            ->assertSessionHasErrors('subject_id');
+
+        $this->assertDatabaseCount('question_papers', 0);
+    }
+
+    public function test_non_leadership_school_staff_cannot_open_the_school_wide_library(): void
+    {
+        $staff = User::factory()->create([
+            'tenant_id' => $this->school->id,
+            'email_verified_at' => now(),
+            'must_change_password' => false,
+        ]);
+        $staff->assignRole('school_staff');
+
+        $this->actingAs($staff)
+            ->get(route('school.question-papers.index', ['tenantId' => $this->school->id]))
+            ->assertForbidden();
+    }
+
+    /** @return array{0: User, 1: Teacher} */
+    private function makeTeacher(string $email): array
+    {
+        $user = User::factory()->create([
+            'tenant_id' => $this->school->id,
+            'email' => $email,
+            'must_change_password' => false,
+        ]);
+        $user->assignRole('teacher');
+
+        $teacher = Teacher::create([
+            'tenant_id' => $this->school->id,
+            'user_id' => $user->id,
+            'name' => Str::headline(Str::before($email, '@')),
+            'email' => $email,
+            'subject_ids' => [$this->subject->id],
+            'subject' => $this->subject->label,
+            'status' => 'active',
+        ]);
+
+        return [$user, $teacher];
+    }
+}

@@ -10,6 +10,7 @@ export function teacherPortalNavItems(schoolId, options = {}) {
         { href: `${base}/certificates`, label: 'Certificates' },
         { href: `${base}/training`, label: 'Training' },
         { href: `${base}/question-banks`, label: 'Talent Search Banks' },
+        { href: `${base}/question-papers`, label: 'Question Papers' },
         { href: `${base}/profile`, label: 'Profile' },
     ];
 

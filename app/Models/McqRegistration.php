@@ -22,6 +22,7 @@ class McqRegistration extends Model
         'fee_receipt_id',
         'started_at', 'submitted_at', 'draft_answers',
         'cancelled_at', 'cancelled_by_user_id',
+        'school_marked_paid_at', 'school_marked_paid_by_user_id', 'school_paid_note',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class McqRegistration extends Model
         'approved_at'           => 'datetime',
         'attendance_marked_at'  => 'datetime',
         'cancelled_at'          => 'datetime',
+        'school_marked_paid_at' => 'datetime',
     ];
 
     /** @param  \Illuminate\Database\Eloquent\Builder<McqRegistration>  $query */
@@ -75,6 +77,34 @@ class McqRegistration extends Model
         return $this->status === 'registered'
             && $this->approval_status !== 'approved'
             && empty($this->hall_ticket_no);
+    }
+
+    /**
+     * School-internal payment checklist flag — set by the School Admin while
+     * cross-verifying their physical/offline collection against this roster.
+     * Independent of the Sahodaya-approved FeeReceipt/McqSchoolFee workflow.
+     */
+    public function isMarkedPaidBySchool(): bool
+    {
+        return $this->school_marked_paid_at !== null;
+    }
+
+    public function markPaidBySchool(int $userId, ?string $note = null): void
+    {
+        $this->forceFill([
+            'school_marked_paid_at'         => now(),
+            'school_marked_paid_by_user_id' => $userId,
+            'school_paid_note'              => $note,
+        ])->save();
+    }
+
+    public function unmarkPaidBySchool(): void
+    {
+        $this->forceFill([
+            'school_marked_paid_at'         => null,
+            'school_marked_paid_by_user_id' => null,
+            'school_paid_note'              => null,
+        ])->save();
     }
 
     public function approvalStatusLabel(): string

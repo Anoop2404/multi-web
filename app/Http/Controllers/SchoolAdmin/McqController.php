@@ -63,7 +63,10 @@ class McqController extends SchoolAdminController
             ->map(function (McqRegistration $reg) use ($exam) {
                 $row = $reg->toArray();
                 $row['student'] = $reg->student
-                    ? array_merge($reg->student->only('id', 'name', 'admission_number', 'reg_no'), ['class_name' => $reg->student->schoolClass?->name])
+                    ? array_merge($reg->student->only('id', 'name', 'admission_number', 'reg_no'), [
+                        'class_name'      => $reg->student->schoolClass?->name,
+                        'school_class_id' => $reg->student->school_class_id,
+                    ])
                     : null;
                 $row['teacher'] = $reg->teacher
                     ? $reg->teacher->only('id', 'name', 'employee_code', 'reg_no')
@@ -74,6 +77,11 @@ class McqController extends SchoolAdminController
                 $row['approval_status_label'] = $reg->approvalStatusLabel();
                 $row['lifecycle_status'] = McqRegistrationStatusPresenter::forRegistration($reg, $exam);
                 $row['can_cancel'] = $reg->canBeCancelledBySchool();
+                // School-internal payment checklist (independent of Sahodaya fee approval) —
+                // lets the school cross-verify a physical/offline collection per class.
+                $row['school_paid']      = $reg->isMarkedPaidBySchool();
+                $row['school_paid_at']   = $reg->school_marked_paid_at?->toIso8601String();
+                $row['school_paid_note'] = $reg->school_paid_note;
                 if ($exam->results_published && $reg->mark) {
                     $row['mark'] = McqResultPresenter::forRegistration($reg, $reg->mark);
                 }
@@ -233,6 +241,8 @@ class McqController extends SchoolAdminController
         }
 
         $ticketsIssuedCount = $registrations->filter(fn ($r) => ! empty($r['hall_ticket_no']))->count();
+        $schoolPaidCount = $registrations->where('school_paid', true)->count();
+        $schoolUnpaidCount = $registrations->count() - $schoolPaidCount;
         $canRegister = ! $gate['blocked'] && in_array($exam->status, ['published', 'ongoing'], true);
 
         $reportService = app(McqReportService::class);
@@ -306,6 +316,8 @@ class McqController extends SchoolAdminController
             'registeredStudentIds'   => $registeredIds,
             'registeredTeacherIds'   => $registeredTeacherIds,
             'ticketsIssuedCount'     => $ticketsIssuedCount,
+            'schoolPaidCount'        => $schoolPaidCount,
+            'schoolUnpaidCount'      => $schoolUnpaidCount,
             'lazyLoadStudents'       => $lazyStudents,
             'studentCount'           => $studentTotalCount,
             'registerStats'          => [
@@ -520,6 +532,21 @@ class McqController extends SchoolAdminController
     public function cancelRegistration(Request $request, string $tenantId, McqExam $exam)
     {
         return app(McqRegistrationController::class)->cancel($request, $tenantId, $exam);
+    }
+
+    public function markPaid(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)
+    {
+        return app(McqRegistrationController::class)->markPaid($request, $tenantId, $exam, $registration);
+    }
+
+    public function unmarkPaid(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)
+    {
+        return app(McqRegistrationController::class)->unmarkPaid($request, $tenantId, $exam, $registration);
+    }
+
+    public function bulkMarkPaid(Request $request, string $tenantId, McqExam $exam)
+    {
+        return app(McqRegistrationController::class)->bulkMarkPaid($request, $tenantId, $exam);
     }
 
     public function uploadFee(Request $request, string $tenantId, McqExam $exam)

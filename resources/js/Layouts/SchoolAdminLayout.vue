@@ -165,6 +165,8 @@ const STAFF_NAV = {
     training: ['training.view', 'training.manage', 'fest.view', 'fest.manage'],
     website: ['website.view', 'website.manage', 'website.news'],
     users: ['users.manage'],
+    // An empty requirement keeps this leadership-only: full school managers bypass canNav.
+    questionPapers: [],
 };
 
 function canNav(section) {

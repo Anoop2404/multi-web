@@ -173,6 +173,7 @@ const quickLinks = computed(() => {
         { href: `${base}/fest`, label: 'Fest', icon: '🎭' },
         { href: `${base}/exams`, label: 'Talent Search', icon: '📝' },
         { href: `${base}/question-banks`, label: 'Question banks', icon: '📚' },
+        { href: `${base}/question-papers`, label: 'Question papers', icon: '📄' },
         { href: `${base}/certificates`, label: 'Certificates', icon: '🏆' },
     ];
 });

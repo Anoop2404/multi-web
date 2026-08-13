@@ -120,6 +120,7 @@ class McqRegistrationController extends SchoolAdminController
 
         $registrations = McqRegistration::where('school_id', $this->school->id)
             ->whereIn('exam_id', $exams->pluck('id'))
+            ->active()
             ->with(['exam', 'mark', 'feeReceipt', 'student'])
             ->get()
             ->groupBy('exam_id')
@@ -543,6 +544,66 @@ class McqRegistrationController extends SchoolAdminController
         }
 
         return back()->with('success', 'Registration cancelled. You can re-register later if needed.');
+    }
+
+    /**
+     * School-internal payment checklist: mark one registration as paid.
+     *
+     * This does NOT touch FeeReceipt/McqSchoolFee or Sahodaya approval — it is
+     * purely so the School Admin can cross-verify their physical/offline
+     * collection against the roster before uploading batch payment proof.
+     */
+    public function markPaid(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)
+    {
+        $data = $request->validate([
+            'note' => 'nullable|string|max:255',
+        ]);
+
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_if($registration->exam_id !== $exam->id, 404);
+        abort_if($registration->school_id !== $this->school->id, 403);
+        abort_if($registration->isCancelled(), 422, 'This registration is cancelled.');
+
+        $registration->markPaidBySchool($request->user()->id, $data['note'] ?? null);
+
+        return back()->with('success', "Marked {$registration->participantName()} as paid.");
+    }
+
+    public function unmarkPaid(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_if($registration->exam_id !== $exam->id, 404);
+        abort_if($registration->school_id !== $this->school->id, 403);
+
+        $registration->unmarkPaidBySchool();
+
+        return back()->with('success', "Unmarked {$registration->participantName()} as paid.");
+    }
+
+    /**
+     * Bulk mark-paid for a class-wise cross-verification pass — e.g. after
+     * reconciling a stack of cash receipts against the printed roster.
+     */
+    public function bulkMarkPaid(Request $request, string $tenantId, McqExam $exam)
+    {
+        $data = $request->validate([
+            'registration_ids'   => 'required|array|min:1',
+            'registration_ids.*' => 'integer',
+        ]);
+
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+
+        $registrations = McqRegistration::where('exam_id', $exam->id)
+            ->where('school_id', $this->school->id)
+            ->whereIn('id', $data['registration_ids'])
+            ->active()
+            ->get();
+
+        foreach ($registrations as $registration) {
+            $registration->markPaidBySchool($request->user()->id);
+        }
+
+        return back()->with('success', "Marked {$registrations->count()} student(s) as paid.");
     }
 
     public function resetPortalPassword(Request $request, string $tenantId, McqExam $exam, Student $student)

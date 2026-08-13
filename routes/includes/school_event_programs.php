@@ -297,6 +297,9 @@ Route::prefix('mcq')->name('mcq.')->group(function () {
     Route::post('/{exam}/attendance', [McqController::class, 'storeAttendance'])->name('attendance.store');
     Route::post('/{exam}/register', [McqController::class, 'register']);
     Route::post('/{exam}/cancel', [McqController::class, 'cancelRegistration'])->name('cancel');
+    Route::post('/{exam}/registrations/{registration}/mark-paid', [McqController::class, 'markPaid'])->name('registrations.mark-paid');
+    Route::post('/{exam}/registrations/{registration}/unmark-paid', [McqController::class, 'unmarkPaid'])->name('registrations.unmark-paid');
+    Route::post('/{exam}/registrations/mark-paid-bulk', [McqController::class, 'bulkMarkPaid'])->name('registrations.mark-paid-bulk');
     Route::post('/{exam}/register-by-class', [McqController::class, 'bulkRegister'])->name('register-by-class');
     Route::post('/{exam}/register-bulk', [McqController::class, 'bulkRegister']);
     Route::post('/{exam}/register-teacher', [McqController::class, 'registerTeacher']);

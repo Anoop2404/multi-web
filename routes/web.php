@@ -34,6 +34,7 @@ use App\Http\Controllers\SahodayaAdmin\ScreenSettingController;
 use App\Http\Controllers\Portal\JudgeDashboardController;
 use App\Http\Controllers\Portal\StudentDashboardController;
 use App\Http\Controllers\Portal\TeacherDashboardController;
+use App\Http\Controllers\Portal\TeacherQuestionPaperController;
 use App\Http\Controllers\PublicCertificateController;
 use App\Http\Controllers\DisplayScreenController;
 use App\Http\Controllers\SahodayaAdmin\FestHouseController;
@@ -57,6 +58,7 @@ use App\Http\Controllers\SchoolAdmin\EventController;
 use App\Http\Controllers\SchoolAdmin\GalleryController;
 use App\Http\Controllers\SchoolAdmin\JobVacancyController;
 use App\Http\Controllers\SchoolAdmin\NewsController;
+use App\Http\Controllers\SchoolAdmin\QuestionPaperController;
 use App\Http\Controllers\SchoolAdmin\SchoolClassController;
 use App\Http\Controllers\SchoolAdmin\RegistrationProfileController;
 use App\Http\Controllers\SchoolAdmin\SchoolSetupController;
@@ -330,6 +332,9 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/documents', [\App\Http\Controllers\SchoolAdmin\SchoolDocumentController::class, 'index'])->name('documents.index');
     Route::post('/documents', [\App\Http\Controllers\SchoolAdmin\SchoolDocumentController::class, 'store'])->name('documents.store');
     Route::get('/documents/{document}/download', [\App\Http\Controllers\SchoolAdmin\SchoolDocumentController::class, 'download'])->name('documents.download');
+
+    Route::get('/question-papers', [QuestionPaperController::class, 'index'])->name('question-papers.index');
+    Route::get('/question-papers/{paper}/download', [QuestionPaperController::class, 'download'])->name('question-papers.download');
 
     Route::get('/students/setup', [SchoolClassController::class, 'index'])->name('students.setup');
 
@@ -1601,6 +1606,11 @@ Route::prefix('portal/teacher/{tenantId}')
         Route::get('/question-banks/{bank}', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'showBank'])->name('question-banks.show');
         Route::post('/question-banks/{bank}/questions', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'storeQuestion'])->name('questions.store');
         Route::delete('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'destroyQuestion'])->name('questions.destroy');
+        Route::get('/question-papers', [TeacherQuestionPaperController::class, 'index'])->name('question-papers.index');
+        Route::post('/question-papers', [TeacherQuestionPaperController::class, 'store'])->name('question-papers.store');
+        Route::put('/question-papers/{paper}', [TeacherQuestionPaperController::class, 'update'])->name('question-papers.update');
+        Route::get('/question-papers/{paper}/download', [TeacherQuestionPaperController::class, 'download'])->name('question-papers.download');
+        Route::delete('/question-papers/{paper}', [TeacherQuestionPaperController::class, 'destroy'])->name('question-papers.destroy');
         Route::get('/exams', [\App\Http\Controllers\Portal\TeacherMcqRegistrationController::class, 'index'])->name('exams');
         Route::post('/exams/{exam}/register', [\App\Http\Controllers\Portal\TeacherMcqRegistrationController::class, 'register'])->name('exams.register');
         Route::get('/profile', [\App\Http\Controllers\Portal\TeacherProfileController::class, 'edit'])->name('profile');

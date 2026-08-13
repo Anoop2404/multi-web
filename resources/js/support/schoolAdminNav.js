@@ -293,6 +293,7 @@ export function schoolAdminNav(schoolId, options = {}) {
             { label: 'Students', href: schoolAdminHref(schoolId, 'students'), icon: 'users', badge: pendingChangeRequests },
             { label: 'Import history', href: schoolAdminHref(schoolId, 'imports'), icon: 'clock' },
             { label: 'Teachers', href: schoolAdminHref(schoolId, 'teachers'), icon: 'user-check' },
+            ...(canNav('questionPapers') ? [{ label: 'Question papers', href: schoolAdminHref(schoolId, 'question-papers'), icon: 'book-open' }] : []),
             { label: 'School houses', href: schoolAdminHref(schoolId, 'houses'), icon: 'layers' },
             { label: 'Payment history', href: schoolAdminHref(schoolId, 'payments'), icon: 'credit-card' },
             { label: 'Settings', href: schoolAdminHref(schoolId, 'settings'), icon: 'settings' },
