@@ -1,134 +1,133 @@
 <template>
     <PortalLayout
         role-label="Teacher Portal"
-        title="My profile"
+        title="My Profile & Security"
         :subtitle="school.name"
         accent="navy"
         :nav-items="navItems"
         :avatar-url="teacher?.photo_url"
         show-avatar-placeholder
     >
-        <!-- Identity summary -->
-        <section class="profile-section-card mb-6">
-            <div class="profile-section-head">
-                <div class="flex items-start gap-3">
-                    <span class="profile-step-icon">👤</span>
+        <!-- Identity Summary Card -->
+        <section class="card rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm mb-6">
+            <div class="flex items-start gap-4 border-b border-slate-100 pb-4 mb-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eff6ff] text-[#0f3d7a] text-lg font-bold">
+                    👤
+                </span>
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Teacher Record & Credentials</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Maintained by your school administration & Sahodaya board.</p>
+                </div>
+            </div>
+
+            <div v-if="teacher" class="flex flex-col sm:flex-row items-start gap-6">
+                <div class="shrink-0 relative">
+                    <img
+                        v-if="teacher.photo_url"
+                        :src="teacher.photo_url"
+                        :alt="teacher.name"
+                        class="h-24 w-24 rounded-2xl object-cover border-2 border-white shadow-md ring-2 ring-[#0f3d7a]/20"
+                    >
+                    <div
+                        v-else
+                        class="h-24 w-24 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-xs text-slate-400 text-center px-2 font-medium"
+                    >
+                        No Photo
+                    </div>
+                </div>
+
+                <dl class="flex-1 grid gap-4 sm:grid-cols-2 text-xs min-w-0 bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
                     <div>
-                        <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Teacher record</p>
-                        <h2 class="text-lg font-bold text-slate-900">Teacher details</h2>
-                        <p class="mt-1 text-sm text-slate-500">Maintained by your school administrator.</p>
+                        <dt class="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Full Name</dt>
+                        <dd class="mt-1 font-bold text-slate-900 text-sm">{{ teacher.name }}</dd>
                     </div>
-                </div>
-            </div>
-            <div class="profile-section-body">
-                <div v-if="teacher" class="flex items-start gap-4">
-                    <div class="shrink-0">
-                        <img
-                            v-if="teacher.photo_url"
-                            :src="teacher.photo_url"
-                            :alt="teacher.name"
-                            class="h-20 w-20 rounded-full object-cover border-2 border-[#eff6ff] shadow-sm"
-                        >
-                        <div
-                            v-else
-                            class="h-20 w-20 rounded-full border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-xs text-slate-400 text-center px-1"
-                        >
-                            No photo
-                        </div>
+                    <div v-if="teacher.reg_no">
+                        <dt class="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Register Number</dt>
+                        <dd class="mt-1 font-mono font-bold text-[#0f3d7a] text-sm">{{ teacher.reg_no }}</dd>
                     </div>
-                    <dl class="flex-1 grid gap-3 sm:grid-cols-2 text-sm min-w-0">
-                        <div>
-                            <dt class="text-slate-500">Name</dt>
-                            <dd class="mt-0.5 font-medium text-slate-900">{{ teacher.name }}</dd>
-                        </div>
-                        <div v-if="teacher.reg_no">
-                            <dt class="text-slate-500">Register no.</dt>
-                            <dd class="mt-0.5 font-medium text-slate-900">{{ teacher.reg_no }}</dd>
-                        </div>
-                        <div v-if="teacher.designation">
-                            <dt class="text-slate-500">Designation</dt>
-                            <dd class="mt-0.5 font-medium text-slate-900">{{ teacher.designation }}</dd>
-                        </div>
-                        <div v-if="teacher.subject">
-                            <dt class="text-slate-500">Subject</dt>
-                            <dd class="mt-0.5 font-medium text-slate-900">{{ teacher.subject }}</dd>
-                        </div>
-                    </dl>
-                </div>
-                <EmptyState v-else title="No teacher record linked" description="Ask your school administrator to link your account to a teacher record." icon="👤" />
-                <p v-if="teacher && !teacher.photo_url" class="text-xs text-slate-400 mt-3">
-                    Profile photo is uploaded by your school admin from the Teachers page.
-                </p>
+                    <div v-if="teacher.designation">
+                        <dt class="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Designation</dt>
+                        <dd class="mt-1 font-semibold text-slate-900 text-sm">{{ teacher.designation }}</dd>
+                    </div>
+                    <div v-if="teacher.subject">
+                        <dt class="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Primary Subject</dt>
+                        <dd class="mt-1 font-semibold text-slate-900 text-sm">{{ teacher.subject }}</dd>
+                    </div>
+                </dl>
             </div>
+            <EmptyState v-else title="No teacher record linked" description="Ask your school administrator to link your account to a teacher record." icon="👤" />
+            <p v-if="teacher && !teacher.photo_url" class="text-xs text-slate-400 mt-4 leading-relaxed">
+                ℹ️ Profile photo is managed by your school admin from the Sahodaya School Portal.
+            </p>
         </section>
 
         <!-- Contact details -->
-        <form @submit.prevent="saveProfile" class="profile-section-card mb-6">
-            <div class="profile-section-head">
-                <div class="flex items-start gap-3">
-                    <span class="profile-step-icon">✉️</span>
-                    <div>
-                        <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Account</p>
-                        <h2 class="text-lg font-bold text-slate-900">Contact details</h2>
-                        <p class="mt-1 text-sm text-slate-500">Used for sign-in and portal notifications.</p>
-                    </div>
+        <form @submit.prevent="saveProfile" class="card rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm mb-6 space-y-4">
+            <div class="flex items-start gap-4 border-b border-slate-100 pb-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0f3d7a] text-lg font-bold">
+                    ✉️
+                </span>
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Account & Contact Details</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Used for portal sign-in and automated notifications.</p>
                 </div>
             </div>
-            <div class="profile-section-body">
-                <FormGrid>
-                    <FormField label="Full name" required :error="profileForm.errors.name">
-                        <input v-model="profileForm.name" type="text" class="field" required>
-                    </FormField>
-                    <FormField label="Email" required :error="profileForm.errors.email">
-                        <input v-model="profileForm.email" type="email" class="field" required>
-                    </FormField>
-                    <FormField label="Phone" :error="profileForm.errors.phone">
-                        <input v-model="profileForm.phone" type="text" class="field">
-                    </FormField>
-                    <FormField label="Designation" :error="profileForm.errors.designation">
-                        <input v-model="profileForm.designation" type="text" class="field">
-                    </FormField>
-                </FormGrid>
-                <FormActions>
-                    <button type="submit" class="btn-primary" :disabled="profileForm.processing">
-                        {{ profileForm.processing ? 'Saving…' : 'Save profile' }}
-                    </button>
-                    <span v-if="profileForm.recentlySuccessful" class="text-xs font-semibold text-emerald-700">Saved ✓</span>
-                </FormActions>
-            </div>
+
+            <FormGrid>
+                <FormField label="Full Name" required :error="profileForm.errors.name">
+                    <input v-model="profileForm.name" type="text" class="field" required>
+                </FormField>
+                <FormField label="Email Address" required :error="profileForm.errors.email">
+                    <input v-model="profileForm.email" type="email" class="field" required>
+                </FormField>
+                <FormField label="Phone Number" :error="profileForm.errors.phone">
+                    <input v-model="profileForm.phone" type="text" class="field" placeholder="+91">
+                </FormField>
+                <FormField label="Designation" :error="profileForm.errors.designation">
+                    <input v-model="profileForm.designation" type="text" class="field">
+                </FormField>
+            </FormGrid>
+            <FormActions>
+                <button type="submit" class="btn-primary text-xs !min-h-0 !py-2.5 px-5 shadow-sm" :disabled="profileForm.processing">
+                    {{ profileForm.processing ? 'Saving…' : 'Save Profile Changes' }}
+                </button>
+                <span v-if="profileForm.recentlySuccessful" class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                    ✓ Saved successfully
+                </span>
+            </FormActions>
         </form>
 
-        <!-- Password -->
-        <form @submit.prevent="savePassword" class="profile-section-card">
-            <div class="profile-section-head">
-                <div class="flex items-start gap-3">
-                    <span class="profile-step-icon">🔒</span>
-                    <div>
-                        <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Security</p>
-                        <h2 class="text-lg font-bold text-slate-900">Change password</h2>
-                        <p class="mt-1 text-sm text-slate-500">Choose a strong password you don't use elsewhere.</p>
-                    </div>
+        <!-- Security & Password -->
+        <form @submit.prevent="savePassword" class="card rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm space-y-4">
+            <div class="flex items-start gap-4 border-b border-slate-100 pb-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-900 text-lg font-bold">
+                    🔒
+                </span>
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Security & Password</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Update your password regularly to protect your teacher portal account.</p>
                 </div>
             </div>
-            <div class="profile-section-body">
-                <FormGrid>
-                    <FormField label="Current password" required :error="passwordForm.errors.current_password" class-extra="sm:col-span-2">
-                        <input v-model="passwordForm.current_password" type="password" class="field" required autocomplete="current-password">
-                    </FormField>
-                    <FormField label="New password" required :error="passwordForm.errors.password">
-                        <input v-model="passwordForm.password" type="password" class="field" required autocomplete="new-password">
-                    </FormField>
-                    <FormField label="Confirm new password" required>
-                        <input v-model="passwordForm.password_confirmation" type="password" class="field" required autocomplete="new-password">
-                    </FormField>
-                </FormGrid>
-                <FormActions>
-                    <button type="submit" class="btn-secondary" :disabled="passwordForm.processing">
-                        {{ passwordForm.processing ? 'Updating…' : 'Update password' }}
-                    </button>
-                    <span v-if="passwordForm.recentlySuccessful" class="text-xs font-semibold text-emerald-700">Password updated ✓</span>
-                </FormActions>
-            </div>
+
+            <FormGrid>
+                <FormField label="Current Password" required :error="passwordForm.errors.current_password" class-extra="sm:col-span-2">
+                    <input v-model="passwordForm.current_password" type="password" class="field" required autocomplete="current-password">
+                </FormField>
+                <FormField label="New Password" required :error="passwordForm.errors.password">
+                    <input v-model="passwordForm.password" type="password" class="field" required autocomplete="new-password">
+                </FormField>
+                <FormField label="Confirm New Password" required>
+                    <input v-model="passwordForm.password_confirmation" type="password" class="field" required autocomplete="new-password">
+                </FormField>
+            </FormGrid>
+            <FormActions>
+                <button type="submit" class="btn-primary text-xs !min-h-0 !py-2.5 px-5 shadow-sm" :disabled="passwordForm.processing">
+                    {{ passwordForm.processing ? 'Updating…' : 'Update Password' }}
+                </button>
+                <span v-if="passwordForm.recentlySuccessful" class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                    ✓ Password updated successfully
+                </span>
+            </FormActions>
         </form>
     </PortalLayout>
 </template>
@@ -174,3 +173,4 @@ function savePassword() {
     });
 }
 </script>
+
