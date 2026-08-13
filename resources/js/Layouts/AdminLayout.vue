@@ -140,7 +140,7 @@ const stateNavGroups = computed(() => [
 
 // Superadmin sees everything
 const superNavGroups = computed(() => {
-    const groups = [
+    return [
         {
             label: 'Overview',
             items: [
@@ -162,55 +162,54 @@ const superNavGroups = computed(() => {
             ],
         },
         {
+            label: 'State Workspace & Results',
+            items: [
+                { href: '/admin/state-workspace/qualifiers', icon: '📥', label: 'Qualifier Intakes' },
+                { href: '/admin/state-workspace/fest',       icon: '🏆', label: 'State Finals' },
+                { href: '/admin/kalotsav',                    icon: '🎭', label: 'Kalotsav View' },
+                { href: '/admin/sports',                      icon: '🏅', label: 'Sports Results' },
+                { href: '/admin/board-results',                icon: '🎓', label: 'Board Results' },
+            ],
+        },
+        {
             label: 'Subscriptions',
             items: [
                 { href: '/admin/billing', icon: '💳', label: 'Billing & Subscriptions' },
             ],
         },
         {
-            label: 'Security',
+            label: 'Security & Tools',
             items: [
-                { href: '/admin/state-users', icon: '👤', label: 'State Users' },
-                { href: '/admin/audit-logs', icon: '📋', label: 'Audit Log' },
-                { href: '/admin/storage-migration', icon: '☁️', label: 'S3 migration' },
+                { href: '/admin/dev-pass-token',    icon: '🔑', label: 'Dev Pass Token' },
+                { href: '/admin/state-users',       icon: '👤', label: 'State Users' },
+                { href: '/admin/audit-logs',        icon: '📋', label: 'Audit Log' },
+                { href: '/admin/storage-migration', icon: '☁️', label: 'S3 Migration' },
             ],
         },
         {
             label: 'Platform Rules',
             items: [
-                { href: '/admin/state-programs',               icon: '🏆', label: 'State Programs' },
+                { href: '/admin/state-programs',               icon: '📋', label: 'State Programs' },
                 { href: '/admin/state-remittances',            icon: '💳', label: 'State Remittances' },
                 { href: '/admin/master-data/class-categories', icon: '📚', label: 'Class Categories' },
                 { href: '/admin/master-data/teaching-types',   icon: '👩‍🏫', label: 'Teaching Types' },
                 { href: '/admin/master-data/subjects',         icon: '📖', label: 'Subjects' },
-                { href: '/admin/master-data/designations',   icon: '🏷️', label: 'Designations' },
-                { href: '/admin/master-data/age-categories', icon: '🎂', label: 'Age Categories' },
+                { href: '/admin/master-data/designations',     icon: '🏷️', label: 'Designations' },
+                { href: '/admin/master-data/age-categories',   icon: '🎂', label: 'Age Categories' },
+            ],
+        },
+        {
+            label: 'Site Builder & Themes',
+            items: [
+                { href: '/admin/builder/sections', icon: '📐', label: 'Sections' },
+                { href: '/admin/builder/theme',    icon: '🎨', label: 'Theme & Skin' },
+                { href: '/admin/builder/nav',      icon: '🧭', label: 'Navigation' },
+                { href: '/admin/builder/footer',   icon: '🦶', label: 'Footer' },
+                { href: '/admin/builder/widgets',  icon: '🔧', label: 'Widgets' },
+                { href: '/admin/skin-presets',     icon: '🖌️', label: 'Skin Presets' },
             ],
         },
     ];
-
-    if (websiteEnabled.value) {
-        groups.push(
-            {
-                label: 'Site Builder',
-                items: [
-                    { href: '/admin/builder/sections', icon: '📐', label: 'Sections' },
-                    { href: '/admin/builder/theme',    icon: '🎨', label: 'Theme & Skin' },
-                    { href: '/admin/builder/nav',      icon: '🧭', label: 'Navigation' },
-                    { href: '/admin/builder/footer',   icon: '🦶', label: 'Footer' },
-                    { href: '/admin/builder/widgets',  icon: '🔧', label: 'Widgets' },
-                ],
-            },
-            {
-                label: 'Content',
-                items: [
-                    { href: '/admin/skin-presets', icon: '🖌️', label: 'Skin Presets' },
-                ],
-            },
-        );
-    }
-
-    return groups;
 });
 
 const navGroups = computed(() => {
