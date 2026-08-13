@@ -9,40 +9,46 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (! Schema::hasTable('state_fest_marks')) {
+        $connection = config('state.connection', 'state');
+        $schema = Schema::connection($connection);
+
+        if (! $schema->hasTable('state_fest_marks')) {
             return;
         }
 
-        DB::connection('state')
+        DB::connection($connection)
             ->table('state_fest_marks')
             ->whereNotNull('registration_id')
             ->select('state_event_id', 'registration_id')
             ->groupBy('state_event_id', 'registration_id')
             ->havingRaw('COUNT(*) > 1')
             ->get()
-            ->each(function ($duplicate) {
-                $ids = DB::connection('state')
+            ->each(function ($duplicate) use ($connection) {
+                $ids = DB::connection($connection)
                     ->table('state_fest_marks')
                     ->where('state_event_id', $duplicate->state_event_id)
                     ->where('registration_id', $duplicate->registration_id)
                     ->orderBy('id')
                     ->pluck('id');
 
-                DB::connection('state')
+                DB::connection($connection)
                     ->table('state_fest_marks')
                     ->whereIn('id', $ids->slice(1))
                     ->delete();
             });
 
-        Schema::table('state_fest_marks', function (Blueprint $table) {
+        $schema->table('state_fest_marks', function (Blueprint $table) {
             $table->unique(['state_event_id', 'registration_id'], 'state_mark_event_registration_unique');
         });
     }
 
     public function down(): void
     {
-        if (Schema::hasTable('state_fest_marks')) {
-            Schema::table('state_fest_marks', function (Blueprint $table) {
+        $connection = config('state.connection', 'state');
+        $schema = Schema::connection($connection);
+
+        if ($schema->hasTable('state_fest_marks')) {
+            $schema->table('state_fest_marks', function (Blueprint $table) {
                 $table->dropUnique('state_mark_event_registration_unique');
             });
         }
