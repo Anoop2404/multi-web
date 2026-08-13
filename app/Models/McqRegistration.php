@@ -95,12 +95,12 @@ class McqRegistration extends Model
 
     public function student(): BelongsTo
     {
-        return $this->belongsTo(Student::class);
+        return $this->belongsTo(Student::class)->withTrashed();
     }
 
     public function teacher(): BelongsTo
     {
-        return $this->belongsTo(Teacher::class);
+        return $this->belongsTo(Teacher::class)->withTrashed();
     }
 
     public function certificate(): HasOne
@@ -111,7 +111,25 @@ class McqRegistration extends Model
     /** Display name for student or teacher registrations. */
     public function participantName(): string
     {
-        return (string) ($this->student?->name ?? $this->teacher?->name ?? '');
+        $student = $this->student;
+        if ($student) {
+            return $student->trashed() ? "{$student->name} (Withdrawn)" : $student->name;
+        }
+
+        $teacher = $this->teacher;
+        if ($teacher) {
+            return $teacher->trashed() ? "{$teacher->name} (Inactive)" : $teacher->name;
+        }
+
+        if ($this->student_id) {
+            return '[Deleted Student #'.$this->student_id.']';
+        }
+
+        if ($this->teacher_id) {
+            return '[Deleted Teacher #'.$this->teacher_id.']';
+        }
+
+        return '—';
     }
 
     public function isTeacherRegistration(): bool

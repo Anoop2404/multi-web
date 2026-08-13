@@ -93,4 +93,55 @@ class McqReportTest extends TestCase
         $response = $printable->classWiseRegistrationPdf($exam, $schoolId, null, true);
         $this->assertSame(200, $response->getStatusCode());
     }
+
+    public function test_reports_include_withdrawn_student_names_and_classes_without_blank_rows(): void
+    {
+        $sahodayaId = (string) Str::uuid();
+        $schoolId = (string) Str::uuid();
+
+        $school = Tenant::create([
+            'id'        => $schoolId,
+            'type'      => 'school',
+            'name'      => 'Test School',
+            'parent_id' => $sahodayaId,
+        ]);
+
+        $exam = McqExam::create([
+            'tenant_id' => $sahodayaId,
+            'title'     => 'STSE Exam 2',
+            'status'    => 'published',
+        ]);
+
+        $class = SchoolClass::create([
+            'tenant_id' => $schoolId,
+            'name'      => '10',
+        ]);
+
+        $student = Student::create([
+            'tenant_id'       => $schoolId,
+            'school_class_id' => $class->id,
+            'name'            => 'Withdrawn Student',
+            'status'          => 'active',
+        ]);
+
+        $reg = McqRegistration::create([
+            'exam_id'   => $exam->id,
+            'student_id'=> $student->id,
+            'school_id' => $schoolId,
+            'status'    => 'registered',
+        ]);
+
+        // Soft-delete the student
+        $student->delete();
+
+        $reg->refresh();
+        $this->assertSame('Withdrawn Student (Withdrawn)', $reg->participantName());
+
+        $reportService = app(McqReportService::class);
+        $rows = $reportService->registrationRows($exam, $schoolId);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('Withdrawn Student (Withdrawn)', $rows[0]['student_name']);
+        $this->assertSame('10', $rows[0]['class_name']);
+    }
 }
