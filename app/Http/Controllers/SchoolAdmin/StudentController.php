@@ -52,9 +52,11 @@ class StudentController extends SchoolAdminController
                 ->select('students.*');
         } else {
             $query->orderBy(match ($sort) {
-                'parent_email' => 'parent_email',
-                'status'       => 'status',
-                default        => 'name',
+                'parent_email' => 'students.parent_email',
+                'status'       => 'students.status',
+                'reg_no'       => 'students.reg_no',
+                'verified_at'  => 'students.verified_at',
+                default        => 'students.name',
             }, $dir);
         }
 
@@ -1114,31 +1116,31 @@ class StudentController extends SchoolAdminController
     /** @param  array<string, mixed>  $filters */
     private function studentListQuery(array $filters)
     {
-        return Student::where('tenant_id', $this->school->id)
+        return Student::where('students.tenant_id', $this->school->id)
             ->with(['schoolClass.classCategory'])
             ->when(! empty($filters['class_category_id']), function ($q) use ($filters) {
                 $q->whereHas('schoolClass', fn ($c) => $c->where('class_category_id', $filters['class_category_id']));
             })
             ->when(($filters['school_class_id'] ?? null) === 'unassigned', function ($q) {
-                $q->whereNull('school_class_id');
+                $q->whereNull('students.school_class_id');
             }, function ($q) use ($filters) {
-                $q->when(! empty($filters['school_class_id']), fn ($inner) => $inner->where('school_class_id', $filters['school_class_id']));
+                $q->when(! empty($filters['school_class_id']), fn ($inner) => $inner->where('students.school_class_id', $filters['school_class_id']));
             })
             ->when(($filters['status'] ?? 'active') !== 'all', function ($q) use ($filters) {
-                $q->where('status', $filters['status'] ?? 'active');
+                $q->where('students.status', $filters['status'] ?? 'active');
             })
-            ->when(($filters['verification'] ?? 'all') === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
-            ->when(($filters['verification'] ?? 'all') === 'unverified', fn ($q) => $q->whereNull('verified_at'))
+            ->when(($filters['verification'] ?? 'all') === 'verified', fn ($q) => $q->whereNotNull('students.verified_at'))
+            ->when(($filters['verification'] ?? 'all') === 'unverified', fn ($q) => $q->whereNull('students.verified_at'))
             ->when(! empty($filters['search']), function ($q) use ($filters) {
                 $term = '%'.$filters['search'].'%';
                 $q->where(function ($inner) use ($term) {
-                    $inner->where('name', 'like', $term)
-                        ->orWhere('parent_email', 'like', $term)
-                        ->orWhere('email', 'like', $term)
-                        ->orWhere('admission_number', 'like', $term)
-                        ->orWhere('reg_no', 'like', $term)
-                        ->orWhere('roll_number', 'like', $term)
-                        ->orWhere('parent_name', 'like', $term);
+                    $inner->where('students.name', 'like', $term)
+                        ->orWhere('students.parent_email', 'like', $term)
+                        ->orWhere('students.email', 'like', $term)
+                        ->orWhere('students.admission_number', 'like', $term)
+                        ->orWhere('students.reg_no', 'like', $term)
+                        ->orWhere('students.roll_number', 'like', $term)
+                        ->orWhere('students.parent_name', 'like', $term);
                 });
             });
     }

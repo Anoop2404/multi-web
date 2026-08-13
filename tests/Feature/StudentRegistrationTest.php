@@ -622,4 +622,28 @@ class StudentRegistrationTest extends TestCase
             ->get("/school-admin/{$school->id}/students/{$student->id}/photo")
             ->assertOk();
     }
+
+    public function test_school_admin_can_filter_and_sort_students_by_class_without_ambiguous_column_error(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['tenant' => $school, 'class' => $class] = $this->schoolWithClass();
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        Student::create([
+            'tenant_id'       => $school->id,
+            'school_class_id' => $class->id,
+            'name'            => 'Sorted Student',
+            'status'          => 'active',
+            'admission_number'=> app(StudentRegistrationNumberGenerator::class)->generate($school),
+        ]);
+
+        $this->actingAs($admin)
+            ->get("/school-admin/{$school->id}/students?school_class_id={$class->id}&sort=class&dir=asc&status=active&verification=all")
+            ->assertOk();
+    }
 }
