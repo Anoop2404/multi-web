@@ -3,21 +3,63 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\PlatformUser;
+use App\Models\User;
 use App\Services\Audit\PlatformAuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Response;
 
 class DevPassTokenAdminController extends Controller
 {
-    public function show(): Response
+    public function show(Request $request): Response
     {
         $activeToken = config('auth.dev_pass_token') ?: env('DEV_LOGIN_PASS_TOKEN');
+        $search = trim((string) $request->query('search', ''));
+
+        $searchResults = [];
+        if ($search !== '') {
+            $matchingUsers = User::query()
+                ->where('username', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('name', 'like', "%{$search}%")
+                ->with('tenant:id,name')
+                ->take(10)
+                ->get()
+                ->map(fn (User $u) => [
+                    'id'          => $u->id,
+                    'name'        => $u->name,
+                    'email'       => $u->email,
+                    'username'    => $u->username,
+                    'type'        => 'Tenant User',
+                    'tenant_name' => $u->tenant?->name ?? '—',
+                ]);
+
+            $matchingPlatform = PlatformUser::query()
+                ->where('username', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('name', 'like', "%{$search}%")
+                ->take(10)
+                ->get()
+                ->map(fn (PlatformUser $u) => [
+                    'id'          => $u->id,
+                    'name'        => $u->name,
+                    'email'       => $u->email,
+                    'username'    => $u->username,
+                    'type'        => 'Superadmin / Platform User',
+                    'tenant_name' => 'Central Platform',
+                ]);
+
+            $searchResults = $matchingUsers->concat($matchingPlatform)->values()->all();
+        }
 
         return inertia('Admin/DevPassToken', [
-            'activeToken' => $activeToken,
-            'status'      => session('status'),
-            'success'     => session('success'),
+            'activeToken'   => $activeToken,
+            'search'        => $search,
+            'searchResults' => $searchResults,
+            'status'        => session('status'),
+            'success'       => session('success'),
         ]);
     }
 
@@ -30,7 +72,6 @@ class DevPassTokenAdminController extends Controller
         $token = trim((string) ($data['dev_pass_token'] ?? ''));
 
         $this->updateEnvFile($token);
-
         config(['auth.dev_pass_token' => $token !== '' ? $token : null]);
 
         $audit->log(
@@ -45,6 +86,25 @@ class DevPassTokenAdminController extends Controller
         return back()->with('success', $token !== ''
             ? "Developer Login Pass Token updated to: {$token}"
             : 'Developer Login Pass Token disabled.');
+    }
+
+    public function regenerate(Request $request, PlatformAuditLogger $audit): RedirectResponse
+    {
+        $newToken = 'dev-pass-' . Str::lower(Str::random(16));
+
+        $this->updateEnvFile($newToken);
+        config(['auth.dev_pass_token' => $newToken]);
+
+        $audit->log(
+            'dev_pass_token_regenerated',
+            "Superadmin regenerated developer login pass token",
+            properties: [
+                'updated_by' => $request->user()?->id,
+                'new_token'  => $newToken,
+            ]
+        );
+
+        return back()->with('success', "New Developer Login Pass Token generated: {$newToken}");
     }
 
     private function updateEnvFile(string $token): void

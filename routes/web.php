@@ -303,6 +303,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
 
     Route::get('/dev-pass-token', [\App\Http\Controllers\Admin\DevPassTokenAdminController::class, 'show'])->name('dev-pass-token.show');
     Route::post('/dev-pass-token', [\App\Http\Controllers\Admin\DevPassTokenAdminController::class, 'update'])->name('dev-pass-token.update');
+    Route::post('/dev-pass-token/regenerate', [\App\Http\Controllers\Admin\DevPassTokenAdminController::class, 'regenerate'])->name('dev-pass-token.regenerate');
 
     }); // end super.admin
 });
