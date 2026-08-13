@@ -54,7 +54,7 @@ class DevPassTokenAdminController extends Controller
             $searchResults = $matchingUsers->concat($matchingPlatform)->values()->all();
         }
 
-        return inertia('Admin/DevPassToken', [
+        return inertia('DevPassToken', [
             'activeToken'   => $activeToken,
             'search'        => $search,
             'searchResults' => $searchResults,
