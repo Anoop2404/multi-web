@@ -3,7 +3,7 @@
         role-label="Teacher Portal"
         title="Question Papers"
         :subtitle="`${teacher.name} · ${school.name}`"
-        accent="indigo"
+        accent="navy"
         :nav-items="navItems"
     >
         <section class="card mb-5">
@@ -70,7 +70,7 @@
                         <p class="text-xs text-slate-400 mt-1 truncate">{{ paper.original_name }} · {{ fileSize(paper.file_size) }} · Uploaded {{ formatDate(paper.created_at) }}</p>
                     </div>
                     <div class="flex items-center gap-3 shrink-0">
-                        <a :href="downloadUrl(paper)" class="text-sm font-semibold text-indigo-700">Download</a>
+                        <a :href="downloadUrl(paper)" class="text-sm font-semibold text-[#0f3d7a]">Download</a>
                         <button type="button" class="text-sm font-semibold text-slate-700" @click="openEdit(paper)">Edit</button>
                         <button type="button" class="text-sm font-semibold text-red-600" @click="removePaper(paper)">Remove</button>
                     </div>
@@ -124,8 +124,8 @@
 
         <div v-if="papers.links?.length > 3" class="flex justify-center gap-1 mt-5">
             <Link v-for="link in papers.links" :key="link.label" :href="link.url || '#'" preserve-scroll
-                  class="px-3 py-1.5 rounded text-xs font-medium"
-                  :class="link.active ? 'bg-indigo-700 text-white' : (link.url ? 'bg-white text-slate-700 border' : 'text-slate-300 pointer-events-none')"
+                  class="pagination-link"
+                  :class="link.active ? 'pagination-link--active' : (!link.url && 'opacity-40 pointer-events-none')"
                   v-html="link.label" />
         </div>
     </PortalLayout>

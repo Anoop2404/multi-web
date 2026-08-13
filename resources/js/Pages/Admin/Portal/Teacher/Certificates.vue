@@ -3,24 +3,28 @@
         role-label="Teacher Portal"
         title="Certificates"
         :subtitle="school.name"
-        accent="indigo"
+        accent="navy"
         :nav-items="navItems"
     >
         <section class="card">
-            <h2 class="font-semibold text-sm mb-2">Fest certificates</h2>
-            <ul class="text-sm divide-y">
-                <li v-for="(c, i) in festCerts" :key="i" class="py-2 flex justify-between gap-2">
-                    <span>{{ c.event?.title ?? 'Event' }} — {{ c.item?.title ?? '' }}</span>
-                    <a v-if="c.uuid" :href="`/certificates/print/${c.uuid}`" target="_blank" class="text-xs font-semibold text-indigo-600 shrink-0">Print ↗</a>
+            <h2 class="section-title text-base mb-3">Fest certificates</h2>
+            <ul v-if="festCerts?.length" class="text-sm divide-y divide-slate-100">
+                <li v-for="(c, i) in festCerts" :key="i" class="py-3 flex justify-between items-center gap-3">
+                    <div class="min-w-0">
+                        <p class="font-medium text-slate-900 truncate">{{ c.event?.title ?? 'Event' }}</p>
+                        <p v-if="c.item?.title" class="text-xs text-slate-500 truncate">{{ c.item.title }}</p>
+                    </div>
+                    <a v-if="c.uuid" :href="`/certificates/print/${c.uuid}`" target="_blank" class="btn-secondary text-xs !min-h-0 !py-1.5 !px-3 shrink-0">Print ↗</a>
                 </li>
-                <li v-if="!festCerts?.length" class="text-gray-400 py-2">No certificates yet</li>
             </ul>
+            <EmptyState v-else title="No certificates yet" description="Certificates you've earned from fest and training will appear here." icon="🏆" />
         </section>
     </PortalLayout>
 </template>
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import EmptyState from '@/Components/ui/EmptyState.vue';
 import { computed } from 'vue';
 import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';
 

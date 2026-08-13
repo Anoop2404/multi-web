@@ -3,129 +3,138 @@
         role-label="Teacher Portal"
         title="Training"
         :subtitle="school.name"
-        accent="indigo"
+        accent="navy"
         :nav-items="navItems"
         :avatar-url="teacher?.photo_url"
         show-avatar-placeholder
     >
-        <section v-if="openPrograms?.length" class="card mb-4">
-            <h2 class="font-semibold text-sm mb-1 text-slate-900">Open programmes</h2>
-            <p class="text-xs text-slate-500 mb-3">Register for Sahodaya teacher training events.</p>
-            <div v-for="p in openPrograms" :key="p.id" class="border-t first:border-0 pt-4 first:pt-0 mb-4 last:mb-0">
-                <p class="font-medium text-sm text-slate-900">{{ p.title }}</p>
-                <p v-if="p.description" class="text-xs text-slate-500 mt-0.5">{{ p.description }}</p>
-                <p class="text-xs text-slate-500 mt-1">
-                    <span v-if="p.venue">{{ p.venue }}</span>
-                    <span v-if="p.start_date"> · {{ formatDate(p.start_date) }}<span v-if="p.end_date && p.end_date !== p.start_date"> – {{ formatDate(p.end_date) }}</span></span>
-                    <span v-if="p.has_fee"> · Fee ₹{{ p.fee_amount }}</span>
-                </p>
-                <button v-if="p.can_register"
-                        type="button"
-                        class="btn-primary text-xs mt-2 !min-h-0 !py-1.5 !px-3"
-                        :disabled="registering === p.id"
-                        @click="register(p)">
-                    {{ registering === p.id ? 'Registering…' : 'Register' }}
-                </button>
-                <p v-else-if="p.ineligibility_reason" class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-2">
-                    {{ p.ineligibility_reason }}
-                </p>
-            </div>
-        </section>
+        <section class="card mb-5">
+            <h2 class="section-title text-base mb-1">Open programmes</h2>
+            <p class="text-xs text-slate-500 mb-4">Register for Sahodaya teacher training events.</p>
 
-        <section v-else class="card mb-4">
-            <h2 class="font-semibold text-sm mb-1 text-slate-900">Open programmes</h2>
-            <p class="text-sm text-slate-400 py-3">No training programmes are open for registration right now. Check back later or contact your school admin.</p>
+            <div v-if="openPrograms?.length" class="grid gap-3 sm:grid-cols-2">
+                <div v-for="p in openPrograms" :key="p.id" class="program-card">
+                    <div class="flex items-center gap-3">
+                        <span class="program-card-icon">📚</span>
+                        <p class="font-semibold text-slate-900">{{ p.title }}</p>
+                    </div>
+                    <p v-if="p.description" class="text-xs text-slate-500">{{ p.description }}</p>
+                    <p class="text-xs text-slate-500">
+                        <span v-if="p.venue">{{ p.venue }}</span>
+                        <span v-if="p.start_date"> · {{ formatDate(p.start_date) }}<span v-if="p.end_date && p.end_date !== p.start_date"> – {{ formatDate(p.end_date) }}</span></span>
+                        <span v-if="p.has_fee"> · Fee ₹{{ p.fee_amount }}</span>
+                    </p>
+                    <button v-if="p.can_register"
+                            type="button"
+                            class="btn-primary text-xs mt-1 !min-h-0 !py-1.5 !px-3 w-fit"
+                            :disabled="registering === p.id"
+                            @click="register(p)">
+                        {{ registering === p.id ? 'Registering…' : 'Register' }}
+                    </button>
+                    <p v-else-if="p.ineligibility_reason" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">
+                        {{ p.ineligibility_reason }}
+                    </p>
+                </div>
+            </div>
+            <EmptyState v-else title="No open training programmes" description="Check back later or contact your school admin about upcoming Sahodaya training." icon="📚" />
         </section>
 
         <section class="card">
-            <h2 class="font-semibold text-sm mb-2 text-slate-900">My registrations</h2>
-            <div v-for="t in training" :key="t.id" class="border-t first:border-0 pt-4 first:pt-0 mb-4 last:mb-0">
-                <p class="font-medium text-sm text-slate-900">{{ t.program?.title }}</p>
-                <p class="text-xs text-slate-500 capitalize">{{ t.status }}
-                    <span v-if="t.status === 'waitlisted' && t.waitlist_position"> · position #{{ t.waitlist_position }}</span>
-                    <span v-if="t.fee_status"> · fee {{ t.fee_status.replace('_', ' ') }}</span>
-                </p>
-                <p v-if="t.program?.venue" class="text-xs text-slate-500">{{ t.program.venue }}</p>
+            <h2 class="section-title text-base mb-3">My registrations</h2>
 
-                <ul v-if="t.sessions?.length" class="mt-2 text-xs space-y-1">
-                    <li v-for="s in t.sessions" :key="s.id" class="text-slate-600">
-                        {{ s.title }} · {{ s.scheduled_at ? new Date(s.scheduled_at).toLocaleString() : 'TBA' }}
-                        <span v-if="s.venue"> · {{ s.venue }}</span>
-                        <span v-if="s.attendance" class="ml-1 capitalize font-medium text-indigo-700">({{ s.attendance }})</span>
-                    </li>
-                </ul>
-
-                <form v-if="needsPayment(t)" @submit.prevent="uploadPayment(t)" class="mt-3 space-y-2 border rounded-lg p-3 bg-slate-50">
-                    <p class="text-xs font-semibold text-slate-700">
-                        Upload payment proof
-                        <span v-if="t.fee_total"> · Balance ₹{{ balance(t) }}</span>
-                    </p>
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" required class="field text-xs"
-                           @change="e => paymentForms[t.id].payment_proof = e.target.files[0]">
-                    <input v-model="paymentForms[t.id].transaction_ref" class="field text-xs" placeholder="Transaction ref (optional)">
-                    <input v-if="t.fee_total > 0" v-model="paymentForms[t.id].amount" type="number" min="1" :max="balance(t)"
-                           step="0.01" class="field text-xs" :placeholder="`Amount (max ₹${balance(t)})`">
-                    <button type="submit" class="btn-primary text-xs !min-h-0 !py-1.5" :disabled="paymentForms[t.id]?.processing">
-                        {{ paymentForms[t.id]?.processing ? 'Uploading…' : 'Submit proof' }}
-                    </button>
-                </form>
-
-                <a v-if="t.certificate_uuid" :href="`/portal/teacher/${school.id}/training/${t.id}/certificate`" target="_blank"
-                   class="text-xs font-semibold text-indigo-600 mt-2 inline-block">Download certificate ↗</a>
-
-                <p v-if="t.feedback" class="text-xs text-slate-500 mt-2">
-                    Feedback submitted · {{ t.feedback.rating }}/5
-                    <span class="capitalize">({{ t.feedback.status }})</span>
-                </p>
-
-                <form v-if="t.can_submit_feedback" @submit.prevent="submitFeedback(t)"
-                      class="mt-3 space-y-2 border rounded-lg p-3 bg-slate-50">
-                    <p class="text-xs font-semibold text-slate-700">Share your feedback</p>
-                    <label class="block text-xs text-slate-600">
-                        Overall rating (1–5)
-                        <select v-model="feedbackForms[t.id].rating" required class="field text-xs mt-1">
-                            <option value="" disabled>Select…</option>
-                            <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-                        </select>
-                    </label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <label class="block text-xs text-slate-600">
-                            Content
-                            <select v-model="feedbackForms[t.id].content_rating" class="field text-xs mt-1">
-                                <option value="">—</option>
-                                <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-                            </select>
-                        </label>
-                        <label class="block text-xs text-slate-600">
-                            Trainer
-                            <select v-model="feedbackForms[t.id].trainer_rating" class="field text-xs mt-1">
-                                <option value="">—</option>
-                                <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-                            </select>
-                        </label>
-                        <label class="block text-xs text-slate-600">
-                            Venue
-                            <select v-model="feedbackForms[t.id].venue_rating" class="field text-xs mt-1">
-                                <option value="">—</option>
-                                <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-                            </select>
-                        </label>
+            <div v-if="training?.length" class="space-y-4">
+                <div v-for="t in training" :key="t.id" class="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="font-semibold text-slate-900">{{ t.program?.title }}</p>
+                            <p v-if="t.program?.venue" class="text-xs text-slate-500 mt-0.5">{{ t.program.venue }}</p>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="track-status-pill" :class="pillClass(t.status)">{{ t.status }}</span>
+                            <span v-if="t.status === 'waitlisted' && t.waitlist_position" class="text-xs text-slate-500">#{{ t.waitlist_position }}</span>
+                            <span v-if="t.fee_status" class="status-pill status-pill--draft capitalize">{{ t.fee_status.replace('_', ' ') }}</span>
+                        </div>
                     </div>
-                    <textarea v-model="feedbackForms[t.id].comments" rows="2" class="field text-xs"
-                              placeholder="Comments (optional)"></textarea>
-                    <button type="submit" class="btn-primary text-xs !min-h-0 !py-1.5"
-                            :disabled="!feedbackForms[t.id]?.rating || feedbackForms[t.id]?.processing">
-                        {{ feedbackForms[t.id]?.processing ? 'Submitting…' : 'Submit feedback' }}
-                    </button>
-                </form>
+
+                    <ul v-if="t.sessions?.length" class="mt-3 text-xs space-y-1 border-t border-slate-100 pt-3">
+                        <li v-for="s in t.sessions" :key="s.id" class="text-slate-600">
+                            <span class="font-medium text-slate-800">{{ s.title }}</span>
+                            · {{ s.scheduled_at ? new Date(s.scheduled_at).toLocaleString() : 'TBA' }}
+                            <span v-if="s.venue"> · {{ s.venue }}</span>
+                            <span v-if="s.attendance" class="ml-1 capitalize font-semibold text-[#0f3d7a]">({{ s.attendance }})</span>
+                        </li>
+                    </ul>
+
+                    <form v-if="needsPayment(t)" @submit.prevent="uploadPayment(t)" class="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                        <p class="text-xs font-semibold text-slate-700">
+                            Upload payment proof
+                            <span v-if="t.fee_total"> · Balance ₹{{ balance(t) }}</span>
+                        </p>
+                        <input type="file" accept=".pdf,.jpg,.jpeg,.png" required class="field field--sm"
+                               @change="e => paymentForms[t.id].payment_proof = e.target.files[0]">
+                        <input v-model="paymentForms[t.id].transaction_ref" class="field field--sm" placeholder="Transaction ref (optional)">
+                        <input v-if="t.fee_total > 0" v-model="paymentForms[t.id].amount" type="number" min="1" :max="balance(t)"
+                               step="0.01" class="field field--sm" :placeholder="`Amount (max ₹${balance(t)})`">
+                        <button type="submit" class="btn-primary text-xs !min-h-0 !py-1.5" :disabled="paymentForms[t.id]?.processing">
+                            {{ paymentForms[t.id]?.processing ? 'Uploading…' : 'Submit proof' }}
+                        </button>
+                    </form>
+
+                    <a v-if="t.certificate_uuid" :href="`${base}/training/${t.id}/certificate`" target="_blank"
+                       class="text-xs font-semibold text-[#0f3d7a] mt-3 inline-block">Download certificate ↗</a>
+
+                    <p v-if="t.feedback" class="text-xs text-slate-500 mt-3">
+                        Feedback submitted · {{ t.feedback.rating }}/5
+                        <span class="capitalize">({{ t.feedback.status }})</span>
+                    </p>
+
+                    <form v-if="t.can_submit_feedback" @submit.prevent="submitFeedback(t)"
+                          class="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                        <p class="text-xs font-semibold text-slate-700">Share your feedback</p>
+                        <FormField label="Overall rating (1–5)">
+                            <select v-model="feedbackForms[t.id].rating" required class="field field--sm">
+                                <option value="" disabled>Select…</option>
+                                <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+                            </select>
+                        </FormField>
+                        <div class="grid grid-cols-3 gap-2">
+                            <FormField label="Content">
+                                <select v-model="feedbackForms[t.id].content_rating" class="field field--sm">
+                                    <option value="">—</option>
+                                    <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+                                </select>
+                            </FormField>
+                            <FormField label="Trainer">
+                                <select v-model="feedbackForms[t.id].trainer_rating" class="field field--sm">
+                                    <option value="">—</option>
+                                    <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+                                </select>
+                            </FormField>
+                            <FormField label="Venue">
+                                <select v-model="feedbackForms[t.id].venue_rating" class="field field--sm">
+                                    <option value="">—</option>
+                                    <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+                                </select>
+                            </FormField>
+                        </div>
+                        <textarea v-model="feedbackForms[t.id].comments" rows="2" class="field text-xs"
+                                  placeholder="Comments (optional)"></textarea>
+                        <button type="submit" class="btn-primary text-xs !min-h-0 !py-1.5"
+                                :disabled="!feedbackForms[t.id]?.rating || feedbackForms[t.id]?.processing">
+                            {{ feedbackForms[t.id]?.processing ? 'Submitting…' : 'Submit feedback' }}
+                        </button>
+                    </form>
+                </div>
             </div>
-            <p v-if="!training?.length" class="text-sm text-slate-400 py-3">You have not registered for any training yet.</p>
+            <EmptyState v-else title="No training registrations yet" description="Register for an open programme above to see it here." icon="🎓" />
         </section>
     </PortalLayout>
 </template>
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import FormField from '@/Components/ui/FormField.vue';
+import EmptyState from '@/Components/ui/EmptyState.vue';
 import { computed, reactive, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';
@@ -138,6 +147,7 @@ const props = defineProps({
 });
 
 const navItems = computed(() => teacherPortalNavItems(props.school.id));
+const base = computed(() => `/portal/teacher/${props.school.id}`);
 const registering = ref(null);
 
 const paymentForms = reactive({});
@@ -153,6 +163,14 @@ for (const t of props.training ?? []) {
         comments: '',
         processing: false,
     };
+}
+
+function pillClass(status) {
+    const key = String(status ?? '').toLowerCase();
+    if (['confirmed', 'attended', 'completed'].includes(key)) return 'track-status-pill--approved';
+    if (['cancelled', 'rejected'].includes(key)) return 'track-status-pill--rejected';
+    if (['waitlisted', 'pending'].includes(key)) return 'track-status-pill--submitted';
+    return 'track-status-pill--pending';
 }
 
 function formatDate(d) {
@@ -175,7 +193,7 @@ function balance(t) {
 
 function register(program) {
     registering.value = program.id;
-    router.post(`/portal/teacher/${props.school.id}/training/programs/${program.id}/register`, {}, {
+    router.post(`${base.value}/training/programs/${program.id}/register`, {}, {
         preserveScroll: true,
         onFinish: () => { registering.value = null; },
     });
@@ -191,7 +209,7 @@ function uploadPayment(registration) {
     if (form.transaction_ref) data.append('transaction_ref', form.transaction_ref);
     if (form.amount) data.append('amount', form.amount);
 
-    router.post(`/portal/teacher/${props.school.id}/training/registrations/${registration.id}/payment`, data, {
+    router.post(`${base.value}/training/registrations/${registration.id}/payment`, data, {
         preserveScroll: true,
         forceFormData: true,
         onFinish: () => { form.processing = false; },
@@ -208,7 +226,7 @@ function submitFeedback(registration) {
     if (!form?.rating) return;
     form.processing = true;
 
-    router.post(`/portal/teacher/${props.school.id}/training/registrations/${registration.id}/feedback`, {
+    router.post(`${base.value}/training/registrations/${registration.id}/feedback`, {
         rating: form.rating,
         content_rating: form.content_rating || null,
         trainer_rating: form.trainer_rating || null,

@@ -1,17 +1,18 @@
 <template>
-    <div class="min-h-screen bg-slate-50 flex flex-col">
-        <header class="bg-white border-b border-slate-200 shrink-0">
+    <div class="min-h-screen bg-slate-50 flex flex-col portal-shell">
+        <header class="relative bg-white/90 backdrop-blur-sm border-b border-slate-200 shrink-0 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+            <div class="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#0f3d7a] via-[#1e5aa8] to-[#d4a017]"></div>
             <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
                 <div class="flex items-center gap-3 min-w-0">
                     <div v-if="avatarUrl" class="shrink-0">
                         <img
                             :src="avatarUrl"
                             :alt="title"
-                            class="h-12 w-12 rounded-full object-cover border-2 border-indigo-100 shadow-sm"
+                            class="h-12 w-12 rounded-full object-cover border-2 border-[#eff6ff] shadow-sm"
                         >
                     </div>
                     <div v-else-if="showAvatarPlaceholder" class="shrink-0">
-                        <div class="h-12 w-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold border-2 border-indigo-50">
+                        <div class="h-12 w-12 rounded-full bg-gradient-to-br from-[#0f3d7a] to-[#1e5aa8] text-white flex items-center justify-center text-sm font-bold shadow-sm">
                             {{ initials }}
                         </div>
                     </div>
@@ -31,7 +32,7 @@
                       :href="item.href"
                       class="text-xs font-semibold px-3 py-1.5 rounded-lg transition shrink-0 whitespace-nowrap"
                       :class="isActive(item)
-                          ? 'bg-indigo-600 text-white shadow-sm'
+                          ? 'bg-[color:var(--brand-navy)] text-white shadow-sm'
                           : 'text-slate-600 hover:bg-slate-100'">
                     {{ item.label }}
                 </Link>
@@ -54,7 +55,7 @@ const props = defineProps({
     title: { type: String, required: true },
     subtitle: { type: String, default: '' },
     roleLabel: { type: String, required: true },
-    accent: { type: String, default: 'indigo' },
+    accent: { type: String, default: 'navy' },
     navItems: { type: Array, default: () => [] },
     avatarUrl: { type: String, default: '' },
     showAvatarPlaceholder: { type: Boolean, default: false },
@@ -63,11 +64,12 @@ const props = defineProps({
 const page = usePage();
 
 const accentClass = computed(() => ({
-    indigo: 'text-indigo-600',
+    navy: 'text-[#0f3d7a]',
+    indigo: 'text-[#0f3d7a]',
     amber: 'text-amber-600',
     emerald: 'text-emerald-700',
     violet: 'text-violet-600',
-}[props.accent] ?? 'text-indigo-600'));
+}[props.accent] ?? 'text-[#0f3d7a]'));
 
 const initials = computed(() => {
     const parts = (props.title || '').trim().split(/\s+/).filter(Boolean);

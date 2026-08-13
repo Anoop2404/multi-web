@@ -1315,6 +1315,15 @@ input:checked + .toggle-switch::after,
     @apply border-emerald-100 bg-emerald-50/60 text-emerald-900;
 }
 
+/* ── Teacher/Student portal shell ─────────────────────────────────────── */
+
+.portal-shell {
+    background:
+        radial-gradient(ellipse 120% 80% at 100% 0%, rgba(15, 61, 122, 0.05) 0%, transparent 55%),
+        radial-gradient(ellipse 80% 50% at 0% 100%, rgba(212, 160, 23, 0.04) 0%, transparent 50%),
+        linear-gradient(180deg, #f4f7fb 0%, #f8fafc 100%);
+}
+
 /* ── Reports hub ── */
 .reports-shell { @apply space-y-8; }
 .reports-tabs { @apply flex flex-wrap gap-1 rounded-xl border border-slate-200/90 bg-slate-50/80 p-1; }
