@@ -81,6 +81,13 @@
                                 class="block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-3 py-2 border font-mono"
                             />
                             <button
+                                type="button"
+                                @click="generateRandomCustomToken"
+                                class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition-colors shrink-0"
+                            >
+                                🎲 Fill Random
+                            </button>
+                            <button
                                 type="submit"
                                 :disabled="form.processing"
                                 class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition-colors shrink-0"
@@ -215,6 +222,15 @@ const regenerateToken = () => {
             showToken.value = true;
         },
     });
+};
+
+const generateRandomCustomToken = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let rand = '';
+    for (let i = 0; i < 12; i++) {
+        rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    form.dev_pass_token = `sahodaya-pass-${rand}`;
 };
 
 const disableToken = () => {
