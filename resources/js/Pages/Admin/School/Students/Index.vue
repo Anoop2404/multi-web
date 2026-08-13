@@ -80,6 +80,15 @@
                 Your Sahodaya admin verifies student records before fest and Talent Search registration.
             </div>
 
+            <div v-if="unassignedCount > 0" class="notice-banner notice-banner--warning text-sm flex flex-wrap items-center justify-between gap-3">
+                <span>
+                    <strong>{{ unassignedCount }}</strong> student(s) have no class assigned.
+                </span>
+                <button type="button" class="btn-secondary text-xs !min-h-0 shrink-0" @click="filterUnassigned">
+                    View unassigned students
+                </button>
+            </div>
+
             <SahodayaDataTable
                 :columns="columns"
                 :links="students.links"
@@ -90,8 +99,34 @@
                 empty="No students found."
                 @sort="toggleSort"
             >
+                <template #head-select>
+                    <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll"
+                           class="rounded border-gray-300 text-[#0f3d7a] focus:ring-[#0f3d7a]"
+                           title="Select all on this page">
+                </template>
+
                 <template #toolbar>
                     <div class="space-y-3">
+                        <div v-if="selectedIds.length > 0" class="bg-[#0f3d7a] text-white p-3 rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-md">
+                            <div class="flex items-center gap-2 text-sm font-semibold">
+                                <span>{{ selectedIds.length }} student(s) selected</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" @click="showBulkAssignModal = true"
+                                        class="btn-secondary text-xs bg-white text-[#0f3d7a] hover:bg-gray-100 border-none font-semibold">
+                                    Assign to Class
+                                </button>
+                                <button type="button" @click="confirmBulkWithdraw"
+                                        class="btn-secondary text-xs bg-red-600 text-white hover:bg-red-700 border-none font-semibold"
+                                        :disabled="bulkWithdrawForm.processing">
+                                    {{ bulkWithdrawForm.processing ? 'Removing…' : 'Remove selected' }}
+                                </button>
+                                <button type="button" @click="selectedIds = []" class="text-xs text-white/80 hover:text-white underline ml-2">
+                                    Clear selection
+                                </button>
+                            </div>
+                        </div>
+
                         <FormGrid class-extra="sm:grid-cols-2 lg:grid-cols-5 items-end">
                             <FormField label="Category">
                                 <select v-model="filterForm.class_category_id" @change="onCategoryChange" class="field">
@@ -102,6 +137,7 @@
                             <FormField label="Class">
                                 <select v-model="filterForm.school_class_id" class="field">
                                     <option :value="null">All classes</option>
+                                    <option value="unassigned">⚠️ Unassigned (No Class) ({{ unassignedCount }})</option>
                                     <option v-for="c in filteredClasses" :key="c.id" :value="c.id">Class {{ c.name }}</option>
                                 </select>
                             </FormField>
@@ -133,6 +169,10 @@
                 </template>
 
                 <tr v-for="student in students.data" :key="student.id" class="hover:bg-gray-50/80">
+                    <td class="px-3 py-3 w-10 text-center">
+                        <input type="checkbox" :value="student.id" v-model="selectedIds"
+                               class="rounded border-gray-300 text-[#0f3d7a] focus:ring-[#0f3d7a]">
+                    </td>
                     <td class="px-4 py-3 w-14">
                         <button
                             v-if="canUpdatePhoto"
@@ -371,6 +411,37 @@
             </div>
         </div>
 
+        <!-- Bulk Assign Class Modal -->
+        <div v-if="showBulkAssignModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="showBulkAssignModal = false"></div>
+            <div class="relative modal-shell max-w-md">
+                <div class="modal-head">
+                    <div>
+                        <h3 class="font-bold text-[#041525]">Assign Class</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Select a class for {{ selectedIds.length }} selected student(s).</p>
+                    </div>
+                    <button type="button" @click="showBulkAssignModal = false" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                </div>
+                <form @submit.prevent="submitBulkAssignClass" class="p-6 space-y-4">
+                    <div>
+                        <label class="form-label mb-1.5">Target Class *</label>
+                        <select v-model="bulkAssignForm.school_class_id" required class="field">
+                            <option value="">Select class</option>
+                            <option v-for="c in schoolClassesSorted" :key="c.id" :value="c.id">
+                                {{ formatClassOption(c) }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-end gap-3 pt-2">
+                        <button type="button" @click="showBulkAssignModal = false" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+                        <button type="submit" :disabled="bulkAssignForm.processing" class="btn-primary">
+                            {{ bulkAssignForm.processing ? 'Assigning…' : `Assign ${selectedIds.length} student(s)` }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Quick photo update (click avatar in list) -->
         <StudentPhotoEditModal
             v-model="showPhotoEdit"
@@ -405,6 +476,7 @@ const props = defineProps({
     studentEditLock: { type: Object, default: () => ({ locked: false }) },
     canManageDirectly: { type: Boolean, default: false },
     unverifiedCount: { type: Number, default: 0 },
+    unassignedCount: { type: Number, default: 0 },
     missingRegNoCount: { type: Number, default: 0 },
     pendingChangeRequests: { type: Number, default: 0 },
 });
@@ -422,11 +494,66 @@ const bulkUploadTab = ref('csv');
 const showEdit = ref(false);
 const showCreateRequest = ref(false);
 const showPhotoEdit = ref(false);
+const showBulkAssignModal = ref(false);
+const selectedIds = ref([]);
 const editingStudent = ref(null);
 const photoEditStudent = ref(null);
 const editPhotoFile = ref(null);
 const createPhotoFile = ref(null);
 const photoBroken = reactive({});
+
+const isAllSelected = computed(() => {
+    const pageIds = props.students?.data?.map(s => s.id) ?? [];
+    return pageIds.length > 0 && pageIds.every(id => selectedIds.value.includes(id));
+});
+
+function toggleSelectAll() {
+    const pageIds = props.students?.data?.map(s => s.id) ?? [];
+    if (isAllSelected.value) {
+        selectedIds.value = selectedIds.value.filter(id => !pageIds.includes(id));
+    } else {
+        selectedIds.value = [...new Set([...selectedIds.value, ...pageIds])];
+    }
+}
+
+function filterUnassigned() {
+    filterForm.school_class_id = 'unassigned';
+    applyFilters();
+}
+
+const bulkAssignForm = useForm({
+    school_class_id: '',
+});
+
+const bulkWithdrawForm = useForm({});
+
+function submitBulkAssignClass() {
+    if (!bulkAssignForm.school_class_id || !selectedIds.value.length) return;
+    bulkAssignForm.transform(() => ({
+        student_ids: selectedIds.value,
+        school_class_id: bulkAssignForm.school_class_id,
+    })).post(`/school-admin/${props.school.id}/students/bulk-assign-class`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showBulkAssignModal.value = false;
+            selectedIds.value = [];
+            bulkAssignForm.reset();
+        },
+    });
+}
+
+function confirmBulkWithdraw() {
+    if (!selectedIds.value.length) return;
+    if (!confirm(`Withdraw ${selectedIds.value.length} selected student(s)?`)) return;
+    bulkWithdrawForm.transform(() => ({
+        student_ids: selectedIds.value,
+    })).post(`/school-admin/${props.school.id}/students/bulk-withdraw`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            selectedIds.value = [];
+        },
+    });
+}
 
 watch(() => props.students?.data, (rows) => {
     if (!rows?.length) return;
@@ -439,6 +566,7 @@ watch(() => props.students?.data, (rows) => {
 
 const columns = computed(() => {
     const base = [
+        { key: 'select',       label: '',       sortable: false, class: 'w-10 text-center' },
         { key: 'photo',        label: 'Photo',  sortable: false, class: 'w-14' },
         { key: 'name',         label: 'Name',   sortable: true, class: 'min-w-[13rem]' },
         { key: 'admission_number', label: 'Admission No.', sortable: false },

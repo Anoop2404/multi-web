@@ -57,15 +57,27 @@ class StateFestProgramController extends Controller
             ->get(['id', 'name', 'domain', 'subdomain'])
             ->map(function ($s) use ($stateProgram) {
                 $prop = $stateProgram->propagations->firstWhere('sahodaya_id', $s->id);
+
+                // STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN — Set 1, Item 3
+                // Surface sahodaya_customized_at so the State Admin can see which
+                // Sahodayas have locally overridden the state-seeded event fields.
+                $customizedAt = null;
+                if ($prop?->tenant_event_id) {
+                    $customizedAt = \App\Models\FestEvent::where('id', $prop->tenant_event_id)
+                        ->value('sahodaya_customized_at');
+                }
+
                 return [
-                    'id'              => $s->id,
-                    'name'            => $s->name,
-                    'subdomain'       => $s->subdomain,
-                    'deployed'        => filled($prop?->tenant_event_id),
-                    'tenant_event_id' => $prop?->tenant_event_id,
-                    'is_enabled'      => (bool) ($prop?->is_enabled ?? true),
+                    'id'                    => $s->id,
+                    'name'                  => $s->name,
+                    'subdomain'             => $s->subdomain,
+                    'deployed'              => filled($prop?->tenant_event_id),
+                    'tenant_event_id'       => $prop?->tenant_event_id,
+                    'is_enabled'            => (bool) ($prop?->is_enabled ?? true),
+                    'sahodaya_customized_at' => $customizedAt,
                 ];
             });
+
 
         return inertia('StatePrograms/Show', [
             'program'      => $stateProgram,

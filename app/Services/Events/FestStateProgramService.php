@@ -92,6 +92,13 @@ class FestStateProgramService
                             ? FestEvent::query()->find($existing->tenant_event_id)
                             : null;
 
+                        // Tracks whether this run seeds a brand-new tenant event from the
+                        // program's current values (createTenantEvent()) vs. touching one
+                        // that already exists (syncTenantEvent(), which — per Set 1 items
+                        // 1-2 — no longer overwrites the Sahodaya's own settings). Only a
+                        // fresh seed resets the "last synced from State" snapshot below.
+                        $isFreshSeed = ! $event;
+
                         if ($event) {
                             $this->syncTenantEvent($event, $program, $level);
                             $updated++;
@@ -102,13 +109,23 @@ class FestStateProgramService
 
                         app(FestItemSyncService::class)->syncProgramToEvent($program, $event);
 
+                        $propagationValues = ['tenant_event_id' => $event->id];
+                        if ($isFreshSeed) {
+                            // See STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN_2026_08_13.md Set 1
+                            // item 3 — snapshot of when this event's settings last actually
+                            // came from the program, so FestStateProgramPropagation::
+                            // isDivergedFromState() can tell both sides when State has since
+                            // edited the program, without re-introducing an auto-overwrite.
+                            $propagationValues['program_updated_at_when_synced'] = $program->updated_at;
+                        }
+
                         FestStateProgramPropagation::updateOrCreate(
                             [
                                 'state_program_id' => $program->id,
                                 'sahodaya_id'      => $sahodaya->id,
                                 'level_round'      => $level,
                             ],
-                            ['tenant_event_id' => $event->id]
+                            $propagationValues
                         );
                     });
                 } catch (\Throwable $e) {
@@ -174,24 +191,23 @@ class FestStateProgramService
 
     public function syncTenantEvent(FestEvent $event, FestStateProgram $program, string $levelRound): FestEvent
     {
-        $fee = app(FestEventFeeResolver::class)->resolveForProgram($program, $levelRound);
-        $feeModel = $fee['fee_model'] ?? 'none';
-
+        // Rule-boundary fix (STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN_2026_08_13.md, Set 1 items
+        // 1-2): a Sahodaya runs its own conducted round under its own rules once the event
+        // exists — title, dates, venue, fee, description, scoring preset, and participation
+        // policy are the Sahodaya's to set (via FestEventController::update() and
+        // FestParticipationPolicyController::store()) and must not be silently reverted just
+        // because State re-published the program. This method used to overwrite every one of
+        // those fields — and re-run copyFromStateProgram(), resetting any Sahodaya-customized
+        // participation policy — on every single sync call, which is exactly the "State
+        // clobbers Sahodaya's own rules" bug this fixes. conduct_levels is the one field
+        // genuinely still under State's authority after creation (which rounds exist at all),
+        // matching FestEventController::update(), which already refuses to let a Sahodaya
+        // change conduct_levels on a state-linked event. Everything else here is seeded once,
+        // at creation, by createTenantEvent()/copyFromStateProgram() above, and belongs to the
+        // Sahodaya from that point on — this method intentionally no longer touches it.
         $event->update([
-            'title'              => $program->title,
-            'conduct_levels'     => FestConductLevels::normalize($program->conduct_levels ?? [], $program->event_type),
-            'registration_open'  => $program->registration_open,
-            'registration_close' => $program->registration_close,
-            'event_start'        => $program->event_start,
-            'event_end'          => $program->event_end,
-            'venue'              => $program->venue,
-            'fee_type'           => $feeModel === 'none' ? 'none' : 'per_item',
-            'fee_amount'         => null,
-            'description'        => $program->description,
-            'scoring_preset'     => $program->event_type === 'kalolsavam' ? 'confed_kalotsav' : $event->scoring_preset,
+            'conduct_levels' => FestConductLevels::normalize($program->conduct_levels ?? [], $program->event_type),
         ]);
-
-        app(FestParticipationPolicyService::class)->copyFromStateProgram($event, $program);
 
         return $event->fresh();
     }

@@ -109,6 +109,7 @@ class FestEvent extends Model
         'max_participants' => 'integer',
         'max_teams' => 'integer',
         'sort_order' => 'integer',
+        'sahodaya_customized_at' => 'datetime',
     ];
 
     /** Whether composite sports fee columns are configured (checklist readiness). */
@@ -180,6 +181,26 @@ class FestEvent extends Model
             if ($event->parent_event_id && $event->parentEvent) {
                 if (! str_contains($event->title, $event->parentEvent->title)) {
                     $event->title = "{$event->parentEvent->title} — {$event->title}";
+                }
+            }
+
+            // STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN — Set 2, Item 5
+            // Once a FestEvent row has state_program_id set, both state_program_id itself
+            // and event_type are immutable. Guard is only active on *updates* of persisted
+            // rows (exists = true). New records created via FestCascadeService::create()
+            // or FestStateProgramService::createTenantEvent() pass through unaffected.
+            if ($event->exists) {
+                if ($event->isDirty('state_program_id')
+                    && $event->getOriginal('state_program_id') !== null) {
+                    throw new \DomainException(
+                        "FestEvent #{$event->id}: state_program_id is immutable once set."
+                    );
+                }
+                if ($event->isDirty('event_type')
+                    && $event->getOriginal('state_program_id') !== null) {
+                    throw new \DomainException(
+                        "FestEvent #{$event->id}: event_type cannot be changed on a State-linked event."
+                    );
                 }
             }
         });
@@ -643,6 +664,17 @@ class FestEvent extends Model
     public function isStateProgram(): bool
     {
         return $this->state_program_id !== null;
+    }
+
+    /**
+     * True when a Sahodaya Admin has explicitly edited at least one state-seeded field
+     * (title, dates, venue, fee, description) after the event was first created from the
+     * State program. Used by the customization indicator badge (Set 1, Item 3 of the
+     * STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN_2026_08_13).
+     */
+    public function isCustomizedBySahodaya(): bool
+    {
+        return $this->sahodaya_customized_at !== null;
     }
 
     public function isEditableBySahodaya(): bool

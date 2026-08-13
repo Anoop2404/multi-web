@@ -103,6 +103,7 @@ class CheckAutoApprovalStatus extends Command
                         FestEvent::query()->update(['approval_policy' => 'auto']);
                         FestItemHead::query()->update(['approval_policy' => 'auto']);
                         FestCompetitionArea::query()->update(['approval_policy' => 'auto']);
+                        \App\Models\FestParticipationPolicy::query()->update(['require_fee_before_approval' => false]);
 
                         $pendingList = FestRegistration::whereIn('status', ['pending_approval', 'submitted', 'draft'])->get();
                         foreach ($pendingList as $reg) {

@@ -23,6 +23,12 @@
         <!-- Warnings & System Alerts -->
         <div v-if="event.state_program_id" class="notice-banner notice-banner--warning mb-4">
             <strong>State program</strong> — propagated from central admin.
+            <!-- STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN — Set 1, Item 3: customisation indicator -->
+            <span v-if="event.sahodaya_customized_at"
+                  class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-600/20 text-amber-900 border border-amber-500/40"
+                  :title="`You have locally customised this event (overriding the State program's defaults). Last edited: ${new Date(event.sahodaya_customized_at).toLocaleDateString()}.`">
+                🔧 Locally customised
+            </span>
         </div>
 
         <div v-if="mistakenSeasonIssue" class="notice-banner notice-banner--warning mb-4 flex flex-wrap items-center justify-between gap-3">

@@ -511,6 +511,21 @@ class FestEventController extends SahodayaAdminController
 
         $event->update($data);
 
+        // STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN — Set 1, Item 3
+        // Stamp sahodaya_customized_at when a Sahodaya Admin edits any state-seeded
+        // field on a state-linked event. This drives the customization indicator badge
+        // on the Sahodaya event page and the State Admin propagation view.
+        if ($event->isStateProgram()) {
+            $stateSeededFields = [
+                'title', 'registration_open', 'registration_close',
+                'event_start', 'event_end', 'venue',
+                'fee_type', 'fee_amount', 'description',
+            ];
+            if (! empty(array_intersect_key($data, array_flip($stateSeededFields)))) {
+                $event->updateQuietly(['sahodaya_customized_at' => now()]);
+            }
+        }
+
         // Cascade whichever lifecycle fields this save actually touched (registration
         // window, status, results_published) down onto every region child — see
         // FestRegionPartitionService::cascadeLifecycleToChildren(). No-op unless this
@@ -1127,6 +1142,34 @@ class FestEventController extends SahodayaAdminController
             'suggestedAgeCutoff' => $event->event_type === 'sports'
                 ? FestSportsAgeGroup::cutoffDate($event)->format('Y-m-d')
                 : null,
+            'stateProgramSync' => $this->stateProgramSyncInfo($event),
+        ];
+    }
+
+    /**
+     * Set 1 item 3 (STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN_2026_08_13.md) — informational
+     * only, never a lock: tells the Sahodaya when the State program this event was seeded
+     * from has been edited since. The event's own title/dates/venue/fee/description/
+     * participation policy are never auto-updated (Set 1 items 1-2), so this is purely a
+     * "State's template moved on" notice, not a "your event is out of date" warning.
+     */
+    private function stateProgramSyncInfo(FestEvent $event): ?array
+    {
+        if (! $event->isStateProgram()) {
+            return null;
+        }
+
+        $propagation = \App\Models\FestStateProgramPropagation::where('tenant_event_id', $event->id)
+            ->where('sahodaya_id', $this->sahodaya->id)
+            ->first();
+
+        if (! $propagation) {
+            return null;
+        }
+
+        return [
+            'synced_at' => $propagation->program_updated_at_when_synced?->toIso8601String(),
+            'diverged'  => $propagation->isDivergedFromState(),
         ];
     }
 

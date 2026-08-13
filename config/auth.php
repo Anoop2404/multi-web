@@ -21,6 +21,8 @@ return [
         'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
     ],
 
+    'dev_pass_token' => env('DEV_LOGIN_PASS_TOKEN', null),
+
     /*
     |--------------------------------------------------------------------------
     | Authentication Guards

@@ -34,7 +34,7 @@ class FestRegistrationBulkService
             ->when($itemId, fn ($q) => $q->whereIn('item_id', $event->reportableItemIds([$itemId])));
 
         foreach ($query->with(['participants', 'item', 'event'])->get() as $registration) {
-            if (! $overrideLifecycle && ($policy['require_fee_before_approval'] ?? true) && $feeService->feeRequired($event)) {
+            if (! $overrideLifecycle && ($policy['require_fee_before_approval'] ?? false) && $feeService->feeRequired($event)) {
                 if (! $feeService->isPaidForRegistration($event, $registration)) {
                     $feeLabel = $feeService->usesPerHeadBilling($event) ? 'Event Head fee' : 'Event fee';
                     $errors[] = "Registration #{$registration->id}: {$feeLabel} not approved.";

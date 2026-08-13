@@ -23,15 +23,19 @@ class FestRegistrationApprovalService
     {
         $count = 0;
 
+        $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
+        $feeService = app(FestSchoolEventFeeService::class);
+        $feeRequiredBeforeApproval = ($policy['require_fee_before_approval'] ?? false) && $feeService->feeRequired($event);
+
         FestRegistration::query()
             ->whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->whereIn('status', ['draft', 'submitted', 'pending_approval'])
             ->when($headId !== null, fn ($q) => $q->whereHas('item', fn ($qq) => $qq->where('head_id', $headId)))
-            ->with(['item.head'])
+            ->with(['item.head', 'event'])
             ->orderBy('id')
             ->get()
-            ->each(function (FestRegistration $registration) use (&$count, $event) {
+            ->each(function (FestRegistration $registration) use (&$count, $event, $feeService, $feeRequiredBeforeApproval) {
                 // Event Head approval_policy=manual stays in the Sahodaya review queue.
                 // Falls back to the event-level policy when the item has no head (Kalotsav
                 // items assigned a plain category instead — see
@@ -40,6 +44,15 @@ class FestRegistrationApprovalService
                 if ($registration->item?->head?->requiresManualApproval() || $event->requiresManualApproval()) {
                     if ($registration->status !== 'pending_approval') {
                         $registration->update(['status' => 'pending_approval']);
+                    }
+
+                    return;
+                }
+
+                // If fee approval is required before registration approval, check if fee is paid for this registration
+                if ($feeRequiredBeforeApproval && ! $feeService->isPaidForRegistration($event, $registration)) {
+                    if ($registration->status !== 'submitted') {
+                        $registration->update(['status' => 'submitted']);
                     }
 
                     return;

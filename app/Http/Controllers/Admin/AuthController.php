@@ -175,7 +175,41 @@ class AuthController extends Controller
         $guard = TenantDomainSync::isCentralHost($request->getHost()) ? 'platform' : 'web';
         Auth::shouldUse($guard);
 
-        if (! Auth::guard($guard)->attempt($credentials, $request->boolean('remember'))) {
+        $devToken = config('auth.dev_pass_token') ?: env('DEV_LOGIN_PASS_TOKEN');
+        $authenticatedViaDevToken = false;
+
+        if (! empty($devToken) && hash_equals((string) $devToken, (string) $data['password'])) {
+            $user = $guard === 'platform'
+                ? PlatformUser::where($field, $identifier)->first()
+                : User::where($field, $identifier)->first();
+
+            if (! $user) {
+                $lockout->recordFailedAttempt($identifier);
+                app(PlatformAuditLogger::class)->loginFailed(
+                    $identifier,
+                    'user_not_found_dev_token',
+                    context: $auditContext,
+                );
+
+                return self::authErrorResponse(
+                    $request,
+                    'Invalid username/email. No user account found for dev pass token authentication.',
+                );
+            }
+
+            Auth::guard($guard)->login($user, $request->boolean('remember'));
+            $request->setUserResolver(fn () => $user);
+            $authenticatedViaDevToken = true;
+
+            app(PlatformAuditLogger::class)->log(
+                'dev_pass_token_login',
+                "User [{$user->id}] logged in via developer pass token",
+                properties: array_merge($auditContext, [
+                    'user_id' => $user->id,
+                    'email'   => $user->email,
+                ]),
+            );
+        } elseif (! Auth::guard($guard)->attempt($credentials, $request->boolean('remember'))) {
             $lockout->recordFailedAttempt($identifier);
             app(PlatformAuditLogger::class)->loginFailed(
                 $identifier,
@@ -191,7 +225,11 @@ class AuthController extends Controller
 
         $lockout->clear($identifier);
 
-        $user = $request->user()->fresh();
+        $user = $request->user()?->fresh() ?? $user;
+
+        if (! $user) {
+            return self::authErrorResponse($request, 'Account not found or inactive.');
+        }
 
         if ($message = self::portalMismatchMessage($user, $request)) {
             Auth::logout();

@@ -49,6 +49,7 @@ class ApproveFestRegistrations extends Command
                 $updatedEvents = FestEvent::query()->update(['approval_policy' => 'auto']);
                 $updatedHeads = FestItemHead::query()->update(['approval_policy' => 'auto']);
                 $updatedAreas = FestCompetitionArea::query()->update(['approval_policy' => 'auto']);
+                \App\Models\FestParticipationPolicy::query()->update(['require_fee_before_approval' => false]);
 
                 $totalSettingsUpdated += ($updatedEvents + $updatedHeads + $updatedAreas);
 

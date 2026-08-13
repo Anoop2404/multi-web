@@ -354,6 +354,8 @@
                                     <th class="py-3 px-4">Sahodaya Complex</th>
                                     <th class="py-3 px-4">Deployment Status</th>
                                     <th class="py-3 px-4">Program Status</th>
+                                    <!-- STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN — Set 1, Item 3 -->
+                                    <th class="py-3 px-4">Customisation</th>
                                     <th class="py-3 px-4 text-right">State Item Visibility Controls</th>
                                 </tr>
                             </thead>
@@ -379,6 +381,16 @@
                                             🔴 Disabled — Click to Enable
                                         </button>
                                     </td>
+                                    <!-- STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN — Set 1, Item 3 -->
+                                    <td class="py-3.5 px-4">
+                                        <span v-if="cluster.sahodaya_customized_at"
+                                              class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200"
+                                              :title="`This Sahodaya has locally customised their event settings (title, dates, venue, fee, or description). Re-publishing this program will NOT overwrite their changes. Customised since: ${new Date(cluster.sahodaya_customized_at).toLocaleDateString()}.`">
+                                            🔧 Customised · {{ new Date(cluster.sahodaya_customized_at).toLocaleDateString() }}
+                                        </span>
+                                        <span v-else-if="cluster.deployed" class="text-xs text-slate-400 font-medium">✓ Synced to State</span>
+                                        <span v-else class="text-xs text-slate-300">—</span>
+                                    </td>
                                     <td class="py-3.5 px-4 text-right">
                                         <button v-if="cluster.deployed" type="button" @click="openSahodayaItemModal(cluster)" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition">
                                             🎯 Manage Sahodaya Items →
@@ -386,6 +398,7 @@
                                         <span v-else class="text-xs text-slate-400 font-medium">Publish program first</span>
                                     </td>
                                 </tr>
+
                             </tbody>
                         </table>
                     </div>

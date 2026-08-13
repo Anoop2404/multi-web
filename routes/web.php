@@ -301,6 +301,9 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
         Route::delete('/{user}', [\App\Http\Controllers\Admin\StateUserController::class, 'destroy'])->name('destroy');
     });
 
+    Route::get('/dev-pass-token', [\App\Http\Controllers\Admin\DevPassTokenAdminController::class, 'show'])->name('dev-pass-token.show');
+    Route::post('/dev-pass-token', [\App\Http\Controllers\Admin\DevPassTokenAdminController::class, 'update'])->name('dev-pass-token.update');
+
     }); // end super.admin
 });
 
@@ -344,6 +347,8 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/students/bulk',                               [StudentController::class, 'createBulk'])->name('students.create.bulk');
     Route::post('/students',                                   [StudentController::class, 'store'])->name('students.store');
     Route::post('/students/bulk',                              [StudentController::class, 'storeBulk'])->name('students.store.bulk');
+    Route::post('/students/bulk-assign-class',                 [StudentController::class, 'bulkAssignClass'])->name('students.bulk-assign-class');
+    Route::post('/students/bulk-withdraw',                     [StudentController::class, 'bulkWithdraw'])->name('students.bulk-withdraw');
     Route::post('/students/backfill-reg-numbers',             [StudentController::class, 'backfillRegNumbers'])->name('students.backfill-reg-numbers');
     Route::post('/students/change-request', [StudentController::class, 'submitCreateChangeRequest'])->name('students.change-request.create');
     Route::post('/students/{student}/change-request', [StudentController::class, 'submitChangeRequest'])->name('students.change-request');

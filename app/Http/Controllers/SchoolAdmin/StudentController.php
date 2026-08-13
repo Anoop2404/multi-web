@@ -75,6 +75,10 @@ class StudentController extends SchoolAdminController
                 ->where('status', 'active')
                 ->whereNull('verified_at')
                 ->count(),
+            'unassignedCount' => Student::where('tenant_id', $this->school->id)
+                ->where('status', 'active')
+                ->whereNull('school_class_id')
+                ->count(),
             'missingRegNoCount' => Student::where('tenant_id', $this->school->id)
                 ->where('status', 'active')
                 ->get(['id', 'reg_no'])
@@ -218,6 +222,79 @@ class StudentController extends SchoolAdminController
         }
 
         return back()->with('success', "{$created} student(s) added.");
+    }
+
+    public function bulkAssignClass(Request $request)
+    {
+        if (! filled($this->school->school_prefix)) {
+            return redirect("/school-admin/{$this->school->id}/setup/code");
+        }
+
+        $this->assertCanEditStudents();
+
+        $data = $request->validate([
+            'student_ids'     => 'required|array|min:1|max:500',
+            'student_ids.*'   => 'integer|exists:students,id',
+            'school_class_id' => [
+                'required',
+                Rule::exists('school_classes', 'id')->where('tenant_id', $this->school->id),
+            ],
+        ]);
+
+        $schoolClass = SchoolClass::where('tenant_id', $this->school->id)->findOrFail($data['school_class_id']);
+
+        $updatedCount = Student::where('tenant_id', $this->school->id)
+            ->whereIn('id', $data['student_ids'])
+            ->update(['school_class_id' => $schoolClass->id]);
+
+        app(DataChangeLogger::class)->event(
+            'updated',
+            "Bulk assigned {$updatedCount} student(s) to Class {$schoolClass->name}",
+            $this->school->id,
+            'students',
+            null,
+            ['school_class_id' => $schoolClass->id, 'count' => $updatedCount],
+        );
+
+        return back()->with('success', "Assigned {$updatedCount} student(s) to Class {$schoolClass->name}.");
+    }
+
+    public function bulkWithdraw(Request $request)
+    {
+        if (! filled($this->school->school_prefix)) {
+            return redirect("/school-admin/{$this->school->id}/setup/code");
+        }
+
+        $this->assertCanEditStudents();
+
+        $data = $request->validate([
+            'student_ids'   => 'required|array|min:1|max:500',
+            'student_ids.*' => 'integer|exists:students,id',
+        ]);
+
+        $students = Student::where('tenant_id', $this->school->id)
+            ->whereIn('id', $data['student_ids'])
+            ->get();
+
+        $withdrawnCount = 0;
+        $skippedCount = 0;
+
+        foreach ($students as $student) {
+            if ($this->hasActiveFestRegistration($student)) {
+                $skippedCount++;
+                continue;
+            }
+
+            $this->withdrawStudent($student);
+            $withdrawnCount++;
+        }
+
+        $message = "Withdrawn {$withdrawnCount} student(s).";
+        if ($skippedCount > 0) {
+            $message .= " {$skippedCount} student(s) skipped because they have active event registrations.";
+        }
+
+        return back()->with($skippedCount > 0 ? 'warning' : 'success', $message);
     }
 
     public function provisionPortal(Request $request, string $tenantId, Student $student)
@@ -1025,7 +1102,7 @@ class StudentController extends SchoolAdminController
     {
         return $request->validate([
             'class_category_id' => 'nullable|integer',
-            'school_class_id'   => 'nullable|integer',
+            'school_class_id'   => 'nullable|string|max:50',
             'status'            => 'nullable|in:active,transferred,graduated,withdrawn,all',
             'verification'      => 'nullable|in:all,verified,unverified',
             'search'            => 'nullable|string|max:100',
@@ -1042,7 +1119,11 @@ class StudentController extends SchoolAdminController
             ->when(! empty($filters['class_category_id']), function ($q) use ($filters) {
                 $q->whereHas('schoolClass', fn ($c) => $c->where('class_category_id', $filters['class_category_id']));
             })
-            ->when(! empty($filters['school_class_id']), fn ($q) => $q->where('school_class_id', $filters['school_class_id']))
+            ->when(($filters['school_class_id'] ?? null) === 'unassigned', function ($q) {
+                $q->whereNull('school_class_id');
+            }, function ($q) use ($filters) {
+                $q->when(! empty($filters['school_class_id']), fn ($inner) => $inner->where('school_class_id', $filters['school_class_id']));
+            })
             ->when(($filters['status'] ?? 'active') !== 'all', function ($q) use ($filters) {
                 $q->where('status', $filters['status'] ?? 'active');
             })

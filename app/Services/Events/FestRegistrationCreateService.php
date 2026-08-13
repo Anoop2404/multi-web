@@ -134,9 +134,24 @@ class FestRegistrationCreateService
 
                 $limitService = new FestParticipationLimitService($event);
                 $waitlisted = $event->event_type === 'sports' && $limitService->isHeadAtCapacity($item, $school->id);
+
+                $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
+                $feeService = app(FestSchoolEventFeeService::class);
+                $feeRequiredBeforeApproval = ($policy['require_fee_before_approval'] ?? false) && $feeService->feeRequired($event);
+
+                $registrationDraft = new FestRegistration([
+                    'event_id'  => $event->id,
+                    'item_id'   => $item->id,
+                    'school_id' => $school->id,
+                ]);
+                $registrationDraft->setRelation('item', $item);
+
+                $feeUnpaid = $feeRequiredBeforeApproval && ! $feeService->isPaidForRegistration($event, $registrationDraft);
+
                 $initialStatus = match (true) {
                     $waitlisted => 'waitlisted',
                     $item->head?->requiresManualApproval() || $event->requiresManualApproval() => 'pending_approval',
+                    $feeUnpaid => 'submitted',
                     default => 'approved',
                 };
                 $eventRegService = app(FestEventRegistrationService::class);
@@ -155,8 +170,8 @@ class FestRegistrationCreateService
                     'event_id'     => $event->id,
                     'item_id'      => $item->id,
                     'school_id'    => $school->id,
-                    'status'       => $initialStatus,
-                    'submitted_at' => $initialStatus === 'waitlisted' ? null : now(),
+                    'status'       => 'submitted',
+                    'submitted_at' => $waitlisted ? null : now(),
                 ]);
 
                 $groupId = null;
@@ -204,12 +219,31 @@ class FestRegistrationCreateService
 
                 app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
 
-                if ($initialStatus !== 'waitlisted') {
+                if (! $waitlisted) {
                     foreach ($registration->fresh(['participants'])->participants as $participant) {
                         app(FestNumberingService::class)->assignParticipantNumbers($participant);
                     }
 
                     app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+                }
+
+                $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
+                $feeService = app(FestSchoolEventFeeService::class);
+                $feeRequiredBeforeApproval = ($policy['require_fee_before_approval'] ?? false) && $feeService->feeRequired($event);
+                $feeUnpaid = $feeRequiredBeforeApproval && ! $feeService->isPaidForRegistration($event, $registration);
+
+                $finalStatus = match (true) {
+                    $waitlisted => 'waitlisted',
+                    $item->head?->requiresManualApproval() || $event->requiresManualApproval() => 'pending_approval',
+                    $feeUnpaid => 'submitted',
+                    default => 'approved',
+                };
+
+                if ($registration->status !== $finalStatus) {
+                    $registration->update([
+                        'status'       => $finalStatus,
+                        'submitted_at' => $finalStatus === 'waitlisted' ? null : ($registration->submitted_at ?? now()),
+                    ]);
                 }
 
                 return $registration->load(['participants.student', 'item']);
@@ -381,7 +415,12 @@ class FestRegistrationCreateService
             // notifyIfRosterEditRevokedApproval() (LIFE-10) — the actual notification for
             // this fires after the transaction commits, not here.
             if ($registration->status === 'submitted' || $registration->status === 'approved') {
-                $newStatus = ($item->head?->requiresManualApproval() || $event->requiresManualApproval())
+                $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
+                $feeService = app(FestSchoolEventFeeService::class);
+                $feeRequiredBeforeApproval = ($policy['require_fee_before_approval'] ?? false) && $feeService->feeRequired($event);
+                $feeUnpaid = $feeRequiredBeforeApproval && ! $feeService->isPaidForRegistration($event, $registration);
+
+                $newStatus = ($item->head?->requiresManualApproval() || $event->requiresManualApproval() || $feeUnpaid)
                     ? 'submitted'
                     : 'approved';
                 $registration->update(['status' => $newStatus, 'submitted_at' => now()]);

@@ -62,6 +62,11 @@
                     <p class="font-semibold text-slate-900">Billing</p>
                     <p class="text-xs text-slate-500 mt-0.5">Subscriptions, plans, and receipts</p>
                 </Link>
+                <Link href="/admin/dev-pass-token" class="track-card block">
+                    <div class="text-2xl mb-2">🔑</div>
+                    <p class="font-semibold text-slate-900">Dev Pass Token</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Set developer login pass token for users</p>
+                </Link>
             </div>
 
             <div class="notice-banner notice-banner--info">

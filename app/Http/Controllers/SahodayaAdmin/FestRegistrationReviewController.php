@@ -240,10 +240,18 @@ class FestRegistrationReviewController extends SahodayaAdminController
         }
 
         if ($request->boolean('auto_approve')) {
-            app(FestRegistrationApprovalService::class)->approve($registration->load(['participants', 'item', 'event']));
-            app(FestEventNotifier::class)->registrationApproved($registration);
-            $audit->festRegistrationApproved($registration);
-            $message = 'Registration created and approved for '.$school->name.'.';
+            $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
+            $feeService = app(FestSchoolEventFeeService::class);
+
+            if (($policy['require_fee_before_approval'] ?? false) && $feeService->feeRequired($event) && ! $feeService->isPaidForRegistration($event, $registration)) {
+                $audit->festEvent($event, FestPageActivity::REGISTRATIONS, 'fest.registration.on_behalf', "Registration entered for {$school->name}: {$item->title}");
+                $message = 'Registration created for '.$school->name.' — pending fee payment before approval.';
+            } else {
+                app(FestRegistrationApprovalService::class)->approve($registration->load(['participants', 'item', 'event']));
+                app(FestEventNotifier::class)->registrationApproved($registration);
+                $audit->festRegistrationApproved($registration);
+                $message = 'Registration created and approved for '.$school->name.'.';
+            }
         } else {
             $audit->festEvent($event, FestPageActivity::REGISTRATIONS, 'fest.registration.on_behalf', "Registration entered for {$school->name}: {$item->title}");
             $message = 'Registration submitted for '.$school->name.' — pending approval.';
@@ -295,7 +303,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
         $feeService = app(FestSchoolEventFeeService::class);
 
-        if (! $request->boolean('override_lifecycle') && ($policy['require_fee_before_approval'] ?? true) && $feeService->feeRequired($event)) {
+        if (! $request->boolean('override_lifecycle') && ($policy['require_fee_before_approval'] ?? false) && $feeService->feeRequired($event)) {
             $feeLabel = $feeService->usesPerHeadBilling($event) ? 'Event Head fee' : 'Event fee';
             abort_unless(
                 $feeService->isPaidForRegistration($event, $registration),
