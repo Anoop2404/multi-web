@@ -9,6 +9,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('state_fest_marks')) {
+            return;
+        }
+
         DB::connection('state')
             ->table('state_fest_marks')
             ->whereNotNull('registration_id')
@@ -37,8 +41,10 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('state_fest_marks', function (Blueprint $table) {
-            $table->dropUnique('state_mark_event_registration_unique');
-        });
+        if (Schema::hasTable('state_fest_marks')) {
+            Schema::table('state_fest_marks', function (Blueprint $table) {
+                $table->dropUnique('state_mark_event_registration_unique');
+            });
+        }
     }
 };
