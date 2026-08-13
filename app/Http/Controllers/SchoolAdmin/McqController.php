@@ -32,11 +32,12 @@ class McqController extends SchoolAdminController
 
         $registeredCount = McqRegistration::where('school_id', $this->school->id)
             ->whereIn('exam_id', $exams->pluck('id'))
+            ->active()
             ->count();
 
         $hubStats = [
             'available'   => $exams->whereIn('status', ['published', 'ongoing'])->count(),
-            'registered'  => $exams->filter(fn (McqExam $e) => McqRegistration::where('exam_id', $e->id)->where('school_id', $this->school->id)->exists())->count(),
+            'registered'  => $exams->filter(fn (McqExam $e) => McqRegistration::where('exam_id', $e->id)->where('school_id', $this->school->id)->active()->exists())->count(),
             'completed'   => $exams->where('status', 'completed')->where('results_published', true)->count(),
             'total_regs'  => $registeredCount,
         ];

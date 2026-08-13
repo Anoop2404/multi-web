@@ -53,11 +53,13 @@ class McqRegistrationController extends SchoolAdminController
         $exams = $examModels->map(function (McqExam $exam) use ($students, $eligibility, $sahodayaId) {
             $myCount = McqRegistration::where('exam_id', $exam->id)
                 ->where('school_id', $this->school->id)
+                ->active()
                 ->count();
 
             $eligibleIds = $eligibility->eligibleStudents($exam, $students)->pluck('id');
             $registeredIds = McqRegistration::where('exam_id', $exam->id)
                 ->where('school_id', $this->school->id)
+                ->active()
                 ->pluck('student_id');
 
             $pendingCount = $eligibleIds->diff($registeredIds)->count();
