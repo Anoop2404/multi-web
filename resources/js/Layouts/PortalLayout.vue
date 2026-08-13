@@ -1,55 +1,76 @@
 <template>
-    <div class="min-h-screen bg-slate-50 flex flex-col portal-shell font-sans text-slate-900">
-        <!-- Sticky Top Navigation Header -->
-        <header class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-slate-200/80 shrink-0 shadow-[0_4px_20px_rgba(15,23,42,0.03)]">
-            <!-- Top Multi-Tone Vibrant Gradient Strip -->
-            <div class="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#041525] via-[#0f3d7a] via-40% via-[#1e5aa8] to-[#d4a017]" />
+    <div class="min-h-screen bg-slate-50 flex font-sans text-slate-900 portal-shell">
+        <!-- Desktop Fixed/Sticky Left Sidebar Navigation -->
+        <aside class="hidden lg:flex w-64 bg-[#041525] text-white flex-col shrink-0 border-r border-slate-800/80 sticky top-0 h-screen overflow-y-auto shadow-xl">
+            <!-- Top Vibrant Accent Strip -->
+            <div class="h-1 bg-gradient-to-r from-[#041525] via-[#0f3d7a] via-40% via-[#1e5aa8] to-[#d4a017]" />
 
-            <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
-                <!-- Branding / Profile Identity -->
-                <div class="flex items-center gap-3.5 min-w-0">
+            <!-- Brand & Teacher Identity Header -->
+            <div class="p-5 border-b border-slate-800/80">
+                <div class="flex items-center gap-3">
                     <div v-if="avatarUrl" class="shrink-0 relative group">
                         <img
                             :src="avatarUrl"
                             :alt="title"
-                            class="h-11 w-11 rounded-full object-cover border-2 border-white shadow-md ring-2 ring-[#0f3d7a]/20 transition duration-200 group-hover:scale-105"
+                            class="h-11 w-11 rounded-2xl object-cover border-2 border-[#0f3d7a] shadow-md ring-2 ring-[#0f3d7a]/30"
                         >
-                        <span class="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Account" />
+                        <span class="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-[#041525]" title="Active Account" />
                     </div>
                     <div v-else-if="showAvatarPlaceholder" class="shrink-0 relative">
-                        <div class="h-11 w-11 rounded-full bg-gradient-to-br from-[#041525] via-[#0f3d7a] to-[#1e5aa8] text-white flex items-center justify-center text-sm font-extrabold shadow-md ring-2 ring-[#0f3d7a]/20">
+                        <div class="h-11 w-11 rounded-2xl bg-gradient-to-br from-[#0f3d7a] to-[#1e5aa8] text-white flex items-center justify-center text-sm font-extrabold shadow-md ring-2 ring-[#0f3d7a]/30">
                             {{ initials }}
                         </div>
-                        <span class="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+                        <span class="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-[#041525]" />
                     </div>
-                    <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-[#0f3d7a]">
-                                <span class="h-1.5 w-1.5 rounded-full bg-[#0f3d7a]" />
-                                {{ roleLabel }}
-                            </span>
-                        </div>
-                        <h1 class="text-base sm:text-lg font-bold text-slate-900 truncate leading-tight mt-0.5">{{ title }}</h1>
-                        <p v-if="subtitle" class="text-xs text-slate-500 truncate mt-0.5 flex items-center gap-1">
-                            <svg class="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                            {{ subtitle }}
-                        </p>
+                    <div class="min-w-0 flex-1">
+                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-white/10 text-amber-400">
+                            {{ roleLabel }}
+                        </span>
+                        <h2 class="text-sm font-bold text-white truncate mt-0.5 leading-tight" :title="title">{{ title }}</h2>
+                        <p v-if="subtitle" class="text-xs text-slate-400 truncate mt-0.5" :title="subtitle">{{ subtitle }}</p>
                     </div>
                 </div>
+            </div>
 
-                <!-- Right Header Controls -->
-                <div class="flex items-center gap-2 shrink-0">
-                    <SignOutButton class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-red-600 bg-slate-100 hover:bg-red-50 px-3 py-1.5 rounded-xl transition duration-150 border border-slate-200/60" />
+            <!-- Navigation Links -->
+            <nav v-if="navItems.length" class="flex-1 p-3 space-y-1 overflow-y-auto">
+                <p class="px-3 pt-2 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Portal Navigation</p>
+                <Link v-for="item in navItems" :key="item.href"
+                      :href="item.href"
+                      class="flex items-center gap-3 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition duration-150 group"
+                      :class="isActive(item)
+                          ? 'bg-[#0f3d7a] text-white font-bold shadow-md ring-1 ring-white/10'
+                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'">
+                    <span v-if="getNavIcon(item.icon)" class="w-4 h-4 shrink-0 opacity-80 group-hover:opacity-100" v-html="getNavIcon(item.icon)" />
+                    <span class="truncate">{{ item.label }}</span>
+                </Link>
+            </nav>
 
-                    <!-- Mobile Menu Toggle Button -->
+            <!-- Bottom Sign Out Action -->
+            <div class="p-4 border-t border-slate-800/80 bg-[#020b14]">
+                <SignOutButton class="w-full justify-center inline-flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800/70 hover:bg-red-950/80 hover:border-red-800/50 py-2.5 px-3 rounded-xl transition duration-150 border border-slate-700/50" />
+            </div>
+        </aside>
+
+        <!-- Main Workspace (Content + Mobile Topbar) -->
+        <div class="flex-1 flex flex-col min-w-0 min-h-screen">
+            <!-- Mobile Top Header Bar -->
+            <header class="lg:hidden sticky top-0 z-40 bg-[#041525] text-white border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#0f3d7a] to-[#1e5aa8] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                        {{ initials }}
+                    </div>
+                    <div class="min-w-0">
+                        <span class="text-[10px] uppercase font-extrabold text-amber-400 tracking-wider">{{ roleLabel }}</span>
+                        <h1 class="text-sm font-bold text-white truncate">{{ title }}</h1>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <SignOutButton class="text-xs text-slate-300 hover:text-red-400 bg-slate-800/80 px-2.5 py-1.5 rounded-lg" />
                     <button
                         v-if="navItems.length"
                         type="button"
-                        class="sm:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
-                        :aria-expanded="mobileMenuOpen"
-                        aria-label="Toggle Navigation Menu"
+                        class="p-2 rounded-xl text-slate-300 hover:bg-slate-800 transition"
                         @click="mobileMenuOpen = !mobileMenuOpen"
                     >
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -58,47 +79,43 @@
                         </svg>
                     </button>
                 </div>
-            </div>
+            </header>
 
-            <!-- Desktop Horizontal Navigation Tabs -->
-            <nav v-if="navItems.length"
-                 class="hidden sm:flex max-w-6xl mx-auto px-6 pb-2.5 gap-1.5 overflow-x-auto scrollbar-none">
-                <Link v-for="item in navItems" :key="item.href"
-                      :href="item.href"
-                      class="inline-flex items-center gap-2 text-xs font-semibold px-3.5 py-2 rounded-xl transition duration-150 shrink-0 whitespace-nowrap"
-                      :class="isActive(item)
-                          ? 'bg-[#041525] text-white shadow-sm ring-1 ring-[#041525]'
-                          : 'text-slate-600 hover:bg-slate-100/90 hover:text-slate-900'">
-                    <span v-if="getNavIcon(item.icon)" class="w-3.5 h-3.5 opacity-90" v-html="getNavIcon(item.icon)" />
-                    {{ item.label }}
-                </Link>
-            </nav>
-
-            <!-- Mobile Navigation Drawer / Dropdown -->
+            <!-- Mobile Slide-over Drawer -->
             <div v-if="navItems.length && mobileMenuOpen"
-                 class="sm:hidden border-t border-slate-200 bg-white/95 backdrop-blur-md px-4 py-3 shadow-lg transition duration-200">
-                <div class="grid grid-cols-2 gap-1.5">
-                    <Link v-for="item in navItems" :key="item.href"
-                          :href="item.href"
-                          class="inline-flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl transition duration-150"
-                          :class="isActive(item)
-                              ? 'bg-[#041525] text-white font-bold'
-                              : 'text-slate-700 bg-slate-50 hover:bg-slate-100'"
-                          @click="mobileMenuOpen = false">
-                        <span v-if="getNavIcon(item.icon)" class="w-3.5 h-3.5" v-html="getNavIcon(item.icon)" />
-                        {{ item.label }}
-                    </Link>
-                </div>
+                 class="lg:hidden fixed inset-0 z-50 flex">
+                <div class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs" @click="mobileMenuOpen = false" />
+                <aside class="relative w-72 max-w-[80vw] bg-[#041525] text-white flex flex-col h-full z-10 shadow-2xl">
+                    <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+                        <div class="min-w-0">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">{{ roleLabel }}</span>
+                            <h2 class="text-sm font-bold text-white truncate">{{ title }}</h2>
+                        </div>
+                        <button type="button" class="p-1.5 text-slate-400 hover:text-white" @click="mobileMenuOpen = false">
+                            ✕
+                        </button>
+                    </div>
+                    <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+                        <Link v-for="item in navItems" :key="item.href"
+                              :href="item.href"
+                              class="flex items-center gap-3 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition"
+                              :class="isActive(item) ? 'bg-[#0f3d7a] text-white font-bold' : 'text-slate-300 hover:bg-slate-800'"
+                              @click="mobileMenuOpen = false">
+                            <span v-if="getNavIcon(item.icon)" class="w-4 h-4 shrink-0" v-html="getNavIcon(item.icon)" />
+                            {{ item.label }}
+                        </Link>
+                    </nav>
+                </aside>
             </div>
-        </header>
 
-        <!-- Global Flash Messages -->
-        <FlashBanner class="max-w-6xl mx-auto px-4 sm:px-6 pt-4 w-full" />
+            <!-- Global Flash Messages -->
+            <FlashBanner class="max-w-7xl mx-auto px-4 sm:px-6 pt-4 w-full" />
 
-        <!-- Main Page View Content -->
-        <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-            <slot />
-        </main>
+            <!-- Main Page View Content -->
+            <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+                <slot />
+            </main>
+        </div>
     </div>
 </template>
 
@@ -163,6 +180,7 @@ function getNavIcon(name) {
     return icons[name] || null;
 }
 </script>
+
 
 <style scoped>
 .scrollbar-none {

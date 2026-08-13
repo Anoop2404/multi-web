@@ -5,14 +5,15 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\McqQuestion;
 use App\Models\McqQuestionBank;
+use App\Models\SchoolClass;
 use App\Models\Tenant;
-use App\Support\FestClassGroupScheme;
+use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class TeacherMcqController extends Controller
 {
-    public function banks(Request $request, string $tenantId)
+    public function banks(Request $request, string $tenantId, EffectiveMasterDataResolver $resolver)
     {
         $teacher = $request->attributes->get('portalTeacher');
         $school = Tenant::findOrFail($tenantId);
@@ -23,11 +24,36 @@ class TeacherMcqController extends Controller
             ->latest()
             ->get();
 
+        $assignedClasses = $teacher->schoolClasses()->where('tenant_id', $school->id)->active()->get(['school_classes.id', 'school_classes.name']);
+        $classes = $assignedClasses->isNotEmpty()
+            ? $assignedClasses
+            : SchoolClass::where('tenant_id', $school->id)->active()->orderBy('display_order')->orderBy('name')->get(['id', 'name']);
+
+        if ($classes->isEmpty()) {
+            $classes = collect([
+                ['id' => 'Class 1', 'name' => 'Class 1'],
+                ['id' => 'Class 2', 'name' => 'Class 2'],
+                ['id' => 'Class 3', 'name' => 'Class 3'],
+                ['id' => 'Class 4', 'name' => 'Class 4'],
+                ['id' => 'Class 5', 'name' => 'Class 5'],
+                ['id' => 'Class 6', 'name' => 'Class 6'],
+                ['id' => 'Class 7', 'name' => 'Class 7'],
+                ['id' => 'Class 8', 'name' => 'Class 8'],
+                ['id' => 'Class 9', 'name' => 'Class 9'],
+                ['id' => 'Class 10', 'name' => 'Class 10'],
+                ['id' => 'Class 11', 'name' => 'Class 11'],
+                ['id' => 'Class 12', 'name' => 'Class 12'],
+            ]);
+        }
+
+        $masterSubjects = $resolver->subjects($school->parent_id);
+
         return inertia('Portal/Teacher/QuestionBanks', [
-            'school'  => $school->only('id', 'name'),
-            'teacher' => $teacher->only('id', 'name', 'subject'),
-            'banks'   => $banks,
-            'classGroups' => FestClassGroupScheme::labelsForSahodaya($school->parent_id),
+            'school'   => $school->only('id', 'name'),
+            'teacher'  => $teacher->only('id', 'name', 'subject'),
+            'banks'    => $banks,
+            'classes'  => $classes->values(),
+            'subjects' => $masterSubjects->values(),
         ]);
     }
 
@@ -39,7 +65,7 @@ class TeacherMcqController extends Controller
         $data = $request->validate([
             'title'       => 'required|string|max:255',
             'subject'     => 'required|string|max:120',
-            'class_group' => 'nullable|in:lp,up,hs,hss,open',
+            'class_group' => 'nullable|string|max:80',
             'description' => 'nullable|string|max:2000',
         ]);
 

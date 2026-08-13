@@ -19,13 +19,16 @@
                 <FormField label="Bank Title" required :error="form.errors.title">
                     <input v-model="form.title" class="field" placeholder="e.g. Class 10 Science Practice MCQs" required>
                 </FormField>
-                <FormField label="Subject" required :error="form.errors.subject">
-                    <input v-model="form.subject" class="field" placeholder="e.g. Science / Mathematics" required>
+                <FormField label="Subject (from Master)" required :error="form.errors.subject">
+                    <select v-model="form.subject" class="field" required>
+                        <option value="">Select subject…</option>
+                        <option v-for="s in subjects" :key="s.id || s.label" :value="s.label || s.name">{{ s.label || s.name }}</option>
+                    </select>
                 </FormField>
                 <FormField label="Class / Standard (optional)" :error="form.errors.class_group">
                     <select v-model="form.class_group" class="field">
-                        <option value="">Select class group</option>
-                        <option v-for="(label, key) in classGroups" :key="key" :value="key">{{ label }}</option>
+                        <option value="">Select class / standard…</option>
+                        <option v-for="c in classes" :key="c.id || c.name" :value="c.name">{{ c.name }}</option>
                     </select>
                 </FormField>
                 <FormField label="Description & Notes (optional)" class-extra="sm:col-span-2" :error="form.errors.description">
@@ -60,7 +63,10 @@
                                 {{ bank.questions_count }} Question(s)
                             </span>
                         </div>
-                        <p class="text-xs text-slate-500 mt-1 font-medium">{{ bank.subject }}</p>
+                        <p class="text-xs text-slate-500 mt-1 font-medium">
+                            {{ bank.subject }}
+                            <span v-if="bank.class_group" class="text-slate-400"> · {{ bank.class_group }}</span>
+                        </p>
                     </div>
 
                     <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
@@ -89,8 +95,16 @@ import { useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';
 
-const props = defineProps({ school: Object, teacher: Object, banks: Array, classGroups: Object });
-const form = useForm({ title: '', subject: props.teacher.subject || '', class_group: '', description: '' });
+const props = defineProps({
+    school: Object,
+    teacher: Object,
+    banks: Array,
+    classes: { type: Array, default: () => [] },
+    subjects: { type: Array, default: () => [] },
+});
+
+const defaultSubject = props.teacher?.subject || (props.subjects?.[0]?.label || props.subjects?.[0]?.name) || '';
+const form = useForm({ title: '', subject: defaultSubject, class_group: '', description: '' });
 
 function createBank() {
     form.post(`/portal/teacher/${props.school.id}/question-banks`, { preserveScroll: true, onSuccess: () => form.reset('title', 'description') });
@@ -98,4 +112,5 @@ function createBank() {
 
 const navItems = computed(() => teacherPortalNavItems(props.school.id));
 </script>
+
 
