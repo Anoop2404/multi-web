@@ -15,9 +15,13 @@
         .summary td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: center; }
         .summary .lbl { font-size: 9px; text-transform: uppercase; color: #64748b; display: block; margin-bottom: 2px; }
         .summary .val { font-size: 13px; font-weight: bold; color: #0f172a; }
+        .class-section { page-break-after: always; break-after: page; margin-bottom: 14px; }
+        .class-section:last-child { page-break-after: avoid; break-after: avoid; }
         .class-heading { background-color: #0f3d7a; color: #fff; font-size: 11px; font-weight: bold; padding: 5px 8px; margin-top: 12px; }
         .class-heading:first-of-type { margin-top: 0; }
         table.roster { width: 100%; border-collapse: collapse; }
+        table.roster thead { display: table-header-group; }
+        table.roster tr { page-break-inside: avoid; break-inside: avoid; }
         table.roster th, table.roster td { border: 1px solid #cbd5e1; padding: 4px 7px; }
         table.roster th { background-color: #eef2f7; font-size: 9.5px; text-transform: uppercase; text-align: left; color: #334155; }
         table.roster td { font-size: 10.5px; }
@@ -27,7 +31,7 @@
         .status-paid { color: #15803d; font-weight: bold; }
         .status-unpaid { color: #b91c1c; font-weight: bold; }
         .class-subtotal td { background-color: #f1f5f9; font-weight: bold; }
-        .grand-total { width: 100%; border-collapse: collapse; margin-top: 14px; }
+        .grand-total { width: 100%; border-collapse: collapse; margin-top: 14px; page-break-inside: avoid; break-inside: avoid; }
         .grand-total td { border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 11.5px; }
         .grand-total .lbl { text-align: right; font-weight: bold; width: 70%; }
         .grand-total .val { text-align: right; font-weight: bold; width: 30%; }
@@ -71,49 +75,51 @@
     </table>
 
     @forelse($groupedRows as $className => $rows)
-        <div class="class-heading">{{ $className }} ({{ count($rows) }} student{{ count($rows) === 1 ? '' : 's' }})</div>
-        <table class="roster">
-            <thead>
-                <tr>
-                    <th style="width: 28px;" class="text-center">Sl No</th>
-                    <th>Student Name</th>
-                    <th>Adm No / Reg No</th>
-                    @if(!$school)
-                        <th>School</th>
-                    @endif
-                    <th class="text-right">Fee Amount</th>
-                    <th class="text-center">Status</th>
-                    <th>Receipt No</th>
-                </tr>
-            </thead>
-            <tbody>
-                @php($classFee = 0)
-                @php($classPaid = 0)
-                @foreach($rows as $i => $row)
-                    @php($classFee += $row['fee_amount'])
-                    @if($row['payment_status'] === 'Paid')
-                        @php($classPaid += $row['fee_amount'])
-                    @endif
+        <div class="class-section">
+            <div class="class-heading">{{ $className }} ({{ count($rows) }} student{{ count($rows) === 1 ? '' : 's' }})</div>
+            <table class="roster">
+                <thead>
                     <tr>
-                        <td class="text-center">{{ $i + 1 }}</td>
-                        <td class="font-bold">{{ $row['student_name'] }}</td>
-                        <td>{{ $row['admission_number'] }} / {{ $row['reg_no'] }}</td>
+                        <th style="width: 28px;" class="text-center">Sl No</th>
+                        <th>Student Name</th>
+                        <th>Adm No / Reg No</th>
                         @if(!$school)
-                            <td>{{ $row['school_name'] }}</td>
+                            <th>School</th>
                         @endif
-                        <td class="text-right">₹{{ number_format($row['fee_amount'], 2) }}</td>
-                        <td class="text-center {{ $row['payment_status'] === 'Paid' ? 'status-paid' : 'status-unpaid' }}">{{ $row['payment_status'] }}</td>
-                        <td>{{ $row['receipt_no'] }}</td>
+                        <th class="text-right">Fee Amount</th>
+                        <th class="text-center">Status</th>
+                        <th>Receipt No</th>
                     </tr>
-                @endforeach
-                <tr class="class-subtotal">
-                    <td colspan="{{ $school ? 3 : 4 }}" class="text-right">Class Total</td>
-                    <td class="text-right">₹{{ number_format($classFee, 2) }}</td>
-                    <td class="text-center">{{ number_format($classPaid, 2) === number_format($classFee, 2) ? 'All Paid' : '' }}</td>
-                    <td></td>
-                </tr>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @php($classFee = 0)
+                    @php($classPaid = 0)
+                    @foreach($rows as $i => $row)
+                        @php($classFee += $row['fee_amount'])
+                        @if($row['payment_status'] === 'Paid')
+                            @php($classPaid += $row['fee_amount'])
+                        @endif
+                        <tr>
+                            <td class="text-center">{{ $i + 1 }}</td>
+                            <td class="font-bold">{{ $row['student_name'] }}</td>
+                            <td>{{ $row['admission_number'] }} / {{ $row['reg_no'] }}</td>
+                            @if(!$school)
+                                <td>{{ $row['school_name'] }}</td>
+                            @endif
+                            <td class="text-right">₹{{ number_format($row['fee_amount'], 2) }}</td>
+                            <td class="text-center {{ $row['payment_status'] === 'Paid' ? 'status-paid' : 'status-unpaid' }}">{{ $row['payment_status'] }}</td>
+                            <td>{{ $row['receipt_no'] }}</td>
+                        </tr>
+                    @endforeach
+                    <tr class="class-subtotal">
+                        <td colspan="{{ $school ? 3 : 4 }}" class="text-right">Class Total</td>
+                        <td class="text-right">₹{{ number_format($classFee, 2) }}</td>
+                        <td class="text-center">{{ number_format($classPaid, 2) === number_format($classFee, 2) ? 'All Paid' : '' }}</td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     @empty
         <p style="text-align: center; color: #94a3b8; padding: 20px 0;">No registrations found for this filter.</p>
     @endforelse
