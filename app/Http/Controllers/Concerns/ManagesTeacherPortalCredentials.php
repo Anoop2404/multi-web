@@ -6,6 +6,7 @@ use App\Models\Teacher;
 use App\Models\User;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Auth\UserCredentialService;
+use App\Services\Mail\SahodayaMailer;
 use App\Services\Portal\TeacherPortalProvisioner;
 use Illuminate\Http\RedirectResponse;
 
@@ -19,10 +20,50 @@ trait ManagesTeacherPortalCredentials
             $password,
         );
 
+        $teacherFresh = $teacher->fresh();
+        $this->sendTeacherCredentialsMail($teacherFresh, $result['password']);
+
         return back()->with([
-            'success'        => $teacher->user_id ? 'Teacher portal login updated.' : 'Teacher portal login created.',
-            'newCredentials' => $this->teacherPortalCredentialsPayload($teacher->fresh(), $result['password']),
+            'success'        => $teacher->user_id ? 'Teacher portal login updated & email sent.' : 'Teacher portal login created & email sent.',
+            'newCredentials' => $this->teacherPortalCredentialsPayload($teacherFresh, $result['password']),
         ]);
+    }
+
+    protected function sendTeacherCredentialsMail(Teacher $teacher, ?string $password = null): bool
+    {
+        if (! $teacher->email) {
+            return false;
+        }
+
+        $teacher->loadMissing('user');
+        $user = $teacher->user;
+        if (! $user) {
+            return false;
+        }
+
+        $school = $this->school ?? $teacher->tenant;
+        if (! $school || ! $school->parent_id) {
+            return false;
+        }
+
+        $plainPassword = $password ?? $user->plain_password ?? '—';
+        $username = $teacher->login_code ?? $user->username ?? '';
+
+        SahodayaMailer::for($school->parent_id)->sendView(
+            $teacher->email,
+            "Your Teacher Portal Credentials - {$school->name}",
+            'emails.teacher-credentials',
+            [
+                'teacher'       => $teacher,
+                'school'        => $school,
+                'user'          => $user,
+                'username'      => $username,
+                'plainPassword' => $plainPassword,
+                'loginUrl'      => url('/portal/login'),
+            ]
+        );
+
+        return true;
     }
 
     protected function resetTeacherPortalPassword(Teacher $teacher, ?int $actorUserId = null): RedirectResponse
@@ -39,9 +80,12 @@ trait ManagesTeacherPortalCredentials
             ['user_id' => $user->id],
         );
 
+        $teacherFresh = $teacher->fresh();
+        $this->sendTeacherCredentialsMail($teacherFresh, $result['password']);
+
         return back()->with([
-            'success'        => 'Portal password reset.',
-            'newCredentials' => $this->teacherPortalCredentialsPayload($teacher->fresh(), $result['password']),
+            'success'        => 'Portal password reset & email sent.',
+            'newCredentials' => $this->teacherPortalCredentialsPayload($teacherFresh, $result['password']),
         ]);
     }
 
@@ -57,3 +101,4 @@ trait ManagesTeacherPortalCredentials
         ];
     }
 }
+

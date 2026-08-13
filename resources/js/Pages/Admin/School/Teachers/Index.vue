@@ -12,6 +12,12 @@
                 <button type="button" class="btn-secondary" :class="mode === 'import' ? 'ring-2 ring-[#041525]/20' : ''" @click="mode = 'import'">Import CSV/Excel</button>
                 <button type="button" class="btn-secondary" :class="mode === 'photos' ? 'ring-2 ring-[#041525]/20' : ''" @click="mode = 'photos'">Update photos (ZIP)</button>
                 <Link :href="`/school-admin/${school.id}/imports`" class="btn-secondary">Import history</Link>
+                <button type="button" class="btn-secondary font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-200" @click="provisionAllPortals" :disabled="provisioningAll">
+                    🔑 Create Logins &amp; Email All
+                </button>
+                <button type="button" class="btn-secondary font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200" @click="sendAllCredentialsMail" :disabled="sendingAllMail">
+                    ✉️ Send Emails to All
+                </button>
                 <a :href="exportUrl('xlsx')" class="btn-secondary ml-auto">↓ Export (.xlsx)</a>
                 <a :href="exportUrl('csv')" class="btn-secondary">↓ Export (.csv)</a>
                 <a :href="exportPdfUrl()" class="btn-secondary">↓ Print / PDF</a>
@@ -226,7 +232,14 @@
                             <td class="p-3 text-xs text-gray-600">{{ (t.subject_labels || []).join(', ') || t.subject || '—' }}</td>
                             <td class="p-3"><span class="text-xs" :class="t.is_verified ? 'text-emerald-700' : 'text-amber-700'">{{ t.is_verified ? 'Verified' : 'Pending' }}</span></td>
                             <td class="p-3">
-                                <button v-if="t.user_id" type="button" class="text-xs text-green-700 font-semibold" @click="openLogin(t)">Credentials</button>
+                                <div v-if="t.user_id" class="flex flex-col gap-1 items-start">
+                                    <button type="button" class="text-xs text-green-700 font-semibold inline-flex items-center gap-1" @click="openLogin(t)">
+                                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Credentials
+                                    </button>
+                                    <button type="button" class="text-[11px] text-indigo-600 hover:underline font-medium" @click="sendCredentialsMail(t)" :disabled="sendingMailId === t.id">
+                                        ✉️ {{ sendingMailId === t.id ? 'Sending...' : 'Send Mail' }}
+                                    </button>
+                                </div>
                                 <button v-else type="button" class="text-xs text-indigo-700 font-semibold" @click="openProvision(t)">Create login</button>
                             </td>
                             <td class="p-3 text-right whitespace-nowrap">
@@ -280,12 +293,12 @@
             <form @submit.prevent="submitProvision" class="relative modal-shell max-w-md w-full p-6 space-y-4">
                 <h3 class="font-bold">Portal login — {{ provisionTeacher.name }}</h3>
                 <p class="text-sm text-gray-600">
-                    Creates a portal account with an auto-generated temp password (shown once after you confirm).
+                    Creates a portal account with an auto-generated temp password and sends login credentials to teacher email.
                 </p>
                 <input v-model="provisionForm.email" type="email" class="field" required placeholder="Teacher email">
                 <div class="flex justify-end gap-2">
                     <button type="button" @click="closeProvision" class="text-sm text-gray-500">Cancel</button>
-                    <button type="submit" class="btn-primary" :disabled="provisionForm.processing">Create login</button>
+                    <button type="submit" class="btn-primary" :disabled="provisionForm.processing">Create login &amp; send mail</button>
                 </div>
             </form>
         </div>
@@ -306,6 +319,9 @@
                 </div>
                 <div class="flex justify-end gap-2 flex-wrap">
                     <button type="button" @click="closeLogin" class="text-sm text-gray-500">Close</button>
+                    <button type="button" class="btn-secondary text-sm" :disabled="sendingMailId === loginTeacher?.id" @click="sendCredentialsMail(loginTeacher)">
+                        ✉️ {{ sendingMailId === loginTeacher?.id ? 'Sending...' : 'Send via email' }}
+                    </button>
                     <button type="button" class="btn-secondary text-sm" :disabled="resetForm.processing" @click="resetPortalPassword">
                         Reset password
                     </button>
@@ -365,6 +381,36 @@ const editingTeacher = ref(null);
 const provisionTeacher = ref(null);
 const loginTeacher = ref(null);
 const displayPassword = ref(null);
+const provisioningAll = ref(false);
+const sendingAllMail = ref(false);
+const sendingMailId = ref(null);
+
+function provisionAllPortals() {
+    if (!confirm('Create portal login accounts for all unregistered teachers and email them their credentials?')) return;
+    provisioningAll.value = true;
+    router.post(`/school-admin/${props.school.id}/teachers/provision-all-portals`, {}, {
+        preserveScroll: true,
+        onFinish: () => { provisioningAll.value = false; },
+    });
+}
+
+function sendAllCredentialsMail() {
+    if (!confirm('Send credentials emails to all teachers with active portal accounts?')) return;
+    sendingAllMail.value = true;
+    router.post(`/school-admin/${props.school.id}/teachers/send-all-credentials-mail`, {}, {
+        preserveScroll: true,
+        onFinish: () => { sendingAllMail.value = false; },
+    });
+}
+
+function sendCredentialsMail(teacher) {
+    if (!teacher || !teacher.user_id) return;
+    sendingMailId.value = teacher.id;
+    router.post(`/school-admin/${props.school.id}/teachers/${teacher.id}/send-credentials-mail`, {}, {
+        preserveScroll: true,
+        onFinish: () => { sendingMailId.value = null; },
+    });
+}
 
 const visiblePassword = computed(() => displayPassword.value ?? loginTeacher.value?.portal_password ?? null);
 const mode = ref('single');

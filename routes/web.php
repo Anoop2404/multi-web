@@ -465,6 +465,9 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/teachers/import', [TeacherController::class, 'importStore'])->name('teachers.import.store');
     Route::put('/teachers/{teacher}', [TeacherController::class, 'update'])->name('teachers.update');
     Route::post('/teachers/{teacher}/provision-portal', [TeacherController::class, 'provisionPortal'])->name('teachers.provision-portal');
+    Route::post('/teachers/{teacher}/send-credentials-mail', [TeacherController::class, 'sendCredentialsMail'])->name('teachers.send-credentials-mail');
+    Route::post('/teachers/provision-all-portals', [TeacherController::class, 'provisionAllPortals'])->name('teachers.provision-all-portals');
+    Route::post('/teachers/send-all-credentials-mail', [TeacherController::class, 'sendAllCredentialsMail'])->name('teachers.send-all-credentials-mail');
     Route::post('/teachers/{teacher}/reset-portal-password', [TeacherController::class, 'resetPortalPassword'])->name('teachers.reset-portal-password');
     Route::get('/teachers/{teacher}/photo', [TeacherController::class, 'showPhoto'])->name('teachers.photo');
     Route::post('/teachers/{teacher}/photo', [TeacherController::class, 'updatePhoto'])->name('teachers.photo.upload');

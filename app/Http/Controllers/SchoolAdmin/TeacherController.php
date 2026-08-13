@@ -725,6 +725,80 @@ class TeacherController extends SchoolAdminController
         return $this->provisionTeacherPortalLogin($teacher, $data['email'], $data['password'] ?? null);
     }
 
+    public function provisionAllPortals(Request $request)
+    {
+        $teachers = Teacher::where('tenant_id', $this->school->id)
+            ->where('status', 'active')
+            ->whereNull('user_id')
+            ->get();
+
+        if ($teachers->isEmpty()) {
+            return back()->with('info', 'All active teachers already have portal login accounts.');
+        }
+
+        $provisioner = app(TeacherPortalProvisioner::class);
+        $count = 0;
+        $mailed = 0;
+
+        foreach ($teachers as $teacher) {
+            $email = strtolower(trim((string) $teacher->email));
+            if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+
+            try {
+                $result = $provisioner->provision($teacher->fresh(), $email);
+                $count++;
+                if ($this->sendTeacherCredentialsMail($teacher->fresh(), $result['password'])) {
+                    $mailed++;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed bulk portal provision for teacher', [
+                    'teacher_id' => $teacher->id,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return back()->with('success', "Created portal logins for {$count} teacher(s) and emailed credentials to {$mailed} teacher(s).");
+    }
+
+    public function sendCredentialsMail(Request $request, string $tenantId, Teacher $teacher)
+    {
+        abort_if($teacher->tenant_id !== $this->school->id, 403);
+        abort_unless($teacher->user_id, 422, 'Teacher does not have a portal login account yet.');
+
+        $sent = $this->sendTeacherCredentialsMail($teacher);
+
+        if (! $sent) {
+            return back()->with('error', 'Could not send credentials email. Check teacher email address.');
+        }
+
+        return back()->with('success', "Credentials email sent to {$teacher->email}.");
+    }
+
+    public function sendAllCredentialsMail(Request $request)
+    {
+        $teachers = Teacher::where('tenant_id', $this->school->id)
+            ->where('status', 'active')
+            ->whereNotNull('user_id')
+            ->whereNotNull('email')
+            ->get();
+
+        if ($teachers->isEmpty()) {
+            return back()->with('info', 'No teachers with active portal accounts and valid emails found.');
+        }
+
+        $count = 0;
+        foreach ($teachers as $teacher) {
+            if ($this->sendTeacherCredentialsMail($teacher)) {
+                $count++;
+            }
+        }
+
+        return back()->with('success', "Credentials emails sent to {$count} teacher(s).");
+    }
+
     public function resetPortalPassword(
         string $tenantId,
         Teacher $teacher,
