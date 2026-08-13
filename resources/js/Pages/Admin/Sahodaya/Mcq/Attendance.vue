@@ -45,6 +45,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th class="w-12">#</th>
                             <th>Reg. no.</th>
                             <th>Student</th>
                             <th>School</th>
@@ -54,12 +55,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="r in filteredRegistrations" :key="r.id">
+                        <tr v-for="(r, i) in paginatedRegistrations" :key="r.id">
+                            <td class="text-xs font-bold text-slate-400">{{ (attendancePage - 1) * attendancePageSize + i + 1 }}</td>
                             <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
-                            <td>{{ r.student?.name }}</td>
-                            <td class="text-xs">{{ r.school?.name }}</td>
+                            <td class="font-bold text-slate-900">{{ r.student?.name || r.participant_name || '—' }}</td>
+                            <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td>
-                                <select v-model="forms[r.id].attendance_status" class="field" :aria-label="`Attendance for ${r.student?.name}`">
+                                <select v-model="forms[r.id].attendance_status" class="field text-xs" :aria-label="`Attendance for ${r.student?.name}`">
                                     <option value="pending">Pending</option>
                                     <option value="present">Present</option>
                                     <option value="absent">Absent</option>
@@ -76,25 +78,40 @@
                             <td><button type="button" @click="save(r)" class="link-brand text-xs">Save</button></td>
                         </tr>
                         <tr v-if="!filteredRegistrations.length">
-                            <td colspan="6" class="p-6 text-center text-slate-400">No matching registrations.</td>
+                            <td colspan="7" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div v-if="filteredRegistrations.length > attendancePageSize" class="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
+                <div>Showing <span class="font-bold text-slate-900">{{ (attendancePage - 1) * attendancePageSize + 1 }}</span> to <span class="font-bold text-slate-900">{{ Math.min(attendancePage * attendancePageSize, filteredRegistrations.length) }}</span> of <span class="font-bold text-slate-900">{{ filteredRegistrations.length }}</span> candidates</div>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="attendancePage <= 1" @click="attendancePage--">← Previous</button>
+                    <span class="font-semibold">Page {{ attendancePage }} of {{ totalAttendancePages }}</span>
+                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="attendancePage >= totalAttendancePages" @click="attendancePage++">Next →</button>
+                </div>
             </div>
         </div>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, summary: Object, pendingCorrectionsCount: { type: Number, default: 0 } });
 const searchQuery = ref('');
+const attendancePage = ref(1);
+const attendancePageSize = ref(50);
 const importFile = ref(null);
 const page = usePage();
+
+watch(searchQuery, () => {
+    attendancePage.value = 1;
+});
+
 const importErrors = computed(() => page.props.flash?.import_errors ?? []);
 const forms = reactive({});
 for (const r of props.registrations) {
@@ -105,8 +122,15 @@ const filteredRegistrations = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();
     if (!q) return props.registrations;
     return props.registrations.filter((r) =>
-        [r.hall_ticket_no, r.student?.name, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
+        [r.hall_ticket_no, r.student?.name, r.student?.admission_number, r.student?.reg_no, r.teacher?.name, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
     );
+});
+
+const totalAttendancePages = computed(() => Math.ceil(filteredRegistrations.value.length / attendancePageSize.value) || 1);
+
+const paginatedRegistrations = computed(() => {
+    const start = (attendancePage.value - 1) * attendancePageSize.value;
+    return filteredRegistrations.value.slice(start, start + attendancePageSize.value);
 });
 
 function save(r) {

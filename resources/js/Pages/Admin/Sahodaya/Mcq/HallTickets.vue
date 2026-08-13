@@ -100,13 +100,17 @@
             <p v-if="!hallsForm.halls.length" class="text-xs text-slate-500">No halls configured — seat allocation will use a single Main room.</p>
         </div>
 
-        <input v-model="searchQuery" type="search" class="field max-w-md mb-4" placeholder="Search ticket or student…">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <input v-model="searchQuery" type="search" class="field max-w-md text-xs" placeholder="Search ticket, name, admission no…">
+            <span class="text-xs text-slate-500 font-semibold">Showing {{ filteredRegistrations.length }} candidate(s)</span>
+        </div>
 
         <div class="form-section overflow-hidden !p-0">
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th class="w-12">#</th>
                             <th>Reg. no.</th>
                             <th>Candidate</th>
                             <th>School</th>
@@ -115,18 +119,27 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="r in filteredRegistrations" :key="r.id">
-                            <td class="font-mono">{{ r.hall_ticket_no || '—' }}</td>
-                            <td>{{ r.student?.name || r.teacher?.name }}</td>
-                            <td class="text-xs">{{ r.school?.name }}</td>
+                        <tr v-for="(r, i) in paginatedRegistrations" :key="r.id">
+                            <td class="text-xs font-bold text-slate-400">{{ (ticketsPage - 1) * ticketsPageSize + i + 1 }}</td>
+                            <td class="font-mono text-xs font-bold text-indigo-700">{{ r.hall_ticket_no || '—' }}</td>
+                            <td class="font-bold text-slate-900">{{ r.student?.name || r.teacher?.name || r.participant_name || '—' }}</td>
+                            <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td class="text-xs capitalize">{{ (r.approval_status || 'pending').replaceAll('_', ' ') }}</td>
                             <td class="text-xs">{{ r.hall_room || '—' }} {{ r.seat_no ? `· Seat ${r.seat_no}` : '' }}</td>
                         </tr>
                         <tr v-if="!filteredRegistrations.length">
-                            <td colspan="5" class="p-6 text-center text-slate-400">No matching registrations.</td>
+                            <td colspan="6" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div v-if="filteredRegistrations.length > ticketsPageSize" class="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
+                <div>Showing <span class="font-bold text-slate-900">{{ (ticketsPage - 1) * ticketsPageSize + 1 }}</span> to <span class="font-bold text-slate-900">{{ Math.min(ticketsPage * ticketsPageSize, filteredRegistrations.length) }}</span> of <span class="font-bold text-slate-900">{{ filteredRegistrations.length }}</span> candidates</div>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="ticketsPage <= 1" @click="ticketsPage--">← Previous</button>
+                    <span class="font-semibold">Page {{ ticketsPage }} of {{ totalTicketsPages }}</span>
+                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="ticketsPage >= totalTicketsPages" @click="ticketsPage++">Next →</button>
+                </div>
             </div>
         </div>
     </SahodayaAdminLayout>
@@ -155,8 +168,14 @@ const props = defineProps({
 });
 
 const searchQuery = ref('');
+const ticketsPage = ref(1);
+const ticketsPageSize = ref(50);
 const logoInput = ref(null);
 const localLogoPreview = ref(null);
+
+watch(searchQuery, () => {
+    ticketsPage.value = 1;
+});
 
 const hallsForm = useForm({
     halls: (props.halls?.length ? props.halls : []).map(h => ({ name: h.name, capacity: h.capacity })),
@@ -220,8 +239,15 @@ const filteredRegistrations = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();
     if (!q) return props.registrations;
     return props.registrations.filter((r) =>
-        [r.hall_ticket_no, r.student?.name, r.teacher?.name, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
+        [r.hall_ticket_no, r.student?.name, r.student?.admission_number, r.student?.reg_no, r.teacher?.name, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
     );
+});
+
+const totalTicketsPages = computed(() => Math.ceil(filteredRegistrations.value.length / ticketsPageSize.value) || 1);
+
+const paginatedRegistrations = computed(() => {
+    const start = (ticketsPage.value - 1) * ticketsPageSize.value;
+    return filteredRegistrations.value.slice(start, start + ticketsPageSize.value);
 });
 
 function saveDesign() {

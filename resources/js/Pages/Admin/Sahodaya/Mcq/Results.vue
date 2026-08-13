@@ -71,14 +71,15 @@
             <div class="p-4 border-b border-slate-100 flex flex-wrap gap-3 items-center justify-between">
                 <div>
                     <h3 class="section-title !mb-0">Mark entry</h3>
-                    <p class="section-desc">Offline scores after attendance is marked.</p>
+                    <p class="section-desc">Offline scores after attendance is marked ({{ filteredRegistrations.length }} candidate(s)).</p>
                 </div>
-                <input v-model="regSearch" type="search" class="field max-w-xs" placeholder="Search student or ticket…">
+                <input v-model="regSearch" type="search" class="field max-w-xs text-xs" placeholder="Search name, adm no, ticket…">
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th class="w-12">#</th>
                             <th>Student</th>
                             <th>School</th>
                             <th>Reg. no.</th>
@@ -91,8 +92,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="r in filteredRegistrations" :key="r.id" :class="['absent','malpractice','withheld'].includes(r.attendance_status) ? 'opacity-60' : ''">
-                            <td>{{ r.student?.name || ('#' + r.student_id) }}</td>
+                        <tr v-for="(r, i) in paginatedRegistrations" :key="r.id" :class="['absent','malpractice','withheld'].includes(r.attendance_status) ? 'opacity-60' : ''">
+                            <td class="text-xs font-bold text-slate-400">{{ (resultsPage - 1) * resultsPageSize + i + 1 }}</td>
+                            <td class="font-bold text-slate-900">{{ r.student?.name || r.participant_name || ('#' + r.student_id) }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
                             <td class="text-xs whitespace-nowrap">
@@ -132,17 +134,25 @@
                             </td>
                         </tr>
                         <tr v-if="!filteredRegistrations.length">
-                            <td :colspan="9" class="p-6 text-center text-slate-400">No matching registrations.</td>
+                            <td :colspan="10" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div v-if="filteredRegistrations.length > resultsPageSize" class="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
+                <div>Showing <span class="font-bold text-slate-900">{{ (resultsPage - 1) * resultsPageSize + 1 }}</span> to <span class="font-bold text-slate-900">{{ Math.min(resultsPage * resultsPageSize, filteredRegistrations.length) }}</span> of <span class="font-bold text-slate-900">{{ filteredRegistrations.length }}</span> candidates</div>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="resultsPage <= 1" @click="resultsPage--">← Previous</button>
+                    <span class="font-semibold">Page {{ resultsPage }} of {{ totalResultsPages }}</span>
+                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="resultsPage >= totalResultsPages" @click="resultsPage++">Next →</button>
+                </div>
             </div>
         </section>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
@@ -150,9 +160,14 @@ import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, gradeBands: { type: Array, default: () => [] } });
 
 const regSearch = ref('');
+const resultsPage = ref(1);
+const resultsPageSize = ref(50);
 const marksFile = ref(null);
 const page = usePage();
-const importErrors = computed(() => page.props.flash?.import_errors ?? []);
+
+watch(regSearch, () => {
+    resultsPage.value = 1;
+});
 
 const markForms = reactive({});
 for (const r of props.registrations) {
@@ -177,8 +192,15 @@ const filteredRegistrations = computed(() => {
     const q = regSearch.value.trim().toLowerCase();
     if (!q) return props.registrations;
     return props.registrations.filter((r) =>
-        [r.student?.name, r.hall_ticket_no, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
+        [r.student?.name, r.student?.admission_number, r.student?.reg_no, r.teacher?.name, r.teacher?.reg_no, r.teacher?.employee_code, r.hall_ticket_no, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
     );
+});
+
+const totalResultsPages = computed(() => Math.ceil(filteredRegistrations.value.length / resultsPageSize.value) || 1);
+
+const paginatedRegistrations = computed(() => {
+    const start = (resultsPage.value - 1) * resultsPageSize.value;
+    return filteredRegistrations.value.slice(start, start + resultsPageSize.value);
 });
 
 function importMarks() {

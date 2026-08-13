@@ -332,32 +332,48 @@
         </div>
 
         <!-- Students tab -->
-        <div v-else-if="tab === 'students'" class="card card--flush overflow-hidden">
-            <div class="p-4 border-b border-slate-100">
-                <h3 class="section-title !mb-0">Registered students</h3>
-                <p class="text-xs text-slate-500 mt-1">{{ registrations.length }} student(s) registered for this exam.</p>
+        <div v-else-if="tab === 'students'" class="card card--flush overflow-hidden p-4 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div>
+                    <h3 class="section-title !mb-0">Registered students</h3>
+                    <p class="text-xs text-slate-500 mt-1">{{ filteredRegisteredStudents.length }} student(s) registered for this exam.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input v-model="registeredSearchQuery" type="text" placeholder="Search name, adm no, hall ticket..." class="field text-xs min-w-[240px] bg-slate-50 border-slate-300 py-2 rounded-lg" />
+                </div>
             </div>
-            <table class="data-table">
-                <thead><tr><th>Student</th><th>Approval</th><th>Exam reg. no.</th><th>Seat</th><th>Status</th><th class="text-right">Action</th></tr></thead>
-                <tbody>
-                    <tr v-for="r in registrations" :key="r.id">
-                        <td>{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</td>
-                        <td><span class="text-xs capitalize">{{ r.approval_status_label || r.approval_status }}</span></td>
-                        <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
-                        <td>{{ r.seat_no || '—' }}</td>
-                        <td class="text-xs">
-                            <span class="font-semibold" :class="lifecycleTone(r.lifecycle_status?.tone)">{{ r.lifecycle_status?.label || r.status }}</span>
-                        </td>
-                        <td class="text-right whitespace-nowrap space-x-2">
-                            <a v-if="examHasFee" :href="`${base}/registrations/${r.id}/invoice`" target="_blank" class="text-xs font-semibold text-indigo-600 hover:underline">Invoice</a>
-                            <button v-if="r.can_cancel && canRegister" type="button"
-                                    class="text-xs font-semibold text-red-600 hover:text-red-700"
-                                    @click="r.teacher_id ? cancelTeacher(r.teacher_id, r.participant_name || r.teacher?.name) : cancelStudent(r.student_id, r.participant_name || studentDisplayName(r.student))">Cancel</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            <EmptyState v-if="!registrations.length" title="No registrations yet" description="Register students from the Register tab." icon="👥" class="py-8" />
+            <div class="overflow-x-auto">
+                <table class="data-table w-full">
+                    <thead><tr><th class="w-12">#</th><th>Student</th><th>Approval</th><th>Exam reg. no.</th><th>Seat</th><th>Status</th><th class="text-right">Action</th></tr></thead>
+                    <tbody>
+                        <tr v-for="(r, i) in paginatedRegisteredStudents" :key="r.id">
+                            <td class="text-xs font-bold text-slate-400">{{ (registeredPage - 1) * registeredPageSize + i + 1 }}</td>
+                            <td class="font-bold text-slate-900">{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</td>
+                            <td><span class="text-xs capitalize">{{ r.approval_status_label || r.approval_status }}</span></td>
+                            <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
+                            <td>{{ r.seat_no || '—' }}</td>
+                            <td class="text-xs">
+                                <span class="font-semibold" :class="lifecycleTone(r.lifecycle_status?.tone)">{{ r.lifecycle_status?.label || r.status }}</span>
+                            </td>
+                            <td class="text-right whitespace-nowrap space-x-2">
+                                <a v-if="examHasFee" :href="`${base}/registrations/${r.id}/invoice`" target="_blank" class="text-xs font-semibold text-indigo-600 hover:underline">Invoice</a>
+                                <button v-if="r.can_cancel && canRegister" type="button"
+                                        class="text-xs font-semibold text-red-600 hover:text-red-700"
+                                        @click="r.teacher_id ? cancelTeacher(r.teacher_id, r.participant_name || r.teacher?.name) : cancelStudent(r.student_id, r.participant_name || studentDisplayName(r.student))">Cancel</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div v-if="filteredRegisteredStudents.length > registeredPageSize" class="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100 text-xs text-slate-600">
+                <div>Showing <span class="font-bold text-slate-900">{{ (registeredPage - 1) * registeredPageSize + 1 }}</span> to <span class="font-bold text-slate-900">{{ Math.min(registeredPage * registeredPageSize, filteredRegisteredStudents.length) }}</span> of <span class="font-bold text-slate-900">{{ filteredRegisteredStudents.length }}</span> candidates</div>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="registeredPage <= 1" @click="registeredPage--">← Previous</button>
+                    <span class="font-semibold">Page {{ registeredPage }} of {{ totalRegisteredPages }}</span>
+                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="registeredPage >= totalRegisteredPages" @click="registeredPage++">Next →</button>
+                </div>
+            </div>
+            <EmptyState v-if="!filteredRegisteredStudents.length" title="No matching registrations" description="Try clearing your search query or registering students from the Register tab." icon="👥" class="py-8" />
         </div>
 
         <!-- Hall tickets tab -->
@@ -538,19 +554,25 @@
                         <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Pending</p>
                     </div>
                 </div>
-                <div class="flex flex-wrap gap-2 items-center">
-                    <button type="button" class="btn-secondary text-xs" @click="markAll('present')">Mark all present</button>
-                    <button type="button" class="btn-secondary text-xs" @click="markAll('absent')">Mark all absent</button>
-                    <a :href="reportExports.attendance" class="btn-secondary text-xs ml-auto">Export attendance ↓</a>
+                <div class="flex flex-wrap gap-2 items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="btn-secondary text-xs" @click="markAll('present')">Mark all present</button>
+                        <button type="button" class="btn-secondary text-xs" @click="markAll('absent')">Mark all absent</button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input v-model="attendanceSearchQuery" type="text" placeholder="Search student or ticket..." class="field text-xs min-w-[220px] bg-slate-50 border-slate-300 py-1.5 rounded-lg" />
+                        <a :href="reportExports.attendance" class="btn-secondary text-xs">Export attendance ↓</a>
+                    </div>
                 </div>
                 <p v-if="exam.results_published" class="text-xs text-amber-700">
                     Results are published for this exam. Attendance changes will be sent to the Sahodaya for approval instead of applying immediately.
                 </p>
-                <div class="card card--flush overflow-hidden">
-                    <table class="data-table">
-                        <thead><tr><th>Hall ticket</th><th>Student</th><th>Class</th><th class="text-center">Attendance</th><th>Note</th><th></th></tr></thead>
+                <div class="card card--flush overflow-hidden p-4 space-y-3">
+                    <table class="data-table w-full">
+                        <thead><tr><th class="w-12">#</th><th>Hall ticket</th><th>Student</th><th>Class</th><th class="text-center">Attendance</th><th>Note</th><th></th></tr></thead>
                         <tbody>
-                            <tr v-for="row in attendanceState" :key="row.id">
+                            <tr v-for="(row, i) in paginatedAttendanceState" :key="row.id">
+                                <td class="text-xs font-bold text-slate-400">{{ (attendancePage - 1) * attendancePageSize + i + 1 }}</td>
                                 <td class="font-mono text-xs">{{ row.hall_ticket_no || '—' }}</td>
                                 <td>{{ studentDisplayName(row.student) }}</td>
                                 <td class="text-xs">{{ row.class_name || row.student?.class_name || '—' }}</td>
@@ -588,6 +610,14 @@
                             </tr>
                         </tbody>
                     </table>
+                    <div v-if="filteredAttendanceState.length > attendancePageSize" class="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100 text-xs text-slate-600">
+                        <div>Showing <span class="font-bold text-slate-900">{{ (attendancePage - 1) * attendancePageSize + 1 }}</span> to <span class="font-bold text-slate-900">{{ Math.min(attendancePage * attendancePageSize, filteredAttendanceState.length) }}</span> of <span class="font-bold text-slate-900">{{ filteredAttendanceState.length }}</span> candidates</div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="attendancePage <= 1" @click="attendancePage--">← Previous</button>
+                            <span class="font-semibold">Page {{ attendancePage }} of {{ totalAttendancePages }}</span>
+                            <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="attendancePage >= totalAttendancePages" @click="attendancePage++">Next →</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="sticky bottom-4 flex justify-end">
                     <button type="button" class="btn-primary" @click="saveAttendance">Save attendance</button>
@@ -596,37 +626,50 @@
         </div>
 
         <!-- Results tab -->
-        <div v-else-if="tab === 'results'" class="card card--flush overflow-hidden">
-            <div class="p-4 border-b border-slate-100">
-                <h3 class="section-title !mb-0">Exam results</h3>
-                <p class="text-xs text-slate-500 mt-1">Published by Sahodaya for your registered students.</p>
+        <div v-else-if="tab === 'results'" class="card card--flush overflow-hidden p-4 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div>
+                    <h3 class="section-title !mb-0">Exam results</h3>
+                    <p class="text-xs text-slate-500 mt-1">Published by Sahodaya for your registered students.</p>
+                </div>
+                <input v-model="resultsSearchQuery" type="text" placeholder="Search student name..." class="field text-xs min-w-[220px] bg-slate-50 border-slate-300 py-1.5 rounded-lg" />
             </div>
-            <table class="data-table">
-                <thead><tr><th>Student</th><th>Score</th><th>Rank</th><th>Grade</th></tr></thead>
+            <table class="data-table w-full">
+                <thead><tr><th class="w-12">#</th><th>Student</th><th>Score</th><th>Rank</th><th>Grade</th></tr></thead>
                 <tbody>
-                    <tr v-for="r in registrations" :key="r.id">
-                        <td>{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</td>
+                    <tr v-for="(r, i) in paginatedResults" :key="r.id">
+                        <td class="text-xs font-bold text-slate-400">{{ (resultsPage - 1) * resultsPageSize + i + 1 }}</td>
+                        <td class="font-bold text-slate-900">{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</td>
                         <td>{{ r.mark?.score ?? '—' }}</td>
                         <td>{{ r.mark?.rank ?? '—' }}</td>
                         <td>{{ r.mark?.grade ?? '—' }}</td>
                     </tr>
                 </tbody>
             </table>
-            <EmptyState v-if="!registrations.length" title="No results" description="No registered students for this exam." icon="📊" class="py-8" />
+            <div v-if="filteredResults.length > resultsPageSize" class="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100 text-xs text-slate-600">
+                <div>Showing <span class="font-bold text-slate-900">{{ (resultsPage - 1) * resultsPageSize + 1 }}</span> to <span class="font-bold text-slate-900">{{ Math.min(resultsPage * resultsPageSize, filteredResults.length) }}</span> of <span class="font-bold text-slate-900">{{ filteredResults.length }}</span> candidates</div>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="resultsPage <= 1" @click="resultsPage--">← Previous</button>
+                    <span class="font-semibold">Page {{ resultsPage }} of {{ totalResultsPages }}</span>
+                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="resultsPage >= totalResultsPages" @click="resultsPage++">Next →</button>
+                </div>
+            </div>
+            <EmptyState v-if="!filteredResults.length" title="No results found" description="No matching registered students for this exam." icon="📊" class="py-8" />
         </div>
 
         <!-- Toppers tab -->
-        <div v-else-if="tab === 'toppers'" class="card card--flush overflow-hidden">
-            <div class="p-4 border-b border-slate-100">
+        <div v-else-if="tab === 'toppers'" class="card card--flush overflow-hidden p-4 space-y-4">
+            <div class="p-2 border-b border-slate-100">
                 <h3 class="section-title !mb-0">School toppers</h3>
                 <p class="text-xs text-slate-500 mt-1">Top performers from your school in this exam.</p>
             </div>
-            <table class="data-table">
-                <thead><tr><th>Rank</th><th>Student</th><th>Class</th><th>Score</th><th>Grade</th></tr></thead>
+            <table class="data-table w-full">
+                <thead><tr><th class="w-12">#</th><th>Rank</th><th>Student</th><th>Class</th><th>Score</th><th>Grade</th></tr></thead>
                 <tbody>
                     <tr v-for="(t, i) in toppers" :key="i">
-                        <td class="font-semibold">{{ t.rank ?? '—' }}</td>
-                        <td>{{ studentDisplayName(t) }}</td>
+                        <td class="text-xs font-bold text-slate-400">{{ i + 1 }}</td>
+                        <td class="font-semibold text-indigo-700">{{ t.rank ?? '—' }}</td>
+                        <td class="font-bold text-slate-900">{{ studentDisplayName(t) }}</td>
                         <td class="text-xs">{{ t.class_name || '—' }}</td>
                         <td>{{ t.score ?? '—' }}</td>
                         <td>{{ t.grade ?? '—' }}</td>
@@ -677,29 +720,32 @@
                 </div>
             </div>
 
-            <!-- Class Filter Toolbar -->
+            <!-- Class & Search Filter Toolbar -->
             <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
                         🎓
                     </div>
                     <div>
-                        <h4 class="font-bold text-slate-900 text-sm">Class Filter Toolbar</h4>
-                        <p class="text-xs text-slate-500">Filter reports by class or select "All Classes" for full school report.</p>
+                        <h4 class="font-bold text-slate-900 text-sm">Report Filters & Search</h4>
+                        <p class="text-xs text-slate-500">Filter reports by class or search candidate by name, admission no, or hall ticket.</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                     <div class="relative">
-                        <select v-model="reportClassFilter" class="field text-xs min-w-[200px] bg-slate-50 font-bold text-slate-800 border-slate-300 focus:bg-white pr-8 py-2 rounded-lg">
+                        <input v-model="reportSearchQuery" type="text" placeholder="Search name, adm no, hall ticket..." class="field text-xs min-w-[220px] bg-slate-50 font-medium border-slate-300 focus:bg-white py-2 rounded-lg" />
+                    </div>
+                    <div class="relative">
+                        <select v-model="reportClassFilter" class="field text-xs min-w-[180px] bg-slate-50 font-bold text-slate-800 border-slate-300 focus:bg-white pr-8 py-2 rounded-lg">
                             <option value="">All Classes (Full School)</option>
                             <option v-for="c in classOptions" :key="c.id" :value="c.name">Class {{ c.name }}</option>
                         </select>
                     </div>
-                    <button v-if="reportClassFilter" type="button" @click="reportClassFilter = ''" class="btn-secondary text-xs py-2 px-3 text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-100 font-medium">
-                        ✕ Clear Filter
+                    <button v-if="reportClassFilter || reportSearchQuery" type="button" @click="reportClassFilter = ''; reportSearchQuery = '';" class="btn-secondary text-xs py-2 px-3 text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-100 font-medium">
+                        ✕ Clear Filters
                     </button>
-                    <span v-if="reportClassFilter" class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg">
-                        Showing Class {{ reportClassFilter }} ({{ filteredReportRows.length }} candidates)
+                    <span v-if="reportClassFilter || reportSearchQuery" class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg">
+                        Showing {{ filteredReportRows.length }} candidate(s)
                     </span>
                 </div>
             </div>
@@ -897,6 +943,7 @@
                     <table class="data-table w-full">
                         <thead class="bg-slate-100 border-b border-slate-200">
                             <tr>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700 w-12">#</th>
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Hall Ticket</th>
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Student Name</th>
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">School Adm. No.</th>
@@ -907,7 +954,8 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            <tr v-for="(row, i) in filteredReportRows.slice(0, 100)" :key="i" class="hover:bg-slate-50 transition-colors">
+                            <tr v-for="(row, i) in paginatedReportRows" :key="i" class="hover:bg-slate-50 transition-colors">
+                                <td class="py-3 px-4 text-xs font-bold text-slate-400">{{ (reportPage - 1) * reportPageSize + i + 1 }}</td>
                                 <td class="py-3 px-4 font-mono text-xs font-bold text-indigo-700">{{ row.hall_ticket_no || '—' }}</td>
                                 <td class="py-3 px-4 font-bold text-slate-900 text-sm">{{ row.student_name }}</td>
                                 <td class="py-3 px-4 font-mono text-xs text-slate-600 font-semibold">{{ row.admission_number || '—' }}</td>
@@ -948,8 +996,8 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            <tr v-for="(row, i) in filteredReportRows" :key="i" class="hover:bg-slate-50 transition-colors">
-                                <td class="py-3 px-4 text-xs text-slate-400 font-bold">{{ i + 1 }}</td>
+                            <tr v-for="(row, i) in paginatedReportRows" :key="i" class="hover:bg-slate-50 transition-colors">
+                                <td class="py-3 px-4 text-xs text-slate-400 font-bold">{{ (reportPage - 1) * reportPageSize + i + 1 }}</td>
                                 <td class="py-3 px-4 font-mono text-xs font-bold text-indigo-700">{{ row.hall_ticket_no || '—' }}</td>
                                 <td class="py-3 px-4 font-bold text-slate-900 text-sm">{{ row.student_name }}</td>
                                 <td class="py-3 px-4 text-xs font-bold text-slate-800">
@@ -1053,6 +1101,22 @@
                         No class-wise fee due records available for preview.
                     </div>
                 </div>
+
+                <!-- Pagination Footer for Live Interactive Data Preview -->
+                <div v-if="['registration', 'attendance'].includes(activeReportPreviewTab) && filteredReportRows.length > reportPageSize" class="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
+                    <div>
+                        Showing <span class="font-bold text-slate-900">{{ (reportPage - 1) * reportPageSize + 1 }}</span> to <span class="font-bold text-slate-900">{{ Math.min(reportPage * reportPageSize, filteredReportRows.length) }}</span> of <span class="font-bold text-slate-900">{{ filteredReportRows.length }}</span> candidates
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="btn-secondary text-xs px-3 py-1.5" :disabled="reportPage <= 1" @click="reportPage--">
+                            ← Previous
+                        </button>
+                        <span class="font-semibold text-slate-700 px-2">Page {{ reportPage }} of {{ totalReportPages }}</span>
+                        <button type="button" class="btn-secondary text-xs px-3 py-1.5" :disabled="reportPage >= totalReportPages" @click="reportPage++">
+                            Next →
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </SchoolAdminLayout>
@@ -1098,16 +1162,133 @@ const props = defineProps({
 
 const activeReportPreviewTab = ref('registration');
 const reportClassFilter = ref('');
+const reportSearchQuery = ref('');
+const reportPage = ref(1);
+const reportPageSize = ref(50);
+
+watch([reportClassFilter, reportSearchQuery, activeReportPreviewTab], () => {
+    reportPage.value = 1;
+});
 
 const filteredReportRows = computed(() => {
-    if (!reportClassFilter.value) {
-        return props.reportRows;
+    let rows = props.reportRows || [];
+    if (reportClassFilter.value) {
+        const clean = String(reportClassFilter.value).toLowerCase().replace('class', '').trim();
+        rows = rows.filter(r => {
+            const cName = String(r.class_name || '').toLowerCase().replace('class', '').trim();
+            return cName === clean;
+        });
     }
-    const clean = String(reportClassFilter.value).toLowerCase().replace('class', '').trim();
-    return props.reportRows.filter(r => {
-        const cName = String(r.class_name || '').toLowerCase().replace('class', '').trim();
-        return cName === clean;
-    });
+    if (reportSearchQuery.value.trim()) {
+        const q = reportSearchQuery.value.trim().toLowerCase();
+        rows = rows.filter(r =>
+            (r.student_name || '').toLowerCase().includes(q) ||
+            (r.admission_number || '').toLowerCase().includes(q) ||
+            (r.reg_no || '').toLowerCase().includes(q) ||
+            (r.hall_ticket_no || '').toLowerCase().includes(q) ||
+            (r.class_name || '').toLowerCase().includes(q)
+        );
+    }
+    return rows;
+});
+
+const totalReportPages = computed(() => Math.ceil(filteredReportRows.value.length / reportPageSize.value) || 1);
+
+const paginatedReportRows = computed(() => {
+    const start = (reportPage.value - 1) * reportPageSize.value;
+    return filteredReportRows.value.slice(start, start + reportPageSize.value);
+});
+
+// Registered students tab search & pagination
+const registeredSearchQuery = ref('');
+const registeredPage = ref(1);
+const registeredPageSize = ref(50);
+
+watch(registeredSearchQuery, () => {
+    registeredPage.value = 1;
+});
+
+const filteredRegisteredStudents = computed(() => {
+    let list = props.registrations || [];
+    if (registeredSearchQuery.value.trim()) {
+        const q = registeredSearchQuery.value.trim().toLowerCase();
+        list = list.filter(r => {
+            const name = (r.participant_name || r.student?.name || r.teacher?.name || '').toLowerCase();
+            const adm = (r.student?.admission_number || '').toLowerCase();
+            const regNo = (r.student?.reg_no || r.teacher?.reg_no || r.teacher?.employee_code || '').toLowerCase();
+            const ht = (r.hall_ticket_no || '').toLowerCase();
+            return name.includes(q) || adm.includes(q) || regNo.includes(q) || ht.includes(q);
+        });
+    }
+    return list;
+});
+
+const totalRegisteredPages = computed(() => Math.ceil(filteredRegisteredStudents.value.length / registeredPageSize.value) || 1);
+
+const paginatedRegisteredStudents = computed(() => {
+    const start = (registeredPage.value - 1) * registeredPageSize.value;
+    return filteredRegisteredStudents.value.slice(start, start + registeredPageSize.value);
+});
+
+// Attendance tab search & pagination
+const attendanceSearchQuery = ref('');
+const attendancePage = ref(1);
+const attendancePageSize = ref(50);
+
+watch(attendanceSearchQuery, () => {
+    attendancePage.value = 1;
+});
+
+const filteredAttendanceState = computed(() => {
+    let list = attendanceState.value || [];
+    if (attendanceSearchQuery.value.trim()) {
+        const q = attendanceSearchQuery.value.trim().toLowerCase();
+        list = list.filter(r => {
+            const name = (r.student?.name || r.participant_name || '').toLowerCase();
+            const ht = (r.hall_ticket_no || '').toLowerCase();
+            const cls = (r.class_name || r.student?.class_name || '').toLowerCase();
+            const adm = (r.student?.admission_number || '').toLowerCase();
+            return name.includes(q) || ht.includes(q) || cls.includes(q) || adm.includes(q);
+        });
+    }
+    return list;
+});
+
+const totalAttendancePages = computed(() => Math.ceil(filteredAttendanceState.value.length / attendancePageSize.value) || 1);
+
+const paginatedAttendanceState = computed(() => {
+    const start = (attendancePage.value - 1) * attendancePageSize.value;
+    return filteredAttendanceState.value.slice(start, start + attendancePageSize.value);
+});
+
+// Results tab search & pagination
+const resultsSearchQuery = ref('');
+const resultsPage = ref(1);
+const resultsPageSize = ref(50);
+
+watch(resultsSearchQuery, () => {
+    resultsPage.value = 1;
+});
+
+const filteredResults = computed(() => {
+    let list = props.registrations || [];
+    if (resultsSearchQuery.value.trim()) {
+        const q = resultsSearchQuery.value.trim().toLowerCase();
+        list = list.filter(r => {
+            const name = (r.participant_name || r.student?.name || r.teacher?.name || '').toLowerCase();
+            const adm = (r.student?.admission_number || '').toLowerCase();
+            const ht = (r.hall_ticket_no || '').toLowerCase();
+            return name.includes(q) || adm.includes(q) || ht.includes(q);
+        });
+    }
+    return list;
+});
+
+const totalResultsPages = computed(() => Math.ceil(filteredResults.value.length / resultsPageSize.value) || 1);
+
+const paginatedResults = computed(() => {
+    const start = (resultsPage.value - 1) * resultsPageSize.value;
+    return filteredResults.value.slice(start, start + resultsPageSize.value);
 });
 
 function reportUrlWithClass(baseUrl, inline = false) {
