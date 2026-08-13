@@ -34,26 +34,39 @@ class McqReportService
             });
         }
 
+        $schoolFees = McqSchoolFee::where('exam_id', $exam->id)
+            ->with('feeReceipt')
+            ->get()
+            ->keyBy('school_id');
+
         return $registrations
             ->values()
-            ->map(fn (McqRegistration $reg) => [
-                'hall_ticket_no'   => $reg->hall_ticket_no,
-                'student_name'     => $reg->participantName(),
-                'admission_number' => $reg->student?->admission_number,
-                'reg_no'           => $reg->student?->reg_no ?? $reg->teacher?->employee_code ?? $reg->teacher?->reg_no,
-                'class_name'       => $reg->student?->schoolClass?->name,
-                'school_name'      => $reg->school?->name,
-                'approval_status'  => $reg->approval_status,
-                'rejection_reason' => $reg->rejection_reason,
-                'attendance_status'=> $reg->attendance_status,
-                'attendance_note'  => $reg->attendance_note,
-                'score'            => $reg->mark?->score,
-                'percentage'       => $reg->mark?->percentage,
-                'rank'             => $reg->mark?->rank,
-                'grade'            => $reg->mark?->grade,
-                'fee_status'       => $reg->feeReceipt?->status,
-                'is_teacher'       => $reg->isTeacherRegistration(),
-            ])
+            ->map(function (McqRegistration $reg) use ($schoolFees) {
+                $schoolFee = $schoolFees->get($reg->school_id);
+                $feeStatus = $reg->feeReceipt?->status
+                    ?? $schoolFee?->feeReceipt?->status
+                    ?? $schoolFee?->status
+                    ?? ($reg->approval_status === 'approved' ? 'approved' : ($reg->approval_status ?: 'pending'));
+
+                return [
+                    'hall_ticket_no'   => $reg->hall_ticket_no,
+                    'student_name'     => $reg->participantName(),
+                    'admission_number' => $reg->student?->admission_number,
+                    'reg_no'           => $reg->student?->reg_no ?? $reg->teacher?->employee_code ?? $reg->teacher?->reg_no,
+                    'class_name'       => $reg->student?->schoolClass?->name,
+                    'school_name'      => $reg->school?->name,
+                    'approval_status'  => $reg->approval_status,
+                    'rejection_reason' => $reg->rejection_reason,
+                    'attendance_status'=> $reg->attendance_status,
+                    'attendance_note'  => $reg->attendance_note,
+                    'score'            => $reg->mark?->score,
+                    'percentage'       => $reg->mark?->percentage,
+                    'rank'             => $reg->mark?->rank,
+                    'grade'            => $reg->mark?->grade,
+                    'fee_status'       => $feeStatus,
+                    'is_teacher'       => $reg->isTeacherRegistration(),
+                ];
+            })
             ->all();
     }
 

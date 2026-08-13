@@ -212,6 +212,12 @@ class McqPrintableDocumentService
 
         $registrations = $query->get();
 
+        $schoolFees = \App\Models\McqSchoolFee::where('exam_id', $exam->id)
+            ->with('feeReceipt')
+            ->get()
+            ->keyBy('school_id');
+        $feeRate = (float) $exam->schoolPayablePerStudent();
+
         $grouped = [];
         foreach ($registrations as $reg) {
             $className = $reg->student?->schoolClass?->name;
@@ -231,8 +237,10 @@ class McqPrintableDocumentService
                 $grouped[$className] = [];
             }
 
-            $amount = (float) ($reg->registration_fee ?: ($exam->fee_per_student ?: 0));
-            $isPaid = $reg->feeReceipt && strtolower($reg->feeReceipt->payment_status) === 'paid';
+            $schoolFee = $schoolFees->get($reg->school_id);
+            $isPaid = $reg->feeReceipt?->status === 'approved'
+                || $schoolFee?->status === 'approved'
+                || $schoolFee?->feeReceipt?->status === 'approved';
 
             $grouped[$className][] = [
                 'student_name'     => $reg->participantName(),
@@ -240,9 +248,9 @@ class McqPrintableDocumentService
                 'reg_no'           => $reg->student?->reg_no ?: '—',
                 'class_name'       => $className,
                 'school_name'      => $reg->school?->name ?: '—',
-                'fee_amount'       => $amount,
+                'fee_amount'       => $feeRate,
                 'payment_status'   => $isPaid ? 'Paid' : 'Unpaid',
-                'receipt_no'       => $reg->feeReceipt?->receipt_number ?: '—',
+                'receipt_no'       => $reg->feeReceipt?->transaction_ref ?: ($schoolFee?->feeReceipt?->transaction_ref ?: '—'),
             ];
         }
 
