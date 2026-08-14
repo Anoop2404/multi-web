@@ -341,23 +341,18 @@ const eligibilityLabel = computed(() => {
 
 const maxSelectedLimit = computed(() => {
     if (isGroup.value) return null;
-    if (isEditing.value) return 1;
     const maxPerSchool = Number(props.item?.max_per_school ?? 1);
-    const existingRegs = props.registrations?.length ?? 0;
-    return Math.max(1, maxPerSchool - existingRegs);
+    return maxPerSchool > 0 ? maxPerSchool : 1;
 });
 
 const pickerSubtitle = computed(() => {
     const parts = [`Eligible: ${eligibilityLabel.value}`];
     if (isGroup.value) {
         parts.push('Team name required');
-    } else if (isEditing.value) {
-        parts.push('Editing entry — select 1 student');
     } else {
-        const max = Number(props.item?.max_per_school ?? 1);
+        const max = maxSelectedLimit.value;
         if (max > 1) {
-            const limit = maxSelectedLimit.value;
-            parts.push(`Select up to ${limit} student${limit > 1 ? 's' : ''}`);
+            parts.push(`Select up to ${max} students for this item`);
         }
     }
     return parts.join(' · ');
@@ -500,8 +495,7 @@ function formatMoney(value) {
 }
 
 function openPicker() {
-    const max = Number(props.item?.max_per_school ?? 1);
-    if (!isEditing.value && (props.registrations?.length ?? 0) >= max && props.registrations[0]) {
+    if (!isEditing.value && isGroup.value && (props.registrations?.length ?? 0) >= (Number(props.item?.max_per_school ?? 1)) && props.registrations[0]) {
         emit('edit', props.registrations[0]);
         return;
     }
@@ -512,8 +506,7 @@ function openPicker() {
 }
 
 function openStandbyPicker() {
-    const max = Number(props.item?.max_per_school ?? 1);
-    if (!isEditing.value && (props.registrations?.length ?? 0) >= max && props.registrations[0]) {
+    if (!isEditing.value && isGroup.value && (props.registrations?.length ?? 0) >= (Number(props.item?.max_per_school ?? 1)) && props.registrations[0]) {
         emit('edit', props.registrations[0]);
     }
     standbyPickerOpen.value = true;

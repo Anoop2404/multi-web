@@ -351,7 +351,33 @@ class FestRegistrationCreateService
                 throw ValidationException::withMessages(['student_ids' => $error]);
             }
         } elseif (count($performerIds) > 1) {
-            throw ValidationException::withMessages(['student_ids' => 'This item allows only one participant.']);
+            $firstPerformer = [$performerIds[0]];
+            $remainingPerformers = array_slice($performerIds, 1);
+
+            $updated = $this->updateForSchool(
+                $registration,
+                $event,
+                $item,
+                $school,
+                $firstPerformer,
+                $standbyIds,
+                $teamName,
+                $teamContacts,
+            );
+
+            foreach ($remainingPerformers as $extraId) {
+                $this->createForSchool(
+                    $event,
+                    $item,
+                    $school,
+                    [$extraId],
+                    [],
+                    $teamName,
+                    teamContacts: $teamContacts,
+                );
+            }
+
+            return $updated;
         }
 
         $limitErrors = (new FestParticipationLimitService($event))
