@@ -463,13 +463,22 @@ class FestEventReportAnalyticsService
     }
 
     /** @return list<array<string, mixed>> */
+    protected function scopedEventIds(): array
+    {
+        if ($this->event->parent_event_id !== null) {
+            return [(int) $this->event->id];
+        }
+
+        return $this->event->reportableEventIds();
+    }
+
     public function itemRegistrationRows(?string $schoolId = null): array
     {
         $feeService = app(FestSchoolEventFeeService::class);
         $schedule = $feeService->resolveSchedule($this->event);
         $feeRequired = $feeService->feeRequired($this->event);
         $feeResolver = app(FestItemFeeResolver::class);
-        $eventIds = $this->event->reportableEventIds();
+        $eventIds = $this->scopedEventIds();
 
         $targetEventId = FestEventItem::where('event_id', $this->event->id)->where('is_enabled', true)->exists()
             ? $this->event->id
