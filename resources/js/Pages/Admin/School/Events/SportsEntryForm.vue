@@ -158,29 +158,29 @@
                         <!-- Meta Information Rows -->
                         <div class="text-[11px] space-y-2 mb-3 font-sans">
                             <div class="flex items-baseline">
-                                <span class="font-bold whitespace-nowrap text-slate-900">Name of the School with Address:</span>
-                                <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[22px] text-slate-900">
+                                <span class="font-bold whitespace-nowrap text-slate-900">Name of the School with Address :&nbsp;</span>
+                                <div class="flex-1 border-b border-dotted border-black ml-1 font-bold px-2 min-h-[22px] text-slate-900">
                                     {{ form.schoolName }}
                                 </div>
                             </div>
 
                             <div class="flex items-baseline">
-                                <span class="font-bold whitespace-nowrap text-slate-900">Team Manager's Name and Contact No. :</span>
-                                <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[22px] text-slate-900">
+                                <span class="font-bold whitespace-nowrap text-slate-900">Team Manager's Name and Contact No. :&nbsp;</span>
+                                <div class="flex-1 border-b border-dotted border-black ml-1 font-bold px-2 min-h-[22px] text-slate-900">
                                     {{ form.teamManager || '________________________________________' }}
                                 </div>
                             </div>
 
                             <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
                                 <div class="flex items-baseline flex-1">
-                                    <span class="font-bold whitespace-nowrap text-slate-900">Name of the Game:</span>
-                                    <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[22px] text-slate-900">
+                                    <span class="font-bold whitespace-nowrap text-slate-900">Name of the Game :&nbsp;</span>
+                                    <div class="flex-1 border-b border-dotted border-black ml-1 font-bold px-2 min-h-[22px] text-slate-900">
                                         {{ form.gameName }}
                                     </div>
                                 </div>
                                 <div class="flex items-baseline md:w-1/3">
-                                    <span class="font-bold whitespace-nowrap text-slate-900">Category:</span>
-                                    <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[22px] text-slate-900">
+                                    <span class="font-bold whitespace-nowrap text-slate-900">Category :&nbsp;</span>
+                                    <div class="flex-1 border-b border-dotted border-black ml-1 font-bold px-2 min-h-[22px] text-slate-900">
                                         {{ form.category }}
                                     </div>
                                 </div>
@@ -191,8 +191,8 @@
                             </div>
 
                             <div class="flex items-baseline pt-0.5">
-                                <span class="font-bold whitespace-nowrap text-slate-900">Region:</span>
-                                <div class="border-b border-dotted border-black ml-2 font-bold px-2 min-h-[20px] text-slate-900">
+                                <span class="font-bold whitespace-nowrap text-slate-900">Region :&nbsp;</span>
+                                <div class="border-b border-dotted border-black ml-1 font-bold px-2 min-h-[20px] text-slate-900">
                                     {{ form.regionName || 'District' }}
                                 </div>
                             </div>

@@ -186,24 +186,24 @@
     <!-- Info Section -->
     <table class="info-table">
         <tr>
-            <td class="info-lbl" style="width: 195px;">Name of the School with Address:</td>
-            <td class="dots-underline">{{ $schoolName ?? ($schoolAddress ? $schoolName . ', ' . $schoolAddress : '') }}</td>
+            <td class="info-lbl" style="width: 205px;">Name of the School with Address :&nbsp;</td>
+            <td class="dots-underline">&nbsp;{{ $schoolName ?? ($schoolAddress ? $schoolName . ', ' . $schoolAddress : '') }}</td>
         </tr>
     </table>
 
     <table class="info-table">
         <tr>
-            <td class="info-lbl" style="width: 240px;">Team Manager's Name and Contact No. :</td>
-            <td class="dots-underline">{{ $teamManager ?? '' }}</td>
+            <td class="info-lbl" style="width: 250px;">Team Manager's Name and Contact No. :&nbsp;</td>
+            <td class="dots-underline">&nbsp;{{ $teamManager ?? '' }}</td>
         </tr>
     </table>
 
     <table class="info-table">
         <tr>
-            <td class="info-lbl" style="width: 125px;">Name of the Game:</td>
-            <td class="dots-underline" style="width: 170px;">{{ $gameName ?? '' }}</td>
-            <td class="info-lbl" style="width: 65px; text-align: right; padding-right: 4px;">Category:</td>
-            <td class="dots-underline" style="width: 110px;">{{ $category ?? '' }}</td>
+            <td class="info-lbl" style="width: 130px;">Name of the Game :&nbsp;</td>
+            <td class="dots-underline" style="width: 165px;">&nbsp;{{ $gameName ?? '' }}</td>
+            <td class="info-lbl" style="width: 75px; text-align: right; padding-right: 4px;">Category :&nbsp;</td>
+            <td class="dots-underline" style="width: 105px;">&nbsp;{{ $category ?? '' }}</td>
             <td style="text-align: right; font-weight: bold; width: 140px;">
                 Boys <span class="checkbox-box">{{ isset($gender) && strtolower($gender) === 'boys' ? '✓' : '' }}</span>
                 &nbsp;&nbsp;
@@ -215,8 +215,8 @@
     <!-- Region Display -->
     <table class="info-table">
         <tr>
-            <td class="info-lbl" style="width: 60px;">Region:</td>
-            <td class="dots-underline">{{ $regionName ?? 'District' }}</td>
+            <td class="info-lbl" style="width: 65px;">Region :&nbsp;</td>
+            <td class="dots-underline">&nbsp;{{ $regionName ?? 'District' }}</td>
         </tr>
     </table>
 
