@@ -316,7 +316,9 @@ class FestRegistrationCreateService
         // handle (use cancel / cancel-with-refund for that instead). Snapshot the fee now so it
         // can be compared against the recalculated total after the roster change below.
         $feeService = app(FestSchoolEventFeeService::class);
-        $dueBefore = (float) ($feeService->currentFeeRecordFor($event, $school->id)?->total_due ?? 0);
+        $feeRecord = $feeService->currentFeeRecordFor($event, $school->id);
+        $dueBefore = (float) ($feeRecord?->total_due ?? 0);
+        $isPaid = $feeRecord && in_array($feeRecord->status, ['paid', 'approved', 'verified'], true);
 
         if ($item->is_enabled === false) {
             throw ValidationException::withMessages(['registration' => 'This item is not open for registration.']);
@@ -378,7 +380,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['student_ids' => implode(' ', $eligibilityErrors)]);
         }
 
-        $updated = DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $feeService, $dueBefore) {
+        $updated = DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $feeService, $dueBefore, $isPaid) {
             $eventRegService = app(FestEventRegistrationService::class);
             foreach (array_merge($performerIds, $standbyIds) as $studentId) {
                 if ($eventRegService->requireEventRegistration($event) && $event->event_type !== 'sports') {
@@ -459,10 +461,10 @@ class FestRegistrationCreateService
 
             $feeAfter = $feeService->recalculate($event, $school->id);
 
-            // A decrease needs a refund/credit, which this in-place edit path doesn't create —
+            // A decrease needs a refund/credit when paid, which this in-place edit path doesn't create —
             // send the school to cancel (or cancel-with-refund, once paid) instead. Throwing
             // here rolls back the whole roster change, including the recalculate() above.
-            if (round((float) $feeAfter->total_due, 2) < round($dueBefore, 2)) {
+            if ($isPaid && round((float) $feeAfter->total_due, 2) < round($dueBefore, 2)) {
                 throw ValidationException::withMessages([
                     'registration' => 'This change would reduce the fee owed — cancel this item instead so the difference can be credited, rather than editing it in place.',
                 ]);
