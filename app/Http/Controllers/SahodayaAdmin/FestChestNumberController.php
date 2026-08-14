@@ -17,10 +17,13 @@ use Illuminate\Http\Request;
 class FestChestNumberController extends SahodayaAdminController
 {
     use BuildsItemHeadReportContext;
+    use \App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
 
     public function index(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event = $this->regionAwareTargetEvent($request, $event);
 
         $navService = app(FestHeadItemNavigationService::class);
         $nav = $navService->navigationForEvent($event);
