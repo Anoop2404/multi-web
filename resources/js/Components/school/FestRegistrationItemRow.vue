@@ -189,7 +189,7 @@
         :coach-phone="isGroup ? form.coach_phone : undefined"
         :manager-name="isGroup ? form.manager_name : undefined"
         :manager-phone="isGroup ? form.manager_phone : undefined"
-        :max-selected="isGroup ? null : 1"
+        :max-selected="maxSelectedLimit"
         :confirm-label="layout === 'sports' ? 'Register selection' : 'Use selection'"
         @update:team-name="form.team_name = $event"
         @update:coach-name="form.coach_name = $event"
@@ -339,6 +339,14 @@ const eligibilityLabel = computed(() => {
     return parts.length ? parts.join(' · ') : 'Open';
 });
 
+const maxSelectedLimit = computed(() => {
+    if (isGroup.value) return null;
+    const maxPerSchool = Number(props.item?.max_per_school ?? 1);
+    const existingRegs = props.registrations?.length ?? 0;
+    const remaining = Math.max(1, maxPerSchool - existingRegs + (isEditing.value ? 1 : 0));
+    return remaining;
+});
+
 const pickerSubtitle = computed(() => {
     const parts = [`Eligible: ${eligibilityLabel.value}`];
     if (isGroup.value) {
@@ -346,7 +354,8 @@ const pickerSubtitle = computed(() => {
     } else {
         const max = Number(props.item?.max_per_school ?? 1);
         if (max > 1) {
-            parts.push(`1 student per entry (up to ${max} entries per school)`);
+            const limit = maxSelectedLimit.value;
+            parts.push(`Select up to ${limit} student${limit > 1 ? 's' : ''}`);
         }
     }
     return parts.join(' · ');

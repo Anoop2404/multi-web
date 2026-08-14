@@ -628,8 +628,8 @@ function submitItem(item) {
         itemErrors[key] = itemBlockReason(item);
         return;
     }
-    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > 1) {
-        itemErrors[key] = 'This item allows only one participant.';
+    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
+        itemErrors[key] = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
         return;
     }
     router.post(`${props.programBase}/register`, {

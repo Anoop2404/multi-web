@@ -109,7 +109,20 @@ class FestRegistrationCreateService
                 throw ValidationException::withMessages(['student_ids' => $error]);
             }
         } elseif (count($performerIds) > 1) {
-            throw ValidationException::withMessages(['student_ids' => 'This item allows only one participant.']);
+            $created = null;
+            foreach ($performerIds as $singleId) {
+                $created = $this->createForSchool(
+                    $event,
+                    $item,
+                    $school,
+                    [$singleId],
+                    $standbyIds,
+                    $teamName,
+                    $skipSchoolClosedCheck,
+                    $teamContacts,
+                );
+            }
+            return $created;
         }
 
         $item->loadMissing('head');
