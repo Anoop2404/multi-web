@@ -272,15 +272,15 @@
     <table class="footer-table">
         <tr>
             <td>
-                <div style="height: 30px;"></div>
+                <div style="height: 40px;"></div>
                 Team manager
             </td>
             <td>
-                <div class="seal-box">STAMP HERE</div>
+                <div style="height: 40px;"></div>
                 School Seal
             </td>
             <td>
-                <div style="height: 30px;"></div>
+                <div style="height: 40px;"></div>
                 Sign & Seal of Principal
             </td>
         </tr>

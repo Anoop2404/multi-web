@@ -264,9 +264,7 @@
                         </div>
 
                         <div class="text-center">
-                            <div class="w-20 h-12 border border-dashed border-slate-400 rounded-full mx-auto mb-1 flex items-center justify-center text-[9px] text-slate-400">
-                                STAMP HERE
-                            </div>
+                            <div class="h-10"></div>
                             <div>School Seal</div>
                         </div>
 
