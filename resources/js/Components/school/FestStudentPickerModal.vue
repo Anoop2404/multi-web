@@ -43,7 +43,7 @@
                             <span v-if="!showIneligible && hasIneligible"> · {{ ineligibleCount }} hidden</span>
                         </span>
                         <span v-if="maxSelected" class="text-slate-400">
-                            · Max {{ maxSelected }}
+                            · {{ maxSelected === 1 ? 'Max 1 per entry' : `Max ${maxSelected}` }}
                         </span>
                         <span v-if="localSelected.length" class="font-semibold text-[#0f3d7a]">
                             · {{ localSelected.length }} selected

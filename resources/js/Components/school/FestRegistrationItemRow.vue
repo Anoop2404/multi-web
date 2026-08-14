@@ -341,7 +341,14 @@ const eligibilityLabel = computed(() => {
 
 const pickerSubtitle = computed(() => {
     const parts = [`Eligible: ${eligibilityLabel.value}`];
-    if (isGroup.value) parts.push('Team name required');
+    if (isGroup.value) {
+        parts.push('Team name required');
+    } else {
+        const max = Number(props.item?.max_per_school ?? 1);
+        if (max > 1) {
+            parts.push(`1 student per entry (up to ${max} entries per school)`);
+        }
+    }
     return parts.join(' · ');
 });
 

@@ -7,6 +7,9 @@
                     description="Search, filter, edit configurations, toggle availability, and add event items.">
             <template #actions>
                 <div class="flex items-center gap-2">
+                    <Link :href="`${base}/items/caps`" class="btn-secondary text-xs flex items-center gap-1.5 !bg-indigo-50 !text-indigo-700 font-bold border-indigo-200 hover:!bg-indigo-100">
+                        <span>⚡ Bulk Limit Caps</span>
+                    </Link>
                     <Link v-if="taxonomyMastersUrl" :href="taxonomyMastersUrl" class="btn-secondary text-xs flex items-center gap-1.5">
                         <span>🏷️ Category masters</span>
                     </Link>
@@ -20,6 +23,18 @@
         <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
                            :event="event" active="items" class="mb-4" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="items" />
+
+        <!-- Sub Tab Bar to switch between Items List & Limit Caps -->
+        <div class="flex items-center gap-2 mb-5 border-b border-slate-200 pb-3">
+            <Link :href="`${base}/items`"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm">
+                <span>📋 Item Catalog & Metadata</span>
+            </Link>
+            <Link :href="`${base}/items/caps`"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200">
+                <span>⚡ Bulk Limit Caps & Squad Rules</span>
+            </Link>
+        </div>
 
         <div class="space-y-5">
             <!-- Search & Filter Bar + Items Registry -->
@@ -266,10 +281,6 @@
                         <input v-model.number="itemForm.max_per_school" type="number" min="1" class="field" placeholder="e.g. 2">
                     </FormField>
 
-                    <FormField label="Qualifiers Count" hint="Qualifiers promoting to next round">
-                        <input v-model.number="itemForm.qualify_count" type="number" min="1" class="field" placeholder="e.g. 2">
-                    </FormField>
-
                     <FormField label="Est. Duration (Mins)" hint="For scheduling">
                         <input v-model.number="itemForm.duration_minutes" type="number" min="1" class="field" placeholder="e.g. 30">
                     </FormField>
@@ -394,10 +405,6 @@
                                 <input v-model.number="editForm.standbys" type="number" min="0" class="field" placeholder="e.g. 2">
                             </FormField>
                         </template>
-
-                        <FormField label="Qualifiers Count">
-                            <input v-model.number="editForm.qualify_count" type="number" min="1" class="field" placeholder="e.g. 2">
-                        </FormField>
 
                         <FormField label="Stage / Category Type">
                             <select v-model="editForm.stage_type" class="field">

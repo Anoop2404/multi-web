@@ -27,6 +27,7 @@ use App\Services\Events\FestQualificationService;
 use App\Services\Events\FestTaxonomyRegistry;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class FestEventController extends SahodayaAdminController
 {
@@ -391,6 +392,100 @@ class FestEventController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/Items/List', $ctx + [
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::ITEMS_LIST),
         ]);
+    }
+
+    public function itemsCaps(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        if ($redirect = $this->redirectSportsSeasonToHub($event, 'Item limits are per sport event — open Chess, Aquatics, etc.')) {
+            return $redirect;
+        }
+
+        $event->load(['items' => function ($q) {
+            $q->withCount(['registrations' => fn ($r) => $r->whereIn('status', \App\Models\FestRegistration::ACTIVE_STATUSES)]);
+        }]);
+        $ctx = $this->eventPageContext($event);
+
+        return $this->inertia('Sahodaya/Events/Items/Caps', $ctx + [
+            'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::ITEMS),
+        ]);
+    }
+
+    public function bulkUpdateItemCaps(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'items'                   => 'required|array',
+            'items.*.id'             => 'required|integer|exists:fest_event_items,id',
+            'items.*.max_per_school' => 'nullable|integer|min:1',
+            'items.*.qualify_count'  => 'nullable|integer|min:1',
+            'items.*.min_group_size' => 'nullable|integer|min:1',
+            'items.*.max_group_size' => 'nullable|integer|min:1',
+            'items.*.min_playing'    => 'nullable|integer|min:1',
+            'items.*.max_subs'       => 'nullable|integer|min:0',
+            'items.*.standbys'       => 'nullable|integer|min:0',
+        ]);
+
+        $updatedCount = 0;
+
+        DB::transaction(function () use ($data, $event, &$updatedCount) {
+            foreach ($data['items'] as $itemData) {
+                $item = FestEventItem::where('event_id', $event->id)->find($itemData['id']);
+                if (! $item) {
+                    continue;
+                }
+
+                $updates = [];
+                if (array_key_exists('max_per_school', $itemData)) {
+                    $val = $itemData['max_per_school'];
+                    $updates['max_per_school'] = ($val !== null && $val !== '') ? (int) $val : null;
+                }
+                if (array_key_exists('qualify_count', $itemData)) {
+                    $val = $itemData['qualify_count'];
+                    $updates['qualify_count'] = ($val !== null && $val !== '') ? (int) $val : null;
+                }
+
+                if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
+                    $squadInput = [
+                        'min_playing' => $itemData['min_playing'] ?? null,
+                        'max_subs'    => $itemData['max_subs'] ?? ($itemData['standbys'] ?? null),
+                        'max_squad'   => $itemData['max_group_size'] ?? null,
+                        'min_squad'   => $itemData['min_group_size'] ?? null,
+                        'standbys'    => $itemData['standbys'] ?? null,
+                    ];
+                    $hasSquadInput = collect($squadInput)->contains(fn ($v) => $v !== null && $v !== '');
+
+                    if ($hasSquadInput) {
+                        $merged = FestTeamSquadRules::mergeIntoItem($squadInput);
+                        if (! empty($merged['criteria_json'])) {
+                            $updates['criteria_json'] = array_merge($item->criteria_json ?? [], $merged['criteria_json']);
+                        }
+                        if (array_key_exists('min_group_size', $itemData) || $merged['min_group_size'] !== null) {
+                            $updates['min_group_size'] = $merged['min_group_size'];
+                        }
+                        if (array_key_exists('max_group_size', $itemData) || $merged['max_group_size'] !== null) {
+                            $updates['max_group_size'] = $merged['max_group_size'];
+                        }
+                    } elseif (array_key_exists('min_group_size', $itemData) || array_key_exists('max_group_size', $itemData)) {
+                        $minVal = $itemData['min_group_size'] ?? null;
+                        $maxVal = $itemData['max_group_size'] ?? null;
+                        $updates['min_group_size'] = ($minVal !== null && $minVal !== '') ? (int) $minVal : null;
+                        $updates['max_group_size'] = ($maxVal !== null && $maxVal !== '') ? (int) $maxVal : null;
+                    }
+                }
+
+                if (! empty($updates)) {
+                    $item->update($updates);
+                    $updatedCount++;
+                }
+            }
+        });
+
+        $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.items.bulk_caps_updated', "Bulk updated limit caps for {$updatedCount} item(s)");
+
+        return back()->with('success', "Updated limit caps for {$updatedCount} item(s).");
     }
 
     public function levels(string $tenantId, FestEvent $event)

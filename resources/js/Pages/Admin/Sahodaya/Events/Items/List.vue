@@ -4,13 +4,30 @@
         <PageHeader :title="`${event.title} — Item listing`" eyebrow="Items"
                     description="Review every item, filter by discipline or age group, and edit configurations.">
             <template #actions>
-                <button type="button" class="btn-primary text-xs" @click="openAddItem()">+ Add item</button>
+                <div class="flex items-center gap-2">
+                    <Link :href="`${base}/items/caps`" class="btn-secondary text-xs flex items-center gap-1.5 !bg-indigo-50 !text-indigo-700 font-bold border-indigo-200 hover:!bg-indigo-100">
+                        <span>⚡ Bulk Limit Caps</span>
+                    </Link>
+                    <button type="button" class="btn-primary text-xs" @click="openAddItem()">+ Add item</button>
+                </div>
             </template>
         </PageHeader>
 
         <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
                            :event="event" active="items-list" class="mb-4" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="items-list" />
+
+        <!-- Sub Tab Bar to switch between Items List & Limit Caps -->
+        <div class="flex items-center gap-2 mb-5 border-b border-slate-200 pb-3">
+            <Link :href="`${base}/items`"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm">
+                <span>📋 Item Catalog & Metadata</span>
+            </Link>
+            <Link :href="`${base}/items/caps`"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200">
+                <span>⚡ Bulk Limit Caps & Squad Rules</span>
+            </Link>
+        </div>
 
         <section class="card !p-4 mb-5 space-y-3">
             <div class="flex flex-wrap gap-3 items-center">
@@ -98,7 +115,6 @@
                                             {{ formatDateRange(item.competition_start, item.competition_end) }}
                                             <span v-if="item.competition_time" class="font-mono">@ {{ item.competition_time.slice(0, 5) }}</span>
                                         </span>
-                                        <span><span class="font-semibold text-slate-600">Qualifiers:</span> {{ item.qualify_count ?? '—' }}</span>
                                         <span><span class="font-semibold text-slate-600">Max/school:</span> {{ item.max_per_school ?? '—' }}</span>
                                         <span>
                                             <span class="font-semibold text-slate-600">Fee:</span>
@@ -125,7 +141,6 @@
                             <th class="whitespace-nowrap">{{ event.event_type === 'kids_fest' ? 'Band' : 'Class' }}</th>
                             <th class="whitespace-nowrap">Gender</th>
                             <th class="whitespace-nowrap">Participant</th>
-                            <th class="whitespace-nowrap text-center">Qualifiers</th>
                             <th class="whitespace-nowrap text-center">Max/school</th>
                             <th class="whitespace-nowrap text-right">Fee</th>
                         </tr>
@@ -154,7 +169,6 @@
                             <td class="text-slate-600">{{ categoryLabel(item) }}</td>
                             <td class="text-slate-600">{{ genderLabel(item.gender) }}</td>
                             <td class="text-slate-600">{{ participantLabel(item.participant_type) }}</td>
-                            <td class="text-center text-slate-600">{{ item.qualify_count ?? '—' }}</td>
                             <td class="text-center text-slate-600">{{ item.max_per_school ?? '—' }}</td>
                             <td class="text-right text-slate-600">
                                 <span v-if="item.fee_amount != null">₹{{ item.fee_amount }}</span>
@@ -238,9 +252,6 @@
                         <select v-model="addForm.participant_type" class="field">
                             <option v-for="(label, key) in taxonomy?.participant_type ?? {}" :key="key" :value="key">{{ label }}</option>
                         </select>
-                    </FormField>
-                    <FormField label="Qualifiers to next level">
-                        <input v-model.number="addForm.qualify_count" type="number" min="1" class="field">
                     </FormField>
                     <FormField label="Max per school">
                         <input v-model.number="addForm.max_per_school" type="number" min="1" class="field">
@@ -334,9 +345,6 @@
                         <select v-model="editForm.participant_type" class="field">
                             <option v-for="(label, key) in taxonomy?.participant_type ?? {}" :key="key" :value="key">{{ label }}</option>
                         </select>
-                    </FormField>
-                    <FormField label="Qualifiers to next level">
-                        <input v-model.number="editForm.qualify_count" type="number" min="1" class="field">
                     </FormField>
                     <FormField label="Max per school">
                         <input v-model.number="editForm.max_per_school" type="number" min="1" class="field">

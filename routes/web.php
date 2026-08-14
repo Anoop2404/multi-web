@@ -1013,7 +1013,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/', [FestEventController::class, 'index'])->name('index');
             Route::post('/', [FestEventController::class, 'store'])->name('store');
             Route::get('/{event}/items/list', [FestEventController::class, 'itemsList'])->name('items.list');
+            Route::get('/{event}/items/caps', [FestEventController::class, 'itemsCaps'])->name('items.caps');
             Route::get('/{event}/items', [FestEventController::class, 'items'])->name('items.index');
+            Route::post('/{event}/items/bulk-caps', [FestEventController::class, 'bulkUpdateItemCaps'])->name('items.bulk-caps');
+            Route::post('/{event}/items/import-catalog', [FestEventController::class, 'importCatalog'])->name('items.import-catalog');
             Route::get('/{event}/levels', [FestEventController::class, 'levels'])->name('levels');
             Route::get('/{event}/activity', [\App\Http\Controllers\SahodayaAdmin\FestEventActivityController::class, 'index'])->name('activity');
             Route::post('/{event}/toggle-nav-hidden', [FestEventController::class, 'toggleNavHidden'])->name('toggle-nav-hidden');
