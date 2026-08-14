@@ -330,6 +330,7 @@ class FestReportService
             'category-wise-students' => $this->categoryWiseStudentsXls($request),
             'item-participants' => $this->itemParticipantsXls($request),
             'student-wise-report' => $this->studentWiseReportXls($request),
+            'student-wise-pdf' => $this->studentWisePdf($request),
             'results' => $this->resultsXls(),
             'fees' => app(FestExportService::class)->fees($this->event),
             'fee-breakdown' => app(FestExportService::class)->feeBreakdown($this->event),
@@ -525,6 +526,20 @@ class FestReportService
             'Item Head', 'Item', 'Class Group', 'School', 'Participant', 'Reg No',
             'Class', 'Chest No', 'Item Reg No', 'Fest ID',
         ], $rows);
+    }
+
+    private function studentWisePdf(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $schoolId = $request->input('school_id');
+        $search = $request->input('search');
+        $analytics = app(FestEventReportAnalyticsService::class, ['event' => $this->event]);
+        $rows = $analytics->studentWiseBrowserRows($schoolId, $search);
+
+        return $this->renderPdf('fest.reports.student-wise', [
+            'event' => $this->event,
+            'students' => $rows,
+            ...$this->brandingData(),
+        ], $this->slug().'-student-wise-report.pdf');
     }
 
     private function studentWiseReportXls(Request $request): StreamedResponse

@@ -1617,7 +1617,7 @@ class FestEventReportAnalyticsService
                 ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
             ->whereNotNull('student_id')
             ->with([
-                'student:id,name,reg_no,gender',
+                'student:id,tenant_id,name,reg_no,gender,photo',
                 'registration.school:id,name',
                 'registration.item:id,title,head_id,event_id',
                 'registration.item.head:id,name',
@@ -1677,6 +1677,7 @@ class FestEventReportAnalyticsService
                 'name'        => $name,
                 'reg_no'      => $regNo,
                 'gender'      => $student->gender,
+                'photo_url'   => $student->photoUrl(),
                 'item_count'  => count($items),
                 'total_score' => collect($items)->sum(fn ($i) => (float) ($i['score'] ?? 0)),
                 'items'       => $items,

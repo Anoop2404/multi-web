@@ -112,6 +112,7 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
 
     workflowItems.push(
         { label: 'Reports', href: reportsBase, icon: 'file-text', exact: true },
+        { label: 'Student-wise report', href: `${reportsBase}/student-wise`, icon: 'users' },
         { label: 'Item-wise report', href: `${reportsBase}/item-wise`, icon: 'list' },
         { label: 'Item counts', href: `${reportsBase}/item-counts`, icon: 'bar-chart' }
     );

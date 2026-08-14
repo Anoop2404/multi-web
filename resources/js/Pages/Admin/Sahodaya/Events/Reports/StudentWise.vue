@@ -1,121 +1,123 @@
 <template>
-    <SahodayaEventsLayout :title="`${event.title} — Student-wise`" :sahodaya="sahodaya" :event="event"
+    <SahodayaEventsLayout :title="`${event.title} — Student-wise report`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Student-wise browser`" eyebrow="Reports"
-                    description="Browse students by school — view all item registrations and marks per student.">
+        <PageHeader :title="`${event.title} — Student-wise participant report`" eyebrow="Reports"
+                    description="View all registered student participants, their school, photos, and registered competition items.">
             <template #actions>
-                <a :href="xlsUrl" target="_blank" class="btn-secondary text-sm">Export Excel ↓</a>
+                <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
             </template>
         </PageHeader>
 
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="student-wise" />
 
-        <form class="card !p-4 mb-4 flex flex-wrap gap-3 items-end" @submit.prevent="applyFilters">
-            <FormField label="School" class-extra="mb-0 min-w-[12rem]">
-                <select v-model="schoolFilter" class="field text-sm">
-                    <option value="">All schools</option>
-                    <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                </select>
-            </FormField>
-            <FormField v-if="event.event_type === 'sports' && childEvents.length" label="Sport Event" class-extra="mb-0 min-w-[12rem]">
-                <select v-model="sportEventFilter" class="field text-sm">
-                    <option value="">All Sport Events</option>
-                    <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
-                        {{ ev.title }} {{ ev.parent_event_id === null ? '(Season Hub)' : '' }}
-                    </option>
-                </select>
-            </FormField>
-            <!-- Non-sports region switcher: unlike the sports filter above (which narrows
-                 the already-loaded rows client-side via item.sport_event_id), region
-                 children aren't tagged onto each row, so this navigates to the selected
-                 child event's own page instead — same pattern as the other report/listing
-                 pages' switchSportEvent(). -->
-            <FormField v-if="event.event_type !== 'sports' && childEvents.length" label="Region" class-extra="mb-0 min-w-[12rem]">
-                <select :value="String(event.id)" @change="switchRegion" class="field text-sm">
+        <!-- Region Switcher -->
+        <div v-if="childEvents.length" class="card mb-6 !py-3.5 border-l-4 border-l-indigo-600 bg-gradient-to-r from-slate-50 to-white shadow-sm">
+            <div class="flex flex-wrap gap-3 items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <span class="p-1.5 rounded-md bg-indigo-50 text-indigo-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a2.5 2.5 0 002.5-2.5V7.865M19 12a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </span>
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-600">
+                        {{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}
+                    </label>
+                </div>
+                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1.5 w-72 font-semibold shadow-sm border-slate-300">
                     <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
                         {{ ev.short_title || ev.title }}
                     </option>
                 </select>
-            </FormField>
-            <FormField label="Search student" class-extra="mb-0 flex-1 min-w-[10rem]">
-                <input v-model="searchFilter" type="search" class="field text-sm" placeholder="Name or reg no…">
-            </FormField>
-            <button type="submit" class="btn-primary text-sm">Apply</button>
-            <button v-if="schoolFilter || searchFilter || selectedStudentId || sportEventFilter" type="button" class="btn-secondary text-sm" @click="clearFilters">Clear</button>
-        </form>
-
-        <div v-if="selectedStudent" class="card mb-6 overflow-hidden">
-            <div class="px-5 py-3 border-b bg-slate-50/80 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                    <h3 class="section-title text-sm">{{ selectedStudent.name }}</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">
-                        {{ selectedStudent.school_name }} · {{ selectedStudent.reg_no }}
-                        · {{ selectedStudent.item_count }} item{{ selectedStudent.item_count === 1 ? '' : 's' }}
-                        · total score {{ selectedStudent.total_score }}
-                    </p>
-                </div>
-                <Link :href="base" class="text-xs font-semibold text-indigo-600 hover:underline">← All students</Link>
             </div>
-            <table class="data-table w-full text-sm">
-                <thead>
-                    <tr>
-                        <th>Head</th><th>Item</th><th>Status</th><th>Fest ID</th><th>Item reg</th><th>Chest</th><th>Grade</th><th>Rank</th><th>Score</th>
-                        <th v-if="event.event_type === 'sports'">Time / distance</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(item, idx) in selectedStudent.items" :key="idx">
-                        <td class="text-xs text-slate-500">{{ item.head_name ?? '—' }}</td>
-                        <td>
-                            {{ item.item_title }}
-                            <span v-if="item.sport_event_title" class="block text-[10px] text-slate-400 font-semibold">{{ item.sport_event_title }}</span>
-                        </td>
-                        <td><span class="text-xs capitalize">{{ item.status }}</span></td>
-                        <td class="font-mono text-xs">{{ item.fest_id ?? '—' }}</td>
-                        <td class="font-mono text-xs">{{ item.item_reg ?? '—' }}</td>
-                        <td class="font-mono text-xs">{{ item.chest_no ?? '—' }}</td>
-                        <td>{{ item.grade ?? '—' }}</td>
-                        <td>{{ item.position ?? '—' }}</td>
-                        <td>{{ item.score ?? '—' }}</td>
-                        <td v-if="event.event_type === 'sports'">
-                            <span v-if="item.mark_value">{{ item.mark_value }} {{ item.mark_unit }}</span>
-                            <span v-else>—</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
         </div>
 
-        <div class="card card--flush overflow-hidden">
-            <table class="data-table w-full text-sm">
-                <thead>
-                    <tr>
-                        <th>Sl No</th>
-                        <th>School</th>
-                        <th>Student</th>
-                        <th>Reg no</th>
-                        <th>Items</th>
-                        <th>Total score</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(row, idx) in filteredRows" :key="row.student_id" class="border-t">
-                        <td>{{ idx + 1 }}</td>
-                        <td class="text-xs">{{ (row.school_name || '').toUpperCase() }}</td>
-                        <td class="font-medium">{{ row.name }}</td>
-                        <td class="font-mono text-xs">{{ row.reg_no }}</td>
-                        <td>{{ row.item_count }}</td>
-                        <td class="font-mono">{{ row.total_score }}</td>
-                        <td class="text-right">
-                            <Link :href="studentUrl(row.student_id)" class="text-xs font-semibold text-indigo-600 hover:underline">View →</Link>
-                        </td>
-                    </tr>
-                    <tr v-if="!filteredRows.length">
-                        <td colspan="7" class="p-8 text-center text-slate-400">No students match filters.</td>
-                    </tr>
-                </tbody>
-            </table>
+        <!-- Filter Toolbar -->
+        <div class="card mb-6 !py-4 shadow-sm border border-slate-200">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <input v-model="searchQuery"
+                               type="text"
+                               placeholder="Search student name or reg no..."
+                               class="field text-xs pl-8 w-full"
+                               @keyup.enter="applyFilters" />
+                        <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </div>
+                    <select v-if="schools?.length" v-model="selectedSchoolId" class="field text-xs w-64" @change="applyFilters">
+                        <option :value="null">All Schools ({{ schools.length }})</option>
+                        <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
+                    </select>
+                    <button type="button" @click="applyFilters" class="btn-secondary text-xs">Filter</button>
+                    <button v-if="searchQuery || selectedSchoolId" type="button" @click="clearFilters" class="btn-subtle text-xs text-slate-500">Clear</button>
+                </div>
+                <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
+            </div>
+        </div>
+
+        <!-- Student Cards List -->
+        <div class="space-y-4">
+            <div v-for="st in filteredRows" :key="st.student_id" class="card p-0 overflow-hidden shadow-sm border border-slate-200 hover:border-slate-300 transition-all">
+                <!-- Card Header -->
+                <div class="px-5 py-3.5 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3.5">
+                        <!-- Photo or Avatar -->
+                        <div class="relative">
+                            <img v-if="st.photo_url" :src="st.photo_url" :alt="st.name" class="w-11 h-11 rounded-full object-cover border-2 border-white shadow-sm ring-1 ring-slate-200" />
+                            <div v-else class="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-white font-bold text-base flex items-center justify-center shadow-sm ring-1 ring-slate-200">
+                                {{ (st.name || 'S').charAt(0).toUpperCase() }}
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                                {{ st.name }}
+                                <span v-if="st.reg_no" class="text-xs font-mono font-normal text-slate-500">({{ st.reg_no }})</span>
+                            </h4>
+                            <p class="text-xs text-slate-600 font-medium mt-0.5 flex items-center gap-1.5">
+                                <span>🏫 {{ st.school_name || '—' }}</span>
+                                <span v-if="st.gender" class="text-slate-400">·</span>
+                                <span v-if="st.gender" class="capitalize text-slate-500">{{ st.gender }}</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
+                            {{ st.item_count }} {{ st.item_count === 1 ? 'item' : 'items' }} registered
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Items Table -->
+                <div class="overflow-x-auto">
+                    <table class="data-table w-full text-xs">
+                        <thead class="bg-slate-50/50 border-b border-slate-100 text-slate-500 uppercase text-[10px] tracking-wider">
+                            <tr>
+                                <th class="w-10 text-center">#</th>
+                                <th>Item Title</th>
+                                <th>Category / Head</th>
+                                <th class="text-center">Chest No</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(item, idx) in st.items" :key="item.item_id || idx" class="hover:bg-slate-50/50">
+                                <td class="text-center text-slate-400 font-mono">{{ idx + 1 }}</td>
+                                <td class="font-semibold text-slate-900">{{ item.item_title }}</td>
+                                <td class="text-slate-600">{{ item.head_name || '—' }}</td>
+                                <td class="text-center font-mono font-bold text-slate-800">{{ item.chest_no || '—' }}</td>
+                                <td class="text-center">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block"
+                                          :class="item.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'">
+                                        {{ item.status || '—' }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div v-if="!filteredRows.length" class="card p-12 text-center text-slate-400">
+                <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <p class="font-semibold">No student participants match the selected filters.</p>
+            </div>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
@@ -123,61 +125,63 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
+import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 
 const props = defineProps({
-    sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
-    event: Object, rows: Array, selectedStudent: Object,
-    filters: Object, schools: Array, xlsUrl: String,
-    childEvents: { type: Array, default: () => [] },
+    sahodaya: Object,
+    publicUrl: String,
+    pendingPaymentsCount: Number,
+    event: Object,
+    rows: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
+    schools: { type: Array, default: () => [] },
+    pdfUrl: String,
+    xlsUrl: String,
     activityLogs: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
 
-const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/student-wise`;
-const schoolFilter = ref(props.filters?.school_id ?? '');
-const searchFilter = ref(props.filters?.search ?? '');
-const selectedStudentId = ref(props.filters?.student_id ?? '');
-const sportEventFilter = ref('');
+const searchQuery = ref(props.filters.search || '');
+const selectedSchoolId = ref(props.filters.school_id || null);
 
-function applyFilters() {
-    router.get(base, {
-        school_id: schoolFilter.value || undefined,
-        search: searchFilter.value.trim() || undefined,
-        student_id: selectedStudentId.value || undefined,
-    }, { preserveScroll: true, preserveState: true });
-}
+const filteredRows = computed(() => {
+    let result = props.rows;
+    if (selectedSchoolId.value) {
+        result = result.filter((r) => String(r.school_id) === String(selectedSchoolId.value));
+    }
+    if (searchQuery.value) {
+        const q = searchQuery.value.toLowerCase();
+        result = result.filter((r) =>
+            (r.name && r.name.toLowerCase().includes(q)) ||
+            (r.reg_no && r.reg_no.toLowerCase().includes(q))
+        );
+    }
+    return result;
+});
 
-function clearFilters() {
-    schoolFilter.value = '';
-    searchFilter.value = '';
-    selectedStudentId.value = '';
-    sportEventFilter.value = '';
-    router.get(base, {}, { preserveScroll: true });
-}
-
-function switchRegion(evt) {
+function switchSportEvent(evt) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports/student-wise`);
 }
 
-function studentUrl(studentId) {
-    return `${base}?${new URLSearchParams({
-        ...(schoolFilter.value ? { school_id: schoolFilter.value } : {}),
-        ...(searchFilter.value.trim() ? { search: searchFilter.value.trim() } : {}),
-        student_id: String(studentId),
-    }).toString()}`;
+function applyFilters() {
+    router.get(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/student-wise`,
+        {
+            search: searchQuery.value || undefined,
+            school_id: selectedSchoolId.value || undefined,
+        },
+        { preserveState: true, replace: true }
+    );
 }
 
-const filteredRows = computed(() => {
-    let list = props.rows ?? [];
-    if (sportEventFilter.value) {
-        list = list.filter(row =>
-            row.items.some(item => String(item.sport_event_id) === String(sportEventFilter.value))
-        );
-    }
-    return list;
-});
+function clearFilters() {
+    searchQuery.value = '';
+    selectedSchoolId.value = null;
+    applyFilters();
+}
 </script>
