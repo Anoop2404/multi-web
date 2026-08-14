@@ -26,14 +26,7 @@ class FestReportController extends SahodayaAdminController
     {
         $base = "/sahodaya-admin/{$tenantId}/events/{$event->id}";
 
-        $headContext = $event->event_type === 'sports'
-            ? $this->itemHeadReportContext($event, null, $tenantId)
-            : [
-                'headItemGroups'  => [],
-                'headsForFilter'  => [],
-                'hasItemHeads'    => false,
-                'headSummary'     => [],
-            ];
+        $headContext = $this->itemHeadReportContext($event, null, $tenantId);
 
         $regions = \App\Models\Region::forTenant($tenantId)
             ->orderBy('sort_order')

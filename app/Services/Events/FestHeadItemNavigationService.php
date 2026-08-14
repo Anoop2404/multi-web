@@ -126,22 +126,23 @@ class FestHeadItemNavigationService
             return $this->sportsNavigation($event, $schoolId, withItems: true);
         }
 
+        $targetEvent = $event->parent_event_id ? $event->rootEvent() : $event;
         $stats = $this->participantStatsByItem($event, $schoolId);
 
         $heads = FestItemHead::query()
-            ->where('event_id', $event->id)
+            ->where('event_id', $targetEvent->id)
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'name', 'sort_order', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time', 'status']);
 
         $items = FestEventItem::query()
-            ->where('event_id', $event->id)
+            ->where('event_id', $targetEvent->id)
             ->where('is_enabled', true)
             ->orderBy('display_order')
             ->orderBy('title')
             ->get(['id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at']);
 
-        $numbering = app(FestNumberingService::class)->settings($event);
+        $numbering = app(FestNumberingService::class)->settings($targetEvent);
         $defaultChestStart = (int) ($numbering['chest_no_start'] ?? 1);
 
         $itemsByHead = $items->groupBy(fn ($i) => $i->head_id ?? 0);
@@ -320,9 +321,10 @@ class FestHeadItemNavigationService
     private function participantStatsByItem(FestEvent $event, ?string $schoolId): array
     {
         $eventIds = $event->reportableEventIds();
+        $targetEvent = $event->parent_event_id ? $event->rootEvent() : $event;
 
         $items = FestEventItem::query()
-            ->where('event_id', $event->id)
+            ->where('event_id', $targetEvent->id)
             ->where('is_enabled', true)
             ->get(['id', 'participant_type', 'inherited_from_item_id']);
 
