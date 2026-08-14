@@ -513,6 +513,9 @@ function openStandbyPicker() {
 }
 
 function handleMainPickerConfirm() {
+    if (isEditing.value && !isGroup.value && (pickerModel.value?.length ?? 0) > 1) {
+        emit('cancel-edit');
+    }
     if (props.layout === 'sports' && canSubmit.value) {
         submit();
     }
