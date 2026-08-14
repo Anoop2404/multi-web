@@ -121,12 +121,12 @@
     }
 
     .col-sl { width: 4%; }
-    .col-name { width: 22%; text-align: left; }
+    .col-name { width: 22%; text-align: left; text-transform: uppercase; font-weight: bold; }
     .col-class { width: 6%; }
     .col-udise { width: 15%; }
     .col-dob { width: 11%; }
-    .col-father { width: 14%; text-align: left; }
-    .col-mother { width: 14%; text-align: left; }
+    .col-father { width: 14%; text-align: left; text-transform: uppercase; }
+    .col-mother { width: 14%; text-align: left; text-transform: uppercase; }
     .col-photo { width: 14%; }
 
     .photo-box {
@@ -245,12 +245,12 @@
                 @endphp
                 <tr>
                     <td class="col-sl"><strong>{{ $i + 1 }}</strong></td>
-                    <td class="col-name">{{ $std['name'] ?? '' }}</td>
+                    <td class="col-name">{{ !empty($std['name']) ? mb_strtoupper($std['name'], 'UTF-8') : '' }}</td>
                     <td class="col-class">{{ $std['class'] ?? '' }}</td>
                     <td class="col-udise">{{ $std['udise_pen'] ?? ($std['admission_no'] ?? '') }}</td>
                     <td class="col-dob">{{ $std['dob'] ?? '' }}</td>
-                    <td class="col-father">{{ $std['father_name'] ?? '' }}</td>
-                    <td class="col-mother">{{ $std['mother_name'] ?? '' }}</td>
+                    <td class="col-father">{{ !empty($std['father_name']) ? mb_strtoupper($std['father_name'], 'UTF-8') : '' }}</td>
+                    <td class="col-mother">{{ !empty($std['mother_name']) ? mb_strtoupper($std['mother_name'], 'UTF-8') : '' }}</td>
                     <td class="col-photo">
                         <div class="photo-box">
                             @if(!empty($std['photo_url']))

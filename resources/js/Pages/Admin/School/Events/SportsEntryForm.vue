@@ -218,7 +218,7 @@
                                         <td class="border border-black p-2 font-bold text-slate-900 w-[4%]">
                                             {{ index + 1 }}
                                         </td>
-                                        <td class="border border-black p-2 text-left font-bold text-slate-900 w-[22%]">
+                                        <td class="border border-black p-2 text-left font-bold text-slate-900 w-[22%] uppercase">
                                             {{ student.name || '—' }}
                                         </td>
                                         <td class="border border-black p-2 text-center font-medium text-slate-800 w-[6%]">
@@ -230,10 +230,10 @@
                                         <td class="border border-black p-2 text-center font-medium text-slate-800 w-[11%]">
                                             {{ student.dob || '—' }}
                                         </td>
-                                        <td class="border border-black p-2 text-left font-normal text-slate-800 w-[14%]">
+                                        <td class="border border-black p-2 text-left font-normal text-slate-800 w-[14%] uppercase">
                                             {{ student.father_name || '—' }}
                                         </td>
-                                        <td class="border border-black p-2 text-left font-normal text-slate-800 w-[14%]">
+                                        <td class="border border-black p-2 text-left font-normal text-slate-800 w-[14%] uppercase">
                                             {{ student.mother_name || '—' }}
                                         </td>
                                         <td class="border border-black p-2 align-middle w-[14%]">

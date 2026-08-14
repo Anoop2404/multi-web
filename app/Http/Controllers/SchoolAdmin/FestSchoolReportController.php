@@ -1528,11 +1528,11 @@ class FestSchoolReportController extends SchoolAdminController
                 $std = $participant->student;
                 $studentsList->push([
                     'id' => $std->id,
-                    'name' => $std->name,
+                    'name' => mb_strtoupper($std->name ?? '', 'UTF-8'),
                     'class' => $std->schoolClass?->name ?? '',
                     'udise_pen' => $std->admission_number ?: ($std->reg_no ?: ''),
                     'dob' => $std->dob ? $std->dob->format('d/m/Y') : '',
-                    'father_name' => $std->parent_name ?? '',
+                    'father_name' => mb_strtoupper($std->parent_name ?? '', 'UTF-8'),
                     'mother_name' => '',
                     'photo_url' => $std->photo ? \App\Support\TenantStorage::assetUrl($this->school, $std->photo) : null,
                     'photo_path' => $std->photo,
