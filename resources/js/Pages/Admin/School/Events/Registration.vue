@@ -1668,7 +1668,17 @@ function updateItem(event, item) {
 }
 
 function itemRegistrationCount(eventId, itemId) {
-    return registrationsForItem(eventId, itemId).length;
+    const regs = registrationsForItem(eventId, itemId);
+    if (!regs.length) return 0;
+    const firstItem = regs[0]?.item;
+    const isGroup = firstItem && ['group', 'team'].includes(firstItem.participant_type);
+    if (isGroup) {
+        return regs.length;
+    }
+    return regs.reduce((sum, r) => {
+        const performers = (r.participants ?? []).filter(p => p.participant_role !== 'standby');
+        return sum + Math.max(1, performers.length);
+    }, 0);
 }
 
 function itemMaxPerSchool(item) {
@@ -1807,7 +1817,7 @@ function itemStatusMeta(event, item) {
 
     if (status === 'registered') {
         return {
-            label: 'Registered',
+            label: max > 1 ? `Registered (${regs}/${max})` : 'Registered',
             badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100',
             hint: max === 1 ? 'Entry submitted for this event' : `${regs} of ${max} school entries used`,
         };
