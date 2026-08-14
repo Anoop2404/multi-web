@@ -13,19 +13,25 @@ table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4p
 <p class="meta">All schools · submitted and approved registrations</p>
 <table>
 <thead><tr>
-    <th>Head</th><th>Item</th><th>Class</th><th>Schools</th><th>Approved</th><th>Pending</th><th>Participants</th><th>Item IDs</th>
+    <th>Item Name</th><th>Category</th><th>Type</th><th>Schools</th><th>Total Regs</th><th>Approved</th><th>Pending</th><th>Students / Teams</th>
 </tr></thead>
 <tbody>
 @foreach($items as $item)
 <tr>
-    <td>{{ $item->head_name ?? '—' }}</td>
-    <td>{{ $item->title }}</td>
-    <td>{{ strtoupper($item->class_group ?? '') }}</td>
-    <td>{{ $item->school_count ?? '—' }}</td>
+    <td><strong>{{ $item->title }}</strong></td>
+    <td>{{ strtoupper($item->class_group ?? '—') }}</td>
+    <td>{{ ($item->participant_type ?? 'individual') === 'individual' ? 'Indiv' : 'Team' }}</td>
+    <td>{{ $item->school_count ?? 0 }}</td>
+    <td><strong>{{ $item->registered_count }}</strong></td>
     <td>{{ $item->approved }}</td>
     <td>{{ $item->pending }}</td>
-    <td>{{ $item->participants }}</td>
-    <td>{{ $item->item_reg_assigned ?? '—' }}</td>
+    <td>
+        @if(($item->participant_type ?? 'individual') === 'individual')
+            {{ $item->participants }} students
+        @else
+            {{ $item->registered_count }} teams/groups
+        @endif
+    </td>
 </tr>
 @endforeach
 </tbody></table>

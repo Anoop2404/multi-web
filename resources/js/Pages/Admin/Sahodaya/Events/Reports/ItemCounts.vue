@@ -90,29 +90,24 @@
                 <table class="data-table">
                     <thead class="bg-gray-50 border-b">
                         <tr>
-                            <th>Head</th>
-                            <th>Item</th>
-                            <th>Age / class</th>
+                            <th>Item Name</th>
+                            <th>Category</th>
                             <th>Type</th>
-                            <th>Reg window</th>
-                            <th>Competition</th>
                             <th>Schools</th>
+                            <th>Total Regs</th>
                             <th>Approved</th>
                             <th>Pending</th>
-                            <th>Participants</th>
-                            <th>Item IDs</th>
-                            <th>Max / school</th>
+                            <th>Students / Teams</th>
                         </tr>
                     </thead>
                     <tbody>
                         <template v-for="(row, idx) in displayRows" :key="row.item_id">
                             <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                                <td colspan="12" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                <td colspan="8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                     {{ row.head_name ?? 'Other items' }}
                                 </td>
                             </tr>
                             <tr>
-                                <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
                                 <td class="font-medium">
                                     {{ row.title }}
                                     <span v-if="row.item_code" class="block text-xs font-mono text-slate-400">{{ row.item_code }}</span>
@@ -124,21 +119,22 @@
                                         {{ row.participant_type === 'individual' ? 'Indiv' : 'Team' }}
                                     </span>
                                 </td>
-                                <td class="text-xs whitespace-nowrap">{{ formatDateRange(row.reg_start, row.reg_end) }}</td>
-                                <td class="text-xs whitespace-nowrap">
-                                    {{ formatDateRange(row.competition_start, row.competition_end) }}
-                                    <span v-if="row.competition_time" class="block text-[10px] text-slate-400 font-mono">@ {{ row.competition_time.slice(0, 5) }}</span>
+                                <td class="font-semibold text-slate-800">{{ row.school_count ?? 0 }}</td>
+                                <td class="font-bold text-indigo-900">{{ row.registration_count }}</td>
+                                <td class="text-emerald-700 font-semibold">{{ row.approved }}</td>
+                                <td class="text-amber-700 font-semibold">{{ row.pending }}</td>
+                                <td class="font-bold text-slate-900">
+                                    <template v-if="row.participant_type === 'individual'">
+                                        {{ row.participant_count }} <span class="text-xs font-normal text-slate-400">students</span>
+                                    </template>
+                                    <template v-else>
+                                        {{ row.registration_count }} <span class="text-xs font-normal text-indigo-500">teams/groups</span>
+                                    </template>
                                 </td>
-                                <td>{{ row.school_count ?? '—' }}</td>
-                                <td>{{ row.approved }}</td>
-                                <td>{{ row.pending }}</td>
-                                <td>{{ row.participant_count }}</td>
-                                <td>{{ row.item_reg_assigned }}</td>
-                                <td>{{ row.max_per_school ?? '—' }}</td>
                             </tr>
                         </template>
                         <tr v-if="!displayRows.length">
-                            <td colspan="12" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
+                            <td colspan="8" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
                         </tr>
                     </tbody>
                 </table>

@@ -624,15 +624,13 @@ class FestReportService
         $items = collect($this->itemRegistrationCountRows())->map(fn ($row) => (object) [
             'title'            => $row['title'],
             'head_name'        => $row['head_name'] ?? null,
-            'class_group'      => $row['class_group'],
-            'stage_type'       => $row['stage_type'] ?? null,
+            'class_group'      => $row['age_group'] ?? $row['class_group'] ?? '—',
+            'participant_type' => $row['participant_type'] ?? 'individual',
             'approved'         => $row['approved'],
             'pending'          => $row['pending'],
             'registered_count' => $row['registration_count'],
             'participants'     => $row['participant_count'],
-            'item_reg_assigned'=> $row['item_reg_assigned'],
-            'school_count'     => $row['school_count'] ?? null,
-            'fee_per_item'     => $row['fee_per_item'],
+            'school_count'     => $row['school_count'] ?? 0,
         ]);
 
         return $this->renderPdf('fest.reports.item-list', [
