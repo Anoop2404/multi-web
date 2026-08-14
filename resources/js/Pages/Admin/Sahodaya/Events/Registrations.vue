@@ -24,7 +24,7 @@
         </p>
 
         <!-- Sport Event / Region Switcher -->
-        <div v-if="event.event_type === 'sports' && childEvents.length" class="card mb-4 !py-3">
+        <div v-if="childEvents.length" class="card mb-4 !py-3">
             <div class="flex flex-wrap gap-3 items-center">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Sport Event / Region:</label>
                 <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">

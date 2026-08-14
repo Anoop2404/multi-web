@@ -9,8 +9,8 @@
         <FestEventWorkflowStepper v-else :sahodaya-id="sahodaya.id" :event-id="event.id"
                                   :event-type="event.event_type" :current-step="'reports'" />
 
-        <!-- Sport Event Switcher -->
-        <div v-if="isSports && childEvents.length" class="card mb-4">
+        <!-- Sport Event / Region Switcher -->
+        <div v-if="childEvents.length" class="card mb-4">
             <div class="flex flex-wrap gap-3 items-center">
                 <div>
                     <label class="text-xs font-semibold text-slate-600">Select Sport Event / Region</label>

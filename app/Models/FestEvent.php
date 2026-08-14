@@ -387,17 +387,32 @@ class FestEvent extends Model
     }
 
     /**
-     * Clean list of sport event / region dropdown options for UI selectors.
-     * Removes redundant parent title prefixes and excludes unneeded intermediate containers.
+     * Clean list of dropdown options for the event-switcher used across admin listing
+     * and report pages (Results, Fees, ChestNumbers, Attendance, Registrations,
+     * MarkEntry, and every FestReportController interactive page) — "Hub / All Regions"
+     * plus each operational child, so an admin can jump straight to one region's data
+     * without leaving the page.
+     *
+     * Originally sports-only (season -> sport -> region). Generalized 2026-08-14: any
+     * partitioned Sahodaya-level event — Kalotsav, Kids Fest, Teacher Fest, English
+     * Fest, Science Fest, Custom, anything synced via
+     * FestRegionPartitionService::syncPartitionsFromRegions() — now gets the same
+     * dropdown for its region children instead of always returning an empty list.
+     * Non-partitioned events (no region children) still return [] so the dropdown stays
+     * hidden, matching existing behavior.
      *
      * @return list<array{id: int, title: string, short_title: string, parent_event_id: ?int, is_hub: bool}>
      */
     public function sportEventDropdownOptions(): array
     {
-        if ($this->event_type !== 'sports') {
-            return [];
-        }
+        return $this->event_type === 'sports'
+            ? $this->sportsSeasonDropdownOptions()
+            : $this->regionDropdownOptions();
+    }
 
+    /** Sports' nested season -> sport -> region topology. Unchanged from the original implementation. */
+    private function sportsSeasonDropdownOptions(): array
+    {
         $rawParentId = $this->getRawOriginal('parent_event_id')
             ?: ($this->id ? self::where('id', $this->id)->value('parent_event_id') : null);
         $seasonId = (int) ($rawParentId ?: ($this->parent_event_id ?: $this->id));
@@ -446,6 +461,48 @@ class FestEvent extends Model
                 'short_title'     => $shortTitle,
                 'parent_event_id' => $ev->parent_event_id,
                 'is_hub'          => $isHub,
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * Non-sports region topology (single level: hub -> region children). Uses the same
+     * rootEvent()/childrenForRoles() topology helpers as FestReportScopeResolver and
+     * FestReportController::reportProps() rather than a hand-rolled query, so this stays
+     * consistent with the rest of the region-scoped reporting work — see
+     * docs/REGION_PHASE_EVENT_REPORTING_REMEDIATION_PLAN.md.
+     */
+    private function regionDropdownOptions(): array
+    {
+        $root = $this->rootEvent();
+        $regionChildren = $root->childrenForRoles(['region'])
+            ->load('region:id,name,code')
+            ->sortBy('sort_order')
+            ->values();
+
+        if ($regionChildren->isEmpty()) {
+            return [];
+        }
+
+        $options = [[
+            'id'              => $root->id,
+            'title'           => "{$root->title} (All Regions)",
+            'short_title'     => 'All Regions',
+            'parent_event_id' => null,
+            'is_hub'          => true,
+        ]];
+
+        foreach ($regionChildren as $child) {
+            $label = $child->region?->name ?? $child->title;
+
+            $options[] = [
+                'id'              => $child->id,
+                'title'           => $label,
+                'short_title'     => $label,
+                'parent_event_id' => $child->parent_event_id,
+                'is_hub'          => false,
             ];
         }
 

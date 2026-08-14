@@ -1,0 +1,1 @@
+var e={male:`Boys`,female:`Girls`,mixed:`Mixed`,open:`Open`},t=new Set([`male`,`m`,`boy`,`boys`]),n=new Set([`female`,`f`,`girl`,`girls`]);function r(e){let r=String(e??``).trim().toLowerCase();return!r||r===`open`?`open`:t.has(r)?`male`:n.has(r)?`female`:r===`mixed`||r===`common`?`mixed`:r}function i(t){let n=r(t);return!n||n===`open`?null:e[n]??n}export{r as n,i as t};

@@ -25,6 +25,18 @@
                     </option>
                 </select>
             </FormField>
+            <!-- Non-sports region switcher: unlike the sports filter above (which narrows
+                 the already-loaded rows client-side via item.sport_event_id), region
+                 children aren't tagged onto each row, so this navigates to the selected
+                 child event's own page instead — same pattern as the other report/listing
+                 pages' switchSportEvent(). -->
+            <FormField v-if="event.event_type !== 'sports' && childEvents.length" label="Region" class-extra="mb-0 min-w-[12rem]">
+                <select :value="String(event.id)" @change="switchRegion" class="field text-sm">
+                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
+                        {{ ev.short_title || ev.title }}
+                    </option>
+                </select>
+            </FormField>
             <FormField label="Search student" class-extra="mb-0 flex-1 min-w-[10rem]">
                 <input v-model="searchFilter" type="search" class="field text-sm" placeholder="Name or reg no…">
             </FormField>
@@ -145,6 +157,10 @@ function clearFilters() {
     selectedStudentId.value = '';
     sportEventFilter.value = '';
     router.get(base, {}, { preserveScroll: true });
+}
+
+function switchRegion(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports/student-wise`);
 }
 
 function studentUrl(studentId) {

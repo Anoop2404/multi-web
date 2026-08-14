@@ -48,15 +48,14 @@ class FestReportController extends SahodayaAdminController
         //
         // Most tiles still link to the child event's own id/URL — that's each region
         // child's own report, and it's already correctly isolated to that child. The
-        // exception is FestReportCatalog::REGION_ID_AWARE_IDS (item counts, head-wise
-        // participants, discipline registration, mark-entry status, schedule/clashes,
-        // assignment completeness): those builders resolve data via
-        // $event->reportableEventIds()/reportableItemIds(), which, run directly on the
-        // child, pulls in the hub's own uncopied item/registration rows alongside the
-        // child's own. For just those ids, regionScopedRows() reroutes the tile through
-        // the parent hub with an explicit region_id instead (same pattern already used
-        // for Registration Register / Overall Ranking), which those six controller
-        // methods now understand. See FestReportCatalog::REGION_ID_AWARE_IDS docblock.
+        // exception is FestReportCatalog::REGION_ID_AWARE_IDS: those builders resolve
+        // data via $event->reportableEventIds()/reportableItemIds(), which, run
+        // directly on the child, pulls in the hub's own uncopied item/registration rows
+        // alongside the child's own. For just those ids, regionScopedRows() reroutes the
+        // tile through the parent hub with an explicit region_id instead (same pattern
+        // already used for Registration Register / Overall Ranking), which every
+        // controller method behind those ids now understands via regionAwareTargetEvent().
+        // See FestReportCatalog::REGION_ID_AWARE_IDS docblock for the current list.
         $regionChildren = $event->childrenForRoles(['region'])
             ->load('region:id,name,code')
             ->sortBy('sort_order')
@@ -224,7 +223,13 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($event);
+        // Region-wise retrofit (plan §4.4/Phase 3): same regionAwareTargetEvent()
+        // isolation already applied to markEntryStatus/scheduleClashes/itemCounts/etc. —
+        // a region-partition child opened directly (or the hub with ?region_id=) now
+        // resolves through it instead of reading $event's own
+        // reportableEventIds()/reportableItemIds(), which otherwise pulled the hub's
+        // uncopied rows in alongside the child's.
+        $service = new FestReportService($this->regionAwareTargetEvent($request, $event));
         $schoolId = $request->input('school_id');
         $classGroup = $request->input('class_group');
         $grouped = [];
@@ -286,21 +291,21 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
-    public function houseDetailed(string $tenantId, FestEvent $event)
+    public function houseDetailed(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         return $this->inertia('Sahodaya/Events/Reports/HouseDetailed', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
-            'board'   => EventContext::for($event)->scoreboardByHouse(),
+            'board'   => EventContext::for($this->regionAwareTargetEvent($request, $event))->scoreboardByHouse(),
             'pdfUrl'  => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/house-wise",
         ])));
     }
 
-    public function participationCounts(string $tenantId, FestEvent $event)
+    public function participationCounts(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($event);
+        $service = new FestReportService($this->regionAwareTargetEvent($request, $event));
         $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
 
         $regs = $service->activeRegistrations();
@@ -359,7 +364,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($event);
+        $service = new FestReportService($this->regionAwareTargetEvent($request, $event));
         $date = $request->input('date');
         $stageId = $request->integer('stage_id') ?: null;
         $rows = $service->itemScheduleRows($date, $stageId);
@@ -443,7 +448,7 @@ class FestReportController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($event->event_type === 'sports', 404);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
         $areaId = $request->input('area_id') !== null && $request->input('area_id') !== ''
             ? ($request->input('area_id') === 'other' ? 0 : $request->integer('area_id'))
             : null;
@@ -472,7 +477,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
         $schoolId = $request->input('school_id');
         $data = $analytics->ageGroupMatrix($schoolId ?: null);
 
@@ -510,9 +515,13 @@ class FestReportController extends SahodayaAdminController
     }
 
     /**
-     * Resolves the FestEvent a region-aware report should actually read from, for the
-     * six report builders in FestReportCatalog::REGION_ID_AWARE_IDS (and feeCollection —
-     * added when the same issue was found in fee/payment reports). Two paths:
+     * Resolves the FestEvent a region-aware report should actually read from, for every
+     * report builder in FestReportCatalog::REGION_ID_AWARE_IDS plus feeCollection,
+     * schoolDetailed, houseDetailed, participationCounts, areaWiseParticipants,
+     * ageGroupMatrix, itemSchedule, numberingRegister/exportNumberingRegister,
+     * pendingApprovals/exportPendingApprovals, studentWise, and itemWise (retrofitted
+     * in the same pass once the same reportableEventIds()-on-a-region-child issue was
+     * confirmed in each). Two paths:
      *
      *   1. $event is already a region-partition child (parent_event_id set) — reached
      *      either via its own direct URL, or because ResolveRegionScopedReportEvent
@@ -661,37 +670,40 @@ class FestReportController extends SahodayaAdminController
         return (new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event)))->exportAssignmentCompleteness();
     }
 
-    public function numberingRegister(string $tenantId, FestEvent $event)
+    public function numberingRegister(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
 
         return $this->inertia('Sahodaya/Events/Reports/NumberingRegister', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'   => $analytics->numberingRegisterRows(),
-            'xlsUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/numbering-register/export",
+            'xlsUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/numbering-register/export".($request->integer('region_id') ? '?region_id='.$request->integer('region_id') : ''),
         ])));
     }
 
-    public function exportNumberingRegister(string $tenantId, FestEvent $event)
+    public function exportNumberingRegister(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        return (new \App\Services\Events\FestEventReportAnalyticsService($event))->exportNumberingRegister();
+        return (new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event)))->exportNumberingRegister();
     }
 
     public function pendingApprovals(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
         $schoolId = $request->input('school_id');
 
         return $this->inertia('Sahodaya/Events/Reports/PendingApprovals', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'           => $analytics->pendingApprovalRows($schoolId ?: null),
             'schools'        => (new FestReportService($event))->schools(),
             'filterSchoolId' => $schoolId,
-            'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/pending-approvals/export?'.http_build_query(array_filter(['school_id' => $schoolId])),
+            'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/pending-approvals/export?'.http_build_query(array_filter([
+                'school_id' => $schoolId,
+                'region_id' => $request->integer('region_id') ?: null,
+            ])),
         ])));
     }
 
@@ -699,7 +711,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        return (new \App\Services\Events\FestEventReportAnalyticsService($event))
+        return (new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event)))
             ->exportPendingApprovals($request->input('school_id'));
     }
 
@@ -707,8 +719,9 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($event);
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $service = new FestReportService($targetEvent);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($targetEvent);
         $schoolId = $request->input('school_id');
         $search = $request->input('search');
         $studentId = $request->integer('student_id') ?: null;
@@ -741,7 +754,7 @@ class FestReportController extends SahodayaAdminController
             app(\App\Services\Events\FestItemHeadService::class)->syncEventHeads($event);
         }
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
         $itemId = $request->integer('item_id') ?: null;
         $participants = $itemId ? $analytics->itemWiseBrowserRows($itemId) : [];
 
@@ -787,12 +800,12 @@ class FestReportController extends SahodayaAdminController
             'export_type' => $exportType,
         ]);
 
-        // FestReportCatalog::REGION_ID_AWARE_IDS exports (item-list, discipline-
-        // registration, head-wise-participants, mark-entry-status/mark-entered-summary,
-        // clashes/clashes-school, assignment-completeness) resolve their data off
-        // whatever event FestReportService is constructed with — reroute through the
-        // same isolation used by the interactive pages above, so the export a region
-        // tile links to matches what the interactive page for that region showed.
+        // FestReportCatalog::REGION_ID_AWARE_IDS exports resolve their data off whatever
+        // event FestReportService is constructed with — reroute through the same
+        // isolation used by the interactive pages above, so the export a region tile
+        // links to (and every catalog-driven Downloads.vue export button) matches what
+        // the interactive page for that region showed. See the catalog constant's own
+        // docblock for the current id list.
         $targetEvent = in_array($exportType, FestReportCatalog::REGION_ID_AWARE_IDS, true)
             ? $this->regionAwareTargetEvent($request, $event)
             : $event;
