@@ -1499,9 +1499,10 @@ class FestSchoolReportController extends SchoolAdminController
 
         // Group items for selection dropdown
         $registeredItems = $registrations->map(function ($reg) {
+            $rawTitle = $reg->item?->title ?? 'Item #'.$reg->item_id;
             return [
                 'id' => $reg->item_id,
-                'title' => $reg->item?->title ?? 'Item #'.$reg->item_id,
+                'title' => trim(str_replace('_', ' ', $rawTitle)),
                 'category' => $reg->item?->age_group ?: ($reg->item?->category ?: 'General'),
                 'gender' => $reg->item?->gender ?: 'boys',
                 'discipline' => $reg->item?->sport_discipline,
@@ -1542,13 +1543,16 @@ class FestSchoolReportController extends SchoolAdminController
             $academicYear = $m[0];
         }
 
+        $rawGameTitle = $selectedItem?->title ?: ($event->title ?: 'Sports Meet');
+        $cleanGameName = trim(str_replace('_', ' ', $rawGameTitle));
+
         $formData = [
             'sahodayaName' => $sahodaya?->name ?? 'MALAPPURAM CENTRAL SAHODAYA',
             'sahodayaLogoUrl' => $sahodayaLogoUrl,
             'academicYear' => $academicYear,
             'schoolName' => $this->school->name . ($this->school->address ? ', ' . $this->school->address : ''),
             'teamManager' => '',
-            'gameName' => $selectedItem?->title ?: ($event->title ?: 'Sports Meet'),
+            'gameName' => $cleanGameName,
             'category' => $selectedItem?->age_group ?: ($selectedItem?->category ?: ''),
             'gender' => strtolower($selectedItem?->gender ?? 'boys'),
             'regionName' => $regionName,

@@ -319,6 +319,10 @@ const form = ref(props.form || {
     regionName: null,
 });
 
+if (form.value.gameName) {
+    form.value.gameName = form.value.gameName.replace(/_/g, ' ');
+}
+
 const selectedItem = ref(props.selectedItemId || (props.registeredItems?.[0]?.id ?? null));
 
 const students = ref((props.initialStudents && props.initialStudents.length) ? props.initialStudents : [
