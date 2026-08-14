@@ -1559,7 +1559,7 @@ class FestSchoolReportController extends SchoolAdminController
             'gameName' => $cleanGameName,
             'category' => $selectedItem?->age_group ?: ($selectedItem?->category ?: ''),
             'gender' => strtolower($selectedItem?->gender ?? 'open'),
-        ];           'regionName' => $regionName,
+            'regionName' => $regionName,
         ];
 
         // Direct PDF Download / Stream Response
