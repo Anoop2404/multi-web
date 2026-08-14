@@ -274,7 +274,7 @@ class AnnualRegistrationController extends SchoolAdminController
             ->with('info', 'Student records are managed under Records → Students. Return here to submit for Sahodaya review.');
     }
 
-    public function destroyStudent(string $tenantId, int $student)
+    public function destroyStudent(string $tenantId, int|string $student)
     {
         return redirect("/school-admin/{$this->school->id}/students")
             ->with('info', 'Student records are managed under Records → Students.');

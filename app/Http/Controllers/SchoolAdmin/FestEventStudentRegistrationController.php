@@ -42,11 +42,11 @@ class FestEventStudentRegistrationController extends SchoolAdminController
         return back()->with('success', "Registered {$count} student(s) for the event. IMPORTANT: Please proceed to Step 2 (Item Registration) to assign these students to specific items.");
     }
 
-    public function destroy(string $tenantId, FestEvent $event, string $program, int $student)
+    public function destroy(string $tenantId, FestEvent $event, string $program, int|string $student)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        app(FestEventRegistrationService::class)->withdrawStudent($event, $this->school, $student);
+        app(FestEventRegistrationService::class)->withdrawStudent($event, $this->school, (int) $student);
 
         return back()->with('success', "Removed the student's event registration.");
     }
