@@ -1581,8 +1581,8 @@ class FestSchoolReportController extends SchoolAdminController
         }
 
         return $this->inertia('School/Events/SportsEntryForm', [
-            'school' => $this->school->only('id', 'name'),
-            'event' => $event->only('id', 'title'),
+            'school' => $this->school,
+            'event' => $event,
             'form' => $formData,
             'initialStudents' => $uniqueStudents,
             'registeredItems' => $registeredItems,
