@@ -55,12 +55,8 @@ class FestParticipationLimitService
         $errors = [];
         $policy = $this->policyFor($item->class_group);
 
-        if (($policy['one_entry_per_item_per_school'] ?? true) && $this->schoolHasItemEntry($schoolId, $item->id, $policy, $excludeRegistrationId)) {
-            $errors[] = 'Your school already has an entry for this item.';
-        }
-
         $maxPerSchool = (int) ($item->max_per_school ?? 1);
-        if ($maxPerSchool > 0) {
+        if ($maxPerSchool > 1) {
             $itemCount = FestRegistration::whereIn('event_id', $this->scopeEventIds())
                 ->where('school_id', $schoolId)
                 ->whereIn('item_id', $this->equivalentItemIds($item))
@@ -68,8 +64,10 @@ class FestParticipationLimitService
                 ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
                 ->count();
             if ($itemCount >= $maxPerSchool) {
-                $errors[] = "Maximum {$maxPerSchool} entr".($maxPerSchool === 1 ? 'y' : 'ies').' per school for this item.';
+                $errors[] = "Maximum {$maxPerSchool} entries per school for this item.";
             }
+        } elseif (($policy['one_entry_per_item_per_school'] ?? true) && $this->schoolHasItemEntry($schoolId, $item->id, $policy, $excludeRegistrationId)) {
+            $errors[] = 'Your school already has an entry for this item.';
         }
 
         $errors = array_merge($errors, $this->validateHeadCapacity($item, $policy, $schoolId, $excludeRegistrationId));
