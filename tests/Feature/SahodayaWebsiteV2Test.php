@@ -60,6 +60,14 @@ class SahodayaWebsiteV2Test extends TestCase
         );
     }
 
+    public function test_classic_site_does_not_receive_v2_section_width_constraints(): void
+    {
+        $this->get('http://v2-site.sahodaya.test/')
+            ->assertOk()
+            ->assertSee('legacy-site-section', false)
+            ->assertDontSee('class="site-section-frame', false);
+    }
+
     public function test_experience_is_previewable_as_a_draft_without_changing_live_content(): void
     {
         $this->actingAs($this->admin)->postJson($this->api('/experience/draft'), [

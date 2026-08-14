@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsFestIdCardResponses;
+use App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
 use App\Models\FestEvent;
 use App\Support\FestPageActivity;
 use App\Services\Audit\PlatformAuditLogger;
@@ -13,28 +14,31 @@ use Illuminate\Http\Request;
 class FestIdCardController extends SahodayaAdminController
 {
     use BuildsFestIdCardResponses;
+    use ResolvesRegionAwareReportEvent;
 
-    public function index(string $tenantId, FestEvent $event, FestIdCardService $service)
+    public function index(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $event->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')]);
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $targetEvent->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')]);
 
-        $itemCounts = $service->itemParticipantCounts($event);
-        $registrationCounts = $service->itemRegistrationCounts($event);
+        $itemCounts = $service->itemParticipantCounts($targetEvent);
+        $registrationCounts = $service->itemRegistrationCounts($targetEvent);
 
         return $this->inertia('Sahodaya/Events/IdCards/Index', $this->withEventActivity($event, FestPageActivity::ID_CARDS, [
-            'event'  => $event->only('id', 'title', 'status', 'event_type'),
-            'items'  => $event->items->map(fn ($item) => [
+            'event'  => $targetEvent->only('id', 'title', 'status', 'event_type'),
+            'items'  => $targetEvent->items->map(fn ($item) => [
                 'id'                  => $item->id,
                 'title'               => $item->title,
                 'participant_type'    => $item->participant_type,
                 'count'               => $itemCounts[$item->id] ?? 0,
                 'registration_count'  => $registrationCounts[$item->id] ?? 0,
             ]),
-            'heads'  => $service->headOptions($event),
-            'meta'   => $service->indexMeta($event),
-            'schools'=> $service->schoolOptions($event),
+            'heads'  => $service->headOptions($targetEvent),
+            'meta'   => $service->indexMeta($targetEvent),
+            'schools'=> $service->schoolOptions($targetEvent),
+            'childEvents' => $event->sportEventDropdownOptions(),
         ]));
     }
 
@@ -42,6 +46,7 @@ class FestIdCardController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
         $data = $this->validated($request);
         $filters = $this->idCardFilters($request);
 
@@ -56,7 +61,7 @@ class FestIdCardController extends SahodayaAdminController
         }
 
         return response()->json([
-            'cards' => $service->cards($event, $data['audience'], $filters),
+            'cards' => $service->cards($targetEvent, $data['audience'], $filters),
         ]);
     }
 
@@ -67,14 +72,15 @@ class FestIdCardController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
         $data = $this->validated($request);
         $filters = $this->idCardFilters($request);
         $service->requireStudentItem($data['audience'], $filters);
-        $cards = $service->cards($event, $data['audience'], $filters);
-        $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, $data['audience']);
+        $cards = $service->cards($targetEvent, $data['audience'], $filters);
+        $customTemplate = $this->resolveCustomIdCardTemplate($targetEvent, $filters['item_id'] ?? null, $data['audience']);
 
         return view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
-            $event,
+            $targetEvent,
             $this->sahodaya,
             $cards,
             $data['audience'],
@@ -95,21 +101,22 @@ class FestIdCardController extends SahodayaAdminController
         $event = FestEvent::findOrFail($event);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
         $data = $this->validated($request);
         $filters = $this->idCardFilters($request);
         $filters['include_data_uris'] = true;
         $service->requireStudentItem($data['audience'], $filters);
-        $cards = $service->cards($event, $data['audience'], $filters);
-        $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, $data['audience']);
+        $cards = $service->cards($targetEvent, $data['audience'], $filters);
+        $customTemplate = $this->resolveCustomIdCardTemplate($targetEvent, $filters['item_id'] ?? null, $data['audience']);
 
-        $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'ID cards PDF generated', [
+        $audit->festEvent($targetEvent, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'ID cards PDF generated', [
             'audience' => $data['audience'],
             'count'    => count($cards),
             'template' => $customTemplate ? 'custom:'.$customTemplate->id : $request->input('template', 'standard'),
             'scope'    => $filters['scope'] ?? 'item',
         ]);
 
-        $slug = str($event->title)->slug('-');
+        $slug = str($targetEvent->title)->slug('-');
         $scopeSuffix = match ($filters['scope'] ?? 'item') {
             'event' => 'event-pass',
             'head'  => 'head-pass',
@@ -118,7 +125,7 @@ class FestIdCardController extends SahodayaAdminController
 
         $isDomPdf = empty(env('PDF_CONVERTER_URL'));
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
-            $event,
+            $targetEvent,
             $this->sahodaya,
             $cards,
             $data['audience'],

@@ -5,6 +5,25 @@
                     description="Generate ID cards for approved participants, plus staff and volunteer lanyards. Four cards per A4 sheet.">
         </PageHeader>
 
+        <!-- Region Switcher -->
+        <div v-if="childEvents.length" class="card mb-6 !py-3.5 border-l-4 border-l-indigo-600 bg-gradient-to-r from-slate-50 to-white shadow-sm">
+            <div class="flex flex-wrap gap-3 items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <span class="p-1.5 rounded-md bg-indigo-50 text-indigo-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a2.5 2.5 0 002.5-2.5V7.865M19 12a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </span>
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-600">
+                        {{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}
+                    </label>
+                </div>
+                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1.5 w-72 font-semibold shadow-sm border-slate-300">
+                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
+                        {{ ev.short_title || ev.title }}
+                    </option>
+                </select>
+            </div>
+        </div>
+
         <div class="grid lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-4">
                 <div class="card space-y-4">
@@ -148,7 +167,7 @@
 
 <script setup>
 import { computed, reactive, ref, onMounted } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import IdCardPreviewTile from '@/Components/fest/IdCardPreviewTile.vue';
@@ -157,7 +176,12 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, items: { type: Array, default: () => [] }, meta: Object, schools: Array,
     activityLogs: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
+
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/id-cards`);
+}
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/id-cards`;
 const audience = ref('head');
