@@ -495,9 +495,8 @@ function formatMoney(value) {
 }
 
 function openPicker() {
-    if (!isEditing.value && isGroup.value && (props.registrations?.length ?? 0) >= (Number(props.item?.max_per_school ?? 1)) && props.registrations[0]) {
+    if (!isEditing.value && (props.registrations?.length ?? 0) > 0 && props.registrations[0]) {
         emit('edit', props.registrations[0]);
-        return;
     }
     if (!isEditing.value && isGroup.value && !String(props.form.team_name ?? '').trim()) {
         props.form.team_name = nextTeamName.value;
@@ -506,16 +505,13 @@ function openPicker() {
 }
 
 function openStandbyPicker() {
-    if (!isEditing.value && isGroup.value && (props.registrations?.length ?? 0) >= (Number(props.item?.max_per_school ?? 1)) && props.registrations[0]) {
+    if (!isEditing.value && (props.registrations?.length ?? 0) > 0 && props.registrations[0]) {
         emit('edit', props.registrations[0]);
     }
     standbyPickerOpen.value = true;
 }
 
 function handleMainPickerConfirm() {
-    if (isEditing.value && !isGroup.value && (pickerModel.value?.length ?? 0) > 1) {
-        emit('cancel-edit');
-    }
     if (props.layout === 'sports' && canSubmit.value) {
         submit();
     }
