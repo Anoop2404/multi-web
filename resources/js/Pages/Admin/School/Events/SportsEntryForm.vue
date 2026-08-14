@@ -1,20 +1,20 @@
 <template>
     <SchoolAdminLayout title="Entry Form" :school="school">
-        <div class="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
-            <!-- Control Header & Items Navigation Menu (Hidden during print) -->
-            <div class="max-w-[210mm] mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 mb-6 no-print">
-                
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
+        <div class="max-w-[210mm] mx-auto py-6 px-4 space-y-6 font-sans">
+            
+            <!-- Top Controls & Sports Items Menu (Hidden on Print) -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:p-6 no-print space-y-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                     <div>
                         <h1 class="text-xl font-bold text-slate-900 flex items-center gap-2">
-                            <span class="text-2xl">🏆</span> Games Competition Entry Form
+                            <span>🏆</span> Games Competition Entry Form
                         </h1>
                         <p class="text-xs text-slate-500 mt-1">
-                            Preview or download official A4 entry forms for your registered sports items.
+                            Official A4 entry form preview ({{ form.regionName || 'District' }})
                         </p>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2 shrink-0">
                         <button 
                             @click="previewSelectedPdf" 
                             type="button" 
@@ -34,20 +34,20 @@
                         <button 
                             @click="printForm" 
                             type="button" 
-                            class="px-4 py-2 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                            class="px-4 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer"
                         >
                             🖨️ Print Form
                         </button>
                     </div>
                 </div>
 
-                <!-- Items Menu Bar (Inside Page) -->
+                <!-- Items Menu Bar -->
                 <div v-if="registeredItems && registeredItems.length">
-                    <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center justify-between mb-2.5">
                         <h2 class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                             <span>📋</span> Registered Sports Items Menu ({{ registeredItems.length }})
                         </h2>
-                        <span class="text-[11px] text-slate-400">Click an item card to switch form preview</span>
+                        <span class="text-[11px] text-slate-400">Click any item card to load its form</span>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -58,8 +58,8 @@
                             :class="[
                                 'p-3 rounded-lg border text-left cursor-pointer transition relative group flex flex-col justify-between',
                                 selectedItem == item.id 
-                                    ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-sm' 
-                                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
+                                    ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-sm' 
+                                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                             ]"
                         >
                             <div>
@@ -78,25 +78,24 @@
                                 </div>
 
                                 <div class="text-[11px] text-slate-500 flex items-center gap-2">
-                                    <span>Category: <strong>{{ item.category }}</strong></span>
+                                    <span>Cat: <strong>{{ item.category }}</strong></span>
                                     <span>•</span>
                                     <span class="text-slate-700 font-medium">{{ item.registered_count || 0 }} Athletes</span>
                                 </div>
                             </div>
 
-                            <!-- Item Action Buttons -->
                             <div class="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-200/60">
                                 <button 
                                     @click.stop="previewItemPdf(item.id)" 
                                     type="button" 
-                                    class="flex-1 py-1 px-2 text-[10px] font-bold rounded bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition text-center flex items-center justify-center gap-1"
+                                    class="flex-1 py-1 px-2 text-[10px] font-bold rounded bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition text-center"
                                 >
-                                    👁️ Preview PDF
+                                    👁️ PDF
                                 </button>
                                 <button 
                                     @click.stop="downloadItemPdf(item.id)" 
                                     type="button" 
-                                    class="flex-1 py-1 px-2 text-[10px] font-bold rounded bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition text-center flex items-center justify-center gap-1"
+                                    class="flex-1 py-1 px-2 text-[10px] font-bold rounded bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition text-center"
                                 >
                                     📥 Download
                                 </button>
@@ -107,8 +106,8 @@
             </div>
 
             <!-- Official Printable Canvas Container (Exact A4 Sheet Preview) -->
-            <div class="max-w-[210mm] mx-auto flex justify-center">
-                <div class="printable-form bg-white w-[210mm] min-h-[297mm] max-w-[210mm] p-[10mm_12mm] shadow-lg relative text-slate-900 font-sans flex flex-col justify-between overflow-hidden box-border">
+            <div class="w-full flex justify-center">
+                <div class="printable-form bg-white w-full max-w-[210mm] min-h-[297mm] p-[10mm_12mm] shadow-md border border-slate-200 rounded-xl relative text-slate-900 font-sans flex flex-col justify-between overflow-hidden box-border">
                     
                     <!-- Decorative Wave Graphics -->
                     <svg class="absolute top-0 right-0 w-[240px] h-[100px] pointer-events-none z-0" viewBox="0 0 260 110" fill="none">
@@ -380,6 +379,7 @@ function printForm() {
         width: 100% !important;
         max-width: 100% !important;
         padding: 0 !important;
+        border: none !important;
     }
 }
 </style>
