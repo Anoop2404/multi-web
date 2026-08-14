@@ -15,13 +15,6 @@
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2">
-                        <button 
-                            @click="addStudentRow" 
-                            type="button" 
-                            class="px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer"
-                        >
-                            ➕ Add Student
-                        </button>
 
                         <button 
                             @click="previewSelectedPdf" 
