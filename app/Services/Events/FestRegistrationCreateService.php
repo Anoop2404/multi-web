@@ -108,21 +108,34 @@ class FestRegistrationCreateService
             if ($error) {
                 throw ValidationException::withMessages(['student_ids' => $error]);
             }
-        } elseif (count($performerIds) > 1) {
-            $created = null;
-            foreach ($performerIds as $singleId) {
-                $created = $this->createForSchool(
-                    $event,
-                    $item,
-                    $school,
-                    [$singleId],
-                    $standbyIds,
-                    $teamName,
-                    $skipSchoolClosedCheck,
-                    $teamContacts,
-                );
+        } else {
+            $existingReg = FestRegistration::whereIn('event_id', $event->reportableEventIds())
+                ->where('school_id', $school->id)
+                ->where('item_id', $item->id)
+                ->whereIn('status', ['submitted', 'pending_approval', 'approved'])
+                ->whereHas('participants', fn ($q) => $q->whereIn('student_id', $performerIds)->where('participant_role', 'performer'))
+                ->first();
+
+            if ($existingReg && count($performerIds) === 1) {
+                return $existingReg;
             }
-            return $created;
+
+            if (count($performerIds) > 1) {
+                $created = null;
+                foreach ($performerIds as $singleId) {
+                    $created = $this->createForSchool(
+                        $event,
+                        $item,
+                        $school,
+                        [$singleId],
+                        $standbyIds,
+                        $teamName,
+                        $skipSchoolClosedCheck,
+                        $teamContacts,
+                    );
+                }
+                return $created;
+            }
         }
 
         $item->loadMissing('head');
