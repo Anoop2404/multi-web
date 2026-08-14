@@ -109,32 +109,28 @@ class FestRegistrationCreateService
                 throw ValidationException::withMessages(['student_ids' => $error]);
             }
         } else {
+            $maxAllowed = (int) ($item->max_per_school ?? 1);
+            if (count($performerIds) > $maxAllowed) {
+                throw ValidationException::withMessages(['student_ids' => "Maximum {$maxAllowed} participant".($maxAllowed === 1 ? '' : 's').' allowed for this item.']);
+            }
+
             $existingReg = FestRegistration::whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $school->id)
                 ->where('item_id', $item->id)
                 ->whereIn('status', ['submitted', 'pending_approval', 'approved'])
-                ->whereHas('participants', fn ($q) => $q->whereIn('student_id', $performerIds)->where('participant_role', 'performer'))
                 ->first();
 
-            if ($existingReg && count($performerIds) === 1) {
-                return $existingReg;
-            }
-
-            if (count($performerIds) > 1) {
-                $created = null;
-                foreach ($performerIds as $singleId) {
-                    $created = $this->createForSchool(
-                        $event,
-                        $item,
-                        $school,
-                        [$singleId],
-                        $standbyIds,
-                        $teamName,
-                        $skipSchoolClosedCheck,
-                        $teamContacts,
-                    );
-                }
-                return $created;
+            if ($existingReg) {
+                return $this->updateForSchool(
+                    $existingReg,
+                    $event,
+                    $item,
+                    $school,
+                    $performerIds,
+                    $standbyIds,
+                    $teamName,
+                    $teamContacts,
+                );
             }
         }
 
@@ -363,34 +359,11 @@ class FestRegistrationCreateService
             if ($error) {
                 throw ValidationException::withMessages(['student_ids' => $error]);
             }
-        } elseif (count($performerIds) > 1) {
-            $firstPerformer = [$performerIds[0]];
-            $remainingPerformers = array_slice($performerIds, 1);
-
-            $updated = $this->updateForSchool(
-                $registration,
-                $event,
-                $item,
-                $school,
-                $firstPerformer,
-                $standbyIds,
-                $teamName,
-                $teamContacts,
-            );
-
-            foreach ($remainingPerformers as $extraId) {
-                $this->createForSchool(
-                    $event,
-                    $item,
-                    $school,
-                    [$extraId],
-                    [],
-                    $teamName,
-                    teamContacts: $teamContacts,
-                );
+        } else {
+            $maxAllowed = (int) ($item->max_per_school ?? 1);
+            if (count($performerIds) > $maxAllowed) {
+                throw ValidationException::withMessages(['student_ids' => "Maximum {$maxAllowed} participant".($maxAllowed === 1 ? '' : 's').' allowed for this item.']);
             }
-
-            return $updated;
         }
 
         $limitErrors = (new FestParticipationLimitService($event))
