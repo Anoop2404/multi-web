@@ -142,6 +142,7 @@ export const SCHOOL_EVENT_REPORTS = [
     { id: 'teacher-wise', label: 'Teacher-wise results', category: 'competition', phase: 'after', hasPreview: true, hasExport: true, exportSuffix: 'teacher-wise/export', exportLabel: 'CSV', program: 'teacher-fest', icon: '👩‍🏫', hint: 'Teacher fest results' },
     { id: 'mark-entry-status', label: 'Mark entry status', category: 'competition', phase: 'during', hasPreview: true, hasExport: true, pdfExportSuffix: 'mark-entry-status/pdf', exportSuffix: 'mark-entry-status/export', exportLabel: 'CSV', icon: '✏️', hint: 'Marking progress by item' },
     { id: 'qualifiers', label: 'Promoted qualifiers', category: 'competition', phase: 'after', hasPreview: true, hasExport: true, exportSuffix: 'qualifiers/export', exportLabel: 'CSV', icon: '🏅', hint: 'Students promoted to next level', program: 'sports-meet', externalPath: 'qualifiers' },
+    { id: 'games-entry-form', label: 'Entry Form', category: 'ops', phase: 'before', hasPreview: true, hasExport: true, pdfExportSuffix: 'games-entry-form?download=1', icon: '📝', hint: 'Official A4 Games Entry Form by sports item with photos', featured: true, program: 'sports-meet' },
     // Print & ops
     { id: 'id-cards', label: 'ID cards', category: 'ops', phase: 'before', hasPreview: true, hasExport: true, pdfExportSuffix: 'id-cards/pdf', icon: '🪪', hint: 'Print student ID cards by head or item', featured: true },
     { id: 'admit-cards', label: 'Admit cards (bulk PDF)', category: 'ops', phase: 'before', hasPreview: false, hasExport: true, pdfExportSuffix: 'export/admit-cards', icon: '🎫', hint: 'Bulk admit cards PDF' },
@@ -150,6 +151,10 @@ export const SCHOOL_EVENT_REPORTS = [
 ];
 
 export function schoolReportPdfHref(eventBase, report) {
+    if (report.id === 'games-entry-form') {
+        const base = eventBase.replace(/\/reports\/(\d+)$/, '/events/$1');
+        return `${base}/games-entry-form?download=1`;
+    }
     if (report.pdfExportSuffix) {
         return `${eventBase}/${report.pdfExportSuffix}`;
     }
@@ -183,6 +188,10 @@ export function featuredSchoolReports(programSlug) {
 }
 
 export function schoolReportHref(eventBase, report) {
+    if (report.id === 'games-entry-form') {
+        const base = eventBase.replace(/\/reports\/(\d+)$/, '/events/$1');
+        return `${base}/games-entry-form`;
+    }
     if (report.externalPath) {
         const base = eventBase.replace(/\/reports\/\d+$/, '');
         return `${base}/${report.externalPath}`;
