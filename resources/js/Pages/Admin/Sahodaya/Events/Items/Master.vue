@@ -281,6 +281,10 @@
                         <input v-model.number="itemForm.max_per_school" type="number" min="1" class="field" placeholder="e.g. 2">
                     </FormField>
 
+                    <FormField label="Qualifiers Count" hint="Qualifiers promoting to next round">
+                        <input v-model.number="itemForm.qualify_count" type="number" min="1" class="field" placeholder="e.g. 2">
+                    </FormField>
+
                     <FormField label="Est. Duration (Mins)" hint="For scheduling">
                         <input v-model.number="itemForm.duration_minutes" type="number" min="1" class="field" placeholder="e.g. 30">
                     </FormField>
@@ -405,6 +409,10 @@
                                 <input v-model.number="editForm.standbys" type="number" min="0" class="field" placeholder="e.g. 2">
                             </FormField>
                         </template>
+
+                        <FormField label="Qualifiers Count">
+                            <input v-model.number="editForm.qualify_count" type="number" min="1" class="field" placeholder="e.g. 2">
+                        </FormField>
 
                         <FormField label="Stage / Category Type">
                             <select v-model="editForm.stage_type" class="field">

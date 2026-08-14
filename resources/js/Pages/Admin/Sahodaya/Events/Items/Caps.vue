@@ -3,7 +3,7 @@
                           :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         
         <PageHeader :title="`${event.title} — Item Limits & Caps`" eyebrow="Bulk Limits Management"
-                    description="Configure school entry caps and team squad sizes across all event items.">
+                    description="Configure school entry caps, state qualifier promotion limits, and team squad sizes across all event items.">
             <template #actions>
                 <div class="flex items-center gap-2">
                     <Link :href="`${base}/items`" class="btn-secondary text-xs flex items-center gap-1.5">
@@ -34,14 +34,22 @@
             </Link>
         </div>
 
-        <!-- EXPLANATION BANNER: School Limits & Squad Caps -->
+        <!-- EXPLANATION BANNER: Qualifier Count, School Limits & Squad Caps -->
         <div class="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 text-white shadow-md border border-indigo-900/50 mb-5 space-y-3">
             <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2 text-indigo-200 font-bold text-sm">
-                    <span>💡 Event Limits & Team Squad Caps</span>
+                <div class="flex items-center gap-2 text-amber-300 font-bold text-sm">
+                    <span>💡 Understanding Event Limits & Qualifiers Count</span>
                 </div>
             </div>
-            <div class="grid md:grid-cols-2 gap-3 text-xs text-slate-300 pt-1">
+            <div class="grid md:grid-cols-3 gap-3 text-xs text-slate-300 pt-1">
+                <div class="bg-white/5 p-3 rounded-xl border border-white/10 space-y-1">
+                    <p class="font-bold text-white flex items-center gap-1.5 text-xs">
+                        <span>🏆</span> Qualifier Count
+                    </p>
+                    <p class="text-[11px] leading-relaxed text-slate-300">
+                        The number of top-ranked winners (e.g. 1st & 2nd place) who qualify/promote from this Sahodaya event to the <strong>State Level Competition</strong>.
+                    </p>
+                </div>
                 <div class="bg-white/5 p-3 rounded-xl border border-white/10 space-y-1">
                     <p class="font-bold text-white flex items-center gap-1.5 text-xs">
                         <span>🏫</span> School Limit (Max/School)
@@ -83,7 +91,7 @@
                 </div>
             </div>
 
-            <div class="grid sm:grid-cols-2 gap-3 text-xs">
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
                 <!-- Preset: School Limit -->
                 <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2">
                     <label class="font-bold text-slate-800 block">🏫 Batch Set School Limit</label>
@@ -91,13 +99,25 @@
                         <input v-model.number="batchForm.max_per_school" type="number" min="1" class="field text-xs flex-1" placeholder="e.g. 2">
                         <button type="button" class="btn-secondary text-xs shrink-0 !bg-indigo-50 !text-indigo-700 hover:!bg-indigo-100 font-bold"
                                 @click="applyBatch('max_per_school')">
-                            Apply School Limit
+                            Apply
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Preset: Qualifiers Count -->
+                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                    <label class="font-bold text-slate-800 block">🏆 Batch Set Qualifiers Count</label>
+                    <div class="flex items-center gap-2">
+                        <input v-model.number="batchForm.qualify_count" type="number" min="1" class="field text-xs flex-1" placeholder="e.g. 2">
+                        <button type="button" class="btn-secondary text-xs shrink-0 !bg-amber-50 !text-amber-800 hover:!bg-amber-100 font-bold"
+                                @click="applyBatch('qualify_count')">
+                            Apply
                         </button>
                     </div>
                 </div>
 
                 <!-- Preset: Team Squad Rules -->
-                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2 sm:col-span-2 lg:col-span-1">
                     <label class="font-bold text-slate-800 block">👥 Batch Set Team Squad & Sub Count</label>
                     <div class="grid grid-cols-3 gap-1.5">
                         <input v-model.number="batchForm.min_group_size" type="number" min="1" class="field text-xs !px-2" placeholder="Min">
@@ -148,18 +168,21 @@
                             </th>
                             <th class="py-3 px-3">Item Details</th>
                             <th class="py-3 px-3">Type</th>
-                            <th class="py-3 px-3 w-36 text-center bg-indigo-50/50 text-indigo-900 border-x border-indigo-100">
+                            <th class="py-3 px-3 w-32 text-center bg-indigo-50/50 text-indigo-900 border-x border-indigo-100">
                                 School Limit<br><span class="normal-case text-[9px] font-normal text-slate-500">(Max / School)</span>
+                            </th>
+                            <th class="py-3 px-3 w-32 text-center bg-amber-50/50 text-amber-950 border-r border-amber-100">
+                                Qualifiers Count<br><span class="normal-case text-[9px] font-normal text-slate-500">(State Promotion)</span>
                             </th>
                             <th class="py-3 px-3 text-center bg-emerald-50/50 text-emerald-950" colspan="3">
                                 Team Squad Rules<br><span class="normal-case text-[9px] font-normal text-slate-500">(Group / Team Items Only)</span>
                             </th>
                         </tr>
                         <tr class="bg-emerald-50/30 text-slate-500 font-bold text-[10px] uppercase border-b border-slate-200 text-center">
-                            <th colspan="4"></th>
-                            <th class="py-1.5 px-2 w-28">Min Members</th>
-                            <th class="py-1.5 px-2 w-28">Max Members</th>
-                            <th class="py-1.5 px-2 w-28">Sub Count</th>
+                            <th colspan="5"></th>
+                            <th class="py-1.5 px-2 w-24">Min Members</th>
+                            <th class="py-1.5 px-2 w-24">Max Members</th>
+                            <th class="py-1.5 px-2 w-24">Sub Count</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
@@ -202,18 +225,24 @@
                                        v-model.number="capsState[item.id].max_per_school" placeholder="1">
                             </td>
 
+                            <!-- Qualifiers Count Input -->
+                            <td class="py-2 px-3 text-center bg-amber-50/30 border-r border-amber-100/60">
+                                <input type="number" min="1" class="field text-center font-bold text-xs !py-1 !px-2 w-20 mx-auto"
+                                       v-model.number="capsState[item.id].qualify_count" placeholder="2">
+                            </td>
+
                             <!-- Team Squad Rule Inputs -->
                             <template v-if="isMultiPerson(item)">
                                 <td class="py-2 px-2 text-center bg-emerald-50/20">
-                                    <input type="number" min="1" class="field text-center font-semibold text-xs !py-1 !px-1.5 w-18 mx-auto"
+                                    <input type="number" min="1" class="field text-center font-semibold text-xs !py-1 !px-1.5 w-16 mx-auto"
                                            v-model.number="capsState[item.id].min_group_size" placeholder="Min">
                                 </td>
                                 <td class="py-2 px-2 text-center bg-emerald-50/20">
-                                    <input type="number" min="1" class="field text-center font-semibold text-xs !py-1 !px-1.5 w-18 mx-auto"
+                                    <input type="number" min="1" class="field text-center font-semibold text-xs !py-1 !px-1.5 w-16 mx-auto"
                                            v-model.number="capsState[item.id].max_group_size" placeholder="Max">
                                 </td>
                                 <td class="py-2 px-2 text-center bg-emerald-50/20">
-                                    <input type="number" min="0" class="field text-center font-semibold text-xs !py-1 !px-1.5 w-18 mx-auto"
+                                    <input type="number" min="0" class="field text-center font-semibold text-xs !py-1 !px-1.5 w-16 mx-auto"
                                            v-model.number="capsState[item.id].max_subs" placeholder="Subs">
                                 </td>
                             </template>
@@ -311,6 +340,7 @@ function initCapsState() {
 
         const row = {
             max_per_school: item.max_per_school ?? null,
+            qualify_count: item.qualify_count ?? null,
             min_group_size: minGroup,
             max_group_size: maxGroup,
             max_subs: maxSubs,
@@ -335,6 +365,7 @@ function isDirty(itemId) {
 
     return (
         (curr.max_per_school ?? null) !== (orig.max_per_school ?? null) ||
+        (curr.qualify_count ?? null) !== (orig.qualify_count ?? null) ||
         (curr.min_group_size ?? null) !== (orig.min_group_size ?? null) ||
         (curr.max_group_size ?? null) !== (orig.max_group_size ?? null) ||
         (curr.max_subs ?? null) !== (orig.max_subs ?? null)
@@ -383,6 +414,7 @@ function clearSelection() {
 
 const batchForm = reactive({
     max_per_school: null,
+    qualify_count: null,
     min_group_size: null,
     max_group_size: null,
     max_subs: null,
@@ -398,6 +430,9 @@ function applyBatch(field) {
 
         if (field === 'max_per_school' && batchForm.max_per_school !== null) {
             capsState[item.id].max_per_school = batchForm.max_per_school;
+        }
+        if (field === 'qualify_count' && batchForm.qualify_count !== null) {
+            capsState[item.id].qualify_count = batchForm.qualify_count;
         }
         if (field === 'team_squad' && isMultiPerson(item)) {
             if (batchForm.min_group_size !== null) capsState[item.id].min_group_size = batchForm.min_group_size;
@@ -415,6 +450,7 @@ function saveAll() {
         .map(item => ({
             id: item.id,
             max_per_school: capsState[item.id].max_per_school,
+            qualify_count: capsState[item.id].qualify_count,
             min_group_size: capsState[item.id].min_group_size,
             max_group_size: capsState[item.id].max_group_size,
             max_subs: capsState[item.id].max_subs,
