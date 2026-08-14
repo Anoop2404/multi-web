@@ -341,16 +341,18 @@ const eligibilityLabel = computed(() => {
 
 const maxSelectedLimit = computed(() => {
     if (isGroup.value) return null;
+    if (isEditing.value) return 1;
     const maxPerSchool = Number(props.item?.max_per_school ?? 1);
     const existingRegs = props.registrations?.length ?? 0;
-    const remaining = Math.max(1, maxPerSchool - existingRegs + (isEditing.value ? 1 : 0));
-    return remaining;
+    return Math.max(1, maxPerSchool - existingRegs);
 });
 
 const pickerSubtitle = computed(() => {
     const parts = [`Eligible: ${eligibilityLabel.value}`];
     if (isGroup.value) {
         parts.push('Team name required');
+    } else if (isEditing.value) {
+        parts.push('Editing entry — select 1 student');
     } else {
         const max = Number(props.item?.max_per_school ?? 1);
         if (max > 1) {
