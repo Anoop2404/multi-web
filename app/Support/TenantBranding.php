@@ -84,6 +84,15 @@ class TenantBranding
             if ($embedded) {
                 return $embedded;
             }
+
+            if (str_starts_with($stored, '/')) {
+                $path = public_path(ltrim($stored, '/'));
+                if (is_file($path)) {
+                    $mime = mime_content_type($path) ?: 'image/png';
+
+                    return 'data:'.$mime.';base64,'.base64_encode((string) file_get_contents($path));
+                }
+            }
         }
 
         if ($tenant->subdomain && isset(self::DEFAULT_LOGOS[$tenant->subdomain])) {
@@ -101,6 +110,13 @@ class TenantBranding
         }
 
         if (str_starts_with($url, '/')) {
+            $path = public_path(ltrim($url, '/'));
+            if (is_file($path)) {
+                $mime = mime_content_type($path) ?: 'image/png';
+
+                return 'data:'.$mime.';base64,'.base64_encode((string) file_get_contents($path));
+            }
+
             return url($url);
         }
 

@@ -1444,6 +1444,7 @@ class FestSchoolReportController extends SchoolAdminController
 
         $sahodaya = Tenant::find($this->school->parent_id);
         $sahodayaLogoUrl = $sahodaya ? TenantBranding::logoUrl($sahodaya) : null;
+        $sahodayaLogoEmbed = $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null;
 
         // Dynamically resolve Region Name for ANY Sahodaya tenant & event structure:
         $rawRegionName = null;
@@ -1564,6 +1565,7 @@ class FestSchoolReportController extends SchoolAdminController
         // Direct PDF Download / Stream Response
         if ($request->boolean('download') || $request->query('export') === 'pdf' || $request->boolean('preview')) {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.sports-games-entry-form', array_merge($formData, [
+                'sahodayaLogoUrl' => $sahodayaLogoEmbed ?: $sahodayaLogoUrl,
                 'students' => $this->embedPhotosForPdf($uniqueStudents),
             ]))->setPaper('a4', 'portrait');
 
@@ -1577,6 +1579,7 @@ class FestSchoolReportController extends SchoolAdminController
 
         if ($request->boolean('raw_html')) {
             return view('reports.sports-games-entry-form', array_merge($formData, [
+                'sahodayaLogoUrl' => $sahodayaLogoEmbed ?: $sahodayaLogoUrl,
                 'students' => $this->embedPhotosForPdf($uniqueStudents),
             ]));
         }
