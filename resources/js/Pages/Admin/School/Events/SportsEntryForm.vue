@@ -1,16 +1,16 @@
 <template>
     <SchoolAdminLayout title="Entry Form" :school="school">
-        <div class="max-w-[210mm] mx-auto py-6 px-4 space-y-6 font-sans">
+        <div class="w-full max-w-7xl mx-auto py-6 px-4 md:px-8 space-y-6 font-sans">
             
             <!-- Top Controls & Sports Items Menu (Hidden on Print) -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:p-6 no-print space-y-5">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6 no-print space-y-5">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                     <div>
                         <h1 class="text-xl font-bold text-slate-900 flex items-center gap-2">
                             <span>🏆</span> Games Competition Entry Form
                         </h1>
                         <p class="text-xs text-slate-500 mt-1">
-                            Official A4 entry form preview ({{ form.regionName || 'District' }})
+                            Official entry form preview and export ({{ form.regionName || 'District' }})
                         </p>
                     </div>
 
@@ -18,7 +18,7 @@
                         <button 
                             @click="previewSelectedPdf" 
                             type="button" 
-                            class="px-3.5 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                            class="px-4 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer"
                         >
                             👁️ Preview PDF
                         </button>
@@ -26,7 +26,7 @@
                         <button 
                             @click="downloadSelectedPdf" 
                             type="button" 
-                            class="px-3.5 py-2 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                            class="px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer"
                         >
                             📥 Download PDF
                         </button>
@@ -43,33 +43,33 @@
 
                 <!-- Items Menu Bar -->
                 <div v-if="registeredItems && registeredItems.length">
-                    <div class="flex items-center justify-between mb-2.5">
+                    <div class="flex items-center justify-between mb-3">
                         <h2 class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                             <span>📋</span> Registered Sports Items Menu ({{ registeredItems.length }})
                         </h2>
                         <span class="text-[11px] text-slate-400">Click any item card to load its form</span>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
                         <div 
                             v-for="item in registeredItems" 
                             :key="item.id"
                             @click="selectItem(item.id)"
                             :class="[
-                                'p-3 rounded-lg border text-left cursor-pointer transition relative group flex flex-col justify-between',
+                                'p-3.5 rounded-xl border text-left cursor-pointer transition relative group flex flex-col justify-between',
                                 selectedItem == item.id 
                                     ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-sm' 
-                                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
                             ]"
                         >
                             <div>
-                                <div class="flex items-center justify-between gap-1 mb-1">
+                                <div class="flex items-center justify-between gap-1 mb-1.5">
                                     <span class="font-bold text-xs text-slate-900 line-clamp-1">
                                         {{ item.title }}
                                     </span>
                                     <span 
                                         :class="[
-                                            'text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase shrink-0',
+                                            'text-[10px] px-2 py-0.5 rounded font-semibold uppercase shrink-0',
                                             item.gender === 'girls' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'
                                         ]"
                                     >
@@ -84,18 +84,18 @@
                                 </div>
                             </div>
 
-                            <div class="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-200/60">
+                            <div class="flex items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-200/60">
                                 <button 
                                     @click.stop="previewItemPdf(item.id)" 
                                     type="button" 
-                                    class="flex-1 py-1 px-2 text-[10px] font-bold rounded bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition text-center"
+                                    class="flex-1 py-1.5 px-2 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition text-center"
                                 >
                                     👁️ PDF
                                 </button>
                                 <button 
                                     @click.stop="downloadItemPdf(item.id)" 
                                     type="button" 
-                                    class="flex-1 py-1 px-2 text-[10px] font-bold rounded bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition text-center"
+                                    class="flex-1 py-1.5 px-2 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition text-center"
                                 >
                                     📥 Download
                                 </button>
@@ -105,12 +105,12 @@
                 </div>
             </div>
 
-            <!-- Official Printable Canvas Container (Exact A4 Sheet Preview) -->
+            <!-- Official Entry Form Preview Container (Full Width on Screen) -->
             <div class="w-full flex justify-center">
-                <div class="printable-form bg-white w-full max-w-[210mm] min-h-[297mm] p-[10mm_12mm] shadow-md border border-slate-200 rounded-xl relative text-slate-900 font-sans flex flex-col justify-between overflow-hidden box-border">
+                <div class="printable-form bg-white w-full rounded-2xl shadow-sm border border-slate-200 p-6 md:p-10 relative text-slate-900 font-sans flex flex-col justify-between overflow-hidden box-border">
                     
                     <!-- Decorative Wave Graphics -->
-                    <svg class="absolute top-0 right-0 w-[240px] h-[100px] pointer-events-none z-0" viewBox="0 0 260 110" fill="none">
+                    <svg class="absolute top-0 right-0 w-[280px] h-[110px] pointer-events-none z-0" viewBox="0 0 260 110" fill="none">
                         <path d="M70 0 C 130 0, 160 55, 260 65 L 260 0 Z" fill="#e3a835" />
                         <path d="M0 0 C 80 0, 130 90, 260 95 L 260 0 Z" fill="#006d77" opacity="0.95" />
                         <path d="M110 0 C 170 0, 200 45, 260 50 L 260 0 Z" fill="#055158" />
@@ -118,15 +118,15 @@
 
                     <div class="relative z-10">
                         <!-- Form Header with Sahodaya Logo -->
-                        <div class="text-center mb-3">
-                            <div class="flex justify-center mb-1.5">
+                        <div class="text-center mb-4">
+                            <div class="flex justify-center mb-2">
                                 <img 
                                     v-if="form.sahodayaLogoUrl" 
                                     :src="form.sahodayaLogoUrl" 
                                     alt="Sahodaya Logo" 
                                     class="h-16 max-h-16 object-contain mx-auto mb-1"
                                 />
-                                <svg v-else class="w-32 h-14" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+                                <svg v-else class="w-36 h-16" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
                                     <g transform="translate(100, 75)">
                                         <path d="M 0 0 L -80 -55 A 95 95 0 0 1 -60 -70 Z" fill="#22c55e"/>
                                         <path d="M 0 0 L -55 -72 A 95 95 0 0 1 -30 -85 Z" fill="#84cc16"/>
@@ -144,47 +144,47 @@
                                     </g>
                                 </svg>
                             </div>
-                            <h2 class="text-xl font-black uppercase tracking-wide text-slate-900 font-sans">
+                            <h2 class="text-xl md:text-2xl font-black uppercase tracking-wide text-slate-900 font-sans">
                                 {{ form.sahodayaName || 'MALAPPURAM CENTRAL SAHODAYA' }}
                             </h2>
-                            <p class="text-[11px] font-bold text-slate-800 font-sans mt-0.5">
+                            <p class="text-xs font-bold text-slate-800 font-sans mt-0.5">
                                 (A Movement initiated and Guided by Central Board of Secondary Education, Delhi)
                             </p>
-                            <h3 class="text-lg font-black uppercase tracking-wider text-slate-900 font-sans mt-2 mb-2 underline decoration-1 underline-offset-4">
+                            <h3 class="text-lg md:text-xl font-black uppercase tracking-wider text-slate-900 font-sans mt-2.5 mb-3 underline decoration-1 underline-offset-4">
                                 GAMES COMPETITION ENTRY FORM {{ form.academicYear || '2026-27' }}
                             </h3>
                         </div>
 
                         <!-- Meta Information Rows -->
-                        <div class="text-xs space-y-2 mb-3 font-sans">
+                        <div class="text-xs md:text-sm space-y-2.5 mb-4 font-sans">
                             <div class="flex items-baseline">
                                 <span class="font-bold whitespace-nowrap text-slate-900">Name of the School with Address:</span>
-                                <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[20px] text-slate-900">
+                                <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[22px] text-slate-900">
                                     {{ form.schoolName }}
                                 </div>
                             </div>
 
                             <div class="flex items-baseline">
                                 <span class="font-bold whitespace-nowrap text-slate-900">Team Manager's Name and Contact No. :</span>
-                                <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[20px] text-slate-900">
+                                <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[22px] text-slate-900">
                                     {{ form.teamManager || '________________________________________' }}
                                 </div>
                             </div>
 
-                            <div class="flex items-center justify-between gap-2">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
                                 <div class="flex items-baseline flex-1">
                                     <span class="font-bold whitespace-nowrap text-slate-900">Name of the Game:</span>
-                                    <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[20px] text-slate-900">
+                                    <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[22px] text-slate-900">
                                         {{ form.gameName }}
                                     </div>
                                 </div>
-                                <div class="flex items-baseline w-1/3">
+                                <div class="flex items-baseline md:w-1/3">
                                     <span class="font-bold whitespace-nowrap text-slate-900">Category:</span>
-                                    <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[20px] text-slate-900">
+                                    <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[22px] text-slate-900">
                                         {{ form.category }}
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-4 font-bold pl-2 text-slate-900">
+                                <div class="flex items-center gap-4 font-bold pl-1 text-slate-900">
                                     <span>Boys <span class="inline-block w-6 h-4 border border-black text-center text-xs leading-3 bg-white">{{ form.gender === 'boys' ? '✓' : '' }}</span></span>
                                     <span>Girls <span class="inline-block w-6 h-4 border border-black text-center text-xs leading-3 bg-white">{{ form.gender === 'girls' ? '✓' : '' }}</span></span>
                                 </div>
@@ -192,70 +192,72 @@
 
                             <div class="flex items-baseline pt-0.5">
                                 <span class="font-bold whitespace-nowrap text-slate-900">Region:</span>
-                                <div class="border-b border-dotted border-black ml-2 font-bold px-2 min-h-[18px] text-slate-900">
+                                <div class="border-b border-dotted border-black ml-2 font-bold px-2 min-h-[20px] text-slate-900">
                                     {{ form.regionName || 'District' }}
                                 </div>
                             </div>
                         </div>
 
                         <!-- Students Table -->
-                        <table class="w-full border-collapse border border-black text-center text-xs mt-2 font-sans">
-                            <thead>
-                                <tr class="bg-slate-100 font-bold border-b border-black text-slate-900">
-                                    <th class="border border-black p-1.5 w-[5%] font-bold">Sl<br>No</th>
-                                    <th class="border border-black p-1.5 w-[22%] text-left font-bold">NAME OF THE STUDENT</th>
-                                    <th class="border border-black p-1.5 w-[7%] font-bold">CLASS</th>
-                                    <th class="border border-black p-1.5 w-[14%] font-bold">UDISE PEN NUMBER/ADM.NO.</th>
-                                    <th class="border border-black p-1.5 w-[11%] font-bold">DATE OF BIRTH</th>
-                                    <th class="border border-black p-1.5 w-[14%] text-left font-bold">FATHER'S NAME</th>
-                                    <th class="border border-black p-1.5 w-[14%] text-left font-bold">MOTHER'S NAME</th>
-                                    <th class="border border-black p-1.5 w-[13%] font-bold">PHOTOGRAPHS ATTESTED<br><span class="font-normal text-[9px] text-slate-700">(SIGN. & SEAL PRINCIPAL)</span></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="(student, index) in displayStudents" :key="index" class="border-b border-black">
-                                    <td class="border border-black p-1.5 font-bold text-slate-900">
-                                        {{ index + 1 }}
-                                    </td>
-                                    <td class="border border-black p-1.5 text-left font-bold text-slate-900">
-                                        {{ student.name || '—' }}
-                                    </td>
-                                    <td class="border border-black p-1.5 text-center font-medium text-slate-800">
-                                        {{ student.class || '—' }}
-                                    </td>
-                                    <td class="border border-black p-1.5 text-center font-medium text-slate-800">
-                                        {{ student.udise_pen || '—' }}
-                                    </td>
-                                    <td class="border border-black p-1.5 text-center font-medium text-slate-800">
-                                        {{ student.dob || '—' }}
-                                    </td>
-                                    <td class="border border-black p-1.5 text-left font-normal text-slate-800">
-                                        {{ student.father_name || '—' }}
-                                    </td>
-                                    <td class="border border-black p-1.5 text-left font-normal text-slate-800">
-                                        {{ student.mother_name || '—' }}
-                                    </td>
-                                    <td class="border border-black p-1.5 align-middle">
-                                        <div class="w-[30mm] h-[38mm] mx-auto border border-dashed border-slate-400 rounded-sm flex flex-col items-center justify-center text-[9px] text-slate-500 bg-slate-50 overflow-hidden p-0.5 box-border">
-                                            <img 
-                                                v-if="student.photo_url" 
-                                                :src="student.photo_url" 
-                                                alt="Student Photo" 
-                                                class="w-full h-full object-cover rounded-xs"
-                                            />
-                                            <template v-else>
-                                                <div class="font-medium text-slate-600 text-center leading-tight">Affix Photo</div>
-                                                <div class="text-[8px] text-slate-400 text-center mt-0.5">(Attested)</div>
-                                            </template>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <div class="overflow-x-auto">
+                            <table class="w-full border-collapse border border-black text-center text-xs mt-2 font-sans">
+                                <thead>
+                                    <tr class="bg-slate-100 font-bold border-b border-black text-slate-900">
+                                        <th class="border border-black p-2 w-[5%] font-bold">Sl<br>No</th>
+                                        <th class="border border-black p-2 w-[22%] text-left font-bold">NAME OF THE STUDENT</th>
+                                        <th class="border border-black p-2 w-[7%] font-bold">CLASS</th>
+                                        <th class="border border-black p-2 w-[14%] font-bold">UDISE PEN NUMBER/ADM.NO.</th>
+                                        <th class="border border-black p-2 w-[11%] font-bold">DATE OF BIRTH</th>
+                                        <th class="border border-black p-2 w-[14%] text-left font-bold">FATHER'S NAME</th>
+                                        <th class="border border-black p-2 w-[14%] text-left font-bold">MOTHER'S NAME</th>
+                                        <th class="border border-black p-2 w-[13%] font-bold">PHOTOGRAPHS ATTESTED<br><span class="font-normal text-[9px] text-slate-700">(SIGN. & SEAL PRINCIPAL)</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(student, index) in displayStudents" :key="index" class="border-b border-black">
+                                        <td class="border border-black p-2 font-bold text-slate-900">
+                                            {{ index + 1 }}
+                                        </td>
+                                        <td class="border border-black p-2 text-left font-bold text-slate-900">
+                                            {{ student.name || '—' }}
+                                        </td>
+                                        <td class="border border-black p-2 text-center font-medium text-slate-800">
+                                            {{ student.class || '—' }}
+                                        </td>
+                                        <td class="border border-black p-2 text-center font-medium text-slate-800">
+                                            {{ student.udise_pen || '—' }}
+                                        </td>
+                                        <td class="border border-black p-2 text-center font-medium text-slate-800">
+                                            {{ student.dob || '—' }}
+                                        </td>
+                                        <td class="border border-black p-2 text-left font-normal text-slate-800">
+                                            {{ student.father_name || '—' }}
+                                        </td>
+                                        <td class="border border-black p-2 text-left font-normal text-slate-800">
+                                            {{ student.mother_name || '—' }}
+                                        </td>
+                                        <td class="border border-black p-2 align-middle">
+                                            <div class="w-[30mm] h-[38mm] mx-auto border border-dashed border-slate-400 rounded-sm flex flex-col items-center justify-center text-[9px] text-slate-500 bg-slate-50 overflow-hidden p-0.5 box-border">
+                                                <img 
+                                                    v-if="student.photo_url" 
+                                                    :src="student.photo_url" 
+                                                    alt="Student Photo" 
+                                                    class="w-full h-full object-cover rounded-xs"
+                                                />
+                                                <template v-else>
+                                                    <div class="font-medium text-slate-600 text-center leading-tight">Affix Photo</div>
+                                                    <div class="text-[8px] text-slate-400 text-center mt-0.5">(Attested)</div>
+                                                </template>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     <!-- Footer Signatures -->
-                    <div class="flex justify-between items-end pt-8 font-bold text-xs font-sans text-slate-900">
+                    <div class="flex justify-between items-end pt-10 font-bold text-xs font-sans text-slate-900">
                         <div class="text-center">
                             <div class="h-10"></div>
                             <div>Team manager</div>
@@ -376,10 +378,12 @@ function printForm() {
     }
     .printable-form {
         box-shadow: none !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        padding: 0 !important;
         border: none !important;
+        border-radius: 0 !important;
+        width: 210mm !important;
+        max-width: 210mm !important;
+        padding: 10mm 12mm !important;
+        margin: 0 auto !important;
     }
 }
 </style>
