@@ -13,34 +13,46 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FestEventFeesController extends SahodayaAdminController
 {
-    public function index(string $tenantId, FestEvent $event)
+    public function index(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $selectedRegionId = $request->integer('region_id') ?: null;
+        if ($selectedRegionId !== null) {
+            $childEvent = $event->regionalChild($selectedRegionId) ?? FestEvent::find($selectedRegionId);
+            if ($childEvent) {
+                $event = $childEvent;
+            }
+        }
 
         $feeService = app(FestSchoolEventFeeService::class);
         $schedule = $feeService->resolveSchedule($event);
         $feeOwnerEvent = $feeService->feeOwnerEvent($event);
+        $reportableEventIds = $event->reportableEventIds();
 
-        // Previously recalculated every registered school's fee unconditionally on
-        // every view of this dashboard. Fee schedule changes now trigger their own
-        // eager recalculation (FestEventSettingsController::updateFeeSettings()/
-        // updateItemFee() -> RecalculateEventSchoolFeesJob), and registration
-        // create/withdraw/approve already call recalculate() directly — so only
-        // schools with no fee row at all (never computed) need it run here.
         $schoolIdsWithFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)->pluck('school_id');
-        FestRegistration::whereIn('event_id', $event->reportableEventIds())
+        FestRegistration::whereIn('event_id', $reportableEventIds)
             ->distinct()
             ->pluck('school_id')
             ->diff($schoolIdsWithFees)
             ->each(fn (string $schoolId) => $feeService->recalculate($event, $schoolId));
 
+        $regionSchoolIds = null;
+        if ($event->parent_event_id !== null || $selectedRegionId !== null) {
+            $regionSchoolIds = FestRegistration::whereIn('event_id', $reportableEventIds)
+                ->distinct()
+                ->pluck('school_id')
+                ->all();
+        }
+
         $schoolFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)
+            ->when($regionSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $regionSchoolIds))
             ->forAmountAggregation()
             ->with(['school', 'feeReceipt', 'receipts.attachments', 'head'])
             ->orderBy('school_id')
             ->get()
-            ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event) {
-                $regs = FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event, $reportableEventIds) {
+                $regs = FestRegistration::whereIn('event_id', $reportableEventIds)
                     ->where('school_id', $fee->school_id)
                     ->whereIn('status', ['submitted', 'approved'])
                     ->with(['item', 'participants.student', 'participants.teacher'])

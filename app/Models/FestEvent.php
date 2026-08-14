@@ -617,7 +617,13 @@ class FestEvent extends Model
     public function childrenForRoles(array $roles): \Illuminate\Database\Eloquent\Collection
     {
         return self::where('parent_event_id', $this->id)
-            ->whereIn('partition_role', $roles)
+            ->where(function ($query) use ($roles) {
+                $query->whereIn('partition_role', $roles)
+                    ->orWhereNotNull('region_id');
+                if (in_array('region', $roles, true)) {
+                    $query->orWhereNull('partition_role');
+                }
+            })
             ->get();
     }
 
@@ -625,8 +631,10 @@ class FestEvent extends Model
     public function regionalChild(int $regionId): ?self
     {
         return self::where('parent_event_id', $this->id)
-            ->where('partition_role', 'region')
-            ->where('region_id', $regionId)
+            ->where(function ($query) use ($regionId) {
+                $query->where('region_id', $regionId)
+                    ->orWhere('id', $regionId);
+            })
             ->first();
     }
 
