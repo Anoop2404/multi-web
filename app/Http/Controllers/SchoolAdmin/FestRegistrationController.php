@@ -110,12 +110,11 @@ class FestRegistrationController extends SchoolAdminController
 
         $registrationEventIds = $this->registrationEventIdsForSchoolView($events);
 
-        $approvalService = app(\App\Services\Events\FestRegistrationApprovalService::class);
-        foreach ($events as $eventToPromote) {
-            $approvalService->promoteAllEligibleWaitlisted($eventToPromote);
-            if (! $eventToPromote->requiresManualApproval()) {
-                $approvalService->approveSchoolEvent($eventToPromote, $this->school->id);
-            }
+        // Queued instead of an inline foreach — see App\Jobs\PromoteWaitlistedRegistrationsJob
+        // for why this couldn't just be removed (it's the only trigger for waitlist
+        // promotion in the codebase) and what changes once the queue driver is async.
+        if ($events->isNotEmpty()) {
+            \App\Jobs\PromoteWaitlistedRegistrationsJob::dispatch($events->pluck('id')->all(), $this->school->id);
         }
 
         $registrations = FestRegistration::where('school_id', $this->school->id)
@@ -365,11 +364,8 @@ class FestRegistrationController extends SchoolAdminController
             $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
         }
 
-        $approvalService = app(\App\Services\Events\FestRegistrationApprovalService::class);
-        $approvalService->promoteAllEligibleWaitlisted($event);
-        if (! $event->requiresManualApproval()) {
-            $approvalService->approveSchoolEvent($event, $this->school->id);
-        }
+        // Queued instead of an inline call — see App\Jobs\PromoteWaitlistedRegistrationsJob.
+        \App\Jobs\PromoteWaitlistedRegistrationsJob::dispatch([$event->id], $this->school->id);
 
         $registrations = FestRegistration::where('school_id', $this->school->id)
             ->whereIn('event_id', $this->registrationEventIdsForSchoolView(collect([$event])))
@@ -485,7 +481,7 @@ class FestRegistrationController extends SchoolAdminController
         $allowed = collect([$resolved])->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)
             ->filterFestEventsForUser($request->user(), $this->school->id, $meta['slug'], $rows));
 
-        abort_if($allowed->isEmpty(), 403);
+        abort_if($allowed->isEmpty(), 403, 'This event isn\'t open for your school to register in.');
 
         return $resolved;
     }
@@ -626,10 +622,20 @@ class FestRegistrationController extends SchoolAdminController
     ): FestEvent {
         $navService ??= app(\App\Services\Events\FestHeadItemNavigationService::class);
         if ($event->parent_event_id && $event->parentEvent) {
-            app(\App\Services\Events\FestItemSyncService::class)
-                ->copyItemsToPartition($event->parentEvent, $event, $event->partition_role ?? 'region');
-            $event->unsetRelation('items');
-            $event->load('items');
+            // Previously ran (and wrote to fest_event_items) unconditionally on every
+            // page view. Item sync to existing partitions already happens on the write
+            // path — FestEventController::store()/update()/importCatalog() for hub
+            // items all call syncItemToExistingPartitions() whenever a hub item
+            // changes, and partition creation itself copies items at creation time
+            // (copyItemsToPartition() is documented elsewhere as idempotent per item).
+            // Only run it here as a lazy-init fallback for the case this partition
+            // genuinely has no items yet.
+            if (! FestEventItem::where('event_id', $event->id)->exists()) {
+                app(\App\Services\Events\FestItemSyncService::class)
+                    ->copyItemsToPartition($event->parentEvent, $event, $event->partition_role ?? 'region');
+                $event->unsetRelation('items');
+                $event->load('items');
+            }
         }
         $limitService = new FestParticipationLimitService($event);
         $usage = $limitService->usageForSchool($this->school->id);
@@ -639,7 +645,17 @@ class FestRegistrationController extends SchoolAdminController
             ->where('school_id', $this->school->id)
             ->first();
 
-        if ($feeService->feeRequired($event)) {
+        // Previously recalculated (and wrote to fest_school_event_fees) on every single
+        // page view. Now only computed here as a lazy-init fallback for a school/event
+        // pairing that has never been calculated before — every write path that should
+        // change a school's fee (registration create/withdraw/approve, fee schedule
+        // edits) already calls FestSchoolEventFeeService::recalculate() directly (see
+        // FestRegistrationCreateService, FestRegistrationApprovalService,
+        // FestEventStatusService, FestEventSettingsController::updateFeeSettings()/
+        // updateItemFee() — the latter two were added specifically so this read path
+        // could stop recalculating; see RecalculateEventSchoolFeesJob), so re-deriving
+        // it here on every read is redundant once a row exists.
+        if ($feeService->feeRequired($event) && ! $schoolFee) {
             $schoolFee = $feeService->recalculate($event, $this->school->id);
         }
 
@@ -682,7 +698,18 @@ class FestRegistrationController extends SchoolAdminController
         $event->setAttribute('uses_per_head_billing', $usesPerHead);
         $event->setAttribute('school_head_fees', []);
         if ($usesPerHead && $feeService->feeRequired($event)) {
-            $headFees = $feeService->recalculateAllHeadsForSchool($event, $this->school->id);
+            // Same reasoning as the single-fee case above: read existing per-head rows
+            // instead of recalculating on every view once they exist. recalculate()'s
+            // per-head branch (recalculateAggregateForPerHeadEvent()) already calls
+            // recalculateAllHeadsForSchool() internally, so every write path that
+            // triggers recalculate() keeps these rows fresh too.
+            $existingHeadFees = FestSchoolEventFee::where('event_id', $event->id)
+                ->where('school_id', $this->school->id)
+                ->whereNotNull('head_id')
+                ->get();
+            $headFees = $existingHeadFees->isNotEmpty()
+                ? $existingHeadFees
+                : $feeService->recalculateAllHeadsForSchool($event, $this->school->id);
             $headsById = FestItemHead::where('event_id', $event->id)->get()->keyBy('id');
             $event->setAttribute('school_head_fees', $headFees->map(function (FestSchoolEventFee $fee) use ($feeService, $event, $schedule, $headsById) {
                 $head = $headsById->get($fee->head_id);

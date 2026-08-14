@@ -20,6 +20,7 @@ class McqExam extends Model
         'eligibility_config',
         'grade_master_id', 'hall_ticket_template_id', 'certificate_template_id',
         'results_published', 'results_published_at',
+        'hall_tickets_published', 'hall_tickets_published_at', 'hall_tickets_published_by_user_id',
     ];
 
     protected static function booted(): void
@@ -60,7 +61,15 @@ class McqExam extends Model
         'promotion_locked'         => 'boolean',
         'results_published'        => 'boolean',
         'results_published_at'     => 'datetime',
+        'hall_tickets_published'    => 'boolean',
+        'hall_tickets_published_at' => 'datetime',
     ];
+
+    /** Whether Sahodaya has released hall tickets (roll no./hall/seat) for schools & candidates to see. */
+    public function hallTicketsPublished(): bool
+    {
+        return (bool) $this->hall_tickets_published;
+    }
 
     /**
      * Whether registration is within an explicit date window (when set).

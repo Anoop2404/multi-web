@@ -467,7 +467,11 @@ function clearFilters() {
 }
 
 function canEdit(item) {
-    return item.owner_level !== 'state';
+    // State-catalog items are fully editable here — every Sahodaya conducts these items
+    // locally as part of the state->Sahodaya->school cascade, so they need the same edit
+    // access as their own items. Only deletion of a state-catalog item stays blocked
+    // (backend keeps that guard in destroyItem()).
+    return true;
 }
 
 function ownerLevelLabel(level) {

@@ -2,21 +2,25 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
-use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
-use App\Models\FestEventItem;
-use App\Support\FestPageActivity;
 use App\Events\FestScoreboardUpdated;
+use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestQualification;
+use App\Models\FestResult;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\EventContext;
 use App\Services\Events\EventLifecycleGate;
+use App\Services\Events\FestCertificateService;
 use App\Services\Events\FestCmsAutoPush;
 use App\Services\Events\FestEventNotifier;
 use App\Services\Events\FestItemHeadService;
 use App\Services\Events\FestItemResultsService;
 use App\Services\Events\FestQualificationService;
+use App\Services\Events\FestRegionPartitionService;
+use App\Support\FestPageActivity;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class FestResultsController extends SahodayaAdminController
 {
@@ -60,63 +64,63 @@ class FestResultsController extends SahodayaAdminController
 
         $nextEvents = collect($qualService->candidateNextEvents($event))
             ->map(fn (FestEvent $e) => [
-                'id'          => $e->id,
-                'title'       => $e->title,
-                'status'      => $e->status,
+                'id' => $e->id,
+                'title' => $e->title,
+                'status' => $e->status,
                 'level_round' => $e->level_round,
-                'suggested'   => $suggestedNext?->id === $e->id,
+                'suggested' => $suggestedNext?->id === $e->id,
             ]);
 
         $childEvents = $event->sportEventDropdownOptions();
 
         return $this->inertia('Sahodaya/Events/Results', $this->withEventActivity($event, FestPageActivity::RESULTS, array_merge($ctx, [
-            'event'             => $event,
-            'scoreboard'        => EventContext::for($event)->scoreboardBySchool(),
-            'qualifications'    => $qualifications,
-            'nextEvents'        => $nextEvents,
-            'suggestedNextId'   => $suggestedNext?->id,
-            'levelLabels'       => FestEvent::levelLabels(),
-            'itemSummaries'     => $itemSummaries->values()->all(),
-            'publishTotals'     => $resultsService->totals($event),
-            'filterHeadId'      => $headId === 0 ? 'other' : $headId,
-            'selectedHeadId'    => $headId === 0 ? 'other' : $headId,
-            'filterItemId'      => $itemId,
-            'selectedItemId'    => $itemId,
-            'selectedItem'      => $selectedItem,
-            'itemResultRows'    => $itemResultRows,
-            'resultsBaseUrl'    => "/sahodaya-admin/{$tenantId}/events/{$event->id}/results",
-            'marksBaseUrl'      => "/sahodaya-admin/{$tenantId}/events/{$event->id}/marks",
-            'childEvents'       => $childEvents,
+            'event' => $event,
+            'scoreboard' => EventContext::for($event)->scoreboardBySchool(),
+            'qualifications' => $qualifications,
+            'nextEvents' => $nextEvents,
+            'suggestedNextId' => $suggestedNext?->id,
+            'levelLabels' => FestEvent::levelLabels(),
+            'itemSummaries' => $itemSummaries->values()->all(),
+            'publishTotals' => $resultsService->totals($event),
+            'filterHeadId' => $headId === 0 ? 'other' : $headId,
+            'selectedHeadId' => $headId === 0 ? 'other' : $headId,
+            'filterItemId' => $itemId,
+            'selectedItemId' => $itemId,
+            'selectedItem' => $selectedItem,
+            'itemResultRows' => $itemResultRows,
+            'resultsBaseUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/results",
+            'marksBaseUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/marks",
+            'childEvents' => $childEvents,
         ])));
     }
 
     /** @param list<array<string, mixed>> $groups */
-    private function enrichHeadGroupsWithPublishStatus(array $groups, \Illuminate\Support\Collection $summaryByItem): array
+    private function enrichHeadGroupsWithPublishStatus(array $groups, Collection $summaryByItem): array
     {
         return array_map(function (array $group) use ($summaryByItem) {
             $items = array_map(function (array $item) use ($summaryByItem) {
                 $summary = $summaryByItem->get($item['id']);
 
                 return array_merge($item, $summary ? [
-                    'age_group'             => $summary['age_group'] ?? null,
-                    'class_group'           => $summary['class_group'] ?? null,
-                    'gender'                => $summary['gender'] ?? null,
-                    'sport_discipline'      => $summary['sport_discipline'] ?? null,
-                    'stage_type'            => $summary['stage_type'] ?? null,
-                    'performers'            => (int) ($summary['performers'] ?? 0),
-                    'registration_count'    => (int) ($summary['registration_count'] ?? 0),
-                    'marks_entered'         => (int) ($summary['marks_entered'] ?? 0),
-                    'marks_pending'         => (int) ($summary['marks_pending'] ?? 0),
-                    'marks_ready'           => (bool) ($summary['marks_ready'] ?? false),
-                    'judges_assigned'       => (int) ($summary['judges_assigned'] ?? 0),
-                    'results_published'     => (bool) ($summary['results_published'] ?? $item['results_published'] ?? false),
-                    'results_published_at'  => $summary['results_published_at'] ?? $item['results_published_at'] ?? null,
-                    'reg_start'             => $summary['reg_start'] ?? null,
-                    'reg_end'               => $summary['reg_end'] ?? null,
-                    'item_competition_start'=> $summary['item_competition_start'] ?? null,
-                    'item_competition_end'  => $summary['item_competition_end'] ?? null,
-                    'competition_start'     => $summary['competition_start'] ?? null,
-                    'competition_end'       => $summary['competition_end'] ?? null,
+                    'age_group' => $summary['age_group'] ?? null,
+                    'class_group' => $summary['class_group'] ?? null,
+                    'gender' => $summary['gender'] ?? null,
+                    'sport_discipline' => $summary['sport_discipline'] ?? null,
+                    'stage_type' => $summary['stage_type'] ?? null,
+                    'performers' => (int) ($summary['performers'] ?? 0),
+                    'registration_count' => (int) ($summary['registration_count'] ?? 0),
+                    'marks_entered' => (int) ($summary['marks_entered'] ?? 0),
+                    'marks_pending' => (int) ($summary['marks_pending'] ?? 0),
+                    'marks_ready' => (bool) ($summary['marks_ready'] ?? false),
+                    'judges_assigned' => (int) ($summary['judges_assigned'] ?? 0),
+                    'results_published' => (bool) ($summary['results_published'] ?? $item['results_published'] ?? false),
+                    'results_published_at' => $summary['results_published_at'] ?? $item['results_published_at'] ?? null,
+                    'reg_start' => $summary['reg_start'] ?? null,
+                    'reg_end' => $summary['reg_end'] ?? null,
+                    'item_competition_start' => $summary['item_competition_start'] ?? null,
+                    'item_competition_end' => $summary['item_competition_end'] ?? null,
+                    'competition_start' => $summary['competition_start'] ?? null,
+                    'competition_end' => $summary['competition_end'] ?? null,
                 ] : []);
             }, $group['items'] ?? []);
 
@@ -141,9 +145,17 @@ class FestResultsController extends SahodayaAdminController
             ->whereIn('id', $data['item_ids'])
             ->get();
 
+        // Compute the full-event completeness aggregate once for this batch instead of once
+        // per item — assertCanPublish()/publishItem() previously recomputed it on every
+        // iteration, turning an N-item bulk publish into N full-event aggregate scans. See
+        // FestItemResultsService::publishItem() docblock for the one known edge case this
+        // introduces (grouped/inherited items published in the same batch).
+        $resultsService = app(FestItemResultsService::class);
+        $summaries = $resultsService->itemSummaries($event);
+
         $publishedCount = 0;
         foreach ($items as $item) {
-            app(FestItemResultsService::class)->publishItem($item);
+            $resultsService->publishItem($item, $summaries);
             $publishedCount++;
         }
 
@@ -199,28 +211,40 @@ class FestResultsController extends SahodayaAdminController
         // live on its region/finale children, never the hub's own event_id — recalculating
         // only $event left every child's FestResult stale as of this publish. Recompute
         // each reportable event (a no-op loop of one for a non-hub event).
-        foreach (\App\Models\FestEvent::whereIn('id', $event->reportableEventIds())->get() as $scopeEvent) {
+        foreach (FestEvent::whereIn('id', $event->reportableEventIds())->get() as $scopeEvent) {
             EventContext::for($scopeEvent)->recalculateSchoolPoints();
         }
 
         $event->update([
             'results_published' => true,
-            'status'            => 'completed',
+            'status' => 'completed',
         ]);
 
         // Cascade to region AND finale/cluster children — a hub-level "Publish Results"
         // represents the whole fest being final, so finale (which the region-only default
         // deliberately excludes for registration/lock fields) needs to move with it too.
         // See FestRegionPartitionService::cascadeLifecycleToChildren()'s $includeFinale doc.
-        app(\App\Services\Events\FestRegionPartitionService::class)->cascadeLifecycleToChildren($event, [
+        app(FestRegionPartitionService::class)->cascadeLifecycleToChildren($event, [
             'results_published' => true,
-            'status'            => 'completed',
+            'status' => 'completed',
         ], includeFinale: true);
 
-        app(\App\Services\Events\FestCertificateService::class)->generateForEvent($event);
-        app(\App\Services\Events\FestCertificateService::class)->generateParticipationForEvent($event);
-        app(\App\Services\Events\FestCmsAutoPush::class)->pushScoreboard($event);
-        app(\App\Services\Events\FestEventNotifier::class)->resultsPublished($event);
+        // The public portal uses the summary projection's timestamp as the official
+        // publication time. Recalculation creates/updates these rows but does not itself
+        // publish them, so stamp every reportable scope only after the lifecycle gate and
+        // hub/child publication updates have succeeded.
+        $publicationEventIds = $event->parent_event_id ? [$event->id] : $event->reportableEventIds();
+        FestResult::whereIn('event_id', $publicationEventIds)
+            ->whereNull('item_id')
+            ->update([
+                'published_at' => now(),
+                'published_by' => auth()->id(),
+            ]);
+
+        app(FestCertificateService::class)->generateForEvent($event);
+        app(FestCertificateService::class)->generateParticipationForEvent($event);
+        app(FestCmsAutoPush::class)->pushScoreboard($event);
+        app(FestEventNotifier::class)->resultsPublished($event);
 
         FestScoreboardUpdated::dispatch($event->fresh());
 
@@ -236,7 +260,7 @@ class FestResultsController extends SahodayaAdminController
 
         $event->update([
             'results_published' => false,
-            'status'            => 'ongoing',
+            'status' => 'ongoing',
         ]);
 
         // LIFE-08 fix (functional audit, 2026-08-11/12): publish() above cascades to
@@ -249,13 +273,21 @@ class FestResultsController extends SahodayaAdminController
         // clawing back a certificate a school may have already downloaded is a materially
         // different (and much larger) feature than "undo a publish click" — out of scope
         // for this symmetric-cascade fix.
-        app(\App\Services\Events\FestRegionPartitionService::class)->cascadeLifecycleToChildren($event, [
+        app(FestRegionPartitionService::class)->cascadeLifecycleToChildren($event, [
             'results_published' => false,
-            'status'            => 'ongoing',
+            'status' => 'ongoing',
         ], includeFinale: true);
 
-        app(\App\Services\Events\FestCmsAutoPush::class)->pushScoreboard($event);
-        app(\App\Services\Events\FestEventNotifier::class)->resultsUnpublished($event);
+        $publicationEventIds = $event->parent_event_id ? [$event->id] : $event->reportableEventIds();
+        FestResult::whereIn('event_id', $publicationEventIds)
+            ->whereNull('item_id')
+            ->update([
+                'published_at' => null,
+                'published_by' => null,
+            ]);
+
+        app(FestCmsAutoPush::class)->pushScoreboard($event);
+        app(FestEventNotifier::class)->resultsUnpublished($event);
 
         FestScoreboardUpdated::dispatch($event->fresh());
 
@@ -281,7 +313,7 @@ class FestResultsController extends SahodayaAdminController
         if ($result['promoted'] > 0) {
             app(FestEventNotifier::class)->promotionCompleted($toEvent, $result['promoted'], $event);
             app(PlatformAuditLogger::class)->festPromotionCompleted($toEvent, $result['promoted'], [
-                'page'          => FestPageActivity::RESULTS,
+                'page' => FestPageActivity::RESULTS,
                 'from_event_id' => $event->id,
             ]);
         }
@@ -302,7 +334,7 @@ class FestResultsController extends SahodayaAdminController
         if ($result['promoted'] > 0) {
             app(FestEventNotifier::class)->promotionCompleted($toEvent, $result['promoted'], $event);
             app(PlatformAuditLogger::class)->festPromotionCompleted($toEvent, $result['promoted'], [
-                'page'          => FestPageActivity::RESULTS,
+                'page' => FestPageActivity::RESULTS,
                 'from_event_id' => $event->id,
             ]);
         }

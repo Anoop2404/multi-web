@@ -732,6 +732,15 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/sections/{sectionId}', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'deleteSection'])->name('sections.delete');
             Route::post('/sections/{sectionId}/toggle', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'toggleSection'])->name('sections.toggle');
             Route::post('/sections/reorder', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'reorderSections'])->name('sections.reorder');
+            Route::post('/sections/{sectionId}/duplicate', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'duplicateSection'])->name('sections.duplicate');
+            Route::get('/experiences', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'experiences'])->name('experiences.index');
+            Route::post('/experience/draft', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'applyExperienceDraft'])->name('experience.draft');
+            Route::post('/experience/cancel', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'cancelExperienceDraft'])->name('experience.cancel');
+            Route::post('/experience/publish', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'publishExperienceDraft'])->name('experience.publish');
+            Route::get('/experience/versions', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'experienceVersions'])->name('experience.versions');
+            Route::post('/experience/versions/{versionId}/restore', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'restoreExperienceVersion'])->name('experience.versions.restore');
+            Route::get('/readiness', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'readiness'])->name('readiness');
+            Route::post('/design', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'saveDesign'])->name('design.save');
             Route::get('/nav', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'getNav'])->name('nav.get');
             Route::post('/nav', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'saveNav'])->name('nav.save');
             Route::get('/footer', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'getFooter'])->name('footer.get');
@@ -1365,6 +1374,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/hall-tickets/preview', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'previewHallTicket'])->name('hall-tickets.preview');
             Route::post('/{exam}/hall-tickets/design', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'updateHallTicketDesign'])->name('hall-tickets.design');
             Route::post('/{exam}/hall-tickets/generate', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'generateHallTickets'])->name('hall-tickets.generate');
+            Route::post('/{exam}/hall-tickets/publish', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'publishHallTickets'])->name('hall-tickets.publish');
+            Route::post('/{exam}/hall-tickets/unpublish', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'unpublishHallTickets'])->name('hall-tickets.unpublish');
             Route::post('/{exam}/hall-tickets/halls', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'saveHalls'])->name('hall-tickets.halls');
             Route::post('/{exam}/hall-tickets/allocate-seats', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'allocateSeats'])->name('hall-tickets.allocate-seats');
             Route::get('/{exam}/hall-tickets/print-all', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'printAllHallTickets'])->name('hall-tickets.print-all');
@@ -1722,3 +1733,11 @@ Route::prefix('state/external')->name('state.external.')->middleware(['web', 'th
 Route::get('/state/results', [\App\Http\Controllers\Public\StatePublicResultsController::class, 'index'])
     ->middleware(['web', 'throttle:60,1'])
     ->name('state.public-results');
+
+Route::get('/sports/entry-form', function (\Illuminate\Http\Request $request) {
+    if ($request->has('inertia') || $request->wantsJson()) {
+        return inertia('School/Events/SportsEntryForm');
+    }
+    return view('reports.sports-games-entry-form');
+})->middleware(['web'])->name('sports.entry-form');
+

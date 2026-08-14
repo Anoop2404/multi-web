@@ -793,7 +793,7 @@ class FestEventController extends SahodayaAdminController
         ]);
 
         $schoolEvent = FestEvent::findOrFail($data['school_event_id']);
-        abort_if($schoolEvent->level_round !== 'school', 422);
+        abort_if($schoolEvent->level_round !== 'school', 422, 'Only a school-round event can be linked here.');
         abort_if($schoolEvent->tenant_id !== $this->sahodaya->id, 403);
 
         $schoolEvent->update(['parent_event_id' => $event->id]);
@@ -909,7 +909,11 @@ class FestEventController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($item->event_id !== $event->id, 403);
-        abort_if($item->isStateCatalog(), 422, 'State catalog items cannot be edited here.');
+        // State-catalog items were previously read-only here, but every Sahodaya is the one
+        // actually conducting these items locally (the state->Sahodaya->school cascade means
+        // there's no separate "state runs it" mode) — so full edit access is required. Deletion
+        // of a state-catalog item stays blocked below in destroyItem(), since removing it would
+        // drop it from the state cascade entirely, which is a different, more destructive action.
 
         $registry = app(FestTaxonomyRegistry::class)->forTenant($this->sahodaya->id);
         $registry->ensureDefaults();
@@ -1242,8 +1246,8 @@ class FestEventController extends SahodayaAdminController
     public function promoteDisciplineEvents(string $tenantId, FestEvent $event)
     {
         abort_unless($event->tenant_id === $this->sahodaya->id, 404);
-        abort_unless($event->event_type === 'sports', 422);
-        abort_unless($event->parent_event_id === null, 422);
+        abort_unless($event->event_type === 'sports', 422, 'Only sports events support this.');
+        abort_unless($event->parent_event_id === null, 422, 'This can only be done on a top-level event, not a sub-event.');
 
         // Explicit admin action: allowed to create missing sport events.
         $result = app(\App\Services\Events\FestSportsEventSyncService::class)->syncSeason($event, createMissing: true);

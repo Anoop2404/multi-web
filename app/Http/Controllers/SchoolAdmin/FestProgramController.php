@@ -110,7 +110,7 @@ class FestProgramController extends SchoolAdminController
     public function linkParent(Request $request, string $tenantId, FestEvent $festProgram)
     {
         abort_unless($festProgram->level_round === 'school', 404);
-        abort_unless($festProgram->conducting_school_id === $this->school->id, 403);
+        abort_unless($festProgram->conducting_school_id === $this->school->id, 403, 'Only the school conducting this program can manage it.');
 
         $data = $request->validate([
             'parent_event_id' => 'required|exists:fest_events,id',
@@ -129,7 +129,7 @@ class FestProgramController extends SchoolAdminController
     public function show(string $tenantId, FestEvent $festProgram)
     {
         abort_unless($festProgram->level_round === 'school', 404);
-        abort_unless($festProgram->conducting_school_id === $this->school->id, 403);
+        abort_unless($festProgram->conducting_school_id === $this->school->id, 403, 'Only the school conducting this program can manage it.');
         abort_if($festProgram->tenant_id !== $this->school->parent_id, 403);
 
         if ($festProgram->event_type === 'sports') {
@@ -169,7 +169,7 @@ class FestProgramController extends SchoolAdminController
 
     public function storePolicy(Request $request, string $tenantId, FestEvent $festProgram, FestParticipationPolicyService $service)
     {
-        abort_unless($festProgram->conducting_school_id === $this->school->id, 403);
+        abort_unless($festProgram->conducting_school_id === $this->school->id, 403, 'Only the school conducting this program can manage it.');
 
         $data = $request->validate([
             'preset_key' => 'nullable|string|max:60',
@@ -199,7 +199,7 @@ class FestProgramController extends SchoolAdminController
 
     public function storeItem(Request $request, string $tenantId, FestEvent $festProgram)
     {
-        abort_unless($festProgram->conducting_school_id === $this->school->id, 403);
+        abort_unless($festProgram->conducting_school_id === $this->school->id, 403, 'Only the school conducting this program can manage it.');
 
         $data = $request->validate([
             'title'            => 'required|string|max:255',
@@ -221,7 +221,7 @@ class FestProgramController extends SchoolAdminController
 
     public function destroyItem(string $tenantId, FestEvent $festProgram, FestEventItem $item)
     {
-        abort_unless($festProgram->conducting_school_id === $this->school->id, 403);
+        abort_unless($festProgram->conducting_school_id === $this->school->id, 403, 'Only the school conducting this program can manage it.');
         abort_if($item->event_id !== $festProgram->id, 404);
         abort_unless($item->isEditableBySchool(), 422, 'Only school custom items can be removed here.');
 
@@ -233,7 +233,7 @@ class FestProgramController extends SchoolAdminController
     public function marks(string $tenantId, FestEvent $festProgram)
     {
         abort_unless($festProgram->level_round === 'school', 404);
-        abort_unless($festProgram->conducting_school_id === $this->school->id, 403);
+        abort_unless($festProgram->conducting_school_id === $this->school->id, 403, 'Only the school conducting this program can manage it.');
 
         $festProgram->load('items');
 
@@ -256,7 +256,7 @@ class FestProgramController extends SchoolAdminController
 
     public function storeMark(Request $request, string $tenantId, FestEvent $festProgram, \App\Services\Events\FestMarkSaveService $markSave, PlatformAuditLogger $audit)
     {
-        abort_unless($festProgram->conducting_school_id === $this->school->id, 403);
+        abort_unless($festProgram->conducting_school_id === $this->school->id, 403, 'Only the school conducting this program can manage it.');
 
         \App\Services\Events\EventLifecycleGate::allowMarkEntry($festProgram);
 

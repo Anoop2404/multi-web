@@ -1,0 +1,1 @@
+function e(e,t=null){let n=`/portal/exam/${e}`,r=[{href:n,label:t?`My exams`:`Dashboard`,exact:!t}];if(!t)return r;let i=`${n}/exams/${t}`;return r.push({href:`${i}/attendance`,label:`Attendance`},{href:`${i}/supervision`,label:`Supervision`},{href:`${i}/marks`,label:`Mark entry`}),r}export{e as t};

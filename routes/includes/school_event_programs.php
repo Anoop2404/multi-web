@@ -60,6 +60,12 @@ foreach ($festPrograms as $cfg) {
         Route::get('/reports/{event}', [FestSchoolReportController::class, 'eventHub'])
             ->defaults('program', $slug)
             ->name('reports.event');
+        Route::get('/events/{event}/games-entry-form', [FestSchoolReportController::class, 'gamesEntryForm'])
+            ->defaults('program', $slug)
+            ->name('event.games-entry-form');
+        Route::get('/reports/{event}/games-entry-form', [FestSchoolReportController::class, 'gamesEntryForm'])
+            ->defaults('program', $slug)
+            ->name('reports.games-entry-form');
         Route::get('/reports/{event}/export/{exportType}', [FestSchoolReportController::class, 'export'])
             ->defaults('program', $slug)
             ->name('reports.export');

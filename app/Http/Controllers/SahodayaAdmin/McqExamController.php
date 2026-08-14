@@ -615,7 +615,7 @@ class McqExamController extends SahodayaAdminController
     public function exportLeaderboard(string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
-        abort_unless($exam->results_published, 403);
+        abort_unless($exam->results_published, 403, 'Results haven\'t been published for this exam yet.');
 
         $rows = McqMark::query()
             ->whereHas('registration', fn ($q) => $q->where('exam_id', $exam->id))

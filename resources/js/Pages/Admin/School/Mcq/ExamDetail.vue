@@ -6,6 +6,8 @@
             </template>
         </PageHeader>
 
+        <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
+
         <div v-if="exam.level_label || exam.series_title" class="flex flex-wrap gap-2 mb-4">
             <span v-if="exam.level_label" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800">{{ exam.level_label }}</span>
             <span v-if="exam.exam_type_label" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">{{ exam.exam_type_label }}</span>
@@ -401,36 +403,46 @@
 
         <!-- Hall tickets tab -->
         <div v-else-if="tab === 'hall-tickets'" class="space-y-4">
-            <div v-if="downloadGate?.blocked" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <p class="font-semibold">Payment pending</p>
-                <p class="text-xs mt-1">{{ downloadGate.reason }} Pay Sahodaya membership and exam fees to download hall tickets.</p>
-                <Link v-if="downloadGate.links?.payments" :href="downloadGate.links.payments" class="link-brand text-xs font-semibold mt-2 inline-block">Go to payments →</Link>
-            </div>
-            <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                <div class="card card--muted !py-3 text-center">
-                    <p class="text-lg font-bold text-indigo-700">{{ ticketsIssuedCount }}</p>
-                    <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Tickets issued</p>
-                </div>
-                <div class="card card--muted !py-3 text-center">
-                    <p class="text-lg font-bold">{{ registrations.length - ticketsIssuedCount }}</p>
-                    <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Pending issue</p>
-                </div>
-                <div class="card card--muted !py-3 text-center lg:col-span-1 col-span-2">
-                    <p class="text-sm font-semibold capitalize">{{ schoolFee?.status?.replace('_', ' ') || 'No fee batch' }}</p>
-                    <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Fee status</p>
-                </div>
-            </div>
-            <div class="card p-4 space-y-3">
-                <p class="text-sm text-slate-700">
-                    Hall tickets are available after membership and exam fees are paid and verified.
+            <div v-if="!hallTicketsPublished" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p class="font-semibold">Hall tickets have not been released yet</p>
+                <p class="text-xs mt-1">
+                    Reg. numbers are assigned automatically as Sahodaya approves registrations, but they only become visible here —
+                    and to teachers/students in their own portals — once Sahodaya publishes hall tickets for this exam. Check back
+                    closer to the exam date.
                 </p>
-                <div class="flex flex-wrap gap-2">
-                    <a v-if="ticketsIssuedCount && canDownloadDocuments" :href="pdfUrl" target="_blank" class="btn-primary text-sm">Download hall tickets PDF</a>
-                    <Link v-if="schoolFee?.status !== 'approved'" :href="`${base}/fee`" class="btn-secondary text-sm">Check fee status</Link>
-                </div>
-                <p v-if="!ticketsIssuedCount && !downloadGate?.blocked" class="text-sm text-amber-700">No hall tickets yet — register students and complete fee payment.</p>
-                <p v-else-if="!canDownloadDocuments" class="text-sm text-amber-700">Hall ticket download is locked until fees are cleared.</p>
             </div>
+            <template v-else>
+                <div v-if="downloadGate?.blocked" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p class="font-semibold">Payment pending</p>
+                    <p class="text-xs mt-1">{{ downloadGate.reason }} Pay Sahodaya membership and exam fees to download hall tickets.</p>
+                    <Link v-if="downloadGate.links?.payments" :href="downloadGate.links.payments" class="link-brand text-xs font-semibold mt-2 inline-block">Go to payments →</Link>
+                </div>
+                <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div class="card card--muted !py-3 text-center">
+                        <p class="text-lg font-bold text-indigo-700">{{ ticketsIssuedCount }}</p>
+                        <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Tickets issued</p>
+                    </div>
+                    <div class="card card--muted !py-3 text-center">
+                        <p class="text-lg font-bold">{{ registrations.length - ticketsIssuedCount }}</p>
+                        <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Pending issue</p>
+                    </div>
+                    <div class="card card--muted !py-3 text-center lg:col-span-1 col-span-2">
+                        <p class="text-sm font-semibold capitalize">{{ schoolFee?.status?.replace('_', ' ') || 'No fee batch' }}</p>
+                        <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Fee status</p>
+                    </div>
+                </div>
+                <div class="card p-4 space-y-3">
+                    <p class="text-sm text-slate-700">
+                        Hall tickets are available after membership and exam fees are paid and verified.
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <a v-if="ticketsIssuedCount && canDownloadDocuments" :href="pdfUrl" target="_blank" class="btn-primary text-sm">Download hall tickets PDF</a>
+                        <Link v-if="schoolFee?.status !== 'approved'" :href="`${base}/fee`" class="btn-secondary text-sm">Check fee status</Link>
+                    </div>
+                    <p v-if="!ticketsIssuedCount && !downloadGate?.blocked" class="text-sm text-amber-700">No hall tickets yet — register students and complete fee payment.</p>
+                    <p v-else-if="!canDownloadDocuments" class="text-sm text-amber-700">Hall ticket download is locked until fees are cleared.</p>
+                </div>
+            </template>
         </div>
 
         <!-- Fee tab -->
@@ -1152,6 +1164,7 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SchoolMcqSubNav from '@/Components/school/SchoolMcqSubNav.vue';
 import McqSchoolWorkflowStepper from '@/Components/school/McqSchoolWorkflowStepper.vue';
 import { TALENT_SEARCH_EXAMS_LABEL } from '@/support/mcqSchoolLabels.js';
+import InlineAlert from '@/Components/ui/InlineAlert.vue';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
@@ -1371,6 +1384,7 @@ const feeAmount = ref('');
 const base = computed(() => `/school-admin/${props.school.id}/mcq/${props.exam.id}`);
 const pdfUrl = computed(() => `${base.value}/hall-tickets/pdf`);
 const canDownloadDocuments = computed(() => !props.downloadGate?.blocked);
+const hallTicketsPublished = computed(() => !!props.exam?.hall_tickets_published);
 
 // For large schools (see lazyLoadStudents/studentCount below), the server sends an
 // empty `students` list and this page fetches 50-row batches on demand. For small
@@ -1736,6 +1750,7 @@ function uploadBatchFee() {
 }
 
 // --- Attendance ---
+const alertMessage = ref('');
 const attendanceState = ref(props.attendanceRows.map(r => ({ ...r, attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' })));
 const presentCount = computed(() => attendanceState.value.filter(r => r.attendance_status === 'present').length);
 const absentCount = computed(() => attendanceState.value.filter(r => r.attendance_status === 'absent').length);
@@ -1751,7 +1766,7 @@ function saveAttendance() {
     const editable = attendanceState.value.filter(r => !r.pending_correction_status);
     const missingNote = editable.find(r => ['malpractice', 'withheld'].includes(r.attendance_status) && !r.attendance_note?.trim());
     if (missingNote) {
-        alert('A reason/note is required for every student marked Malpractice or Withheld.');
+        alertMessage.value = 'A reason/note is required for every student marked Malpractice or Withheld.';
         return;
     }
     router.post(`${base.value}/attendance`, {

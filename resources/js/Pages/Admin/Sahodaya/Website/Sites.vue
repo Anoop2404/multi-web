@@ -61,7 +61,7 @@ function create() {
     form.post(base, { preserveScroll: true, onSuccess: () => form.reset() });
 }
 function remove(s) {
-    if (!confirm(`Remove microsite "${s.name}"?`)) return;
+    if (!confirm(`Remove microsite "${s.name}" and all ${s.sections_count ?? 0} of its sections?\n\nThis cannot be undone.`)) return;
     router.delete(`${base}/${s.id}`, { preserveScroll: true });
 }
 </script>

@@ -28,7 +28,7 @@ class SportsMeetController extends SchoolAdminController
     {
         abort_unless($event->event_type === 'sports', 404);
         abort_unless($event->level_round === 'school', 404);
-        abort_unless($event->conducting_school_id === $this->school->id, 403);
+        abort_unless($event->conducting_school_id === $this->school->id, 403, 'Only the school conducting this sports meet can manage it.');
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
     }
 

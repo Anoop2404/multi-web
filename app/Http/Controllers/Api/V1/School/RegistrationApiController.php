@@ -161,7 +161,7 @@ class RegistrationApiController extends SchoolApiController
         // Counts can also be edited after approval, so a school can report a mid-year
         // enrollment increase; it does not itself change counts_status — the school must
         // still explicitly resubmit for Sahodaya review via the submit-track endpoint.
-        abort_unless(in_array($submission->counts_status, ['pending', 'rejected', 'approved']), 403);
+        abort_unless(in_array($submission->counts_status, ['pending', 'rejected', 'approved']), 403, 'This action isn\'t available at the registration\'s current status.');
 
         $data = $request->validate([
             'counts' => 'required|array',
@@ -193,7 +193,7 @@ class RegistrationApiController extends SchoolApiController
     {
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
-        abort_unless(in_array($submission->teacher_status, ['pending', 'rejected']), 403);
+        abort_unless(in_array($submission->teacher_status, ['pending', 'rejected']), 403, 'Teacher registration can only be edited while pending or rejected.');
 
         $data = $request->validate([
             'name'             => 'required|string|max:255',
@@ -269,7 +269,7 @@ class RegistrationApiController extends SchoolApiController
     {
         $registration = app(RegistrationStatusService::class)
             ->ensureMembershipFee($this->currentRegistration());
-        abort_unless(in_array($registration->registration_status, ['payment_pending', 'payment_rejected']), 403);
+        abort_unless(in_array($registration->registration_status, ['payment_pending', 'payment_rejected']), 403, 'Payment can only be resubmitted while pending or rejected.');
 
         $data = $request->validate([
             'payment_method'  => 'nullable|string|max:50',

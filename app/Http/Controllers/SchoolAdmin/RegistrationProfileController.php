@@ -109,7 +109,7 @@ class RegistrationProfileController extends SchoolAdminController
     {
         $user = $request->user();
         $sahodaya = $this->school->parent;
-        abort_unless($sahodaya, 422);
+        abort_unless($sahodaya, 422, 'Your school isn\'t linked to a Sahodaya yet.');
 
         $profile = SahodayaProfile::where('tenant_id', $sahodaya->id)->first();
         $fields = SchoolApplicationForm::resolveForSchoolProfile($profile);

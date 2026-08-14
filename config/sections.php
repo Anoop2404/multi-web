@@ -1347,4 +1347,26 @@ return [
         ],
     ],
 
+    'sahodaya_action_hub' => [
+        'seasonal' => [
+            'label' => 'Seasonal Action Hub',
+            'description' => 'Lifecycle-aware registration, schedule and results actions.',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'subheading', 'type' => 'textarea', 'label' => 'Description'],
+            ],
+        ],
+    ],
+
+    'resource_centre' => [
+        'search-grid' => [
+            'label' => 'Searchable Resource Centre',
+            'description' => 'Search and filter ERP circulars and downloads.',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'subheading', 'type' => 'textarea', 'label' => 'Description'],
+            ],
+        ],
+    ],
+
 ];

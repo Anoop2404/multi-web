@@ -119,7 +119,7 @@ class ExamOpsController extends Controller
     public function marks(Request $request, string $tenantId, McqExam $exam)
     {
         $user = $request->user();
-        abort_unless($user->hasAnyRole(['exam_controller', 'mark_entry_admin', 'sahodaya_admin']), 403);
+        abort_unless($user->hasAnyRole(['exam_controller', 'mark_entry_admin', 'sahodaya_admin']), 403, 'You don\'t have permission to perform exam operations.');
 
         $this->authorizeExam($request, $tenantId, $exam);
 
@@ -141,7 +141,7 @@ class ExamOpsController extends Controller
     public function storeMark(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)
     {
         $user = $request->user();
-        abort_unless($user->hasAnyRole(['exam_controller', 'mark_entry_admin', 'sahodaya_admin']), 403);
+        abort_unless($user->hasAnyRole(['exam_controller', 'mark_entry_admin', 'sahodaya_admin']), 403, 'You don\'t have permission to perform exam operations.');
         abort_if($registration->exam_id !== $exam->id, 403);
         $this->authorizeExam($request, $tenantId, $exam);
 
@@ -295,7 +295,7 @@ class ExamOpsController extends Controller
         }
 
         $assigned = McqExamStaff::where('exam_id', $exam->id)->where('user_id', $user->id)->exists();
-        abort_unless($assigned, 403);
+        abort_unless($assigned, 403, 'You\'re not assigned as staff for this exam.');
     }
 
     /** Sahodaya-side trusted roles who may directly overwrite attendance/marks at any time. */

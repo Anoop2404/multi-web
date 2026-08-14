@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
@@ -13,17 +14,55 @@ class WebsiteSite extends Model
 
     protected $fillable = [
         'tenant_id', 'name', 'slug', 'is_primary', 'is_active', 'seo_json',
+        'template_key', 'template_version', 'experience_version', 'homepage_mode',
+        'homepage_mode_override_until', 'design_json', 'draft_template_json',
     ];
 
     protected $casts = [
         'is_primary' => 'boolean',
         'is_active' => 'boolean',
         'seo_json' => 'array',
+        'design_json' => 'array',
+        'draft_template_json' => 'array',
+        'homepage_mode_override_until' => 'datetime',
     ];
 
     public function sections(): HasMany
     {
         return $this->hasMany(SiteSection::class, 'site_id');
+    }
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(WebsiteSiteVersion::class, 'website_site_id')->orderByDesc('id');
+    }
+
+    /**
+     * Sections belonging to this site. The primary site also owns legacy rows
+     * whose site_id predates the multi-site migration and is therefore null.
+     */
+    public function sectionQuery(): Builder
+    {
+        return SiteSection::query()
+            ->where('tenant_id', $this->tenant_id)
+            ->where(function (Builder $query) {
+                $query->where('site_id', $this->id);
+
+                if ($this->is_primary) {
+                    $query->orWhereNull('site_id');
+                }
+            });
+    }
+
+    public static function resolveForTenant(string $tenantId, ?int $siteId = null): self
+    {
+        if ($siteId !== null) {
+            return self::query()
+                ->where('tenant_id', $tenantId)
+                ->findOrFail($siteId);
+        }
+
+        return self::ensurePrimary($tenantId);
     }
 
     public static function ensurePrimary(string $tenantId): self

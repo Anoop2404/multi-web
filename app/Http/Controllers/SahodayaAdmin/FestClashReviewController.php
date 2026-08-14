@@ -36,7 +36,7 @@ class FestClashReviewController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_unless(in_array($clashRequest->event_id, $event->reportableEventIds(), true), 403);
-        abort_unless($clashRequest->status === 'pending', 422);
+        abort_unless($clashRequest->status === 'pending', 422, 'Only pending clash requests can be reviewed.');
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);
 
@@ -54,7 +54,7 @@ class FestClashReviewController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_unless(in_array($clashRequest->event_id, $event->reportableEventIds(), true), 403);
-        abort_unless($clashRequest->status === 'pending', 422);
+        abort_unless($clashRequest->status === 'pending', 422, 'Only pending clash requests can be reviewed.');
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);
 

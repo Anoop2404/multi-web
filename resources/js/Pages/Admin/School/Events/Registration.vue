@@ -23,6 +23,8 @@
             </template>
         </PageHeader>
 
+        <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
+
         <div v-if="schoolRegion?.applies" class="mb-5 max-w-2xl">
             <div v-if="schoolRegion.region && !showChangeRegion" class="notice-banner notice-banner--info text-sm flex flex-wrap items-center gap-3 justify-between">
                 <p>Your {{ programLabel }} region: <strong>{{ schoolRegion.region }}</strong>.</p>
@@ -602,11 +604,14 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import QuickAddStudentModal from '@/Components/school/QuickAddStudentModal.vue';
 import FestRegistrationItemRow from '@/Components/school/FestRegistrationItemRow.vue';
 import SportsEventAthletesPanel from '@/Components/school/SportsEventAthletesPanel.vue';
+import InlineAlert from '@/Components/ui/InlineAlert.vue';
 import SchoolEventWorkflowStepper from '@/Components/school/SchoolEventWorkflowStepper.vue';
 import EventBillingPanel from '@/Components/school/EventBillingPanel.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { genderLabel } from '@/support/festItemEligibility.js';
 import { studentDisplayName } from '@/support/studentDisplay.js';
+
+const alertMessage = ref('');
 
 const props = defineProps({
     school: Object,
@@ -1937,7 +1942,7 @@ function submitBulkAssign() {
     const itemIds = (event.items ?? []).filter((item) => bulkAssignItemIds.value.includes(item.id)).map((i) => i.id);
 
     if (!studentIds.length || !itemIds.length) {
-        alert('Pick athletes in item rows and select items for bulk assign.');
+        alertMessage.value = 'Pick athletes in item rows and select items for bulk assign.';
         return;
     }
 
@@ -1952,7 +1957,7 @@ function submitBulkAssign() {
         onError: (errors) => {
             const keys = Object.keys(errors);
             if (keys.length) {
-                alert(errors[keys[0]]);
+                alertMessage.value = errors[keys[0]];
             }
         },
     });
@@ -1963,14 +1968,14 @@ function uploadEventPayment(event) {
     // input) — up to 5 images for one payment, submitted together as one receipt.
     const files = eventPaymentFiles[event.id];
     if (!files || !files.length) {
-        alert('Choose a payment proof file first, or skip — registration does not require it.');
+        alertMessage.value = 'Choose a payment proof file first, or skip — registration does not require it.';
         return;
     }
     // Txn ref / bank name / amount are all required by the backend — see
     // FestRegistrationController::uploadEventPayment(). The <input required> attributes
     // stop most bad submits, but router.post bypasses native form validation, so re-check here.
     if (!eventPaymentRefs[event.id] || !eventPaymentBanks[event.id] || !eventPaymentAmounts[event.id]) {
-        alert('Enter the transaction reference, bank name, and amount paid before uploading.');
+        alertMessage.value = 'Enter the transaction reference, bank name, and amount paid before uploading.';
         return;
     }
     router.post(`${programBase.value}/events/${event.id}/payment`, {
@@ -2017,14 +2022,14 @@ function uploadHeadPayment(event, headFee) {
     const key = headPaymentKey(event.id, headFee.head_id);
     const files = headPaymentFiles[key];
     if (!files || !files.length) {
-        alert('Choose a payment proof file for this Sport Event first.');
+        alertMessage.value = 'Choose a payment proof file for this Sport Event first.';
         return;
     }
     // Txn ref / bank name / amount are all required by the backend — see
     // FestRegistrationController::uploadEventPayment(). Re-check here since router.post
     // bypasses native <input required> form validation.
     if (!headPaymentRefs[key] || !headPaymentBanks[key] || !headPaymentAmounts[key]) {
-        alert('Enter the transaction reference, bank name, and amount paid before uploading.');
+        alertMessage.value = 'Enter the transaction reference, bank name, and amount paid before uploading.';
         return;
     }
     router.post(`${programBase.value}/events/${event.id}/payment`, {

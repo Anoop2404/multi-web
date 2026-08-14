@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\SiteSection;
 use App\Models\Tenant;
+use App\Models\WebsiteSite;
 
 class CkscSiteTemplate
 {
@@ -18,7 +19,9 @@ class CkscSiteTemplate
         self::seedFooter($sahodaya);
         self::seedCmsPages($sahodaya);
 
-        if ($replaceSections || ! $sahodaya->sections()->exists()) {
+        $primarySite = WebsiteSite::ensurePrimary($sahodaya->id);
+
+        if ($replaceSections || ! $primarySite->sectionQuery()->exists()) {
             self::seedSections($sahodaya, $replaceSections);
         } else {
             SahodayaTenantBranding::personalizeExistingSections($sahodaya);
@@ -58,13 +61,16 @@ class CkscSiteTemplate
 
     private static function seedSections(Tenant $sahodaya, bool $replace): void
     {
+        $primarySite = WebsiteSite::ensurePrimary($sahodaya->id);
+
         if ($replace) {
-            $sahodaya->sections()->delete();
+            $primarySite->sectionQuery()->delete();
         }
 
         foreach (SahodayaTenantBranding::homepageSections($sahodaya) as $section) {
             SiteSection::create(array_merge($section, [
                 'tenant_id' => $sahodaya->id,
+                'site_id' => $primarySite->id,
                 'is_active' => true,
             ]));
         }

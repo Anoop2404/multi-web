@@ -251,7 +251,7 @@ class UnifiedPaymentsController extends SahodayaAdminController
             $audit->log('receipt.email.resent', "Membership receipt resent for {$payment->school?->name}", $receipt);
         } else {
             $receipt = FeeReceipt::findOrFail($data['fee_receipt_id'] ?? 0);
-            abort_unless($receipt->status === 'approved', 422);
+            abort_unless($receipt->status === 'approved', 422, 'Only approved receipts can be resent.');
 
             $school = $this->resolveSchoolForReceipt($data['type'], $data['id'], $receipt);
             abort_if($school->parent_id !== $this->sahodaya->id, 403);

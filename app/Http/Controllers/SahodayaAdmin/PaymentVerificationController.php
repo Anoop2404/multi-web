@@ -126,7 +126,7 @@ class PaymentVerificationController extends SahodayaAdminController
         // assignment for the year the payment actually belongs to, not
         // whichever region the school happens to be in today.
         abort_if($this->regionScopedSchoolIds([$payment->school_id], $payment->academic_year) === [], 403, 'This school is outside your assigned region.');
-        abort_unless($payment->status === 'submitted', 403);
+        abort_unless($payment->status === 'submitted', 403, 'Only submitted payments can be verified.');
 
         $data = $request->validate([
             'action' => 'required|in:verify,reject',

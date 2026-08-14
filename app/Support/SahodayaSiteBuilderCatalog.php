@@ -25,6 +25,9 @@ class SahodayaSiteBuilderCatalog
         'contact'               => ['side-by-side', 'stacked', 'with-whatsapp'],
         'newsletter'            => ['subscribe-form'],
         'sahodaya_home'         => ['dashboard'],
+        'sahodaya_action_hub'   => ['seasonal'],
+        'resource_centre'       => ['search-grid'],
+        'governance'            => ['structure'],
     ];
 
     public static function allows(string $sectionType, ?string $variant = null): bool

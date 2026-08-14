@@ -10,11 +10,12 @@ class SiteSectionVersion extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'site_section_id', 'variant', 'config', 'note', 'created_by', 'created_at',
+        'site_section_id', 'variant', 'config', 'layout_json', 'note', 'created_by', 'created_at',
     ];
 
     protected $casts = [
         'config' => 'array',
+        'layout_json' => 'array',
         'created_at' => 'datetime',
     ];
 

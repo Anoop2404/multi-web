@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
+use App\Support\TenantStorage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -113,5 +114,36 @@ class Student extends Model
         $version = $this->updated_at?->timestamp ?? 0;
 
         return $serveRoute.($version ? '?v='.$version : '');
+    }
+
+    /**
+     * Cached, downscaled base64 data URI for this student's photo — usable regardless of
+     * which portal/session is rendering the page (unlike photoUrl()/sahodayaPhotoUrl(),
+     * which each require a specific authenticated route context). Mirrors
+     * Teacher::photoDataUri(); see that method's docblock and
+     * docs/N1_AND_REPORT_MEMORY_AUDIT_2026_08_03.md §2 for why bulk documents (hall tickets,
+     * ID cards) embed a cached data URI instead of an app URL.
+     */
+    public function photoDataUri(): ?string
+    {
+        if (! $this->photo || ! $this->tenant_id) {
+            return null;
+        }
+
+        if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
+            return $this->photo;
+        }
+
+        $cacheKey = 'student-photo-thumb:'.$this->id.':'.($this->updated_at?->timestamp ?? 0);
+
+        return \Illuminate\Support\Facades\Cache::remember(
+            $cacheKey,
+            now()->addDays(30),
+            function () {
+                $tenant = $this->relationLoaded('tenant') ? $this->tenant : Tenant::find($this->tenant_id);
+
+                return TenantStorage::photoBase64DataUri($tenant, $this->photo);
+            },
+        );
     }
 }

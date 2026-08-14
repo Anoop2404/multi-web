@@ -1,5 +1,6 @@
 <template>
     <section class="rounded-xl border border-indigo-100 bg-indigo-50/40 overflow-hidden mb-4">
+        <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" class="mx-4 mt-3" />
         <div class="px-4 py-3 border-b border-indigo-100 flex flex-wrap items-center justify-between gap-2">
             <div>
                 <h4 class="text-sm font-bold text-indigo-950">{{ isSportsEvent ? 'Event athletes' : 'Event registration' }}</h4>
@@ -157,6 +158,7 @@
 import { computed, ref, watch, watchEffect } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import { studentDisplayName } from '@/support/studentDisplay.js';
+import InlineAlert from '@/Components/ui/InlineAlert.vue';
 
 const props = defineProps({
     event: { type: Object, required: true },
@@ -170,6 +172,7 @@ const props = defineProps({
 });
 
 const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'];
+const alertMessage = ref('');
 
 const search = ref('');
 const classFilter = ref('');
@@ -434,7 +437,7 @@ function submit() {
         onError: (errors) => {
             const keys = Object.keys(errors);
             if (keys.length) {
-                alert(errors[keys[0]]);
+                alertMessage.value = errors[keys[0]];
             }
         },
     });

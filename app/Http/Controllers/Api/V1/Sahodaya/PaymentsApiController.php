@@ -70,7 +70,7 @@ class PaymentsApiController extends SahodayaApiController
     {
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
         $payment = MembershipPayment::whereIn('school_id', $schoolIds)->findOrFail($paymentId);
-        abort_unless($payment->status === 'submitted', 403);
+        abort_unless($payment->status === 'submitted', 403, 'Only submitted payments can be verified.');
 
         $data = $request->validate([
             'action' => 'required|in:verify,reject',

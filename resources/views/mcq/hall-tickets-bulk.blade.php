@@ -28,21 +28,37 @@
         <span style="color:#64748b;">{{ $exam->title }}</span>
     </p>
 
+    @php
+        $examTimingLabel = \App\Support\Mcq\McqHallTicketDesign::examTimingLabel($exam->scheduled_at, $exam->duration_minutes) ?? 'TBA';
+        $reportTimeLabel = \App\Support\Mcq\McqHallTicketDesign::reportTimeLabel($exam->scheduled_at, $design);
+        $gateClosureLabel = \App\Support\Mcq\McqHallTicketDesign::gateClosureLabel($exam->scheduled_at, $design);
+        $qrService = app(\App\Services\Events\FestIdCardQrService::class);
+    @endphp
     <div class="grid">
         @foreach($registrations as $r)
+            @php($participant = \App\Support\Mcq\McqHallTicketDesign::participantFields($r))
             @include('mcq.partials.hall-ticket-card', [
                 'design' => $design,
                 'logoUrl' => $logoUrl,
                 'sample' => [
                     'exam_title' => $exam->title,
-                    'student_name' => $r->student?->name ?? '—',
-                    'student_reg_no' => $r->student?->reg_no,
+                    'participant_type' => $participant['type'],
+                    'participant_name' => $participant['name'],
+                    'secondary_label' => $participant['secondary_label'],
+                    'secondary_value' => $participant['secondary_value'],
+                    'tertiary_label' => $participant['tertiary_label'],
+                    'tertiary_value' => $participant['tertiary_value'],
+                    'photo_src' => $participant['photo'],
                     'school_name' => $r->school?->name,
                     'hall_ticket_no' => $r->hall_ticket_no ?? '—',
                     'hall_room' => $r->hall_room,
                     'seat_no' => $r->seat_no,
-                    'scheduled_at_label' => $exam->scheduled_at?->format('d M Y, h:i A') ?? 'TBA',
+                    'venue' => $exam->venue,
+                    'scheduled_at_label' => $examTimingLabel,
+                    'report_time_label' => $reportTimeLabel,
+                    'gate_closure_label' => $gateClosureLabel,
                     'hall_instructions' => $exam->hall_instructions,
+                    'qr_src' => $r->hall_ticket_no ? $qrService->dataUri("MCQHT|{$exam->id}|{$r->id}|{$r->hall_ticket_no}") : null,
                 ],
             ])
         @endforeach

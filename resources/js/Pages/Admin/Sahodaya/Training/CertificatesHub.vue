@@ -14,6 +14,8 @@
             </template>
         </PageHeader>
 
+        <InlineAlert :message="certAlert" type="success" @dismiss="certAlert = ''" />
+
         <!-- STATS OVERVIEW -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="card p-4 border-l-4 border-indigo-500">
@@ -157,6 +159,9 @@ import { ref, computed } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import InlineAlert from '@/Components/ui/InlineAlert.vue';
+
+const certAlert = ref('');
 
 const props = defineProps({
     sahodaya: Object,
@@ -201,7 +206,7 @@ function sendTestEmail() {
     testEmailForm.post(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/certificates/send-test-email`, {
         preserveScroll: true,
         onSuccess: () => {
-            alert(`Test certificate email successfully sent to ${testEmailForm.test_email}! Check your inbox.`);
+            certAlert.value = `Test certificate email successfully sent to ${testEmailForm.test_email}! Check your inbox.`;
         },
     });
 }

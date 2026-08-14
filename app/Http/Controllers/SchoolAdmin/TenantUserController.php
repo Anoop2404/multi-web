@@ -21,7 +21,7 @@ class TenantUserController extends SchoolAdminController
     {
         $actor = request()->user();
         $assignable = TenantUserCatalog::assignableRolesFor($actor);
-        abort_if($assignable === [], 403);
+        abort_if($assignable === [], 403, 'No roles are available for you to assign.');
 
         $visibleRoles = $actor->hasRole('school_principal')
             ? TenantUserCatalog::schoolPanelRoles()
@@ -64,7 +64,7 @@ class TenantUserController extends SchoolAdminController
     public function store(Request $request, TenantUserProvisioner $provisioner, PlatformAuditLogger $audit, SchoolUserScopeService $scopes)
     {
         $assignable = TenantUserCatalog::assignableRolesFor($request->user());
-        abort_if($assignable === [], 403);
+        abort_if($assignable === [], 403, 'No roles are available for you to assign.');
 
         $data = $request->validate([
             'name'            => 'required|string|max:255',
@@ -139,7 +139,7 @@ class TenantUserController extends SchoolAdminController
     public function updateLeadershipContact(Request $request, string $tenantId, string $roleKey)
     {
         $assignable = TenantUserCatalog::assignableRolesFor($request->user());
-        abort_if($assignable === [], 403);
+        abort_if($assignable === [], 403, 'No roles are available for you to assign.');
         $config = $this->leadershipRoleConfig($roleKey);
 
         $data = $request->validate([
@@ -184,7 +184,7 @@ class TenantUserController extends SchoolAdminController
         $role = $config['role'];
         $canProvision = in_array($role, $assignable, true)
             || (in_array($role, ['school_principal', 'school_vice_principal'], true) && $assignable !== []);
-        abort_unless($canProvision, 403);
+        abort_unless($canProvision, 403, 'You don\'t have permission to provision this role.');
 
         $rules = [
             'event_scopes' => $config['scoped'] ? 'required|array|min:1' : 'nullable|array',
@@ -273,7 +273,7 @@ class TenantUserController extends SchoolAdminController
         abort_if($user->tenant_id !== $this->school->id, 403);
 
         $assignable = TenantUserCatalog::assignableRolesFor($request->user());
-        abort_if($assignable === [], 403);
+        abort_if($assignable === [], 403, 'No roles are available for you to assign.');
 
         $data = $request->validate([
             'name'            => 'required|string|max:255',
@@ -358,7 +358,7 @@ class TenantUserController extends SchoolAdminController
     public function destroy(string $tenantId, User $user, TenantUserProvisioner $provisioner, PlatformAuditLogger $audit)
     {
         abort_if($user->tenant_id !== $this->school->id, 403);
-        abort_if($user->hasAnyRole(TenantUserCatalog::schoolManagementRoles()) && ! request()->user()?->hasRole('school_principal'), 403);
+        abort_if($user->hasAnyRole(TenantUserCatalog::schoolManagementRoles()) && ! request()->user()?->hasRole('school_principal'), 403, 'Only the school principal can manage other school-management accounts.');
 
         $audit->userDeleted($user);
         $provisioner->destroy($user, $this->school->id, TenantUserCatalog::schoolPanelRoles());

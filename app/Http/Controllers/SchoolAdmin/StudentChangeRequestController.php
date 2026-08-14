@@ -10,7 +10,7 @@ class StudentChangeRequestController extends SchoolAdminController
 {
     public function index()
     {
-        abort_unless($this->canReview(), 403);
+        abort_unless($this->canReview(), 403, 'You don\'t have permission to review change requests.');
 
         $requests = StudentEditChangeRequest::where('school_id', $this->school->id)
             ->where('school_approval_status', 'pending_school')
@@ -27,7 +27,7 @@ class StudentChangeRequestController extends SchoolAdminController
 
     public function approve(Request $request, string $tenantId, StudentEditChangeRequest $changeRequest, StudentEditChangeService $service)
     {
-        abort_unless($this->canReview(), 403);
+        abort_unless($this->canReview(), 403, 'You don\'t have permission to review change requests.');
         abort_if($changeRequest->school_id !== $this->school->id, 403);
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);
@@ -43,7 +43,7 @@ class StudentChangeRequestController extends SchoolAdminController
 
     public function reject(Request $request, string $tenantId, StudentEditChangeRequest $changeRequest, StudentEditChangeService $service)
     {
-        abort_unless($this->canReview(), 403);
+        abort_unless($this->canReview(), 403, 'You don\'t have permission to review change requests.');
         abort_if($changeRequest->school_id !== $this->school->id, 403);
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);

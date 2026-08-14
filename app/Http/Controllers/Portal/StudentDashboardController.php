@@ -261,7 +261,7 @@ class StudentDashboardController extends Controller
                         'exam'             => $exam->only('id', 'title'),
                         'lifecycle_status' => \App\Support\Mcq\McqRegistrationStatusPresenter::forRegistration($reg, $exam),
                         'show_results'     => (bool) $exam->results_published,
-                        'show_hall_ticket' => (bool) $reg->hall_ticket_no,
+                        'show_hall_ticket' => (bool) $exam->hall_tickets_published && (bool) $reg->hall_ticket_no,
                         'show_certificate' => (bool) $exam->results_published
                             && $reg->status === 'submitted'
                             && $reg->attendance_status !== 'absent'

@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\OfficeBearers;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
+use App\Models\WebsiteSite;
 
 /**
  * Per-tenant branding: names, contact, theme palette, and personalized copy.
@@ -420,7 +421,9 @@ class SahodayaTenantBranding
     {
         $fresh = collect(self::homepageSections($tenant))->keyBy(fn ($s) => $s['section_type'].':'.$s['variant']);
 
-        foreach ($tenant->sections()->get() as $section) {
+        $primarySite = WebsiteSite::ensurePrimary($tenant->id);
+
+        foreach ($primarySite->sectionQuery()->get() as $section) {
             $key = $section->section_type.':'.$section->variant;
             if ($fresh->has($key)) {
                 $section->update(['config' => $fresh[$key]['config']]);

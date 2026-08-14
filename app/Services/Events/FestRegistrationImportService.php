@@ -65,6 +65,34 @@ class FestRegistrationImportService
         $limitService = new FestParticipationLimitService($event);
         $eligibilityService = app(FestRegistrationEligibilityService::class);
 
+        // Previously looked up one Student/Teacher row per reg_no, individually, inside
+        // the loop below — a school importing a few hundred rows ran a few hundred
+        // individual lookup queries. Batch-fetch every reg_no referenced anywhere in
+        // this import once, up front, keyed by reg_no so the loop below is an in-memory
+        // lookup instead. Duplicate-reg_no-across-groups (e.g. the same student on a
+        // performer row in one group and a standby row in another) is naturally
+        // deduped by array_unique() before the query, and the keyed map handles being
+        // read multiple times identically to the old per-row query.
+        $allRegNos = [];
+        foreach ($grouped as $group) {
+            foreach ($group['rows'] as $entry) {
+                $allRegNos[] = $entry['reg_no'];
+            }
+        }
+        $allRegNos = array_values(array_unique($allRegNos));
+
+        if ($isTeacherFest) {
+            $teachersByRegNo = Teacher::where('tenant_id', $school->id)
+                ->whereIn('reg_no', $allRegNos)
+                ->get()
+                ->keyBy('reg_no');
+        } else {
+            $studentsByRegNo = Student::where('tenant_id', $school->id)
+                ->whereIn('reg_no', $allRegNos)
+                ->get()
+                ->keyBy('reg_no');
+        }
+
         foreach ($grouped as $group) {
             $item = $group['item'];
             $performers = [];
@@ -81,7 +109,7 @@ class FestRegistrationImportService
             if ($isTeacherFest) {
                 $teacherIds = [];
                 foreach ($performers as $regNo) {
-                    $teacher = Teacher::where('tenant_id', $school->id)->where('reg_no', $regNo)->first();
+                    $teacher = $teachersByRegNo->get($regNo);
                     if (! $teacher) {
                         $errors[] = "Teacher reg_no {$regNo} not found.";
                         $skipped++;
@@ -133,7 +161,7 @@ class FestRegistrationImportService
 
             $performerIds = [];
             foreach ($performers as $regNo) {
-                $student = Student::where('tenant_id', $school->id)->where('reg_no', $regNo)->first();
+                $student = $studentsByRegNo->get($regNo);
                 if (! $student) {
                     $errors[] = "Student reg_no {$regNo} not found.";
                     $skipped++;
@@ -145,7 +173,7 @@ class FestRegistrationImportService
 
             $standbyIds = [];
             foreach ($standbys as $regNo) {
-                $student = Student::where('tenant_id', $school->id)->where('reg_no', $regNo)->first();
+                $student = $studentsByRegNo->get($regNo);
                 if (! $student) {
                     $errors[] = "Standby reg_no {$regNo} not found.";
                     $skipped++;

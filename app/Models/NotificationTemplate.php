@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class NotificationTemplate extends Model
 {
@@ -12,6 +13,17 @@ class NotificationTemplate extends Model
         'is_active' => 'boolean',
         'channels_json' => 'array',
     ];
+
+    /**
+     * Flush NotificationService::cachedTemplate()'s cache entry whenever a template is
+     * edited or removed, so admin changes (including deactivating one) take effect
+     * immediately instead of waiting out that cache's TTL.
+     */
+    protected static function booted(): void
+    {
+        static::saved(fn (self $template) => Cache::forget("notif_template:{$template->slug}"));
+        static::deleted(fn (self $template) => Cache::forget("notif_template:{$template->slug}"));
+    }
 
     /**
      * Resolve a template's title/body by slug with {{variable}} substitution,

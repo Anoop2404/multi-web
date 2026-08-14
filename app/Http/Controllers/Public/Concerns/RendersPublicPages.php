@@ -45,6 +45,33 @@ trait RendersPublicPages
     {
         $layout = $this->layoutData($tenant);
         $widgets = $layout['widgets'] ?? [];
+        $experience = $extra['experience'] ?? [];
+        $policy = $experience['widget_policy'] ?? [];
+        $design = $experience['design'] ?? [];
+
+        if (($experience['experience_version'] ?? 'v1') === 'v2') {
+            $navVariants = ['directory' => 'logo-left', 'event' => 'dark', 'editorial' => 'centered-below', 'institutional' => 'cksc-pill'];
+            $footerVariants = ['directory' => 'four-column', 'event' => 'minimal-single-row', 'editorial' => 'two-column-logo', 'institutional' => 'three-column'];
+            if (isset($navVariants[$design['navigation'] ?? ''])) {
+                $layout['navConfig']['layout_variant'] = $navVariants[$design['navigation']];
+                $layout['navConfig']['style'] = $navVariants[$design['navigation']];
+            }
+            if (isset($footerVariants[$design['footer'] ?? ''])) {
+                $layout['footerConfig']['layout_variant'] = $footerVariants[$design['footer']];
+            }
+        }
+
+        foreach ($policy as $widget => $enabled) {
+            if ($enabled === false) {
+                if (isset($widgets[$widget]) && is_array($widgets[$widget])) {
+                    $widgets[$widget]['show'] = false;
+                    $widgets[$widget]['active'] = false;
+                } else {
+                    $widgets[$widget] = ['show' => false, 'active' => false];
+                }
+            }
+        }
+        $layout['widgets'] = $widgets;
 
         if ($widgets['visitor_counter']['active'] ?? false) {
             $count = TenantCache::store()->increment("tenant:{$tenant->id}:visitors");
@@ -54,7 +81,7 @@ trait RendersPublicPages
 
         return response()->view($view, array_merge($layout, $extra, [
             'tenant'      => $tenant,
-            'tenantTheme' => $layout['theme'],
+            'tenantTheme' => array_merge($layout['theme'] ?? [], $experience['design'] ?? []),
         ]));
     }
 }

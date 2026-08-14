@@ -7,6 +7,7 @@ use App\Models\NotificationTemplate;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Mail\SahodayaMailer;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -32,7 +33,10 @@ class NotificationService
             ]);
 
             if (config('erp.fcm_in_app_only', true)) {
-                app(FcmPushService::class)->sendToUser($user, $title, $body, $actionUrl);
+                // Queued instead of an inline sendToUser() call — see
+                // App\Jobs\SendFcmPushJob for why (blocking curl call per device
+                // token, invoked from per-recipient notify loops elsewhere).
+                \App\Jobs\SendFcmPushJob::dispatch($user->id, $title, $body, $actionUrl);
             }
         }
 
@@ -50,7 +54,7 @@ class NotificationService
 
     public function notifyFromTemplate(User $user, string $slug, array $replacements = [], ?string $actionUrl = null): ?InAppNotification
     {
-        $template = NotificationTemplate::where('slug', $slug)->where('is_active', true)->first();
+        $template = $this->cachedTemplate($slug);
 
         $title = $template?->title;
         $body = $template?->body_template;
@@ -73,6 +77,26 @@ class NotificationService
         }
 
         return $this->notify($user, $title, $body, $actionUrl, $template?->channels_json ?? ['in_app'], $slug);
+    }
+
+    /**
+     * notifyFromTemplate() is routinely called inside per-recipient loops (bulk admin
+     * notify, board-result certification, student-edit notifications, schedule
+     * reminders) where the same slug is looked up once per recipient even though the
+     * template is static for the duration of that loop. A short-TTL cache removes the
+     * redundant query without needing every call site to be rewritten to resolve the
+     * template once themselves. NotificationTemplate flushes this key on save/delete
+     * (see NotificationTemplate::booted()), so admin edits take effect immediately
+     * rather than waiting out the TTL; the TTL is just a safety net for any path that
+     * bypasses the model (e.g. a raw DB update).
+     */
+    private function cachedTemplate(string $slug): ?NotificationTemplate
+    {
+        return Cache::remember(
+            "notif_template:{$slug}",
+            300,
+            fn () => NotificationTemplate::where('slug', $slug)->where('is_active', true)->first(),
+        );
     }
 
     private function fallbackTemplate(string $slug): ?array

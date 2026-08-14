@@ -21,9 +21,17 @@ class FestEventFeesController extends SahodayaAdminController
         $schedule = $feeService->resolveSchedule($event);
         $feeOwnerEvent = $feeService->feeOwnerEvent($event);
 
+        // Previously recalculated every registered school's fee unconditionally on
+        // every view of this dashboard. Fee schedule changes now trigger their own
+        // eager recalculation (FestEventSettingsController::updateFeeSettings()/
+        // updateItemFee() -> RecalculateEventSchoolFeesJob), and registration
+        // create/withdraw/approve already call recalculate() directly — so only
+        // schools with no fee row at all (never computed) need it run here.
+        $schoolIdsWithFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)->pluck('school_id');
         FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->distinct()
             ->pluck('school_id')
+            ->diff($schoolIdsWithFees)
             ->each(fn (string $schoolId) => $feeService->recalculate($event, $schoolId));
 
         $schoolFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)

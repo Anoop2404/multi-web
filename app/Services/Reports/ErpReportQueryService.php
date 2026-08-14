@@ -414,19 +414,48 @@ class ErpReportQueryService
     {
         $schoolIds = $this->schoolIds($sahodayaId);
 
-        return Student::whereIn('tenant_id', $schoolIds)
+        // Previously fetched every student with an admission number (the overwhelming
+        // majority of a Sahodaya's full roster) into PHP just to group and discard
+        // everything that wasn't a duplicate. Find the duplicate (tenant_id,
+        // admission_number) pairs at the DB level first — a GROUP BY ... HAVING that
+        // returns only actual duplicates, typically a handful of rows regardless of
+        // how large the school roster is — then fetch just those specific students.
+        $duplicateKeys = Student::whereIn('tenant_id', $schoolIds)
             ->whereNotNull('admission_number')
             ->where('admission_number', '!=', '')
+            ->selectRaw('tenant_id, admission_number, count(*) as cnt')
+            ->groupBy('tenant_id', 'admission_number')
+            ->having('cnt', '>', 1)
+            ->get();
+
+        if ($duplicateKeys->isEmpty()) {
+            return collect();
+        }
+
+        $students = Student::whereIn('tenant_id', $schoolIds)
+            ->where(function ($q) use ($duplicateKeys) {
+                foreach ($duplicateKeys as $key) {
+                    $q->orWhere(function ($q2) use ($key) {
+                        $q2->where('tenant_id', $key->tenant_id)
+                            ->where('admission_number', $key->admission_number);
+                    });
+                }
+            })
             ->with('tenant:id,name')
             ->get()
-            ->groupBy(fn (Student $s) => $s->tenant_id.'|'.$s->admission_number)
-            ->filter(fn ($group) => $group->count() > 1)
-            ->map(fn ($group, $key) => [
-                'school'           => $group->first()->tenant?->name,
-                'admission_number' => explode('|', $key)[1] ?? '',
-                'count'            => $group->count(),
-                'students'         => $group->pluck('name')->join(', '),
-            ])
+            ->groupBy(fn (Student $s) => $s->tenant_id.'|'.$s->admission_number);
+
+        return $duplicateKeys
+            ->map(function ($key) use ($students) {
+                $group = $students->get($key->tenant_id.'|'.$key->admission_number, collect());
+
+                return [
+                    'school'           => $group->first()?->tenant?->name,
+                    'admission_number' => $key->admission_number,
+                    'count'            => (int) $key->cnt,
+                    'students'         => $group->pluck('name')->join(', '),
+                ];
+            })
             ->values();
     }
 

@@ -22,12 +22,19 @@
                     <p class="text-xs text-gray-400 mt-1">Results published on {{ \Carbon\Carbon::parse($publishedAt)->format('d M Y, g:i A') }}</p>
                 @endif
             </div>
-            <a href="{{ route('tenant.fest.scoreboard', $event->id) }}" class="text-sm font-semibold text-amber-700 hover:underline">Scoreboard →</a>
+            <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}" class="text-sm font-semibold text-amber-700 hover:underline">Scoreboard →</a>
         </div>
+
+        @include('public.fest.partials.scope-nav', [
+            'routeName' => 'tenant.fest.results',
+            'routeQuery' => ['tab' => $tab],
+        ])
+
+        <p class="text-sm font-semibold text-gray-600 mb-4">{{ $selectedScope['label'] }}</p>
 
         <nav class="flex flex-wrap gap-2 mb-8">
             @foreach($tabs as $key => $label)
-                <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => $key]) }}"
+                <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'scope' => $selectedScope['key'], 'tab' => $key]) }}"
                    class="px-4 py-2 rounded-full text-sm border {{ $tab === $key ? 'bg-amber-500 text-white border-amber-500' : 'bg-white hover:border-amber-400' }}">
                     {{ $label }}
                 </a>

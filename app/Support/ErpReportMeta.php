@@ -391,8 +391,8 @@ class ErpReportMeta
             'RPT-BRD-001' => ['columns' => ['school', 'class', 'examination_type', 'academic_year', 'appeared', 'passed', 'pass_percent', 'distinctions', 'highest_mark', 'status'], 'filters' => ['academic_year', 'class']],
             'RPT-BRD-002' => ['columns' => ['rank', 'school', 'class', 'examination_type', 'score', 'pass_percent', 'scope'], 'filters' => ['academic_year', 'class']],
             'RPT-BRD-003' => ['columns' => ['school', 'class', 'examination_type', 'academic_year', 'pass_percent', 'appeared', 'passed'], 'filters' => ['academic_year', 'class']],
-            'RPT-BRD-004' => ['columns' => ['rank', 'student', 'school', 'admission_no', 'roll_no', 'percentage', 'marks_obtained', 'total_marks'], 'filters' => ['academic_year']],
-            'RPT-BRD-005' => ['columns' => ['stream', 'rank', 'student', 'school', 'percentage', 'admission_no', 'roll_no'], 'filters' => ['academic_year']],
+            'RPT-BRD-004' => ['columns' => ['sl_no', 'student', 'school', 'admission_no', 'roll_no', 'percentage', 'marks_obtained', 'total_marks'], 'filters' => ['academic_year']],
+            'RPT-BRD-005' => ['columns' => ['stream', 'sl_no', 'student', 'school', 'percentage', 'admission_no', 'roll_no'], 'filters' => ['academic_year']],
 
             // Email
             'RPT-EML-001' => ['columns' => ['recipient', 'template_key', 'status', 'sent_at', 'error'], 'filters' => ['from', 'to']],

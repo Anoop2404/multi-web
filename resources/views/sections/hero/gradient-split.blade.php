@@ -23,8 +23,8 @@
                 {{ $config['heading'] ?? $tenant->name }}
             </h1>
 
-            @if(!empty($config['tagline']))
-            <p class="text-lg sm:text-xl text-white/80 max-w-lg leading-relaxed">{{ $config['tagline'] }}</p>
+            @if(!empty($config['tagline'] ?? $config['subheading'] ?? null))
+            <p class="text-lg sm:text-xl text-white/80 max-w-lg leading-relaxed">{{ $config['tagline'] ?? $config['subheading'] }}</p>
             @endif
 
             @if(!empty($config['motto']))
@@ -34,18 +34,18 @@
             @endif
 
             <div class="flex flex-wrap gap-3 pt-2">
-                @if(!empty($config['cta_label']) && !empty($config['cta_url']))
-                <a href="{{ $config['cta_url'] }}"
+                @if(!empty($config['cta_label'] ?? $config['primary_label'] ?? null) && !empty($config['cta_url'] ?? $config['primary_url'] ?? null))
+                <a href="{{ $config['cta_url'] ?? $config['primary_url'] }}"
                    class="inline-flex items-center gap-2 bg-white font-bold px-6 py-3 rounded-full text-sm shadow-lg hover:shadow-xl hover:scale-105 transition-all"
                    style="color: var(--color-primary)">
-                    {{ $config['cta_label'] }}
+                    {{ $config['cta_label'] ?? $config['primary_label'] }}
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                 </a>
                 @endif
-                @if(!empty($config['secondary_cta_label']) && !empty($config['secondary_cta_url']))
-                <a href="{{ $config['secondary_cta_url'] }}"
+                @if(!empty($config['secondary_cta_label'] ?? $config['secondary_label'] ?? null) && !empty($config['secondary_cta_url'] ?? $config['secondary_url'] ?? null))
+                <a href="{{ $config['secondary_cta_url'] ?? $config['secondary_url'] }}"
                    class="inline-flex items-center gap-2 border-2 border-white/50 text-white font-semibold px-6 py-3 rounded-full text-sm hover:bg-white/10 transition">
-                    {{ $config['secondary_cta_label'] }}
+                    {{ $config['secondary_cta_label'] ?? $config['secondary_label'] }}
                 </a>
                 @endif
             </div>

@@ -6,6 +6,7 @@
         accent="emerald"
         :nav-items="navItems"
     >
+        <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
         <div class="card card--flush">
             <form @submit.prevent="importCsv" class="p-4 border-b border-slate-100 flex flex-wrap gap-3 items-end">
                 <div>
@@ -73,9 +74,11 @@ import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
+import InlineAlert from '@/Components/ui/InlineAlert.vue';
 
 const props = defineProps({ sahodaya: Object, exam: Object, registrations: Object, isTrustedReviewer: { type: Boolean, default: false } });
 const csvFile = ref(null);
+const alertMessage = ref('');
 const forms = reactive({});
 for (const r of props.registrations.data ?? []) {
     forms[r.id] = { attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' };
@@ -85,7 +88,7 @@ function save(r) {
     const status = forms[r.id].attendance_status;
     if (status === 'pending') return;
     if (['malpractice', 'withheld'].includes(status) && !forms[r.id].attendance_note?.trim()) {
-        alert('A reason/note is required when marking malpractice or withheld.');
+        alertMessage.value = 'A reason/note is required when marking malpractice or withheld.';
         return;
     }
     router.post(`/portal/exam/${props.sahodaya.id}/exams/${props.exam.id}/attendance`, {

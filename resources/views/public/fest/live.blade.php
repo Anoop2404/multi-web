@@ -1,10 +1,21 @@
 @extends('layouts.public')
 
 @section('content')
-<section class="py-12 px-4 bg-slate-950 text-white min-h-screen" id="fest-live-root" data-live-url="{{ route('tenant.fest.live.data', $event->id) }}">
+<section class="py-12 px-4 bg-slate-950 text-white min-h-screen" id="fest-live-root" data-live-url="{{ route('tenant.fest.live.data', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}">
     <div class="max-w-3xl mx-auto">
         <p class="text-amber-400 text-xs uppercase tracking-widest text-center">Live</p>
         <h1 class="text-3xl font-bold text-center mt-1">{{ $event->title }}</h1>
+        @if(count($scopes ?? []) > 1)
+        <nav class="flex flex-wrap justify-center gap-2 mt-5" aria-label="Event scope">
+            @foreach($scopes as $scopeOption)
+            <a href="{{ route('tenant.fest.live', ['event' => $event->id, 'scope' => $scopeOption['key']]) }}"
+               @if($selectedScope['key'] === $scopeOption['key']) aria-current="page" @endif
+               class="px-3 py-1.5 rounded-full text-xs border {{ $selectedScope['key'] === $scopeOption['key'] ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-white/5 text-white border-white/20 hover:border-amber-400' }}">
+                {{ $scopeOption['label'] }}
+            </a>
+            @endforeach
+        </nav>
+        @endif
         <p id="live-refresh-badge" class="text-center text-[10px] text-white/40 mt-2">Auto-refreshing every 30s</p>
         <div id="now-performing" class="mt-6 p-4 bg-white/10 rounded-xl text-center text-sm @if(!$nowPerforming) hidden @endif">
             @if($nowPerforming)
@@ -17,7 +28,7 @@
             @endif
             @endif
         </div>
-        <h2 class="font-semibold mt-10 mb-3">School Standings</h2>
+        <h2 class="font-semibold mt-10 mb-3">{{ $selectedScope['label'] }} School Standings</h2>
         <ol id="school-scoreboard" class="space-y-2">
             @forelse($scoreboard as $row)
             <li class="flex justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3">
@@ -25,7 +36,7 @@
                 <span class="font-mono">{{ $row['total_points'] }}</span>
             </li>
             @empty
-            <li class="text-white/40 text-center py-6">No scores yet</li>
+            <li class="text-white/40 text-center py-6">{{ $standingsPublished ? 'No scores yet' : 'Official standings are not published yet' }}</li>
             @endforelse
         </ol>
         @if(count($houseScoreboard))
@@ -72,7 +83,7 @@
         @endif
         <p class="mt-8 text-center space-x-4">
             <a href="{{ route('tenant.fest.records', $event->id) }}" class="text-amber-400 text-sm">All records →</a>
-            <a href="{{ route('tenant.fest.show', $event->id) }}" class="text-amber-400 text-sm">← Festival hub</a>
+            <a href="{{ route('tenant.fest.show', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}" class="text-amber-400 text-sm">← Festival hub</a>
         </p>
     </div>
 </section>
@@ -83,11 +94,11 @@
     const url = root.dataset.liveUrl;
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-    function renderSchool(rows) {
+    function renderSchool(rows, published) {
         const el = document.getElementById('school-scoreboard');
         if (!el) return;
         if (!rows.length) {
-            el.innerHTML = '<li class="text-white/40 text-center py-6">No scores yet</li>';
+            el.innerHTML = `<li class="text-white/40 text-center py-6">${published ? 'No scores yet' : 'Official standings are not published yet'}</li>`;
             return;
         }
         el.innerHTML = rows.map(r => `<li class="flex justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3">
@@ -119,7 +130,7 @@
             const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
             if (!res.ok) return;
             const data = await res.json();
-            renderSchool(data.scoreboard || []);
+            renderSchool(data.scoreboard || [], Boolean(data.standingsPublished));
             renderHouse(data.houseScoreboard || []);
             renderNow(data.nowPerforming);
             const badge = document.getElementById('live-refresh-badge');

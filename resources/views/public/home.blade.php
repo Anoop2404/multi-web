@@ -7,7 +7,18 @@
             [$sectionType, $variant] = SectionVariantResolver::path($section->section_type, $section->variant);
             $anchor = str_replace('_', '-', $section->section_type);
         @endphp
-        <div id="{{ $anchor }}" class="scroll-mt-24">
+        @php
+            $layout = !empty($previewMode) ? ($section->layout_json ?? []) : $section->publicLayout();
+            $frameClasses = collect([
+                'site-section-frame',
+                'site-section-width-'.($layout['width'] ?? 'standard'),
+                'site-section-spacing-'.($layout['spacing'] ?? 'standard'),
+                'site-section-surface-'.($layout['surface'] ?? 'canvas'),
+                'site-section-heading-'.($layout['heading_alignment'] ?? 'left'),
+                'site-section-media-'.($layout['media_treatment'] ?? 'natural'),
+            ])->implode(' ');
+        @endphp
+        <div id="{{ $anchor }}" class="{{ $frameClasses }} scroll-mt-24" data-section-type="{{ $section->section_type }}">
         @includeIf("sections.{$sectionType}.{$variant}", [
             'config'  => (!empty($previewMode) ? ($section->config ?? []) : $section->publicConfig()),
             'section' => $section,

@@ -4,6 +4,8 @@
         <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Mark hall attendance before entering scores." />
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="attendance" />
 
+        <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
+
         <a v-if="pendingCorrectionsCount" :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance-corrections`"
            class="card !py-3 mb-4 flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-800 text-sm">
             <span>{{ pendingCorrectionsCount }} attendance correction request(s) awaiting your approval.</span>
@@ -100,6 +102,9 @@ import { computed, reactive, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import InlineAlert from '@/Components/ui/InlineAlert.vue';
+
+const alertMessage = ref('');
 
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, summary: Object, pendingCorrectionsCount: { type: Number, default: 0 } });
 const searchQuery = ref('');
@@ -137,7 +142,7 @@ function save(r) {
     const status = forms[r.id].attendance_status;
     if (status === 'pending') return;
     if (['malpractice', 'withheld'].includes(status) && !forms[r.id].attendance_note?.trim()) {
-        alert('A reason/note is required when marking malpractice or withheld.');
+        alertMessage.value = 'A reason/note is required when marking malpractice or withheld.';
         return;
     }
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/attendance`, {

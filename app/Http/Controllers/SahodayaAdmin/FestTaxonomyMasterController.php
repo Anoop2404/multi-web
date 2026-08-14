@@ -35,7 +35,7 @@ class FestTaxonomyMasterController extends SahodayaAdminController
     public function store(Request $request)
     {
         $dimension = $request->input('dimension', 'sport_discipline');
-        abort_unless(array_key_exists($dimension, FestTaxonomyMaster::DIMENSIONS), 422);
+        abort_unless(array_key_exists($dimension, FestTaxonomyMaster::DIMENSIONS), 422, 'Unknown taxonomy dimension.');
 
         $data = $request->validate([
             'dimension'  => ['required', Rule::in(array_keys(FestTaxonomyMaster::DIMENSIONS))],
@@ -95,7 +95,7 @@ class FestTaxonomyMasterController extends SahodayaAdminController
     public function resetDefaults(Request $request, FestTaxonomyRegistry $registry)
     {
         $dimension = $request->input('dimension');
-        abort_unless($dimension && array_key_exists($dimension, FestTaxonomyMaster::DIMENSIONS), 422);
+        abort_unless($dimension && array_key_exists($dimension, FestTaxonomyMaster::DIMENSIONS), 422, 'Unknown taxonomy dimension.');
 
         FestTaxonomyMaster::where('tenant_id', $this->sahodaya->id)
             ->where('dimension', $dimension)

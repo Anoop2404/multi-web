@@ -10,6 +10,7 @@
                     Manage Class X (AISSE) &amp; Class XII (AISSCE) board results, upload proof documents, and submit for Sahodaya verification.
                 </p>
             </div>
+            <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" class="w-full mt-3" />
 
             <div class="flex items-center gap-3 self-start md:self-auto print:hidden">
                 <button
@@ -506,6 +507,9 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+import InlineAlert from '@/Components/ui/InlineAlert.vue';
+
+const alertMessage = ref('');
 
 const props = defineProps({
     school: Object,
@@ -853,7 +857,7 @@ function saveSubjectTopper() {
     if (!finalSubject || !subjectForm.value.name || subjectForm.value.marks === '') return;
 
     if (!props.activeResult) {
-        alert('Please click "Save Draft" first to initialize this board result before adding subject toppers.');
+        alertMessage.value = 'Please click \"Save Draft\" first to initialize this board result before adding subject toppers.';
         return;
     }
 

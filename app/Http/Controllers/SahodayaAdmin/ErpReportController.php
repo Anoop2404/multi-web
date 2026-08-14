@@ -11,7 +11,7 @@ class ErpReportController extends SahodayaAdminController
     public function show(string $tenantId, string $reportId, Request $request, ReportRunner $runner, ReportFilterOptionsService $filterOptions)
     {
         abort_unless($runner->isRunnable($reportId), 404);
-        abort_unless($runner->authorize($request->user(), $reportId), 403);
+        abort_unless($runner->authorize($request->user(), $reportId), 403, 'You don\'t have permission to view this report.');
 
         $definition = $runner->find($this->sahodaya->id, $reportId);
         abort_if(! $definition, 404);
@@ -39,7 +39,7 @@ class ErpReportController extends SahodayaAdminController
     public function export(string $tenantId, string $reportId, Request $request, ReportRunner $runner)
     {
         abort_unless($runner->isRunnable($reportId), 404);
-        abort_unless($runner->authorize($request->user(), $reportId), 403);
+        abort_unless($runner->authorize($request->user(), $reportId), 403, 'You don\'t have permission to export this report.');
 
         $filters = $this->validatedFilters($request, $runner, $reportId);
         $filters = $this->withCurrentUserFilter($request, $reportId, $filters);

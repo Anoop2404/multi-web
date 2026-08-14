@@ -28,6 +28,8 @@ class SiteSection extends Model
         'published_at',
         'updated_by',
         'archived_configs',
+        'layout_json',
+        'published_layout_json',
     ];
 
     protected $casts = [
@@ -35,6 +37,8 @@ class SiteSection extends Model
         'config' => 'array',
         'published_config' => 'array',
         'archived_configs' => 'array',
+        'layout_json' => 'array',
+        'published_layout_json' => 'array',
         'display_order' => 'integer',
         'published_at' => 'datetime',
     ];
@@ -59,6 +63,7 @@ class SiteSection extends Model
         $history[] = [
             'variant' => $this->variant,
             'config' => $this->config,
+            'layout_json' => $this->layout_json,
             'archived_at' => now()->toIso8601String(),
         ];
 
@@ -99,6 +104,7 @@ class SiteSection extends Model
     public function publish(?int $userId = null): void
     {
         $this->published_config = $this->config;
+        $this->published_layout_json = $this->layout_json;
         $this->status = self::STATUS_PUBLISHED;
         $this->published_at = now();
         $this->updated_by = $userId ?? auth()->id();
@@ -117,13 +123,19 @@ class SiteSection extends Model
         return $this->config ?? [];
     }
 
+    public function publicLayout(): array
+    {
+        return $this->published_layout_json ?? $this->layout_json ?? [];
+    }
+
     public function hasUnpublishedChanges(): bool
     {
         if ($this->status === self::STATUS_DRAFT) {
             return true;
         }
 
-        return json_encode($this->config ?? []) !== json_encode($this->published_config ?? []);
+        return json_encode($this->config ?? []) !== json_encode($this->published_config ?? [])
+            || json_encode($this->layout_json ?? []) !== json_encode($this->published_layout_json ?? []);
     }
 
     public function tenant()
@@ -140,7 +152,10 @@ class SiteSection extends Model
     {
         return $query->where(function ($q) {
             $q->where('status', self::STATUS_PUBLISHED)
-                ->orWhereNull('status');
+                ->orWhereNull('status')
+                // A published section remains live from its immutable snapshot
+                // while newer config/layout edits are still in draft.
+                ->orWhereNotNull('published_config');
         });
     }
 

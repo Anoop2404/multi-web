@@ -154,10 +154,21 @@ class FestItemResultsService
         ])->values()->all();
     }
 
-    public function assertCanPublish(FestEventItem $item): void
+    /**
+     * @param  ?list<array<string, mixed>>  $summaries  Pre-fetched itemSummaries() output for
+     *                                                    the item's event, to avoid recomputing
+     *                                                    the full-event aggregate on every call
+     *                                                    when checking many items in a loop (see
+     *                                                    FestResultsController::bulkPublishItems()).
+     *                                                    Defaults to null, which recomputes
+     *                                                    exactly as before — existing single-item
+     *                                                    callers are unaffected.
+     */
+    public function assertCanPublish(FestEventItem $item, ?array $summaries = null): void
     {
         $event = $item->event ?? FestEvent::findOrFail($item->event_id);
-        $summary = collect($this->itemSummaries($event))->firstWhere('item_id', $item->id);
+        $summaries ??= $this->itemSummaries($event);
+        $summary = collect($summaries)->firstWhere('item_id', $item->id);
 
         abort_unless($summary, 404, 'Item not found.');
         abort_if($summary['results_published'] ?? false, 422, 'Results for this item are already published.');
@@ -173,9 +184,25 @@ class FestItemResultsService
         );
     }
 
-    public function publishItem(FestEventItem $item): void
+    /**
+     * @param  ?list<array<string, mixed>>  $summaries  See assertCanPublish() — pass a
+     *                                                    precomputed itemSummaries() result when
+     *                                                    publishing many items from the same event
+     *                                                    in one request to avoid an O(items) blowup
+     *                                                    of full-event aggregate queries. Note: the
+     *                                                    snapshot is taken once before the loop, so
+     *                                                    if two items being bulk-published share the
+     *                                                    same inherited/root item group, the second
+     *                                                    won't see the first's just-published state
+     *                                                    in this same request — it will re-run an
+     *                                                    idempotent UPDATE instead of hitting the
+     *                                                    "already published" guard. No data
+     *                                                    inconsistency results, just a skipped
+     *                                                    validation message in that rare case.
+     */
+    public function publishItem(FestEventItem $item, ?array $summaries = null): void
     {
-        $this->assertCanPublish($item);
+        $this->assertCanPublish($item, $summaries);
         $event = $item->event ?? FestEvent::findOrFail($item->event_id);
         $itemIds = $event->reportableItemIds([$item->id]);
 

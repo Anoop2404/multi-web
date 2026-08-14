@@ -59,7 +59,7 @@ class StorageMigrationController extends Controller
     public function progress(Request $request)
     {
         $key = $request->string('key')->toString();
-        abort_if($key === '', 422);
+        abort_if($key === '', 422, 'A storage key is required.');
 
         return response()->json(Cache::get($key, ['status' => 'unknown']));
     }

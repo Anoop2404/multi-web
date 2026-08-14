@@ -25,7 +25,7 @@ class SetupWizardController extends SahodayaAdminController
 
     public function complete(SahodayaSetupService $setup)
     {
-        abort_if($this->isStaff, 403);
+        abort_if($this->isStaff, 403, 'Only Sahodaya admins can complete setup.');
 
         if (! $setup->isComplete($this->sahodaya)) {
             return back()->withErrors(['setup' => 'Complete all required steps before finishing setup.']);
@@ -39,7 +39,7 @@ class SetupWizardController extends SahodayaAdminController
 
     public function dismiss(SahodayaSetupService $setup)
     {
-        abort_if($this->isStaff, 403);
+        abort_if($this->isStaff, 403, 'Only Sahodaya admins can dismiss setup.');
 
         $setup->dismiss($this->sahodaya);
 

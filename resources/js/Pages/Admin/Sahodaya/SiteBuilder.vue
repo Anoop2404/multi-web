@@ -5,8 +5,35 @@
                          :pendingPaymentsCount="pendingPaymentsCount"
                          :show-header-title="false">
         <PageHeader title="Website builder" eyebrow="Website"
-                    description="Design homepage sections, navigation, theme colours, and apply the CKSC-style template." />
+                    description="Manage each public website independently without changing another site's sections." />
         <div class="space-y-5 max-w-5xl">
+
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-end justify-between gap-4">
+                <div class="min-w-[240px] flex-1">
+                    <label for="website-site-selector" class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                        Editing website
+                    </label>
+                    <select id="website-site-selector" :value="currentSite?.id" @change="switchSite($event.target.value)"
+                            class="w-full max-w-lg border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                        <option v-for="site in sites" :key="site.id" :value="site.id">
+                            {{ site.name }}{{ site.is_primary ? ' — Primary website' : ' — Microsite' }}
+                        </option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-2">
+                        Sections, experience and V2 design belong to this website. Navigation links and footer contact content remain shared by this Sahodaya.
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold px-2.5 py-1 rounded-full"
+                          :class="currentSite?.is_primary ? 'bg-purple-50 text-purple-700' : 'bg-sky-50 text-sky-700'">
+                        {{ currentSite?.is_primary ? 'Primary' : 'Microsite' }}
+                    </span>
+                    <a v-if="selectedPublicUrl" :href="selectedPublicUrl" target="_blank"
+                       class="text-sm font-semibold text-purple-700 hover:text-purple-900">
+                        View published ↗
+                    </a>
+                </div>
+            </div>
 
             <!-- Public website toggle -->
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
@@ -32,20 +59,9 @@
                 </label>
             </div>
 
-            <!-- Website template (layout from CKSC reference, content from this Sahodaya) -->
-            <div class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white border border-white/10"
-                 style="background: linear-gradient(135deg, var(--color-primary, #5b21b6), var(--color-secondary, #7c3aed));">
-                <div>
-                    <h2 class="font-bold">Apply Website Template</h2>
-                    <p class="text-sm text-white/80 mt-1">
-                        Pill menu, hero slider, and homepage sections — personalized with {{ sahodaya.name }} contact details, region, and theme colours.
-                    </p>
-                </div>
-                <button @click="applyCkscTemplate" :disabled="ckscTemplateSaving"
-                        class="px-4 py-2 text-sm font-bold rounded-xl disabled:opacity-50 shrink-0"
-                        style="background: var(--color-accent, #f59e0b); color: #1e1b4b;">
-                    {{ ckscTemplateSaving ? 'Applying…' : 'Apply & personalize' }}
-                </button>
+            <div v-if="experienceDraft" class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white bg-gradient-to-r from-indigo-950 to-purple-800">
+                <div><p class="text-xs font-bold uppercase tracking-wider text-purple-200">Unpublished experience draft</p><h2 class="font-bold mt-1">{{ experienceName(experienceDraft.template_key) }}</h2><p class="text-sm text-white/75 mt-1">The live website is unchanged until you publish this draft.</p></div>
+                <div class="flex flex-wrap gap-2"><a :href="selectedPreviewUrl" target="_blank" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Preview draft ↗</a><button @click="cancelExperienceDraft" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Cancel draft</button><button @click="publishExperienceDraft" :disabled="experienceSaving || !readinessReport.ready" class="px-4 py-2 text-sm font-bold rounded-xl bg-amber-400 text-indigo-950 disabled:opacity-50">Publish experience</button></div>
             </div>
 
             <!-- Tabs -->
@@ -57,10 +73,19 @@
                             : 'text-gray-600 hover:bg-gray-50'">
                     {{ tab.label }}
                 </button>
-                <a v-if="publicUrl" :href="publicUrl" target="_blank"
+                <a v-if="selectedPreviewUrl" :href="selectedPreviewUrl" target="_blank"
                    class="ml-auto self-center text-xs text-purple-600 hover:text-purple-800 font-semibold px-3">
-                    Preview site ↗
+                    Preview draft ↗
                 </a>
+            </div>
+
+            <div v-if="activeTab === 'experience'" class="space-y-5"><div class="flex justify-end"><PreviewToolbar v-if="selectedPreviewUrl" :url="selectedPreviewUrl" /></div><ExperiencePicker :experiences="experiences" :selected-key="selectedExperienceKey" :current-key="currentSite?.template_key" @select="selectedExperienceKey = $event" @apply="applyExperienceDraft" /></div>
+
+            <div v-if="activeTab === 'readiness'" class="space-y-5">
+                <ReadinessPanel :report="readinessReport" />
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center justify-between gap-4"><div><h3 class="font-bold text-gray-950">Publication and rollback</h3><p class="text-sm text-gray-500 mt-1">Publishing a V2 experience stores a complete restore point for the current website.</p></div><div class="flex gap-2"><button @click="refreshReadiness" class="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold">Run checks</button><button v-if="experienceDraft" @click="publishExperienceDraft" :disabled="!readinessReport.ready || experienceSaving" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold disabled:opacity-50">Publish V2 draft</button></div></div>
+                <div v-if="siteVersions.length" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"><h3 class="font-bold text-gray-950 mb-4">Restore points</h3><div class="divide-y divide-gray-100"><div v-for="version in siteVersions" :key="version.id" class="py-3 flex items-center justify-between gap-4"><div><p class="text-sm font-semibold text-gray-800">{{ experienceName(version.template_key) || 'Classic website' }}</p><p class="text-xs text-gray-400">{{ version.action.replace(/_/g, ' ') }} · {{ formatDate(version.created_at) }}</p></div><button @click="restoreSiteVersion(version)" class="text-xs font-bold text-purple-700">Restore</button></div></div></div>
+                <div v-if="currentSite?.is_primary" class="rounded-2xl border border-gray-200 bg-gray-50 p-5 flex flex-wrap items-center justify-between gap-4"><div><h3 class="font-bold text-gray-800">Legacy Confederation Classic</h3><p class="text-sm text-gray-500 mt-1">Kept only for existing sites that still need the original CKSC-compatible layout.</p></div><button @click="applyCkscTemplate" :disabled="ckscTemplateSaving" class="px-4 py-2 text-sm font-bold rounded-xl border border-gray-300 bg-white">{{ ckscTemplateSaving ? 'Applying…' : 'Apply legacy template' }}</button></div>
             </div>
 
             <!-- ── Navigation & Login ─────────────────────────────────────── -->
@@ -218,7 +243,7 @@
             <div v-if="activeTab === 'theme'" class="space-y-5">
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
                     <div>
-                        <h2 class="font-bold text-gray-900">Theme Colours</h2>
+                        <h2 class="font-bold text-gray-900">Design character</h2>
                         <p class="text-sm text-gray-500 mt-1">
                             Controls navbar, buttons, hero gradient, section headings, and footer across your public site.
                         </p>
@@ -313,10 +338,22 @@
                         </div>
                     </div>
 
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-gray-100">
+                        <label class="text-xs font-bold text-gray-600">Type scale<select v-model="designConfig.type_scale" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="compact">Compact</option><option value="balanced">Balanced</option><option value="editorial">Editorial</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Density<select v-model="designConfig.density" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Surface<select v-model="designConfig.surface" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="flat">Flat</option><option value="bordered">Bordered</option><option value="soft">Soft</option><option value="elevated">Elevated</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Corners<select v-model="designConfig.corners" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="square">Square</option><option value="soft">Soft</option><option value="rounded">Rounded</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Buttons<select v-model="designConfig.buttons" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="solid">Solid</option><option value="bordered">Bordered</option><option value="understated">Understated</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Images<select v-model="designConfig.images" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="documentary">Documentary</option><option value="vibrant">Vibrant</option><option value="formal">Formal</option><option value="monochrome">Monochrome</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Motion<select v-model="designConfig.motion" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="none">None</option><option value="restrained">Restrained</option><option value="expressive">Expressive</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Homepage mode<select v-model="designConfig.homepage_mode" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="evergreen">Evergreen</option><option value="registration_open">Registration open</option><option value="event_live">Event live</option><option value="results_published">Results published</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Manual mode expires<input v-model="designConfig.homepage_mode_override_until" type="datetime-local" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><span class="block mt-1 font-normal text-gray-400">Leave blank to follow ERP event status.</span></label>
+                    </div>
+
                     <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
-                        <button @click="saveTheme" :disabled="themeSaving"
+                        <button @click="saveDesign" :disabled="themeSaving"
                                 class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
-                            {{ themeSaving ? 'Saving…' : 'Save Theme Colours' }}
+                            {{ themeSaving ? 'Saving…' : 'Save design' }}
                         </button>
                         <span v-if="themeSaved" class="text-sm text-green-600 font-medium">Saved! Refresh public site to see changes.</span>
                     </div>
@@ -331,9 +368,9 @@
                     <span class="text-xs text-gray-400">{{ sections.length }} total · {{ sections.filter(s => s.is_active).length }} active</span>
                 </div>
                 <div class="flex items-center gap-3">
-                    <a v-if="publicUrl" :href="publicUrl" target="_blank"
+                    <a v-if="selectedPreviewUrl" :href="selectedPreviewUrl" target="_blank"
                        class="text-xs text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-1">
-                        Preview site ↗
+                        Preview draft ↗
                     </a>
                     <button @click="openAddModal"
                             class="flex items-center gap-2 px-4 py-2 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition">
@@ -361,7 +398,7 @@
                      :class="section.is_active ? 'border-gray-100' : 'border-gray-100 opacity-60'">
 
                     <!-- Card header row -->
-                    <div class="px-5 py-4 flex items-center gap-4">
+                    <div class="px-5 py-4 flex items-center gap-4" draggable="true" @dragstart="dragIndex = idx" @dragover.prevent @drop="dropSection(idx)" @dragend="dragIndex = null">
                         <!-- Reorder handles -->
                         <div class="flex flex-col gap-0.5 shrink-0">
                             <button @click="moveUp(idx)" :disabled="idx === 0"
@@ -382,6 +419,7 @@
                                     {{ sectionTypeLabel(section.section_type) }}
                                 </span>
                                 <span class="text-[11px] font-mono bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{{ section.variant }}</span>
+                                <span class="text-[11px] font-semibold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full">{{ sourceBadge(section.section_type) }}</span>
                                 <span v-if="!section.is_active" class="text-[11px] font-semibold bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Hidden</span>
                             </div>
                             <p class="text-xs text-gray-400 truncate">
@@ -444,6 +482,9 @@
                                     </option>
                                 </select>
                             </div>
+                            <div v-if="sectionVersions[section.id]?.length" :class="(section.archived_configs || []).length ? '' : 'ml-auto'">
+                                <select @change="restorePublishedVersion(section, $event.target.value)" class="text-xs border border-gray-200 rounded-xl px-3 py-2 text-gray-500 bg-white"><option value="">Restore saved version…</option><option v-for="version in sectionVersions[section.id]" :key="version.id" :value="version.id">{{ version.note || 'Saved' }} — {{ formatDate(version.created_at) }}</option></select>
+                            </div>
                         </div>
 
                         <!-- Content fields -->
@@ -460,6 +501,8 @@
                             (office bearers, member schools, events, etc.).
                         </div>
 
+                        <SectionLayoutEditor v-model="editLayouts[section.id]" />
+
                         <!-- Save row -->
                         <div class="flex items-center gap-3 pt-2 border-t border-gray-100 flex-wrap">
                             <button @click="saveSection(section)"
@@ -472,6 +515,7 @@
                                     class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
                                 Publish
                             </button>
+                            <button @click="duplicateSection(section)" :disabled="saving[section.id]" class="px-4 py-2.5 border border-gray-200 text-sm text-gray-600 rounded-xl hover:bg-white transition">Duplicate</button>
                             <button @click="expandedId = null"
                                     class="px-4 py-2.5 border border-gray-200 text-sm text-gray-500 rounded-xl hover:bg-gray-50 transition">
                                 Cancel
@@ -480,7 +524,7 @@
                                   class="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg">
                                 Unpublished changes
                             </span>
-                            <a v-if="publicUrl" :href="`${publicUrl.replace(/\/$/, '')}/preview-site`" target="_blank"
+                            <a v-if="selectedPreviewUrl" :href="selectedPreviewUrl" target="_blank"
                                class="ml-auto text-xs text-purple-600 hover:underline font-semibold">
                                 Preview drafts ↗
                             </a>
@@ -562,7 +606,11 @@
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import { ref, reactive, computed, defineComponent, h } from 'vue';
+import { ref, reactive, computed, defineComponent, h, onMounted } from 'vue';
+import ExperiencePicker from '@/Components/sahodaya/website/ExperiencePicker.vue';
+import ReadinessPanel from '@/Components/sahodaya/website/ReadinessPanel.vue';
+import SectionLayoutEditor from '@/Components/sahodaya/website/SectionLayoutEditor.vue';
+import PreviewToolbar from '@/Components/sahodaya/website/PreviewToolbar.vue';
 
 const props = defineProps({
     sahodaya:                Object,
@@ -582,20 +630,29 @@ const props = defineProps({
     navNeedsSetup:           { type: Boolean, default: false },
     themeConfig:             { type: Object, default: () => ({}) },
     themePresets:            { type: Array,  default: () => [] },
+    sites:                   { type: Array,  default: () => [] },
+    currentSite:             { type: Object, default: null },
+    experiences:             { type: Array, default: () => [] },
+    readiness:               { type: Object, default: () => ({ ready: false, errors: [], warnings: [], score: 0 }) },
 });
 
 const tabs = [
-    { id: 'sections', label: 'Page Sections' },
-    { id: 'theme', label: 'Theme Colours' },
+    { id: 'experience', label: 'Experience' },
+    { id: 'sections', label: 'Sections' },
     { id: 'navigation', label: 'Navigation & Login' },
+    { id: 'theme', label: 'Design' },
     { id: 'footer', label: 'Footer Links' },
+    { id: 'readiness', label: 'Readiness & Publish' },
 ];
-const activeTab = ref(props.navNeedsSetup ? 'navigation' : 'sections');
+const activeTab = ref(props.navNeedsSetup ? 'navigation' : (props.currentSite?.experience_version === 'v2' ? 'sections' : 'experience'));
 
 const sections    = ref([...(props.sections ?? [])]);
 const expandedId  = ref(null);
 const editConfigs = reactive({});
+const editLayouts = reactive({});
 const saving      = reactive({});
+const sectionVersions = reactive({});
+const dragIndex = ref(null);
 
 const navConfig = reactive({
     layout_variant: props.navConfig?.layout_variant ?? 'sahodaya-modern',
@@ -632,7 +689,37 @@ const themeConfig = reactive({
     font_heading: props.themeConfig?.font_heading ?? 'Inter',
     font_body: props.themeConfig?.font_body ?? 'Inter',
 });
+const siteDesign = props.currentSite?.design_json ?? {};
+const designConfig = reactive({
+    type_scale: siteDesign.type_scale ?? 'balanced',
+    density: siteDesign.density ?? 'comfortable',
+    surface: siteDesign.surface ?? 'bordered',
+    corners: siteDesign.corners ?? 'soft',
+    buttons: siteDesign.buttons ?? 'solid',
+    images: siteDesign.images ?? 'documentary',
+    motion: siteDesign.motion ?? 'restrained',
+    navigation: siteDesign.navigation ?? 'directory',
+    footer: siteDesign.footer ?? 'directory',
+    homepage_mode: props.currentSite?.homepage_mode ?? 'evergreen',
+    homepage_mode_override_until: props.currentSite?.homepage_mode_override_until ?? '',
+});
 const themePresets = props.themePresets?.length ? props.themePresets : [];
+const experiences = props.experiences ?? [];
+const selectedExperienceKey = ref(props.currentSite?.draft_template_json?.template_key ?? props.currentSite?.template_key ?? props.experiences?.[0]?.key ?? null);
+const experienceDraft = ref(props.currentSite?.draft_template_json ?? null);
+const readinessReport = ref({ ...(props.readiness ?? {}) });
+const experienceSaving = ref(false);
+const siteVersions = ref([]);
+const currentSite = computed(() => props.currentSite ?? props.sites?.[0] ?? null);
+const selectedPublicUrl = computed(() => {
+    if (!props.publicUrl || !currentSite.value) return null;
+    const base = props.publicUrl.replace(/\/$/, '');
+    return currentSite.value.is_primary ? base : `${base}/m/${currentSite.value.slug}`;
+});
+const selectedPreviewUrl = computed(() => {
+    if (!props.publicUrl || !currentSite.value) return null;
+    return `${props.publicUrl.replace(/\/$/, '')}/preview-site?site_id=${currentSite.value.id}`;
+});
 
 const addModal = reactive({
     open: false, selectedType: null, selectedVariant: null, saving: false,
@@ -666,6 +753,11 @@ function sectionPreview(s) {
     const cfg = s.config ?? {};
     return cfg.heading ?? cfg.title ?? cfg.tagline ?? (fieldsFor(s.section_type, s.variant).length ? 'Click Edit to configure content' : 'Data-driven section');
 }
+function sourceBadge(type) {
+    if (['office_bearers', 'member_schools', 'events_programs', 'news_circulars', 'sports_meet', 'resource_centre', 'sahodaya_action_hub'].includes(type)) return 'ERP';
+    if (['statistics', 'programmes', 'downloads_sahodaya', 'academic_quicklinks'].includes(type)) return 'Mixed';
+    return 'Manual';
+}
 function formatDate(d) {
     if (!d) return '';
     try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return ''; }
@@ -676,24 +768,50 @@ function formatDate(d) {
 function csrf() { return document.querySelector('meta[name=csrf-token]')?.content ?? ''; }
 const baseUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/site-builder/api`);
 
+function switchSite(siteId) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('site_id', siteId);
+    window.location.assign(url.toString());
+}
+
+function scopedBody(path, body = {}) {
+    if ((path.startsWith('/sections') || path.startsWith('/experience') || path === '/design' || path === '/apply-cksc-template') && currentSite.value?.id) {
+        return { ...body, site_id: currentSite.value.id };
+    }
+    return body;
+}
+
 async function apiPatch(path, body) {
     const r = await fetch(`${baseUrl.value}${path}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
-        body: JSON.stringify(body),
+        body: JSON.stringify(scopedBody(path, body)),
     });
-    return r.json();
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.message || 'Unable to save changes.');
+    return data;
 }
 async function apiPost(path, body) {
     const r = await fetch(`${baseUrl.value}${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
-        body: JSON.stringify(body),
+        body: JSON.stringify(scopedBody(path, body)),
     });
-    return r.json();
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.message || 'Unable to save changes.');
+    return data;
+}
+async function apiGet(path) {
+    const join = path.includes('?') ? '&' : '?';
+    const siteQuery = currentSite.value?.id ? `${join}site_id=${currentSite.value.id}` : '';
+    const r = await fetch(`${baseUrl.value}${path}${siteQuery}`, { headers: { 'Accept': 'application/json' } });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.message || 'Unable to load data.');
+    return data;
 }
 async function apiDelete(path) {
-    await fetch(`${baseUrl.value}${path}`, {
+    const query = currentSite.value?.id ? `?site_id=${currentSite.value.id}` : '';
+    await fetch(`${baseUrl.value}${path}${query}`, {
         method: 'DELETE',
         headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
     });
@@ -833,6 +951,64 @@ function applyThemePreset(preset) {
     themeConfig.accent_color = preset.accent_color ?? themeConfig.accent_color;
 }
 
+function experienceName(key) {
+    return experiences.find(item => item.key === key)?.name ?? (key ? key.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '');
+}
+
+async function applyExperienceDraft(key, mode = 'full') {
+    if (!confirm(`${mode === 'style' ? 'Apply the design character from' : 'Create a complete draft using'} “${experienceName(key)}”? The published website will not change.`)) return;
+    experienceSaving.value = true;
+    try {
+        const response = await apiPost('/experience/draft', { template_key: key, mode });
+        experienceDraft.value = response.draft;
+        readinessReport.value = response.readiness;
+        selectedExperienceKey.value = key;
+    } finally { experienceSaving.value = false; }
+}
+
+async function cancelExperienceDraft() {
+    if (!confirm('Cancel this experience draft? The published website will remain unchanged.')) return;
+    await apiPost('/experience/cancel', {});
+    experienceDraft.value = null;
+    await refreshReadiness();
+}
+
+async function publishExperienceDraft() {
+    if (!confirm('Publish this complete V2 experience now? A restore point will be created automatically.')) return;
+    experienceSaving.value = true;
+    try {
+        const response = await apiPost('/experience/publish', {});
+        experienceDraft.value = null;
+        sections.value = response.sections ?? sections.value;
+        if (response.site) Object.assign(props.currentSite, response.site);
+        await Promise.all([refreshReadiness(), loadVersions()]);
+    } finally { experienceSaving.value = false; }
+}
+
+async function refreshReadiness() { readinessReport.value = await apiGet('/readiness'); }
+async function loadVersions() { siteVersions.value = await apiGet('/experience/versions'); }
+async function restoreSiteVersion(version) {
+    if (!confirm(`Restore the website version from ${formatDate(version.created_at)}? The current website will also be saved as a restore point.`)) return;
+    const response = await apiPost(`/experience/versions/${version.id}/restore`, {});
+    sections.value = response.sections ?? sections.value;
+    if (response.site) Object.assign(props.currentSite, response.site);
+    await Promise.all([refreshReadiness(), loadVersions()]);
+}
+
+async function saveDesign() {
+    themeSaving.value = true;
+    const supportedHeading = ['Inter', 'Manrope', 'Merriweather', 'Roboto'].includes(themeConfig.font_heading) ? themeConfig.font_heading : 'Inter';
+    const supportedBody = ['Inter', 'Manrope', 'Roboto'].includes(themeConfig.font_body) ? themeConfig.font_body : 'Inter';
+    try {
+        await apiPost('/design', {
+            primary: themeConfig.primary, secondary: themeConfig.secondary, accent_color: themeConfig.accent_color,
+            display_font: supportedHeading, body_font: supportedBody, ...designConfig,
+        });
+        await saveTheme();
+        themeSaved.value = true;
+    } finally { themeSaving.value = false; }
+}
+
 async function saveTheme() {
     themeSaving.value = true;
     try {
@@ -868,7 +1044,19 @@ function toggleEdit(section) {
         if (!editConfigs[section.id]) {
             editConfigs[section.id] = { ...(section.config ?? {}) };
         }
+        if (!editLayouts[section.id]) editLayouts[section.id] = { ...(section.layout_json ?? {}) };
+        loadSectionVersions(section);
     }
+}
+
+async function loadSectionVersions(section) { sectionVersions[section.id] = await apiGet(`/sections/${section.id}/versions`); }
+async function restorePublishedVersion(section, versionId) {
+    if (!versionId || !confirm('Restore this saved version as an unpublished draft?')) return;
+    const updated = await apiPost(`/sections/${section.id}/versions/${versionId}/restore`, {});
+    Object.assign(section, updated);
+    editConfigs[section.id] = { ...(updated.config ?? {}) };
+    editLayouts[section.id] = { ...(updated.layout_json ?? {}) };
+    await loadSectionVersions(section);
 }
 
 async function toggleActive(section) {
@@ -880,7 +1068,7 @@ async function saveSection(section) {
     saving[section.id] = true;
     try {
         const config = editConfigs[section.id] ?? section.config ?? {};
-        const updated = await apiPatch(`/sections/${section.id}`, { config, status: 'draft' });
+        const updated = await apiPatch(`/sections/${section.id}`, { config, layout_json: editLayouts[section.id] ?? section.layout_json ?? {}, status: 'draft' });
         const idx = sections.value.findIndex(s => s.id === section.id);
         if (idx !== -1) Object.assign(sections.value[idx], updated);
         expandedId.value = null;
@@ -893,7 +1081,7 @@ async function publishSection(section) {
     saving[section.id] = true;
     try {
         const config = editConfigs[section.id] ?? section.config ?? {};
-        await apiPatch(`/sections/${section.id}`, { config, status: 'draft' });
+        await apiPatch(`/sections/${section.id}`, { config, layout_json: editLayouts[section.id] ?? section.layout_json ?? {}, status: 'draft' });
         const updated = await apiPost(`/sections/${section.id}/publish`, {});
         const idx = sections.value.findIndex(s => s.id === section.id);
         if (idx !== -1) Object.assign(sections.value[idx], updated);
@@ -926,6 +1114,14 @@ async function removeSection(section) {
     sections.value = sections.value.filter(s => s.id !== section.id);
 }
 
+async function duplicateSection(section) {
+    saving[section.id] = true;
+    try {
+        const copy = await apiPost(`/sections/${section.id}/duplicate`, {});
+        sections.value.push(copy);
+    } finally { saving[section.id] = false; }
+}
+
 async function moveUp(idx) {
     if (idx === 0) return;
     [sections.value[idx - 1], sections.value[idx]] = [sections.value[idx], sections.value[idx - 1]];
@@ -938,6 +1134,13 @@ async function moveDown(idx) {
 }
 async function saveOrder() {
     await apiPost('/sections/reorder', { ids: sections.value.map(s => s.id) });
+}
+async function dropSection(targetIndex) {
+    if (dragIndex.value === null || dragIndex.value === targetIndex) return;
+    const [moved] = sections.value.splice(dragIndex.value, 1);
+    sections.value.splice(targetIndex, 0, moved);
+    dragIndex.value = null;
+    await saveOrder();
 }
 
 function openAddModal() {
@@ -959,6 +1162,7 @@ async function createSection() {
                 variant:      addModal.selectedVariant,
                 config:       {},
                 is_active:    false,
+                site_id:      currentSite.value?.id,
             }),
         });
         const newSection = await r.json();
@@ -967,10 +1171,13 @@ async function createSection() {
         // Auto-open editor for the new section
         expandedId.value = newSection.id;
         editConfigs[newSection.id] = {};
+        editLayouts[newSection.id] = {};
     } finally {
         addModal.saving = false;
     }
 }
+
+onMounted(loadVersions);
 
 // ── Inline field editor component ─────────────────────────────────────────────
 
@@ -985,6 +1192,7 @@ const SectionFieldEditor = defineComponent({
     setup(props, { emit }) {
         const local = reactive({ ...(props.config ?? {}) });
         const mediaUploading = reactive({});
+        const mediaError = reactive({});
 
         function onInput(key, val) {
             local[key] = val;
@@ -1023,11 +1231,12 @@ const SectionFieldEditor = defineComponent({
                         const file = e.target.files?.[0];
                         if (!file || !props.uploadMedia) return;
                         mediaUploading[key] = true;
+                        mediaError[key] = '';
                         try {
                             const path = await props.uploadMedia(file);
                             onChange(path);
                         } catch (err) {
-                            alert(err.message || 'Upload failed');
+                            mediaError[key] = err.message || 'Upload failed';
                         } finally {
                             mediaUploading[key] = false;
                             e.target.value = '';
@@ -1035,6 +1244,9 @@ const SectionFieldEditor = defineComponent({
                     },
                     class: 'block w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100',
                 }),
+                mediaError[key]
+                    ? h('p', { class: 'text-xs text-red-600 font-medium' }, mediaError[key])
+                    : null,
                 h('input', {
                     type: 'url',
                     value: value ?? '',

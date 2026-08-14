@@ -65,6 +65,6 @@ class QuestionPaperController extends SchoolAdminController
     private function assertLeadershipAccess(Request $request): void
     {
         $user = $request->user();
-        abort_unless($user?->isSuperAdmin() || $user?->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal']), 403);
+        abort_unless($user?->isSuperAdmin() || $user?->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal']), 403, 'You don\'t have permission to manage question papers.');
     }
 }

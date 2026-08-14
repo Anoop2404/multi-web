@@ -62,19 +62,22 @@ class TeacherMcqRegistrationController extends Controller
             ->values();
 
         $registrations = $myRegs->values()->map(function (McqRegistration $reg) {
+            $hallTicketsPublished = (bool) $reg->exam?->hall_tickets_published;
+
             return [
                 'id' => $reg->id,
                 'status' => $reg->status,
                 'approval_status' => $reg->approval_status,
                 'approval_status_label' => $reg->approvalStatusLabel(),
-                'hall_ticket_no' => $reg->hall_ticket_no,
-                'hall_room' => $reg->hall_room,
-                'seat_no' => $reg->seat_no,
+                'show_hall_ticket' => $hallTicketsPublished && (bool) $reg->hall_ticket_no,
+                'hall_ticket_no' => $hallTicketsPublished ? $reg->hall_ticket_no : null,
+                'hall_room' => $hallTicketsPublished ? $reg->hall_room : null,
+                'seat_no' => $hallTicketsPublished ? $reg->seat_no : null,
                 'score' => $reg->mark?->score,
                 'grade' => $reg->mark?->grade,
                 'rank' => $reg->mark?->rank,
                 'has_certificate' => (bool) $reg->certificate,
-                'exam' => $reg->exam?->only('id', 'title', 'scheduled_at', 'venue', 'status', 'results_published'),
+                'exam' => $reg->exam?->only('id', 'title', 'scheduled_at', 'venue', 'status', 'results_published', 'hall_tickets_published'),
             ];
         });
 

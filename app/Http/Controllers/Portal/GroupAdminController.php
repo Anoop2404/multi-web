@@ -230,7 +230,7 @@ class GroupAdminController extends Controller
         $user = $request->user();
         if (! $user->isSuperAdmin() && ! $user->hasRole('school_admin')) {
             $classIds = $this->assignedClassIds($user, $tenantId);
-            abort_if($classIds === [], 403);
+            abort_if($classIds === [], 403, 'No classes are assigned to you as group admin.');
         }
 
         return (new FestReportService($event))->downloadAdmitCards(

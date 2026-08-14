@@ -4,6 +4,10 @@
 <section class="py-12 px-4">
     <div class="max-w-3xl mx-auto">
         <h1 class="text-2xl font-bold font-heading mb-6">{{ $event->title }} — Schedule</h1>
+        @include('public.fest.partials.scope-nav', [
+            'routeName' => 'tenant.fest.schedule',
+        ])
+        <p class="text-sm text-gray-500 mb-4">{{ $selectedScope['label'] }}</p>
         <div class="overflow-x-auto">
         <table class="w-full min-w-[640px] text-sm bg-white border rounded-xl overflow-hidden">
             <thead class="bg-gray-50">
@@ -47,7 +51,7 @@
             </tbody>
         </table>
         </div>
-        <p class="mt-4"><a href="{{ route('tenant.fest.show', $event->id) }}" class="text-sm text-amber-700">← Back</a></p>
+        <p class="mt-4"><a href="{{ route('tenant.fest.show', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}" class="text-sm text-amber-700">← Back</a></p>
     </div>
 </section>
 @endsection

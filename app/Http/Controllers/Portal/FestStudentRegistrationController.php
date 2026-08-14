@@ -56,7 +56,7 @@ class FestStudentRegistrationController extends Controller
         $school = Tenant::findOrFail($tenantId);
         abort_if($student->tenant_id !== $school->id, 403);
         abort_if($event->tenant_id !== $school->parent_id, 403);
-        abort_if(! $event->allow_student_self_register, 403);
+        abort_if(! $event->allow_student_self_register, 403, 'Self-registration isn\'t open for this event.');
         abort_if($event->event_type !== 'sports', 404);
 
         $student->load('schoolClass');
@@ -122,7 +122,7 @@ class FestStudentRegistrationController extends Controller
         $school = Tenant::findOrFail($tenantId);
         abort_if($student->tenant_id !== $school->id, 403);
         abort_if($event->tenant_id !== $school->parent_id, 403);
-        abort_if(! $event->allow_student_self_register, 403);
+        abort_if(! $event->allow_student_self_register, 403, 'Self-registration isn\'t open for this event.');
         abort_if($school->fest_registration_closed, 422, 'Fest registration is closed for your school.');
 
         app(FestEventRegistrationService::class)->registerStudent($event, $student, $school);
@@ -137,7 +137,7 @@ class FestStudentRegistrationController extends Controller
         abort_if($student->tenant_id !== $school->id, 403);
         abort_if($event->tenant_id !== $school->parent_id, 403);
         abort_if($item->event_id !== $event->id, 403);
-        abort_if(! $event->allow_student_self_register, 403);
+        abort_if(! $event->allow_student_self_register, 403, 'Self-registration isn\'t open for this event.');
         abort_if($school->fest_registration_closed, 422, 'Fest registration is closed for your school.');
 
         app(FestRegistrationCreateService::class)->createForSchool(

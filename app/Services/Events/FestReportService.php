@@ -120,30 +120,100 @@ class FestReportService
             ->get();
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * @return list<array<string, mixed>>
+     *
+     * Batched rewrite (2026-08-13): the original version called
+     * FestEvent::reportableItemIds() — itself 2-3 queries — three separate times
+     * (participants/marks/judges) per item, i.e. roughly 3+ query groups per item, for
+     * every item in the event (~450+ queries on a 150-item Kalotsavam). This version
+     * fetches the whole reportable item family, participant/mark/judge rows once each,
+     * then computes each item's own "reportable group" (partition siblings sharing a
+     * root id or item_code, matching reportableItemIds()'s own logic exactly) and counts
+     * in memory. Output shape and per-row values are unchanged — see
+     * markEntryStatusCsv()/markEntryStatusSummary() which consume this unmodified.
+     */
     public function markEntryStatusRows(?string $schoolId = null): array
     {
+        $items = $this->items();
+        if ($items->isEmpty()) {
+            return [];
+        }
+
+        $eventIds = $this->event->reportableEventIds();
+
+        // Every item across the reportable event family (partition children/season-hub
+        // children included), fetched once so each row's expanded id group can be
+        // computed in memory instead of via a fresh reportableItemIds() query per item.
+        $familyItems = FestEventItem::whereIn('event_id', $eventIds)
+            ->get(['id', 'item_code', 'inherited_from_item_id']);
+
+        $rootIdOf = fn (FestEventItem $i) => (int) ($i->inherited_from_item_id ?: $i->id);
+
+        // Same expansion FestEvent::reportableItemIds([$item->id]) performs: every
+        // family item sharing this item's root id, or sharing its item_code.
+        $groupIdsByItemId = [];
+        foreach ($items as $item) {
+            $itemRootId = $rootIdOf($item);
+            $itemCode = $item->item_code;
+
+            $groupIdsByItemId[$item->id] = $familyItems
+                ->filter(fn (FestEventItem $fi) => $rootIdOf($fi) === $itemRootId
+                    || ($itemCode !== null && $fi->item_code === $itemCode))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        $allGroupItemIds = collect($groupIdsByItemId)->flatten()->unique()->values();
+
+        // Raw participant rows (not pre-aggregated counts) across every item's expanded
+        // group in one query, counted per row's own group below — this preserves the
+        // "distinct participant across the whole group" semantics the original per-item
+        // query had, without risking a double-count from summing per-sub-item counts.
+        $participantsByItemId = FestParticipant::query()
+            ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
+            ->whereIn('fest_registrations.event_id', $eventIds)
+            ->whereIn('fest_registrations.item_id', $allGroupItemIds)
+            ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
+            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+            ->selectRaw('fest_participants.id as participant_id, fest_registrations.item_id as item_id')
+            ->get()
+            ->groupBy('item_id');
+
+        $scoredQuery = FestMark::query()
+            ->whereIn('event_id', $eventIds)
+            ->whereIn('item_id', $allGroupItemIds)
+            ->where(fn ($q) => $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position'));
+        if ($schoolId) {
+            $scoredQuery->whereHas('participant.registration', fn ($q) => $q->where('school_id', $schoolId));
+        }
+        $scoredByItemId = $scoredQuery->get(['item_id', 'participant_id'])->groupBy('item_id');
+
+        $judgesByItemId = FestJudgeAssignment::whereIn('event_id', $eventIds)
+            ->whereIn('item_id', $allGroupItemIds)
+            ->get(['item_id'])
+            ->groupBy('item_id');
+
         $rows = [];
-        foreach ($this->items() as $item) {
-            $partCount = FestParticipant::whereHas('registration', fn ($q) => $q
-                ->whereIn('event_id', $this->event->reportableEventIds())
-                ->whereIn('item_id', $this->event->reportableItemIds([$item->id]))
-                ->whereNotIn('status', ['rejected', 'withdrawn'])
-                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId)))->count();
+        foreach ($items as $item) {
+            $groupIds = $groupIdsByItemId[$item->id];
 
-            $scoredQuery = FestMark::whereIn('event_id', $this->event->reportableEventIds())
-                ->whereIn('item_id', $this->event->reportableItemIds([$item->id]))
-                ->where(function ($q) {
-                    $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position');
-                });
-            if ($schoolId) {
-                $scoredQuery->whereHas('participant.registration', fn ($q) => $q->where('school_id', $schoolId));
-            }
-            $scored = $scoredQuery->distinct('participant_id')->count('participant_id');
-
-            $judges = FestJudgeAssignment::whereIn('event_id', $this->event->reportableEventIds())
-                ->whereIn('item_id', $this->event->reportableItemIds([$item->id]))
+            $partCount = collect($groupIds)
+                ->flatMap(fn ($id) => $participantsByItemId->get($id, collect()))
+                ->pluck('participant_id')
+                ->unique()
                 ->count();
+
+            $scored = collect($groupIds)
+                ->flatMap(fn ($id) => $scoredByItemId->get($id, collect()))
+                ->pluck('participant_id')
+                ->unique()
+                ->count();
+
+            $judges = collect($groupIds)->sum(fn ($id) => $judgesByItemId->get($id, collect())->count());
 
             $rows[] = [
                 'item_id'      => $item->id,

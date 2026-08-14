@@ -68,7 +68,7 @@ class FestMarkCoordinatorController extends Controller
     public function marks(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $tenantId, 403);
-        abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403);
+        abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403, 'You\'re not assigned as a mark coordinator for this event.');
 
         $event->load('items');
 
@@ -111,7 +111,7 @@ class FestMarkCoordinatorController extends Controller
     public function storeAttendance(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $tenantId, 403);
-        abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403);
+        abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403, 'You\'re not assigned as a mark coordinator for this event.');
 
         $data = $request->validate([
             'item_id'        => 'required|exists:fest_event_items,id',
@@ -142,7 +142,7 @@ class FestMarkCoordinatorController extends Controller
     public function autoRankItem(Request $request, string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)
     {
         abort_if($event->tenant_id !== $tenantId, 403);
-        abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403);
+        abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403, 'You\'re not assigned as a mark coordinator for this event.');
         abort_if($item->event_id !== $event->id, 404);
         abort_unless($event->event_type === 'sports', 422, 'Auto-rank applies to sports events only.');
 
@@ -156,7 +156,7 @@ class FestMarkCoordinatorController extends Controller
     public function storeMark(Request $request, string $tenantId, FestEvent $event, FestMarkSaveService $markSave)
     {
         abort_if($event->tenant_id !== $tenantId, 403);
-        abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403);
+        abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403, 'You\'re not assigned as a mark coordinator for this event.');
 
         EventLifecycleGate::allowMarkEntry($event);
 

@@ -464,7 +464,7 @@ class TrainingRegistrationController extends SchoolAdminController
         PlatformAuditLogger $audit,
     ) {
         abort_if($program->tenant_id !== $this->school->parent_id, 403);
-        abort_unless($program->allow_school_attendance ?? true, 403);
+        abort_unless($program->allow_school_attendance ?? true, 403, 'This training program doesn\'t track school-level attendance.');
         abort_if($session->program_id !== $program->id, 404);
 
         $registrations = TrainingRegistration::where('program_id', $program->id)

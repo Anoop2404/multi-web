@@ -554,9 +554,11 @@ class FestEventSettingsController extends SahodayaAdminController
 
         foreach ($data['item_fees'] ?? [] as $row) {
             $item = FestEventItem::where('event_id', $event->id)->find($row['id']);
-            if (! $item || $item->isStateCatalog()) {
+            if (! $item) {
                 continue;
             }
+            // State-catalog items are fully editable at the Sahodaya level (they're the ones
+            // actually conducting them), so fee_amount is no longer skipped for owner_level='state'.
 
             $item->update([
                 'fee_amount' => isset($row['fee_amount']) && $row['fee_amount'] !== ''
@@ -594,6 +596,12 @@ class FestEventSettingsController extends SahodayaAdminController
         // LOOKUP to the hub, but registrations actually price against each child's own
         // FestEventItem/FestItemHead rows, which that read-side redirect never touches.
         app(FestSchoolEventFeeService::class)->propagateFeeSettingsToChildren($event->fresh());
+
+        // Recalculate every already-registered school's fee now that the schedule
+        // changed, instead of leaving it to the registration page's own read-time
+        // recalculation (removed — see FestRegistrationController::
+        // hydrateEventForSchoolRegistration()). Queued: see RecalculateEventSchoolFeesJob.
+        \App\Jobs\RecalculateEventSchoolFeesJob::dispatch($event->id);
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,
@@ -641,6 +649,11 @@ class FestEventSettingsController extends SahodayaAdminController
         // already-spawned region/finale children (and already-registered schools within
         // them) silently out of sync (Phase 6 audit). No-ops for non-hub events.
         app(\App\Services\Events\FestSchoolEventFeeService::class)->propagateFeeSettingsToChildren($event->fresh());
+
+        // Same reasoning as updateFeeSettings() above — this single-item fee edit also
+        // changes what schools owe, so recalculate eagerly here rather than relying on
+        // the (now removed) read-time recalculation on the registration page.
+        \App\Jobs\RecalculateEventSchoolFeesJob::dispatch($event->id);
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,

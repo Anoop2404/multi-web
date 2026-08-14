@@ -10,6 +10,8 @@
             description="Verify annual Sahodaya membership fees from member schools. Separate from fest event registration fees."
         />
 
+        <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
+
         <div class="space-y-5">
             <!-- Fee totals -->
             <div class="grid sm:grid-cols-3 gap-3">
@@ -221,6 +223,9 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { reactive, computed, defineComponent, h, ref } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
+import InlineAlert from '@/Components/ui/InlineAlert.vue';
+
+const alertMessage = ref('');
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String,
@@ -319,7 +324,7 @@ function rejectPayment(payment) {
         return;
     }
     if (! reason.trim()) {
-        alert('Please enter a rejection reason.');
+        alertMessage.value = 'Please enter a rejection reason.';
         return;
     }
 

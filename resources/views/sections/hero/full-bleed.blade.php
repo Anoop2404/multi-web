@@ -24,15 +24,15 @@
                 {!! nl2br(e($config['heading'] ?? $tenant->name)) !!}
             </h1>
 
-            @if(!empty($config['tagline']))
-            <p class="text-xl text-white/75 max-w-xl">{{ $config['tagline'] }}</p>
+            @if(!empty($config['tagline'] ?? $config['subheading'] ?? null))
+            <p class="text-xl text-white/75 max-w-xl">{{ $config['tagline'] ?? $config['subheading'] }}</p>
             @endif
 
             <div class="flex flex-wrap gap-3 pt-4">
-                @if(!empty($config['cta_label']) && !empty($config['cta_url']))
-                <a href="{{ $config['cta_url'] }}"
+                @if(!empty($config['cta_label'] ?? $config['primary_label'] ?? null) && !empty($config['cta_url'] ?? $config['primary_url'] ?? null))
+                <a href="{{ $config['cta_url'] ?? $config['primary_url'] }}"
                    class="inline-flex items-center gap-2 bg-white text-gray-900 font-extrabold text-sm px-7 py-3.5 rounded-full shadow-2xl hover:scale-105 transition-all">
-                    {{ $config['cta_label'] }}
+                    {{ $config['cta_label'] ?? $config['primary_label'] }}
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                 </a>
                 @endif

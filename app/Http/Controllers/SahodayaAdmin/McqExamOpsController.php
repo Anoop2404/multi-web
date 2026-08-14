@@ -165,6 +165,8 @@ class McqExamOpsController extends SahodayaAdminController
             'previewSample'   => McqHallTicketDesign::previewSample($exam),
             'ticketsIssued'   => $ticketsIssued,
             'halls'           => $seating->normalizedHalls($exam),
+            'hallTicketsPublished'   => (bool) $exam->hall_tickets_published,
+            'hallTicketsPublishedAt' => $exam->hall_tickets_published_at?->format('d M Y, h:i A'),
         ]);
     }
 
@@ -210,6 +212,11 @@ class McqExamOpsController extends SahodayaAdminController
             'hall_instructions'   => 'nullable|string|max:2000',
             'logo'                => 'nullable|file|mimes:jpg,jpeg,png,webp,svg|max:2048',
             'remove_logo'         => 'nullable|boolean',
+            'show_photo'          => 'nullable|boolean',
+            'show_qr'             => 'nullable|boolean',
+            'show_signature'      => 'nullable|boolean',
+            'report_before_minutes'      => 'nullable|integer|min:0|max:240',
+            'gate_closure_after_minutes' => 'nullable|integer|min:0|max:240',
         ]);
 
         if (array_key_exists('next_hall_ticket_no', $data) && $data['next_hall_ticket_no'] !== null) {
@@ -244,6 +251,11 @@ class McqExamOpsController extends SahodayaAdminController
             'primary_color' => $data['primary_color'] ?? $current['primary_color'],
             'accent_color'  => $data['accent_color'] ?? $current['accent_color'],
             'layout'        => $data['layout'] ?? $current['layout'],
+            'show_photo'     => array_key_exists('show_photo', $data) ? (bool) $data['show_photo'] : $current['show_photo'],
+            'show_qr'        => array_key_exists('show_qr', $data) ? (bool) $data['show_qr'] : $current['show_qr'],
+            'show_signature' => array_key_exists('show_signature', $data) ? (bool) $data['show_signature'] : $current['show_signature'],
+            'report_before_minutes'      => $data['report_before_minutes'] ?? $current['report_before_minutes'],
+            'gate_closure_after_minutes' => $data['gate_closure_after_minutes'] ?? $current['gate_closure_after_minutes'],
         ]));
 
         $settings = McqHallTicketDesign::mergeIntoSettings($exam->settings_json ?? [], $design);
@@ -262,7 +274,7 @@ class McqExamOpsController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         $registrations = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student', 'teacher', 'school'])
+            ->with(['student.schoolClass', 'teacher', 'school'])
             ->orderBy('hall_ticket_no')
             ->get();
 
@@ -276,6 +288,37 @@ class McqExamOpsController extends SahodayaAdminController
         $count = $service->issueBulk($exam);
 
         return back()->with('success', "{$count} hall ticket(s) generated.");
+    }
+
+    /**
+     * Release hall tickets (roll no., hall, seat) to schools and candidates.
+     * Roll numbers are already assigned per-registration as each is approved — this flag is
+     * the single, coordinated "make it visible" switch so schools don't see numbers trickle
+     * in one student at a time while Sahodaya is still finalizing halls/seating.
+     */
+    public function publishHallTickets(string $tenantId, McqExam $exam, Request $request)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $exam->update([
+            'hall_tickets_published'           => true,
+            'hall_tickets_published_at'        => now(),
+            'hall_tickets_published_by_user_id'=> $request->user()?->id,
+        ]);
+
+        return back()->with('success', 'Hall tickets are now visible to schools and candidates.');
+    }
+
+    public function unpublishHallTickets(string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $exam->update([
+            'hall_tickets_published'    => false,
+            'hall_tickets_published_at' => null,
+        ]);
+
+        return back()->with('success', 'Hall tickets are hidden from schools until you publish them again.');
     }
 
     public function saveHalls(Request $request, string $tenantId, McqExam $exam)

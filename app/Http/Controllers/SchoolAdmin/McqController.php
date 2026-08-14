@@ -626,13 +626,14 @@ class McqController extends SchoolAdminController
     public function hallTicketsPdf(string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_unless($exam->hall_tickets_published, 403, 'Hall tickets have not been released by Sahodaya yet.');
 
         app(SchoolDocumentDownloadGateService::class)->assertMcqExamFeeForDownloads($exam, $this->school);
 
         $registrations = McqRegistration::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
             ->whereNotNull('hall_ticket_no')
-            ->with(['student'])
+            ->with(['student.schoolClass', 'teacher', 'school'])
             ->orderBy('hall_ticket_no')
             ->get();
 

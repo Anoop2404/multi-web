@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\WebsiteSite;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class WebsiteSiteController extends SahodayaAdminController
 {
@@ -65,9 +66,16 @@ class WebsiteSiteController extends SahodayaAdminController
         abort_if($site->tenant_id !== $this->sahodaya->id, 403);
         abort_if($site->is_primary, 422, 'Primary site cannot be deleted.');
 
-        $site->sections()->update(['site_id' => null]);
-        $site->delete();
+        DB::transaction(function () use ($site) {
+            $sectionIds = $site->sections()->pluck('id');
+            if ($sectionIds->isNotEmpty()) {
+            \App\Models\SiteSectionVersion::whereIn('site_section_id', $sectionIds)->delete();
+            $site->versions()->delete();
+                $site->sections()->delete();
+            }
+            $site->delete();
+        });
 
-        return back()->with('success', 'Microsite removed.');
+        return back()->with('success', 'Microsite and its sections removed.');
     }
 }

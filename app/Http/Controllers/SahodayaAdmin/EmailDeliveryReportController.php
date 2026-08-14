@@ -35,7 +35,7 @@ class EmailDeliveryReportController extends SahodayaAdminController
 
     public function retry(string $tenantId, NotificationLog $notificationLog, NotificationService $notifications)
     {
-        abort_unless(in_array($notificationLog->status, ['failed', 'skipped'], true), 422);
+        abort_unless(in_array($notificationLog->status, ['failed', 'skipped'], true), 422, 'Only failed or skipped emails can be resent.');
 
         $user = User::where('email', $notificationLog->to)->first();
         if (! $user) {

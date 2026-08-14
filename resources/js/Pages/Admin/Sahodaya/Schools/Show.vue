@@ -5,6 +5,7 @@
                          :pendingSubmissionsCount="pendingSubmissionsCount"
                          :pendingPaymentsCount="pendingPaymentsCount">
         <div class="max-w-3xl space-y-5">
+            <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
             <Link :href="`/sahodaya-admin/${sahodaya.id}/schools`"
                   class="inline-flex items-center gap-1.5 text-xs text-[#0f3d7a] hover:underline font-semibold">
                 ← Back to Schools
@@ -277,6 +278,9 @@
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, defineComponent, h, ref } from 'vue';
+import InlineAlert from '@/Components/ui/InlineAlert.vue';
+
+const alertMessage = ref('');
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String,
@@ -389,7 +393,7 @@ function cancelMembershipWithSettlement() {
     } else if (settlementInput.trim() === '2') {
         settlement = 'forfeit';
     } else {
-        alert('Invalid option selected.');
+        alertMessage.value = 'Invalid option selected.';
         return;
     }
 

@@ -1436,4 +1436,94 @@ class FestSchoolReportController extends SchoolAdminController
             $rows,
         );
     }
+
+    public function gamesEntryForm(Request $request, string $tenantId, FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $sahodaya = Tenant::find($this->school->parent_id);
+        $reportableEventIds = $event->reportableEventIds();
+
+        // Get all registered sports items for this school in this event
+        $registrations = FestRegistration::whereIn('event_id', $reportableEventIds)
+            ->where('school_id', $this->school->id)
+            ->active()
+            ->with([
+                'item:id,title,category,gender,age_group,sport_discipline',
+                'participants.student.schoolClass',
+            ])
+            ->get();
+
+        // Group items for selection dropdown
+        $registeredItems = $registrations->map(function ($reg) {
+            return [
+                'id' => $reg->item_id,
+                'title' => $reg->item?->title ?? 'Item #'.$reg->item_id,
+                'category' => $reg->item?->age_group ?: ($reg->item?->category ?: 'General'),
+                'gender' => $reg->item?->gender ?: 'boys',
+                'discipline' => $reg->item?->sport_discipline,
+            ];
+        })->filter(fn ($item) => !empty($item['id']))->unique('id')->values();
+
+        $selectedItemId = $request->integer('item_id') ?: ($registeredItems->first()['id'] ?? null);
+
+        // Filter registrations by selected item if specified
+        $filteredRegs = $selectedItemId 
+            ? $registrations->where('item_id', $selectedItemId)
+            : $registrations;
+
+        $selectedItem = $selectedItemId ? \App\Models\FestEventItem::find($selectedItemId) : null;
+
+        $studentsList = collect();
+        foreach ($filteredRegs as $reg) {
+            foreach ($reg->participants as $participant) {
+                if (!$participant->student) continue;
+                $std = $participant->student;
+                $studentsList->push([
+                    'id' => $std->id,
+                    'name' => $std->name,
+                    'class' => $std->schoolClass?->name ?? '',
+                    'udise_pen' => $std->admission_number ?: ($std->reg_no ?: ''),
+                    'dob' => $std->dob ? $std->dob->format('d/m/Y') : '',
+                    'father_name' => $std->parent_name ?? '',
+                    'mother_name' => '',
+                    'photo_url' => $std->photo ? TenantStorage::url($std->photo) : null,
+                ]);
+            }
+        }
+
+        $uniqueStudents = $studentsList->unique('id')->values()->all();
+
+        $academicYear = '2026-27';
+        if ($event->title && preg_match('/\d{4}-\d{2,4}/', $event->title, $m)) {
+            $academicYear = $m[0];
+        }
+
+        $formData = [
+            'sahodayaName' => $sahodaya?->name ?? 'MALAPPURAM CENTRAL SAHODAYA',
+            'academicYear' => $academicYear,
+            'schoolName' => $this->school->name . ($this->school->address ? ', ' . $this->school->address : ''),
+            'teamManager' => '',
+            'gameName' => $selectedItem?->title ?: ($event->title ?: 'Sports Meet'),
+            'category' => $selectedItem?->age_group ?: ($selectedItem?->category ?: ''),
+            'gender' => strtolower($selectedItem?->gender ?? 'boys'),
+            'region' => 'tirur',
+        ];
+
+        if ($request->wantsJson() || $request->has('inertia')) {
+            return $this->inertia('School/Events/SportsEntryForm', [
+                'school' => $this->school->only('id', 'name'),
+                'event' => $event->only('id', 'title'),
+                'form' => $formData,
+                'initialStudents' => $uniqueStudents,
+                'registeredItems' => $registeredItems,
+                'selectedItemId' => $selectedItemId,
+            ]);
+        }
+
+        return view('reports.sports-games-entry-form', array_merge($formData, [
+            'students' => $uniqueStudents,
+        ]));
+    }
 }
+

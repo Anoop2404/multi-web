@@ -12,6 +12,7 @@ use App\Support\HtmlSanitizer;
 use App\Support\SectionFieldRegistry;
 use App\Support\SectionVariantResolver;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,22 +20,11 @@ class BuilderApiController extends Controller
 {
     // ── Sections ─────────────────────────────────────────────────────────────
 
-    public function sections(string $tenantId): JsonResponse
+    public function sections(Request $request, string $tenantId): JsonResponse
     {
-        $siteId = request()->integer('site_id') ?: null;
-        WebsiteSite::ensurePrimary($tenantId);
+        $site = $this->resolveSite($request, $tenantId);
 
-        $sections = SiteSection::where('tenant_id', $tenantId)
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
-            ->when(! $siteId, function ($q) use ($tenantId) {
-                $primary = WebsiteSite::where('tenant_id', $tenantId)->where('is_primary', true)->value('id');
-                $q->where(function ($inner) use ($primary) {
-                    $inner->whereNull('site_id');
-                    if ($primary) {
-                        $inner->orWhere('site_id', $primary);
-                    }
-                });
-            })
+        $sections = $site->sectionQuery()
             ->orderBy('display_order')
             ->get()
             ->map(fn (SiteSection $s) => $this->sectionPayload($s));
@@ -50,13 +40,22 @@ class BuilderApiController extends Controller
             'config' => 'nullable|array',
             'is_active' => 'boolean',
             'site_id' => 'nullable|integer',
+            'layout_json' => 'nullable|array',
+            'layout_json.width' => 'nullable|in:narrow,standard,wide,full',
+            'layout_json.spacing' => 'nullable|in:compact,standard,spacious',
+            'layout_json.surface' => 'nullable|in:canvas,muted,primary,dark,image',
+            'layout_json.heading_alignment' => 'nullable|in:left,center',
+            'layout_json.media_treatment' => 'nullable|in:natural,framed,editorial,edge-to-edge',
             'status' => 'nullable|in:draft,published',
         ]);
 
-        $primary = WebsiteSite::ensurePrimary($tenantId);
+        $site = WebsiteSite::resolveForTenant(
+            $tenantId,
+            isset($data['site_id']) ? (int) $data['site_id'] : null,
+        );
         $data['tenant_id'] = $tenantId;
-        $data['site_id'] = $data['site_id'] ?? $primary->id;
-        $data['display_order'] = SiteSection::where('tenant_id', $tenantId)->max('display_order') + 1;
+        $data['site_id'] = $site->id;
+        $data['display_order'] = ((int) $site->sectionQuery()->max('display_order')) + 1;
         $data['config'] = HtmlSanitizer::sanitizeConfig($data['config'] ?? []);
         $data['status'] = $data['status'] ?? SiteSection::STATUS_DRAFT;
         $data['updated_by'] = auth()->id();
@@ -75,7 +74,8 @@ class BuilderApiController extends Controller
 
     public function updateSection(Request $request, string $tenantId, int $sectionId): JsonResponse
     {
-        $section = SiteSection::where('tenant_id', $tenantId)->findOrFail($sectionId);
+        $site = $this->resolveSite($request, $tenantId);
+        $section = $this->sectionForSite($site, $sectionId);
 
         $data = $request->validate([
             'section_type' => 'string|max:50',
@@ -84,7 +84,17 @@ class BuilderApiController extends Controller
             'is_active' => 'boolean',
             'status' => 'nullable|in:draft,published',
             'site_id' => 'nullable|integer',
+            'layout_json' => 'nullable|array',
+            'layout_json.width' => 'nullable|in:narrow,standard,wide,full',
+            'layout_json.spacing' => 'nullable|in:compact,standard,spacious',
+            'layout_json.surface' => 'nullable|in:canvas,muted,primary,dark,image',
+            'layout_json.heading_alignment' => 'nullable|in:left,center',
+            'layout_json.media_treatment' => 'nullable|in:natural,framed,editorial,edge-to-edge',
         ]);
+
+        // site_id selects the builder scope. Moving a section between sites is
+        // intentionally not supported by this endpoint.
+        unset($data['site_id']);
 
         if (array_key_exists('config', $data) && is_array($data['config'])) {
             $data['config'] = HtmlSanitizer::sanitizeConfig($data['config']);
@@ -118,9 +128,10 @@ class BuilderApiController extends Controller
         return response()->json($this->sectionPayload($section->fresh()));
     }
 
-    public function publishSection(string $tenantId, int $sectionId): JsonResponse
+    public function publishSection(Request $request, string $tenantId, int $sectionId): JsonResponse
     {
-        $section = SiteSection::where('tenant_id', $tenantId)->findOrFail($sectionId);
+        $site = $this->resolveSite($request, $tenantId);
+        $section = $this->sectionForSite($site, $sectionId);
         $section->config = HtmlSanitizer::sanitizeConfig($section->config ?? []);
         $section->publish();
         $this->bustCache($tenantId);
@@ -128,24 +139,27 @@ class BuilderApiController extends Controller
         return response()->json($this->sectionPayload($section->fresh()));
     }
 
-    public function sectionVersions(string $tenantId, int $sectionId): JsonResponse
+    public function sectionVersions(Request $request, string $tenantId, int $sectionId): JsonResponse
     {
-        $section = SiteSection::where('tenant_id', $tenantId)->findOrFail($sectionId);
+        $site = $this->resolveSite($request, $tenantId);
+        $section = $this->sectionForSite($site, $sectionId);
 
         return response()->json(
             $section->versions()->limit(30)->get(['id', 'variant', 'note', 'created_by', 'created_at'])
         );
     }
 
-    public function restoreSectionVersion(string $tenantId, int $sectionId, int $versionId): JsonResponse
+    public function restoreSectionVersion(Request $request, string $tenantId, int $sectionId, int $versionId): JsonResponse
     {
-        $section = SiteSection::where('tenant_id', $tenantId)->findOrFail($sectionId);
+        $site = $this->resolveSite($request, $tenantId);
+        $section = $this->sectionForSite($site, $sectionId);
         $version = SiteSectionVersion::where('site_section_id', $section->id)->findOrFail($versionId);
 
         $section->recordVersion('Before restore #'.$versionId);
         $section->update([
             'variant' => $version->variant ?: $section->variant,
             'config' => HtmlSanitizer::sanitizeConfig($version->config ?? []),
+            'layout_json' => $version->layout_json ?? [],
             'status' => SiteSection::STATUS_DRAFT,
             'updated_by' => auth()->id(),
         ]);
@@ -154,17 +168,19 @@ class BuilderApiController extends Controller
         return response()->json($this->sectionPayload($section->fresh()));
     }
 
-    public function deleteSection(string $tenantId, int $sectionId): JsonResponse
+    public function deleteSection(Request $request, string $tenantId, int $sectionId): JsonResponse
     {
-        SiteSection::where('tenant_id', $tenantId)->findOrFail($sectionId)->delete();
+        $site = $this->resolveSite($request, $tenantId);
+        $this->sectionForSite($site, $sectionId)->delete();
         $this->bustCache($tenantId);
 
         return response()->json(['deleted' => true]);
     }
 
-    public function toggleSection(string $tenantId, int $sectionId): JsonResponse
+    public function toggleSection(Request $request, string $tenantId, int $sectionId): JsonResponse
     {
-        $section = SiteSection::where('tenant_id', $tenantId)->findOrFail($sectionId);
+        $site = $this->resolveSite($request, $tenantId);
+        $section = $this->sectionForSite($site, $sectionId);
         $section->update(['is_active' => ! $section->is_active]);
         $this->bustCache($tenantId);
 
@@ -173,12 +189,27 @@ class BuilderApiController extends Controller
 
     public function reorderSections(Request $request, string $tenantId): JsonResponse
     {
-        $ids = $request->validate(['ids' => 'required|array'])['ids'];
+        $data = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'required|integer|distinct',
+            'site_id' => 'nullable|integer',
+        ]);
+        $site = $this->resolveSite($request, $tenantId);
+        $ids = array_map('intval', $data['ids']);
 
-        foreach ($ids as $order => $id) {
-            SiteSection::where('tenant_id', $tenantId)->where('id', $id)
-                ->update(['display_order' => $order]);
-        }
+        $allowedIds = $site->sectionQuery()
+            ->whereIn('id', $ids)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        abort_unless(count($allowedIds) === count($ids), 422, 'All sections must belong to the selected website.');
+
+        DB::transaction(function () use ($site, $ids) {
+            foreach ($ids as $order => $id) {
+                $site->sectionQuery()->whereKey($id)->update(['display_order' => $order]);
+            }
+        });
 
         $this->bustCache($tenantId);
 
@@ -191,6 +222,18 @@ class BuilderApiController extends Controller
         return array_merge($section->toArray(), [
             'has_unpublished_changes' => $section->hasUnpublishedChanges(),
         ]);
+    }
+
+    private function resolveSite(Request $request, string $tenantId): WebsiteSite
+    {
+        $siteId = $request->filled('site_id') ? $request->integer('site_id') : null;
+
+        return WebsiteSite::resolveForTenant($tenantId, $siteId ?: null);
+    }
+
+    private function sectionForSite(WebsiteSite $site, int $sectionId): SiteSection
+    {
+        return $site->sectionQuery()->findOrFail($sectionId);
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────

@@ -15,6 +15,30 @@
         </PageHeader>
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="hall-tickets" />
 
+        <div class="notice-banner mb-6 flex flex-wrap items-center justify-between gap-3"
+             :class="hallTicketsPublished ? 'notice-banner--success' : 'notice-banner--warning'">
+            <div>
+                <p class="font-semibold">
+                    {{ hallTicketsPublished ? 'Hall tickets are visible to schools' : 'Hall tickets are hidden from schools' }}
+                </p>
+                <p class="mt-1 text-sm">
+                    <template v-if="hallTicketsPublished">
+                        Published {{ hallTicketsPublishedAt }}. Schools and candidates can now see reg. no., hall, and seat.
+                    </template>
+                    <template v-else>
+                        Reg. numbers are still assigned automatically as registrations are approved, but schools and candidates
+                        won't see them, and the school Hall Tickets tab/PDF stays disabled, until you publish.
+                    </template>
+                </p>
+            </div>
+            <button v-if="hallTicketsPublished" type="button" class="btn-secondary text-sm shrink-0" @click="unpublish">
+                Unpublish
+            </button>
+            <button v-else type="button" class="btn-primary text-sm shrink-0" @click="publish">
+                Publish to schools
+            </button>
+        </div>
+
         <div class="grid lg:grid-cols-2 gap-6 mb-6">
             <form @submit.prevent="saveDesign" class="card space-y-4">
                 <div>
@@ -51,12 +75,27 @@
                         <label class="flex items-center gap-2 text-sm mr-4">
                             <input v-model="designForm.show_reg_no" type="checkbox"> School admission no.
                         </label>
-                        <label class="flex items-center gap-2 text-sm">
+                        <label class="flex items-center gap-2 text-sm mr-4">
                             <input v-model="designForm.show_school" type="checkbox"> School name
+                        </label>
+                        <label class="flex items-center gap-2 text-sm mr-4">
+                            <input v-model="designForm.show_photo" type="checkbox"> Candidate photo
+                        </label>
+                        <label class="flex items-center gap-2 text-sm mr-4">
+                            <input v-model="designForm.show_qr" type="checkbox"> Verification QR code
+                        </label>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input v-model="designForm.show_signature" type="checkbox"> Signature lines
                         </label>
                     </FormField>
                     <FormField label="Reg. no. starts at" hint="Any whole number from 1. Quick presets below, or type your own (e.g. 10001).">
                         <McqRegNoStartField v-model="designForm.next_hall_ticket_no" :disabled="ticketsIssued" />
+                    </FormField>
+                    <FormField label="Reporting time" hint="Minutes before exam start candidates should arrive.">
+                        <input v-model.number="designForm.report_before_minutes" type="number" min="0" max="240" class="field">
+                    </FormField>
+                    <FormField label="Gate closure" hint="Minutes after exam start when late entry is no longer allowed (0 = at start).">
+                        <input v-model.number="designForm.gate_closure_after_minutes" type="number" min="0" max="240" class="field">
                     </FormField>
                     <FormField label="Hall instructions" class-extra="sm:col-span-2">
                         <textarea v-model="designForm.hall_instructions" class="field" rows="2" placeholder="Shown on admit card"></textarea>
@@ -165,6 +204,8 @@ const props = defineProps({
     previewSample: Object,
     ticketsIssued: Boolean,
     halls: { type: Array, default: () => [] },
+    hallTicketsPublished: { type: Boolean, default: false },
+    hallTicketsPublishedAt: { type: String, default: null },
 });
 
 const searchQuery = ref('');
@@ -207,6 +248,11 @@ const designForm = useForm({
     next_hall_ticket_no: props.exam.next_hall_ticket_no ?? 100,
     hall_instructions: props.exam.hall_instructions ?? '',
     remove_logo: false,
+    show_photo: props.hallTicketDesign?.show_photo ?? true,
+    show_qr: props.hallTicketDesign?.show_qr ?? true,
+    show_signature: props.hallTicketDesign?.show_signature ?? true,
+    report_before_minutes: props.hallTicketDesign?.report_before_minutes ?? 30,
+    gate_closure_after_minutes: props.hallTicketDesign?.gate_closure_after_minutes ?? 0,
 });
 
 watch(() => logoInput.value?.files?.[0], (file) => {
@@ -262,6 +308,11 @@ function saveDesign() {
     fd.append('next_hall_ticket_no', String(designForm.next_hall_ticket_no));
     fd.append('hall_instructions', designForm.hall_instructions || '');
     fd.append('remove_logo', designForm.remove_logo ? '1' : '0');
+    fd.append('show_photo', designForm.show_photo ? '1' : '0');
+    fd.append('show_qr', designForm.show_qr ? '1' : '0');
+    fd.append('show_signature', designForm.show_signature ? '1' : '0');
+    fd.append('report_before_minutes', String(designForm.report_before_minutes));
+    fd.append('gate_closure_after_minutes', String(designForm.gate_closure_after_minutes));
     const file = logoInput.value?.files?.[0];
     if (file) fd.append('logo', file);
 
@@ -278,5 +329,14 @@ function saveDesign() {
 
 function generate() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/generate`, {}, { preserveScroll: true });
+}
+
+function publish() {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/publish`, {}, { preserveScroll: true });
+}
+
+function unpublish() {
+    if (!window.confirm('Hide hall tickets from schools and candidates again?')) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/unpublish`, {}, { preserveScroll: true });
 }
 </script>

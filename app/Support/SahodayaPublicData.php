@@ -6,6 +6,7 @@ use App\Models\Circular;
 use App\Models\KalotsavEvent;
 use App\Models\OfficeBearers;
 use App\Models\Tenant;
+use App\Models\Download;
 use Illuminate\Support\Collection;
 
 class SahodayaPublicData
@@ -76,6 +77,33 @@ class SahodayaPublicData
             ->orderByDesc('issued_date')
             ->limit($limit)
             ->get();
+    }
+
+    public static function resources(string $tenantId, int $limit = 40): Collection
+    {
+        $circulars = Circular::where('tenant_id', $tenantId)->orderByDesc('issued_date')->limit($limit)->get()->map(fn ($item) => [
+            'title' => $item->title,
+            'category' => $item->category ?: 'Circular',
+            'year' => $item->academic_year ?: $item->issued_date?->format('Y'),
+            'date' => $item->issued_date?->format('d M Y'),
+            'url' => $item->file_path ? asset('storage/'.$item->file_path) : '#',
+            'type' => strtoupper(pathinfo($item->file_path ?? '', PATHINFO_EXTENSION) ?: 'Link'),
+            'size' => null,
+            'sort_date' => $item->issued_date?->timestamp ?? 0,
+        ]);
+
+        $downloads = Download::where('tenant_id', $tenantId)->active()->limit($limit)->get()->map(fn ($item) => [
+            'title' => $item->title,
+            'category' => $item->category_label,
+            'year' => $item->academic_year ?: $item->updated_at?->format('Y'),
+            'date' => $item->updated_at?->format('d M Y'),
+            'url' => $item->file_path ? asset('storage/'.$item->file_path) : '#',
+            'type' => strtoupper(pathinfo($item->file_name ?: $item->file_path, PATHINFO_EXTENSION) ?: 'File'),
+            'size' => $item->file_size,
+            'sort_date' => $item->updated_at?->timestamp ?? 0,
+        ]);
+
+        return $circulars->concat($downloads)->sortByDesc('sort_date')->take($limit)->values();
     }
 
     public static function announcements(string $tenantId, array $config = [], int $limit = 5): Collection

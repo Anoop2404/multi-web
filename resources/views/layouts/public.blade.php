@@ -59,7 +59,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/public.js'])
 </head>
-<body class="font-body text-gray-800 bg-white">
+<body class="font-body text-gray-800 bg-white experience-{{ $experience['key'] ?? 'classic' }} mode-{{ $experience['homepage_mode'] ?? 'evergreen' }}" data-experience="{{ $experience['key'] ?? 'classic' }}">
 
     {{-- Global widgets: topbar (phone/email/socials) --}}
     @include('partials.widgets.topbar')

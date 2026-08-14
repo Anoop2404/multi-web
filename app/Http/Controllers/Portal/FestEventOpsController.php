@@ -745,7 +745,7 @@ class FestEventOpsController extends Controller
             ->where('user_id', $user->id)
             ->exists();
 
-        abort_unless($has, 403);
+        abort_unless($has, 403, 'You\'re not assigned to this event.');
     }
 
     private function authorizeDuty(Request $request, int $eventId, string $duty): void
@@ -760,7 +760,7 @@ class FestEventOpsController extends Controller
             ->where('duty', $duty)
             ->exists();
 
-        abort_unless($has, 403);
+        abort_unless($has, 403, 'You\'re not assigned to this duty for this event.');
     }
 
     /** @param  list<string>  $duties */
@@ -776,7 +776,7 @@ class FestEventOpsController extends Controller
             ->whereIn('duty', $duties)
             ->exists();
 
-        abort_unless($has, 403);
+        abort_unless($has, 403, 'You\'re not assigned to any of the required duties for this event.');
     }
 
     private function assignmentsFor($user, string $tenantId)

@@ -794,6 +794,27 @@ class FestSchoolEventFeeService
     }
 
     /**
+     * Eagerly recalculate every already-registered school's fee for this event. Used
+     * when the fee schedule itself changes (FestEventSettingsController::
+     * updateFeeSettings()/updateItemFee()) so already-registered schools see the
+     * corrected amount on their next page view instead of carrying a stale total_due
+     * until some other registration write event (create/withdraw/approve) happens to
+     * refresh it. Mirrors the exact "recalculate eagerly here, it's cheap and
+     * idempotent" pattern propagateFeeSettingsToChildren() already uses for partition
+     * children — see that method's own comment for the reasoning; this is the same
+     * fix applied to the event itself (which propagateFeeSettingsToChildren() never
+     * touches — it only cascades to child partitions).
+     */
+    public function recalculateAllRegisteredSchools(FestEvent $event): void
+    {
+        FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
+            ->distinct()
+            ->pluck('school_id')
+            ->each(fn (string $schoolId) => $this->recalculate($event, $schoolId));
+    }
+
+    /**
      * For sports_composite events billed per Event Head, `recalculate()` no longer manages a
      * single payable record — each head has its own fee record, paid independently (see
      * recalculateForHead/attachPaymentForHead/isHeadPaid). This method keeps every per-head

@@ -84,11 +84,14 @@
 
                     <div class="flex flex-wrap items-center gap-3 text-xs text-slate-600 pt-2 border-t border-slate-100">
                         <span class="capitalize font-semibold text-slate-700">Status: {{ r.status }}</span>
-                        <span v-if="r.hall_ticket_no" class="bg-amber-50 text-amber-900 font-mono font-bold px-2 py-0.5 rounded border border-amber-200">
+                        <span v-if="r.show_hall_ticket" class="bg-amber-50 text-amber-900 font-mono font-bold px-2 py-0.5 rounded border border-amber-200">
                             Ticket #{{ r.hall_ticket_no }}
                         </span>
-                        <span v-if="r.hall_room || r.seat_no" class="text-slate-700 font-medium">
+                        <span v-if="r.show_hall_ticket && (r.hall_room || r.seat_no)" class="text-slate-700 font-medium">
                             Hall: {{ r.hall_room || '—' }} {{ r.seat_no ? `· Seat ${r.seat_no}` : '' }}
+                        </span>
+                        <span v-else-if="r.approval_status === 'approved' && !r.show_hall_ticket" class="text-slate-400 italic">
+                            Hall ticket not released yet
                         </span>
                     </div>
 

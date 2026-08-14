@@ -18,7 +18,8 @@ class StudentMcqController extends Controller
         $student = $request->attributes->get('portalStudent');
         abort_if($registration->school_id !== $tenantId || $registration->student_id !== $student->id, 403);
 
-        $registration->load(['exam', 'student', 'school']);
+        $registration->load(['exam', 'student.schoolClass', 'school']);
+        abort_unless($registration->exam?->hall_tickets_published, 403, 'Hall tickets have not been released by Sahodaya yet.');
 
         return view('mcq.hall-ticket', [
             'registration' => $registration,

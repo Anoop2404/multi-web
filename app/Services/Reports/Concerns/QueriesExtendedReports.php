@@ -2014,8 +2014,13 @@ trait QueriesExtendedReports
             ->orderByDesc('percentage')
             ->orderBy('rank')
             ->get()
-            ->map(fn (Topper $t) => [
-                'rank' => $t->rank,
+            ->values()
+            ->map(fn (Topper $t, int $i) => [
+                // Sl. no. by list position, not $t->rank — that field is each school's own
+                // self-reported rank within its own topper submission, so across schools it's
+                // duplicated (multiple "1"s) and out of order relative to percentage. Not a
+                // meaningful cross-school rank, so we don't show it as one.
+                'sl_no' => $i + 1,
                 'student' => $t->name,
                 'school' => $names[$t->tenant_id] ?? $t->tenant_id,
                 'admission_no' => $t->admission_no,
@@ -2045,14 +2050,18 @@ trait QueriesExtendedReports
             ->orderByDesc('percentage')
             ->get()
             ->filter(fn (Topper $t) => !blank($t->examStream?->label ?? $t->stream) && !in_array(strtolower(trim($t->examStream?->label ?? $t->stream)), ['unknown', 'unknown stream', 'general', 'general / all streams'], true))
-            ->map(fn (Topper $t) => [
-                'stream' => $t->examStream?->label ?? $t->stream,
-                'rank' => $t->rank,
+            // Sl. no. resets per stream (not $t->rank, each school's own self-reported rank —
+            // see rptBoardClassXMerit() above for why that's not a meaningful cross-school number).
+            ->groupBy(fn (Topper $t) => $t->examStream?->label ?? $t->stream)
+            ->flatMap(fn ($group, $streamLabel) => $group->values()->map(fn (Topper $t, int $i) => [
+                'stream' => $streamLabel,
+                'sl_no' => $i + 1,
                 'student' => $t->name,
                 'school' => $names[$t->tenant_id] ?? $t->tenant_id,
                 'percentage' => $t->percentage,
                 'admission_no' => $t->admission_no,
                 'roll_no' => $t->roll_no,
-            ]);
+            ]))
+            ->values();
     }
 }

@@ -40,7 +40,7 @@ class FestSubstitutionReviewController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_unless(in_array($substitutionRequest->event_id, $event->reportableEventIds(), true), 403);
-        abort_unless($substitutionRequest->status === 'pending', 422);
+        abort_unless($substitutionRequest->status === 'pending', 422, 'Only pending substitution requests can be reviewed.');
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);
 
@@ -75,7 +75,7 @@ class FestSubstitutionReviewController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_unless(in_array($substitutionRequest->event_id, $event->reportableEventIds(), true), 403);
-        abort_unless($substitutionRequest->status === 'pending', 422);
+        abort_unless($substitutionRequest->status === 'pending', 422, 'Only pending substitution requests can be reviewed.');
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);
 

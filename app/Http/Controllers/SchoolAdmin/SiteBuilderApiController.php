@@ -13,9 +13,9 @@ use Illuminate\Validation\ValidationException;
 
 class SiteBuilderApiController extends SchoolAdminController
 {
-    public function sections(): JsonResponse
+    public function sections(Request $request): JsonResponse
     {
-        return app(BuilderApiController::class)->sections($this->school->id);
+        return app(BuilderApiController::class)->sections($request, $this->school->id);
     }
 
     public function storeSection(Request $request): JsonResponse
@@ -39,12 +39,12 @@ class SiteBuilderApiController extends SchoolAdminController
 
     public function deleteSection(string $tenantId, int $sectionId): JsonResponse
     {
-        return app(BuilderApiController::class)->deleteSection($this->school->id, $sectionId);
+        return app(BuilderApiController::class)->deleteSection(request(), $this->school->id, $sectionId);
     }
 
     public function toggleSection(string $tenantId, int $sectionId): JsonResponse
     {
-        return app(BuilderApiController::class)->toggleSection($this->school->id, $sectionId);
+        return app(BuilderApiController::class)->toggleSection(request(), $this->school->id, $sectionId);
     }
 
     public function reorderSections(Request $request): JsonResponse
@@ -54,17 +54,17 @@ class SiteBuilderApiController extends SchoolAdminController
 
     public function publishSection(string $tenantId, int $sectionId): JsonResponse
     {
-        return app(BuilderApiController::class)->publishSection($this->school->id, $sectionId);
+        return app(BuilderApiController::class)->publishSection(request(), $this->school->id, $sectionId);
     }
 
     public function sectionVersions(string $tenantId, int $sectionId): JsonResponse
     {
-        return app(BuilderApiController::class)->sectionVersions($this->school->id, $sectionId);
+        return app(BuilderApiController::class)->sectionVersions(request(), $this->school->id, $sectionId);
     }
 
     public function restoreSectionVersion(string $tenantId, int $sectionId, int $versionId): JsonResponse
     {
-        return app(BuilderApiController::class)->restoreSectionVersion($this->school->id, $sectionId, $versionId);
+        return app(BuilderApiController::class)->restoreSectionVersion(request(), $this->school->id, $sectionId, $versionId);
     }
 
     public function getNav(): JsonResponse

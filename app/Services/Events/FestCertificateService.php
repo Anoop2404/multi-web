@@ -188,11 +188,23 @@ class FestCertificateService
      * Build the template/background/field data needed to render a fest certificate,
      * merged with the existing entity payload from payloadFor().
      *
+     * @param  ?array<string, mixed>  $payload  Precomputed payloadFor()/payloadsFor()-shaped
+     *                                           data, to avoid a redundant find() query when
+     *                                           rendering many certificates in a loop (see
+     *                                           FestCertificateController::downloadZip()).
+     *                                           Defaults to null, which computes it exactly as
+     *                                           before — single-certificate callers unaffected.
+     * @param  array<string, ?CertificateTemplate>  $templateCache  Pass the same array by
+     *                                           reference across multiple renderContext() calls
+     *                                           in a loop so the same event+item+type template
+     *                                           isn't re-queried for every certificate. Defaults
+     *                                           to a fresh (unshared) array, so single calls
+     *                                           behave exactly as before.
      * @return array<string, mixed>
      */
-    public function renderContext(Certificate $certificate): array
+    public function renderContext(Certificate $certificate, ?array $payload = null, array &$templateCache = []): array
     {
-        $payload = $this->payloadFor($certificate);
+        $payload ??= $this->payloadFor($certificate);
 
         /** @var ?FestEvent $event */
         $event = $payload['event'] ?? null;
@@ -200,7 +212,15 @@ class FestCertificateService
 
         $sahodaya = $event ? Tenant::find($event->tenant_id) : null;
 
-        $template = $event ? $this->resolveTemplate($event, $itemId, $certificate->cert_type) : null;
+        $templateCacheKey = $event ? $event->id.':'.($itemId ?? '0').':'.$certificate->cert_type : null;
+        if ($templateCacheKey !== null && array_key_exists($templateCacheKey, $templateCache)) {
+            $template = $templateCache[$templateCacheKey];
+        } else {
+            $template = $event ? $this->resolveTemplate($event, $itemId, $certificate->cert_type) : null;
+            if ($templateCacheKey !== null) {
+                $templateCache[$templateCacheKey] = $template;
+            }
+        }
 
         $logoUrl = $template?->logo_path && $sahodaya
             ? TenantStorage::logoUrl($sahodaya, $template->logo_path)
@@ -305,6 +325,77 @@ class FestCertificateService
                 : null,
             'recordBreak' => null,
         ];
+    }
+
+    /**
+     * Batch-resolve payloadFor()-shaped data for many certificates in a fixed number of
+     * queries instead of one (or two, for FestParticipant certs, since payloadFor() also
+     * does a per-participant FestMark lookup) query per certificate. Same output shape as
+     * payloadFor(), keyed by certificate id. Used by list/export endpoints that previously
+     * called payloadFor() once per row inside a loop — see
+     * FestCertificateController::index()/downloadZip().
+     *
+     * @param  \Illuminate\Support\Collection<int, Certificate>  $certificates
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>> keyed by certificate id
+     */
+    public function payloadsFor(\Illuminate\Support\Collection $certificates): \Illuminate\Support\Collection
+    {
+        $participantEntityIds = $certificates->where('entity_type', FestParticipant::class)->pluck('entity_id');
+        $recordBreakEntityIds = $certificates->where('entity_type', FestRecordBreak::class)->pluck('entity_id');
+
+        $participants = FestParticipant::with(['student', 'registration.item', 'registration.event'])
+            ->whereIn('id', $participantEntityIds)
+            ->get()
+            ->keyBy('id');
+
+        // Same "one mark per participant" semantics as payloadFor()'s per-participant
+        // FestMark::where('participant_id', ...)->first() call — ordered by id so the
+        // batched result is deterministic. payloadFor()'s original query had no explicit
+        // order, so this doesn't change which mark is picked in practice for the common
+        // case (a participant with zero or one mark row), only makes it well-defined for
+        // the rare case of more than one.
+        $marksByParticipant = FestMark::whereIn('participant_id', $participants->keys())
+            ->orderBy('id')
+            ->get()
+            ->groupBy('participant_id')
+            ->map(fn ($group) => $group->first());
+
+        $recordBreaks = FestRecordBreak::with([
+            'event',
+            'item',
+            'participant.student',
+            'participant.registration.school',
+        ])->whereIn('id', $recordBreakEntityIds)
+            ->get()
+            ->keyBy('id');
+
+        return $certificates->mapWithKeys(function (Certificate $certificate) use ($participants, $marksByParticipant, $recordBreaks) {
+            if ($certificate->entity_type === FestRecordBreak::class) {
+                $break = $recordBreaks->get($certificate->entity_id);
+
+                return [$certificate->id => [
+                    'certificate' => $certificate,
+                    'participant' => $break?->participant,
+                    'student'     => $break?->participant?->student,
+                    'event'       => $break?->event,
+                    'item'        => $break?->item,
+                    'mark'        => null,
+                    'recordBreak' => $break,
+                ]];
+            }
+
+            $participant = $participants->get($certificate->entity_id);
+
+            return [$certificate->id => [
+                'certificate' => $certificate,
+                'participant' => $participant,
+                'student'     => $participant?->student,
+                'event'       => $participant?->registration?->event,
+                'item'        => $participant?->registration?->item,
+                'mark'        => $participant ? $marksByParticipant->get($participant->id) : null,
+                'recordBreak' => null,
+            ]];
+        });
     }
 
     /** @return array<string, mixed> */

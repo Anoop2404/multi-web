@@ -215,17 +215,36 @@ class AnnualRegistrationController extends SchoolAdminController
         return back()->with('success', 'Region saved.');
     }
 
-    public function students(EffectiveMasterDataResolver $resolver)
+    public function students(EffectiveMasterDataResolver $resolver, Request $request)
     {
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
 
+        // Previously ->get() with no limit — a school with ~3000 active students
+        // (see docs/SCALE_AND_PAGINATION_PLAN.md's corrected per-school scale note)
+        // shipped its entire roster on every visit to this read-only snapshot page.
+        // studentTotal is kept as its own count query (not derived from the page of
+        // rows) since it also drives the "submit for review" button's disabled state.
+        $studentTotal = Student::where('tenant_id', $this->school->id)
+            ->where('status', 'active')
+            ->count();
+
+        $search = trim((string) $request->query('search', ''));
+
         $students = Student::where('tenant_id', $this->school->id)
             ->where('status', 'active')
+            ->when($search !== '', function ($query) use ($search) {
+                $like = '%'.mb_strtolower($search).'%';
+                $query->where(function ($q) use ($like) {
+                    $q->whereRaw('LOWER(name) LIKE ?', [$like])
+                        ->orWhereRaw('LOWER(reg_no) LIKE ?', [$like]);
+                });
+            })
             ->with('schoolClass.classCategory')
             ->orderBy('name')
-            ->get()
-            ->map(fn (Student $student) => [
+            ->paginate(50)
+            ->withQueryString()
+            ->through(fn (Student $student) => [
                 'id'           => $student->id,
                 'name'         => $student->name,
                 'reg_no'       => $student->reg_no,
@@ -244,7 +263,8 @@ class AnnualRegistrationController extends SchoolAdminController
             'submission'   => $submission,
             'profile'      => $this->registrationProfilePayload(),
             'students'     => $students,
-            'studentTotal' => $students->count(),
+            'studentTotal' => $studentTotal,
+            'search'       => $search,
         ]);
     }
 
@@ -289,7 +309,7 @@ class AnnualRegistrationController extends SchoolAdminController
         // Counts can also be edited after approval, so a school can report a mid-year
         // enrollment increase; this only updates the saved rows, it does not change
         // counts_status — the school must still explicitly resubmit for Sahodaya review.
-        abort_unless(in_array($submission->counts_status, ['pending', 'rejected', 'approved']), 403);
+        abort_unless(in_array($submission->counts_status, ['pending', 'rejected', 'approved']), 403, 'This action isn\'t available at the registration\'s current status.');
 
         $data = $request->validate([
             'counts' => 'required|array',
@@ -351,7 +371,7 @@ class AnnualRegistrationController extends SchoolAdminController
         $this->assertRegistrationEditAllowed($windowService);
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
-        abort_unless(in_array($submission->teacher_status, ['pending', 'rejected']), 403);
+        abort_unless(in_array($submission->teacher_status, ['pending', 'rejected']), 403, 'Teacher registration can only be edited while pending or rejected.');
 
         $data = $request->validate([
             'name'             => 'required|string|max:255',
@@ -370,7 +390,7 @@ class AnnualRegistrationController extends SchoolAdminController
         $this->assertRegistrationEditAllowed($windowService);
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
-        abort_unless(in_array($submission->teacher_status, ['pending', 'rejected']), 403);
+        abort_unless(in_array($submission->teacher_status, ['pending', 'rejected']), 403, 'Teacher registration can only be edited while pending or rejected.');
 
         $data = $request->validate([
             'teachers'                    => 'required|array|min:1|max:50',
@@ -508,7 +528,7 @@ class AnnualRegistrationController extends SchoolAdminController
     {
         $registration = app(RegistrationStatusService::class)
             ->ensureMembershipFee($this->currentRegistration());
-        abort_unless(in_array($registration->registration_status, ['payment_pending', 'payment_rejected']), 403);
+        abort_unless(in_array($registration->registration_status, ['payment_pending', 'payment_rejected']), 403, 'Payment can only be resubmitted while pending or rejected.');
 
         if ($registration->membership_fee_amount === null) {
             return back()->with('error', 'Membership fee is not configured yet. Please contact your Sahodaya office.');

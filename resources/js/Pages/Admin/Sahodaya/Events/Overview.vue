@@ -150,14 +150,14 @@
                             <FormField label="Event Title" class-extra="sm:col-span-2" required>
                                 <input v-model="form.title" class="field" required>
                             </FormField>
-                            <FormField label="Lifecycle Phase Status" class-extra="sm:col-span-2">
+                            <FormField label="Lifecycle Phase Status" class-extra="sm:col-span-2" :hint="nextStepHint">
                                 <select v-model="form.status" class="field font-medium">
-                                    <option value="draft">Draft (setup — Sahodaya only)</option>
-                                    <option v-if="!isSports" value="published">Published</option>
-                                    <option v-if="isSports" value="published">Published (Sahodaya announce only)</option>
-                                    <option value="registration_open">Registration open</option>
-                                    <option value="ongoing">Ongoing</option>
-                                    <option value="completed">Completed</option>
+                                    <option value="draft" :disabled="!isStatusReachable('draft')">Draft (setup — Sahodaya only)</option>
+                                    <option v-if="!isSports" value="published" :disabled="!isStatusReachable('published')">Published</option>
+                                    <option v-if="isSports" value="published" :disabled="!isStatusReachable('published')">Published (Sahodaya announce only)</option>
+                                    <option value="registration_open" :disabled="!isStatusReachable('registration_open')">Registration open</option>
+                                    <option value="ongoing" :disabled="!isStatusReachable('ongoing')">Ongoing</option>
+                                    <option value="completed" :disabled="!isStatusReachable('completed')">Completed</option>
                                 </select>
                             </FormField>
                         </FormGrid>
@@ -299,7 +299,29 @@
                         </div>
                     </div>
 
-                    <p v-if="form.hasErrors" class="text-sm text-red-600 font-medium">
+                    <div v-if="form.errors.status" class="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+                        <span class="text-lg leading-none">⚠️</span>
+                        <div class="flex-1">
+                            <p class="text-sm font-bold text-amber-900">
+                                Can't skip ahead to "{{ statusLabels[form.status] ?? form.status }}"
+                            </p>
+                            <p class="text-xs text-amber-800 mt-1 leading-relaxed">
+                                This event is currently <strong>{{ statusLabels[event.status] ?? event.status }}</strong>.
+                                Phases move one step at a time —
+                                <template v-if="nextStepLabelList.length">
+                                    the next allowed step{{ nextStepLabelList.length > 1 ? 's are' : ' is' }}
+                                    <strong>{{ nextStepLabelList.join(' or ') }}</strong>.
+                                </template>
+                                <template v-else>this event has no further steps available.</template>
+                            </p>
+                            <button v-if="firstNextStatus" type="button"
+                                    class="btn-primary text-xs mt-2.5 !bg-amber-600 hover:!bg-amber-700 !border-transparent"
+                                    :disabled="form.processing" @click="applyNextStatus">
+                                {{ form.processing ? 'Saving...' : `Set to ${statusLabels[firstNextStatus]} instead` }}
+                            </button>
+                        </div>
+                    </div>
+                    <p v-else-if="form.hasErrors" class="text-sm text-red-600 font-medium">
                         {{ Object.values(form.errors).flat().join(' ') }}
                     </p>
                     <div class="flex justify-end pt-3 border-t border-slate-100">
@@ -409,6 +431,60 @@ function statusClass(status) {
         ongoing: 'bg-amber-100 text-amber-900 border-amber-200',
         completed: 'bg-violet-100 text-violet-800 border-violet-200',
     }[status] ?? 'bg-slate-100 text-slate-700 border-slate-200';
+}
+
+// Mirrors App\Support\StatusTransitionGuard::FEST_EVENT_TRANSITIONS.
+// Keeping this in sync with the backend lets us disable illegal phase
+// jumps in the UI instead of letting the user hit a raw validation error.
+const FEST_EVENT_TRANSITIONS = {
+    draft: ['published', 'cancelled'],
+    published: ['registration_open', 'draft', 'cancelled'],
+    registration_open: ['ongoing', 'published', 'cancelled'],
+    ongoing: ['completed', 'cancelled'],
+    completed: [],
+    cancelled: ['draft'],
+};
+
+const statusLabels = {
+    draft: 'Draft',
+    published: 'Published',
+    registration_open: 'Registration open',
+    ongoing: 'Ongoing',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+};
+
+// Statuses reachable from the event's *persisted* status (not the
+// in-progress form value) — this is what the backend guard will accept.
+const allowedNextStatuses = computed(() => {
+    const current = props.event.status;
+    return new Set([current, ...(FEST_EVENT_TRANSITIONS[current] ?? [])]);
+});
+
+function isStatusReachable(status) {
+    return allowedNextStatuses.value.has(status);
+}
+
+const nextStepLabelList = computed(() => {
+    const current = props.event.status;
+    return (FEST_EVENT_TRANSITIONS[current] ?? [])
+        .filter((s) => s !== 'cancelled')
+        .map((s) => statusLabels[s] ?? s);
+});
+
+const nextStepHint = computed(() => {
+    if (!nextStepLabelList.value.length) return '';
+    return `From ${statusLabels[props.event.status] ?? props.event.status}, you can move to: ${nextStepLabelList.value.join(' or ')}.`;
+});
+
+const firstNextStatus = computed(() => {
+    return (FEST_EVENT_TRANSITIONS[props.event.status] ?? []).find((s) => s !== 'cancelled') ?? null;
+});
+
+function applyNextStatus() {
+    if (!firstNextStatus.value) return;
+    form.status = firstNextStatus.value;
+    saveEvent();
 }
 
 const form = useForm({

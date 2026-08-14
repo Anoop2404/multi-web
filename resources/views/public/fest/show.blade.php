@@ -8,16 +8,30 @@
         @unless($event->results_published)
         <p class="text-xs text-amber-700 mt-2">Live fest — participant names hidden on-stage until results are published.</p>
         @endunless
+
+        @include('public.fest.partials.scope-nav', [
+            'routeName' => 'tenant.fest.show',
+            'class' => 'mt-6 mb-2',
+        ])
+
+        @if(($selectedScope['key'] ?? 'overall') !== 'overall')
+        <p class="text-sm text-gray-500 mt-3">Viewing {{ $selectedScope['label'] }} pages for this event.</p>
+        @endif
+
         <div class="grid sm:grid-cols-2 gap-3 mt-8">
-            @if($event->schedule_published)
-            <a href="{{ route('tenant.fest.schedule', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">📅 Schedule</a>
+            @if($scopeSchedulePublished)
+            <a href="{{ route('tenant.fest.schedule', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">📅 {{ $selectedScope['label'] }} Schedule</a>
             @else
             <div class="p-4 bg-gray-50 border rounded-xl text-sm text-gray-500">📅 Schedule — not published yet</div>
             @endif
-            <a href="{{ route('tenant.fest.live', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🔴 Live Scoreboard</a>
-            <a href="{{ route('tenant.fest.scoreboard', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🏆 Category Scoreboard</a>
-            @if($event->results_published)
-            <a href="{{ route('tenant.fest.results', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🥇 Published Results</a>
+            <a href="{{ route('tenant.fest.live', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🔴 Live Event</a>
+            @if($scopeResultsPublished)
+            <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🏆 {{ $selectedScope['label'] }} Scoreboard</a>
+            @else
+            <div class="p-4 bg-gray-50 border rounded-xl text-sm text-gray-500">🏆 Scoreboard — not published yet</div>
+            @endif
+            @if($scopeResultsPublished)
+            <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🥇 {{ $selectedScope['label'] }} Results</a>
             @endif
             @if($event->manual_pdf_path)
             <a href="{{ route('tenant.fest.manual', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">📄 Event Manual (PDF)</a>
@@ -40,7 +54,7 @@
                 @endif
             </a>
             @endif
-            @if($event->results_published)
+            @if($scopeResultsPublished)
             <a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}"
                class="p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm hover:border-amber-400 block">
                 {{ $item->title }} — results

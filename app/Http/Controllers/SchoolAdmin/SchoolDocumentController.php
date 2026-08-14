@@ -38,7 +38,7 @@ class SchoolDocumentController extends SchoolAdminController
     public function store(Request $request)
     {
         $sahodayaId = $this->school->parent_id;
-        abort_unless($sahodayaId, 403);
+        abort_unless($sahodayaId, 403, 'Your school isn\'t linked to a Sahodaya yet. Contact your Sahodaya admin.');
 
         $request->validate([
             'document_type_id' => 'required|exists:school_document_types,id',
