@@ -13,7 +13,7 @@ table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4p
 <p class="meta">All schools · submitted and approved registrations</p>
 <table>
 <thead><tr>
-    <th>Head</th><th>Item</th><th>Class</th><th>Schools</th><th>Approved</th><th>Pending</th><th>Participants</th><th>Item IDs</th><th>Fee/item</th>
+    <th>Head</th><th>Item</th><th>Class</th><th>Schools</th><th>Approved</th><th>Pending</th><th>Participants</th><th>Item IDs</th>
 </tr></thead>
 <tbody>
 @foreach($items as $item)
@@ -26,7 +26,6 @@ table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4p
     <td>{{ $item->pending }}</td>
     <td>{{ $item->participants }}</td>
     <td>{{ $item->item_reg_assigned ?? '—' }}</td>
-    <td>@if($item->fee_per_item !== null) ₹{{ $item->fee_per_item }}@else — @endif</td>
 </tr>
 @endforeach
 </tbody></table>

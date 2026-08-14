@@ -3,14 +3,26 @@
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Item registration counts`" eyebrow="Reports"
                     :description="event.event_type === 'sports'
-                        ? 'Registrations, participants, schools and fees per item — grouped by Sport Event.'
-                        : 'Registrations, participants, schools and fees per item — grouped by item head.'">
+                        ? 'Registrations, participants, and limits per item — grouped by Sport Event.'
+                        : 'Registrations, participants, and limits per item — grouped by item head.'">
             <template #actions>
                 <a :href="pdfUrl" target="_blank" class="btn-secondary text-sm">Export PDF ↓</a>
             </template>
         </PageHeader>
 
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="item-counts" />
+
+        <!-- Region Switcher -->
+        <div v-if="childEvents.length" class="card mb-4 !py-3">
+            <div class="flex flex-wrap gap-3 items-center">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}</label>
+                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
+                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
+                        {{ ev.short_title || ev.title }}
+                    </option>
+                </select>
+            </div>
+        </div>
 
         <ReportHeadFilter v-if="hasItemHeads"
                           v-model="headFilter"
@@ -20,7 +32,7 @@
                           :is-sports="event.event_type === 'sports'"
                           @apply="applyFilter" />
 
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ filteredTotals.items }}</p>
                 <p class="text-xs text-slate-500 mt-1">Items</p>
@@ -37,13 +49,6 @@
                 <p class="text-xl font-bold text-amber-700">{{ filteredTotals.pending }}</p>
                 <p class="text-xs text-slate-500 mt-1">Awaiting review</p>
             </div>
-            <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold text-indigo-700">
-                    <template v-if="filteredTotals.estimated_fee">₹{{ filteredTotals.estimated_fee }}</template>
-                    <template v-else>—</template>
-                </p>
-                <p class="text-xs text-slate-500 mt-1">Est. total fee</p>
-            </div>
         </div>
 
         <section v-if="headSummary?.length" class="mb-8">
@@ -59,7 +64,6 @@
                             <th>Pending</th>
                             <th>Participants</th>
                             <th>Max item regs</th>
-                            <th>Est. fee</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -73,10 +77,6 @@
                             <td>
                                 <span v-if="row.max_item_title" class="text-xs text-slate-500 block">{{ row.max_item_title }}</span>
                                 {{ row.busiest_item_regs ?? row.max_item_reg_count ?? 0 }}
-                            </td>
-                            <td>
-                                <template v-if="row.estimated_fee">₹{{ row.estimated_fee }}</template>
-                                <template v-else>—</template>
                             </td>
                         </tr>
                     </tbody>
@@ -102,14 +102,12 @@
                             <th>Participants</th>
                             <th>Item IDs</th>
                             <th>Max / school</th>
-                            <th>Fee / item</th>
-                            <th>Line fee</th>
                         </tr>
                     </thead>
                     <tbody>
                         <template v-for="(row, idx) in displayRows" :key="row.item_id">
                             <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                                <td colspan="15" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                <td colspan="12" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                     {{ row.head_name ?? 'Other items' }}
                                 </td>
                             </tr>
@@ -137,18 +135,10 @@
                                 <td>{{ row.participant_count }}</td>
                                 <td>{{ row.item_reg_assigned }}</td>
                                 <td>{{ row.max_per_school ?? '—' }}</td>
-                                <td>
-                                    <template v-if="row.fee_per_item !== null">₹{{ row.fee_per_item }}</template>
-                                    <template v-else>—</template>
-                                </td>
-                                <td>
-                                    <template v-if="row.line_fee !== null">₹{{ row.line_fee }}</template>
-                                    <template v-else>—</template>
-                                </td>
                             </tr>
                         </template>
                         <tr v-if="!displayRows.length">
-                            <td colspan="15" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
+                            <td colspan="12" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -161,6 +151,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
@@ -177,9 +168,14 @@ const props = defineProps({
     totals: Object,
     pdfUrl: String,
     activityLogs: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/item-counts`;
+
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports/item-counts`);
+}
 
 const {
     headFilter,
@@ -197,7 +193,6 @@ const filteredTotals = computed(() => ({
     approved: displayRows.value.reduce((n, r) => n + r.approved, 0),
     pending: displayRows.value.reduce((n, r) => n + r.pending, 0),
     registrations: displayRows.value.reduce((n, r) => n + r.registration_count, 0),
-    estimated_fee: Math.round(displayRows.value.reduce((n, r) => n + (r.line_fee ?? 0), 0) * 100) / 100,
 }));
 
 const filteredHeadSummary = computed(() => {

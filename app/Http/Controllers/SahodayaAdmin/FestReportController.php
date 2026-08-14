@@ -399,6 +399,7 @@ class FestReportController extends SahodayaAdminController
             'headSummary' => $analytics->headRegistrationSummary(),
             'totals'      => $analytics->itemRegistrationTotals($rows),
             'pdfUrl'      => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/item-list",
+            'childEvents' => $event->sportEventDropdownOptions(),
         ])));
     }
 
