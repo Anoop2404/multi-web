@@ -111,8 +111,12 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
     );
 
     workflowItems.push(
-        { label: 'Reports', href: reportsBase, icon: 'file-text', exact: true },
-        { label: 'Entry Form', href: `${eventBase}/games-entry-form`, icon: 'file-text' },
+        { label: 'Reports', href: reportsBase, icon: 'file-text', exact: true }
+    );
+    if (isSports) {
+        workflowItems.push({ label: 'Entry Form', href: `${eventBase}/games-entry-form`, icon: 'file-text' });
+    }
+    workflowItems.push(
         { label: 'ID Cards', href: `${reportsBase}/id-cards`, icon: 'credit-card' },
         { label: 'Clash requests', href: `${eventBase}/clash-requests`, icon: 'alert-circle' },
         { label: 'Substitutions', href: `${eventBase}/substitution-requests`, icon: 'repeat' },

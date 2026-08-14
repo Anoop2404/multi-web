@@ -192,8 +192,8 @@ class FestReportCatalog
 
         if ($eventType === 'sports') {
             $pages = array_values(array_filter($pages, fn ($p) => $p['id'] !== 'area-wise-participants'));
-        } elseif ($eventType !== null) {
-            $pages = array_values(array_filter($pages, fn ($p) => $p['id'] !== 'house-detailed'));
+        } else {
+            $pages = array_values(array_filter($pages, fn ($p) => !in_array($p['id'], ['house-detailed', 'games-entry-form'], true)));
         }
 
         return $pages;
@@ -205,12 +205,19 @@ class FestReportCatalog
      * pulls in the hub's own uncopied item/registration rows alongside the child's own —
      * not full cross-region combination, but not correctly isolated either. Confirmed by
      * a manual audit (see docs/REGION_PHASE_EVENT_REPORTING_REMEDIATION_PLAN.md Phase 1
-     * completion notes): Item Counts, Head-wise Participants, Discipline Registration,
-     * Mark Entry Status, Schedule/Clashes, and Assignment Completeness. Only these ids
-     * get rerouted through the parent hub + region_id by regionScopedRows() below; every
-     * other report keeps linking to the child event's own id/URL (its existing, working
-     * behavior) rather than blanket-rerouting everything, which would regress reports
-     * that don't understand region_id into showing fully combined data unlabeled.
+     * completion notes): originally Item Counts, Head-wise Participants, Discipline
+     * Registration, Mark Entry Status, Schedule/Clashes, and Assignment Completeness;
+     * fee/payment and attendance were added shortly after when the same issue was found
+     * there. A second pass (2026-08-14) found and fixed the identical issue in School
+     * Detailed, House Detailed, Participation Counts, Area-wise Participants, Age Group
+     * Matrix, Item Schedule, Numbering Register, Pending Approvals, Student-wise, and
+     * Item-wise — those ids are included below now too. Only ids in this list get
+     * rerouted through the parent hub + region_id by regionScopedRows() below (and
+     * through regionAwareTargetEvent() by FestReportController::export()'s generic
+     * dispatcher); every other report keeps linking to the child event's own id/URL (its
+     * existing, working behavior) rather than blanket-rerouting everything, which would
+     * regress reports that don't understand region_id into showing fully combined data
+     * unlabeled.
      *
      * @var list<string>
      */
@@ -229,6 +236,20 @@ class FestReportCatalog
         // own reportAwareTargetEvent()-equivalent fix is applied there — see
         // FestAttendanceController).
         'attendance', 'attendance-sheet', 'attendance-sheet-school',
+        // Second retrofit pass (2026-08-14): same reportableEventIds()/reportableItemIds()
+        // issue found in the remaining FestReportController interactive pages and their
+        // catalog-driven exports. Both the interactivePages() id and the exports() id are
+        // listed for each report where the two catalogs use different ids for the same
+        // report (school-detailed page vs. school-wise export, etc.) — regionScopedRows()
+        // is applied separately to each catalog, so both need to match this one flat list.
+        'school-detailed', 'school-wise',
+        'house-detailed', 'house-wise',
+        'participation-counts', 'student-participation',
+        'area-wise-participants', 'age-group-matrix',
+        'item-schedule', 'item-schedule-pdf',
+        'student-wise', 'student-wise-report',
+        'item-wise', 'item-participants',
+        'numbering-register', 'pending-approvals',
     ];
 
     /**

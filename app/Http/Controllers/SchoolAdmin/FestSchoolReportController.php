@@ -1441,6 +1441,10 @@ class FestSchoolReportController extends SchoolAdminController
     public function gamesEntryForm(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        if ($event->event_type !== 'sports') {
+            return redirect()->to("/school-admin/{$this->school->id}/{$program}/events/{$event->id}/registration")
+                ->with('error', 'The Games Entry Form is only available for Sports Events.');
+        }
 
         $sahodaya = Tenant::find($this->school->parent_id);
         $sahodayaLogoUrl = $sahodaya ? TenantBranding::logoUrl($sahodaya) : null;
@@ -1492,8 +1496,15 @@ class FestSchoolReportController extends SchoolAdminController
         $registrations = FestRegistration::whereIn('event_id', $reportableEventIds)
             ->where('school_id', $this->school->id)
             ->active()
+            ->whereHas('item', function ($q) {
+                $q->where(function ($query) {
+                    $query->whereNotNull('sport_discipline')
+                          ->orWhere('category', 'sports')
+                          ->orWhereIn('participant_type', ['team', 'group']);
+                });
+            })
             ->with([
-                'item:id,title,category,gender,age_group,sport_discipline',
+                'item:id,title,category,gender,age_group,sport_discipline,participant_type',
                 'participants.student.schoolClass',
             ])
             ->get();
