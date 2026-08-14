@@ -215,15 +215,13 @@
         </tr>
     </table>
 
-    <!-- Region Display (Displayed directly if event is region-based) -->
-    @if(!empty($regionName))
+    <!-- Region Display -->
     <table class="info-table">
         <tr>
             <td class="info-lbl" style="width: 60px;">Region:</td>
-            <td class="dots-underline">{{ $regionName }}</td>
+            <td class="dots-underline">{{ $regionName ?? 'District' }}</td>
         </tr>
     </table>
-    @endif
 
     <!-- Participants Table -->
     <table class="participants-table">

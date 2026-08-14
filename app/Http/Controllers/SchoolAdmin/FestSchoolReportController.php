@@ -1445,15 +1445,26 @@ class FestSchoolReportController extends SchoolAdminController
         $sahodaya = Tenant::find($this->school->parent_id);
         $sahodayaLogoUrl = $sahodaya ? TenantBranding::logoUrl($sahodaya) : null;
 
-        // Resolve Region Name if event is region-based
-        $regionName = null;
-        if (!empty($event->cluster_label)) {
-            $regionName = $event->cluster_label;
-        } elseif ($event->partition_role === 'region') {
-            $event->loadMissing('region');
-            $regionName = $event->region?->name ?? $event->cluster_key;
-        } elseif (preg_match('/REGION\s*[\d\w\s()]+/i', $event->title, $m)) {
-            $regionName = trim($m[0]);
+        // Resolve Region Name: e.g. "Tirur Region", "Manjeri Region", "Nilambur Region", else "District"
+        $rawRegionText = implode(' ', array_filter([
+            $event->cluster_label,
+            $event->cluster_key,
+            $event->title,
+            $event->partition_role === 'region' ? ($event->region?->name ?? null) : null,
+        ]));
+
+        if (stripos($rawRegionText, 'Tirur') !== false) {
+            $regionName = 'Tirur Region';
+        } elseif (stripos($rawRegionText, 'Manjeri') !== false) {
+            $regionName = 'Manjeri Region';
+        } elseif (stripos($rawRegionText, 'Nilambur') !== false) {
+            $regionName = 'Nilambur Region';
+        } elseif ($event->partition_role === 'region' && !empty($event->cluster_label)) {
+            $regionName = str_ends_with(strtolower($event->cluster_label), 'region')
+                ? $event->cluster_label
+                : $event->cluster_label . ' Region';
+        } else {
+            $regionName = 'District';
         }
 
         $reportableEventIds = $event->reportableEventIds();

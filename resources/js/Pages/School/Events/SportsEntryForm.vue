@@ -198,11 +198,10 @@
                             </div>
                         </div>
 
-                        <!-- Display Region Name directly if event is region-based (No Checkboxes) -->
-                        <div v-if="form.regionName" class="flex items-baseline pt-0.5">
+                        <div class="flex items-baseline pt-0.5">
                             <span class="font-bold whitespace-nowrap">Region:</span>
                             <div class="border-b border-dotted border-black ml-2 font-bold px-2 min-h-[18px]">
-                                {{ form.regionName }}
+                                {{ form.regionName || 'District' }}
                             </div>
                         </div>
                     </div>
