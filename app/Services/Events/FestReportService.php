@@ -320,7 +320,7 @@ class FestReportService
     public function export(string $type, Request $request): StreamedResponse|\Symfony\Component\HttpFoundation\Response
     {
         $audience = $request->input('audience', 'staff') === 'public' ? 'public' : 'staff';
-        $this->preview = $request->boolean('preview');
+        $this->preview = $request->boolean('inline') || $request->boolean('preview') || (! $request->boolean('download') && ! $request->has('download'));
 
         EventLifecycleGate::allowReportExport($this->event, $type, $audience);
         EventLifecycleGate::allowResultReport($this->event, $type);
