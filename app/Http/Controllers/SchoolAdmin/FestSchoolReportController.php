@@ -1574,20 +1574,20 @@ class FestSchoolReportController extends SchoolAdminController
             return $pdf->download($filename);
         }
 
-        if ($request->wantsJson() || $request->has('inertia')) {
-            return $this->inertia('School/Events/SportsEntryForm', [
-                'school' => $this->school->only('id', 'name'),
-                'event' => $event->only('id', 'title'),
-                'form' => $formData,
-                'initialStudents' => $uniqueStudents,
-                'registeredItems' => $registeredItems,
-                'selectedItemId' => $selectedItemId,
-            ]);
+        if ($request->boolean('raw_html')) {
+            return view('reports.sports-games-entry-form', array_merge($formData, [
+                'students' => $uniqueStudents,
+            ]));
         }
 
-        return view('reports.sports-games-entry-form', array_merge($formData, [
-            'students' => $uniqueStudents,
-        ]));
+        return $this->inertia('School/Events/SportsEntryForm', [
+            'school' => $this->school->only('id', 'name'),
+            'event' => $event->only('id', 'title'),
+            'form' => $formData,
+            'initialStudents' => $uniqueStudents,
+            'registeredItems' => $registeredItems,
+            'selectedItemId' => $selectedItemId,
+        ]);
     }
 }
 
