@@ -1506,7 +1506,7 @@ class FestSchoolReportController extends SchoolAdminController
                 'id' => $reg->item_id,
                 'title' => trim(str_replace('_', ' ', $rawTitle)),
                 'category' => $reg->item?->age_group ?: ($reg->item?->category ?: 'General'),
-                'gender' => strtolower($reg->item?->gender ?: 'boys'),
+                'gender' => strtolower($reg->item?->gender ?: 'open'),
                 'discipline' => $reg->item?->sport_discipline,
                 'registered_count' => $count,
             ];
@@ -1558,8 +1558,8 @@ class FestSchoolReportController extends SchoolAdminController
             'teamManager' => '',
             'gameName' => $cleanGameName,
             'category' => $selectedItem?->age_group ?: ($selectedItem?->category ?: ''),
-            'gender' => strtolower($selectedItem?->gender ?? 'boys'),
-            'regionName' => $regionName,
+            'gender' => strtolower($selectedItem?->gender ?? 'open'),
+        ];           'regionName' => $regionName,
         ];
 
         // Direct PDF Download / Stream Response

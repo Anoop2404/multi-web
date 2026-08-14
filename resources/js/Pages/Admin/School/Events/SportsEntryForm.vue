@@ -185,8 +185,8 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-4 font-bold pl-1 text-slate-900">
-                                    <span>Boys <span class="inline-block w-6 h-4 border border-black text-center text-[11px] leading-3 bg-white">{{ form.gender === 'boys' ? '✓' : '' }}</span></span>
-                                    <span>Girls <span class="inline-block w-6 h-4 border border-black text-center text-[11px] leading-3 bg-white">{{ form.gender === 'girls' ? '✓' : '' }}</span></span>
+                                    <span>Boys <span class="inline-block w-6 h-4 border border-black text-center text-[11px] leading-3 bg-white">{{ checkBoys ? '✓' : '' }}</span></span>
+                                    <span>Girls <span class="inline-block w-6 h-4 border border-black text-center text-[11px] leading-3 bg-white">{{ checkGirls ? '✓' : '' }}</span></span>
                                 </div>
                             </div>
 
@@ -306,9 +306,15 @@ const form = ref(props.form || {
     regionName: null,
 });
 
-if (form.value.gameName) {
-    form.value.gameName = form.value.gameName.replace(/_/g, ' ');
-}
+const checkBoys = computed(() => {
+    const g = String(form.value.gender ?? '').toLowerCase();
+    return !['girls', 'girl', 'female', 'f'].includes(g);
+});
+
+const checkGirls = computed(() => {
+    const g = String(form.value.gender ?? '').toLowerCase();
+    return !['boys', 'boy', 'male', 'm'].includes(g);
+});
 
 const selectedItem = ref(props.selectedItemId || (props.registeredItems?.[0]?.id ?? null));
 

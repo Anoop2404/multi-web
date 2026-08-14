@@ -205,9 +205,16 @@
             <td class="info-lbl" style="width: 75px; text-align: right; padding-right: 4px;">Category :&nbsp;</td>
             <td class="dots-underline" style="width: 105px;">&nbsp;{{ $category ?? '' }}</td>
             <td style="text-align: right; font-weight: bold; width: 140px;">
-                Boys <span class="checkbox-box">{{ isset($gender) && strtolower($gender) === 'boys' ? '✓' : '' }}</span>
+                @php
+                    $rawG = strtolower($gender ?? '');
+                    $isBoysOnly = in_array($rawG, ['boys', 'boy', 'male', 'm']);
+                    $isGirlsOnly = in_array($rawG, ['girls', 'girl', 'female', 'f']);
+                    $checkBoys = !$isGirlsOnly;
+                    $checkGirls = !$isBoysOnly;
+                @endphp
+                Boys <span class="checkbox-box">{{ $checkBoys ? '✓' : '' }}</span>
                 &nbsp;&nbsp;
-                Girls <span class="checkbox-box">{{ isset($gender) && strtolower($gender) === 'girls' ? '✓' : '' }}</span>
+                Girls <span class="checkbox-box">{{ $checkGirls ? '✓' : '' }}</span>
             </td>
         </tr>
     </table>
