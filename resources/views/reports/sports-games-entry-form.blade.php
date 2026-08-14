@@ -18,7 +18,7 @@
         color: #000;
         margin: 0;
         padding: 0;
-        font-size: 11px;
+        font-size: 10.5px;
         background: #fff;
     }
 
@@ -43,42 +43,45 @@
         font-size: 17px;
         font-weight: bold;
         text-transform: uppercase;
-        color: #0b132b;
+        color: #000;
         margin: 2px 0 2px;
     }
     .org-subtitle {
         font-size: 9.5px;
         font-weight: bold;
-        color: #1c2b4a;
-        margin-bottom: 8px;
+        color: #000;
+        margin-bottom: 6px;
     }
     .main-heading {
-        font-size: 16px;
+        font-size: 15px;
         font-weight: bold;
         text-transform: uppercase;
-        margin: 6px 0 12px;
+        margin: 6px 0 10px;
         text-decoration: underline;
+        color: #000;
     }
 
     .info-table {
         width: 100%;
         border-collapse: collapse;
-        margin-bottom: 8px;
+        margin-bottom: 7px;
     }
     .info-table td {
-        padding: 3px 0;
+        padding: 2.5px 0;
         vertical-align: bottom;
     }
     .info-lbl {
         font-weight: bold;
         white-space: nowrap;
-        font-size: 11px;
+        font-size: 10.5px;
+        color: #000;
     }
     .dots-underline {
         border-bottom: 1px dotted #000;
         padding-left: 6px;
         font-weight: bold;
-        font-size: 11px;
+        font-size: 10.5px;
+        color: #000;
     }
 
     .checkbox-box {
@@ -89,7 +92,7 @@
         text-align: center;
         line-height: 12px;
         font-weight: bold;
-        font-size: 11px;
+        font-size: 10.5px;
         margin-left: 4px;
         background: #fff;
     }
@@ -98,6 +101,7 @@
         width: 100%;
         border-collapse: collapse;
         margin-top: 6px;
+        table-layout: fixed;
     }
     .participants-table th,
     .participants-table td {
@@ -105,22 +109,24 @@
         padding: 4px 3px;
         text-align: center;
         vertical-align: middle;
-        font-size: 10px;
+        font-size: 9.5px;
         word-wrap: break-word;
     }
     .participants-table th {
         font-weight: bold;
-        background-color: #f8fafc;
-        font-size: 10px;
+        background-color: #f1f5f9;
+        font-size: 9.5px;
+        text-transform: uppercase;
+        color: #000;
     }
 
-    .col-sl { width: 5%; }
+    .col-sl { width: 4%; }
     .col-name { width: 22%; text-align: left; }
-    .col-class { width: 7%; }
-    .col-udise { width: 14%; }
+    .col-class { width: 6%; }
+    .col-udise { width: 15%; }
     .col-dob { width: 11%; }
     .col-father { width: 14%; text-align: left; }
-    .col-mother { width: 13%; text-align: left; }
+    .col-mother { width: 14%; text-align: left; }
     .col-photo { width: 14%; }
 
     .photo-box {
@@ -146,25 +152,16 @@
 
     .footer-table {
         width: 100%;
-        margin-top: 30px;
+        margin-top: 35px;
         border-collapse: collapse;
     }
     .footer-table td {
         text-align: center;
         vertical-align: bottom;
         font-weight: bold;
-        font-size: 11px;
+        font-size: 10.5px;
         width: 33.33%;
-    }
-    .seal-box {
-        width: 75px;
-        height: 48px;
-        border: 1px dashed #888;
-        border-radius: 50%;
-        margin: 0 auto 4px;
-        line-height: 48px;
-        font-size: 8.5px;
-        color: #777;
+        color: #000;
     }
 
     @media print {

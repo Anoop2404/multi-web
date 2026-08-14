@@ -200,43 +200,43 @@
 
                         <!-- Students Table -->
                         <div class="overflow-x-auto">
-                            <table class="w-full border-collapse border border-black text-center text-[10px] mt-2 font-sans">
+                            <table class="w-full border-collapse border border-black text-center text-[10px] mt-2 font-sans table-fixed">
                                 <thead>
                                     <tr class="bg-slate-100 font-bold border-b border-black text-slate-900">
-                                        <th class="border border-black p-2 w-[5%] font-bold">Sl<br>No</th>
+                                        <th class="border border-black p-2 w-[4%] font-bold">Sl<br>No</th>
                                         <th class="border border-black p-2 w-[22%] text-left font-bold">NAME OF THE STUDENT</th>
-                                        <th class="border border-black p-2 w-[7%] font-bold">CLASS</th>
-                                        <th class="border border-black p-2 w-[14%] font-bold">UDISE PEN NUMBER/ADM.NO.</th>
+                                        <th class="border border-black p-2 w-[6%] font-bold">CLASS</th>
+                                        <th class="border border-black p-2 w-[15%] font-bold">UDISE PEN NUMBER/ADM.NO.</th>
                                         <th class="border border-black p-2 w-[11%] font-bold">DATE OF BIRTH</th>
                                         <th class="border border-black p-2 w-[14%] text-left font-bold">FATHER'S NAME</th>
                                         <th class="border border-black p-2 w-[14%] text-left font-bold">MOTHER'S NAME</th>
-                                        <th class="border border-black p-2 w-[13%] font-bold">PHOTOGRAPHS ATTESTED<br><span class="font-normal text-[8px] text-slate-700">(SIGN. & SEAL PRINCIPAL)</span></th>
+                                        <th class="border border-black p-2 w-[14%] font-bold">PHOTOGRAPHS ATTESTED<br><span class="font-normal text-[8px] text-slate-700">(SIGN. & SEAL PRINCIPAL)</span></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="(student, index) in displayStudents" :key="index" class="border-b border-black">
-                                        <td class="border border-black p-2 font-bold text-slate-900">
+                                        <td class="border border-black p-2 font-bold text-slate-900 w-[4%]">
                                             {{ index + 1 }}
                                         </td>
-                                        <td class="border border-black p-2 text-left font-bold text-slate-900">
+                                        <td class="border border-black p-2 text-left font-bold text-slate-900 w-[22%]">
                                             {{ student.name || '—' }}
                                         </td>
-                                        <td class="border border-black p-2 text-center font-medium text-slate-800">
+                                        <td class="border border-black p-2 text-center font-medium text-slate-800 w-[6%]">
                                             {{ student.class || '—' }}
                                         </td>
-                                        <td class="border border-black p-2 text-center font-medium text-slate-800">
+                                        <td class="border border-black p-2 text-center font-medium text-slate-800 w-[15%]">
                                             {{ student.udise_pen || '—' }}
                                         </td>
-                                        <td class="border border-black p-2 text-center font-medium text-slate-800">
+                                        <td class="border border-black p-2 text-center font-medium text-slate-800 w-[11%]">
                                             {{ student.dob || '—' }}
                                         </td>
-                                        <td class="border border-black p-2 text-left font-normal text-slate-800">
+                                        <td class="border border-black p-2 text-left font-normal text-slate-800 w-[14%]">
                                             {{ student.father_name || '—' }}
                                         </td>
-                                        <td class="border border-black p-2 text-left font-normal text-slate-800">
+                                        <td class="border border-black p-2 text-left font-normal text-slate-800 w-[14%]">
                                             {{ student.mother_name || '—' }}
                                         </td>
-                                        <td class="border border-black p-2 align-middle">
+                                        <td class="border border-black p-2 align-middle w-[14%]">
                                             <div class="w-[30mm] h-[38mm] mx-auto border border-dashed border-slate-400 rounded-sm flex flex-col items-center justify-center text-[9px] text-slate-500 bg-slate-50 overflow-hidden p-0.5 box-border">
                                                 <img 
                                                     v-if="student.photo_url" 
