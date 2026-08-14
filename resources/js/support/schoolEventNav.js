@@ -112,7 +112,7 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
 
     workflowItems.push(
         { label: 'Reports', href: reportsBase, icon: 'file-text', exact: true },
-        { label: 'Games Entry Form', href: `${eventBase}/games-entry-form`, icon: 'file-text' },
+        { label: 'Entry Form', href: `${eventBase}/games-entry-form`, icon: 'file-text' },
         { label: 'ID Cards', href: `${reportsBase}/id-cards`, icon: 'credit-card' },
         { label: 'Clash requests', href: `${eventBase}/clash-requests`, icon: 'alert-circle' },
         { label: 'Substitutions', href: `${eventBase}/substitution-requests`, icon: 'repeat' },

@@ -187,7 +187,7 @@ class FestReportCatalog
             ['id' => 'item-wise', 'label' => 'Item-wise browser', 'href' => "{$base}/item-wise"],
             ['id' => 'attendance', 'label' => 'Attendance Register', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/attendance"],
             ['id' => 'id-cards', 'label' => 'Participant ID Cards', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/id-cards"],
-            ['id' => 'games-entry-form', 'label' => 'Games Competition Entry Form', 'href' => "/school-admin/{$tenantId}/sports/events/{$eventId}/games-entry-form"],
+            ['id' => 'games-entry-form', 'label' => 'Entry Form', 'href' => "/school-admin/{$tenantId}/sports/events/{$eventId}/games-entry-form"],
         ];
 
         if ($eventType === 'sports') {
