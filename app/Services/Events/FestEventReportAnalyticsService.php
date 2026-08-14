@@ -471,8 +471,12 @@ class FestEventReportAnalyticsService
         $feeResolver = app(FestItemFeeResolver::class);
         $eventIds = $this->event->reportableEventIds();
 
+        $targetEventId = FestEventItem::where('event_id', $this->event->id)->where('is_enabled', true)->exists()
+            ? $this->event->id
+            : ($this->event->parent_event_id ? $this->event->rootEvent()->id : $this->event->id);
+
         $items = FestEventItem::query()
-            ->whereIn('event_id', $eventIds)
+            ->where('event_id', $targetEventId)
             ->where('is_enabled', true)
             ->with('head:id,name,default_item_fee,extra_item_fee')
             ->orderBy('display_order')
@@ -483,15 +487,20 @@ class FestEventReportAnalyticsService
             return [];
         }
 
-        $itemIds = $items->pluck('id');
+        $allReportableItemIds = [];
+        $itemFamilyMap = [];
+        foreach ($items as $item) {
+            $family = $this->event->reportableItemIds([$item->id]);
+            foreach ($family as $fid) {
+                $allReportableItemIds[] = $fid;
+                $itemFamilyMap[$fid] = $item->id;
+            }
+        }
+        $allReportableItemIds = array_values(array_unique($allReportableItemIds));
 
-        // Batched aggregates instead of ~5 queries per item — at real scale (many
-        // items × thousands of registrations) that was a genuine N+1 cost, not just
-        // an academic one. See docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md §2/§7 Phase 1.
-        // Each map below costs exactly one query, regardless of item count.
         $statusRows = FestRegistration::query()
             ->whereIn('event_id', $eventIds)
-            ->whereIn('item_id', $itemIds)
+            ->whereIn('item_id', $allReportableItemIds)
             ->whereIn('status', ['approved', 'submitted'])
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->selectRaw('item_id, status, count(*) as cnt')
@@ -500,13 +509,14 @@ class FestEventReportAnalyticsService
 
         $statusMap = [];
         foreach ($statusRows as $row) {
-            $statusMap[$row->item_id][$row->status] = (int) $row->cnt;
+            $canonicalId = $itemFamilyMap[$row->item_id] ?? $row->item_id;
+            $statusMap[$canonicalId][$row->status] = ($statusMap[$canonicalId][$row->status] ?? 0) + (int) $row->cnt;
         }
 
         $participantRows = FestParticipant::query()
             ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
             ->whereIn('fest_registrations.event_id', $eventIds)
-            ->whereIn('fest_registrations.item_id', $itemIds)
+            ->whereIn('fest_registrations.item_id', $allReportableItemIds)
             ->whereIn('fest_registrations.status', FestRegistration::ACTIVE_STATUSES)
             ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
             ->selectRaw('fest_registrations.item_id as item_id, count(*) as participant_count, sum(case when fest_participants.item_registration_number is not null then 1 else 0 end) as assigned_count')
@@ -515,16 +525,33 @@ class FestEventReportAnalyticsService
 
         $participantMap = [];
         foreach ($participantRows as $row) {
-            $participantMap[$row->item_id] = ['participants' => (int) $row->participant_count, 'assigned' => (int) $row->assigned_count];
+            $canonicalId = $itemFamilyMap[$row->item_id] ?? $row->item_id;
+            $prevPart = $participantMap[$canonicalId]['participants'] ?? 0;
+            $prevAssigned = $participantMap[$canonicalId]['assigned'] ?? 0;
+            $participantMap[$canonicalId] = [
+                'participants' => $prevPart + (int) $row->participant_count,
+                'assigned'     => $prevAssigned + (int) $row->assigned_count,
+            ];
         }
 
-        $schoolCountMap = $schoolId ? collect() : FestRegistration::query()
-            ->whereIn('event_id', $eventIds)
-            ->whereIn('item_id', $itemIds)
-            ->active()
-            ->selectRaw('item_id, count(distinct school_id) as cnt')
-            ->groupBy('item_id')
-            ->pluck('cnt', 'item_id');
+        $schoolCountMap = [];
+        if (! $schoolId) {
+            $schoolRows = FestRegistration::query()
+                ->whereIn('event_id', $eventIds)
+                ->whereIn('item_id', $allReportableItemIds)
+                ->active()
+                ->selectRaw('item_id, school_id')
+                ->distinct()
+                ->get();
+            $schoolsByCanonical = [];
+            foreach ($schoolRows as $sr) {
+                $cId = $itemFamilyMap[$sr->item_id] ?? $sr->item_id;
+                $schoolsByCanonical[$cId][$sr->school_id] = true;
+            }
+            foreach ($schoolsByCanonical as $cId => $schools) {
+                $schoolCountMap[$cId] = count($schools);
+            }
+        }
 
         $rows = [];
         foreach ($items as $item) {
