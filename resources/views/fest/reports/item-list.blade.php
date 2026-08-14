@@ -77,13 +77,12 @@
         <thead>
             <tr>
                 <th style="width: 5%; text-align: center;">#</th>
-                <th style="width: 32%;">Item Name</th>
-                <th style="width: 16%;">Category / Class</th>
+                <th style="width: 33%;">Item Name</th>
+                <th style="width: 18%;">Category / Class</th>
                 <th style="width: 10%; text-align: center;">Type</th>
-                <th style="width: 9%; text-align: center;">Schools</th>
-                <th style="width: 9%; text-align: center;">Total</th>
-                <th style="width: 9%; text-align: center;">Approved</th>
-                <th style="width: 10%; text-align: center;">Students / Teams</th>
+                <th style="width: 11%; text-align: center;">Total Entries</th>
+                <th style="width: 10%; text-align: center;">Approved</th>
+                <th style="width: 13%; text-align: center;">Total Participants</th>
             </tr>
         </thead>
         <tbody>
@@ -99,15 +98,16 @@
                         {{ ($item->participant_type ?? 'individual') === 'individual' ? 'Indiv' : 'Team' }}
                     </span>
                 </td>
-                <td class="text-center font-bold">{{ $item->school_count ?? 0 }}</td>
-                <td class="text-center font-bold" style="color: #1e1b4b;">{{ $item->registered_count }}</td>
+                <td class="text-center font-bold" style="color: #1e1b4b;">
+                    {{ $item->registered_count }}
+                    <span style="font-weight: normal; font-size: 10px; color: #64748b; display: block;">
+                        {{ ($item->participant_type ?? 'individual') === 'individual' ? 'entries' : 'groups' }}
+                    </span>
+                </td>
                 <td class="text-center font-bold" style="color: #047857;">{{ $item->approved }}</td>
-                <td class="text-center font-bold">
-                    @if(($item->participant_type ?? 'individual') === 'individual')
-                        {{ $item->participants }} <span style="font-weight: normal; font-size: 11px; color: #64748b;">students</span>
-                    @else
-                        {{ $item->registered_count }} <span style="font-weight: normal; font-size: 11px; color: #4338ca;">teams</span>
-                    @endif
+                <td class="text-center font-bold" style="color: #0f172a;">
+                    {{ $item->participants }}
+                    <span style="font-weight: normal; font-size: 10px; color: #64748b; display: block;">students</span>
                 </td>
             </tr>
             @endforeach

@@ -90,14 +90,14 @@
                 <table class="data-table">
                     <thead class="bg-gray-50 border-b">
                         <tr>
+                            <th>#</th>
                             <th>Item Name</th>
                             <th>Category</th>
                             <th>Type</th>
-                            <th>Schools</th>
-                            <th>Total Regs</th>
-                            <th>Approved</th>
-                            <th>Pending</th>
-                            <th>Students / Teams</th>
+                            <th class="text-center">Total Entries</th>
+                            <th class="text-center">Approved</th>
+                            <th class="text-center">Pending</th>
+                            <th class="text-center">Total Participants</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -108,6 +108,7 @@
                                 </td>
                             </tr>
                             <tr>
+                                <td class="text-center text-xs text-slate-400 font-mono">{{ idx + 1 }}</td>
                                 <td class="font-medium">
                                     {{ row.title }}
                                     <span v-if="row.item_code" class="block text-xs font-mono text-slate-400">{{ row.item_code }}</span>
@@ -119,17 +120,15 @@
                                         {{ row.participant_type === 'individual' ? 'Indiv' : 'Team' }}
                                     </span>
                                 </td>
-                                <td class="font-semibold text-slate-800">{{ row.school_count ?? 0 }}</td>
-                                <td class="font-bold text-indigo-900">{{ row.registration_count }}</td>
-                                <td class="text-emerald-700 font-semibold">{{ row.approved }}</td>
-                                <td class="text-amber-700 font-semibold">{{ row.pending }}</td>
-                                <td class="font-bold text-slate-900">
-                                    <template v-if="row.participant_type === 'individual'">
-                                        {{ row.participant_count }} <span class="text-xs font-normal text-slate-400">students</span>
-                                    </template>
-                                    <template v-else>
-                                        {{ row.registration_count }} <span class="text-xs font-normal text-indigo-500">teams/groups</span>
-                                    </template>
+                                <td class="font-bold text-indigo-900 text-center">
+                                    {{ row.registration_count }}
+                                    <span class="block text-[10px] font-normal text-slate-400">{{ row.participant_type === 'individual' ? 'entries' : 'groups' }}</span>
+                                </td>
+                                <td class="text-emerald-700 font-semibold text-center">{{ row.approved }}</td>
+                                <td class="text-amber-700 font-semibold text-center">{{ row.pending }}</td>
+                                <td class="font-bold text-slate-900 text-center">
+                                    {{ row.participant_count }}
+                                    <span class="block text-[10px] font-normal text-slate-400">students</span>
                                 </td>
                             </tr>
                         </template>
