@@ -1,14 +1,14 @@
 <template>
     <div class="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
         <!-- Control Header (Hidden during print) -->
-        <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 mb-6 no-print">
+        <div class="max-w-[210mm] mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 mb-6 no-print">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
                 <div>
                     <h1 class="text-xl font-bold text-slate-900 flex items-center gap-2">
                         <span class="text-2xl">🏆</span> Games Competition Entry Form
                     </h1>
                     <p class="text-xs text-slate-500 mt-1">
-                        Auto-loaded with registered students and items for <strong class="text-slate-700">{{ event?.title || 'Sports Meet' }}</strong>.
+                        Auto-loaded for <strong class="text-slate-700">{{ event?.title || 'Sports Meet' }}</strong>. Ready to print on A4 paper.
                     </p>
                 </div>
 
@@ -101,33 +101,20 @@
                     </div>
                 </div>
 
-                <div class="md:col-span-3">
-                    <label class="block font-semibold text-slate-700 mb-1">Region / Zone Selection</label>
-                    <div class="flex flex-wrap gap-6 py-1">
-                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                            <input type="radio" value="district" v-model="form.region" class="text-blue-600">
-                            <span>District</span>
-                        </label>
-                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                            <input type="radio" value="tirur" v-model="form.region" class="text-blue-600">
-                            <span>Tirur Region</span>
-                        </label>
-                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                            <input type="radio" value="manjeri" v-model="form.region" class="text-blue-600">
-                            <span>Manjeri Region</span>
-                        </label>
-                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                            <input type="radio" value="nilambur" v-model="form.region" class="text-blue-600">
-                            <span>Nilambur Region</span>
-                        </label>
-                    </div>
+                <div v-if="form.regionName" class="md:col-span-3">
+                    <label class="block font-semibold text-slate-700 mb-1">Region</label>
+                    <input 
+                        v-model="form.regionName" 
+                        type="text" 
+                        class="w-full max-w-sm px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                    />
                 </div>
             </div>
         </div>
 
-        <!-- Printable Canvas Container -->
-        <div class="max-w-6xl mx-auto flex justify-center">
-            <div class="printable-form bg-white w-[210mm] min-h-[297mm] p-[12mm_14mm] shadow-lg relative text-slate-900 font-serif flex flex-col justify-between overflow-hidden">
+        <!-- Printable Canvas Container (Exact A4 Sheet) -->
+        <div class="max-w-[210mm] mx-auto flex justify-center">
+            <div class="printable-form bg-white w-[210mm] min-h-[297mm] max-w-[210mm] p-[10mm_12mm] shadow-lg relative text-slate-900 font-serif flex flex-col justify-between overflow-hidden box-border">
                 
                 <!-- Decorative Wave Graphics -->
                 <svg class="absolute top-0 right-0 w-[240px] h-[100px] pointer-events-none z-0" viewBox="0 0 260 110" fill="none">
@@ -137,10 +124,17 @@
                 </svg>
 
                 <div class="relative z-10">
-                    <!-- Form Header -->
+                    <!-- Form Header with Sahodaya Logo -->
                     <div class="text-center mb-3">
                         <div class="flex justify-center mb-1">
-                            <svg class="w-32 h-14" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Real Sahodaya Logo if available, fallback vector emblem -->
+                            <img 
+                                v-if="form.sahodayaLogoUrl" 
+                                :src="form.sahodayaLogoUrl" 
+                                alt="Sahodaya Logo" 
+                                class="h-16 max-h-16 object-contain mx-auto mb-1"
+                            />
+                            <svg v-else class="w-32 h-14" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
                                 <g transform="translate(100, 75)">
                                     <path d="M 0 0 L -80 -55 A 95 95 0 0 1 -60 -70 Z" fill="#22c55e"/>
                                     <path d="M 0 0 L -55 -72 A 95 95 0 0 1 -30 -85 Z" fill="#84cc16"/>
@@ -164,7 +158,7 @@
                         <p class="text-[11px] font-bold text-slate-700 font-sans mt-0.5">
                             (A Movement initiated and Guided by Central Board of Secondary Education, Delhi)
                         </p>
-                        <h3 class="text-lg font-bold uppercase tracking-wider text-black mt-2 mb-3">
+                        <h3 class="text-lg font-bold uppercase tracking-wider text-black mt-2 mb-2">
                             GAMES COMPETITION ENTRY FORM {{ form.academicYear || '2026-27' }}
                         </h3>
                     </div>
@@ -204,12 +198,12 @@
                             </div>
                         </div>
 
-                        <!-- Regions -->
-                        <div class="flex justify-between items-center font-bold px-2 pt-1">
-                            <span>District <span class="inline-block w-6 h-4 border border-black text-center text-xs leading-3 ml-1">{{ form.region === 'district' ? '✓' : '' }}</span></span>
-                            <span>Tirur Region <span class="inline-block w-6 h-4 border border-black text-center text-xs leading-3 ml-1">{{ form.region === 'tirur' ? '✓' : '' }}</span></span>
-                            <span>Manjeri Region <span class="inline-block w-6 h-4 border border-black text-center text-xs leading-3 ml-1">{{ form.region === 'manjeri' ? '✓' : '' }}</span></span>
-                            <span>Nilambur Region <span class="inline-block w-6 h-4 border border-black text-center text-xs leading-3 ml-1">{{ form.region === 'nilambur' ? '✓' : '' }}</span></span>
+                        <!-- Display Region Name directly if event is region-based (No Checkboxes) -->
+                        <div v-if="form.regionName" class="flex items-baseline pt-0.5">
+                            <span class="font-bold whitespace-nowrap">Region:</span>
+                            <div class="border-b border-dotted border-black ml-2 font-bold px-2 min-h-[18px]">
+                                {{ form.regionName }}
+                            </div>
                         </div>
                     </div>
 
@@ -256,12 +250,18 @@
                                 <td class="border border-black p-1 text-left">
                                     <input v-model="student.mother_name" type="text" placeholder="Mother's Name" class="w-full border-0 outline-none bg-transparent text-xs">
                                 </td>
-                                <td class="border border-black p-1">
-                                    <div class="h-24 border border-dashed border-slate-300 flex flex-col items-center justify-center text-[9px] text-slate-500 bg-slate-50 relative overflow-hidden">
-                                        <img v-if="student.photo_url" :src="student.photo_url" alt="Student Photo" class="max-h-full max-w-full object-cover">
+                                <td class="border border-black p-1.5 align-middle">
+                                    <!-- Perfectly Proportioned Passport Photo Frame -->
+                                    <div class="w-[30mm] h-[38mm] mx-auto border border-dashed border-slate-400 rounded-sm flex flex-col items-center justify-center text-[9px] text-slate-500 bg-slate-50 overflow-hidden p-0.5 box-border">
+                                        <img 
+                                            v-if="student.photo_url" 
+                                            :src="student.photo_url" 
+                                            alt="Student Photo" 
+                                            class="w-full h-full object-cover rounded-xs"
+                                        />
                                         <template v-else>
-                                            <div>Affix Photo</div>
-                                            <div class="text-[8px] text-slate-400">(Attested)</div>
+                                            <div class="font-medium text-slate-600 text-center leading-tight">Affix Photo</div>
+                                            <div class="text-[8px] text-slate-400 text-center mt-0.5">(Attested)</div>
                                         </template>
                                     </div>
                                 </td>
@@ -310,13 +310,14 @@ const props = defineProps({
 
 const form = ref(props.form || {
     sahodayaName: 'MALAPPURAM CENTRAL SAHODAYA',
+    sahodayaLogoUrl: null,
     academicYear: '2026-27',
     schoolName: props.school?.name || '',
     teamManager: '',
     gameName: '',
     category: '',
     gender: 'boys',
-    region: 'tirur',
+    regionName: null,
 });
 
 const selectedItem = ref(props.selectedItemId || (props.registeredItems?.[0]?.id ?? null));
@@ -359,6 +360,10 @@ function printForm() {
 
 <style scoped>
 @media print {
+    @page {
+        size: A4 portrait;
+        margin: 8mm;
+    }
     .no-print {
         display: none !important;
     }
@@ -368,6 +373,7 @@ function printForm() {
     .printable-form {
         box-shadow: none !important;
         width: 100% !important;
+        max-width: 100% !important;
         padding: 0 !important;
     }
 }

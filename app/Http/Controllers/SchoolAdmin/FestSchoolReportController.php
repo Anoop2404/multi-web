@@ -1443,6 +1443,19 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $sahodaya = Tenant::find($this->school->parent_id);
+        $sahodayaLogoUrl = $sahodaya ? TenantBranding::logoUrl($sahodaya) : null;
+
+        // Resolve Region Name if event is region-based
+        $regionName = null;
+        if (!empty($event->cluster_label)) {
+            $regionName = $event->cluster_label;
+        } elseif ($event->partition_role === 'region') {
+            $event->loadMissing('region');
+            $regionName = $event->region?->name ?? $event->cluster_key;
+        } elseif (preg_match('/REGION\s*[\d\w\s()]+/i', $event->title, $m)) {
+            $regionName = trim($m[0]);
+        }
+
         $reportableEventIds = $event->reportableEventIds();
 
         // Get all registered sports items for this school in this event
@@ -1502,13 +1515,14 @@ class FestSchoolReportController extends SchoolAdminController
 
         $formData = [
             'sahodayaName' => $sahodaya?->name ?? 'MALAPPURAM CENTRAL SAHODAYA',
+            'sahodayaLogoUrl' => $sahodayaLogoUrl,
             'academicYear' => $academicYear,
             'schoolName' => $this->school->name . ($this->school->address ? ', ' . $this->school->address : ''),
             'teamManager' => '',
             'gameName' => $selectedItem?->title ?: ($event->title ?: 'Sports Meet'),
             'category' => $selectedItem?->age_group ?: ($selectedItem?->category ?: ''),
             'gender' => strtolower($selectedItem?->gender ?? 'boys'),
-            'region' => 'tirur',
+            'regionName' => $regionName,
         ];
 
         if ($request->wantsJson() || $request->has('inertia')) {

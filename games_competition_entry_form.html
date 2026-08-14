@@ -22,7 +22,6 @@
     color: #000;
   }
 
-  /* Control Panel (Hidden during print) */
   .no-print-bar {
     background: #1e293b;
     color: #fff;
@@ -60,36 +59,14 @@
     align-items: center;
     gap: 6px;
   }
-  .btn-primary {
-    background: #2563eb;
-    color: #fff;
-  }
-  .btn-primary:hover {
-    background: #1d4ed8;
-  }
-  .btn-secondary {
-    background: #475569;
-    color: #fff;
-  }
-  .btn-secondary:hover {
-    background: #334155;
-  }
-  .btn-success {
-    background: #10b981;
-    color: #fff;
-  }
-  .btn-success:hover {
-    background: #059669;
-  }
-  .btn-outline {
-    background: transparent;
-    color: #cbd5e1;
-    border: 1px solid #475569;
-  }
-  .btn-outline:hover {
-    background: #334155;
-    color: #fff;
-  }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-secondary { background: #475569; color: #fff; }
+  .btn-secondary:hover { background: #334155; }
+  .btn-success { background: #10b981; color: #fff; }
+  .btn-success:hover { background: #059669; }
+  .btn-outline { background: transparent; color: #cbd5e1; border: 1px solid #475569; }
+  .btn-outline:hover { background: #334155; color: #fff; }
 
   .wrapper {
     display: flex;
@@ -97,12 +74,12 @@
     padding: 24px 0;
   }
 
-  /* Form Container (A4 Printable Canvas) */
   .form-canvas {
     width: 210mm;
     min-height: 297mm;
+    max-width: 210mm;
     background: #ffffff;
-    padding: 12mm 14mm;
+    padding: 10mm 12mm;
     position: relative;
     box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     overflow: hidden;
@@ -111,7 +88,6 @@
     justify-content: space-between;
   }
 
-  /* Decorative Top Curves */
   .header-bg-curves {
     position: absolute;
     top: 0;
@@ -122,12 +98,11 @@
     z-index: 1;
   }
 
-  /* Header Section */
   .form-header {
     position: relative;
     z-index: 2;
     text-align: center;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
   .logo-wrapper {
     display: flex;
@@ -136,10 +111,10 @@
   }
   .logo-svg {
     width: 130px;
-    height: 65px;
+    height: 60px;
   }
   .org-title {
-    font-size: 21px;
+    font-size: 20px;
     font-weight: 900;
     letter-spacing: 0.5px;
     text-transform: uppercase;
@@ -148,34 +123,33 @@
     font-family: 'Arial Black', Arial, sans-serif;
   }
   .org-subtitle {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: bold;
     color: #1c2b4a;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
     font-family: Arial, sans-serif;
   }
   .form-main-title {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    margin: 8px 0 16px;
-    text-decoration: none;
+    margin: 6px 0 14px;
+    text-decoration: underline;
     color: #000;
   }
 
-  /* Info Form Rows */
   .info-section {
     position: relative;
     z-index: 2;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.8;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
   .info-row {
     display: flex;
     align-items: baseline;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
   }
   .info-label {
     white-space: nowrap;
@@ -193,33 +167,29 @@
     border: none;
     background: transparent;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
     color: #0b132b;
     outline: none;
     padding: 0 4px;
   }
-  .fillable-input:focus {
-    background: rgba(37, 99, 235, 0.05);
-  }
 
-  /* Inline Split Rows */
   .info-inline-grid {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     gap: 8px;
   }
   .checkbox-group {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     font-weight: bold;
     cursor: pointer;
   }
   .checkbox-box {
-    width: 24px;
+    width: 22px;
     height: 16px;
     border: 1px solid #000;
     display: inline-block;
@@ -230,23 +200,6 @@
     background: #fff;
   }
 
-  /* Region Checkboxes Grid */
-  .region-grid {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 10px 0 14px;
-    padding: 0 10px;
-    font-size: 14px;
-    font-weight: bold;
-  }
-  .region-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* Main Table */
   .participants-table {
     width: 100%;
     border-collapse: collapse;
@@ -256,45 +209,43 @@
   .participants-table th, 
   .participants-table td {
     border: 1px solid #000;
-    padding: 4px 5px;
+    padding: 4px 4px;
     text-align: center;
     vertical-align: middle;
-    font-size: 12px;
+    font-size: 11px;
     word-wrap: break-word;
   }
   .participants-table th {
     font-weight: bold;
     background-color: #fff;
-    padding: 6px 3px;
-    font-size: 12px;
+    padding: 5px 3px;
+    font-size: 11px;
   }
 
-  /* Column widths */
-  .col-sl { width: 4.5%; }
+  .col-sl { width: 5%; }
   .col-name { width: 22%; text-align: left; }
-  .col-class { width: 6.5%; }
+  .col-class { width: 7%; }
   .col-udise { width: 14%; }
   .col-dob { width: 11%; }
   .col-father { width: 14%; text-align: left; }
   .col-mother { width: 14%; text-align: left; }
-  .col-photo { width: 14%; }
+  .col-photo { width: 13%; }
 
   .table-input {
     width: 100%;
     border: none;
     background: transparent;
     font-family: inherit;
-    font-size: 11.5px;
+    font-size: 11px;
     outline: none;
     padding: 2px;
   }
-  .table-input.center {
-    text-align: center;
-  }
+  .table-input.center { text-align: center; }
   
+  /* Passport Photo Box */
   .photo-box {
-    width: 100%;
-    height: 115px;
+    width: 30mm;
+    height: 38mm;
     border: 1px dashed #777;
     display: flex;
     flex-direction: column;
@@ -305,10 +256,12 @@
     background: #fafafa;
     position: relative;
     cursor: pointer;
+    margin: 0 auto;
+    overflow: hidden;
   }
   .photo-box img {
-    max-width: 100%;
-    max-height: 100%;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
   }
   .photo-box .photo-text {
@@ -317,9 +270,8 @@
     line-height: 1.1;
   }
 
-  /* Footer Signatures */
   .form-footer {
-    margin-top: 30px;
+    margin-top: 25px;
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
@@ -328,54 +280,34 @@
   .sig-block {
     text-align: center;
     font-weight: bold;
-    font-size: 15px;
+    font-size: 14px;
   }
-  .sig-space {
-    height: 45px;
-  }
+  .sig-space { height: 40px; }
   .seal-box-placeholder {
-    width: 90px;
-    height: 60px;
+    width: 80px;
+    height: 50px;
     border: 1px dashed #aaa;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 9px;
     color: #888;
     margin: 0 auto 4px;
   }
 
-  /* Print Styles */
   @media print {
-    .no-print-bar {
-      display: none !important;
-    }
-    body {
-      background: #fff;
-    }
-    .wrapper {
-      padding: 0;
-    }
+    .no-print-bar { display: none !important; }
+    body { background: #fff; }
+    .wrapper { padding: 0; }
     .form-canvas {
       box-shadow: none;
       width: 100%;
+      max-width: 100%;
       min-height: auto;
       padding: 0;
     }
-    .fillable-input {
-      background: transparent !important;
-    }
-    .photo-box {
-      border: 1px dashed #999;
-      background: #fff;
-    }
-    .photo-box .upload-icon {
-      display: none;
-    }
-    .btn-delete-row {
-      display: none !important;
-    }
+    .btn-delete-row { display: none !important; }
   }
 
   .btn-delete-row {
@@ -387,47 +319,25 @@
     background: none;
     padding: 2px 4px;
   }
-  .btn-delete-row:hover {
-    color: #dc2626;
-  }
 </style>
 </head>
 <body>
 
-<!-- Interactive Top Control Bar -->
 <div class="no-print-bar">
-  <h2>
-    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-    Games Competition Entry Form (Sahodaya)
-  </h2>
+  <h2>Games Competition Entry Form</h2>
   <div class="btn-group">
-    <button class="btn btn-outline" onclick="loadSampleData()">
-      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-      Fill Sample Data
-    </button>
-    <button class="btn btn-secondary" onclick="addTableRow()">
-      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-      Add Student Row
-    </button>
-    <button class="btn btn-success" onclick="clearForm()">
-      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-      Clear Form
-    </button>
-    <button class="btn btn-primary" onclick="window.print()">
-      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-      Print / Save PDF
-    </button>
+    <button class="btn btn-outline" onclick="loadSampleData()">Fill Sample Data</button>
+    <button class="btn btn-secondary" onclick="addTableRow()">Add Student Row</button>
+    <button class="btn btn-success" onclick="clearForm()">Clear Form</button>
+    <button class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
   </div>
 </div>
 
 <div class="wrapper">
   <div class="form-canvas">
     
-    <!-- Top Curves Graphic -->
     <svg class="header-bg-curves" viewBox="0 0 260 110" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Gold Ribbon -->
       <path d="M70 0 C 130 0, 160 55, 260 65 L 260 0 Z" fill="url(#goldGradient)"/>
-      <!-- Teal Curve -->
       <path d="M0 0 C 80 0, 130 90, 260 95 L 260 0 Z" fill="#006d77" opacity="0.95"/>
       <path d="M110 0 C 170 0, 200 45, 260 50 L 260 0 Z" fill="#055158"/>
       <defs>
@@ -440,13 +350,10 @@
     </svg>
 
     <div>
-      <!-- Header Banner -->
       <div class="form-header">
         <div class="logo-wrapper">
-          <!-- Multi-colored Sahodaya Sunburst Logo -->
           <svg class="logo-svg" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
             <g transform="translate(100, 75)">
-              <!-- Sun Rays -->
               <path d="M 0 0 L -80 -55 A 95 95 0 0 1 -60 -70 Z" fill="#22c55e"/>
               <path d="M 0 0 L -55 -72 A 95 95 0 0 1 -30 -85 Z" fill="#84cc16"/>
               <path d="M 0 0 L -25 -87 A 95 95 0 0 1 0 -92 Z" fill="#eab308"/>
@@ -454,15 +361,11 @@
               <path d="M 0 0 L 35 -83 A 95 95 0 0 1 60 -70 Z" fill="#ef4444"/>
               <path d="M 0 0 L 65 -68 A 95 95 0 0 1 82 -50 Z" fill="#a855f7"/>
               <path d="M 0 0 L 85 -48 A 95 95 0 0 1 95 -25 Z" fill="#3b82f6"/>
-
-              <!-- People Figurines -->
               <circle cx="-50" cy="-45" r="7" fill="#15803d"/>
               <circle cx="-25" cy="-58" r="7" fill="#ca8a04"/>
               <circle cx="0" cy="-63" r="7" fill="#ea580c"/>
               <circle cx="25" cy="-58" r="7" fill="#dc2626"/>
               <circle cx="50" cy="-45" r="7" fill="#2563eb"/>
-              
-              <!-- Sun Core -->
               <path d="M -50 0 A 50 50 0 0 1 50 0 Z" fill="#eab308"/>
             </g>
           </svg>
@@ -474,7 +377,6 @@
         <div class="form-main-title">GAMES COMPETITION ENTRY FORM <span id="academicYear">2026-27</span></div>
       </div>
 
-      <!-- Info Fields -->
       <div class="info-section">
         <div class="info-row">
           <span class="info-label">Name of the School with Address:</span>
@@ -515,24 +417,14 @@
           </div>
         </div>
 
-        <!-- Region Options -->
-        <div class="region-grid">
-          <div class="region-item" onclick="toggleCheckbox('cbDistrict')">
-            District <span class="checkbox-box" id="cbDistrict"></span>
-          </div>
-          <div class="region-item" onclick="toggleCheckbox('cbTirur')">
-            Tirur Region <span class="checkbox-box" id="cbTirur">✓</span>
-          </div>
-          <div class="region-item" onclick="toggleCheckbox('cbManjeri')">
-            Manjeri Region <span class="checkbox-box" id="cbManjeri"></span>
-          </div>
-          <div class="region-item" onclick="toggleCheckbox('cbNilambur')">
-            Nilambur Region <span class="checkbox-box" id="cbNilambur"></span>
+        <div class="info-row" id="regionRow">
+          <span class="info-label">Region:</span>
+          <div class="dots-line">
+            <input type="text" class="fillable-input" id="regionName" value="Tirur Region" placeholder="Region Name">
           </div>
         </div>
       </div>
 
-      <!-- Participants Table -->
       <table class="participants-table" id="participantsTable">
         <thead>
           <tr>
@@ -543,16 +435,14 @@
             <th class="col-dob">Date of Birth</th>
             <th class="col-father">Father's Name</th>
             <th class="col-mother">Mother's Name</th>
-            <th class="col-photo">Photographs attested<br><span style="font-size: 10px; font-weight: normal;">(Sign. & Seal Principal)</span></th>
+            <th class="col-photo">Photographs attested<br><span style="font-size: 8.5px; font-weight: normal;">(Sign. & Seal Principal)</span></th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <!-- Default Rows (Initial 4 rows matching PDF) -->
         </tbody>
       </table>
     </div>
 
-    <!-- Signatures Footer -->
     <div class="form-footer">
       <div class="sig-block">
         <div class="sig-space"></div>
@@ -615,9 +505,8 @@
         </td>
         <td class="col-photo">
           <div class="photo-box" onclick="triggerPhotoUpload(${slNo})">
-            ${photoUrl ? `<img src="${photoUrl}" alt="Photo">` : `
+            ${photoUrl ? `<img src="${photoUrl}" alt="Attested Photo">` : `
               <div class="photo-text">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="upload-icon" style="margin-bottom:2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 <div>Affix Photo</div>
                 <div style="font-size:8px; color:#888;">(Attested)</div>
               </div>
@@ -704,13 +593,10 @@
     document.getElementById('teamManager').value = 'Mr. Rajesh Kumar (Physical Director, +91 94471 98765)';
     document.getElementById('gameName').value = 'Football';
     document.getElementById('categoryName').value = 'Under 17';
+    document.getElementById('regionName').value = 'Tirur Region';
 
     document.getElementById('cbBoys').innerText = '✓';
     document.getElementById('cbGirls').innerText = '';
-    document.getElementById('cbTirur').innerText = '✓';
-    document.getElementById('cbDistrict').innerText = '';
-    document.getElementById('cbManjeri').innerText = '';
-    document.getElementById('cbNilambur').innerText = '';
 
     const sampleStudents = [
       { name: 'Mohammed Rayan', studentClass: 'X-A', udise: '32080501201 / Adm: 4892', dob: '14/05/2010', father: 'Abdul Kareem', mother: 'Sainaba' },
@@ -727,18 +613,14 @@
     document.getElementById('teamManager').value = '';
     document.getElementById('gameName').value = '';
     document.getElementById('categoryName').value = '';
+    document.getElementById('regionName').value = '';
 
     document.getElementById('cbBoys').innerText = '';
     document.getElementById('cbGirls').innerText = '';
-    document.getElementById('cbDistrict').innerText = '';
-    document.getElementById('cbTirur').innerText = '';
-    document.getElementById('cbManjeri').innerText = '';
-    document.getElementById('cbNilambur').innerText = '';
 
     renderRows(4);
   }
 
-  // Initialize with 4 blank rows
   document.addEventListener('DOMContentLoaded', () => {
     renderRows(4);
   });

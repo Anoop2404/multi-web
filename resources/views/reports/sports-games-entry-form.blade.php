@@ -6,7 +6,7 @@
 <style>
     @page {
         size: A4 portrait;
-        margin: 10mm;
+        margin: 8mm 10mm;
     }
     * {
         box-sizing: border-box;
@@ -29,38 +29,44 @@
 
     .form-header {
         text-align: center;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
         position: relative;
+    }
+    .logo-img {
+        max-height: 60px;
+        object-fit: contain;
+        margin: 0 auto 4px;
+        display: block;
     }
 
     .org-title {
-        font-size: 18px;
+        font-size: 17px;
         font-weight: bold;
         text-transform: uppercase;
         color: #0b132b;
-        margin: 4px 0 2px;
+        margin: 2px 0 2px;
     }
     .org-subtitle {
         font-size: 9.5px;
         font-weight: bold;
         color: #1c2b4a;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     .main-heading {
-        font-size: 17px;
+        font-size: 16px;
         font-weight: bold;
         text-transform: uppercase;
-        margin: 8px 0 14px;
+        margin: 6px 0 12px;
         text-decoration: underline;
     }
 
     .info-table {
         width: 100%;
         border-collapse: collapse;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     .info-table td {
-        padding: 4px 0;
+        padding: 3px 0;
         vertical-align: bottom;
     }
     .info-lbl {
@@ -88,20 +94,6 @@
         background: #fff;
     }
 
-    .region-row {
-        width: 100%;
-        margin: 8px 0 12px;
-    }
-    .region-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    .region-table td {
-        font-weight: bold;
-        font-size: 11px;
-        vertical-align: middle;
-    }
-
     .participants-table {
         width: 100%;
         border-collapse: collapse;
@@ -110,7 +102,7 @@
     .participants-table th,
     .participants-table td {
         border: 1px solid #000;
-        padding: 5px 4px;
+        padding: 4px 3px;
         text-align: center;
         vertical-align: middle;
         font-size: 10px;
@@ -119,57 +111,59 @@
     .participants-table th {
         font-weight: bold;
         background-color: #f8fafc;
-        font-size: 10.5px;
+        font-size: 10px;
     }
 
     .col-sl { width: 5%; }
-    .col-name { width: 23%; text-align: left; }
+    .col-name { width: 22%; text-align: left; }
     .col-class { width: 7%; }
     .col-udise { width: 14%; }
     .col-dob { width: 11%; }
     .col-father { width: 14%; text-align: left; }
     .col-mother { width: 13%; text-align: left; }
-    .col-photo { width: 13%; height: 95px; }
+    .col-photo { width: 14%; }
 
     .photo-box {
-        width: 100%;
-        height: 90px;
+        width: 28mm;
+        height: 36mm;
         border: 1px dashed #666;
         display: block;
         margin: 0 auto;
         text-align: center;
+        overflow: hidden;
+        background: #fafafa;
     }
     .photo-box img {
-        max-width: 100%;
-        max-height: 88px;
+        width: 100%;
+        height: 100%;
         object-fit: cover;
     }
     .photo-text {
-        padding-top: 25px;
+        padding-top: 35px;
         font-size: 8px;
         color: #555;
     }
 
     .footer-table {
         width: 100%;
-        margin-top: 35px;
+        margin-top: 30px;
         border-collapse: collapse;
     }
     .footer-table td {
         text-align: center;
         vertical-align: bottom;
         font-weight: bold;
-        font-size: 12px;
+        font-size: 11px;
         width: 33.33%;
     }
     .seal-box {
-        width: 80px;
-        height: 50px;
+        width: 75px;
+        height: 48px;
         border: 1px dashed #888;
         border-radius: 50%;
         margin: 0 auto 4px;
-        line-height: 50px;
-        font-size: 9px;
+        line-height: 48px;
+        font-size: 8.5px;
         color: #777;
     }
 
@@ -184,6 +178,9 @@
     
     <!-- Header -->
     <div class="form-header">
+        @if(!empty($sahodayaLogoUrl))
+            <img src="{{ $sahodayaLogoUrl }}" class="logo-img" alt="Sahodaya Logo">
+        @endif
         <div class="org-title">{{ $sahodayaName ?? 'MALAPPURAM CENTRAL SAHODAYA' }}</div>
         <div class="org-subtitle">{{ $sahodayaSubtitle ?? '(A Movement initiated and Guided by Central Board of Secondary Education, Delhi)' }}</div>
         <div class="main-heading">GAMES COMPETITION ENTRY FORM {{ $academicYear ?? '2026-27' }}</div>
@@ -218,17 +215,15 @@
         </tr>
     </table>
 
-    <!-- Region Selection -->
-    <div class="region-row">
-        <table class="region-table">
-            <tr>
-                <td>District <span class="checkbox-box">{{ isset($region) && strtolower($region) === 'district' ? '✓' : '' }}</span></td>
-                <td>Tirur Region <span class="checkbox-box">{{ isset($region) && strtolower($region) === 'tirur' ? '✓' : '' }}</span></td>
-                <td>Manjeri Region <span class="checkbox-box">{{ isset($region) && strtolower($region) === 'manjeri' ? '✓' : '' }}</span></td>
-                <td>Nilambur Region <span class="checkbox-box">{{ isset($region) && strtolower($region) === 'nilambur' ? '✓' : '' }}</span></td>
-            </tr>
-        </table>
-    </div>
+    <!-- Region Display (Displayed directly if event is region-based) -->
+    @if(!empty($regionName))
+    <table class="info-table">
+        <tr>
+            <td class="info-lbl" style="width: 60px;">Region:</td>
+            <td class="dots-underline">{{ $regionName }}</td>
+        </tr>
+    </table>
+    @endif
 
     <!-- Participants Table -->
     <table class="participants-table">
@@ -241,7 +236,7 @@
                 <th class="col-dob">Date of Birth</th>
                 <th class="col-father">Father's Name</th>
                 <th class="col-mother">Mother's Name</th>
-                <th class="col-photo">Photographs attested<br><span style="font-size: 8.5px; font-weight: normal;">(Sign. & Seal Principal)</span></th>
+                <th class="col-photo">Photographs attested<br><span style="font-size: 8px; font-weight: normal;">(Sign. & Seal Principal)</span></th>
             </tr>
         </thead>
         <tbody>
@@ -279,7 +274,7 @@
     <table class="footer-table">
         <tr>
             <td>
-                <div style="height: 35px;"></div>
+                <div style="height: 30px;"></div>
                 Team manager
             </td>
             <td>
@@ -287,7 +282,7 @@
                 School Seal
             </td>
             <td>
-                <div style="height: 35px;"></div>
+                <div style="height: 30px;"></div>
                 Sign & Seal of Principal
             </td>
         </tr>
