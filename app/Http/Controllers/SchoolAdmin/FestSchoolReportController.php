@@ -25,6 +25,7 @@ use App\Support\ExcelExport;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
 use App\Support\TenantBranding;
+use App\Support\TenantStorage;
 use App\Support\FestEventMeta;
 use Illuminate\Http\Request;
 
@@ -1487,7 +1488,7 @@ class FestSchoolReportController extends SchoolAdminController
                     'dob' => $std->dob ? $std->dob->format('d/m/Y') : '',
                     'father_name' => $std->parent_name ?? '',
                     'mother_name' => '',
-                    'photo_url' => $std->photo ? TenantStorage::url($std->photo) : null,
+                    'photo_url' => $std->photo ? \App\Support\TenantStorage::url($std->photo) : null,
                 ]);
             }
         }
