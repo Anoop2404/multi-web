@@ -1,0 +1,1 @@
+function e(e){if(!e)return`Student`;let t=String(e.name??``).trim(),n=String(e.admission_number??``).trim();return t&&n?`${t} (${n})`:t||n||`Student`}export{e as t};

@@ -144,19 +144,19 @@
                                     </g>
                                 </svg>
                             </div>
-                            <h2 class="text-xl md:text-2xl font-black uppercase tracking-wide text-slate-900 font-sans">
+                            <h2 class="text-[17px] font-bold uppercase tracking-wide text-slate-900 font-sans">
                                 {{ form.sahodayaName || 'MALAPPURAM CENTRAL SAHODAYA' }}
                             </h2>
-                            <p class="text-xs font-bold text-slate-800 font-sans mt-0.5">
+                            <p class="text-[9.5px] font-bold text-slate-800 font-sans mt-0.5">
                                 (A Movement initiated and Guided by Central Board of Secondary Education, Delhi)
                             </p>
-                            <h3 class="text-lg md:text-xl font-black uppercase tracking-wider text-slate-900 font-sans mt-2.5 mb-3 underline decoration-1 underline-offset-4">
+                            <h3 class="text-[16px] font-bold uppercase tracking-wider text-slate-900 font-sans mt-2.5 mb-3 underline decoration-1 underline-offset-4">
                                 GAMES COMPETITION ENTRY FORM {{ form.academicYear || '2026-27' }}
                             </h3>
                         </div>
 
                         <!-- Meta Information Rows -->
-                        <div class="text-xs md:text-sm space-y-2.5 mb-4 font-sans">
+                        <div class="text-[11px] space-y-2 mb-3 font-sans">
                             <div class="flex items-baseline">
                                 <span class="font-bold whitespace-nowrap text-slate-900">Name of the School with Address:</span>
                                 <div class="flex-1 border-b border-dotted border-black ml-2 font-bold px-1 min-h-[22px] text-slate-900">
@@ -185,8 +185,8 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-4 font-bold pl-1 text-slate-900">
-                                    <span>Boys <span class="inline-block w-6 h-4 border border-black text-center text-xs leading-3 bg-white">{{ form.gender === 'boys' ? '✓' : '' }}</span></span>
-                                    <span>Girls <span class="inline-block w-6 h-4 border border-black text-center text-xs leading-3 bg-white">{{ form.gender === 'girls' ? '✓' : '' }}</span></span>
+                                    <span>Boys <span class="inline-block w-6 h-4 border border-black text-center text-[11px] leading-3 bg-white">{{ form.gender === 'boys' ? '✓' : '' }}</span></span>
+                                    <span>Girls <span class="inline-block w-6 h-4 border border-black text-center text-[11px] leading-3 bg-white">{{ form.gender === 'girls' ? '✓' : '' }}</span></span>
                                 </div>
                             </div>
 
@@ -200,7 +200,7 @@
 
                         <!-- Students Table -->
                         <div class="overflow-x-auto">
-                            <table class="w-full border-collapse border border-black text-center text-xs mt-2 font-sans">
+                            <table class="w-full border-collapse border border-black text-center text-[10px] mt-2 font-sans">
                                 <thead>
                                     <tr class="bg-slate-100 font-bold border-b border-black text-slate-900">
                                         <th class="border border-black p-2 w-[5%] font-bold">Sl<br>No</th>
@@ -210,7 +210,7 @@
                                         <th class="border border-black p-2 w-[11%] font-bold">DATE OF BIRTH</th>
                                         <th class="border border-black p-2 w-[14%] text-left font-bold">FATHER'S NAME</th>
                                         <th class="border border-black p-2 w-[14%] text-left font-bold">MOTHER'S NAME</th>
-                                        <th class="border border-black p-2 w-[13%] font-bold">PHOTOGRAPHS ATTESTED<br><span class="font-normal text-[9px] text-slate-700">(SIGN. & SEAL PRINCIPAL)</span></th>
+                                        <th class="border border-black p-2 w-[13%] font-bold">PHOTOGRAPHS ATTESTED<br><span class="font-normal text-[8px] text-slate-700">(SIGN. & SEAL PRINCIPAL)</span></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -257,7 +257,7 @@
                     </div>
 
                     <!-- Footer Signatures -->
-                    <div class="flex justify-between items-end pt-10 font-bold text-xs font-sans text-slate-900">
+                    <div class="flex justify-between items-end pt-10 font-bold text-[11px] font-sans text-slate-900">
                         <div class="text-center">
                             <div class="h-10"></div>
                             <div>Team manager</div>

@@ -1534,6 +1534,7 @@ class FestSchoolReportController extends SchoolAdminController
                     'father_name' => $std->parent_name ?? '',
                     'mother_name' => '',
                     'photo_url' => $std->photo ? \App\Support\TenantStorage::assetUrl($this->school, $std->photo) : null,
+                    'photo_path' => $std->photo,
                 ]);
             }
         }
@@ -1563,7 +1564,7 @@ class FestSchoolReportController extends SchoolAdminController
         // Direct PDF Download / Stream Response
         if ($request->boolean('download') || $request->query('export') === 'pdf' || $request->boolean('preview')) {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.sports-games-entry-form', array_merge($formData, [
-                'students' => $uniqueStudents,
+                'students' => $this->embedPhotosForPdf($uniqueStudents),
             ]))->setPaper('a4', 'portrait');
 
             $filename = \Illuminate\Support\Str::slug("Games Entry Form {$cleanGameName} {$this->school->name}") . '.pdf';
@@ -1576,7 +1577,7 @@ class FestSchoolReportController extends SchoolAdminController
 
         if ($request->boolean('raw_html')) {
             return view('reports.sports-games-entry-form', array_merge($formData, [
-                'students' => $uniqueStudents,
+                'students' => $this->embedPhotosForPdf($uniqueStudents),
             ]));
         }
 
@@ -1584,10 +1585,36 @@ class FestSchoolReportController extends SchoolAdminController
             'school' => $this->school,
             'event' => $event,
             'form' => $formData,
-            'initialStudents' => $uniqueStudents,
+            'initialStudents' => array_map(fn ($s) => \Illuminate\Support\Arr::except($s, ['photo_path']), $uniqueStudents),
             'registeredItems' => $registeredItems,
             'selectedItemId' => $selectedItemId,
         ]);
+    }
+
+    /**
+     * Swap each student's remote/asset `photo_url` for a base64 data URI before handing
+     * the list to a DomPDF view. DomPDF's `enable_remote` is off by default (security:
+     * it would otherwise let a PDF template fetch arbitrary attacker-controlled URLs at
+     * render time), so an <img src="https://..."> in the games-entry-form blade view
+     * silently renders as a blank/broken image — same pattern already solved for ID
+     * card PDFs via TenantStorage::photoBase64DataUri() (see FestIdCardService::portraitDataUri()).
+     * Falls back to the original photo_url (rather than a broken image) if the file
+     * can't be found/embedded, so a lookup failure never regresses below current behavior.
+     *
+     * @param  array<int, array<string, mixed>>  $students
+     * @return array<int, array<string, mixed>>
+     */
+    private function embedPhotosForPdf(array $students): array
+    {
+        return array_map(function (array $std) {
+            if (! empty($std['photo_path'])) {
+                $std['photo_url'] = \App\Support\TenantStorage::photoBase64DataUri($this->school, $std['photo_path'])
+                    ?: $std['photo_url'];
+            }
+            unset($std['photo_path']);
+
+            return $std;
+        }, $students);
     }
 }
 
