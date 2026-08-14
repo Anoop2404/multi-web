@@ -1445,24 +1445,42 @@ class FestSchoolReportController extends SchoolAdminController
         $sahodaya = Tenant::find($this->school->parent_id);
         $sahodayaLogoUrl = $sahodaya ? TenantBranding::logoUrl($sahodaya) : null;
 
-        // Resolve Region Name: e.g. "Tirur Region", "Manjeri Region", "Nilambur Region", else "District"
-        $rawRegionText = implode(' ', array_filter([
-            $event->cluster_label,
-            $event->cluster_key,
-            $event->title,
-            $event->partition_role === 'region' ? ($event->region?->name ?? null) : null,
-        ]));
+        // Dynamically resolve Region Name for ANY Sahodaya tenant & event structure:
+        $rawRegionName = null;
 
-        if (stripos($rawRegionText, 'Tirur') !== false) {
-            $regionName = 'Tirur Region';
-        } elseif (stripos($rawRegionText, 'Manjeri') !== false) {
-            $regionName = 'Manjeri Region';
-        } elseif (stripos($rawRegionText, 'Nilambur') !== false) {
-            $regionName = 'Nilambur Region';
-        } elseif ($event->partition_role === 'region' && !empty($event->cluster_label)) {
-            $regionName = str_ends_with(strtolower($event->cluster_label), 'region')
-                ? $event->cluster_label
-                : $event->cluster_label . ' Region';
+        if ($event->region_id) {
+            $event->loadMissing('region');
+            $rawRegionName = $event->region?->name;
+        }
+
+        if (!$rawRegionName && !empty($event->cluster_label)) {
+            $rawRegionName = $event->cluster_label;
+        }
+
+        if (!$rawRegionName && preg_match('/(?:REGION|ZONE|CLUSTER)\s*[\d\w\s()]+/i', $event->title, $m)) {
+            $rawRegionName = trim($m[0]);
+        }
+
+        if (!$rawRegionName) {
+            $assignment = \App\Models\SchoolRegionAssignment::where('school_id', $this->school->id)
+                ->with('region')
+                ->first();
+            $rawRegionName = $assignment?->region?->name;
+        }
+
+        if ($rawRegionName) {
+            if (preg_match('/\(([^)]+)\)/', $rawRegionName, $m)) {
+                $clean = trim($m[1]);
+            } else {
+                $clean = preg_replace('/^(REGION|ZONE|CLUSTER)\s*\d*\s*[-—:]*\s*/i', '', $rawRegionName);
+                $clean = trim($clean);
+            }
+
+            if (!empty($clean) && !str_contains(strtolower($clean), 'region') && !str_contains(strtolower($clean), 'zone')) {
+                $regionName = $clean . ' Region';
+            } else {
+                $regionName = !empty($clean) ? $clean : $rawRegionName;
+            }
         } else {
             $regionName = 'District';
         }
