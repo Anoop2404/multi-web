@@ -17,6 +17,18 @@
 
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="item-wise" />
 
+        <!-- Region Switcher -->
+        <div v-if="childEvents.length" class="card mb-4 !py-3">
+            <div class="flex flex-wrap gap-3 items-center">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}</label>
+                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
+                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
+                        {{ ev.short_title || ev.title }}
+                    </option>
+                </select>
+            </div>
+        </div>
+
         <ReportHeadItemNavigator
             :groups="headItemGroups"
             :base-url="base"
@@ -76,6 +88,7 @@
 </template>
 
 <script setup>
+import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
@@ -91,7 +104,12 @@ const props = defineProps({
     hasItemHeads: Boolean,
     pdfUrl: String, xlsUrl: String,
     activityLogs: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/item-wise`;
+
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports/item-wise`);
+}
 </script>

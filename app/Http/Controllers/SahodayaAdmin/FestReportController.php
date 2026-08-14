@@ -769,6 +769,7 @@ class FestReportController extends SahodayaAdminController
             'filterItemId'   => $itemId,
             'pdfUrl'         => $itemId ? '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/item-wise?'.http_build_query(['item_id' => $itemId]) : null,
             'xlsUrl'         => $itemId ? '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/item-participants?'.http_build_query(['item_id' => $itemId]) : null,
+            'childEvents'    => $event->sportEventDropdownOptions(),
         ])));
     }
 

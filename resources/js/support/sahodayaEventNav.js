@@ -136,6 +136,8 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
 
     const outputItems = [
         { label: 'Reports hub', href: `${base}/reports`, icon: 'file-text', permissions: FEST_VIEW },
+        { label: 'Item-wise report', href: `${base}/reports/item-wise`, icon: 'list', permissions: FEST_VIEW },
+        { label: 'Item counts', href: `${base}/reports/item-counts`, icon: 'bar-chart', permissions: FEST_VIEW },
         { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permissions: FEST_CERTIFICATES },
         { label: 'ID cards', href: `${base}/id-cards`, icon: 'credit-card', permissions: FEST_VIEW },
     ];
