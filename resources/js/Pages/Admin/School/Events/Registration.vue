@@ -1635,8 +1635,8 @@ function updateItem(event, item) {
     const standby = (form.standby_ids ?? []).slice(0, 2);
     delete itemErrors[key];
 
-    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > 1) {
-        itemErrors[key] = 'This item allows only one participant.';
+    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
+        itemErrors[key] = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
         scrollToItemRow(event.id, item.id);
         return;
     }
@@ -1892,8 +1892,8 @@ function submitItem(event, item) {
         return;
     }
 
-    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > 1) {
-        itemErrors[key] = 'This item allows only one participant.';
+    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
+        itemErrors[key] = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
         scrollToItemRow(event.id, item.id);
         return;
     }
