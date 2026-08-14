@@ -1497,15 +1497,17 @@ class FestSchoolReportController extends SchoolAdminController
             ])
             ->get();
 
-        // Group items for selection dropdown
+        // Group items for selection dropdown & menu navigation
         $registeredItems = $registrations->map(function ($reg) {
             $rawTitle = $reg->item?->title ?? 'Item #'.$reg->item_id;
+            $count = $reg->participants ? $reg->participants->filter(fn($p) => !empty($p->student_id))->count() : 0;
             return [
                 'id' => $reg->item_id,
                 'title' => trim(str_replace('_', ' ', $rawTitle)),
                 'category' => $reg->item?->age_group ?: ($reg->item?->category ?: 'General'),
-                'gender' => $reg->item?->gender ?: 'boys',
+                'gender' => strtolower($reg->item?->gender ?: 'boys'),
                 'discipline' => $reg->item?->sport_discipline,
+                'registered_count' => $count,
             ];
         })->filter(fn ($item) => !empty($item['id']))->unique('id')->values();
 
@@ -1557,6 +1559,20 @@ class FestSchoolReportController extends SchoolAdminController
             'gender' => strtolower($selectedItem?->gender ?? 'boys'),
             'regionName' => $regionName,
         ];
+
+        // Direct PDF Download / Stream Response
+        if ($request->boolean('download') || $request->query('export') === 'pdf' || $request->boolean('preview')) {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.sports-games-entry-form', array_merge($formData, [
+                'students' => $uniqueStudents,
+            ]))->setPaper('a4', 'portrait');
+
+            $filename = \Illuminate\Support\Str::slug("Games Entry Form {$cleanGameName} {$this->school->name}") . '.pdf';
+
+            if ($request->boolean('preview')) {
+                return $pdf->stream($filename);
+            }
+            return $pdf->download($filename);
+        }
 
         if ($request->wantsJson() || $request->has('inertia')) {
             return $this->inertia('School/Events/SportsEntryForm', [

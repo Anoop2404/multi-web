@@ -1,38 +1,41 @@
 <template>
     <div class="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
-        <!-- Control Header (Hidden during print) -->
+        <!-- Control Header & Items Navigation Menu (Hidden during print) -->
         <div class="max-w-[210mm] mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 mb-6 no-print">
+            
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
                 <div>
                     <h1 class="text-xl font-bold text-slate-900 flex items-center gap-2">
                         <span class="text-2xl">🏆</span> Games Competition Entry Form
                     </h1>
                     <p class="text-xs text-slate-500 mt-1">
-                        Auto-loaded for <strong class="text-slate-700">{{ event?.title || 'Sports Meet' }}</strong>. Ready to print on A4 paper.
+                        Select a registered game item below to preview or download its official PDF entry form.
                     </p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <!-- Registered Items Selector -->
-                    <div v-if="registeredItems && registeredItems.length" class="flex items-center gap-2">
-                        <label class="text-xs font-semibold text-slate-700 whitespace-nowrap">Registered Game:</label>
-                        <select 
-                            v-model="selectedItem" 
-                            @change="onItemChange" 
-                            class="text-xs py-1.5 px-3 border border-slate-300 rounded-lg bg-slate-50 font-medium outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option v-for="item in registeredItems" :key="item.id" :value="item.id">
-                                {{ item.title }} ({{ item.category }})
-                            </option>
-                        </select>
-                    </div>
-
                     <button 
                         @click="addStudentRow" 
                         type="button" 
-                        class="px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition flex items-center gap-1"
+                        class="px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer"
                     >
                         ➕ Add Student
+                    </button>
+
+                    <button 
+                        @click="previewSelectedPdf" 
+                        type="button" 
+                        class="px-3 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                        👁️ Preview PDF
+                    </button>
+
+                    <button 
+                        @click="downloadSelectedPdf" 
+                        type="button" 
+                        class="px-3 py-2 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                        📥 Download PDF
                     </button>
 
                     <button 
@@ -40,20 +43,84 @@
                         type="button" 
                         class="px-4 py-2 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition flex items-center gap-1.5 cursor-pointer"
                     >
-                        🖨️ Print / Save PDF
+                        🖨️ Print Form
                     </button>
                 </div>
             </div>
 
-            <!-- Interactive Inputs Form -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <!-- Items Menu Bar (Inside Page) -->
+            <div v-if="registeredItems && registeredItems.length" class="mb-5">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                        <span>📋</span> Registered Sports Items Menu ({{ registeredItems.length }})
+                    </h2>
+                    <span class="text-[11px] text-slate-400">Click any item to view & export</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    <div 
+                        v-for="item in registeredItems" 
+                        :key="item.id"
+                        @click="selectItem(item.id)"
+                        :class="[
+                            'p-3 rounded-lg border text-left cursor-pointer transition relative group flex flex-col justify-between',
+                            selectedItem == item.id 
+                                ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-sm' 
+                                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
+                        ]"
+                    >
+                        <div>
+                            <div class="flex items-center justify-between gap-1 mb-1">
+                                <span class="font-bold text-xs text-slate-900 line-clamp-1">
+                                    {{ item.title }}
+                                </span>
+                                <span 
+                                    :class="[
+                                        'text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase shrink-0',
+                                        item.gender === 'girls' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'
+                                    ]"
+                                >
+                                    {{ item.gender }}
+                                </span>
+                            </div>
+
+                            <div class="text-[11px] text-slate-500 flex items-center gap-2">
+                                <span>Category: <strong>{{ item.category }}</strong></span>
+                                <span>•</span>
+                                <span class="text-slate-700 font-medium">{{ item.registered_count || 0 }} Athletes</span>
+                            </div>
+                        </div>
+
+                        <!-- Item Action Buttons -->
+                        <div class="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-200/60">
+                            <button 
+                                @click.stop="previewItemPdf(item.id)" 
+                                type="button" 
+                                class="flex-1 py-1 px-2 text-[10px] font-bold rounded bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition text-center flex items-center justify-center gap-1"
+                            >
+                                👁️ Preview PDF
+                            </button>
+                            <button 
+                                @click.stop="downloadItemPdf(item.id)" 
+                                type="button" 
+                                class="flex-1 py-1 px-2 text-[10px] font-bold rounded bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition text-center flex items-center justify-center gap-1"
+                            >
+                                📥 Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Edit Inputs -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs bg-slate-50/60 p-3.5 rounded-lg border border-slate-200/80">
                 <div class="md:col-span-2">
                     <label class="block font-semibold text-slate-700 mb-1">School Name with Address</label>
                     <input 
                         v-model="form.schoolName" 
                         type="text" 
                         placeholder="e.g. Crescent Higher Secondary School, Malappuram" 
-                        class="w-full px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                        class="w-full px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                     />
                 </div>
 
@@ -63,7 +130,7 @@
                         v-model="form.teamManager" 
                         type="text" 
                         placeholder="e.g. Mr. Abdul Rahman (+91 98470 12345)" 
-                        class="w-full px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                        class="w-full px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                     />
                 </div>
 
@@ -73,7 +140,7 @@
                         v-model="form.gameName" 
                         type="text" 
                         placeholder="e.g. Football / Volleyball" 
-                        class="w-full px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                        class="w-full px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                     />
                 </div>
 
@@ -83,7 +150,7 @@
                         v-model="form.category" 
                         type="text" 
                         placeholder="e.g. Under 17 / Under 19" 
-                        class="w-full px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                        class="w-full px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                     />
                 </div>
 
@@ -101,12 +168,12 @@
                     </div>
                 </div>
 
-                <div v-if="form.regionName" class="md:col-span-3">
+                <div class="md:col-span-3">
                     <label class="block font-semibold text-slate-700 mb-1">Region</label>
                     <input 
                         v-model="form.regionName" 
                         type="text" 
-                        class="w-full max-w-sm px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                        class="w-full max-w-sm px-3 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none font-bold bg-white"
                     />
                 </div>
             </div>
@@ -127,7 +194,6 @@
                     <!-- Form Header with Sahodaya Logo -->
                     <div class="text-center mb-3">
                         <div class="flex justify-center mb-1">
-                            <!-- Real Sahodaya Logo if available, fallback vector emblem -->
                             <img 
                                 v-if="form.sahodayaLogoUrl" 
                                 :src="form.sahodayaLogoUrl" 
@@ -250,7 +316,6 @@
                                     <input v-model="student.mother_name" type="text" placeholder="Mother's Name" class="w-full border-0 outline-none bg-transparent text-xs">
                                 </td>
                                 <td class="border border-black p-1.5 align-middle">
-                                    <!-- Perfectly Proportioned Passport Photo Frame -->
                                     <div class="w-[30mm] h-[38mm] mx-auto border border-dashed border-slate-400 rounded-sm flex flex-col items-center justify-center text-[9px] text-slate-500 bg-slate-50 overflow-hidden p-0.5 box-border">
                                         <img 
                                             v-if="student.photo_url" 
@@ -350,9 +415,38 @@ function removeStudentRow(index) {
     }
 }
 
-function onItemChange() {
-    if (selectedItem.value && props.event?.id) {
-        router.get(window.location.pathname, { item_id: selectedItem.value }, { preserveState: true, preserveScroll: true });
+function selectItem(itemId) {
+    if (itemId && props.event?.id) {
+        selectedItem.value = itemId;
+        router.get(window.location.pathname, { item_id: itemId }, { preserveState: true, preserveScroll: true });
+    }
+}
+
+function previewItemPdf(itemId) {
+    const url = `${window.location.pathname}?item_id=${itemId}&preview=1`;
+    window.open(url, '_blank');
+}
+
+function downloadItemPdf(itemId) {
+    const url = `${window.location.pathname}?item_id=${itemId}&download=1`;
+    window.location.href = url;
+}
+
+function previewSelectedPdf() {
+    if (selectedItem.value) {
+        previewItemPdf(selectedItem.value);
+    } else {
+        const url = `${window.location.pathname}?preview=1`;
+        window.open(url, '_blank');
+    }
+}
+
+function downloadSelectedPdf() {
+    if (selectedItem.value) {
+        downloadItemPdf(selectedItem.value);
+    } else {
+        const url = `${window.location.pathname}?download=1`;
+        window.location.href = url;
     }
 }
 
