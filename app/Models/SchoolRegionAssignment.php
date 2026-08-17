@@ -52,6 +52,10 @@ class SchoolRegionAssignment extends Model
      */
     public function scopeForPartitionGroup($query, ?string $partitionGroup)
     {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('school_region_assignments', 'partition_group')) {
+            return $query;
+        }
+
         return $query->where('partition_group', $partitionGroup);
     }
 }
