@@ -23,125 +23,96 @@ class CheckSchoolBoardResults extends Command
     {
         $input = trim((string) $this->argument('school'));
 
-        // Discover all tenant databases
-        $tenantDbs = ['sahodaya'];
-        try {
-            $databases = DB::select("SELECT datname FROM pg_database WHERE datname LIKE 'sahodaya%'");
-            foreach ($databases as $d) {
-                if (! in_array($d->datname, $tenantDbs, true)) {
-                    $tenantDbs[] = $d->datname;
-                }
-            }
-        } catch (\Throwable) {
-            // MySQL or non-pg fallback
-        }
+        // 1. Find school tenant in central DB
+        $school = Tenant::where('id', $input)
+            ->orWhere('school_prefix', $input)
+            ->orWhere('data->name', 'like', "%{$input}%")
+            ->first();
 
-        $foundSchool = null;
-        $foundDb = null;
-        $foundSahodaya = null;
-
-        foreach ($tenantDbs as $dbName) {
-            try {
-                config(['database.connections.dynamic.driver' => 'pgsql']);
-                config(['database.connections.dynamic.host' => '127.0.0.1']);
-                config(['database.connections.dynamic.port' => 5432]);
-                config(['database.connections.dynamic.database' => $dbName]);
-                config(['database.connections.dynamic.username' => env('DB_USERNAME', 'postgres')]);
-                config(['database.connections.dynamic.password' => env('DB_PASSWORD', '')]);
-                DB::purge('dynamic');
-
-                if (Schema::connection('dynamic')->hasTable('tenants')) {
-                    $schoolRow = DB::connection('dynamic')->table('tenants')
-                        ->where('id', $input)
+        // 2. If not found in central DB, search within initialized tenant environments
+        if (! $school) {
+            $parentTenants = Tenant::whereNull('parent_id')->orWhere('type', 'sahodaya')->get();
+            foreach ($parentTenants as $pt) {
+                try {
+                    tenancy()->initialize($pt);
+                    $candidate = Tenant::where('id', $input)
                         ->orWhere('school_prefix', $input)
-                        ->orWhere('data', 'like', "%{$input}%")
+                        ->orWhere('name', 'like', "%{$input}%")
                         ->first();
-
-                    if ($schoolRow) {
-                        $foundSchool = $schoolRow;
-                        $foundDb = $dbName;
-                        $foundSahodaya = $schoolRow->parent_id ? DB::connection('dynamic')->table('tenants')->where('id', $schoolRow->parent_id)->first() : null;
+                    if ($candidate) {
+                        $school = $candidate;
                         break;
                     }
-                }
-            } catch (\Throwable) {
-                continue;
-            }
-        }
-
-        if (! $foundSchool) {
-            // Check central database
-            $schoolRow = Tenant::where('id', $input)
-                ->orWhere('school_prefix', $input)
-                ->first();
-            if ($schoolRow) {
-                $foundSchool = (object) [
-                    'id' => $schoolRow->id,
-                    'school_prefix' => $schoolRow->school_prefix,
-                    'parent_id' => $schoolRow->parent_id,
-                    'data' => json_encode(['name' => $schoolRow->name]),
-                ];
-                $foundSahodaya = $schoolRow->parent_id ? Tenant::find($schoolRow->parent_id) : null;
-                if ($foundSahodaya) {
-                    try {
-                        tenancy()->initialize($foundSahodaya);
-                        $foundDb = config('database.connections.tenant.database');
-                    } catch (\Throwable) {
-                        // ignore
-                    }
+                } catch (\Throwable) {
+                    continue;
                 }
             }
         }
 
-        if (! $foundSchool) {
-            $this->error("School matching '{$input}' could not be found across any tenant database.");
+        if (! $school) {
+            $this->error("School matching '{$input}' could not be found.");
             return self::FAILURE;
         }
 
-        $schoolData = is_string($foundSchool->data ?? null) ? json_decode($foundSchool->data, true) : (array) ($foundSchool->data ?? []);
-        $schoolName = $schoolData['name'] ?? $foundSchool->name ?? $foundSchool->id;
+        $schoolName = $school->data['name'] ?? $school->name ?? $school->id;
+        $sahodayaId = $school->parent_id;
+        $sahodaya = null;
+
+        if ($sahodayaId) {
+            $sahodaya = Tenant::find($sahodayaId);
+            if (! $sahodaya) {
+                // Search parent in central database
+                config(['database.default' => 'central']);
+                $sahodaya = Tenant::find($sahodayaId);
+            }
+        }
+
+        if ($sahodaya) {
+            try {
+                tenancy()->initialize($sahodaya);
+            } catch (\Throwable $e) {
+                $this->warn("Tenancy initialization warning: " . $e->getMessage());
+            }
+        }
+
+        $dbName = config('database.connections.tenant.database') ?? config('database.connections.pgsql.database');
 
         $this->info("=================================================");
         $this->info("  School: {$schoolName}");
-        $this->info("  ID: {$foundSchool->id}");
-        $this->info("  Prefix: " . ($foundSchool->school_prefix ?? 'None'));
-        $this->info("  Database: " . ($foundDb ?? 'Central'));
+        $this->info("  ID: {$school->id}");
+        $this->info("  Prefix: " . ($school->school_prefix ?? 'None'));
+        $this->info("  Parent Sahodaya: " . ($sahodaya?->name ?? $sahodayaId ?? 'None'));
+        $this->info("  Active Tenant DB: {$dbName}");
         $this->info("=================================================\n");
 
-        // Query BoardResult records
-        $queryConn = $foundDb ? DB::connection('dynamic') : DB::connection();
-        
-        $results = collect();
-        if (Schema::connection($foundDb ? 'dynamic' : null)->hasTable('board_results')) {
-            $results = $queryConn->table('board_results')
-                ->where('tenant_id', $foundSchool->id)
-                ->orderByDesc('academic_year')
-                ->orderByDesc('class')
-                ->get();
-        }
+        // Query BoardResult records via Eloquent
+        $results = BoardResult::where('tenant_id', $school->id)
+            ->orderByDesc('academic_year')
+            ->orderByDesc('class')
+            ->get();
 
         $this->info("1. BOARD RESULTS SUMMARY (" . $results->count() . " saved rows):");
         if ($results->isEmpty()) {
             $this->warn("   No BoardResult records found in database for this school.");
         } else {
             $headers = ['ID', 'Year', 'Class', 'Status', 'Appeared', 'Pass %', 'Pdf File', 'Updated At'];
-            $rows = $results->map(fn ($r) => [
+            $rows = $results->map(fn (BoardResult $r) => [
                 $r->id,
                 $r->academic_year,
                 "Class {$r->class}",
-                strtoupper($r->status),
+                strtoupper((string) $r->status),
                 $r->total_appeared ?? 0,
                 ($r->pass_percent ?? 0) . '%',
                 ! empty($r->result_pdf_path) ? 'Yes (Uploaded)' : 'No',
-                $r->updated_at ?? 'N/A',
+                $r->updated_at ? $r->updated_at->format('Y-m-d H:i') : 'N/A',
             ])->all();
             $this->table($headers, $rows);
         }
 
-        // Query Toppers records
-        $toppers = collect();
-        if (Schema::connection($foundDb ? 'dynamic' : null)->hasTable('toppers')) {
-            $toppers = $queryConn->table('toppers')->where('tenant_id', $foundSchool->id)->get();
+        // Query Toppers records via Eloquent / DB
+        $toppers = Topper::where('tenant_id', $school->id)->get();
+        if ($toppers->isEmpty() && Schema::hasTable('board_result_toppers')) {
+            $toppers = BoardResultTopper::where('school_id', $school->id)->get();
         }
 
         $this->info("\n2. TOPPERS LIST (" . $toppers->count() . " records):");
@@ -163,8 +134,8 @@ class CheckSchoolBoardResults extends Command
 
         // Query Subject Toppers
         $subjectToppers = collect();
-        if (Schema::connection($foundDb ? 'dynamic' : null)->hasTable('board_result_subject_toppers')) {
-            $subjectToppers = $queryConn->table('board_result_subject_toppers')->where('school_id', $foundSchool->id)->get();
+        if (Schema::hasTable('board_result_subject_toppers')) {
+            $subjectToppers = BoardResultSubjectTopper::where('school_id', $school->id)->get();
         }
         $this->info("\n3. SUBJECT TOPPERS (" . $subjectToppers->count() . " records):");
         if ($subjectToppers->isNotEmpty()) {
@@ -184,8 +155,8 @@ class CheckSchoolBoardResults extends Command
 
         // Query Full A1 Achievers
         $fullA1 = collect();
-        if (Schema::connection($foundDb ? 'dynamic' : null)->hasTable('board_result_full_a1_achievers')) {
-            $fullA1 = $queryConn->table('board_result_full_a1_achievers')->where('school_id', $foundSchool->id)->get();
+        if (Schema::hasTable('board_result_full_a1_achievers')) {
+            $fullA1 = BoardResultFullA1Achiever::where('school_id', $school->id)->get();
         }
         $this->info("\n4. FULL A1 ACHIEVERS (" . $fullA1->count() . " records):");
         if ($fullA1->isNotEmpty()) {
@@ -202,23 +173,21 @@ class CheckSchoolBoardResults extends Command
         }
 
         // Query Data Change Audit Logs
-        $logs = collect();
-        if (Schema::connection($foundDb ? 'dynamic' : null)->hasTable('data_change_logs')) {
-            $logs = $queryConn->table('data_change_logs')
-                ->where('school_id', $foundSchool->id)
-                ->whereIn('log_name', ['board_result', 'topper', 'achievement'])
-                ->latest()
-                ->limit(10)
-                ->get();
-        }
+        $logs = DataChangeLog::where('school_id', $school->id)
+            ->whereIn('log_name', ['board_result', 'topper', 'achievement'])
+            ->latest()
+            ->limit(10)
+            ->get();
 
         $this->info("\n5. RECENT AUDIT LOGS (" . $logs->count() . " recent entries):");
         if ($logs->isNotEmpty()) {
-            $headers = ['Date', 'Action', 'Description', 'User ID'];
+            $headers = ['ID', 'Date', 'Action', 'Description', 'Subject ID', 'User ID'];
             $rows = $logs->map(fn ($l) => [
-                $l->created_at ?? 'N/A',
+                $l->id,
+                $l->created_at ? $l->created_at->format('Y-m-d H:i') : 'N/A',
                 $l->action,
                 $l->description,
+                $l->subject_id ?? 'N/A',
                 $l->causer_user_id,
             ])->all();
             $this->table($headers, $rows);
