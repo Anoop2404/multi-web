@@ -31,13 +31,13 @@ class SchoolFestProgram
     public static function slugForEventType(string $eventType): string
     {
         return match ($eventType) {
-            'sports'       => 'sports-meet',
-            'kids_fest'    => 'kids-fest',
-            'teacher_fest' => 'teacher-fest',
-            'english_fest' => 'english-fest',
-            'science_fest' => 'science-fest',
-            'custom'       => 'custom',
-            default        => 'kalotsav',
+            'sports', 'sports_meet', 'athletics' => 'sports-meet',
+            'kids_fest', 'kids'                  => 'kids-fest',
+            'teacher_fest', 'teachers'            => 'teacher-fest',
+            'english_fest', 'english'            => 'english-fest',
+            'science_fest', 'science'            => 'science-fest',
+            'custom'                             => 'custom',
+            default                              => 'kalotsav',
         };
     }
 }
