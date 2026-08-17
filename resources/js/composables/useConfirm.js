@@ -1,7 +1,8 @@
 import { ref } from 'vue';
-import Swal from 'sweetalert2';
+import { useSweetAlert } from '@/composables/useSweetAlert.js';
 
 const dialogRef = ref(null);
+const { showAlert } = useSweetAlert();
 
 /** @param {import('vue').Ref|null} ref */
 export function registerConfirmDialog(ref) {
@@ -23,22 +24,14 @@ export function useConfirm() {
                 return dialog.ask(options);
             }
 
-            return Swal.fire({
+            return showAlert({
                 title: options.title ?? 'Are you sure?',
                 text: options.message ?? '',
-                icon: options.destructive ? 'warning' : 'question',
+                icon: options.destructive ? 'warning' : 'info',
                 showCancelButton: true,
                 confirmButtonText: options.confirmLabel ?? 'Yes, proceed',
                 cancelButtonText: options.cancelLabel ?? 'Cancel',
                 confirmButtonColor: options.destructive ? '#dc2626' : '#0f3d7a',
-                cancelButtonColor: '#94a3b8',
-                customClass: {
-                    popup: 'rounded-2xl font-sans shadow-xl border border-slate-100',
-                    title: 'text-lg font-bold text-slate-900',
-                    htmlContainer: 'text-sm text-slate-600',
-                    confirmButton: 'px-4 py-2 rounded-xl text-sm font-semibold shadow-sm',
-                    cancelButton: 'px-4 py-2 rounded-xl text-sm font-semibold shadow-sm',
-                },
             }).then((res) => res.isConfirmed);
         },
 
@@ -58,33 +51,21 @@ export function useConfirm() {
                 });
             }
 
-            return Swal.fire({
+            return showAlert({
                 title: options.title ?? 'Input Required',
                 text: options.message ?? '',
                 input: options.inputMultiline ? 'textarea' : 'text',
                 inputValue: options.inputValue ?? '',
                 inputPlaceholder: options.inputPlaceholder ?? '',
-                inputAttributes: {
-                    autocapitalize: 'off',
-                },
                 showCancelButton: true,
                 confirmButtonText: options.confirmLabel ?? 'OK',
                 cancelButtonText: options.cancelLabel ?? 'Cancel',
                 confirmButtonColor: '#0f3d7a',
-                cancelButtonColor: '#94a3b8',
                 inputValidator: (value) => {
                     if ((options.inputRequired ?? true) && !value?.trim()) {
                         return options.inputLabel ? `${options.inputLabel} is required` : 'This field is required';
                     }
                     return null;
-                },
-                customClass: {
-                    popup: 'rounded-2xl font-sans shadow-xl border border-slate-100',
-                    title: 'text-lg font-bold text-slate-900',
-                    htmlContainer: 'text-sm text-slate-600',
-                    input: 'field text-sm rounded-xl',
-                    confirmButton: 'px-4 py-2 rounded-xl text-sm font-semibold shadow-sm',
-                    cancelButton: 'px-4 py-2 rounded-xl text-sm font-semibold shadow-sm',
                 },
             }).then((res) => (res.isConfirmed ? res.value : null));
         },
