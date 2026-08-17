@@ -116,12 +116,16 @@ class SubscriptionController extends Controller
 
         // Activate or extend tenant subscription
         $invoice = $receipt->invoice;
+        $periodEnd = $invoice->plan?->billing_period === 'monthly'
+            ? now()->addMonthNoOverflow()
+            : now()->addYear();
+
         TenantSubscription::updateOrCreate(
             ['tenant_id' => $invoice->tenant_id],
             [
                 'plan_id'      => $invoice->plan_id,
                 'period_start' => now()->toDateString(),
-                'period_end'   => now()->addYear()->toDateString(),
+                'period_end'   => $periodEnd->toDateString(),
                 'status'       => 'active',
             ]
         );
