@@ -84,6 +84,14 @@ class ProgramRouteMap
 
     public static function slugFromEventType(string $eventType): ?string
     {
+        if (in_array($eventType, ['kalolsavam', 'kalotsav', 'art_fest', 'co_curricular'], true)) {
+            return 'kalotsav';
+        }
+
+        if (in_array($eventType, ['sports', 'sports_meet', 'athletics'], true)) {
+            return 'sports-meet';
+        }
+
         foreach (self::FEST_PROGRAMS as $meta) {
             if ($meta['event_type'] === $eventType) {
                 return $meta['slug'];
