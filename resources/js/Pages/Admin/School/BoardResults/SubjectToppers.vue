@@ -618,13 +618,7 @@ async function removeSubjectTopper(row) {
 
     if (!existing) return;
 
-    const updatedSubjectMarks = { ...(existing.subject_marks ?? {}) };
-    delete updatedSubjectMarks[row.subject];
-
-    router.put(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
-        ...existing,
-        subject_marks: updatedSubjectMarks,
-    }, {
+    router.delete(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}?subject=${encodeURIComponent(row.subject)}`, {
         preserveScroll: true,
     });
 }

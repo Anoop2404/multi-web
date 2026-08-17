@@ -1579,7 +1579,18 @@ class BoardResultController extends SchoolAdminController
         );
 
         $wasOverall = $topper->entry_type === Topper::ENTRY_OVERALL;
-        $topper->delete();
+        $subject = $request->query('subject');
+
+        if ($subject) {
+            $topper->subjectMarks()->whereRaw('LOWER(subject_label) = ?', [strtolower(trim($subject))])->delete();
+            if ($topper->isSubjectOnly() && $topper->subjectMarks()->count() === 0) {
+                $topper->delete();
+            }
+        } else {
+            $topper->subjectMarks()->delete();
+            $topper->delete();
+        }
+
         if ($wasOverall) {
             $this->recomputeOverallRanks($boardResult);
         }
