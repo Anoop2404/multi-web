@@ -7,6 +7,7 @@ class SchoolFestProgram
     /** @var array<string, array{slug: string, label: string, eventType: string}> */
     public const MAP = [
         'kalotsav'     => ['slug' => 'kalotsav', 'label' => 'Kalotsav', 'eventType' => 'kalolsavam'],
+        'sports'       => ['slug' => 'sports-meet', 'label' => 'Sports Meet', 'eventType' => 'sports'],
         'sports-meet'  => ['slug' => 'sports-meet', 'label' => 'Sports Meet', 'eventType' => 'sports'],
         'kids-fest'    => ['slug' => 'kids-fest', 'label' => 'Kids Fest', 'eventType' => 'kids_fest'],
         'teacher-fest' => ['slug' => 'teacher-fest', 'label' => 'Teacher Fest', 'eventType' => 'teacher_fest'],

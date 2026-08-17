@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\FestEvent;
+use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
 use Closure;
 use Illuminate\Http\Request;
@@ -26,7 +27,15 @@ class EnsureSchoolFestProgramMatchesEvent
             }
         }
 
-        $expectedType = SchoolFestProgram::eventType($program);
+        // Normalize program to eventType
+        $expectedType = ProgramRouteMap::eventTypeFromPrefix($program)
+            ?? ProgramRouteMap::eventTypeFromSlug($program)
+            ?? (isset(SchoolFestProgram::MAP[$program]) ? SchoolFestProgram::eventType($program) : null);
+
+        if (! $expectedType) {
+            return $next($request);
+        }
+
         $actualType = $event->event_type;
 
         $isKalotsavMatch = in_array($expectedType, ['kalolsavam', 'kalotsav'], true) &&
@@ -40,9 +49,15 @@ class EnsureSchoolFestProgramMatchesEvent
         if (! $matches) {
             $tenantId = $request->route('tenant') ?? $request->route('tenantId') ?? $request->segment(2);
             $correctSlug = SchoolFestProgram::slugForEventType($actualType);
+            $correctPrefix = ProgramRouteMap::prefixFromSlug($correctSlug);
+
+            // Prevent infinite redirect loops if already on correct route prefix or slug
+            if ($program === $correctPrefix || $program === $correctSlug) {
+                return $next($request);
+            }
 
             if ($tenantId && $request->isMethod('GET')) {
-                return redirect("/school-admin/{$tenantId}/{$correctSlug}/events/{$event->id}/overview");
+                return redirect("/school-admin/{$tenantId}/{$correctPrefix}/events/{$event->id}/overview");
             }
 
             abort_unless(
