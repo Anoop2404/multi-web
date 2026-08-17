@@ -588,7 +588,7 @@
                                         <span v-if="item.item_code" class="font-mono text-[10px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">{{ item.item_code }}</span>
                                         <p class="font-bold text-xs text-slate-900 truncate">{{ item.title }}</p>
                                     </div>
-                                    <p class="text-[10px] text-slate-500 capitalize mt-0.5">{{ item.category || 'General' }} · {{ item.class_group || 'Open' }}</p>
+                                    <p class="text-[10px] text-slate-500 font-medium capitalize mt-0.5">{{ item.category || 'General' }} · {{ formatClassGroup(item.class_group) }}</p>
                                 </div>
                                 <button type="button" @click="toggleItemForSahodaya(item, !item.is_enabled)" class="px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap" :class="item.is_enabled ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-rose-100 text-rose-800 hover:bg-rose-200'">
                                     {{ item.is_enabled ? '✓ Enabled' : '✕ Hidden' }}
