@@ -253,21 +253,21 @@
             @foreach($upcoming as $event)
             <article class="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md hover:border-purple-100 transition group">
                 <div class="px-5 py-4 border-b border-gray-50" style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 6%, white), white);">
-                    @if($event->event_date)
+                    @if(!empty($event->event_date))
                     <time class="text-xs font-bold text-purple-600">{{ $event->event_date->format('M j, Y') }}</time>
                     @else
                     <span class="text-xs font-bold text-purple-600">TBA</span>
                     @endif
-                    @if($event->type)
+                    @if(!empty($event->type))
                     <span class="ml-2 text-[10px] uppercase tracking-wider text-gray-400">{{ $event->type }}</span>
                     @endif
                 </div>
                 <div class="p-5">
                     <h3 class="font-heading font-bold text-gray-900 group-hover:text-purple-700 transition">{{ $event->name }}</h3>
-                    @if($event->academic_year)
+                    @if(!empty($event->academic_year))
                     <p class="text-xs text-gray-500 mt-1">{{ $event->academic_year }}</p>
                     @endif
-                    @if($event->venue)
+                    @if(!empty($event->venue))
                     <p class="text-xs text-gray-500 mt-2">📍 {{ $event->venue }}</p>
                     @endif
                 </div>

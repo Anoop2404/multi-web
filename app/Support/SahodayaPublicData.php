@@ -79,6 +79,7 @@ class SahodayaPublicData
                 'type' => $labels[$event->event_type] ?? \Illuminate\Support\Str::headline($event->event_type),
                 'event_date' => $event->event_start,
                 'venue' => $event->venue,
+                'academic_year' => $event->academic_year,
             ]);
     }
 
