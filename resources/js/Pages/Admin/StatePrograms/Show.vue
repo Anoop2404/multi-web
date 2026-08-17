@@ -215,6 +215,66 @@
                         </div>
                     </form>
 
+                    <!-- Search & Filter Controls -->
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/80">
+                        <!-- Quick Filter Pills -->
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <button type="button" 
+                                    @click="catalogFilter = 'all'" 
+                                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                                    :class="catalogFilter === 'all' ? 'bg-slate-900 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'">
+                                All Items
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'all' ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-500'">{{ catalogCounts.all }}</span>
+                            </button>
+
+                            <button type="button" 
+                                    @click="catalogFilter = 'onstage_ind'" 
+                                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                                    :class="catalogFilter === 'onstage_ind' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-indigo-50 border border-slate-200/80'">
+                                🎭 On-Stage (Ind)
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'onstage_ind' ? 'bg-indigo-700 text-indigo-100' : 'bg-indigo-50 text-indigo-600'">{{ catalogCounts.onstage_ind }}</span>
+                            </button>
+
+                            <button type="button" 
+                                    @click="catalogFilter = 'group'" 
+                                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                                    :class="catalogFilter === 'group' ? 'bg-purple-600 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-purple-50 border border-slate-200/80'">
+                                👥 Group Items
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'group' ? 'bg-purple-700 text-purple-100' : 'bg-purple-50 text-purple-600'">{{ catalogCounts.group }}</span>
+                            </button>
+
+                            <button type="button" 
+                                    @click="catalogFilter = 'offstage'" 
+                                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                                    :class="catalogFilter === 'offstage' ? 'bg-amber-600 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-amber-50 border border-slate-200/80'">
+                                🎨 Off-Stage
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'offstage' ? 'bg-amber-700 text-amber-100' : 'bg-amber-50 text-amber-600'">{{ catalogCounts.offstage }}</span>
+                            </button>
+                        </div>
+
+                        <!-- Search & Category Filter Inputs -->
+                        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                            <div class="relative flex-1 sm:w-56">
+                                <input v-model="catalogSearch" 
+                                       type="text" 
+                                       placeholder="Search item or code..." 
+                                       class="w-full pl-8 pr-7 py-1.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                                <span class="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
+                                <button v-if="catalogSearch" type="button" @click="catalogSearch = ''" class="absolute right-2.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
+                            </div>
+
+                            <select v-model="catalogCategoryFilter" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-medium bg-white">
+                                <option value="">All Categories</option>
+                                <option value="category_1">Category 1</option>
+                                <option value="category_2">Category 2</option>
+                                <option value="category_3">Category 3</option>
+                                <option value="category_4">Category 4</option>
+                                <option value="category_5">Category 5 (Group)</option>
+                                <option value="open">Open</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <!-- Items List Table -->
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm border-collapse">
@@ -222,14 +282,14 @@
                                 <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-100">
                                     <th class="py-3 px-4">Item Name</th>
                                     <th class="py-3 px-4">Category / Group</th>
-                                    <th class="py-3 px-4">Type</th>
+                                    <th class="py-3 px-4">Type & Stage</th>
                                     <th class="py-3 px-4 text-center">Fee</th>
                                     <th class="py-3 px-4 text-center">Qualifiers</th>
                                     <th class="py-3 px-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 text-slate-700">
-                                <tr v-for="item in program.items" :key="item.id" class="hover:bg-slate-50/50 transition-colors">
+                                <tr v-for="item in filteredCatalogItems" :key="item.id" class="hover:bg-slate-50/50 transition-colors">
                                     <td class="py-3 px-4 font-bold text-slate-900">
                                         {{ item.title }}
                                         <span class="block text-xs font-normal text-slate-400">Code: {{ item.item_code || 'Auto' }}</span>
@@ -240,9 +300,13 @@
                                         </span>
                                     </td>
                                     <td class="py-3 px-4">
-                                        <span class="px-2 py-0.5 rounded text-xs font-bold uppercase"
-                                              :class="item.participant_type === 'individual' ? 'bg-indigo-50 text-indigo-700' : 'bg-purple-50 text-purple-700'">
-                                            {{ item.participant_type }}
+                                        <span class="px-2 py-0.5 rounded text-[11px] font-bold uppercase inline-block border"
+                                              :class="{
+                                                  'bg-purple-100 text-purple-800 border-purple-200': item.participant_type === 'group' || item.participant_type === 'team',
+                                                  'bg-indigo-50 text-indigo-700 border-indigo-200/60': item.participant_type === 'individual' && item.stage_type !== 'off_stage',
+                                                  'bg-amber-50 text-amber-800 border-amber-200/60': item.stage_type === 'off_stage',
+                                              }">
+                                            {{ item.participant_type === 'group' || item.participant_type === 'team' ? 'Group' : (item.stage_type === 'off_stage' ? 'Off-Stage (Ind)' : 'On-Stage (Ind)') }}
                                         </span>
                                     </td>
                                     <td class="py-3 px-4 text-center font-mono font-medium">
@@ -264,9 +328,15 @@
                                         </div>
                                     </td>
                                 </tr>
-                                <tr v-if="!program.items?.length">
-                                    <td colspan="6" class="py-8 text-center text-slate-400">
-                                        No items added yet. Sahodaya complexes will conduct State catalog items once added.
+                                <tr v-if="!filteredCatalogItems.length">
+                                    <td colspan="6" class="py-12 text-center text-slate-400">
+                                        <p class="text-sm font-medium">No matching items found for your search and filter criteria.</p>
+                                        <button v-if="catalogSearch || catalogFilter !== 'all' || catalogCategoryFilter" 
+                                                type="button" 
+                                                @click="catalogSearch = ''; catalogFilter = 'all'; catalogCategoryFilter = ''" 
+                                                class="mt-2 text-xs font-bold text-indigo-600 hover:underline">
+                                            Reset Filters
+                                        </button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -778,6 +848,47 @@ const itemForm = useForm({
     participant_type: 'individual',
     fee_amount: null,
     qualify_count: null,
+});
+
+const catalogSearch = ref('');
+const catalogFilter = ref('all');
+const catalogCategoryFilter = ref('');
+
+const filteredCatalogItems = computed(() => {
+    let items = props.program.items || [];
+
+    if (catalogSearch.value) {
+        const query = catalogSearch.value.toLowerCase().trim();
+        items = items.filter(i => 
+            (i.title || '').toLowerCase().includes(query) ||
+            (i.item_code || '').toLowerCase().includes(query) ||
+            (i.category || '').toLowerCase().includes(query)
+        );
+    }
+
+    if (catalogFilter.value === 'onstage_ind') {
+        items = items.filter(i => (i.stage_type === 'on_stage' || !i.stage_type) && i.participant_type === 'individual');
+    } else if (catalogFilter.value === 'group') {
+        items = items.filter(i => i.participant_type === 'group' || i.participant_type === 'team');
+    } else if (catalogFilter.value === 'offstage') {
+        items = items.filter(i => i.stage_type === 'off_stage');
+    }
+
+    if (catalogCategoryFilter.value) {
+        items = items.filter(i => i.class_group === catalogCategoryFilter.value);
+    }
+
+    return items;
+});
+
+const catalogCounts = computed(() => {
+    const all = props.program.items || [];
+    return {
+        all: all.length,
+        onstage_ind: all.filter(i => (i.stage_type === 'on_stage' || !i.stage_type) && i.participant_type === 'individual').length,
+        group: all.filter(i => i.participant_type === 'group' || i.participant_type === 'team').length,
+        offstage: all.filter(i => i.stage_type === 'off_stage').length,
+    };
 });
 
 function formatClassGroup(code) {
