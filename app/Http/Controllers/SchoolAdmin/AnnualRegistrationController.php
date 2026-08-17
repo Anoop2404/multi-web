@@ -225,8 +225,16 @@ class AnnualRegistrationController extends SchoolAdminController
             return back()->with('success', 'Region cleared.');
         }
 
+        $match = [
+            'school_id'     => $this->school->id,
+            'academic_year' => $academicYear,
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('school_region_assignments', 'partition_group')) {
+            $match['partition_group'] = null;
+        }
+
         SchoolRegionAssignment::updateOrCreate(
-            ['school_id' => $this->school->id, 'academic_year' => $academicYear, 'partition_group' => null],
+            $match,
             [
                 'tenant_id'           => $sahodayaId,
                 'region_id'           => $data['region_id'],

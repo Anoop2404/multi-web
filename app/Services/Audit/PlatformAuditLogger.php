@@ -9,7 +9,11 @@ use App\Models\FestRegistration;
 use App\Models\McqExam;
 use App\Models\McqRegistration;
 use App\Models\MembershipPayment;
+use App\Models\SubscriptionInvoice;
+use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionReceipt;
 use App\Models\Tenant;
+use App\Models\TenantSubscription;
 use App\Models\User;
 use App\Models\PlatformUser;
 use App\Support\AuditLogCatalog;
@@ -398,6 +402,153 @@ class PlatformAuditLogger
             "Report downloaded: {$reportName}",
             properties: array_merge(['report' => $reportName], $filters),
             category: 'system',
+        );
+    }
+
+    public function tenantCreated(Tenant $tenant): AuditLog
+    {
+        return $this->log(
+            'tenant.created',
+            "Tenant created: {$tenant->name} ({$tenant->type})",
+            $tenant,
+            ['tenant_id' => $tenant->id, 'type' => $tenant->type, 'parent_id' => $tenant->parent_id],
+            category: 'platform',
+        );
+    }
+
+    public function tenantUpdated(Tenant $tenant, array $changes = []): AuditLog
+    {
+        return $this->log(
+            'tenant.updated',
+            "Tenant updated: {$tenant->name}",
+            $tenant,
+            ['tenant_id' => $tenant->id, 'changes' => $changes],
+            category: 'platform',
+        );
+    }
+
+    public function tenantDeleted(Tenant $tenant): AuditLog
+    {
+        return $this->log(
+            'tenant.deleted',
+            "Tenant deleted: {$tenant->name} ({$tenant->type})",
+            $tenant,
+            ['tenant_id' => $tenant->id, 'type' => $tenant->type],
+            category: 'platform',
+        );
+    }
+
+    public function tenantDatabaseSaved(Tenant $tenant): AuditLog
+    {
+        return $this->log(
+            'tenant.database_saved',
+            "Database connection saved for {$tenant->name}",
+            $tenant,
+            ['tenant_id' => $tenant->id],
+            category: 'platform',
+        );
+    }
+
+    public function tenantDatabaseMigrated(Tenant $tenant): AuditLog
+    {
+        return $this->log(
+            'tenant.database_migrated',
+            "Database migrations run for {$tenant->name}",
+            $tenant,
+            ['tenant_id' => $tenant->id],
+            category: 'platform',
+        );
+    }
+
+    public function tenantLogoUpdated(Tenant $tenant): AuditLog
+    {
+        return $this->log(
+            'tenant.logo_updated',
+            "Logo updated for {$tenant->name}",
+            $tenant,
+            ['tenant_id' => $tenant->id],
+            category: 'platform',
+        );
+    }
+
+    public function tenantNavVisibilityUpdated(Tenant $tenant): AuditLog
+    {
+        return $this->log(
+            'tenant.nav_visibility_updated',
+            "Sidebar menu access updated for {$tenant->name}",
+            $tenant,
+            ['tenant_id' => $tenant->id, 'nav_overrides' => $tenant->nav_overrides],
+            category: 'platform',
+        );
+    }
+
+    public function tenantMembershipRejected(Tenant $tenant, ?string $reason): AuditLog
+    {
+        return $this->log(
+            'tenant.membership_rejected',
+            "Membership rejected for {$tenant->name}",
+            $tenant,
+            ['tenant_id' => $tenant->id, 'reason' => $reason],
+            category: 'platform',
+        );
+    }
+
+    public function subscriptionPlanCreated(SubscriptionPlan $plan): AuditLog
+    {
+        return $this->log(
+            'subscription.plan_created',
+            "Subscription plan created: {$plan->name}",
+            $plan,
+            ['billing_period' => $plan->billing_period, 'price_inr' => $plan->price_inr],
+            category: 'billing',
+        );
+    }
+
+    public function tenantSubscriptionSaved(TenantSubscription $subscription): AuditLog
+    {
+        return $this->log(
+            'subscription.tenant_subscription_saved',
+            "Subscription saved for tenant #{$subscription->tenant_id}",
+            $subscription,
+            ['tenant_id' => $subscription->tenant_id, 'plan_id' => $subscription->plan_id, 'status' => $subscription->status],
+            category: 'billing',
+        );
+    }
+
+    public function invoiceCreated(SubscriptionInvoice $invoice): AuditLog
+    {
+        return $this->log(
+            'subscription.invoice_created',
+            "Invoice {$invoice->invoice_number} generated for tenant #{$invoice->tenant_id}",
+            $invoice,
+            ['tenant_id' => $invoice->tenant_id, 'amount' => $invoice->amount],
+            category: 'billing',
+        );
+    }
+
+    public function receiptApproved(SubscriptionReceipt $receipt): AuditLog
+    {
+        $receipt->loadMissing('invoice');
+
+        return $this->log(
+            'subscription.receipt_approved',
+            "Payment receipt approved for invoice {$receipt->invoice->invoice_number}",
+            $receipt,
+            ['tenant_id' => $receipt->invoice->tenant_id, 'invoice_id' => $receipt->invoice_id],
+            category: 'billing',
+        );
+    }
+
+    public function receiptRejected(SubscriptionReceipt $receipt, string $reason): AuditLog
+    {
+        $receipt->loadMissing('invoice');
+
+        return $this->log(
+            'subscription.receipt_rejected',
+            "Payment receipt rejected for invoice {$receipt->invoice->invoice_number}",
+            $receipt,
+            ['tenant_id' => $receipt->invoice->tenant_id, 'invoice_id' => $receipt->invoice_id, 'reason' => $reason],
+            category: 'billing',
         );
     }
 }

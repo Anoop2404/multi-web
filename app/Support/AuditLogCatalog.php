@@ -16,6 +16,8 @@ class AuditLogCatalog
             'training'   => 'Training programs',
             'sports'     => 'Sports meet',
             'finance'    => 'Finance & ledger',
+            'platform'   => 'Platform & tenants',
+            'billing'    => 'Billing & subscriptions',
             'system'     => 'System',
         ];
     }
@@ -61,6 +63,14 @@ class AuditLogCatalog
 
         if (str_starts_with($action, 'ledger.') || str_starts_with($action, 'remittance.')) {
             return 'finance';
+        }
+
+        if (str_starts_with($action, 'tenant.') || str_starts_with($action, 'credential.')) {
+            return 'platform';
+        }
+
+        if (str_starts_with($action, 'subscription.')) {
+            return 'billing';
         }
 
         return 'system';
