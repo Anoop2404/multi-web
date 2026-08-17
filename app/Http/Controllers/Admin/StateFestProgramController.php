@@ -243,6 +243,22 @@ class StateFestProgramController extends Controller
         return back()->with('success', 'State item added (optional — publish to push to Sahodayas).');
     }
 
+    public function updateItem(Request $request, FestStateProgram $stateProgram, FestStateProgramItem $item, FestItemSyncService $syncService)
+    {
+        abort_if($item->state_program_id !== $stateProgram->id, 404);
+
+        $data = $this->validateItem($request);
+
+        $item->update($data);
+
+        if ($stateProgram->status === 'published') {
+            $synced = $syncService->syncProgramToAllPropagations($stateProgram->fresh('items'));
+            return back()->with('success', "Item '{$item->title}' updated and synced to {$synced} Sahodaya event item slot(s).");
+        }
+
+        return back()->with('success', "Item '{$item->title}' updated.");
+    }
+
     public function destroyItem(FestStateProgram $stateProgram, FestStateProgramItem $item, FestItemSyncService $syncService)
     {
         abort_if($item->state_program_id !== $stateProgram->id, 404);
@@ -263,7 +279,7 @@ class StateFestProgramController extends Controller
         return $request->validate([
             'title'              => 'required|string|max:255',
             'item_code'          => 'nullable|string|max:20',
-            'category'           => 'nullable|in:music,dance,drama,literary,sports,general',
+            'category'           => 'nullable|string|max:60',
             'stage_type'         => 'nullable|in:on_stage,off_stage',
             'venue_type'         => 'nullable|in:indoor,outdoor',
             'competition_format' => 'nullable|in:individual,singles,doubles,mixed_doubles,team,relay,group,board_game',

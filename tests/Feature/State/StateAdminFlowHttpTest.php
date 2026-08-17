@@ -186,4 +186,44 @@ class StateAdminFlowHttpTest extends TestCase
                 ->where('actionUrls.marks', "/fest/{$event->id}/marks")
                 ->where('actionUrls.publishResults', "/fest/{$event->id}/publish-results"));
     }
+
+    public function test_state_admin_can_update_state_program_item(): void
+    {
+        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false]);
+        $admin->assignRole('state_admin');
+
+        $program = FestStateProgram::create([
+            'title' => 'State Item Update Program',
+            'event_type' => 'kalotsavam',
+            'conduct_levels' => ['sahodaya', 'state'],
+            'status' => 'draft',
+        ]);
+
+        $item = $program->items()->create([
+            'title' => 'Group Song',
+            'item_code' => '501',
+            'category' => 'music',
+            'class_group' => 'category_5',
+            'participant_type' => 'group',
+            'qualify_count' => 1,
+        ]);
+
+        $response = $this->actingAs($admin)->put("/admin/state-programs/{$program->id}/items/{$item->id}", [
+            'title' => 'Group Song (Renamed)',
+            'item_code' => '501-A',
+            'category' => 'traditional',
+            'class_group' => 'category_5',
+            'participant_type' => 'group',
+            'qualify_count' => 2,
+        ]);
+
+        $response->assertRedirect()->assertSessionHas('success');
+
+        $item->refresh();
+        $this->assertSame('Group Song (Renamed)', $item->title);
+        $this->assertSame('501-A', $item->item_code);
+        $this->assertSame('traditional', $item->category);
+        $this->assertSame('category_5', $item->class_group);
+        $this->assertSame(2, $item->qualify_count);
+    }
 }

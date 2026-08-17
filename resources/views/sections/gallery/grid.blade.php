@@ -6,7 +6,7 @@
 
 <section id="gallery" class="py-14 lg:py-20 px-4 sm:px-6 lg:px-8 bg-slate-900 text-white relative overflow-hidden"
          x-data="{ activeTab: 'All', activeLightboxImage: null, activeLightboxTitle: null }"
-         style="background: linear-gradient(135deg, #091E36 0%, #0F2942 60%, #051329 100%);">
+         style="background: linear-gradient(135deg, var(--color-primary) 0%, #0f172a 100%);">
 
     {{-- Background mesh texture --}}
     <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none"></div>

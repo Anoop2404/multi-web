@@ -95,6 +95,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::delete('/{stateProgram}', [StateFestProgramController::class, 'destroy'])->name('destroy');
             Route::post('/{stateProgram}/publish', [StateFestProgramController::class, 'publish'])->name('publish');
             Route::post('/{stateProgram}/items', [StateFestProgramController::class, 'storeItem'])->name('items.store');
+            Route::put('/{stateProgram}/items/{item}', [StateFestProgramController::class, 'updateItem'])->name('items.update');
             Route::delete('/{stateProgram}/items/{item}', [StateFestProgramController::class, 'destroyItem'])->name('items.destroy');
 
             Route::post('/{stateProgram}/sahodaya/{sahodaya}/toggle', [StateFestProgramController::class, 'toggleSahodaya'])->name('sahodaya.toggle');

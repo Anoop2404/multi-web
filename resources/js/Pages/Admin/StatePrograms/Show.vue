@@ -185,10 +185,19 @@
                                 <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
                             </select>
                             <div v-else>
-                                <input v-model="itemForm.class_group" list="state-class-groups" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="Class category key (e.g. hs)">
-                                <datalist id="state-class-groups">
-                                    <option v-for="(label, key) in taxonomy.class_group" :key="key" :value="key">{{ label }}</option>
-                                </datalist>
+                                <select v-model="itemForm.class_group" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+                                    <option value="">Select Category / Group</option>
+                                    <option value="category_1">Category 1 — Classes 3 & 4 (LP)</option>
+                                    <option value="category_2">Category 2 — Classes 5, 6 & 7 (UP)</option>
+                                    <option value="category_3">Category 3 — Classes 8, 9 & 10 (HS)</option>
+                                    <option value="category_4">Category 4 — Classes 11 & 12 (HSS)</option>
+                                    <option value="category_5">Category 5 — Group Items (Open)</option>
+                                    <option value="open">Open / All Categories</option>
+                                    <option value="lp">LP (Category 1)</option>
+                                    <option value="up">UP (Category 2)</option>
+                                    <option value="hs">HS (Category 3)</option>
+                                    <option value="hss">HSS (Category 4)</option>
+                                </select>
                             </div>
 
                             <select v-model="itemForm.participant_type" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
@@ -216,7 +225,7 @@
                                     <th class="py-3 px-4">Type</th>
                                     <th class="py-3 px-4 text-center">Fee</th>
                                     <th class="py-3 px-4 text-center">Qualifiers</th>
-                                    <th class="py-3 px-4 text-right">Action</th>
+                                    <th class="py-3 px-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 text-slate-700">
@@ -225,8 +234,10 @@
                                         {{ item.title }}
                                         <span class="block text-xs font-normal text-slate-400">Code: {{ item.item_code || 'Auto' }}</span>
                                     </td>
-                                    <td class="py-3 px-4 font-semibold text-slate-600 capitalize">
-                                        {{ item.class_group || item.age_group || 'Open' }}
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200/80">
+                                            {{ formatClassGroup(item.class_group || item.age_group) }}
+                                        </span>
                                     </td>
                                     <td class="py-3 px-4">
                                         <span class="px-2 py-0.5 rounded text-xs font-bold uppercase"
@@ -243,9 +254,14 @@
                                         </span>
                                     </td>
                                     <td class="py-3 px-4 text-right">
-                                        <button type="button" @click="removeItem(item.id)" class="text-xs font-bold text-red-600 hover:text-red-800 transition">
-                                            Remove
-                                        </button>
+                                        <div class="flex items-center justify-end gap-2">
+                                            <button type="button" @click="openEditItemModal(item)" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200/60">
+                                                ✏️ Edit
+                                            </button>
+                                            <button type="button" @click="removeItem(item.id)" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs transition border border-red-200/60">
+                                                Remove
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr v-if="!program.items?.length">
@@ -255,6 +271,120 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- EDIT ITEM MODAL -->
+                <div v-if="isEditingItem" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 space-y-5 border border-slate-100" @click.stop>
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-900">Edit Catalog Item</h3>
+                                <p class="text-xs text-slate-500">Update item details, category, fees, and state qualifier settings.</p>
+                            </div>
+                            <button type="button" @click="closeEditItemModal" class="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
+                        </div>
+
+                        <form @submit.prevent="updateItem" class="space-y-4">
+                            <div class="grid sm:grid-cols-2 gap-3">
+                                <div class="sm:col-span-2">
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Item Title *</label>
+                                    <input v-model="editItemForm.title" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" required>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Item Code</label>
+                                    <input v-model="editItemForm.item_code" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="e.g. 501">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Category / Group *</label>
+                                    <select v-model="editItemForm.class_group" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+                                        <option value="">Select Category</option>
+                                        <option value="category_1">Category 1 — Classes 3 & 4 (LP)</option>
+                                        <option value="category_2">Category 2 — Classes 5, 6 & 7 (UP)</option>
+                                        <option value="category_3">Category 3 — Classes 8, 9 & 10 (HS)</option>
+                                        <option value="category_4">Category 4 — Classes 11 & 12 (HSS)</option>
+                                        <option value="category_5">Category 5 — Group Items (Open)</option>
+                                        <option value="open">Open / All Categories</option>
+                                        <option value="lp">LP (Category 1)</option>
+                                        <option value="up">UP (Category 2)</option>
+                                        <option value="hs">HS (Category 3)</option>
+                                        <option value="hss">HSS (Category 4)</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Discipline Category</label>
+                                    <select v-model="editItemForm.category" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+                                        <option value="music">Music</option>
+                                        <option value="dance">Dance</option>
+                                        <option value="drama">Drama / Theatre</option>
+                                        <option value="literary">Literary</option>
+                                        <option value="fine_arts">Fine Arts</option>
+                                        <option value="traditional">Traditional / Folk</option>
+                                        <option value="sports">Sports</option>
+                                        <option value="general">General</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Participant Type</label>
+                                    <select v-model="editItemForm.participant_type" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+                                        <option value="individual">Individual</option>
+                                        <option value="group">Group</option>
+                                        <option value="team">Team</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Stage Type</label>
+                                    <select v-model="editItemForm.stage_type" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+                                        <option value="on_stage">On Stage</option>
+                                        <option value="off_stage">Off Stage</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Gender Restriction</label>
+                                    <select v-model="editItemForm.gender" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+                                        <option value="open">Open (All)</option>
+                                        <option value="male">Boys Only</option>
+                                        <option value="female">Girls Only</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Qualifiers to State</label>
+                                    <input v-model.number="editItemForm.qualify_count" type="number" min="1" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="2">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Item Fee (₹)</label>
+                                    <input v-model.number="editItemForm.fee_amount" type="number" min="0" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="Optional">
+                                </div>
+
+                                <div v-if="editItemForm.participant_type === 'group' || editItemForm.participant_type === 'team'" class="sm:col-span-2 grid sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Min Group Size</label>
+                                        <input v-model.number="editItemForm.min_group_size" type="number" min="1" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Max Group Size</label>
+                                        <input v-model.number="editItemForm.max_group_size" type="number" min="1" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-sm">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                                <button type="button" @click="closeEditItemModal" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+                                    Cancel
+                                </button>
+                                <button type="submit" :disabled="editItemForm.processing" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow-md">
+                                    Save Item Changes
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -649,6 +779,74 @@ const itemForm = useForm({
     fee_amount: null,
     qualify_count: null,
 });
+
+function formatClassGroup(code) {
+    if (!code) return 'Open / All';
+    const normalized = String(code).toLowerCase().trim();
+    const map = {
+        'category_1': 'Category 1 (Classes 3-4)',
+        'category_2': 'Category 2 (Classes 5-7)',
+        'category_3': 'Category 3 (Classes 8-10)',
+        'category_4': 'Category 4 (Classes 11-12)',
+        'category_5': 'Category 5 (Group)',
+        'lp': 'Category 1 (LP)',
+        'up': 'Category 2 (UP)',
+        'hs': 'Category 3 (HS)',
+        'hss': 'Category 4 (HSS)',
+        'open': 'Open / All',
+    };
+    if (map[normalized]) return map[normalized];
+    return normalized.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+const editingItem = ref(null);
+const isEditingItem = ref(false);
+
+const editItemForm = useForm({
+    title: '',
+    item_code: '',
+    category: 'general',
+    class_group: '',
+    age_group: '',
+    participant_type: 'individual',
+    stage_type: 'on_stage',
+    gender: 'open',
+    qualify_count: 2,
+    fee_amount: null,
+    min_group_size: null,
+    max_group_size: null,
+});
+
+function openEditItemModal(item) {
+    editingItem.value = item;
+    editItemForm.title = item.title ?? '';
+    editItemForm.item_code = item.item_code ?? '';
+    editItemForm.category = item.category ?? 'general';
+    editItemForm.class_group = item.class_group ?? '';
+    editItemForm.age_group = item.age_group ?? '';
+    editItemForm.participant_type = item.participant_type ?? 'individual';
+    editItemForm.stage_type = item.stage_type ?? 'on_stage';
+    editItemForm.gender = item.gender ?? 'open';
+    editItemForm.qualify_count = item.qualify_count ?? 2;
+    editItemForm.fee_amount = item.fee_amount ?? null;
+    editItemForm.min_group_size = item.min_group_size ?? null;
+    editItemForm.max_group_size = item.max_group_size ?? null;
+    isEditingItem.value = true;
+}
+
+function closeEditItemModal() {
+    isEditingItem.value = false;
+    editingItem.value = null;
+    editItemForm.reset();
+}
+
+function updateItem() {
+    if (!editingItem.value) return;
+    editItemForm.put(`/admin/state-programs/${props.program.id}/items/${editingItem.value.id}`, {
+        preserveScroll: true,
+        onSuccess: () => closeEditItemModal(),
+    });
+}
 
 function save() {
     form.put(`/admin/state-programs/${props.program.id}`, { preserveScroll: true });
