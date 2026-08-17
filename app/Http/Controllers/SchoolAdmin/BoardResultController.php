@@ -107,7 +107,10 @@ class BoardResultController extends SchoolAdminController
 
         $results = BoardResult::where('tenant_id', $this->school->id)
             ->when($class, fn ($q) => $q->where('class', $class))
-            ->with(['toppers.subjectMarks', 'toppers.examStream', 'uploads' => fn ($q) => $q->orderByDesc('version')->limit(5)])
+            ->with([
+                'toppers' => fn ($q) => $q->overallEntries()->with(['subjectMarks', 'examStream']),
+                'uploads' => fn ($q) => $q->orderByDesc('version')->limit(5),
+            ])
             ->orderByDesc('academic_year')
             ->orderByDesc('class')
             ->get();
