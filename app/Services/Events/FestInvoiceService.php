@@ -5,19 +5,30 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\FestEventInvoice;
 use App\Models\FestSchoolEventFee;
+use App\Models\FestRegistrationBatch;
 use App\Models\Tenant;
 use App\Services\Events\FestItemFeeResolver;
 use App\Support\TenantBranding;
 
 class FestInvoiceService
 {
-    public function issueForSchool(FestEvent $event, Tenant $school, ?int $issuedBy = null): FestEventInvoice
+    public function issueForSchool(FestEvent $event, Tenant $school, ?int $issuedBy = null, ?int $registrationBatchId = null): FestEventInvoice
     {
+        if ($event->usesPhasedRegionalBilling()) {
+            $root = $event->rootEvent();
+            $batch = $registrationBatchId
+                ? FestRegistrationBatch::where('event_id', $root->id)->findOrFail($registrationBatchId)
+                : $root->registrationBatches()->firstOrFail();
+
+            return $this->issueForSchoolBatch($root, $school, $batch, $issuedBy);
+        }
+
         $feeService = app(FestSchoolEventFeeService::class);
         $schedule = $feeService->resolveSchedule($event);
 
         $existing = FestEventInvoice::where('event_id', $event->id)
             ->where('school_id', $school->id)
+            ->where('billing_key', 'EVENT')
             ->first();
 
         if ($feeService->usesPerHeadBilling($event)) {
@@ -62,6 +73,61 @@ class FestInvoiceService
                 'issued_by' => $issuedBy ?? $existing?->issued_by,
             ]
         );
+    }
+
+    public function issueForSchoolBatch(
+        FestEvent $event,
+        Tenant $school,
+        FestRegistrationBatch $batch,
+        ?int $issuedBy = null,
+    ): FestEventInvoice {
+        abort_unless($batch->event_id === $event->id, 422, 'Payment level does not belong to this event.');
+        $fee = app(FestRegistrationBatchFeeService::class)->recalculateBatch($event, $school->id, $batch);
+        $fee->loadMissing('lines');
+        $billingKey = 'BATCH:'.$batch->id;
+        $existing = FestEventInvoice::where('event_id', $event->id)
+            ->where('school_id', $school->id)
+            ->where('billing_key', $billingKey)
+            ->first();
+
+        $status = $fee->isFullyPaid() ? 'paid' : ($existing?->status === 'paid' ? 'issued' : ($existing?->status ?? 'issued'));
+        $lines = $fee->lines->map(fn ($line) => [
+            'label' => $line->label,
+            'amount' => (float) $line->amount,
+            'item_id' => $line->meta['item_id'] ?? null,
+            'item_title' => $line->label,
+            'head_name' => null,
+        ])->values()->all();
+
+        return FestEventInvoice::updateOrCreate(
+            ['event_id' => $event->id, 'school_id' => $school->id, 'billing_key' => $billingKey],
+            [
+                'registration_batch_id' => $batch->id,
+                'invoice_number' => $existing?->invoice_number ?? $this->batchInvoiceNumber($event, $batch),
+                'school_registration_fee' => $fee->school_registration_fee,
+                'participation_fee' => $fee->participation_fee,
+                'participation_item_count' => $fee->participation_item_count,
+                'total_amount' => $fee->total_due,
+                'breakdown_json' => [
+                    'registration_batch_id' => $batch->id,
+                    'registration_batch_name' => $batch->name,
+                    'participation_lines' => $lines,
+                ],
+                'status' => $status,
+                'issued_at' => $existing?->issued_at ?? now(),
+                'issued_by' => $issuedBy ?? $existing?->issued_by,
+            ]
+        );
+    }
+
+    private function batchInvoiceNumber(FestEvent $event, FestRegistrationBatch $batch): string
+    {
+        $prefix = $batch->invoice_prefix ?: 'FEST-'.$event->id.'-'.$batch->code;
+        $count = FestEventInvoice::where('event_id', $event->id)
+            ->where('registration_batch_id', $batch->id)
+            ->count();
+
+        return $prefix.'-'.str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -252,6 +318,14 @@ class FestInvoiceService
 
         $issued = [];
         foreach ($schools as $school) {
+            if ($event->usesPhasedRegionalBilling()) {
+                foreach ($event->rootEvent()->registrationBatches()->get() as $batch) {
+                    $issued[] = $this->issueForSchoolBatch($event->rootEvent(), $school, $batch, $issuedBy);
+                }
+
+                continue;
+            }
+
             if (app(FestSchoolEventFeeService::class)->billableItemCount($event, $school->id) > 0
                 || app(FestSchoolEventFeeService::class)->feeRequired($event)) {
                 $issued[] = $this->issueForSchool($event, $school, $issuedBy);

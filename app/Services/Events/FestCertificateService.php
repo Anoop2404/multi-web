@@ -20,6 +20,11 @@ class FestCertificateService
     /** @return list<Certificate> */
     public function generateForEvent(FestEvent $event): array
     {
+        if ($event->usesPhasedRegionalBilling()) {
+            abort_if(! $event->parent_event_id || ! $event->source_phase_id, 422, 'Generate certificates from a published operational phase/region event.');
+            abort_unless($event->results_published, 422, 'Publish this phase/region before generating certificates.');
+        }
+
         $created = [];
 
         $marks = FestMark::whereIn('event_id', $event->reportableEventIds())
@@ -58,6 +63,11 @@ class FestCertificateService
     /** @return list<Certificate> */
     public function generateParticipationForEvent(FestEvent $event): array
     {
+        if ($event->usesPhasedRegionalBilling()) {
+            abort_if(! $event->parent_event_id || ! $event->source_phase_id, 422, 'Generate certificates from a published operational phase/region event.');
+            abort_unless($event->results_published, 422, 'Publish this phase/region before generating certificates.');
+        }
+
         $created = [];
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q

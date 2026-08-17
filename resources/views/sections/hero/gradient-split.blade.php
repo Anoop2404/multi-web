@@ -1,95 +1,133 @@
-{{-- hero/gradient-split.blade.php — Text left, image right, diagonal gradient bg --}}
-@php $theme = $tenant->getSetting('theme', []); @endphp
-<section class="relative overflow-hidden py-0 min-h-[560px] flex items-stretch"
-         style="background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 60%, #1e1b4b 100%);">
+@php
+    $previewSchools = \App\Support\SahodayaPublicData::memberSchools($tenant->id)->map(fn ($school) => [
+        'name' => $school->name,
+        'district' => $school->city ?? $school->district,
+    ]);
+    $previewTotal = $previewSchools->count();
+    $districts = $previewSchools->pluck('district')->filter()->unique()->sort()->values();
+    $statSchools = $previewTotal > 0 ? (string) $previewTotal : null;
+    $watermarkLogo = \App\Support\TenantBranding::logoUrl($tenant);
 
-    {{-- Decorative circles --}}
-    <div class="absolute inset-0 pointer-events-none overflow-hidden">
-        <div class="absolute -top-20 -left-20 w-80 h-80 rounded-full opacity-10 bg-white"></div>
-        <div class="absolute top-1/2 right-0 translate-x-1/3 -translate-y-1/2 w-96 h-96 rounded-full opacity-10 bg-white"></div>
-        <div class="absolute bottom-0 left-1/3 w-64 h-64 rounded-full opacity-5 bg-white"></div>
-    </div>
+    // Media slides (photo or video) follow the data slide, in the order configured
+    $mediaSlides = collect($config['slides'] ?? [])->filter(fn ($slide) => !empty($slide['image']) || !empty($slide['video']))->values();
+    $totalSlides = 1 + $mediaSlides->count();
+@endphp
+<section id="hero" class="relative overflow-hidden text-white border-b border-white/10 bg-slate-950 min-h-[78vh] lg:min-h-[620px] flex items-center"
+         x-data="{ activeSlide: 0, count: {{ $totalSlides }}, init() { if (this.count > 1) setInterval(() => { this.activeSlide = (this.activeSlide + 1) % this.count }, 7000) } }">
 
-    <div class="relative z-10 max-w-7xl mx-auto px-4 w-full grid lg:grid-cols-2 gap-0 items-center py-16 lg:py-20">
-        {{-- Left: text --}}
-        <div class="text-white space-y-5 lg:pr-10">
-            @if(!empty($config['eyebrow']))
-            <p class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] bg-white/15 backdrop-blur px-4 py-2 rounded-full text-white/90">
-                {{ $config['eyebrow'] }}
-            </p>
+    {{-- Full-width rotating background: slide 0 is a branded surface (never a stock photo), slides 1+ are configured photos/videos --}}
+    <div class="absolute inset-0">
+        <div x-show="activeSlide === 0" x-transition:enter="transition ease-out duration-700" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="absolute inset-0 overflow-hidden"
+             style="background: linear-gradient(160deg, var(--color-primary) 0%, #071224 75%);">
+            {{-- Restrained brand-accent glow for depth --}}
+            <div class="absolute -top-1/4 -right-[10%] w-[45rem] h-[45rem] rounded-full opacity-[0.16] pointer-events-none" style="background: radial-gradient(circle, var(--color-accent), transparent 65%);"></div>
+            <div class="absolute -bottom-1/3 -left-[5%] w-[32rem] h-[32rem] rounded-full opacity-[0.10] pointer-events-none" style="background: radial-gradient(circle, var(--color-secondary), transparent 65%);"></div>
+            {{-- Oversized, faint logo watermark — makes the default slide feel finished and on-brand with zero photos configured --}}
+            @if($watermarkLogo)
+            <img src="{{ $watermarkLogo }}" alt="" aria-hidden="true"
+                 class="absolute -right-[8%] bottom-[-15%] w-[38rem] max-w-none h-auto opacity-[0.07] pointer-events-none select-none grayscale brightness-[3]">
             @endif
-
-            <h1 class="font-heading text-4xl sm:text-5xl xl:text-6xl font-extrabold leading-tight">
-                {{ $config['heading'] ?? $tenant->name }}
-            </h1>
-
-            @if(!empty($config['tagline'] ?? $config['subheading'] ?? null))
-            <p class="text-lg sm:text-xl text-white/80 max-w-lg leading-relaxed">{{ $config['tagline'] ?? $config['subheading'] }}</p>
-            @endif
-
-            @if(!empty($config['motto']))
-            <p class="text-sm font-semibold text-white/60 italic border-l-4 border-white/30 pl-4">
-                "{{ $config['motto'] }}"
-            </p>
-            @endif
-
-            <div class="flex flex-wrap gap-3 pt-2">
-                @if(!empty($config['cta_label'] ?? $config['primary_label'] ?? null) && !empty($config['cta_url'] ?? $config['primary_url'] ?? null))
-                <a href="{{ $config['cta_url'] ?? $config['primary_url'] }}"
-                   class="inline-flex items-center gap-2 bg-white font-bold px-6 py-3 rounded-full text-sm shadow-lg hover:shadow-xl hover:scale-105 transition-all"
-                   style="color: var(--color-primary)">
-                    {{ $config['cta_label'] ?? $config['primary_label'] }}
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                </a>
-                @endif
-                @if(!empty($config['secondary_cta_label'] ?? $config['secondary_label'] ?? null) && !empty($config['secondary_cta_url'] ?? $config['secondary_url'] ?? null))
-                <a href="{{ $config['secondary_cta_url'] ?? $config['secondary_url'] }}"
-                   class="inline-flex items-center gap-2 border-2 border-white/50 text-white font-semibold px-6 py-3 rounded-full text-sm hover:bg-white/10 transition">
-                    {{ $config['secondary_cta_label'] ?? $config['secondary_label'] }}
-                </a>
-                @endif
-            </div>
-
-            {{-- Stats chips --}}
-            @php
-                use App\Support\SahodayaPublicData;
-                $schools = SahodayaPublicData::memberSchools($tenant->id);
-            @endphp
-            @if($schools->count())
-            <div class="flex flex-wrap gap-3 pt-3 border-t border-white/15">
-                <div class="flex items-center gap-2 text-sm text-white/80">
-                    <span class="text-2xl font-extrabold text-white">{{ $schools->count() }}</span>
-                    Member Schools
-                </div>
-                @if(!empty($config['years_active']))
-                <div class="flex items-center gap-2 text-sm text-white/80">
-                    <span class="text-2xl font-extrabold text-white">{{ $config['years_active'] }}+</span>
-                    Years
-                </div>
-                @endif
-            </div>
-            @endif
+            <div class="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:26px_26px] pointer-events-none"></div>
         </div>
 
-        {{-- Right: image / decorative --}}
-        <div class="hidden lg:flex items-center justify-center">
-            @if(!empty($config['image']))
-            <div class="relative">
-                <div class="absolute inset-4 bg-white/10 rounded-3xl blur-xl"></div>
-                <img src="{{ $config['image'] }}" alt="{{ $config['heading'] ?? '' }}"
-                     class="relative w-full max-w-md rounded-3xl shadow-2xl object-cover aspect-square">
-            </div>
+        @foreach($mediaSlides as $i => $slide)
+        <div x-show="activeSlide === {{ $i + 1 }}" x-transition:enter="transition ease-out duration-700" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="absolute inset-0">
+            @if(!empty($slide['video']))
+            <iframe src="{{ $slide['video'] }}" class="w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>
             @else
-            <div class="relative w-80 h-80">
-                <div class="absolute inset-0 bg-white/5 rounded-full"></div>
-                <div class="absolute inset-8 bg-white/5 rounded-full"></div>
-                <div class="absolute inset-16 bg-white/10 rounded-full flex items-center justify-center">
-                    <span class="text-6xl font-extrabold text-white/30 font-heading">
-                        {{ substr($tenant->name, 0, 1) }}
-                    </span>
+            <img src="{{ $slide['image'] }}" alt="{{ $slide['caption'] ?? '' }}" loading="{{ $i === 0 ? 'eager' : 'lazy' }}" class="v2-media w-full h-full object-cover">
+            @endif
+        </div>
+        @endforeach
+    </div>
+
+    {{-- Persistent scrim so heading/search/stats stay legible over any slide --}}
+    <div class="absolute inset-0 bg-gradient-to-r from-slate-950/92 via-slate-950/70 to-slate-950/35 pointer-events-none"></div>
+    <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none"></div>
+
+    {{-- Persistent content — identity, search, and network facts stay on top regardless of which slide is showing --}}
+    <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-16">
+        <div class="max-w-2xl space-y-7">
+            <div>
+                <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest bg-white/10 px-4 py-1.5 rounded-full border border-white/20 text-white/90">
+                    <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                    <span>{{ $config['eyebrow'] ?? 'CBSE School Network' }}</span>
                 </div>
+
+                <h1 class="mt-4 text-4xl sm:text-5xl lg:text-[3.25rem] font-extrabold font-heading text-white tracking-tight leading-[1.1] drop-shadow-sm">
+                    {{ $config['heading'] ?? $tenant->name }}
+                </h1>
+
+                <p class="mt-3 text-base sm:text-lg text-slate-200 font-normal leading-relaxed max-w-xl">
+                    {{ $config['tagline'] ?? ('Find schools, programmes and shared opportunities across ' . ($tenant->region->name ?? ($tenant->name ?? 'the network')) . '.') }}
+                </p>
+            </div>
+
+            {{-- Primary task: search the directory, right inside the hero --}}
+            <div x-data="{ query: '' }"
+                 @submit.prevent="
+                     const input = document.getElementById('school-query');
+                     if (input) { input.value = query; input.dispatchEvent(new Event('input', { bubbles: true })); }
+                     document.getElementById('member-schools')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                 ">
+                <form class="flex flex-col sm:flex-row gap-2.5" role="search" aria-label="Search member schools">
+                    <label for="hero-school-query" class="sr-only">Search by school name, district or location</label>
+                    <div class="relative flex-1">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                            <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+                        </div>
+                        <input id="hero-school-query" x-model="query" type="search"
+                               placeholder="Search by school name, district or location…"
+                               class="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 text-sm font-medium border border-transparent focus:outline-none focus:ring-2 focus:ring-white/40 shadow-lg">
+                    </div>
+                    <button type="submit" class="v2-btn-accent font-bold px-6 py-3.5 rounded-xl shadow-lg text-sm shrink-0">
+                        Find a school
+                    </button>
+                </form>
+            </div>
+
+            {{-- Structured fact strip — real network data, stays visible on every slide --}}
+            @if($statSchools || !empty($config['years_active']) || $districts->isNotEmpty())
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-3 pt-5 border-t border-white/20">
+                @if($statSchools)
+                <div class="flex items-baseline gap-2">
+                    <span class="text-2xl font-extrabold font-heading text-white">{{ $statSchools }}</span>
+                    <span class="text-xs text-slate-300 font-medium">CBSE Schools</span>
+                </div>
+                <div class="w-px h-6 bg-white/20"></div>
+                @endif
+                @if(!empty($config['years_active']))
+                <div class="flex items-baseline gap-2">
+                    <span class="text-2xl font-extrabold font-heading text-accent">{{ $config['years_active'] }}+</span>
+                    <span class="text-xs text-slate-300 font-medium">Years Active</span>
+                </div>
+                <div class="w-px h-6 bg-white/20"></div>
+                @endif
+                @if($districts->isNotEmpty())
+                <div class="flex items-baseline gap-2">
+                    <span class="text-2xl font-extrabold font-heading text-white">{{ $districts->count() }}</span>
+                    <span class="text-xs text-slate-300 font-medium">{{ $districts->count() === 1 ? 'District' : 'Districts' }} Covered</span>
+                </div>
+                @endif
             </div>
             @endif
         </div>
     </div>
+
+    {{-- Caption + dots for the active slide, bottom-right, out of the content's way --}}
+    @foreach($mediaSlides as $i => $slide)
+    @if(!empty($slide['caption']))
+    <p x-show="activeSlide === {{ $i + 1 }}" class="absolute bottom-16 sm:bottom-6 right-4 sm:right-6 z-10 text-sm font-semibold text-white/90 drop-shadow max-w-xs text-right pointer-events-none">{{ $slide['caption'] }}</p>
+    @endif
+    @endforeach
+
+    @if($totalSlides > 1)
+    <div class="absolute bottom-4 right-4 sm:right-6 z-10 flex items-center gap-1.5">
+        @for($i = 0; $i < $totalSlides; $i++)
+        <button @click="activeSlide = {{ $i }}"
+                :class="activeSlide === {{ $i }} ? 'w-6 bg-accent' : 'w-2 bg-white/50 hover:bg-white/75'"
+                class="h-2 rounded-full transition-all duration-300 cursor-pointer" aria-label="Show slide {{ $i + 1 }}"></button>
+        @endfor
+    </div>
+    @endif
 </section>

@@ -13,7 +13,36 @@
                                    :registration="registration"
                                    current="overview" />
 
-            <div v-if="regions.length" class="card space-y-3">
+            <!-- §7.3 item 4: an event with 2+ regional phase groups (e.g. Off Stage +
+                 Sargadhara) gets one independent picker per group. Everyone else (the vast
+                 majority of Sahodayas) keeps exactly today's single picker below, unchanged. -->
+            <div v-if="regionalGroups.length" class="card space-y-4">
+                <div>
+                    <h2 class="section-title text-base">Kalotsav regions</h2>
+                    <p class="text-sm text-slate-600">
+                        Some Kalotsav phases run region-wise on their own footprint. Choose your school's
+                        region for each phase below ({{ academicYear }}) — they don't need to match.
+                        Your Sahodaya can also assign these for you.
+                    </p>
+                </div>
+                <div v-for="group in regionalGroups" :key="group.key"
+                     class="flex flex-wrap items-end gap-3 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0">
+                    <div class="min-w-[220px] flex-1 max-w-sm">
+                        <label class="label-xs">{{ group.label }} region</label>
+                        <select v-model="groupRegionChoices[group.key]" class="field">
+                            <option :value="null">— Select region —</option>
+                            <option v-for="region in regions" :key="region.id" :value="region.id">
+                                {{ region.name }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+                <button type="button" class="btn-primary text-sm" :disabled="savingRegion" @click="saveRegions">
+                    Save regions
+                </button>
+            </div>
+
+            <div v-else-if="regions.length" class="card space-y-3">
                 <div>
                     <h2 class="section-title text-base">Kalotsav region</h2>
                     <p class="text-sm text-slate-600">
@@ -261,6 +290,8 @@ const props = defineProps({
     profile: Object,
     regions: { type: Array, default: () => [] },
     selectedRegionId: { type: [Number, String, null], default: null },
+    regionalGroups: { type: Array, default: () => [] },
+    selectedRegionsByGroup: { type: Object, default: () => ({}) },
     registrationWindow: Object,
     payments: { type: Array, default: () => [] },
     canBegin: Boolean,
@@ -310,12 +341,26 @@ function begin() {
 }
 
 const regionChoice = ref(props.selectedRegionId ?? null);
+const groupRegionChoices = ref(
+    Object.fromEntries(props.regionalGroups.map(group => [group.key, props.selectedRegionsByGroup?.[group.key] ?? null]))
+);
 const savingRegion = ref(false);
 
 function saveRegion() {
     savingRegion.value = true;
     router.post(`/school-admin/${props.school.id}/registration/region`,
         { region_id: regionChoice.value || null },
+        {
+            preserveScroll: true,
+            onFinish: () => { savingRegion.value = false; },
+        },
+    );
+}
+
+function saveRegions() {
+    savingRegion.value = true;
+    router.post(`/school-admin/${props.school.id}/registration/region`,
+        { regions: { ...groupRegionChoices.value } },
         {
             preserveScroll: true,
             onFinish: () => { savingRegion.value = false; },

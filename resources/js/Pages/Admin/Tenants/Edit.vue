@@ -88,6 +88,9 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     tenant: Object,
@@ -109,8 +112,8 @@ function submit() {
     form.put(`/admin/tenants/${props.tenant.id}`);
 }
 
-function deleteTenant() {
-    if (!confirm(`Delete "${props.tenant.name}"? This cannot be undone.`)) return;
+async function deleteTenant() {
+    if (!(await confirm({ message: `Delete "${props.tenant.name}"? This cannot be undone.`, destructive: true }))) return;
     router.delete(`/admin/tenants/${props.tenant.id}`);
 }
 </script>

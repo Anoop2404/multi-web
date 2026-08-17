@@ -57,7 +57,8 @@
                             </td>
                             <td class="p-3"><span class="px-2 py-0.5 rounded bg-gray-100 text-xs">{{ program.status }}</span></td>
                             <td class="p-3">{{ program.propagations_count }}</td>
-                            <td class="p-3 text-right">
+                            <td class="p-3 text-right space-x-3 whitespace-nowrap">
+                                <Link :href="`/admin/state-programs/${program.id}/external-sahodayas`" class="text-indigo-600 font-medium">🌐 Outside Sahodayas →</Link>
                                 <Link :href="`/admin/state-programs/${program.id}`" class="text-indigo-600 font-medium">Manage →</Link>
                             </td>
                         </tr>

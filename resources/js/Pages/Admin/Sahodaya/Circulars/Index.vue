@@ -170,6 +170,9 @@
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { ref, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -230,8 +233,8 @@ function upload() {
     });
 }
 
-function remove(c) {
-    if (!confirm(`Delete "${c.title}"?`)) return;
+async function remove(c) {
+    if (!(await confirm({ message: `Delete "${c.title}"?` }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/circulars/${c.id}`);
 }
 </script>

@@ -5,6 +5,7 @@ namespace App\Services\Events;
 use App\Events\FestScoreboardUpdated;
 use App\Models\FestAttendance;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use Illuminate\Validation\ValidationException;
@@ -19,8 +20,12 @@ class FestMarkSaveService
     /** @return array{message: string, record_break: bool} */
     public function save(FestEvent $event, array $data, int $lockedBy): array
     {
+        $item = FestEventItem::findOrFail($data['item_id']);
+        abort_if($item->event_id !== $event->id, 403);
+
         $participant = FestParticipant::with('registration')->findOrFail($data['participant_id']);
         abort_if($participant->registration->event_id !== $event->id, 403);
+        abort_if($participant->registration->item_id !== $item->id, 422, 'The participant is not registered for this item.');
         abort_if($participant->registration->status !== 'approved', 422, 'Marks can only be entered for approved registrations.');
         abort_if($participant->participant_role === 'standby', 422, 'Standby participants cannot receive marks.');
         abort_if($participant->disqualified_at !== null, 422, 'Disqualified participants cannot receive marks.');
@@ -54,7 +59,6 @@ class FestMarkSaveService
         }
 
         if ($event->event_type === 'sports' && ! empty($data['position']) && ($data['score'] ?? '') === '') {
-            $item = \App\Models\FestEventItem::find($data['item_id']);
             $isGroup = in_array($item?->participant_type, ['group', 'team'], true);
             $data['score'] = app(FestRankPointService::class)->pointsForRank($event, (int) $data['position'], $isGroup);
         }

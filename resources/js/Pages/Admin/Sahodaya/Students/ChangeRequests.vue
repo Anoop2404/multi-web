@@ -79,6 +79,7 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -86,6 +87,7 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/student-change-requests`;
+const { prompt } = useConfirm();
 
 const statusTabs = [
     { key: 'pending', label: 'Pending' },
@@ -110,13 +112,13 @@ function statusClass(status) {
     }[status] ?? 'bg-slate-100 text-slate-600';
 }
 
-function approve(req) {
-    const note = prompt('Optional note for the school:') ?? '';
+async function approve(req) {
+    const note = await prompt({ message: 'Optional note for the school:' }) ?? '';
     router.post(`${base}/${req.id}/approve`, { resolution_note: note }, { preserveScroll: true });
 }
 
-function reject(req) {
-    const note = prompt('Reason for rejection (optional):') ?? '';
+async function reject(req) {
+    const note = await prompt({ message: 'Reason for rejection (optional):', inputMultiline: true }) ?? '';
     router.post(`${base}/${req.id}/reject`, { resolution_note: note }, { preserveScroll: true });
 }
 </script>

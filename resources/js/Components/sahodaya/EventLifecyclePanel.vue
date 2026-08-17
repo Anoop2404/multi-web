@@ -61,6 +61,7 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodayaId: { type: [String, Number], required: true },
@@ -70,6 +71,8 @@ const props = defineProps({
     currentStatus: { type: String, default: null },
     eventType: { type: String, default: '' },
 });
+
+const { confirm } = useConfirm();
 
 const showAllSteps = ref(false);
 const isSports = computed(() => props.eventType === 'sports');
@@ -85,14 +88,14 @@ const visibleSteps = computed(() => {
     return pending.length > 0 ? pending : props.lifecycle;
 });
 
-function applySuggestedStatus() {
+async function applySuggestedStatus() {
     const incomplete = props.lifecycle.filter((s) => !s.done && !s.optional);
     let message = `Change event status to "${props.suggestedStatus}"?`;
     if (incomplete.length) {
         const items = incomplete.map((s) => `• ${s.label}`).join('\n');
         message = `These checklist items aren't done yet:\n\n${items}\n\nChange status to "${props.suggestedStatus}" anyway?`;
     }
-    if (!confirm(message)) return;
+    if (!(await confirm({ message, destructive: false }))) return;
 
     applying.value = true;
     router.post(`${base.value}/quick-status`, { status: props.suggestedStatus }, {

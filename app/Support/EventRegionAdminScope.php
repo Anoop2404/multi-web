@@ -53,20 +53,48 @@ class EventRegionAdminScope
         return ['eventIds' => $allowedEventIds, 'regionScopes' => $allowedRegionScopes];
     }
 
-    /** Reads the {event} route parameter, whether it arrived as a bound model or a raw id. */
+    /**
+     * Reads the {event} route parameter (Fest routes), whether it arrived as a bound
+     * model or a raw id, and resolves it to the FestEvent id that scoped region/event
+     * admins are checked against.
+     *
+     * Also handles {exam} (every MCQ route binds this instead of {event} — see
+     * routes/web.php's "mcq-exams" group). McqExam has no event_id/FK back to
+     * FestEvent: it is a Sahodaya-wide dataset with its own separate authorization
+     * mechanism (McqExamStaff), entirely independent of FestEventStaff's
+     * event_admin/region_admin scoping. Before this fix, {exam} routes always
+     * resolved to null here, and EnsureSahodayaAdmin lets GET requests through
+     * unchecked when no event id resolves (correct for genuinely event-less routes
+     * like the dashboard) — which silently gave event/region admins, who are only
+     * meant to be scoped to their assigned FestEvent(s), unrestricted read access to
+     * the entire MCQ dataset on any {exam} route.
+     *
+     * Since there is no real FestEvent for an {exam} route to resolve to, we return
+     * the sentinel -1: it can never appear in an admin's allowedEventIds/regionScopes
+     * (real event ids are positive) and FestEvent::query()->find(-1) always resolves
+     * to null, so matchesRegionScope() also returns false. That makes the containment
+     * check in EnsureSahodayaAdmin fail closed for every {exam} route, denying
+     * event/region-scoped admins outright. Full admins (sahodaya_admin, etc.) never
+     * reach that containment check at all — they bypass this branch entirely — so
+     * this is purely additive and does not touch the existing {event} resolution.
+     */
     public static function resolveRouteEventId(Request $request): ?int
     {
         $raw = $request->route('event');
 
-        if ($raw === null) {
-            return null;
+        if ($raw !== null) {
+            if (is_object($raw)) {
+                return isset($raw->id) ? (int) $raw->id : null;
+            }
+
+            return is_numeric($raw) ? (int) $raw : null;
         }
 
-        if (is_object($raw)) {
-            return isset($raw->id) ? (int) $raw->id : null;
+        if ($request->route('exam') !== null) {
+            return -1;
         }
 
-        return is_numeric($raw) ? (int) $raw : null;
+        return null;
     }
 
     /**

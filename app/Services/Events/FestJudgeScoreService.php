@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Events\FestScoreboardUpdated;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestJudgeAssignment;
 use App\Models\FestJudgeScore;
 use App\Models\FestMark;
@@ -19,9 +20,13 @@ class FestJudgeScoreService
     /** @return array{message: string} */
     public function save(FestEvent $event, array $data, int $judgeUserId): array
     {
+        $item = FestEventItem::findOrFail($data['item_id']);
+        abort_if($item->event_id !== $event->id, 403);
+
         $participant = FestParticipant::with('registration')->findOrFail($data['participant_id']);
         abort_if($participant->registration->event_id !== $event->id, 403);
-        abort_if(in_array($participant->registration->status, ['rejected', 'withdrawn'], true), 422, 'Scores cannot be entered for withdrawn or rejected registrations.');
+        abort_if($participant->registration->item_id !== $item->id, 422, 'The participant is not registered for this item.');
+        abort_if($participant->registration->status !== 'approved', 422, 'Scores can only be entered for approved registrations.');
         abort_if($participant->participant_role === 'standby', 422, 'Standby participants cannot receive scores.');
         abort_if($participant->disqualified_at !== null, 422, 'Disqualified participants cannot receive scores.');
 
@@ -64,6 +69,11 @@ class FestJudgeScoreService
 
     public function syncAggregatedMark(FestEvent $event, int $itemId, int $participantId): void
     {
+        $item = FestEventItem::findOrFail($itemId);
+        $participant = FestParticipant::with('registration')->findOrFail($participantId);
+        abort_if($item->event_id !== $event->id || $participant->registration->event_id !== $event->id, 403);
+        abort_if($participant->registration->item_id !== $item->id, 422, 'The participant is not registered for this item.');
+
         $judgeIds = FestJudgeAssignment::query()
             ->where('event_id', $event->id)
             ->where('item_id', $itemId)

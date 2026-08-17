@@ -160,6 +160,66 @@ class EventContext
                 + $gradePointService->pointsForMark($this->event, $mark);
         }
 
+        return $this->rankPointsBySchool($pointsBySchool);
+    }
+
+    public function scoreboardBySchool(): array
+    {
+        $partitionService = app(FestPartitionService::class);
+        if ($partitionService->isPartitionedHub($this->event) && $partitionService->shouldCombineAtFinale($this->event)) {
+            return $partitionService->combinedScoreboard($this->event);
+        }
+
+        return $this->scoreboardBySchoolForEvent();
+    }
+
+    /**
+     * §7.3a (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15) — a school's points
+     * for items where item.phase_id = $phaseId, computed live from this event's own
+     * FestMark rows (mirrors scoreboardByCategory()'s live class_group/age_group
+     * filter, applied to phase_id instead). Used directly by
+     * FestPhaseScoreboardService::phaseScoreboard() for a non-regional phase (called
+     * on the hub event), and once per region-partition child for a regional phase
+     * (called on each child, then summed via
+     * FestPartitionService::aggregateScoreboardAcrossPartitions()).
+     *
+     * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
+     */
+    public function scoreboardByPhase(int $phaseId): array
+    {
+        $gradePointService = app(FestGradePointService::class);
+
+        $marks = FestMark::where('event_id', $this->event->id)
+            ->whereHas('item', fn ($q) => $q->where('phase_id', $phaseId))
+            ->with(['participant.registration', 'item'])
+            ->get();
+
+        $pointsBySchool = [];
+
+        foreach ($marks as $mark) {
+            $participant = $mark->participant;
+            if (! $participant || $participant->disqualified_at) {
+                continue;
+            }
+
+            $schoolId = $participant->registration?->school_id;
+            if (! $schoolId) {
+                continue;
+            }
+
+            $pointsBySchool[$schoolId] = ($pointsBySchool[$schoolId] ?? 0)
+                + $gradePointService->pointsForMark($this->event, $mark);
+        }
+
+        return $this->rankPointsBySchool($pointsBySchool);
+    }
+
+    /**
+     * @param  array<string, int|float>  $pointsBySchool
+     * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
+     */
+    private function rankPointsBySchool(array $pointsBySchool): array
+    {
         if ($pointsBySchool === []) {
             return [];
         }
@@ -190,16 +250,6 @@ class EventContext
         }
 
         return $rows;
-    }
-
-    public function scoreboardBySchool(): array
-    {
-        $partitionService = app(FestPartitionService::class);
-        if ($partitionService->isPartitionedHub($this->event) && $partitionService->shouldCombineAtFinale($this->event)) {
-            return $partitionService->combinedScoreboard($this->event);
-        }
-
-        return $this->scoreboardBySchoolForEvent();
     }
 
     /** @return list<array{school_id: string, school_name: string, total_points: int, rank: int}> */

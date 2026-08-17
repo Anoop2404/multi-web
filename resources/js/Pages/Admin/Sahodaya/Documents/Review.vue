@@ -48,6 +48,9 @@
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { prompt } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -69,8 +72,8 @@ function approve(doc) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/documents/${doc.id}/approve`, {}, { preserveScroll: true });
 }
 
-function reject(doc) {
-    const reason = window.prompt('Rejection reason (required):');
+async function reject(doc) {
+    const reason = await prompt({ message: 'Rejection reason (required):', inputMultiline: true });
     if (!reason) return;
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/documents/${doc.id}/reject`,

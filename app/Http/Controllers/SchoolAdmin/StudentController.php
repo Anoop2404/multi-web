@@ -313,6 +313,26 @@ class StudentController extends SchoolAdminController
         return $this->resetStudentPortalPassword($student, request()->user()?->id);
     }
 
+    /** On-demand reveal of the stored plaintext portal password — not sent in the initial page payload. */
+    public function revealPortalPassword(string $tenantId, Student $student, \App\Services\Audit\PlatformAuditLogger $audit)
+    {
+        abort_if($student->tenant_id !== $this->school->id, 403);
+
+        $student->loadMissing('user:id,username,plain_password');
+
+        $audit->log(
+            'credential.viewed',
+            "Student portal password viewed: {$student->name}",
+            $student,
+            ['student_id' => $student->id],
+        );
+
+        return response()->json([
+            'username' => $student->user?->username ?? $student->reg_no,
+            'password' => $student->user?->plain_password,
+        ]);
+    }
+
     /** @return array<string, mixed> */
     private function portalCredentialsFlash(Student $student, ?string $password = null): array
     {
@@ -1059,7 +1079,6 @@ class StudentController extends SchoolAdminController
             'verified_by'    => $student->verifiedBy?->name ?? $student->verifiedBy?->email,
             'has_portal_login' => (bool) $student->user_id,
             'portal_username'  => $student->user?->username ?? $student->reg_no,
-            'portal_password'  => $student->user?->plain_password,
             'photo_url'      => $student->photoUrl(),
             'has_photo'      => filled($student->photo),
         ];

@@ -97,6 +97,9 @@ Route::middleware([
         Route::get('/about', fn () => app(SahodayaCmsPageController::class)->show('about'))->name('tenant.sahodaya.about');
         Route::get('/executive', fn () => app(SahodayaCmsPageController::class)->show('executive'))->name('tenant.sahodaya.executive');
         Route::get('/contact', fn () => app(SahodayaCmsPageController::class)->show('contact'))->name('tenant.sahodaya.contact');
+        Route::post('/contact', [\App\Http\Controllers\Public\AdmissionEnquiryController::class, 'store'])->name('tenant.contact.submit');
+        Route::post('/enquire', [\App\Http\Controllers\Public\AdmissionEnquiryController::class, 'store'])->name('tenant.enquiry.submit');
+        Route::post('/alumni-register', [\App\Http\Controllers\Public\AlumniPublicController::class, 'store'])->name('alumni.register');
         Route::get('/contactus', fn () => app(SahodayaCmsPageController::class)->show('contact'));
         Route::get('/downloads', fn () => app(SahodayaCmsPageController::class)->show('downloads'))->name('tenant.sahodaya.downloads');
         Route::get('/download', fn () => app(SahodayaCmsPageController::class)->show('downloads'));
@@ -122,6 +125,7 @@ Route::middleware([
             ->middleware('auth')
             ->name('tenant.site.preview');
         Route::get('/m/{slug}', [\App\Http\Controllers\Public\PublicSiteController::class, 'microsite'])->name('tenant.site.microsite');
+        Route::get('/m/{slug}/{page}', [\App\Http\Controllers\Public\PublicSiteController::class, 'micrositePage'])->name('tenant.site.microsite.page');
 
         Route::get('/sitemap.xml', [SeoController::class, 'sitemap']);
         Route::get('/robots.txt', [SeoController::class, 'robots']);

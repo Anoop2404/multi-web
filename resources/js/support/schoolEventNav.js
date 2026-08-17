@@ -11,7 +11,7 @@ export function detectSchoolEventFromUrl(url) {
     const path = full.split('?')[0];
 
     const workspace = path.match(
-        /\/school-admin\/[^/]+\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)\/events\/(\d+)(?:\/|$)/,
+        /\/school-admin\/[^/]+\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest|custom)\/events\/(\d+)(?:\/|$)/,
     );
     if (workspace) {
         return {
@@ -22,7 +22,7 @@ export function detectSchoolEventFromUrl(url) {
     }
 
     const reports = path.match(
-        /\/school-admin\/[^/]+\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)\/reports\/(\d+)(?:\/|$)/,
+        /\/school-admin\/[^/]+\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest|custom)\/reports\/(\d+)(?:\/|$)/,
     );
     if (reports) {
         return {
@@ -33,7 +33,7 @@ export function detectSchoolEventFromUrl(url) {
     }
 
     const festDay = path.match(
-        /\/school-admin\/[^/]+\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)\/fest-day\/(\d+)(?:\/|$)/,
+        /\/school-admin\/[^/]+\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest|custom)\/fest-day\/(\d+)(?:\/|$)/,
     );
     if (festDay) {
         return {
@@ -44,7 +44,7 @@ export function detectSchoolEventFromUrl(url) {
     }
 
     const requests = path.match(
-        /\/school-admin\/[^/]+\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)\/events\/(\d+)\/(clash-requests|substitution-requests)(?:\/|$)/,
+        /\/school-admin\/[^/]+\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest|custom)\/events\/(\d+)\/(clash-requests|substitution-requests)(?:\/|$)/,
     );
     if (requests) {
         return {
@@ -55,7 +55,7 @@ export function detectSchoolEventFromUrl(url) {
     }
 
     const registration = path.match(
-        /\/school-admin\/[^/]+\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)\/registration(?:\/|$)/,
+        /\/school-admin\/[^/]+\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest|custom)\/registration(?:\/|$)/,
     );
     if (registration) {
         const params = new URL(full, 'http://local').searchParams;

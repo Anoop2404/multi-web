@@ -3,6 +3,7 @@
 namespace App\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventPhase;
 use App\Models\FestEventSchoolPartition;
 use App\Models\Region;
 use App\Models\SchoolRegionAssignment;
@@ -21,7 +22,7 @@ class FestRegionPartitionService
     /** @var array<string, bool> request-scoped cache: regions configured per Sahodaya */
     private static array $regionsApplyCache = [];
 
-    /** @var array<string, ?Region> request-scoped cache: school → region (keyed sahodaya:school) */
+    /** @var array<string, ?Region> request-scoped cache: school → region (keyed sahodaya:school:group) */
     private static array $schoolRegionCache = [];
 
     public function __construct(
@@ -39,8 +40,26 @@ class FestRegionPartitionService
             Region::forTenant($sahodayaId)->active()->exists();
     }
 
-    /** The membership region a school belongs to for the active year, or null. Memoized per request. */
-    public function schoolRegion(?string $sahodayaId, string $schoolId): ?Region
+    /**
+     * The membership region a school belongs to for the active year, or null. Memoized
+     * per request.
+     *
+     * §7.3 item 3 (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): optional
+     * `$partitionGroup` parameter, added on top of the pre-existing signature.
+     *
+     * Backward-compat guarantee: every caller that already existed before this change
+     * calls schoolRegion() with two arguments, so $partitionGroup defaults to null —
+     * and null resolves the exact same query this method has always run (the legacy
+     * Sahodaya-wide `SchoolRegionAssignment` row, i.e. `partition_group IS NULL`,
+     * scoped only by school_id + academic_year). Omitting $partitionGroup is always
+     * safe and always means "today's behavior, unchanged."
+     *
+     * When a caller DOES pass a $partitionGroup (a regional phase's
+     * `region_partition_group`, e.g. 'off_stage' or 'sargadhara'), this instead
+     * resolves the group-scoped assignment row for that school/year/group — the
+     * independent-per-phase-group region §7.3 item 4 depends on.
+     */
+    public function schoolRegion(?string $sahodayaId, string $schoolId, ?string $partitionGroup = null): ?Region
     {
         if (! $sahodayaId) {
             $sahodayaId = Tenant::find($schoolId)?->parent_id;
@@ -49,7 +68,7 @@ class FestRegionPartitionService
             }
         }
 
-        $key = $sahodayaId.':'.$schoolId;
+        $key = $sahodayaId.':'.$schoolId.':'.($partitionGroup ?? '');
         if (array_key_exists($key, self::$schoolRegionCache)) {
             return self::$schoolRegionCache[$key];
         }
@@ -59,6 +78,7 @@ class FestRegionPartitionService
         $assignment = SchoolRegionAssignment::forTenant($sahodayaId)
             ->forYear($year)
             ->where('school_id', $schoolId)
+            ->forPartitionGroup($partitionGroup)
             ->with('region')
             ->first();
 
@@ -232,6 +252,13 @@ class FestRegionPartitionService
      * Ensure a partition child event exists per membership region and (re)assign every
      * school to its region's partition. Returns a summary for the admin.
      *
+     * This is the legacy, Sahodaya-wide entry point — it copies the FULL hub item
+     * catalogue (no phase filtering) into every region child, exactly as before §7.3.
+     * Unaffected by the region-per-phase-group addendum: a Sahodaya that never
+     * configures a regional FestEventPhase (region_partition_group) keeps calling this
+     * one method, with this exact behavior, forever. See syncPartitionsFromRegionsForPhase()
+     * below for the new per-group entry point regional phases use instead.
+     *
      * @return array{partitions_created: int, schools_assigned: int}
      */
     public function syncPartitionsFromRegions(FestEvent $hub): array
@@ -290,6 +317,113 @@ class FestRegionPartitionService
         $year = AcademicYear::forSahodaya($hub->tenant_id);
         $assignments = SchoolRegionAssignment::forTenant($hub->tenant_id)
             ->forYear($year)
+            ->forPartitionGroup(null)
+            ->get(['school_id', 'region_id']);
+
+        $assigned = 0;
+        foreach ($assignments as $assignment) {
+            $key = $keyByRegionId[$assignment->region_id] ?? null;
+            if ($key === null) {
+                continue;
+            }
+
+            FestEventSchoolPartition::updateOrCreate(
+                ['event_id' => $hub->id, 'school_id' => $assignment->school_id],
+                ['partition_key' => $key, 'assigned_at' => now()],
+            );
+            $assigned++;
+        }
+
+        return ['partitions_created' => $created, 'schools_assigned' => $assigned];
+    }
+
+    /**
+     * §7.3 items 2/3 (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): the per-group
+     * variant of syncPartitionsFromRegions(), called once per regional phase rather than
+     * once per hub. This is new — nothing existing calls it, so it changes no current
+     * behavior on its own; it only takes effect once a Sahodaya actually configures a
+     * regional FestEventPhase (region_partition_group set) and something invokes this
+     * method for it, which is wiring left to the phase-controls admin UI (outside this
+     * change's scope).
+     *
+     * Deliberately reuses the SAME shared, hub-level set of region-partition child
+     * events that syncPartitionsFromRegions() already creates/maintains — a hub's
+     * "Tirur" region child is one FestEvent shared by every regional phase on that hub,
+     * not one child event per (region, group) pair. What differs per call is which
+     * items get copied into it (only $phase's items — see FestItemSyncService::
+     * copyItemsToPartition()'s new $phase parameter, §7.3 item 5) and which
+     * SchoolRegionAssignment rows are read (scoped to $phase->region_partition_group
+     * instead of the legacy Sahodaya-wide NULL-group rows).
+     *
+     * Known limitation, carried over honestly rather than silently "solved" here:
+     * FestEventSchoolPartition (the table that routes a school to one partition_key on
+     * a hub for registration) still has a single row per (event_id, school_id) — it has
+     * no group dimension. If a school is assigned to different physical regions for two
+     * different regional phases on the same hub, calling this method for both phases in
+     * turn leaves that shared row pointing at whichever phase synced last. Making
+     * registration routing itself independent per phase (§7.3 item 4's "registers under
+     * whichever region they picked for that group") needs its own follow-up beyond the
+     * §7.3 items 1/2/3/5 scope this method covers — likely a group-aware evolution of
+     * FestEventSchoolPartition or a routing table alongside it.
+     *
+     * @return array{partitions_created: int, schools_assigned: int}
+     */
+    public function syncPartitionsFromRegionsForPhase(FestEvent $hub, FestEventPhase $phase): array
+    {
+        abort_if($hub->parent_event_id, 422, 'Sync regions on the hub event, not a partition.');
+        abort_if($hub->event_type === 'sports', 422, 'Sports regions must be synced below each sport discipline.');
+        abort_if((int) $phase->event_id !== (int) $hub->id, 422, 'Phase does not belong to this hub event.');
+
+        $partitionGroup = $phase->region_partition_group;
+        abort_if(! filled($partitionGroup), 422, 'Phase is not configured as a regional phase (region_partition_group is not set).');
+
+        $regions = Region::forTenant($hub->tenant_id)->active()->orderBy('sort_order')->orderBy('name')->get();
+        abort_if($regions->isEmpty(), 422, 'No active regions configured for this Sahodaya.');
+
+        if (($hub->conduct_mode ?? 'standard') !== 'partitioned') {
+            $hub->update(['conduct_mode' => 'partitioned']);
+        }
+
+        $created = 0;
+        $keyByRegionId = [];
+        foreach ($regions as $region) {
+            $key = $this->partitionKeyForRegion($region);
+            $keyByRegionId[$region->id] = $key;
+
+            $partition = $this->partitions->partitionByKey($hub, $key);
+            $expectedTitle = "{$hub->title} — {$region->name}";
+
+            if (! $partition) {
+                $partition = $this->partitions->spawnPartition($hub, [
+                    'title'          => $expectedTitle,
+                    'partition_key'  => $key,
+                    'cluster_label'  => $region->name,
+                    'partition_role' => 'region',
+                    'region_id'      => $region->id,
+                ]);
+                $created++;
+            } else {
+                if (! str_contains($partition->title, $hub->title)) {
+                    $partition->update(['title' => $expectedTitle]);
+                }
+                if ($partition->region_id !== $region->id) {
+                    $partition->update(['region_id' => $region->id]);
+                }
+            }
+
+            // Only $phase's own items — this is the one behavioral difference from
+            // syncPartitionsFromRegions() above (§7.3 item 5).
+            app(FestItemSyncService::class)->copyItemsToPartition($hub, $partition, 'region', $phase);
+            app(FestFoodMenuSyncService::class)->copyMenuToPartition($hub, $partition);
+            $this->inheritRegistrationLifecycle($hub, $partition);
+        }
+
+        app(FestSchoolEventFeeService::class)->propagateFeeSettingsToChildren($hub->fresh());
+
+        $year = AcademicYear::forSahodaya($hub->tenant_id);
+        $assignments = SchoolRegionAssignment::forTenant($hub->tenant_id)
+            ->forYear($year)
+            ->forPartitionGroup($partitionGroup)
             ->get(['school_id', 'region_id']);
 
         $assigned = 0;

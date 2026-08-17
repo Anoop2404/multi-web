@@ -68,6 +68,23 @@ class SahodayaWebsiteSiteScopeTest extends TestCase
             ->assertDontSee('PRIMARY WEBSITE MARKER');
     }
 
+    public function test_v2_microsite_navigation_stays_inside_the_microsite(): void
+    {
+        $this->microsite->update([
+            'template_key' => 'network-directory',
+            'template_version' => '2.0.0',
+            'experience_version' => 'v2',
+            'design_json' => ['navigation' => 'directory'],
+        ]);
+        $this->createPublishedSection($this->microsite, 'MICROSITE ABOUT');
+
+        $this->get('http://scoped-site.sahodaya.test/m/innovation-expo')
+            ->assertOk()
+            ->assertSee('href="/m/innovation-expo"', false)
+            ->assertSee('href="/m/innovation-expo#about-sahodaya"', false)
+            ->assertDontSee('href="/#about-sahodaya"', false);
+    }
+
     public function test_builder_lists_only_the_selected_sites_sections(): void
     {
         $primarySection = $this->createPublishedSection($this->primary, 'PRIMARY WEBSITE MARKER');

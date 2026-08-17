@@ -94,6 +94,7 @@ import { router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -103,6 +104,8 @@ const props = defineProps({
     schoolFees: { type: Array, default: () => [] },
     pendingCount: { type: Number, default: 0 },
 });
+
+const { confirm, prompt } = useConfirm();
 
 const expanded = ref({});
 function toggleExpand(id) {
@@ -121,13 +124,13 @@ function statusClass(status) {
     }[status] ?? 'bg-slate-100 text-slate-600';
 }
 
-function approve(schoolFeeId) {
-    if (!confirm('Approve fee and issue hall tickets for all pending registrations from this school?')) return;
+async function approve(schoolFeeId) {
+    if (!(await confirm({ message: 'Approve fee and issue hall tickets for all pending registrations from this school?', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/payments/${schoolFeeId}/approve`, {}, { preserveScroll: true });
 }
 
-function reject(schoolFeeId) {
-    const reason = prompt('Rejection reason for the school:');
+async function reject(schoolFeeId) {
+    const reason = await prompt({ message: 'Rejection reason for the school:', inputMultiline: true });
     if (!reason?.trim()) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/payments/${schoolFeeId}/reject`, {
         rejection_reason: reason.trim(),

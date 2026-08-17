@@ -98,6 +98,7 @@
 import { Link, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -111,6 +112,8 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+
+const { confirm, prompt } = useConfirm();
 
 const selectForm = useForm({});
 const certifyForm = useForm({ certification_notes: '' });
@@ -128,9 +131,9 @@ function formatDate(value) {
     return new Date(value).toLocaleString();
 }
 
-function select(candidate, nominationType) {
+async function select(candidate, nominationType) {
     if (nominationType === 'reserve') {
-        const skip_reason = window.prompt('Optional: why is this a reserve rather than primary? (leave blank to skip)') || null;
+        const skip_reason = (await prompt({ message: 'Optional: why is this a reserve rather than primary? (leave blank to skip)', inputMultiline: true, inputRequired: false })) || null;
         selectForm.transform(() => ({ ...candidate, nomination_type: nominationType, skip_reason }))
             .post(`${base}/state-nomination/select`, { preserveScroll: true });
         return;
@@ -139,13 +142,13 @@ function select(candidate, nominationType) {
         .post(`${base}/state-nomination/select`, { preserveScroll: true });
 }
 
-function unselect(selection) {
-    if (!confirm(`Withdraw ${selection.student_name} from the nomination?`)) return;
+async function unselect(selection) {
+    if (!(await confirm({ message: `Withdraw ${selection.student_name} from the nomination?`, destructive: true }))) return;
     selectForm.delete(`${base}/state-nomination/selections/${selection.id}`, { preserveScroll: true });
 }
 
-function certify() {
-    if (!confirm('Certify this batch? Once certified, State submission will use these selections instead of raw results, and selections can no longer be changed.')) return;
+async function certify() {
+    if (!(await confirm({ message: 'Certify this batch? Once certified, State submission will use these selections instead of raw results, and selections can no longer be changed.', destructive: false }))) return;
     certifyForm.post(`${base}/state-nomination/certify`, { preserveScroll: true });
 }
 </script>

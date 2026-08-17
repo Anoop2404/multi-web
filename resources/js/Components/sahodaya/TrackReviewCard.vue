@@ -15,6 +15,7 @@
 <script setup>
 import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     label: String,
@@ -24,6 +25,8 @@ const props = defineProps({
     submissionId: [Number, String],
     sahodayaId: [Number, String],
 });
+
+const { prompt } = useConfirm();
 
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/membership/submissions/${props.submissionId}`);
 
@@ -46,8 +49,8 @@ function approve() {
     router.post(`${base.value}/approve-track`, { track: props.track }, { preserveScroll: true });
 }
 
-function reject() {
-    const reason = prompt('Reason for rejection (required):');
+async function reject() {
+    const reason = await prompt({ message: 'Reason for rejection (required):', inputMultiline: true });
     if (!reason?.trim()) return;
     router.post(`${base.value}/reject-track`, { track: props.track, reason: reason.trim() }, { preserveScroll: true });
 }

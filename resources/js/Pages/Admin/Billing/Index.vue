@@ -215,6 +215,7 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { ref, reactive, computed, defineComponent, h } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const StatCard = defineComponent({
     props: { value: [String, Number], label: String, color: String },
@@ -232,6 +233,8 @@ const StatCard = defineComponent({
         ]);
     },
 });
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     plans:          Array,
@@ -287,8 +290,8 @@ function saveSubscription() {
 }
 
 // ─── Receipt actions ───────────────────────────────────────────────────────
-function approveReceipt(r) {
-    if (!confirm('Approve this receipt and activate the subscription?')) return;
+async function approveReceipt(r) {
+    if (!(await confirm({ message: 'Approve this receipt and activate the subscription?', destructive: false }))) return;
     router.post(`/admin/billing/receipts/${r.id}/approve`);
 }
 

@@ -13,6 +13,7 @@ class SchoolStudentsController extends SahodayaAdminController
     public function show(Request $request, string $tenantId, Tenant $school, EffectiveMasterDataResolver $resolver)
     {
         abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+        abort_if($this->membershipRegionScopedSchoolIds([$school->id]) === [], 404);
 
         $filters = $request->validate([
             'class_category_id' => 'nullable|integer',

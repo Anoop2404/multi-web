@@ -177,6 +177,7 @@ import { reactive, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import FestHeadFeeFields from '@/Components/fest/FestHeadFeeFields.vue';
 import { emptyHeadFeeFields, headFeeFieldsFromRecord } from '@/support/festHeadFeeFields';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodayaId: { type: [String, Number], required: true },
@@ -188,6 +189,8 @@ const props = defineProps({
     notificationTriggers: { type: Array, default: () => [] },
     eligibleNotificationUsers: { type: Array, default: () => [] },
 });
+
+const { confirm } = useConfirm();
 
 const saving = ref(false);
 const savingNotifications = ref(false);
@@ -344,8 +347,8 @@ function save() {
     });
 }
 
-function removeHead() {
-    if (!window.confirm(`Remove "${props.head.head_name}"? Linked items will become unassigned.`)) {
+async function removeHead() {
+    if (!(await confirm({ message: `Remove "${props.head.head_name}"? Linked items will become unassigned.` }))) {
         return;
     }
     removing.value = true;

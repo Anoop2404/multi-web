@@ -139,6 +139,7 @@
 import { reactive, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -152,6 +153,7 @@ const props = defineProps({
 // General Sahodaya-level route (not scoped under any one program's prefix) —
 // age categories are shared across every program, not just Sports Meet.
 const base = `/sahodaya-admin/${props.sahodaya.id}/sports-age-groups`;
+const { confirm } = useConfirm();
 
 const cutoffForm = useForm({
     sports_age_cutoff_date: props.globalAgeCutoffDate ?? '',
@@ -209,13 +211,13 @@ function saveEdit(group) {
     });
 }
 
-function removeGroup(group) {
-    if (!confirm(`Remove ${group.label}? In-use categories will be deactivated instead.`)) return;
+async function removeGroup(group) {
+    if (!(await confirm({ message: `Remove ${group.label}? In-use categories will be deactivated instead.` }))) return;
     router.delete(`${base}/${group.id}`, { preserveScroll: true });
 }
 
-function confirmReset() {
-    if (!confirm('Reset all age categories to system defaults? Custom categories will be removed.')) return;
+async function confirmReset() {
+    if (!(await confirm({ message: 'Reset all age categories to system defaults? Custom categories will be removed.' }))) return;
     router.post(`${base}/reset-defaults`, {}, { preserveScroll: true });
 }
 </script>

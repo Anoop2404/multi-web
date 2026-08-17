@@ -16,7 +16,7 @@ class FestSchoolEventFee extends Model
     use TracksPartialPayments;
 
     protected $fillable = [
-        'event_id', 'school_id', 'head_id', 'school_registration_fee', 'student_registration_fee',
+        'event_id', 'school_id', 'head_id', 'phase_id', 'registration_batch_id', 'school_registration_fee', 'student_registration_fee',
         'participation_item_count', 'participation_fee', 'extra_item_fee', 'total_due',
         'amount_paid', 'override_amount', 'fee_receipt_id', 'status',
     ];
@@ -32,8 +32,13 @@ class FestSchoolEventFee extends Model
     ];
 
     /**
-     * When an event has per-head fee rows, exclude the head_id-null rollup so
-     * sum(total_due) does not double-count sports_composite (and similar) billing.
+     * When an event has per-head OR per-phase fee rows, exclude the
+     * head_id=null/phase_id=null rollup so sum(total_due) does not double-count
+     * sports_composite (per-head) or Kalotsavam per-phase billing (see
+     * docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3). Generalized from the original
+     * head_id-only check when phase_id was added — the two scoping columns are
+     * independent (an event uses one or the other, never both today), so either being
+     * non-null on ANY row for the event is enough to disqualify that event's rollup row.
      */
     public function scopeForAmountAggregation(Builder $query): Builder
     {
@@ -41,11 +46,17 @@ class FestSchoolEventFee extends Model
 
         return $query->where(function (Builder $inner) use ($table) {
             $inner->whereNotNull("{$table}.head_id")
+                ->orWhereNotNull("{$table}.phase_id")
+                ->orWhereNotNull("{$table}.registration_batch_id")
                 ->orWhereNotExists(function ($sub) use ($table) {
                     $sub->selectRaw('1')
-                        ->from("{$table} as head_fees")
-                        ->whereColumn('head_fees.event_id', "{$table}.event_id")
-                        ->whereNotNull('head_fees.head_id');
+                        ->from("{$table} as scoped_fees")
+                        ->whereColumn('scoped_fees.event_id', "{$table}.event_id")
+                        ->where(function ($w) {
+                            $w->whereNotNull('scoped_fees.head_id')
+                                ->orWhereNotNull('scoped_fees.phase_id')
+                                ->orWhereNotNull('scoped_fees.registration_batch_id');
+                        });
                 });
         });
     }
@@ -53,14 +64,17 @@ class FestSchoolEventFee extends Model
     /** @param  Collection<int, self>  $fees */
     public static function withoutDuplicateRollups(Collection $fees): Collection
     {
-        $eventsWithHeads = $fees->whereNotNull('head_id')->pluck('event_id')->unique();
+        $eventsWithScopedRows = $fees
+            ->filter(fn (self $fee) => $fee->head_id !== null || $fee->phase_id !== null || $fee->registration_batch_id !== null)
+            ->pluck('event_id')
+            ->unique();
 
-        return $fees->filter(function (self $fee) use ($eventsWithHeads) {
-            if ($fee->head_id !== null) {
+        return $fees->filter(function (self $fee) use ($eventsWithScopedRows) {
+            if ($fee->head_id !== null || $fee->phase_id !== null || $fee->registration_batch_id !== null) {
                 return true;
             }
 
-            return ! $eventsWithHeads->contains($fee->event_id);
+            return ! $eventsWithScopedRows->contains($fee->event_id);
         })->values();
     }
 
@@ -77,6 +91,16 @@ class FestSchoolEventFee extends Model
     public function head(): BelongsTo
     {
         return $this->belongsTo(FestItemHead::class, 'head_id');
+    }
+
+    public function phase(): BelongsTo
+    {
+        return $this->belongsTo(FestEventPhase::class, 'phase_id');
+    }
+
+    public function registrationBatch(): BelongsTo
+    {
+        return $this->belongsTo(FestRegistrationBatch::class, 'registration_batch_id');
     }
 
     public function feeReceipt(): BelongsTo

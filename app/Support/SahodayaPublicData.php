@@ -3,10 +3,11 @@
 namespace App\Support;
 
 use App\Models\Circular;
-use App\Models\KalotsavEvent;
+use App\Models\FestEvent;
 use App\Models\OfficeBearers;
 use App\Models\Tenant;
 use App\Models\Download;
+use App\Services\Events\FestCompetitionTypeRegistry;
 use Illuminate\Support\Collection;
 
 class SahodayaPublicData
@@ -61,14 +62,24 @@ class SahodayaPublicData
 
     public static function upcomingEvents(string $tenantId, int $limit = 4): Collection
     {
-        return KalotsavEvent::where('tenant_id', $tenantId)
-            ->where('is_active', true)
+        $labels = app(FestCompetitionTypeRegistry::class)->forTenant($tenantId)->labels(true);
+
+        return FestEvent::forTenant($tenantId)
+            ->whereNull('parent_event_id') // top-level events only — cascaded regional/cluster children share this parent
+            ->visibleInNav()
+            ->whereIn('status', ['published', 'registration_open', 'ongoing'])
             ->where(function ($q) {
-                $q->whereNull('event_date')->orWhere('event_date', '>=', now()->toDateString());
+                $q->whereNull('event_start')->orWhere('event_start', '>=', now()->toDateString());
             })
-            ->orderBy('event_date')
+            ->orderBy('event_start')
             ->limit($limit)
-            ->get();
+            ->get()
+            ->map(fn (FestEvent $event) => (object) [
+                'name' => $event->title,
+                'type' => $labels[$event->event_type] ?? \Illuminate\Support\Str::headline($event->event_type),
+                'event_date' => $event->event_start,
+                'venue' => $event->venue,
+            ]);
     }
 
     public static function latestCirculars(string $tenantId, int $limit = 6): Collection

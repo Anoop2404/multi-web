@@ -16,7 +16,7 @@ class McqExamsApiController extends SahodayaApiController
         return response()->json(['data' => $exams]);
     }
 
-    public function show(McqExam $exam)
+    public function show(string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 

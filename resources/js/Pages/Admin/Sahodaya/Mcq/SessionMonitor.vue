@@ -33,7 +33,7 @@
         <div class="card card--flush overflow-hidden">
             <table class="data-table">
                 <thead>
-                    <tr><th>Reg. no.</th><th>Student</th><th>School</th><th>Attendance</th><th>Session</th><th>Started</th><th>Submitted</th><th>Score</th></tr>
+                    <tr><th>Reg. no.</th><th>Student</th><th>School</th><th>Attendance</th><th>Session</th><th>Started</th><th>Submitted</th><th>Score</th><th>Proctor</th></tr>
                 </thead>
                 <tbody>
                     <tr v-for="r in registrations" :key="r.id">
@@ -47,6 +47,16 @@
                         <td class="text-xs">{{ formatDateTime(r.started_at) }}</td>
                         <td class="text-xs">{{ formatDateTime(r.submitted_at) }}</td>
                         <td>{{ r.score ?? '—' }}</td>
+                        <td class="text-xs">
+                            <span
+                                v-if="r.proctor_events?.length"
+                                class="font-semibold text-amber-700 cursor-help"
+                                :title="proctorEventsTooltip(r.proctor_events)"
+                            >
+                                {{ r.proctor_events.length }} tab-switch event{{ r.proctor_events.length === 1 ? '' : 's' }}
+                            </span>
+                            <span v-else class="text-slate-400">—</span>
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -77,5 +87,17 @@ function sessionTone(tone) {
         danger: 'text-red-700',
         info: 'text-blue-700',
     })[tone] || 'text-slate-700';
+}
+
+const PROCTOR_EVENT_LABELS = {
+    tab_hidden: 'Tab hidden',
+    window_blur: 'Window lost focus',
+    fullscreen_exit: 'Exited fullscreen',
+};
+
+function proctorEventsTooltip(events) {
+    return events
+        .map(e => `${PROCTOR_EVENT_LABELS[e.type] || e.type} — ${formatDateTime(e.occurred_at)}`)
+        .join('\n');
 }
 </script>

@@ -85,6 +85,9 @@
 import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { computed } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     school:   Object,
@@ -136,13 +139,13 @@ function statusLabel(status) {
     return map[status] ?? status;
 }
 
-function approve(req) {
-    if (!confirm('Approve this profile change request?')) return;
+async function approve(req) {
+    if (!(await confirm({ message: 'Approve this profile change request?', destructive: false }))) return;
     router.post(`/school-admin/${props.school.id}/users/profile-change-requests/${req.id}/approve`, {}, { preserveScroll: true });
 }
 
-function reject(req) {
-    const note = prompt('Reason for rejection (optional):');
+async function reject(req) {
+    const note = await prompt({ message: 'Reason for rejection (optional):', inputMultiline: true, inputRequired: false });
     if (note === null) return; // cancelled
     router.post(`/school-admin/${props.school.id}/users/profile-change-requests/${req.id}/reject`, { note }, { preserveScroll: true });
 }

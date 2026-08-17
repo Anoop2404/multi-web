@@ -147,6 +147,25 @@ class StudentMcqController extends Controller
         return response()->json(['saved' => true]);
     }
 
+    /**
+     * Record a client-reported proctoring event (tab hidden / window blur / fullscreen exit)
+     * for the student's own active session. Detect-and-log only -- never auto-submits or
+     * penalizes; the recorded events are surfaced to Sahodaya staff for later review.
+     */
+    public function recordProctorEvent(Request $request, string $tenantId, McqRegistration $registration, McqExamSessionService $sessions)
+    {
+        $student = $request->attributes->get('portalStudent');
+        abort_if($registration->school_id !== $tenantId || $registration->student_id !== $student->id, 403);
+
+        $data = $request->validate([
+            'type' => ['required', 'string', \Illuminate\Validation\Rule::in(\App\Models\McqProctorEvent::TYPES)],
+        ]);
+
+        $sessions->recordProctorEvent($registration, $data['type']);
+
+        return response()->json(['recorded' => true]);
+    }
+
     public function submitExam(Request $request, string $tenantId, McqRegistration $registration, McqExamSessionService $sessions)
     {
         $student = $request->attributes->get('portalStudent');

@@ -2,6 +2,7 @@
 
 namespace App\Services\Students;
 
+use App\Models\RegNoCounter;
 use App\Models\SahodayaProfile;
 use App\Models\Student;
 use App\Models\Tenant;
@@ -17,27 +18,66 @@ class StudentRegistrationNumberGenerator
 
     private const SEQUENCE_PAD = 4;
 
-    /** Student ID, e.g. STU/26/0001 — per-Sahodaya, per-academic-year sequence. Also used as portal username. */
+    /**
+     * Student ID, e.g. STU/26/0001 — per-Sahodaya, per-academic-year sequence. Also used as portal username.
+     *
+     * O(1) per call as of the 2026-08-15 performance fix (see
+     * docs/N1_AUDIT_SWEEP_2_2026_08_03.md, finding #1). This used to rescan every
+     * reg_no already issued to the Sahodaya for the year on every single call
+     * (Student::whereIn(...)->where('reg_no', 'like', ...)->pluck(...)->max()), which
+     * is O(N) per call and O(N^2) for a bulk import/backfill of N students. It now
+     * reads and atomically increments a `reg_no_counters` row keyed by
+     * (sahodaya_id, year_suffix) instead — see App\Models\RegNoCounter and the
+     * create_reg_no_counters_table migration (which also documents how a
+     * Sahodaya+year's counter gets seeded from pre-existing reg_no data the first
+     * time it's needed, since the counter table starts empty).
+     */
     public function generate(Tenant $school, ?string $academicYear = null): string
     {
-        $base = $this->numberBase($school, $academicYear);
-        $schoolIds = $this->sahodayaSchoolIds($school);
+        $yearSuffix = $this->yearSuffixFor($school, $academicYear);
+        $base = sprintf('%s/%s/', self::PREFIX, $yearSuffix);
 
-        return DB::transaction(function () use ($school, $base, $schoolIds) {
-            // Serialize allocation across the whole Sahodaya by locking the profile row.
+        return DB::transaction(function () use ($school, $base, $yearSuffix) {
+            // Serialize allocation across the whole Sahodaya (across processes/imports)
+            // by locking the profile row for the duration of this transaction. This is
+            // what makes the counter upsert below race-free: only one generate() call
+            // for this Sahodaya can be inside this block at a time, so the "counter row
+            // doesn't exist yet, create it" branch below can never be entered
+            // concurrently by two callers for the same (sahodaya, year).
             SahodayaProfile::where('tenant_id', $school->parent_id)->lockForUpdate()->first();
 
-            // Scoped to this year's base prefix (e.g. "STU/26/") instead of pulling every
-            // reg_no ever assigned across the whole Sahodaya's history — the unscoped version
-            // rescanned the full multi-year, multi-school history on every single call, making
-            // bulk import/backfill of N students effectively O(N x total-ever-students).
-            $max = Student::whereIn('tenant_id', $schoolIds)
-                ->where('reg_no', 'like', $base.'%')
-                ->pluck('reg_no')
-                ->map(fn (?string $value) => $this->parseSequenceForBase($value, $base))
-                ->max() ?? 0;
+            // reg_no_counters lives on the central connection (see RegNoCounter), which
+            // is a different physical database than this transaction's connection when
+            // TENANCY_DATABASE_PER_SAHODAYA is on. Wrap the counter read/create/update in
+            // its own transaction on that connection so the increment is atomic even
+            // though it can't share the outer transaction's connection.
+            return DB::connection(config('tenancy.database.central_connection', 'central'))
+                ->transaction(function () use ($school, $base, $yearSuffix) {
+                    $counter = RegNoCounter::where('sahodaya_id', $school->parent_id)
+                        ->where('year_suffix', $yearSuffix)
+                        ->lockForUpdate()
+                        ->first();
 
-            return $base.str_pad((string) ($max + 1), self::SEQUENCE_PAD, '0', STR_PAD_LEFT);
+                    if (! $counter) {
+                        // First-ever allocation for this (sahodaya, year) since the
+                        // counter table was introduced. Seed it from whatever's already
+                        // in use — computed the old O(N) way, but only once per
+                        // (sahodaya, year) ever, not once per student, so this doesn't
+                        // reintroduce the O(N^2) behavior this fix targets. Every call
+                        // after this one for this (sahodaya, year) takes the O(1) path
+                        // above instead.
+                        $counter = RegNoCounter::create([
+                            'sahodaya_id'    => $school->parent_id,
+                            'year_suffix'    => $yearSuffix,
+                            'last_sequence'  => $this->seedSequenceFromExistingStudents($school, $base),
+                        ]);
+                    }
+
+                    $next = $counter->last_sequence + 1;
+                    $counter->update(['last_sequence' => $next]);
+
+                    return $base.str_pad((string) $next, self::SEQUENCE_PAD, '0', STR_PAD_LEFT);
+                });
         });
     }
 
@@ -132,14 +172,31 @@ class StudentRegistrationNumberGenerator
             ->update(['username' => $username]);
     }
 
-    private function numberBase(Tenant $school, ?string $academicYear = null): string
+    /** Resolve the two-digit-ish academic-year suffix (e.g. "26") used in the reg_no base. */
+    private function yearSuffixFor(Tenant $school, ?string $academicYear = null): string
     {
         $sahodaya = $school->parent;
         abort_unless($sahodaya, new RuntimeException('School is not linked to a Sahodaya.'));
 
-        $yearSuffix = AcademicYear::yearSuffix($academicYear ?? AcademicYear::forSchool($school));
+        return AcademicYear::yearSuffix($academicYear ?? AcademicYear::forSchool($school));
+    }
 
-        return sprintf('%s/%s/', self::PREFIX, $yearSuffix);
+    /**
+     * One-time seed for a brand-new (sahodaya, year) counter row: the highest sequence
+     * already in use for $base across every school in the Sahodaya, computed the same
+     * way generate() used to compute it on every call before the reg_no_counters table
+     * existed. Only ever runs once per (sahodaya, year) — after the counter row is
+     * created, generate() never falls back to this again for that pair.
+     */
+    private function seedSequenceFromExistingStudents(Tenant $school, string $base): int
+    {
+        $schoolIds = $this->sahodayaSchoolIds($school);
+
+        return Student::whereIn('tenant_id', $schoolIds)
+            ->where('reg_no', 'like', $base.'%')
+            ->pluck('reg_no')
+            ->map(fn (?string $value) => $this->parseSequenceForBase($value, $base))
+            ->max() ?? 0;
     }
 
     /** @return list<string> */

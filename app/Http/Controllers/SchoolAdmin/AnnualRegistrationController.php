@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Models\FestEventPhase;
 use App\Models\MembershipPayment;
 use App\Models\Region;
 use App\Models\Registration;
@@ -90,15 +91,37 @@ class AnnualRegistrationController extends SchoolAdminController
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'name', 'description']);
-        $selectedRegionId = $regions->isEmpty() ? null : SchoolRegionAssignment::forTenant($sahodaya->id)
-            ->forYear($academicYear)
-            ->where('school_id', $this->school->id)
-            ->value('region_id');
+
+        // §7.3 item 4 (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md): most Sahodayas have zero or
+        // one regional phase group, so they keep today's single Sahodaya-wide picker exactly
+        // as-is. Only once an event has 2+ regional phase groups (e.g. Off Stage + Sargadhara)
+        // does the UI switch to one independent picker per group.
+        $regionalGroups = $regions->isEmpty() ? [] : $this->regionalPhaseGroups($sahodaya->id);
+
+        $selectedRegionId = null;
+        $selectedRegionsByGroup = [];
+        if (count($regionalGroups) >= 2) {
+            $selectedRegionsByGroup = SchoolRegionAssignment::forTenant($sahodaya->id)
+                ->forYear($academicYear)
+                ->where('school_id', $this->school->id)
+                ->whereIn('partition_group', array_column($regionalGroups, 'key'))
+                ->pluck('region_id', 'partition_group')
+                ->all();
+        } else {
+            $regionalGroups = [];
+            $selectedRegionId = $regions->isEmpty() ? null : SchoolRegionAssignment::forTenant($sahodaya->id)
+                ->forYear($academicYear)
+                ->where('school_id', $this->school->id)
+                ->forPartitionGroup(null)
+                ->value('region_id');
+        }
 
         return $this->inertia('School/Registration/Index', [
             'academicYear'       => $academicYear,
             'regions'            => $regions,
+            'regionalGroups'     => $regionalGroups,
             'selectedRegionId'   => $selectedRegionId,
+            'selectedRegionsByGroup' => $selectedRegionsByGroup,
             'registration'       => $registration?->load('submission'),
             'profile'            => $profilePayload,
             'registrationWindow' => $windowService->displayPayload($window),
@@ -182,6 +205,11 @@ class AnnualRegistrationController extends SchoolAdminController
         $academicYear = AcademicYear::forSchool($this->school);
 
         $regionIds = Region::forTenant($sahodayaId)->active()->pluck('id')->all();
+        $regionalGroups = $this->regionalPhaseGroups($sahodayaId);
+
+        if (count($regionalGroups) >= 2) {
+            return $this->saveRegionsByGroup($request, $sahodayaId, $academicYear, $regionIds, $regionalGroups);
+        }
 
         $data = $request->validate([
             'region_id' => ['nullable', Rule::in($regionIds)],
@@ -191,13 +219,14 @@ class AnnualRegistrationController extends SchoolAdminController
             SchoolRegionAssignment::forTenant($sahodayaId)
                 ->forYear($academicYear)
                 ->where('school_id', $this->school->id)
+                ->forPartitionGroup(null)
                 ->delete();
 
             return back()->with('success', 'Region cleared.');
         }
 
         SchoolRegionAssignment::updateOrCreate(
-            ['school_id' => $this->school->id, 'academic_year' => $academicYear],
+            ['school_id' => $this->school->id, 'academic_year' => $academicYear, 'partition_group' => null],
             [
                 'tenant_id'           => $sahodayaId,
                 'region_id'           => $data['region_id'],
@@ -213,6 +242,87 @@ class AnnualRegistrationController extends SchoolAdminController
             ->syncSchoolAcrossHubs($sahodayaId, $this->school->id);
 
         return back()->with('success', 'Region saved.');
+    }
+
+    /**
+     * Regional-phase-group variant of saveRegion() — one region choice per regional
+     * phase group (§7.3 item 4), persisted as one SchoolRegionAssignment row per group,
+     * keyed by its `partition_group`. Distinct from the legacy single-row (null group)
+     * path above, which is left completely untouched for every Sahodaya that doesn't
+     * have 2+ regional phase groups.
+     *
+     * @param  array<int, array{key: string, label: string}>  $regionalGroups
+     */
+    private function saveRegionsByGroup(
+        Request $request,
+        string $sahodayaId,
+        string $academicYear,
+        array $regionIds,
+        array $regionalGroups,
+    ) {
+        $groupKeys = array_column($regionalGroups, 'key');
+
+        $data = $request->validate([
+            'regions'   => ['required', 'array'],
+            'regions.*' => ['nullable', Rule::in($regionIds)],
+        ]);
+
+        $submitted = collect($data['regions'])->only($groupKeys);
+
+        foreach ($groupKeys as $groupKey) {
+            $regionId = $submitted->get($groupKey);
+
+            if (empty($regionId)) {
+                SchoolRegionAssignment::forTenant($sahodayaId)
+                    ->forYear($academicYear)
+                    ->where('school_id', $this->school->id)
+                    ->forPartitionGroup($groupKey)
+                    ->delete();
+
+                continue;
+            }
+
+            SchoolRegionAssignment::updateOrCreate(
+                ['school_id' => $this->school->id, 'academic_year' => $academicYear, 'partition_group' => $groupKey],
+                [
+                    'tenant_id'           => $sahodayaId,
+                    'region_id'           => $regionId,
+                    'source'              => 'school',
+                    'assigned_by_user_id' => $request->user()?->id,
+                ],
+            );
+        }
+
+        // Deliberately no syncSchoolAcrossHubs() call here: that helper only understands
+        // the legacy single Sahodaya-wide region (FestRegionPartitionService::schoolRegion()
+        // with no group). Routing a school into each regional phase's own group-scoped
+        // partition children is §7.5 Phase G (per-group syncPartitionsFromRegions()
+        // variant), not yet built — these rows are ready for it once it lands.
+        return back()->with('success', 'Regions saved.');
+    }
+
+    /**
+     * Distinct regional phase groups configured across this Sahodaya's fest hubs — e.g.
+     * [['key' => 'off_stage', 'label' => 'Off Stage'], ['key' => 'sargadhara', 'label' =>
+     * 'Sargadhara']]. Empty for the common case of an event with zero or one regional
+     * phase, in which case callers fall back to the legacy single Sahodaya-wide picker.
+     *
+     * @return array<int, array{key: string, label: string}>
+     */
+    private function regionalPhaseGroups(string $sahodayaId): array
+    {
+        return FestEventPhase::query()
+            ->whereNotNull('region_partition_group')
+            ->whereHas('event', fn ($q) => $q->where('tenant_id', $sahodayaId)->whereNull('parent_event_id'))
+            ->orderBy('sort_order')
+            ->get(['region_partition_group', 'name'])
+            ->unique('region_partition_group')
+            ->map(fn (FestEventPhase $phase) => [
+                'key'   => $phase->region_partition_group,
+                'label' => $phase->name,
+            ])
+            ->values()
+            ->all();
     }
 
     public function students(EffectiveMasterDataResolver $resolver, Request $request)

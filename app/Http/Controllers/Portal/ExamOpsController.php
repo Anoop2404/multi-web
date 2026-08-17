@@ -155,6 +155,15 @@ class ExamOpsController extends Controller
 
         app(\App\Services\Mcq\McqMarkSaveService::class)->save($exam, $registration, $data, $user->id);
 
+        // Fix 2026-08-15: this entry point previously wrote/updated the
+        // McqMark row without ever triggering re-ranking, leaving stale
+        // rank data -- closes the "storeMark doesn't trigger re-ranking"
+        // gap from mcq_exam_flow_audit_2026_08_13.md. Mirrors the same
+        // "only re-rank once every present registration has a mark" gate
+        // used by the other mark-writing entry points, via the shared
+        // McqRankingService::rankIfComplete() helper.
+        app(\App\Services\Mcq\McqRankingService::class)->rankIfComplete($exam);
+
         app(PlatformAuditLogger::class)->mcqRegistration(
             $registration->fresh(['exam']),
             'mcq.mark.entered',

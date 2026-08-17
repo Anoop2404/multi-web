@@ -487,7 +487,7 @@ class McqExamOpsController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         $registrations = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student', 'school', 'mark'])
+            ->with(['student', 'school', 'mark', 'proctorEvents'])
             ->orderBy('hall_ticket_no')
             ->get()
             ->map(fn (McqRegistration $r) => [
@@ -501,6 +501,10 @@ class McqExamOpsController extends SahodayaAdminController
                 'started_at'        => $r->started_at?->toDateTimeString(),
                 'submitted_at'      => $r->submitted_at?->toDateTimeString(),
                 'score'             => $r->mark?->score,
+                'proctor_events'    => $r->proctorEvents->map(fn ($e) => [
+                    'type'        => $e->event_type,
+                    'occurred_at' => $e->occurred_at?->toDateTimeString(),
+                ])->values(),
             ]);
 
         return $this->inertia('Sahodaya/Mcq/SessionMonitor', compact('exam', 'registrations'));

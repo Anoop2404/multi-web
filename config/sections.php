@@ -106,18 +106,18 @@ return [
         ],
         'gradient-split' => [
             'label' => 'Gradient Split Hero',
-            'description' => 'Premium gradient bg — text left, image or abstract right',
+            'description' => 'Network directory hero — search + real member data left, photo/video slider right',
             'fields' => [
-                ['key' => 'eyebrow',             'type' => 'text',  'label' => 'Eyebrow Label'],
-                ['key' => 'heading',             'type' => 'text',  'label' => 'Heading', 'required' => true],
-                ['key' => 'tagline',             'type' => 'text',  'label' => 'Tagline'],
-                ['key' => 'motto',               'type' => 'text',  'label' => 'Motto (italicised quote)'],
-                ['key' => 'years_active',        'type' => 'number','label' => 'Years Active (stat chip)'],
-                ['key' => 'cta_label',           'type' => 'text',  'label' => 'Primary Button Label'],
-                ['key' => 'cta_url',             'type' => 'url',   'label' => 'Primary Button URL'],
-                ['key' => 'secondary_cta_label', 'type' => 'text',  'label' => 'Secondary Button Label'],
-                ['key' => 'secondary_cta_url',   'type' => 'url',   'label' => 'Secondary Button URL'],
-                ['key' => 'image',               'type' => 'media', 'label' => 'Right-side Image (optional)'],
+                ['key' => 'eyebrow',      'type' => 'text',   'label' => 'Eyebrow Label'],
+                ['key' => 'heading',      'type' => 'text',   'label' => 'Heading', 'required' => true],
+                ['key' => 'tagline',      'type' => 'text',   'label' => 'Tagline (shown under the heading)'],
+                ['key' => 'years_active', 'type' => 'number', 'label' => 'Years Active (stat chip)'],
+                ['key' => 'slides',       'type' => 'repeater', 'label' => 'Photo / Video Slides',
+                 'fields' => [
+                     ['key' => 'image',   'type' => 'media', 'label' => 'Photo (leave blank if using a video)'],
+                     ['key' => 'video',   'type' => 'url',   'label' => 'Video Embed URL (e.g. YouTube; leave blank if using a photo)'],
+                     ['key' => 'caption', 'type' => 'text',  'label' => 'Caption'],
+                 ]],
             ],
         ],
         'full-bleed' => [
@@ -571,6 +571,21 @@ return [
     ],
 
     'gallery' => [
+        'grid' => [
+            'label' => 'Photo Grid',
+            'description' => 'Filterable photo grid with lightbox — Sahodaya V2 media showcase',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'items',   'type' => 'repeater', 'label' => 'Photos',
+                 'fields' => [
+                     ['key' => 'image',    'type' => 'media',    'label' => 'Photo', 'required' => true],
+                     ['key' => 'title',    'type' => 'text',     'label' => 'Title', 'required' => true],
+                     ['key' => 'category', 'type' => 'text',     'label' => 'Category (used as the filter tab)'],
+                     ['key' => 'date',     'type' => 'text',     'label' => 'Date Label (e.g. "Sep 2025")'],
+                     ['key' => 'caption',  'type' => 'textarea', 'label' => 'Caption'],
+                 ]],
+            ],
+        ],
         'masonry-grid' => [
             'label' => 'Masonry Grid',
             'description' => 'Masonry layout with lightbox',

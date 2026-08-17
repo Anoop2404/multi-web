@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 
 class FestRegistrationsWriteApiController extends SahodayaApiController
 {
-    public function approve(Request $request, FestEvent $event, FestRegistration $registration)
+    public function approve(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($registration->event_id !== $event->id, 403);
@@ -33,7 +33,7 @@ class FestRegistrationsWriteApiController extends SahodayaApiController
         return response()->json(['data' => ['status' => 'approved']]);
     }
 
-    public function reject(Request $request, FestEvent $event, FestRegistration $registration)
+    public function reject(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($registration->event_id !== $event->id, 403);
@@ -62,7 +62,7 @@ class FestRegistrationsWriteApiController extends SahodayaApiController
         return response()->json(['data' => ['status' => 'rejected']]);
     }
 
-    public function bulkApprove(Request $request, FestEvent $event, FestRegistrationBulkService $bulk)
+    public function bulkApprove(Request $request, string $tenantId, FestEvent $event, FestRegistrationBulkService $bulk)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 

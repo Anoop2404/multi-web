@@ -125,6 +125,7 @@ import SubjectPicker from '@/Components/school/SubjectPicker.vue';
 import { router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { useScrollToFirstError } from '@/composables/useScrollToFirstError.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     school: Object,
@@ -137,6 +138,7 @@ const props = defineProps({
 });
 
 const { scrollToFirstError } = useScrollToFirstError();
+const { confirm } = useConfirm();
 
 const canEdit = computed(() =>
     ['pending', 'rejected'].includes(props.submission?.teacher_status),
@@ -181,13 +183,13 @@ function addMany() {
         });
 }
 
-function remove(t) {
-    if (!confirm(`Remove ${t.name} from this submission?`)) return;
+async function remove(t) {
+    if (!(await confirm({ message: `Remove ${t.name} from this submission?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/registration/teachers/${t.id}`, { preserveScroll: true });
 }
 
-function submit() {
-    if (!confirm(`Submit ${props.teachers.length} teacher(s) for Sahodaya review?`)) return;
+async function submit() {
+    if (!(await confirm({ message: `Submit ${props.teachers.length} teacher(s) for Sahodaya review?`, destructive: false }))) return;
     router.post(`/school-admin/${props.school.id}/registration/submit-track`, { track: 'teachers' });
 }
 </script>

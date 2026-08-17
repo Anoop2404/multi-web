@@ -69,7 +69,7 @@
                     <slot name="header-actions" />
                 </div>
             </header>
-            <main class="flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isStateStaff && !isSuperAdmin }">
+            <main class="flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isStateStaff && !isSuperAdmin }" :inert="isStateStaff && !isSuperAdmin">
                 <StaffReadOnlyBanner v-if="isStateStaff && !isSuperAdmin" />
                 <FlashBanner />
                 <slot />
@@ -122,6 +122,7 @@ const stateNavGroups = computed(() => [
         label: 'State Configuration',
         items: [
             { href: '/admin/state-programs', icon: '📋', label: 'State Programs' },
+            { href: '/admin/state-programs', icon: '🌐', label: 'External Sahodayas' },
         ],
     },
     {
@@ -190,6 +191,7 @@ const superNavGroups = computed(() => {
             label: 'Platform Rules',
             items: [
                 { href: '/admin/state-programs',               icon: '📋', label: 'State Programs' },
+                { href: '/admin/state-programs',               icon: '🌐', label: 'External Sahodayas' },
                 { href: '/admin/state-remittances',            icon: '💳', label: 'State Remittances' },
                 { href: '/admin/master-data/class-categories', icon: '📚', label: 'Class Categories' },
                 { href: '/admin/master-data/teaching-types',   icon: '👩‍🏫', label: 'Teaching Types' },
@@ -198,7 +200,10 @@ const superNavGroups = computed(() => {
                 { href: '/admin/master-data/age-categories',   icon: '🎂', label: 'Age Categories' },
             ],
         },
-        {
+    ];
+
+    if (websiteEnabled.value) {
+        groups.push({
             label: 'Site Builder & Themes',
             items: [
                 { href: '/admin/builder/sections', icon: '📐', label: 'Sections' },
@@ -208,8 +213,10 @@ const superNavGroups = computed(() => {
                 { href: '/admin/builder/widgets',  icon: '🔧', label: 'Widgets' },
                 { href: '/admin/skin-presets',     icon: '🖌️', label: 'Skin Presets' },
             ],
-        },
-    ];
+        });
+    }
+
+    return groups;
 });
 
 const navGroups = computed(() => {

@@ -33,6 +33,9 @@
                 <div v-if="timerUrgent" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                     Less than 5 minutes left. Your exam will submit automatically when the timer reaches zero.
                 </div>
+                <div v-if="proctorWarningVisible" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Leaving this tab during the exam is being recorded.
+                </div>
             </div>
 
             <div class="lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-4 lg:items-start">
@@ -187,8 +190,11 @@ const mobileDrawerOpen = ref(false);
 const saveStatus = ref('');
 const remainingSeconds = ref(0);
 const questionRefs = ref({});
+const proctorWarningVisible = ref(false);
 let timerId = null;
 let saveTimerId = null;
+let lastProctorEventAt = 0;
+const PROCTOR_EVENT_THROTTLE_MS = 2000;
 
 const gradableCount = computed(() => props.questions.filter(q => q.options?.length >= 2).length);
 
@@ -280,6 +286,40 @@ async function saveDraft() {
     }
 }
 
+async function reportProctorEvent(type) {
+    if (!props.started || submitting.value) return;
+    const now = Date.now();
+    if (now - lastProctorEventAt < PROCTOR_EVENT_THROTTLE_MS) return;
+    lastProctorEventAt = now;
+    proctorWarningVisible.value = true;
+    try {
+        await fetch(
+            `/portal/student/${props.school.id}/mcq/${props.registration.id}/proctor-event`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': csrfToken(),
+                },
+                body: JSON.stringify({ type }),
+            },
+        );
+    } catch {
+        // Best-effort only -- a failed proctoring beacon must never block or interrupt the exam.
+    }
+}
+
+function handleVisibilityChange() {
+    if (document.visibilityState === 'hidden') {
+        reportProctorEvent('tab_hidden');
+    }
+}
+
+function handleWindowBlur() {
+    reportProctorEvent('window_blur');
+}
+
 function tickTimer() {
     if (!props.expiresAt) return;
     const diff = Math.max(0, Math.floor((new Date(props.expiresAt).getTime() - Date.now()) / 1000));
@@ -318,10 +358,14 @@ onMounted(() => {
     restoreSavedAnswers();
     tickTimer();
     timerId = window.setInterval(tickTimer, 1000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
 });
 
 onUnmounted(() => {
     if (timerId) window.clearInterval(timerId);
     if (saveTimerId) window.clearTimeout(saveTimerId);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('blur', handleWindowBlur);
 });
 </script>

@@ -176,6 +176,7 @@
 import { computed, reactive, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -189,6 +190,7 @@ const props = defineProps({
     academicYear: String,
 });
 
+const { confirm } = useConfirm();
 const base = `/sahodaya-admin/${props.sahodaya.id}/regions`;
 const showAdd = ref(false);
 const editId = ref(null);
@@ -277,8 +279,8 @@ function saveEdit(region) {
     });
 }
 
-function removeRegion(region) {
-    if (!confirm(`Remove "${region.name}"? Schools in it will become unassigned.`)) return;
+async function removeRegion(region) {
+    if (!(await confirm({ message: `Remove "${region.name}"? Schools in it will become unassigned.` }))) return;
     router.delete(`${base}/${region.id}`, { preserveScroll: true });
 }
 

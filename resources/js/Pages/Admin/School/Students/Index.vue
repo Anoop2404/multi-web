@@ -465,6 +465,9 @@ import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 import { calendarDateInputValue, formatDobDetail } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school:     Object,
@@ -542,9 +545,9 @@ function submitBulkAssignClass() {
     });
 }
 
-function confirmBulkWithdraw() {
+async function confirmBulkWithdraw() {
     if (!selectedIds.value.length) return;
-    if (!confirm(`Withdraw ${selectedIds.value.length} selected student(s)?`)) return;
+    if (!(await confirm({ message: `Withdraw ${selectedIds.value.length} selected student(s)?`, destructive: true }))) return;
     bulkWithdrawForm.transform(() => ({
         student_ids: selectedIds.value,
     })).post(`/school-admin/${props.school.id}/students/bulk-withdraw`, {
@@ -600,8 +603,8 @@ const editForm = useForm({
 
 const backfillForm = useForm({});
 
-function backfillRegNumbers() {
-    if (!confirm(`Assign formatted student IDs to ${props.missingRegNoCount} record(s)?`)) return;
+async function backfillRegNumbers() {
+    if (!(await confirm({ message: `Assign formatted student IDs to ${props.missingRegNoCount} record(s)?`, destructive: false }))) return;
     backfillForm.post(`/school-admin/${props.school.id}/students/backfill-reg-numbers`, {
         preserveScroll: true,
     });
@@ -865,8 +868,8 @@ function statusClass(status) {
     }[status] ?? 'bg-gray-100 text-gray-600';
 }
 
-function remove(student) {
-    if (!confirm(`Withdraw student "${student.name}"? The record will be soft-deleted.`)) return;
+async function remove(student) {
+    if (!(await confirm({ message: `Withdraw student "${student.name}"? The record will be soft-deleted.`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/students/${student.id}`);
 }
 

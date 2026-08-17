@@ -19,6 +19,10 @@ class FestRegistrationRouterService
     {
         $hub = $this->resolveHub($event);
 
+        if ($hub->workflow_mode === FestPhasedWorkflowService::MODE) {
+            return $this->resolvePhasedTarget($event, $item, $schoolId, $hub);
+        }
+
         if ($this->partitions->conductMode($hub) !== 'partitioned') {
             return $event;
         }
@@ -74,6 +78,16 @@ class FestRegistrationRouterService
     {
         $hub = $this->resolveHub($event);
 
+        if ($hub->workflow_mode === FestPhasedWorkflowService::MODE) {
+            abort_if($event->id === $hub->id, 422, 'Choose a competition phase before continuing.');
+            $sourcePhase = $event->sourcePhase;
+            abort_if(! $sourcePhase, 422, 'This operational event has no source phase.');
+            $expected = app(FestSchoolPhaseRegionService::class)->operationalEvent($hub, $sourcePhase, $schoolId);
+            abort_unless($expected->id === $event->id, 403, 'This event belongs to a different phase or region.');
+
+            return;
+        }
+
         if ($this->partitions->conductMode($hub) !== 'partitioned') {
             return;
         }
@@ -110,6 +124,24 @@ class FestRegistrationRouterService
         $key = $this->schoolPartitions->resolvePartitionKey($hub, $schoolId);
 
         return $key ? $this->partitions->partitionLabel($hub, $key) : null;
+    }
+
+    private function resolvePhasedTarget(FestEvent $event, FestEventItem $item, string $schoolId, FestEvent $hub): FestEvent
+    {
+        $phase = $item->phase;
+        abort_if(! $phase, 422, 'Assign this item to a competition phase before registration.');
+
+        $sourcePhase = $phase->sourcePhase ?: $phase;
+        abort_unless($sourcePhase->event_id === $hub->id, 422, 'The item phase does not belong to this event workflow.');
+
+        $target = app(FestSchoolPhaseRegionService::class)
+            ->operationalEvent($hub, $sourcePhase, $schoolId);
+
+        if ($event->id !== $hub->id) {
+            abort_unless($event->id === $target->id, 403, 'This event belongs to a different phase or region.');
+        }
+
+        return $target;
     }
 
     private function targetPartitionRole(FestEvent $hub, FestEventItem $item): string

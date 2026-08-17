@@ -63,6 +63,10 @@ class FestPhaseLifecycleService
             throw new HttpException(422, "Item #{$item->id} is enabled but has no competition phase assigned, and phase mode is on for this event. Assign a phase before opening registration/publishing.");
         }
 
+        if ($phase->event_id !== $event->id) {
+            throw new HttpException(422, "Item #{$item->id} is assigned to a competition phase from another event.");
+        }
+
         return $this->fromPhase($phase);
     }
 
@@ -77,7 +81,7 @@ class FestPhaseLifecycleService
             return $this->fromEvent($event);
         }
 
-        $phase = FestEventPhase::find($phaseId);
+        $phase = FestEventPhase::where('event_id', $event->id)->find($phaseId);
 
         return $phase ? $this->fromPhase($phase) : $this->closedLifecycle('phase_not_found');
     }
@@ -101,6 +105,8 @@ class FestPhaseLifecycleService
             'registration_open'   => $event->registration_open,
             'registration_close'  => $event->registration_close,
             'registration_locked' => (bool) $event->registration_locked,
+            'registration_batch_open' => true,
+            'registration_batch_id' => null,
             'food_cutoff_at'      => null,
             'scoring_locked'      => (bool) $event->scoring_locked,
             'schedule_published'  => (bool) $event->schedule_published,
@@ -114,10 +120,17 @@ class FestPhaseLifecycleService
 
     private function fromPhase(FestEventPhase $phase): object
     {
+        $phase->loadMissing('registrationBatch');
+        $batch = $phase->registrationBatch;
+        $registrationOpen = $this->laterDate($phase->registration_open, $batch?->registration_open);
+        $registrationClose = $this->earlierDate($phase->registration_close, $batch?->registration_close);
+
         return (object) [
-            'registration_open'   => $phase->registration_open,
-            'registration_close'  => $phase->registration_close,
-            'registration_locked' => (bool) $phase->registration_locked,
+            'registration_open'   => $registrationOpen,
+            'registration_close'  => $registrationClose,
+            'registration_locked' => (bool) $phase->registration_locked || (bool) ($batch?->registration_locked),
+            'registration_batch_open' => ! $batch || $batch->isRegistrationOpen(),
+            'registration_batch_id' => $batch?->id,
             'food_cutoff_at'      => $phase->food_cutoff_at,
             'scoring_locked'      => (bool) $phase->scoring_locked,
             'schedule_published'  => (bool) $phase->schedule_published,
@@ -135,6 +148,8 @@ class FestPhaseLifecycleService
             'registration_open'   => null,
             'registration_close'  => null,
             'registration_locked' => true,
+            'registration_batch_open' => false,
+            'registration_batch_id' => null,
             'food_cutoff_at'      => null,
             'scoring_locked'      => true,
             'schedule_published'  => false,
@@ -144,5 +159,29 @@ class FestPhaseLifecycleService
             'status'              => null,
             'source'              => "closed:{$reason}",
         ];
+    }
+
+    private function laterDate($first, $second)
+    {
+        if (! $first) {
+            return $second;
+        }
+        if (! $second) {
+            return $first;
+        }
+
+        return $first->gte($second) ? $first : $second;
+    }
+
+    private function earlierDate($first, $second)
+    {
+        if (! $first) {
+            return $second;
+        }
+        if (! $second) {
+            return $first;
+        }
+
+        return $first->lte($second) ? $first : $second;
     }
 }

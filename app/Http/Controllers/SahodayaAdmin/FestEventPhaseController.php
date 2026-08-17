@@ -4,6 +4,8 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\FestEvent;
 use App\Models\FestEventPhase;
+use App\Models\FestRegistrationBatch;
+use App\Models\Region;
 use App\Services\Events\FestEventPhaseService;
 use App\Support\FestPageActivity;
 
@@ -16,7 +18,7 @@ class FestEventPhaseController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $phases = $service->getPhases($event);
+        $phases = $service->getPhases($event)->load(['registrationBatch', 'allowedRegions.region']);
         $items = $event->items()->with('phase')->get()->map(fn ($item) => [
             'id' => $item->id,
             'title' => $item->title,
@@ -30,6 +32,8 @@ class FestEventPhaseController extends SahodayaAdminController
             'event' => $event,
             'phases' => $phases,
             'items' => $items,
+            'registrationBatches' => FestRegistrationBatch::where('event_id', $event->id)->orderBy('sort_order')->get(),
+            'regions' => Region::forTenant($event->tenant_id)->active()->orderBy('sort_order')->get(),
         ]));
     }
 
@@ -42,6 +46,15 @@ class FestEventPhaseController extends SahodayaAdminController
             'code' => 'nullable|string|max:64',
             'sort_order' => 'nullable|integer',
             'is_default' => 'nullable|boolean',
+            // Settable at creation too (not just via update()) so a Sahodaya can lay out a
+            // phase's registration window and its share of the school registration fee in
+            // one step — see docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3/§9 (Phase C).
+            'registration_open' => 'nullable|date',
+            'registration_close' => 'nullable|date|after_or_equal:registration_open',
+            'school_registration_fee_share' => 'nullable|numeric|min:0',
+            'registration_batch_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('fest_registration_batches', 'id')->where('event_id', $event->id)],
+            'is_regional' => 'nullable|boolean',
+            'result_publish_mode' => 'nullable|in:all_regions,per_region',
         ]);
 
         $phase = $service->createPhase($event, $data);
@@ -70,16 +83,23 @@ class FestEventPhaseController extends SahodayaAdminController
             'sort_order' => 'nullable|integer',
             'is_default' => 'nullable|boolean',
             'starts_at' => 'nullable|date',
-            'ends_at' => 'nullable|date',
+            'ends_at' => 'nullable|date|after_or_equal:starts_at',
             'registration_open' => 'nullable|date',
-            'registration_close' => 'nullable|date',
+            'registration_close' => 'nullable|date|after_or_equal:registration_open',
             'registration_locked' => 'nullable|boolean',
             'food_cutoff_at' => 'nullable|date',
             'scoring_locked' => 'nullable|boolean',
             'schedule_published' => 'nullable|boolean',
             'results_published' => 'nullable|boolean',
             'appeals_open' => 'nullable|boolean',
-            'appeal_deadline_at' => 'nullable|date',
+            'appeal_deadline_at' => 'nullable|date|after_or_equal:ends_at',
+            // How much of the event's flat school registration fee this phase collects — see
+            // FestEventPhaseService::updatePhase() and
+            // docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3 item 4.
+            'school_registration_fee_share' => 'nullable|numeric|min:0',
+            'registration_batch_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('fest_registration_batches', 'id')->where('event_id', $event->id)],
+            'is_regional' => 'nullable|boolean',
+            'result_publish_mode' => 'nullable|in:all_regions,per_region',
         ]);
 
         $updated = $service->updatePhase($phase, $data);
@@ -142,10 +162,14 @@ class FestEventPhaseController extends SahodayaAdminController
             // should fail validation before it even reaches the service. Phase 5 audit item 2.
             'phase_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('fest_event_phases', 'id')->where('event_id', $event->id)],
             'item_ids' => 'required|array',
-            'item_ids.*' => 'integer|exists:fest_event_items,id',
+            'item_ids.*' => ['integer', \Illuminate\Validation\Rule::exists('fest_event_items', 'id')->where('event_id', $event->id)],
         ]);
 
         $count = $service->assignItemsToPhase($event, $data['phase_id'] ?? null, $data['item_ids']);
+
+        if ($event->usesPhasedRegionalBilling()) {
+            app(\App\Services\Events\FestPhaseTopologyService::class)->sync($event->fresh());
+        }
 
         $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.phase.items_assigned', "Assigned {$count} item(s) to phase", [
             'phase_id' => $data['phase_id'] ?? null,

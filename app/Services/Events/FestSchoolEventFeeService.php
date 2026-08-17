@@ -5,6 +5,7 @@ namespace App\Services\Events;
 use App\Models\FeeReceipt;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestEventPhase;
 use App\Models\FestItemHead;
 use App\Models\FestLevelRegistration;
 use App\Models\FestParticipant;
@@ -17,11 +18,11 @@ use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Fees\FeeReceiptAttachmentService;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestSportsAgeGroup;
+use App\Support\SchoolClassCategoryResolver;
 use App\Support\TenantStorage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 class FestSchoolEventFeeService
@@ -34,6 +35,10 @@ class FestSchoolEventFeeService
 
     public function feeRequired(FestEvent $event): bool
     {
+        if ($event->usesPhasedRegionalBilling()) {
+            return $event->rootEvent()->registrationBatches()->exists();
+        }
+
         $schedule = $this->resolveSchedule($event);
 
         return ($schedule['fee_model'] ?? 'none') !== 'none';
@@ -345,15 +350,15 @@ class FestSchoolEventFeeService
             return 0;
         }
 
-        $category = $school->application_payload['institution_level']
-            ?? $school->getSetting('institution_level', null);
-
-        if (! $category) {
-            Log::warning('School institution_level missing; defaulting to secondary fee tier.', [
-                'school_id' => $school->id,
-            ]);
-            $category = 'secondary';
-        }
+        // Tier is derived from the school's own active classes (SchoolClass ->
+        // ClassCategory), not a manually-set institution_level tag — see
+        // SchoolClassCategoryResolver and docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §7.4.
+        // school_registration is an arbitrary N-tier map keyed by whatever tier labels
+        // the resolver produces; an event that only ever configured the original
+        // 'secondary'/'senior_secondary' pair keeps behaving exactly as before, since
+        // any tier the map doesn't have an entry for (e.g. 'other') falls back to
+        // 'secondary' here, same as the old institution_level lookup already did.
+        $tier = SchoolClassCategoryResolver::feeTierFor($school);
 
         $amounts = $schedule['school_registration'] ?? [];
 
@@ -361,7 +366,7 @@ class FestSchoolEventFeeService
             return (float) $schedule['override_amount'];
         }
 
-        return (float) ($amounts[$category] ?? $amounts['secondary'] ?? 0);
+        return (float) ($amounts[$tier] ?? $amounts['secondary'] ?? 0);
     }
 
     public function participationFee(int $itemCount, array $schedule): float
@@ -376,12 +381,51 @@ class FestSchoolEventFeeService
         return $first + max(0, $itemCount - 1) * $additional;
     }
 
-    public function billableItemCount(FestEvent $event, string $schoolId, array $schedule = []): int
+    /**
+     * 'student_count_slab' fee model — bills a school a single stepped amount based on
+     * its total registered student count for the event, per a slab table configured in
+     * fee_settings.student_count_slabs (list of {min_count, max_count, amount}; a null
+     * max_count means "and above"). Per-Sahodaya, per-event-type by construction, since
+     * it's just more of that event's own fee_settings JSON — see
+     * docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §7.4.
+     *
+     * A count landing outside every configured range (gaps, or slabs that don't cover
+     * 0..∞) falls back to the highest configured slab rather than silently billing ₹0 —
+     * the same "always resolve to something rather than a silent zero" fallback
+     * schoolRegistrationAmount() already uses for an unconfigured tier.
+     */
+    public function studentCountSlabFee(int $studentCount, array $schedule): float
+    {
+        $slabs = collect($schedule['student_count_slabs'] ?? [])
+            ->filter(fn ($slab) => is_array($slab) && isset($slab['amount']) && $slab['amount'] !== '')
+            ->map(fn ($slab) => [
+                'min_count' => (int) ($slab['min_count'] ?? 0),
+                'max_count' => isset($slab['max_count']) && $slab['max_count'] !== '' && $slab['max_count'] !== null
+                    ? (int) $slab['max_count']
+                    : null,
+                'amount' => (float) $slab['amount'],
+            ])
+            ->sortBy('min_count')
+            ->values();
+
+        if ($slabs->isEmpty()) {
+            return 0.0;
+        }
+
+        $match = $slabs->first(fn ($slab) => $studentCount >= $slab['min_count']
+            && ($slab['max_count'] === null || $studentCount <= $slab['max_count']));
+
+        return (float) ($match['amount'] ?? $slabs->last()['amount']);
+    }
+
+    /** @param  ?int  $phaseId  When given, count only items assigned to this FestEventPhase (see recalculateForPhase()). */
+    public function billableItemCount(FestEvent $event, string $schoolId, array $schedule = [], ?int $phaseId = null): int
     {
         $count = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
-            ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
+            ->whereHas('item', fn ($q) => $q->where('is_enabled', true)
+                ->when($phaseId !== null, fn ($iq) => $iq->where('phase_id', $phaseId)))
             ->count();
 
         if (! ($schedule['charge_standbys'] ?? false)) {
@@ -392,7 +436,8 @@ class FestSchoolEventFeeService
             ->whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $schoolId)
-                ->whereIn('status', ['submitted', 'approved', 'pending_approval']))
+                ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
+                ->when($phaseId !== null, fn ($q2) => $q2->whereHas('item', fn ($iq) => $iq->where('phase_id', $phaseId))))
             ->where('participant_role', 'standby')
             ->count();
 
@@ -410,13 +455,15 @@ class FestSchoolEventFeeService
             ->count();
     }
 
-    public function billableStudentCount(FestEvent $event, string $schoolId): int
+    /** @param  ?int  $phaseId  When given, count only participants on items assigned to this FestEventPhase (see recalculateForPhase()). */
+    public function billableStudentCount(FestEvent $event, string $schoolId, ?int $phaseId = null): int
     {
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $schoolId)
-                ->whereIn('status', ['submitted', 'approved', 'pending_approval']))
+                ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
+                ->when($phaseId !== null, fn ($q2) => $q2->whereHas('item', fn ($iq) => $iq->where('phase_id', $phaseId))))
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->get(['student_id', 'teacher_id'])
@@ -671,8 +718,236 @@ class FestSchoolEventFeeService
         return $fee->fresh(['feeReceipt']);
     }
 
+    /**
+     * Whether this event bills Kalotsavam fees per named Phase instead of one event-wide
+     * amount. Independent of usesPerHeadBilling() (that's the sports-only, fee_model =
+     * sports_composite mechanism) — this is the general-purpose equivalent for any event
+     * using phase_mode_enabled, keyed by phase_id instead of head_id. See
+     * docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3.
+     */
+    public function usesPerPhaseBilling(FestEvent $event): bool
+    {
+        if ($event->usesPhasedRegionalBilling()) {
+            return false;
+        }
+
+        if ($event->event_type === 'sports') {
+            return false;
+        }
+
+        if (! ($event->phase_mode_enabled ?? false)) {
+            return false;
+        }
+
+        if (! Schema::hasColumn('fest_school_event_fees', 'phase_id')) {
+            return false;
+        }
+
+        return FestEventPhase::where('event_id', $event->id)->exists();
+    }
+
+    /** Phases under this event that this school has (or previously had) billable activity for. */
+    public function phasesWithActivityForSchool(FestEvent $event, string $schoolId): Collection
+    {
+        return FestEventPhase::where('event_id', $event->id)
+            ->orderBy('sort_order')
+            ->get()
+            ->filter(function (FestEventPhase $phase) use ($event, $schoolId) {
+                $hasRegistrations = FestRegistration::where('event_id', $event->id)
+                    ->where('school_id', $schoolId)
+                    ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
+                    ->whereHas('item', fn ($q) => $q->where('phase_id', $phase->id))
+                    ->exists();
+
+                if ($hasRegistrations) {
+                    return true;
+                }
+
+                return FestSchoolEventFee::where('event_id', $event->id)
+                    ->where('school_id', $schoolId)
+                    ->where('phase_id', $phase->id)
+                    ->exists();
+            })
+            ->values();
+    }
+
+    /**
+     * Recalculate (and persist) the fee record for one specific named Phase for one school.
+     * Independently payable via attachPaymentForPhase() — no gating between phases (confirmed
+     * 2026-08-15, see plan doc §3 item 7): a school can register/pay a later phase without
+     * having settled an earlier one first.
+     */
+    public function recalculateForPhase(FestEvent $event, string $schoolId, FestEventPhase $phase): FestSchoolEventFee
+    {
+        $schedule = $this->resolveSchedule($event);
+        $feeModel = $schedule['fee_model'] ?? 'none';
+
+        $hasActivity = FestRegistration::where('event_id', $event->id)
+            ->where('school_id', $schoolId)
+            ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
+            ->whereHas('item', fn ($q) => $q->where('phase_id', $phase->id))
+            ->exists();
+
+        $itemCount = $this->billableItemCount($event, $schoolId, $schedule, $phase->id);
+        $studentCount = $this->billableStudentCount($event, $schoolId, $phase->id);
+
+        // The school registration fee is owned by whichever phase(s) the Sahodaya configured
+        // a share for (0 or null = this phase collects none of it) — see
+        // FestEventPhase::school_registration_fee_share and plan doc §3 item 4. Supports both
+        // a flat fee on one phase (e.g. MCS: full amount on "Level 1", 0 on "Level 2") and a
+        // split across phases (e.g. half on each), purely by how shares are configured. Only
+        // charged once this phase actually has registered activity, same guard the event-wide
+        // recalculate() already applies for its own school registration fee.
+        $schoolRegFee = $hasActivity ? (float) ($phase->school_registration_fee_share ?? 0) : 0.0;
+
+        $participationFee = match ($feeModel) {
+            'item_catalog' => $this->itemFeeResolver->participationTotal($event, $schoolId, $schedule, $phase->id),
+            'cksc_tiered' => $this->participationFee($itemCount, $schedule),
+            'per_item' => $itemCount * (float) ($schedule['per_item_amount'] ?? 0),
+            'per_student' => $studentCount * (float) ($schedule['per_student_amount'] ?? 0),
+            'student_count_slab' => $this->studentCountSlabFee($studentCount, $schedule),
+            // flat_school and sports_composite aren't part of per-phase billing today — a
+            // flat-school event has nothing to split by phase (see plan doc's "Explicitly not
+            // changing" note), and sports never reaches usesPerPhaseBilling() at all.
+            default => 0.0,
+        };
+
+        $total = round($schoolRegFee + $participationFee, 2);
+
+        $record = FestSchoolEventFee::firstOrNew([
+            'event_id' => $event->id,
+            'school_id' => $schoolId,
+            'phase_id' => $phase->id,
+        ]);
+
+        $record->fill([
+            'school_registration_fee' => $schoolRegFee,
+            'participation_item_count' => $itemCount,
+            'participation_fee' => $participationFee,
+            'total_due' => $total,
+        ]);
+        $record->save();
+
+        $record->refreshPaidState();
+        $this->applyAvailableCredit($record, $event);
+
+        return $record;
+    }
+
+    /**
+     * Recalculate every phase this school has activity under for this event.
+     *
+     * @return Collection<int, FestSchoolEventFee>
+     */
+    public function recalculateAllPhasesForSchool(FestEvent $event, string $schoolId): Collection
+    {
+        return $this->phasesWithActivityForSchool($event, $schoolId)
+            ->map(fn (FestEventPhase $phase) => $this->recalculateForPhase($event, $schoolId, $phase))
+            ->values();
+    }
+
+    /** Is the fee for one specific named Phase fully paid (or not due)? */
+    public function isPhasePaid(FestEvent $event, string $schoolId, int $phaseId): bool
+    {
+        $phase = FestEventPhase::find($phaseId);
+        if (! $phase || $phase->event_id !== $event->id) {
+            return true;
+        }
+
+        $fee = FestSchoolEventFee::where('event_id', $event->id)
+            ->where('school_id', $schoolId)
+            ->where('phase_id', $phaseId)
+            ->first();
+
+        if (! $fee) {
+            $fee = $this->recalculateForPhase($event, $schoolId, $phase);
+        }
+
+        return $fee->isFullyPaid();
+    }
+
+    /** Upload a payment proof against one specific named Phase's fee record. */
+    public function attachPaymentForPhase(
+        FestEvent $event,
+        string $schoolId,
+        int $phaseId,
+        UploadedFile $proof,
+        int $userId,
+        ?string $transactionRef = null,
+        ?string $bankName = null,
+        ?float $amount = null,
+        array $extraProofs = [],
+    ): FestSchoolEventFee {
+        $phase = FestEventPhase::findOrFail($phaseId);
+        abort_if($phase->event_id !== $event->id, 403);
+
+        if ($event->usesPhasedRegionalBilling()) {
+            abort_if(! $phase->registration_batch_id, 422, 'This phase has no registration payment level.');
+
+            return app(FestRegistrationBatchFeeService::class)->attachPayment(
+                $event,
+                $schoolId,
+                $phase->registration_batch_id,
+                $proof,
+                $userId,
+                $transactionRef,
+                $bankName,
+                $amount,
+                $extraProofs,
+            );
+        }
+
+        $fee = $this->recalculateForPhase($event, $schoolId, $phase);
+        abort_if($fee->total_due <= 0, 422, 'No fee due for this phase.');
+        abort_if($fee->isFullyPaid(), 422, 'Fee already fully paid.');
+
+        $outstanding = $fee->outstandingBalance();
+        $payAmount = $amount !== null ? round($amount, 2) : $outstanding;
+        abort_if($payAmount <= 0, 422, 'Payment amount must be greater than zero.');
+        abort_if($payAmount > $outstanding, 422, 'Payment cannot exceed the outstanding balance of ₹'.number_format($outstanding, 2).'.');
+
+        $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
+
+        FeeReceipt::supersedePriorForFeeable($fee);
+
+        $receipt = FeeReceipt::create([
+            'feeable_type' => FestSchoolEventFee::class,
+            'feeable_id' => $fee->id,
+            'file_path' => $path,
+            'transaction_ref' => $transactionRef,
+            'bank_name' => $bankName,
+            'payment_date' => now()->toDateString(),
+            'amount' => $payAmount,
+            'status' => 'uploaded',
+            'uploaded_by_user_id' => $userId,
+        ]);
+
+        if (! empty($extraProofs)) {
+            app(FeeReceiptAttachmentService::class)
+                ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
+        }
+
+        $fee->update([
+            'fee_receipt_id' => $receipt->id,
+            'status' => 'proof_uploaded',
+        ]);
+
+        return $fee->fresh(['feeReceipt']);
+    }
+
     public function recalculate(FestEvent $event, string $schoolId): FestSchoolEventFee
     {
+        if ($event->usesPhasedRegionalBilling()) {
+            app(FestRegistrationBatchFeeService::class)->recalculateAll($event, $schoolId);
+
+            return FestSchoolEventFee::where('event_id', $event->rootEvent()->id)
+                ->where('school_id', $schoolId)
+                ->whereNull('registration_batch_id')
+                ->whereNull('phase_id')
+                ->whereNull('head_id')
+                ->firstOrFail();
+        }
+
         // Regional registrations live on a partition child, while the fee
         // schedule and the school's single invoice live on the parent hub.
         if ($event->parent_event_id) {
@@ -692,6 +967,10 @@ class FestSchoolEventFeeService
 
         if ($this->usesPerHeadBilling($event)) {
             return $this->recalculateAggregateForPerHeadEvent($event, $schoolId);
+        }
+
+        if ($this->usesPerPhaseBilling($event)) {
+            return $this->recalculateAggregateForPerPhaseEvent($event, $schoolId);
         }
 
         $schedule = $this->resolveSchedule($event);
@@ -740,11 +1019,12 @@ class FestSchoolEventFeeService
                 'per_item' => $itemCount * (float) ($schedule['per_item_amount'] ?? 0),
                 'flat_school' => (float) ($schedule['flat_amount'] ?? $schedule['fee_amount'] ?? 0),
                 'per_student' => $studentCount * (float) ($schedule['per_student_amount'] ?? 0),
+                'student_count_slab' => $this->studentCountSlabFee($studentCount, $schedule),
                 default => 0,
             };
 
             $participationCount = match ($feeModel) {
-                'per_student' => $studentCount,
+                'per_student', 'student_count_slab' => $studentCount,
                 default => $itemCount,
             };
         }
@@ -864,6 +1144,47 @@ class FestSchoolEventFeeService
         return $record;
     }
 
+    /**
+     * Phase-billed equivalent of recalculateAggregateForPerHeadEvent() — for events using
+     * usesPerPhaseBilling(), `recalculate()` no longer manages a single payable record; each
+     * named Phase has its own fee record, paid independently (see recalculateForPhase/
+     * attachPaymentForPhase/isPhasePaid). This keeps every per-phase record in sync as a side
+     * effect, then returns a read-only, phase_id=null "rollup" record purely for legacy
+     * callers that still expect a single FestSchoolEventFee back for display (dashboard tiles,
+     * reports). Not itself payable — same convention as the per-head rollup above.
+     */
+    private function recalculateAggregateForPerPhaseEvent(FestEvent $event, string $schoolId): FestSchoolEventFee
+    {
+        $phaseFees = $this->recalculateAllPhasesForSchool($event, $schoolId);
+
+        $totalDue = round((float) $phaseFees->sum('total_due'), 2);
+        $totalPaid = round((float) $phaseFees->sum('amount_paid'), 2);
+        $schoolRegFee = round((float) $phaseFees->sum('school_registration_fee'), 2);
+        $itemCount = (int) $phaseFees->sum('participation_item_count');
+        $allApproved = $phaseFees->isNotEmpty() && $phaseFees->every(fn (FestSchoolEventFee $f) => $f->isFullyPaid());
+
+        $record = FestSchoolEventFee::firstOrNew([
+            'event_id' => $event->id,
+            'school_id' => $schoolId,
+            'phase_id' => null,
+        ]);
+
+        $record->fill([
+            'school_registration_fee' => $schoolRegFee,
+            'participation_item_count' => $itemCount,
+            'participation_fee' => round($totalDue - $schoolRegFee, 2),
+            'total_due' => $totalDue,
+            'amount_paid' => $totalPaid,
+            'status' => $allApproved ? 'approved' : ($totalPaid > 0 ? 'partial' : 'pending'),
+        ]);
+        $record->save();
+
+        // Same reasoning as recalculateAggregateForPerHeadEvent()'s rollup: this record's
+        // amount_paid is a manual sum of per-phase children, not driven by its own receipts,
+        // so it's deliberately left out of applyAvailableCredit()/refreshPaidState().
+        return $record;
+    }
+
     /** @param  list<array{line_type: string, label: string, quantity: int, unit_amount: float, amount: float, meta?: array}>  $lines */
     private function syncFeeLines(FestSchoolEventFee $fee, array $lines): void
     {
@@ -890,6 +1211,25 @@ class FestSchoolEventFeeService
         }
         $items = [];
         $feeModel = $schedule['fee_model'] ?? 'none';
+
+        if ($fee->registration_batch_id) {
+            foreach ($fee->lines as $line) {
+                $items[] = [
+                    'label' => $line->label,
+                    'amount' => (float) $line->amount,
+                    'line_type' => $line->line_type,
+                    'quantity' => $line->quantity ?? 1,
+                    'meta' => $line->meta,
+                ];
+            }
+
+            return [
+                'items' => $items,
+                'total' => (float) $fee->total_due,
+                'item_count' => (int) $fee->participation_item_count,
+                'registration_batch_id' => (int) $fee->registration_batch_id,
+            ];
+        }
 
         if ($feeModel === 'sports_composite') {
             if ($this->supportsFeeLines()) {
@@ -976,6 +1316,16 @@ class FestSchoolEventFeeService
                 'line_type' => 'student_reg',
                 'quantity' => $studentCount,
             ];
+        } elseif ($feeModel === 'student_count_slab' && $fee->participation_fee > 0) {
+            $studentCount = $fee->participation_item_count;
+            $items[] = [
+                'label' => "Student count fee ({$studentCount} student".($studentCount === 1 ? '' : 's').')',
+                'amount' => (float) $fee->participation_fee,
+                // Same reasoning as the per_student branch above — one stepped charge for
+                // the whole school, not N billable items.
+                'line_type' => 'student_reg',
+                'quantity' => $studentCount,
+            ];
         } elseif ($fee->participation_fee > 0) {
             $label = match ($feeModel) {
                 'flat_school' => 'Flat school fee',
@@ -1010,9 +1360,21 @@ class FestSchoolEventFeeService
         array $extraProofs = [],
     ): FestSchoolEventFee {
         abort_if(
+            $event->usesPhasedRegionalBilling(),
+            422,
+            'This event bills by registration level — upload payment against Level 1 or Level 2.',
+        );
+
+        abort_if(
             $this->usesPerHeadBilling($event),
             422,
             'This event bills fees per Event Head — upload payment against the specific head, not the whole event.',
+        );
+
+        abort_if(
+            $this->usesPerPhaseBilling($event),
+            422,
+            'This event bills fees per phase — upload payment against the specific phase, not the whole event.',
         );
 
         $fee = $this->recalculate($event, $schoolId);
@@ -1061,6 +1423,12 @@ class FestSchoolEventFeeService
             return true;
         }
 
+        if ($event->usesPhasedRegionalBilling()) {
+            $records = app(FestRegistrationBatchFeeService::class)->recalculateAll($event, $schoolId);
+
+            return $records->isEmpty() || $records->every(fn (FestSchoolEventFee $fee) => $fee->isFullyPaid());
+        }
+
         $fee = FestSchoolEventFee::where('event_id', $this->feeOwnerEvent($event)->id)
             ->where('school_id', $schoolId)
             ->first();
@@ -1087,6 +1455,10 @@ class FestSchoolEventFeeService
      */
     public function isPaidForRegistration(FestEvent $event, FestRegistration $registration): bool
     {
+        if ($event->usesPhasedRegionalBilling()) {
+            return app(FestRegistrationBatchFeeService::class)->isPaidForRegistration($event, $registration);
+        }
+
         if (! $this->feeRequired($event)) {
             return true;
         }
@@ -1119,6 +1491,19 @@ class FestSchoolEventFeeService
      */
     public function hasApprovedPaymentForRegistration(FestEvent $event, FestRegistration $registration): bool
     {
+        if ($event->usesPhasedRegionalBilling()) {
+            $batch = app(FestRegistrationBatchFeeService::class)->batchForRegistration($event, $registration);
+            if (! $batch) {
+                return false;
+            }
+
+            return FestSchoolEventFee::where('event_id', $event->rootEvent()->id)
+                ->where('school_id', $registration->school_id)
+                ->where('registration_batch_id', $batch->id)
+                ->where('amount_paid', '>', 0)
+                ->exists();
+        }
+
         $registration->loadMissing('item');
         $headId = $registration->item?->head_id;
 
@@ -1152,6 +1537,7 @@ class FestSchoolEventFeeService
         return FestSchoolEventFee::where('event_id', $this->feeOwnerEvent($event)->id)
             ->where('school_id', $schoolId)
             ->whereNull('head_id')
+            ->when($event->usesPhasedRegionalBilling(), fn ($query) => $query->whereNull('registration_batch_id'))
             ->first();
     }
 
@@ -1391,7 +1777,7 @@ class FestSchoolEventFeeService
             // turned on for such an event, wrongly approving unpaid items.
             $amount = $feeModel === 'per_item'
                 ? $perItemAmount
-                : $this->itemFeeResolver->amountForItem($registration->item, $schedule, $event);
+                : $this->itemFeeResolver->amountForItem($registration->item, $schedule, $event, registration: $registration);
 
             $covered = $amount <= 0 || $paidRemaining >= $amount;
             if ($covered) {

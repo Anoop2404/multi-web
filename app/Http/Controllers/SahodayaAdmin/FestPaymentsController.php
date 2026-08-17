@@ -20,7 +20,8 @@ class FestPaymentsController extends SahodayaAdminController
 
         $base = FestSchoolEventFee::query()
             ->whereIn('event_id', $eventIds)
-            ->with(['event:id,title,event_type,level_round', 'school:id,name', 'feeReceipt']);
+            ->forAmountAggregation()
+            ->with(['event:id,title,event_type,level_round', 'school:id,name', 'feeReceipt', 'registrationBatch:id,name,code']);
 
         $counts = [
             'pending'  => (clone $base)->where('status', 'proof_uploaded')
@@ -89,6 +90,8 @@ class FestPaymentsController extends SahodayaAdminController
             'event_type'     => $event?->event_type,
             'program_label'  => $programSlug ? ProgramRouteMap::labelForSlug($programSlug) : 'Event',
             'level_round'    => $event?->level_round,
+            'billing_level'  => $sf->registrationBatch?->name,
+            'billing_code'   => $sf->registrationBatch?->code,
             'school_id'      => $sf->school_id,
             'school_name'    => $sf->school?->name,
             'total_due'      => (float) $sf->total_due,

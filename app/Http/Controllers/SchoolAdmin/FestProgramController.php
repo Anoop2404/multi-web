@@ -258,8 +258,6 @@ class FestProgramController extends SchoolAdminController
     {
         abort_unless($festProgram->conducting_school_id === $this->school->id, 403, 'Only the school conducting this program can manage it.');
 
-        \App\Services\Events\EventLifecycleGate::allowMarkEntry($festProgram);
-
         $data = $request->validate([
             'participant_id'    => 'required|exists:fest_participants,id',
             'item_id'           => 'required|exists:fest_event_items,id',
@@ -269,6 +267,11 @@ class FestProgramController extends SchoolAdminController
             'measurement_value' => 'nullable|string|max:50',
             'measurement_unit'  => 'nullable|string|max:20',
         ]);
+
+        $item = FestEventItem::find($data['item_id']);
+
+        // Now phase-aware — no-op while phase_mode_enabled is off (see EventLifecycleGate). Reordered validate() before the gate so a malformed item_id 422s on validation, not the business-rule check.
+        \App\Services\Events\EventLifecycleGate::allowMarkEntryForItem($festProgram, $item);
 
         $result = $markSave->save($festProgram, $data, $request->user()->id);
 

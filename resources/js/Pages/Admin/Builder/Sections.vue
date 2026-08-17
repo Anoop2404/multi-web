@@ -150,10 +150,13 @@ import { ref, reactive, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import SectionConfigForm from '@/Components/SectionConfigForm.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     tenants: { type: Array, default: () => [] },
 });
+
+const { confirm } = useConfirm();
 
 const selectedTenantId = ref('');
 const sections = ref([]);
@@ -328,7 +331,7 @@ async function toggleSection(section) {
 }
 
 async function deleteSection(section) {
-    if (!confirm(`Delete "${sectionLabel(section)}"?`)) return;
+    if (!(await confirm({ message: `Delete "${sectionLabel(section)}"?` }))) return;
     await fetch(`/admin/api/tenants/${selectedTenantId.value}/sections/${section.id}`, {
         method: 'DELETE',
         headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content ?? '' },

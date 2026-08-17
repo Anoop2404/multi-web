@@ -195,6 +195,29 @@ export function useEventSettingsForms(props) {
 
     const existingFeeSettings = props.event.fee_settings ?? {};
     const schedule = props.feeSchedule ?? {};
+
+    // N-tier school registration map (Phase I) — start from whatever tier keys are
+    // already configured (existing fee_settings, falling back to the resolved schedule
+    // default), and only fall back to the original 'secondary'/'senior_secondary' pair
+    // when nothing has been configured yet at all, so a brand-new event's form still
+    // shows the familiar two starter rows.
+    const scheduleSchoolRegistration = schedule.school_registration ?? {};
+    const existingSchoolRegistration = existingFeeSettings.school_registration ?? {};
+    const schoolRegistrationTierKeys = Object.keys({ ...scheduleSchoolRegistration, ...existingSchoolRegistration });
+    const initialSchoolRegistration = {};
+    (schoolRegistrationTierKeys.length ? schoolRegistrationTierKeys : ['secondary', 'senior_secondary']).forEach((key) => {
+        initialSchoolRegistration[key] = existingSchoolRegistration[key] ?? scheduleSchoolRegistration[key] ?? '';
+    });
+
+    // student_count_slab fee model's slab table (Phase J) — list of {min_count, max_count, amount}.
+    const initialStudentCountSlabs = (
+        existingFeeSettings.student_count_slabs ?? schedule.student_count_slabs ?? []
+    ).map((slab) => ({
+        min_count: slab.min_count ?? 0,
+        max_count: slab.max_count ?? '',
+        amount: slab.amount ?? '',
+    }));
+
     const feeSettingsForm = useForm({
         fee_model: existingFeeSettings.fee_model
             ?? schedule.fee_model
@@ -203,13 +226,17 @@ export function useEventSettingsForms(props) {
         additional_item: existingFeeSettings.additional_item ?? schedule.additional_item ?? '',
         charge_standbys: existingFeeSettings.charge_standbys ?? schedule.charge_standbys ?? false,
         team_standby_fee_amount: existingFeeSettings.team_standby_fee_amount ?? schedule.team_standby_fee_amount ?? '',
-        school_registration: {
-            secondary: existingFeeSettings.school_registration?.secondary ?? schedule.school_registration?.secondary ?? '',
-            senior_secondary: existingFeeSettings.school_registration?.senior_secondary ?? schedule.school_registration?.senior_secondary ?? '',
-        },
+        // Phase L — event-wide default for the group/team item per-participant surcharge
+        // (flat_fee + rate x actual participant count). Item-level override lives on each
+        // item_fees row below. charge_standbys above doubles as the standby-inclusion toggle
+        // for this surcharge too (same per-Sahodaya setting, reused rather than duplicated).
+        group_item_flat_fee: existingFeeSettings.group_item_flat_fee ?? schedule.group_item_flat_fee ?? '',
+        group_item_per_participant_rate: existingFeeSettings.group_item_per_participant_rate ?? schedule.group_item_per_participant_rate ?? '',
+        school_registration: initialSchoolRegistration,
         flat_amount: existingFeeSettings.flat_amount ?? schedule.flat_amount ?? '',
         per_item_amount: existingFeeSettings.per_item_amount ?? schedule.per_item_amount ?? '',
         per_student_amount: existingFeeSettings.per_student_amount ?? schedule.per_student_amount ?? '',
+        student_count_slabs: initialStudentCountSlabs,
         school_registration_flat: existingFeeSettings.school_registration_flat ?? schedule.school_registration_flat ?? '',
         included_items_per_student: existingFeeSettings.included_items_per_student ?? schedule.included_items_per_student ?? '',
         school_fee_cap: existingFeeSettings.school_fee_cap ?? schedule.school_fee_cap ?? '',
@@ -276,6 +303,8 @@ export function useEventSettingsForms(props) {
             id: item.id,
             title: item.title,
             fee_amount: item.fee_amount ?? '',
+            group_item_flat_fee: item.group_item_flat_fee ?? '',
+            group_item_per_participant_rate: item.group_item_per_participant_rate ?? '',
             age_group: item.age_group ?? null,
             class_group: item.class_group ?? null,
             participant_type: item.participant_type ?? null,

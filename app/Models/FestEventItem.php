@@ -16,7 +16,7 @@ class FestEventItem extends Model
         'participant_type', 'gender', 'class_group', 'age_group', 'kids_band',
         'max_per_school', 'min_group_size', 'max_group_size', 'qualify_count',
         'owner_level', 'state_program_item_id', 'inherited_from_item_id', 'display_order',
-        'fee_amount', 'is_enabled', 'is_mandatory', 'head_id', 'phase_id', 'area_id', 'reg_start', 'reg_end',
+        'fee_amount', 'group_item_flat_fee', 'group_item_per_participant_rate', 'is_enabled', 'is_mandatory', 'head_id', 'phase_id', 'area_id', 'reg_start', 'reg_end',
         'competition_start', 'competition_end', 'competition_time',
         'results_published_at', 'item_reg_id_start', 'chest_no_start',
         'quota_eligible', 'tiebreak_mode', 'tiebreak_secondary', 'mark_judge_count',
@@ -25,6 +25,8 @@ class FestEventItem extends Model
     protected $casts = [
         'criteria_json' => 'array',
         'fee_amount' => 'decimal:2',
+        'group_item_flat_fee' => 'decimal:2',
+        'group_item_per_participant_rate' => 'decimal:2',
         'is_enabled' => 'boolean',
         'is_mandatory' => 'boolean',
         // date:Y-m-d — plain-date serialization. Bare 'date' casts serialize to a UTC

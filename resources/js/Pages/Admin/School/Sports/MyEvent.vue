@@ -173,6 +173,9 @@
 import { reactive, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -246,9 +249,9 @@ function save(participant, item) {
     }, { preserveScroll: true });
 }
 
-function autoRank(item) {
+async function autoRank(item) {
     if (!item?.id) return;
-    if (!confirm(`Auto-rank athletes for "${item.title}" from measurement values?`)) return;
+    if (!(await confirm({ message: `Auto-rank athletes for "${item.title}" from measurement values?`, destructive: false }))) return;
     router.post(`/school-admin/${props.school.id}/sports/my-event/${props.event.id}/items/${item.id}/auto-rank`, {}, { preserveScroll: true });
 }
 

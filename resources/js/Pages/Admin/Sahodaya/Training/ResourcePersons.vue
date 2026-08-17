@@ -113,6 +113,7 @@
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -123,6 +124,7 @@ const props = defineProps({
 
 const showAdd = ref(false);
 const editId = ref(null);
+const { confirm } = useConfirm();
 
 const addForm = useForm({
     name: '',
@@ -169,8 +171,8 @@ function saveEdit(person) {
     });
 }
 
-function removePerson(person) {
-    if (!window.confirm(`Remove ${person.name}? If assigned, they will be deactivated instead.`)) return;
+async function removePerson(person) {
+    if (!(await confirm({ message: `Remove ${person.name}? If assigned, they will be deactivated instead.` }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/training/resource-persons/${person.id}`, {
         preserveScroll: true,
     });

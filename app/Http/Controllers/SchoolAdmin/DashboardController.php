@@ -23,6 +23,13 @@ use App\Support\ProgramRouteMap;
 
 class DashboardController extends SchoolAdminController
 {
+    public function unassigned()
+    {
+        return $this->inertia('Admin/School/Unassigned', [
+            'schoolName' => $this->school->name,
+        ]);
+    }
+
     public function index()
     {
         $user = request()->user();

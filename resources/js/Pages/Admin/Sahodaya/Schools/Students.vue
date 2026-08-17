@@ -167,6 +167,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, reactive, watch } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya:                Object,
@@ -184,6 +185,8 @@ const props = defineProps({
     unverifiedCount:         { type: Number, default: 0 },
     classesCount:            { type: Number, default: 0 },
 });
+
+const { confirm } = useConfirm();
 
 const filterForm = reactive({
     class_category_id: props.filters?.class_category_id ?? null,
@@ -232,8 +235,8 @@ function verifyStudent(studentId) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/students/${studentId}/verify`, {}, { preserveScroll: true });
 }
 
-function bulkVerifySchool() {
-    if (!confirm(`Verify all ${props.unverifiedCount} pending student(s) at ${props.school.name}?`)) return;
+async function bulkVerifySchool() {
+    if (!(await confirm({ message: `Verify all ${props.unverifiedCount} pending student(s) at ${props.school.name}?`, destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/students/verification/bulk-verify`, {
         verify_all_unverified: true,
         school_id: props.school.id,

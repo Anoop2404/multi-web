@@ -472,8 +472,8 @@ function saveEdit() {
     });
 }
 
-function removeItem(item) {
-    if (!confirm(`Delete "${item.title}" from the master catalog?`)) return;
+async function removeItem(item) {
+    if (!(await confirm({ message: `Delete "${item.title}" from the master catalog?` }))) return;
     router.delete(`${catalogBase.value}/items/${item.id}`, { preserveScroll: true });
 }
 </script>

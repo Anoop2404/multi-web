@@ -203,6 +203,7 @@ import { computed } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -211,6 +212,8 @@ const props = defineProps({
     classCategories: { type: Array, default: () => [] },
     masterClasses: { type: Array, default: () => [] },
 });
+
+const { confirm } = useConfirm();
 
 const defaultEligibility = () => ({
     audience: 'students',
@@ -273,8 +276,8 @@ function addLevel() {
     levelForm.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-series/${props.series.id}/levels`);
 }
 
-function lockPromotion(examId) {
-    if (!confirm('Lock the promotion list? Only listed students will be able to register for this level.')) return;
+async function lockPromotion(examId) {
+    if (!(await confirm({ message: 'Lock the promotion list? Only listed students will be able to register for this level.', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-series/${props.series.id}/exams/${examId}/promotion/lock`, {}, { preserveScroll: true });
 }
 

@@ -611,6 +611,7 @@ import ExperiencePicker from '@/Components/sahodaya/website/ExperiencePicker.vue
 import ReadinessPanel from '@/Components/sahodaya/website/ReadinessPanel.vue';
 import SectionLayoutEditor from '@/Components/sahodaya/website/SectionLayoutEditor.vue';
 import PreviewToolbar from '@/Components/sahodaya/website/PreviewToolbar.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya:                Object,
@@ -635,6 +636,8 @@ const props = defineProps({
     experiences:             { type: Array, default: () => [] },
     readiness:               { type: Object, default: () => ({ ready: false, errors: [], warnings: [], score: 0 }) },
 });
+
+const { confirm } = useConfirm();
 
 const tabs = [
     { id: 'experience', label: 'Experience' },
@@ -926,7 +929,7 @@ async function loadDefaultNav() {
 }
 
 async function applyCkscTemplate() {
-    if (!confirm('Replace homepage sections with the CKSC layout (pill menu, hero slider, About, Services, Journey, Gallery, etc.)? Your saved theme colours will be kept.')) {
+    if (!(await confirm({ message: 'Replace homepage sections with the CKSC layout (pill menu, hero slider, About, Services, Journey, Gallery, etc.)? Your saved theme colours will be kept.' }))) {
         return;
     }
     ckscTemplateSaving.value = true;
@@ -956,7 +959,7 @@ function experienceName(key) {
 }
 
 async function applyExperienceDraft(key, mode = 'full') {
-    if (!confirm(`${mode === 'style' ? 'Apply the design character from' : 'Create a complete draft using'} “${experienceName(key)}”? The published website will not change.`)) return;
+    if (!(await confirm({ message: `${mode === 'style' ? 'Apply the design character from' : 'Create a complete draft using'} “${experienceName(key)}”? The published website will not change.`, destructive: false }))) return;
     experienceSaving.value = true;
     try {
         const response = await apiPost('/experience/draft', { template_key: key, mode });
@@ -967,14 +970,14 @@ async function applyExperienceDraft(key, mode = 'full') {
 }
 
 async function cancelExperienceDraft() {
-    if (!confirm('Cancel this experience draft? The published website will remain unchanged.')) return;
+    if (!(await confirm({ message: 'Cancel this experience draft? The published website will remain unchanged.' }))) return;
     await apiPost('/experience/cancel', {});
     experienceDraft.value = null;
     await refreshReadiness();
 }
 
 async function publishExperienceDraft() {
-    if (!confirm('Publish this complete V2 experience now? A restore point will be created automatically.')) return;
+    if (!(await confirm({ message: 'Publish this complete V2 experience now? A restore point will be created automatically.', destructive: false }))) return;
     experienceSaving.value = true;
     try {
         const response = await apiPost('/experience/publish', {});
@@ -988,7 +991,7 @@ async function publishExperienceDraft() {
 async function refreshReadiness() { readinessReport.value = await apiGet('/readiness'); }
 async function loadVersions() { siteVersions.value = await apiGet('/experience/versions'); }
 async function restoreSiteVersion(version) {
-    if (!confirm(`Restore the website version from ${formatDate(version.created_at)}? The current website will also be saved as a restore point.`)) return;
+    if (!(await confirm({ message: `Restore the website version from ${formatDate(version.created_at)}? The current website will also be saved as a restore point.` }))) return;
     const response = await apiPost(`/experience/versions/${version.id}/restore`, {});
     sections.value = response.sections ?? sections.value;
     if (response.site) Object.assign(props.currentSite, response.site);
@@ -1051,7 +1054,7 @@ function toggleEdit(section) {
 
 async function loadSectionVersions(section) { sectionVersions[section.id] = await apiGet(`/sections/${section.id}/versions`); }
 async function restorePublishedVersion(section, versionId) {
-    if (!versionId || !confirm('Restore this saved version as an unpublished draft?')) return;
+    if (!versionId || !(await confirm({ message: 'Restore this saved version as an unpublished draft?', destructive: false }))) return;
     const updated = await apiPost(`/sections/${section.id}/versions/${versionId}/restore`, {});
     Object.assign(section, updated);
     editConfigs[section.id] = { ...(updated.config ?? {}) };
@@ -1094,7 +1097,7 @@ async function publishSection(section) {
 async function switchVariant(section, newVariant) {
     if (newVariant === section.variant) return;
     const msg = `Switch from "${section.variant}" to "${newVariant}"?\n\nCurrent content will be archived and you can restore it any time.`;
-    if (!confirm(msg)) return;
+    if (!(await confirm({ message: msg, destructive: false }))) return;
     const updated = await apiPatch(`/sections/${section.id}`, { variant: newVariant });
     const idx = sections.value.findIndex(s => s.id === section.id);
     if (idx !== -1) Object.assign(sections.value[idx], updated);
@@ -1109,7 +1112,7 @@ function restoreArchived(section, archiveIdx) {
 }
 
 async function removeSection(section) {
-    if (!confirm(`Delete the "${sectionTypeLabel(section.section_type)} / ${section.variant}" section?\n\nThis cannot be undone.`)) return;
+    if (!(await confirm({ message: `Delete the "${sectionTypeLabel(section.section_type)} / ${section.variant}" section?\n\nThis cannot be undone.` }))) return;
     await apiDelete(`/sections/${section.id}`);
     sections.value = sections.value.filter(s => s.id !== section.id);
 }

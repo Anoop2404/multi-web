@@ -121,6 +121,16 @@
                     </label>
                 </div>
             </div>
+            <div v-if="regions.length" class="card card--muted space-y-2">
+                <p class="form-label mb-1">Restrict to region(s) <span class="text-slate-400 font-normal">(optional)</span></p>
+                <p class="text-xs text-slate-500 mb-2">Leave unchecked for unrestricted access. If any region is checked, this user only sees schools/students in those regions for Membership — this is separate from Fest event/region duties above.</p>
+                <div class="flex flex-wrap gap-2">
+                    <label v-for="r in regions" :key="r.id" class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1 text-xs">
+                        <input type="checkbox" :value="r.id" v-model="form.region_ids">
+                        {{ r.name }}
+                    </label>
+                </div>
+            </div>
             <FormActions sticky>
                 <button type="submit" class="btn-primary" :disabled="form.processing">
                     {{ form.processing ? 'Creating…' : 'Create user' }}
@@ -174,6 +184,12 @@
                                 <span v-for="(a, i) in u.exam_assignments" :key="i"
                                       class="inline-flex items-center rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-medium text-sky-700">
                                     {{ a.exam_title }} · {{ a.role === 'controller' ? 'Controller' : 'Hall staff' }}
+                                </span>
+                            </div>
+                            <div v-if="u.region_ids?.length" class="flex flex-wrap gap-1 mt-1.5">
+                                <span v-for="rid in u.region_ids" :key="rid"
+                                      class="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                    🗺️ {{ regionName(rid) }}
                                 </span>
                             </div>
                         </td>
@@ -278,6 +294,16 @@
                         </label>
                     </div>
                 </div>
+                <div v-if="regions.length" class="card card--muted space-y-2">
+                    <p class="form-label mb-1">Restrict to region(s) <span class="text-slate-400 font-normal">(optional)</span></p>
+                    <p class="text-xs text-slate-500 mb-2">Leave unchecked for unrestricted access.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <label v-for="r in regions" :key="r.id" class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1 text-xs">
+                            <input type="checkbox" :value="r.id" v-model="editForm.region_ids">
+                            {{ r.name }}
+                        </label>
+                    </div>
+                </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" @click="editing = null" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary" :disabled="editForm.processing">Save</button>
@@ -291,6 +317,7 @@
 import { ref, watch, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -306,6 +333,7 @@ const props = defineProps({
     mcqExams: Array,
     dutyOptions: Array,
     newCredentials: Object,
+    regions: { type: Array, default: () => [] },
 });
 
 const form = useForm({
@@ -313,14 +341,21 @@ const form = useForm({
     fest_ops_event_id: '', fest_ops_duties: [],
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
+    region_ids: [],
 });
 const editing = ref(null);
+const { confirm } = useConfirm();
 const editForm = useForm({
     name: '', email: '', username: '', password: '', roles: [], permissions: [],
     fest_ops_event_id: '', fest_ops_duties: [],
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
+    region_ids: [],
 });
+
+function regionName(id) {
+    return props.regions.find((r) => r.id === id)?.name ?? `#${id}`;
+}
 
 const groupedRoles = computed(() => {
     const order = [];
@@ -411,6 +446,8 @@ function openEdit(user) {
     const exam = user.exam_assignments?.[0];
     editForm.exam_staff_exam_id = exam?.exam_id ?? '';
     editForm.exam_staff_role = exam?.role ?? 'staff';
+
+    editForm.region_ids = [...(user.region_ids || [])];
 }
 
 function saveEdit() {
@@ -420,13 +457,13 @@ function saveEdit() {
     });
 }
 
-function remove(user) {
-    if (!confirm(`Remove ${user.name}?`)) return;
+async function remove(user) {
+    if (!(await confirm({ message: `Remove ${user.name}?` }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/users/${user.id}`, { preserveScroll: true });
 }
 
-function resetPw(user) {
-    if (!confirm(`Reset password for ${user.name}?`)) return;
+async function resetPw(user) {
+    if (!(await confirm({ message: `Reset password for ${user.name}?` }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/users/${user.id}/reset-password`, {}, { preserveScroll: true });
 }
 </script>

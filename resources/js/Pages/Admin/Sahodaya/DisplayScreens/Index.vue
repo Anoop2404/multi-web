@@ -39,6 +39,9 @@
 import { computed } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -69,8 +72,8 @@ function toggle(screen) {
     }, { preserveScroll: true });
 }
 
-function remove(id) {
-    if (!confirm('Delete this display screen?')) return;
+async function remove(id) {
+    if (!(await confirm({ message: 'Delete this display screen?' }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/display-screens/${id}`, { preserveScroll: true });
 }
 </script>

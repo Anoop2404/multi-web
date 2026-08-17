@@ -3,16 +3,15 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Support\FestPageActivity;
-use App\Events\FestScoreboardUpdated;
 use App\Models\FestEvent;
-use App\Models\FestMark;
-use App\Services\Events\EventContext;
+use App\Models\FestEventItem;
 use App\Services\Events\EventLifecycleGate;
-use App\Services\Events\FestAthleticRecordService;
-use App\Services\Events\FestGradePointService;
+use App\Services\Events\FestMarkSaveService;
 use App\Services\Events\FestParticipantLookupService;
 use App\Services\Audit\PlatformAuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class FestMarksImportController extends SahodayaAdminController
 {
@@ -52,13 +51,11 @@ class FestMarksImportController extends SahodayaAdminController
         Request $request,
         string $tenantId,
         FestEvent $event,
-        FestGradePointService $gradePointService,
-        FestAthleticRecordService $recordService,
+        FestMarkSaveService $markSave,
         FestParticipantLookupService $lookup,
         PlatformAuditLogger $audit,
     ) {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        EventLifecycleGate::allowMarkEntry($event);
 
         $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
 
@@ -90,35 +87,40 @@ class FestMarksImportController extends SahodayaAdminController
             }
 
             $itemId = $participant->registration->item_id;
+            $item = FestEventItem::where('event_id', $event->id)->find($itemId);
+            if (! $item) {
+                $errors[] = 'Participant item does not belong to this event: '.($data['reg_no'] ?? $data['participant_id']);
+
+                continue;
+            }
+
             $score = isset($data['score']) && $data['score'] !== '' ? (float) $data['score'] : null;
             $grade = $data['grade'] ?? null;
 
-            if ($score !== null && ! $grade) {
-                $grade = $gradePointService->resolveGradeFromScore($event, $itemId, $score);
-            }
-
-            $mark = FestMark::updateOrCreate(
-                ['item_id' => $itemId, 'participant_id' => $participant->id],
-                [
-                    'event_id'          => $event->id,
+            try {
+                EventLifecycleGate::allowMarkEntryForItem($event, $item);
+                $markSave->save($event, [
+                    'participant_id'    => $participant->id,
+                    'item_id'           => $itemId,
                     'grade'             => $grade ?: null,
                     'position'          => ! empty($data['position']) ? (int) $data['position'] : null,
                     'score'             => $score,
                     'measurement_value' => $data['measurement_value'] ?? null,
                     'measurement_unit'  => $data['measurement_unit'] ?? null,
-                    'locked_by'         => $request->user()->id,
-                    'locked_at'         => now(),
-                ]
-            );
+                ], $request->user()->id);
+            } catch (ValidationException|HttpException $e) {
+                $message = $e instanceof ValidationException
+                    ? (collect($e->errors())->flatten()->first() ?? 'Mark could not be imported.')
+                    : $e->getMessage();
+                $errors[] = 'Participant '.($data['reg_no'] ?? $data['participant_id']).": {$message}";
 
-            $recordService->evaluateMark($mark->fresh());
+                continue;
+            }
+
             $imported++;
         }
 
         fclose($handle);
-
-        EventContext::for($event)->recalculateSchoolPoints();
-        FestScoreboardUpdated::dispatch($event->fresh());
 
         $audit->festEvent($event, FestPageActivity::MARKS_IMPORT, 'fest.marks.imported', "Imported {$imported} mark row(s)", [
             'imported' => $imported,

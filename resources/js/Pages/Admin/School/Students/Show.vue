@@ -263,6 +263,7 @@
                     :student="student"
                     :provision-url="`/school-admin/${school.id}/students/${student.id}/portal-login`"
                     :reset-url="`/school-admin/${school.id}/students/${student.id}/reset-portal-password`"
+                    :reveal-url="`/school-admin/${school.id}/students/${student.id}/reveal-portal-password`"
                     :portal-login-url="portalLoginUrl"
                 />
             </div>

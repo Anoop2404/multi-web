@@ -172,6 +172,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import FestRegistrationItemRow from '@/Components/school/FestRegistrationItemRow.vue';
 import { genderLabel } from '@/support/festItemEligibility.js';
 import { studentDisplayName } from '@/support/studentDisplay.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     event: { type: Object, required: true },
@@ -186,6 +187,8 @@ const props = defineProps({
 });
 
 defineEmits(['add-student']);
+
+const { confirm } = useConfirm();
 
 const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'];
 const SPORTS_MALE_VALS = new Set(['male', 'm', 'boys', 'boy']);
@@ -522,8 +525,8 @@ function canWithdraw(reg) {
     return props.event.status === 'registration_open' || reg.status === 'submitted';
 }
 
-function withdraw(id) {
-    if (!confirm('Cancel this registration?')) return;
+async function withdraw(id) {
+    if (!(await confirm({ message: 'Cancel this registration?' }))) return;
     router.post(`${props.programBase}/registrations/${id}/withdraw`, {}, { preserveScroll: true });
 }
 

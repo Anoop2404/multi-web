@@ -405,6 +405,125 @@ class MemberSchoolsController extends SahodayaAdminController
         );
     }
 
+    public function bulkResetPassword(
+        Request $request,
+        UserCredentialService $credentials,
+        MembershipNotifier $notifier,
+        PlatformAuditLogger $audit,
+    ) {
+        $data = $request->validate([
+            'school_ids'   => 'required|array|min:1|max:50',
+            'school_ids.*' => 'uuid',
+        ]);
+
+        $schools = Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->whereIn('id', $data['school_ids'])
+            ->get();
+
+        $resetCount = 0;
+
+        foreach ($schools as $school) {
+            $didReset = TenantAuth::withTenantUsers($school, function () use ($school, $credentials, $notifier, $audit, $request) {
+                $loginUser = $this->schoolLoginUser($school);
+                if (! $loginUser) {
+                    return false;
+                }
+
+                $result = $credentials->resetPassword($loginUser, $request->user()?->id);
+                $notifier->schoolCredentialsIssued($result['user'], $result['password'], $school);
+
+                $audit->log(
+                    'membership.school.password.reset',
+                    "School password reset for {$school->name}",
+                    $school,
+                    ['updated_by_user_id' => $request->user()?->id, 'user_id' => $result['user']->id, 'bulk' => true],
+                );
+
+                return true;
+            });
+
+            if ($didReset) {
+                $resetCount++;
+            }
+        }
+
+        if ($resetCount === 0) {
+            return back()->with('error', 'No schools had a login to reset.');
+        }
+
+        $skipped = $schools->count() - $resetCount;
+        $message = "{$resetCount} school password(s) reset and emailed.";
+        if ($skipped > 0) {
+            $message .= " {$skipped} skipped (no login found).";
+        }
+
+        return back()->with('success', $message);
+    }
+
+    public function bulkSendCredentials(
+        Request $request,
+        MembershipNotifier $notifier,
+        PlatformAuditLogger $audit,
+    ) {
+        $data = $request->validate([
+            'school_ids'   => 'required|array|min:1|max:50',
+            'school_ids.*' => 'uuid',
+        ]);
+
+        $schools = Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->whereIn('id', $data['school_ids'])
+            ->get();
+
+        $sentCount = 0;
+
+        foreach ($schools as $school) {
+            $didSend = TenantAuth::withTenantUsers($school, function () use ($school, $notifier, $audit, $request) {
+                $loginUser = $this->schoolLoginUser($school);
+                if (! $loginUser) {
+                    return false;
+                }
+
+                $plainPassword = $loginUser->plain_password;
+                if (! is_string($plainPassword) || trim($plainPassword) === '') {
+                    return false;
+                }
+
+                $notifier->schoolCredentialsIssued($loginUser->fresh(), $plainPassword, $school);
+
+                $audit->log(
+                    'membership.school.credentials.resent',
+                    "School credentials resent for {$school->name}",
+                    $school,
+                    ['updated_by_user_id' => $request->user()?->id, 'user_id' => $loginUser->id, 'bulk' => true],
+                );
+
+                return true;
+            });
+
+            if ($didSend) {
+                $sentCount++;
+            }
+        }
+
+        if ($sentCount === 0) {
+            return back()->with('error', 'No schools had a stored password to resend — use bulk reset instead.');
+        }
+
+        $skipped = $schools->count() - $sentCount;
+        $message = "Credentials resent to {$sentCount} school(s).";
+        if ($skipped > 0) {
+            $message .= " {$skipped} skipped (no login or no stored password).";
+        }
+
+        return back()->with('success', $message);
+    }
+
     public function approve(string $tenantId, Tenant $school, MembershipNotifier $notifier, PlatformAuditLogger $audit)
     {
         abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);

@@ -277,6 +277,7 @@ import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
 import McqSahodayaWorkflowBanner from '@/Components/sahodaya/McqSahodayaWorkflowBanner.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -296,6 +297,8 @@ const props = defineProps({
     gradeBands: { type: Array, default: () => [] },
     clusterRequireStudentVerification: { type: Boolean, default: true },
 });
+
+const { confirm } = useConfirm();
 
 function studentVerificationModeFromExam(exam) {
     const settings = exam?.settings_json ?? {};
@@ -387,8 +390,8 @@ function uploadPaper() {
     });
 }
 
-function removePaper() {
-    if (!confirm('Remove this question paper from the public archive?')) return;
+async function removePaper() {
+    if (!(await confirm({ message: 'Remove this question paper from the public archive?' }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/question-paper`, { preserveScroll: true });
 }
 </script>

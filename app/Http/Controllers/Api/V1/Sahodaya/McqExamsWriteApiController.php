@@ -33,7 +33,7 @@ class McqExamsWriteApiController extends SahodayaApiController
         return response()->json(['data' => $exam], 201);
     }
 
-    public function storeMark(Request $request, McqExam $exam, McqRegistration $registration)
+    public function storeMark(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
         abort_if($registration->exam_id !== $exam->id, 403);
@@ -54,6 +54,15 @@ class McqExamsWriteApiController extends SahodayaApiController
         ]));
 
         $registration->update(['status' => 'submitted', 'submitted_at' => now()]);
+
+        // Fix 2026-08-15: this API entry point previously wrote/updated the
+        // McqMark row without ever triggering re-ranking, leaving stale
+        // rank data -- closes the "storeMark doesn't trigger re-ranking"
+        // gap from mcq_exam_flow_audit_2026_08_13.md. Mirrors the same
+        // "only re-rank once every present registration has a mark" gate
+        // used by the other mark-writing entry points, via the shared
+        // McqRankingService::rankIfComplete() helper.
+        app(\App\Services\Mcq\McqRankingService::class)->rankIfComplete($exam);
 
         return response()->json(['ok' => true]);
     }

@@ -98,6 +98,8 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     school:    Object,
@@ -145,8 +147,8 @@ function save() {
     }
 }
 
-function remove(vac) {
-    if (!confirm(`Delete vacancy "${vac.title}"?`)) return;
+async function remove(vac) {
+    if (!(await confirm({ message: `Delete vacancy "${vac.title}"?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/job-vacancies/${vac.id}`);
 }
 </script>

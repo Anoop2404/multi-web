@@ -25,13 +25,13 @@ trait RendersPublicPages
             'site:layout',
             now()->addHour(),
             fn () => [
-                'navConfig'    => $tenant->settings()->where('key', 'nav_config')->first()?->value ?? [],
+                'navConfig' => $tenant->settings()->where('key', 'nav_config')->first()?->value ?? [],
                 'footerConfig' => $tenant->settings()->where('key', 'footer_config')->first()?->value ?? [],
-                'theme'        => $tenant->settings()->where('key', 'theme')->first()?->value ?? [],
-                'widgets'      => $tenant->settings()->where('key', 'widgets')->first()?->value ?? [],
-                'seo'          => $tenant->settings()->where('key', 'seo')->first()?->value ?? [],
-                'locale'       => $tenant->settings()->where('key', 'locale')->first()?->value ?? 'en',
-                'logo'         => TenantBranding::logoUrl($tenant),
+                'theme' => $tenant->settings()->where('key', 'theme')->first()?->value ?? [],
+                'widgets' => $tenant->settings()->where('key', 'widgets')->first()?->value ?? [],
+                'seo' => $tenant->settings()->where('key', 'seo')->first()?->value ?? [],
+                'locale' => $tenant->settings()->where('key', 'locale')->first()?->value ?? 'en',
+                'logo' => TenantBranding::logoUrl($tenant),
             ]
         );
     }
@@ -59,6 +59,27 @@ trait RendersPublicPages
             if (isset($footerVariants[$design['footer'] ?? ''])) {
                 $layout['footerConfig']['layout_variant'] = $footerVariants[$design['footer']];
             }
+
+            $site = $extra['site'] ?? null;
+            if ($site && ! $site->is_primary) {
+                $micrositePath = route('tenant.site.microsite', ['slug' => $site->slug], false);
+                
+                // Complete list of dedicated sub-page menu items
+                $items = [
+                    ['label' => 'Home', 'url' => $micrositePath, 'external' => false, 'children' => []],
+                    ['label' => 'Member Schools', 'url' => $micrositePath.'/member-schools', 'external' => false, 'children' => []],
+                    ['label' => 'About', 'url' => $micrositePath.'/about', 'external' => false, 'children' => []],
+                    ['label' => 'Programmes', 'url' => $micrositePath.'/events', 'external' => false, 'children' => []],
+                    ['label' => 'Office Bearers', 'url' => $micrositePath.'/office-bearers', 'external' => false, 'children' => []],
+                    ['label' => 'Gallery', 'url' => $micrositePath.'/gallery', 'external' => false, 'children' => []],
+                    ['label' => 'Announcements', 'url' => $micrositePath.'/announcements', 'external' => false, 'children' => []],
+                    ['label' => 'Downloads', 'url' => $micrositePath.'/downloads', 'external' => false, 'children' => []],
+                    ['label' => 'Contact', 'url' => $micrositePath.'/contact', 'external' => false, 'children' => []],
+                ];
+
+                $layout['homeUrl'] = $micrositePath;
+                $layout['navConfig']['items'] = $items;
+            }
         }
 
         foreach ($policy as $widget => $enabled) {
@@ -80,7 +101,7 @@ trait RendersPublicPages
         }
 
         return response()->view($view, array_merge($layout, $extra, [
-            'tenant'      => $tenant,
+            'tenant' => $tenant,
             'tenantTheme' => array_merge($layout['theme'] ?? [], $experience['design'] ?? []),
         ]));
     }

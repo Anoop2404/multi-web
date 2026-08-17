@@ -177,6 +177,12 @@ class McqRegistration extends Model
         return $this->hasOne(McqMark::class, 'registration_id');
     }
 
+    /** Client-reported tab-switch / window-blur / fullscreen-exit events during this exam session (detect-and-log only). */
+    public function proctorEvents(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(McqProctorEvent::class, 'registration_id')->orderBy('occurred_at');
+    }
+
     public function feeReceipt(): BelongsTo
     {
         return $this->belongsTo(FeeReceipt::class, 'fee_receipt_id');

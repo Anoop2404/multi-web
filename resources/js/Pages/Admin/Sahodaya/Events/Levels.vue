@@ -74,6 +74,13 @@
                 </form>
             </div>
 
+            <!-- Region Drill-Down Panel — Phase 4 / §2.5 of
+                 docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md. Only for a hub with
+                 actual region children; lets a full admin see every region's status
+                 at a glance instead of navigating into each region's own page. -->
+            <RegionDrillDownPanel v-if="isPartitionedHub && !event.parent_event_id && regionDrillDown.length"
+                                  :sahodaya-id="sahodaya.id" :regions="regionDrillDown" />
+
             <!-- Two-Column Operations Layout -->
             <div class="grid lg:grid-cols-12 gap-6">
                 
@@ -307,6 +314,8 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import RegionDrillDownPanel from '@/Components/sahodaya/RegionDrillDownPanel.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -318,9 +327,11 @@ const props = defineProps({
     conductPresets: { type: Array, default: () => [] },
     memberSchools: { type: Array, default: () => [] },
     schoolPartitions: { type: Object, default: () => ({}) },
+    regionDrillDown: { type: Array, default: () => [] },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+const { confirm } = useConfirm();
 const showPartitionUi = computed(() => props.conductMode === 'partitioned' || props.event.event_type === 'kalolsavam');
 const showCustomForm = ref(false);
 
@@ -357,8 +368,8 @@ function spawnCluster() {
 function spawnPartition() {
     partitionForm.post(`${base}/spawn-partition`, { preserveScroll: true, onSuccess: () => { partitionForm.reset(); showCustomForm.value = false; } });
 }
-function syncRegionPartitions() {
-    if (!confirm('Create a partition per membership region and assign schools by their region? Existing region partitions are kept.')) return;
+async function syncRegionPartitions() {
+    if (!(await confirm({ message: 'Create a partition per membership region and assign schools by their region? Existing region partitions are kept.', destructive: false }))) return;
     regionSync.post(`${base}/sync-region-partitions`, { preserveScroll: true });
 }
 function applyPreset() {
@@ -373,12 +384,12 @@ function saveAssignments() {
 function spawnSchoolRounds() {
     router.post(`${base}/spawn-school-rounds`, {}, { preserveScroll: true });
 }
-function promoteAllSchoolRounds() {
-    if (!confirm('Promote winners from all school rounds with published results into this cluster event?')) return;
+async function promoteAllSchoolRounds() {
+    if (!(await confirm({ message: 'Promote winners from all school rounds with published results into this cluster event?', destructive: false }))) return;
     router.post(`${base}/promote-all-school-rounds`, {}, { preserveScroll: true });
 }
-function submitStateQualifiers() {
-    if (!confirm('Submit current qualifiers to State? This uses the API outbox and may be retried.')) return;
+async function submitStateQualifiers() {
+    if (!(await confirm({ message: 'Submit current qualifiers to State? This uses the API outbox and may be retried.', destructive: false }))) return;
     router.post(`${base}/submit-state-qualifiers`, {}, { preserveScroll: true });
 }
 </script>

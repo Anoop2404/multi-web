@@ -55,6 +55,7 @@
 <script setup>
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -68,6 +69,7 @@ const props = defineProps({
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/website/domains`;
 const form = useForm({ domain: '' });
+const { confirm } = useConfirm();
 
 function addDomain() {
     form.post(base, { preserveScroll: true, onSuccess: () => form.reset() });
@@ -75,8 +77,8 @@ function addDomain() {
 function verify(d) {
     router.post(`${base}/${d.id}/verify`, {}, { preserveScroll: true });
 }
-function remove(d) {
-    if (!confirm(`Remove ${d.domain}?`)) return;
+async function remove(d) {
+    if (!(await confirm({ message: `Remove ${d.domain}?` }))) return;
     router.delete(`${base}/${d.id}`, { preserveScroll: true });
 }
 </script>

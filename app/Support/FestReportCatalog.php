@@ -4,6 +4,83 @@ namespace App\Support;
 
 class FestReportCatalog
 {
+    /**
+     * EVENT_REPORTS_FIX_TODO_2026_08_14.md Milestone 1.1 — school-safe export allowlist.
+     *
+     * exports() below is the SAME catalog used by both the Sahodaya-admin report
+     * controller and FestSchoolReportController::export(). Its existing 'audience' field
+     * ('staff'|'public'|'both') means "Sahodaya event staff vs the general public" — it
+     * was never an authorization boundary between schools, and FestSchoolReportController
+     * had no separate allowlist at all, so any school admin could request ANY export id
+     * in this catalog by URL, including ones that return every school's registrations,
+     * fees, marks, catering orders, volunteer rosters, and audit-log rows (2026-08-14
+     * audit, P0 "School users can request cross-school fest exports").
+     *
+     * This list is deliberately an ALLOWLIST (fail closed), not a denylist: an export id
+     * only reaches a school if it's named here. New export ids added to exports() are
+     * therefore school-unreachable by default until someone deliberately reviews them and
+     * adds them here — the safe direction for a mistake to fail in.
+     *
+     * Two categories are included:
+     *   1. Exports fixed in this pass to accept/enforce $schoolId (registrations, results,
+     *      fees, fee-breakdown, student-event-registrations — see FestExportService) or
+     *      that already read $request->input('school_id') as a real filter, which
+     *      FestSchoolReportController::export()'s $request->merge(['school_id' => ...])
+     *      forces to the authenticated school (registration-list, category-wise-students,
+     *      item-participants, student-wise-report, school-wise).
+     *   2. Genuinely event-wide comparative/schedule data that isn't any one school's
+     *      private information (rankings, medal tally, item schedule) — these were already
+     *      the same for every viewer, so exposing them isn't the leak the audit found.
+     *
+     * Left OFF deliberately (audit-named unsafe, or unverified — see Milestone 1.2):
+     * green-room-list, judge-sheet, mark-entry-sheet, mark-entered-summary,
+     * mark-entry-status (schools have a dedicated, already-scoped
+     * FestSchoolReportController::exportMarkEntryStatus() for this instead), clashes,
+     * promotions, promotions-pdf, certificate-counts, catering, volunteer-roster,
+     * audit-log-extract, students, discipline-registration, fee-pending-schools,
+     * admit-cards, id-cards-by-head, numbering-register, pending-approvals,
+     * assignment-completeness, head-wise-participants, area-wise-participants,
+     * team-squad-sheets, catering-by-school, attendance-sheet, attendance-sheet-school,
+     * clashes-school, age-group-matrix — none of these were confirmed to filter by school
+     * in this pass; re-verify and move up when they are.
+     *
+     * @var list<string>
+     */
+    public const SCHOOL_SAFE_EXPORT_IDS = [
+        // Fixed in this pass to accept/enforce $schoolId (FestExportService).
+        'registrations',
+        'results',
+        'fees',
+        'fee-breakdown',
+        'student-event-registrations',
+        // Already read $request->input('school_id') as a real filter before this pass —
+        // FestSchoolReportController::export()'s school_id merge forces these to the
+        // authenticated school (see FestReportService::categoryWiseStudentsXls() etc).
+        'registration-list',
+        'category-wise-students',
+        'item-participants',
+        'student-wise-report',
+        'school-wise',
+        // Event-wide comparative/schedule data — the same for every viewer, not any one
+        // school's private information.
+        'overall-ranking',
+        'house-wise',
+        'item-list',
+        'item-wise',
+        'cumulative',
+        'day-wise',
+        'item-schedule',
+        'item-schedule-pdf',
+        'item-order-public',
+        'sahodaya-ranking',
+        'medal-tally',
+    ];
+
+    public static function isSchoolSafe(string $exportId): bool
+    {
+        return in_array($exportId, self::SCHOOL_SAFE_EXPORT_IDS, true);
+    }
+
     /** @return list<string> */
     public static function resultExportTypes(): array
     {

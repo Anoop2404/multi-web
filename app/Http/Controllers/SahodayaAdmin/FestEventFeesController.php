@@ -48,13 +48,19 @@ class FestEventFeesController extends SahodayaAdminController
         $schoolFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)
             ->when($regionSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $regionSchoolIds))
             ->forAmountAggregation()
-            ->with(['school', 'feeReceipt', 'receipts.attachments', 'head'])
+            ->with(['school', 'feeReceipt', 'receipts.attachments', 'head', 'registrationBatch', 'lines'])
             ->orderBy('school_id')
             ->get()
             ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event, $reportableEventIds) {
                 $regs = FestRegistration::whereIn('event_id', $reportableEventIds)
                     ->where('school_id', $fee->school_id)
                     ->whereIn('status', ['submitted', 'approved'])
+                    ->when($fee->registration_batch_id, function ($query) use ($fee) {
+                        $registrationIds = $fee->lines->pluck('meta')
+                            ->map(fn ($meta) => $meta['registration_id'] ?? null)
+                            ->filter();
+                        $query->whereIn('id', $registrationIds);
+                    })
                     ->with(['item', 'participants.student', 'participants.teacher'])
                     ->get();
 
@@ -128,6 +134,8 @@ class FestEventFeesController extends SahodayaAdminController
                     'school_id' => $fee->school_id,
                     'head' => $fee->head?->name,
                     'head_id' => $fee->head_id,
+                    'registration_batch_id' => $fee->registration_batch_id,
+                    'registration_batch' => $fee->registrationBatch?->name,
                     'status' => $effectiveStatus,
                     'total_due' => $fee->total_due,
                     'amount_paid' => $fee->amount_paid,
@@ -163,7 +171,7 @@ class FestEventFeesController extends SahodayaAdminController
             'pending'    => $schoolFees->where('status', 'pending')->count(),
             'awaiting'   => $schoolFees->where('status', 'proof_uploaded')->count(),
             'approved'   => $schoolFees->where('status', 'approved')->count(),
-            'total_schools' => $schoolFees->count(),
+            'total_schools' => $schoolFees->pluck('school_id')->unique()->count(),
         ];
         $summary['unreconciled_overpayment'] = round(
             max(0, $summary['overpayment'] - $summary['recorded_credit']),
@@ -220,7 +228,7 @@ class FestEventFeesController extends SahodayaAdminController
 
         $schoolFees = FestSchoolEventFee::where('event_id', $event->id)
             ->forAmountAggregation()
-            ->with(['school', 'feeReceipt', 'receipts', 'head'])
+            ->with(['school', 'feeReceipt', 'receipts', 'head', 'registrationBatch', 'lines'])
             ->orderBy('school_id')
             ->get()
             ->filter(fn ($fee) => (int) $fee->participation_item_count > 0 || (float) $fee->total_due > 0)
@@ -228,6 +236,12 @@ class FestEventFeesController extends SahodayaAdminController
                 $regs = FestRegistration::whereIn('event_id', $event->reportableEventIds())
                     ->where('school_id', $fee->school_id)
                     ->whereIn('status', ['submitted', 'approved'])
+                    ->when($fee->registration_batch_id, function ($query) use ($fee) {
+                        $registrationIds = $fee->lines->pluck('meta')
+                            ->map(fn ($meta) => $meta['registration_id'] ?? null)
+                            ->filter();
+                        $query->whereIn('id', $registrationIds);
+                    })
                     ->with(['item', 'participants'])
                     ->get();
 
@@ -240,8 +254,10 @@ class FestEventFeesController extends SahodayaAdminController
                 ]);
 
                 return [
+                    'school_id'               => $fee->school_id,
                     'school_name'             => $fee->school?->name ?? $fee->school_id,
                     'head_name'               => $fee->head?->name,
+                    'registration_batch'      => $fee->registrationBatch?->name,
                     'status'                  => $fee->status,
                     'school_registration_fee' => (float) $fee->school_registration_fee,
                     'participation_fee'       => (float) $fee->participation_fee,
@@ -276,7 +292,7 @@ class FestEventFeesController extends SahodayaAdminController
         })->values();
 
         $summary = [
-            'total_schools' => $schoolFees->count(),
+            'total_schools' => $schoolFees->pluck('school_id')->unique()->count(),
             'total_due'     => $schoolFees->sum('total_due'),
             'total_paid'    => $schoolFees->sum('amount_paid'),
             'total_balance' => $schoolFees->sum('balance_due'),
@@ -317,7 +333,7 @@ class FestEventFeesController extends SahodayaAdminController
 
         $rows = FestSchoolEventFee::where('event_id', $event->id)
             ->forAmountAggregation()
-            ->with(['school', 'feeReceipt', 'head'])
+            ->with(['school', 'feeReceipt', 'head', 'registrationBatch'])
             ->orderBy('school_id')
             ->get()
             ->filter(fn ($fee) => (int) $fee->participation_item_count > 0 || (float) $fee->total_due > 0);
@@ -326,12 +342,12 @@ class FestEventFeesController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows, $event) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Event', 'School', 'Head', 'Status', 'School reg fee', 'Participation fee', 'Total due', 'Receipt #', 'Payment date', 'Transaction ref', 'Credit owed']);
+            fputcsv($out, ['Event', 'School', 'Head / payment level', 'Status', 'School reg fee', 'Participation fee', 'Total due', 'Receipt #', 'Payment date', 'Transaction ref', 'Credit owed']);
             foreach ($rows as $fee) {
                 fputcsv($out, [
                     $event->title,
                     $fee->school?->name ?? $fee->school_id,
-                    $fee->head?->name ?? '',
+                    $fee->registrationBatch?->name ?? $fee->head?->name ?? '',
                     $fee->status,
                     $fee->school_registration_fee,
                     $fee->participation_fee,

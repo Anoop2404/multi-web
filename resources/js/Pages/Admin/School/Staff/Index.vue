@@ -53,6 +53,9 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -66,8 +69,8 @@ const filtered = computed(() =>
         : props.staff.filter(m => m.type === typeFilter.value)
 );
 
-function remove(member) {
-    if (!confirm(`Remove "${member.name}"?`)) return;
+async function remove(member) {
+    if (!(await confirm({ message: `Remove "${member.name}"?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/staff/${member.id}`);
 }
 </script>

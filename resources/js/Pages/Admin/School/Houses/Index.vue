@@ -76,6 +76,8 @@
 <script setup>
 import { useForm, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -92,8 +94,8 @@ const assignForm = useForm({ school_house_id: '', student_ids: [] });
 function createHouse() {
     houseForm.post(`/school-admin/${tid}/houses`, { preserveScroll: true, onSuccess: () => houseForm.reset() });
 }
-function removeHouse(id) {
-    if (confirm('Remove this house? Students will be unassigned.')) {
+async function removeHouse(id) {
+    if (await confirm({ message: 'Remove this house? Students will be unassigned.', destructive: true })) {
         router.delete(`/school-admin/${tid}/houses/${id}`, { preserveScroll: true });
     }
 }

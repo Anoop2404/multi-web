@@ -344,10 +344,14 @@ class FestCrossEventReportService
                 $registrations = FestRegistration::where('event_id', $region->id)
                     ->whereNotIn('status', ['withdrawn', 'rejected'])
                     ->count();
+                $titlePrefix = $hub->title.' — ';
+                $regionLabel = str_starts_with($region->title, $titlePrefix)
+                    ? substr($region->title, strlen($titlePrefix))
+                    : $region->title;
 
                 $rows->push([
                     'event'                  => $hub->title,
-                    'region'                 => $region->title,
+                    'region'                 => $regionLabel,
                     'schools_participating'  => $schoolPoints->count(),
                     'registrations'          => $registrations,
                     'total_points'           => round((float) $schoolPoints->sum(), 2),

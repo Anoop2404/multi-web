@@ -174,6 +174,7 @@ import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     school: Object,
@@ -184,6 +185,8 @@ const props = defineProps({
     academicYears: Array,
     currentAcademicYear: String,
 });
+
+const { confirm } = useConfirm();
 
 const navItems = computed(() => teacherPortalNavItems(props.school.id));
 const createFileInput = ref(null);
@@ -239,8 +242,8 @@ function saveEdit() {
         });
 }
 
-function removePaper(paper) {
-    if (!confirm(`Remove “${paper.title}”?`)) return;
+async function removePaper(paper) {
+    if (!(await confirm({ message: `Remove “${paper.title}”?` }))) return;
     router.delete(`/portal/teacher/${props.school.id}/question-papers/${paper.id}`, { preserveScroll: true });
 }
 

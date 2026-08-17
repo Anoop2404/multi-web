@@ -42,6 +42,13 @@ class FestSportsCompositeFeeService
     {
         $fees = $this->resolveSportsFeeSource($event);
 
+        // Phase L: group_item_flat_fee/group_item_per_participant_rate and charge_standbys
+        // live in fee_settings (JSON) same as every other Kalotsavam schedule key — sports
+        // composite's own dedicated fee columns (read via resolveSportsFeeSource() above)
+        // never grew a JSON column, so this is read straight off the event rather than
+        // threaded through $fees. See FestItemFeeResolver::groupItemSurchargeAmount().
+        $groupFeeSchedule = $event->fee_settings ?? [];
+
         $schoolReg = (float) ($fees['school_registration_fee'] ?? 0);
         $studentRegRate = (float) ($fees['student_registration_fee'] ?? 0);
         $teamRegRate = (float) ($fees['team_registration_fee'] ?? 0);
@@ -171,6 +178,17 @@ class FestSportsCompositeFeeService
                 $itemLineLabel = $itemTitle.' — team fee (override)';
                 $quantity = 1;
                 $unitAmount = $itemOverride;
+            } elseif (($groupFee = $this->itemFeeResolver->groupItemSurchargeAmount($registration->item, $groupFeeSchedule, $registration)) !== null) {
+                // Phase L: flat event fee + per-participant surcharge, opt-in via
+                // group_item_flat_fee/group_item_per_participant_rate (item override, else
+                // event-wide schedule default) — see groupItemSurchargeAmount() doc comment.
+                // Reuses the exact same computation FestItemFeeResolver::amountForItem() uses
+                // for Kalotsavam group items, so both places agree on how a 7-member group
+                // item bills ₹250 + (₹100×7).
+                $amount = $groupFee;
+                $itemLineLabel = $itemTitle.' — team fee (flat + per-participant)';
+                $quantity = $performersCount;
+                $unitAmount = $performersCount > 0 ? round($groupFee / $performersCount, 2) : $groupFee;
             } else {
                 if ($teamRegRate == 0) {
                     $itemFee = (float) ($defaultItemFee ?? $studentRegRate);
@@ -341,6 +359,9 @@ class FestSportsCompositeFeeService
         $individualQuota = max(0, (int) ($head->included_items_per_student ?? 0));
         $teamQuota = max(0, (int) ($head->included_teams ?? 0));
 
+        // Phase L — see the identical comment in calculateForEvent().
+        $groupFeeSchedule = $event?->fee_settings ?? [];
+
         $registrations = FestRegistration::whereIn('event_id', $event ? $event->reportableEventIds() : [$head->event_id])
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
@@ -438,6 +459,12 @@ class FestSportsCompositeFeeService
                 $label = $itemTitle.' — team fee (override)';
                 $quantity = 1;
                 $unitAmount = $itemOverride;
+            } elseif (($groupFee = $this->itemFeeResolver->groupItemSurchargeAmount($registration->item, $groupFeeSchedule, $registration)) !== null) {
+                // Phase L — see the identical branch in calculateForEvent().
+                $amount = $groupFee;
+                $label = $itemTitle.' — team fee (flat + per-participant)';
+                $quantity = $performersCount;
+                $unitAmount = $performersCount > 0 ? round($groupFee / $performersCount, 2) : $groupFee;
             } else {
                 if ($teamRegRate == 0) {
                     $itemFee = (float) ($head->default_item_fee ?? $studentRegRate);

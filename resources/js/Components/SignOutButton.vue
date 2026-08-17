@@ -1,13 +1,16 @@
 <script setup>
 import { router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
 
 defineProps({
     class: { type: String, default: '' },
     label: { type: String, default: 'Sign out' },
 });
 
-function signOut() {
-    if (! window.confirm('Are you sure you want to sign out?')) {
+const { confirm } = useConfirm();
+
+async function signOut() {
+    if (! (await confirm({ message: 'Are you sure you want to sign out?', destructive: false }))) {
         return;
     }
 

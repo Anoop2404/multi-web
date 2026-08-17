@@ -6,6 +6,8 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestEventStaff;
 use App\Models\SchoolRegionAssignment;
+use App\Models\FestSchoolPhaseRegionSelection;
+use App\Models\FestRegistrationBatch;
 use App\Models\User;
 use App\Support\AcademicYear;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -25,7 +27,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 class FestReportScopeResolver
 {
     /**
-     * @param  array{mode?: ?string, region_id?: int|string|null, competition_phase_id?: int|string|null, school_id?: ?string, item_ids?: ?list<int>}  $params
+     * @param  array{mode?: ?string, region_id?: int|string|null, competition_phase_id?: int|string|null, registration_batch_id?: int|string|null, school_id?: ?string, item_ids?: ?list<int>}  $params
      */
     public function resolve(FestEvent $requestedEvent, User $actor, array $params = []): FestReportScope
     {
@@ -37,24 +39,35 @@ class FestReportScopeResolver
         $phaseId = isset($params['competition_phase_id']) && $params['competition_phase_id'] !== ''
             ? (int) $params['competition_phase_id']
             : null;
+        $batchId = isset($params['registration_batch_id']) && $params['registration_batch_id'] !== ''
+            ? (int) $params['registration_batch_id']
+            : null;
+
+        if ($batchId !== null) {
+            abort_unless(FestRegistrationBatch::where('event_id', $root->id)->whereKey($batchId)->exists(), 422, 'Payment level does not belong to this event.');
+        }
 
         $regionScopes = $this->actorRegionScopes($actor, $root);
 
         if ($regionScopes !== null) {
-            return $this->resolveForRestrictedActor($requestedEvent, $root, $regionScopes, $regionId, $phaseId);
+            $scope = $this->resolveForRestrictedActor($requestedEvent, $root, $regionScopes, $regionId, $phaseId);
+
+            return $this->withBatch($scope, $batchId);
         }
 
-        return match ($mode) {
+        $scope = match ($mode) {
             'region' => $this->regionScope($requestedEvent, $root, $regionId, $phaseId, false),
             'finale' => $this->roleScope($requestedEvent, $root, 'finale', $phaseId, false),
             'cluster' => $this->roleScope($requestedEvent, $root, 'cluster', $phaseId, false),
             'combined' => $this->combinedScope($requestedEvent, $root, $phaseId, false),
             default => $this->selfScope($requestedEvent, $root, $phaseId, false),
         };
+
+        return $this->withBatch($scope, $batchId);
     }
 
     /**
-     * @param  list<array{event_id: int, region_id: ?int}>  $regionScopes
+     * @param  list<array{event_id: int, region_id: ?int, source_phase_id: ?int}>  $regionScopes
      */
     private function resolveForRestrictedActor(
         FestEvent $requestedEvent,
@@ -64,6 +77,17 @@ class FestReportScopeResolver
         ?int $phaseId,
     ): FestReportScope {
         $allowedRegionIds = collect($regionScopes)->pluck('region_id')->filter()->unique()->values()->all();
+        $allowedPhaseIds = collect($regionScopes)->pluck('source_phase_id')->filter()->unique()->values()->all();
+
+        if ($phaseId !== null && $allowedPhaseIds !== [] && ! in_array($phaseId, $allowedPhaseIds, true)) {
+            throw new HttpException(403, 'You are not assigned to that competition phase.');
+        }
+
+        if ($phaseId === null && count($allowedPhaseIds) === 1) {
+            $phaseId = (int) $allowedPhaseIds[0];
+        } elseif ($phaseId === null && count($allowedPhaseIds) > 1) {
+            return $this->emptyScope($requestedEvent, $root, 'region', $requestedRegionId, null, true);
+        }
 
         if ($allowedRegionIds === []) {
             // Assigned duty=region_admin but no region on any scope row — fail closed
@@ -110,7 +134,7 @@ class FestReportScopeResolver
             return $this->emptyScope($requestedEvent, $root, 'region', null, $phaseId, $restricted);
         }
 
-        $eventIds = $this->regionEventIdsForRoot($root, $regionId);
+        $eventIds = $this->regionEventIdsForRoot($root, $regionId, $phaseId);
         if ($eventIds === []) {
             return $this->emptyScope($requestedEvent, $root, 'region', $regionId, $phaseId, $restricted);
         }
@@ -127,12 +151,20 @@ class FestReportScopeResolver
         // as it stands today, not as it stood when that event actually ran.
         // Falls back to the live current year only if the event predates
         // academic_year_id being populated (older historical events).
-        $year = $root->academicYear?->label ?? AcademicYear::forSahodaya($root->tenant_id);
-        $schoolIds = SchoolRegionAssignment::forTenant($root->tenant_id)
-            ->forYear($year)
-            ->where('region_id', $regionId)
-            ->pluck('school_id')
-            ->all();
+        if ($root->usesPhasedRegionalBilling() && $phaseId) {
+            $schoolIds = FestSchoolPhaseRegionSelection::where('event_id', $root->id)
+                ->where('phase_id', $phaseId)
+                ->where('region_id', $regionId)
+                ->pluck('school_id')
+                ->all();
+        } else {
+            $year = $root->academicYear?->label ?? AcademicYear::forSahodaya($root->tenant_id);
+            $schoolIds = SchoolRegionAssignment::forTenant($root->tenant_id)
+                ->forYear($year)
+                ->where('region_id', $regionId)
+                ->pluck('school_id')
+                ->all();
+        }
 
         return new FestReportScope(
             requestedEvent: $requestedEvent,
@@ -186,6 +218,28 @@ class FestReportScopeResolver
      */
     private function combinedScope(FestEvent $requestedEvent, FestEvent $root, ?int $phaseId, bool $restricted): FestReportScope
     {
+        if ($root->usesPhasedRegionalBilling()) {
+            $eventIds = FestEvent::where('parent_event_id', $root->id)
+                ->when($phaseId, fn ($query) => $query->where('source_phase_id', $phaseId))
+                ->whereNotNull('source_phase_id')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            return new FestReportScope(
+                requestedEvent: $requestedEvent,
+                rootEvent: $root,
+                mode: 'combined',
+                regionId: null,
+                competitionPhaseId: $phaseId,
+                eventIds: $eventIds,
+                itemIds: $this->itemIds($eventIds, $phaseId),
+                schoolIds: [],
+                includedPartitionRoles: ['phase', 'region'],
+                isActorRestricted: $restricted,
+            );
+        }
+
         $regionChildren = $root->childrenForRoles(['region']);
 
         if ($regionChildren->isNotEmpty()) {
@@ -241,8 +295,17 @@ class FestReportScopeResolver
      *
      * @return list<int>
      */
-    private function regionEventIdsForRoot(FestEvent $root, int $regionId): array
+    private function regionEventIdsForRoot(FestEvent $root, int $regionId, ?int $phaseId = null): array
     {
+        if ($root->usesPhasedRegionalBilling()) {
+            return FestEvent::where('parent_event_id', $root->id)
+                ->where('region_id', $regionId)
+                ->when($phaseId, fn ($query) => $query->where('source_phase_id', $phaseId))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
         $direct = $root->regionalChild($regionId);
         if ($direct) {
             return [(int) $direct->id];
@@ -289,10 +352,58 @@ class FestReportScopeResolver
 
         return FestEventItem::query()
             ->whereIn('event_id', $eventIds)
-            ->when($phaseId, fn ($q) => $q->where('phase_id', $phaseId))
+            ->when($phaseId, fn ($q) => $q->whereHas('phase', fn ($phase) => $phase
+                ->where('id', $phaseId)
+                ->orWhere('source_phase_id', $phaseId)))
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
+    }
+
+    private function withBatch(FestReportScope $scope, ?int $batchId): FestReportScope
+    {
+        if ($batchId === null) {
+            return $scope;
+        }
+
+        $batchPhaseIds = \App\Models\FestEventPhase::where('event_id', $scope->rootEvent->id)
+            ->where('registration_batch_id', $batchId)
+            ->pluck('id');
+        $eventIds = FestEvent::whereIn('id', $scope->eventIds)
+            ->whereIn('source_phase_id', $batchPhaseIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($eventIds === [] && in_array((int) $scope->rootEvent->id, $scope->eventIds, true)) {
+            $eventIds = [(int) $scope->rootEvent->id];
+        }
+
+        $itemIds = FestEventItem::whereIn('event_id', $eventIds)
+            ->whereHas('phase', fn ($phase) => $phase
+                ->whereIn('id', $batchPhaseIds)
+                ->orWhereIn('source_phase_id', $batchPhaseIds))
+            ->when($scope->competitionPhaseId, fn ($query, $phaseId) => $query
+                ->whereHas('phase', fn ($phase) => $phase
+                    ->where('id', $phaseId)
+                    ->orWhere('source_phase_id', $phaseId)))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return new FestReportScope(
+            requestedEvent: $scope->requestedEvent,
+            rootEvent: $scope->rootEvent,
+            mode: $scope->mode,
+            regionId: $scope->regionId,
+            competitionPhaseId: $scope->competitionPhaseId,
+            eventIds: $eventIds,
+            itemIds: $itemIds,
+            schoolIds: $scope->schoolIds,
+            includedPartitionRoles: $scope->includedPartitionRoles,
+            isActorRestricted: $scope->isActorRestricted,
+            registrationBatchId: $batchId,
+        );
     }
 
     /**
@@ -301,7 +412,7 @@ class FestReportScopeResolver
      * assignment reaching this root at all — the latter should already have been
      * rejected earlier by EnsureSahodayaAdmin and never reach here).
      *
-     * @return null|list<array{event_id: int, region_id: ?int}>
+     * @return null|list<array{event_id: int, region_id: ?int, source_phase_id: ?int}>
      */
     private function actorRegionScopes(User $actor, FestEvent $root): ?array
     {
@@ -336,8 +447,12 @@ class FestReportScopeResolver
             ->where('user_id', $actor->id)
             ->where('duty', 'region_admin')
             ->whereIn('event_id', array_values(array_unique($candidateEventIds)))
-            ->get(['event_id', 'region_id'])
-            ->map(fn ($row) => ['event_id' => (int) $row->event_id, 'region_id' => $row->region_id !== null ? (int) $row->region_id : null])
+            ->get(['event_id', 'region_id', 'source_phase_id'])
+            ->map(fn ($row) => [
+                'event_id' => (int) $row->event_id,
+                'region_id' => $row->region_id !== null ? (int) $row->region_id : null,
+                'source_phase_id' => $row->source_phase_id !== null ? (int) $row->source_phase_id : null,
+            ])
             ->values()
             ->all();
 

@@ -267,6 +267,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -282,6 +283,7 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}`;
+const { confirm } = useConfirm();
 const f = reactive({
     school_id: props.filters?.school_id ?? '',
     verification: props.filters?.verification ?? 'all',
@@ -399,26 +401,26 @@ function bulkVerifyPage() {
     });
 }
 
-function bulkVerifySchool() {
+async function bulkVerifySchool() {
     if (!props.selectedSchool || !schoolPendingCount.value) return;
-    if (!confirm(`Verify all ${schoolPendingCount.value} pending teacher(s) at ${props.selectedSchool.name}?`)) return;
+    if (!(await confirm({ message: `Verify all ${schoolPendingCount.value} pending teacher(s) at ${props.selectedSchool.name}?`, destructive: false }))) return;
     router.post(`${base}/teachers/verification/bulk-verify`, {
         verify_all_unverified: true,
         school_id: props.selectedSchool.id,
     }, { preserveScroll: true });
 }
 
-function bulkVerifyAllPending() {
+async function bulkVerifyAllPending() {
     if (!props.counts?.unverified) return;
-    if (!confirm(`Verify all ${props.counts.unverified} pending teacher(s) across all schools?`)) return;
+    if (!(await confirm({ message: `Verify all ${props.counts.unverified} pending teacher(s) across all schools?`, destructive: false }))) return;
     router.post(`${base}/teachers/verification/bulk-verify`, {
         verify_all_unverified: true,
     }, { preserveScroll: true });
 }
 
-function bulkVerifySchoolRow(row) {
+async function bulkVerifySchoolRow(row) {
     if (!row.unverified) return;
-    if (!confirm(`Verify all ${row.unverified} pending teacher(s) at ${row.name}?`)) return;
+    if (!(await confirm({ message: `Verify all ${row.unverified} pending teacher(s) at ${row.name}?`, destructive: false }))) return;
     router.post(`${base}/teachers/verification/bulk-verify`, {
         verify_all_unverified: true,
         school_id: row.id,

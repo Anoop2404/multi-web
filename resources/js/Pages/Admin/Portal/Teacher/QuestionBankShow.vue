@@ -110,8 +110,11 @@ import EmptyState from '@/Components/ui/EmptyState.vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({ school: Object, teacher: Object, bank: Object });
+
+const { confirm } = useConfirm();
 
 const qForm = useForm({
     title: '',
@@ -158,8 +161,8 @@ function addQuestion() {
     });
 }
 
-function removeQuestion(q) {
-    if (!confirm('Remove this question?')) return;
+async function removeQuestion(q) {
+    if (!(await confirm({ message: 'Remove this question?' }))) return;
     router.delete(`/portal/teacher/${props.school.id}/question-banks/${props.bank.id}/questions/${q.id}`, { preserveScroll: true });
 }
 </script>

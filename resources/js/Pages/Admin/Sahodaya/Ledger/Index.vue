@@ -188,6 +188,7 @@ import { Link, useForm, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -196,6 +197,8 @@ const props = defineProps({
     academicYears: { type: Array, default: () => [] },
     filterFinancialYearId: { type: Number, default: null },
 });
+
+const { confirm } = useConfirm();
 
 const transactionRows = computed(() => {
     if (Array.isArray(props.transactions)) {
@@ -231,8 +234,8 @@ function addHead() {
     });
 }
 
-function deleteHead(head) {
-    if (!confirm(`Delete head "${head.name}"?`)) return;
+async function deleteHead(head) {
+    if (!(await confirm({ message: `Delete head "${head.name}"?`, destructive: true }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/ledger/heads/${head.id}`, { preserveScroll: true });
 }
 

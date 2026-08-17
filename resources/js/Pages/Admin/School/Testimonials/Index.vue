@@ -103,6 +103,9 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school:       Object,
@@ -151,8 +154,8 @@ function save() {
     }
 }
 
-function remove(t) {
-    if (!confirm(`Delete testimonial from "${t.name}"?`)) return;
+async function remove(t) {
+    if (!(await confirm({ message: `Delete testimonial from "${t.name}"?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/testimonials/${t.id}`);
 }
 </script>

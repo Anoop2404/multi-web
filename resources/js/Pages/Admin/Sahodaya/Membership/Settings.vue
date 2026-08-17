@@ -1062,6 +1062,7 @@
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya:                Object,
@@ -1095,6 +1096,8 @@ const props = defineProps({
     ageCategories:           { type: Array, default: () => [] },
     globalAgeCutoffDate:     { type: String, default: null },
 });
+
+const { confirm } = useConfirm();
 
 const tabGroups = [
     {
@@ -1523,8 +1526,8 @@ function saveCategoryEdit(cat) {
         onSuccess: () => cancelCategoryEdit(),
     });
 }
-function removeCategory(cat) {
-    if (! confirm(`Remove category "${cat.label}"?`)) return;
+async function removeCategory(cat) {
+    if (! (await confirm({ message: `Remove category "${cat.label}"?` }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/membership/custom-categories/${cat.id}`);
 }
 function addClass() {
@@ -1547,8 +1550,8 @@ function saveClassEdit(cls) {
         onSuccess: () => cancelClassEdit(),
     });
 }
-function removeClass(cls) {
-    if (! confirm(`Remove class "${cls.name}"?`)) return;
+async function removeClass(cls) {
+    if (! (await confirm({ message: `Remove class "${cls.name}"?` }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/membership/classes/${cls.id}`);
 }
 function addSubject() {
@@ -1575,8 +1578,8 @@ function saveSubjectEdit(subject) {
         onSuccess: () => cancelSubjectEdit(),
     });
 }
-function removeSubject(s) {
-    if (!confirm(`Remove subject "${s.label}"?`)) return;
+async function removeSubject(s) {
+    if (!(await confirm({ message: `Remove subject "${s.label}"?` }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/membership/subjects/${s.id}`);
 }
 const ageGroupsBase = `/sahodaya-admin/${props.sahodaya.id}/sports-age-groups`;
@@ -1602,8 +1605,8 @@ function saveAgeCategoryEdit(g) {
         onSuccess: () => { editingAgeCategoryId.value = null; },
     });
 }
-function removeAgeCategory(g) {
-    if (!confirm(`Remove ${g.label}? In-use categories will be deactivated instead.`)) return;
+async function removeAgeCategory(g) {
+    if (!(await confirm({ message: `Remove ${g.label}? In-use categories will be deactivated instead.` }))) return;
     router.delete(`${ageGroupsBase}/${g.id}`, { preserveScroll: true });
 }
 function saveAgeCutoff() {

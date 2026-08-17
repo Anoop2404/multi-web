@@ -60,4 +60,30 @@ class McqRankingService
 
         return $eligible->count();
     }
+
+    /**
+     * Re-rank the exam only once ranking is meaningful: when there is at
+     * least one present registration and every present registration has a
+     * mark recorded. Called from all mark-writing entry points so rankings
+     * never go stale, without re-ranking on every keystroke mid-entry.
+     *
+     * Fix 2026-08-15: closes the "storeMark doesn't trigger re-ranking" gap
+     * documented in mcq_exam_flow_audit_2026_08_13.md.
+     */
+    public function rankIfComplete(McqExam $exam): bool
+    {
+        $presentCount = \App\Models\McqRegistration::where('exam_id', $exam->id)
+            ->where('attendance_status', 'present')
+            ->count();
+
+        $markedCount = McqMark::whereHas('registration', fn ($q) => $q->where('exam_id', $exam->id))->count();
+
+        if ($presentCount > 0 && $markedCount >= $presentCount) {
+            $this->rankExam($exam);
+
+            return true;
+        }
+
+        return false;
+    }
 }

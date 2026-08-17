@@ -435,11 +435,13 @@ class McqExamController extends SahodayaAdminController
             "Mark entered for registration #{$registration->id}",
         );
 
-        $presentCount = McqRegistration::where('exam_id', $exam->id)->where('attendance_status', 'present')->count();
-        $markedCount = McqMark::whereHas('registration', fn ($q) => $q->where('exam_id', $exam->id))->count();
-        if ($presentCount > 0 && $markedCount >= $presentCount) {
-            app(\App\Services\Mcq\McqRankingService::class)->rankExam($exam);
-        }
+        // Fix 2026-08-15: re-ranking condition extracted into
+        // McqRankingService::rankIfComplete() so all mark-writing entry
+        // points share it; closes the gap noted in
+        // mcq_exam_flow_audit_2026_08_13.md ("storeMark doesn't trigger
+        // re-ranking") for the other call sites without duplicating this
+        // "only rank once every present student is marked" condition.
+        app(\App\Services\Mcq\McqRankingService::class)->rankIfComplete($exam);
 
         return back()->with('success', 'Marks saved.');
     }

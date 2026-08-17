@@ -25,10 +25,25 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Services\Events\Reports\FestReportScope;
 
 class FestEventReportAnalyticsService
 {
-    public function __construct(public FestEvent $event) {}
+    public function __construct(public FestEvent $event, private ?FestReportScope $scope = null) {}
+
+    /** @return list<int> */
+    private function eventIds(): array
+    {
+        return $this->scope?->eventIds ?? $this->event->reportableEventIds();
+    }
+
+    /** @return list<int> */
+    private function itemIdsFor(int $itemId): array
+    {
+        $ids = $this->event->reportableItemIds([$itemId]);
+
+        return $this->scope ? array_values(array_intersect($ids, $this->scope->itemIds)) : $ids;
+    }
 
     /**
      * Sahodaya branding (org name + logo data URI) for PDF report headers.
@@ -51,7 +66,7 @@ class FestEventReportAnalyticsService
         $taxonomy = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id);
         $labels = $taxonomy->labels('sport_discipline');
 
-        $eventIds = $this->event->reportableEventIds();
+        $eventIds = $this->eventIds();
         $items = FestEventItem::whereIn('event_id', $eventIds)->get(['id', 'sport_discipline']);
         $byDiscipline = $items->groupBy(fn ($i) => $i->sport_discipline ?: 'unspecified');
 
@@ -129,7 +144,7 @@ class FestEventReportAnalyticsService
 
         return FestSchoolEventFee::where('event_id', $this->event->id)
             ->forAmountAggregation()
-            ->with('feeReceipt')
+            ->with(['feeReceipt', 'registrationBatch'])
             ->orderBy('school_id')
             ->get()
             ->map(fn (FestSchoolEventFee $fee) => [
@@ -138,6 +153,8 @@ class FestEventReportAnalyticsService
                 'total_due'        => (float) $fee->total_due,
                 'paid'             => (float) ($fee->feeReceipt?->amount ?? 0),
                 'status'           => $fee->status,
+                'registration_batch_id' => $fee->registration_batch_id,
+                'registration_batch' => $fee->registrationBatch?->name,
                 'receipt_no'       => $fee->feeReceipt?->receipt_number,
                 // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.
                 'available_credit' => $fee->outstandingCredit(),
@@ -469,7 +486,7 @@ class FestEventReportAnalyticsService
             return [(int) $this->event->id];
         }
 
-        return $this->event->reportableEventIds();
+        return $this->eventIds();
     }
 
     public function itemRegistrationRows(?string $schoolId = null): array
@@ -499,7 +516,7 @@ class FestEventReportAnalyticsService
         $allReportableItemIds = [];
         $itemFamilyMap = [];
         foreach ($items as $item) {
-            $family = $this->event->reportableItemIds([$item->id]);
+            $family = $this->itemIdsFor($item->id);
             foreach ($family as $fid) {
                 $allReportableItemIds[] = $fid;
                 $itemFamilyMap[$fid] = $item->id;
@@ -642,7 +659,7 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function assignmentCompletenessRows(?string $schoolId = null): array
     {
-        $eventIds = $this->event->reportableEventIds();
+        $eventIds = $this->eventIds();
 
         $itemScheduleIds = FestSchedule::query()
             ->whereIn('event_id', $eventIds)
@@ -840,7 +857,7 @@ class FestEventReportAnalyticsService
     {
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->whereIn('event_id', $this->event->reportableEventIds())
+                ->whereIn('event_id', $this->eventIds())
                 ->active()
                 ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
             ->with([
@@ -902,7 +919,7 @@ class FestEventReportAnalyticsService
     private function pendingApprovalQuery(?string $schoolId)
     {
         return FestRegistration::query()
-            ->whereIn('event_id', $this->event->reportableEventIds())
+            ->whereIn('event_id', $this->eventIds())
             ->where('status', 'submitted')
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->with(['school:id,name', 'item:id,title,head_id', 'item.head:id,name', 'participants.student:id,name', 'participants.teacher:id,name'])
@@ -1120,7 +1137,7 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function teamSquadRows(?string $schoolId = null): array
     {
-        $teamItems = FestEventItem::whereIn('event_id', $this->event->reportableEventIds())
+        $teamItems = FestEventItem::whereIn('event_id', $this->eventIds())
             ->whereIn('participant_type', ['team', 'group'])
             ->orderBy('title')
             ->get();
@@ -1608,7 +1625,7 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function studentWiseBrowserRows(?string $schoolId = null, ?string $search = null): array
     {
-        $eventIds = $this->event->reportableEventIds();
+        $eventIds = $this->eventIds();
 
         $participants = FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
@@ -1694,7 +1711,7 @@ class FestEventReportAnalyticsService
     {
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->whereIn('event_id', $this->event->reportableEventIds())
+                ->whereIn('event_id', $this->eventIds())
                 ->where('item_id', $itemId)
                 ->active())
             ->with(['student', 'teacher', 'registration.school', 'mark'])

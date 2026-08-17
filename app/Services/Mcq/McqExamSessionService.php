@@ -4,6 +4,7 @@ namespace App\Services\Mcq;
 
 use App\Models\McqExam;
 use App\Models\McqMark;
+use App\Models\McqProctorEvent;
 use App\Models\McqQuestion;
 use App\Models\McqRegistration;
 use Illuminate\Support\Collection;
@@ -282,6 +283,36 @@ class McqExamSessionService
         ]);
 
         return $mark;
+    }
+
+    /**
+     * Record a client-reported proctoring event (tab switch / window blur / fullscreen exit)
+     * for an active exam session. Detect-and-log only: this never mutates the registration's
+     * status, score, or attendance -- it is purely visibility for staff reviewing the session
+     * afterward. Silently ignores events once the session is no longer active/started, or once
+     * the per-registration cap is reached, so a flaky or malicious client cannot spam the table
+     * or record events outside a real session window.
+     */
+    public function recordProctorEvent(McqRegistration $registration, string $eventType, ?\Carbon\Carbon $occurredAt = null): ?McqProctorEvent
+    {
+        if (! in_array($eventType, McqProctorEvent::TYPES, true)) {
+            return null;
+        }
+
+        if (! $registration->started_at || $registration->status === 'submitted') {
+            return null;
+        }
+
+        $existingCount = McqProctorEvent::where('registration_id', $registration->id)->count();
+        if ($existingCount >= McqProctorEvent::MAX_PER_REGISTRATION) {
+            return null;
+        }
+
+        return McqProctorEvent::create([
+            'registration_id' => $registration->id,
+            'event_type'      => $eventType,
+            'occurred_at'     => $occurredAt ?? now(),
+        ]);
     }
 
     private function assertActiveSession(McqRegistration $registration, bool $allowExpired = false): void

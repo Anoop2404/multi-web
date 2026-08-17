@@ -3,8 +3,11 @@
 @section('content')
 <section class="py-12 px-4">
     <div class="max-w-xl mx-auto">
+        <div class="mb-4">
+            <a href="{{ route('tenant.fest.show', $event->id) }}" class="text-sm font-semibold text-amber-700 hover:underline">← Back to Festival Hub</a>
+        </div>
         <h1 class="text-2xl font-bold font-heading mb-4">{{ $event->title }} — Search</h1>
-        <form method="get" class="flex gap-2 mb-2">
+        <form method="get" action="{{ route('tenant.fest.search', $event->id) }}" class="flex gap-2 mb-2">
             <input name="q" value="{{ $q }}" placeholder="{{ $searchHint }}" class="flex-1 border rounded-lg px-3 py-2 text-sm" autofocus>
             <button class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm">Search</button>
         </form>

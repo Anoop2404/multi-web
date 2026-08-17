@@ -9,7 +9,7 @@ class FestEventStaff extends Model
 {
     protected $table = 'fest_event_staff';
 
-    protected $fillable = ['event_id', 'user_id', 'duty', 'stage_id', 'venue_id', 'head_id', 'region_id'];
+    protected $fillable = ['event_id', 'user_id', 'duty', 'stage_id', 'venue_id', 'head_id', 'region_id', 'source_phase_id'];
 
     public function event(): BelongsTo
     {
@@ -24,6 +24,11 @@ class FestEventStaff extends Model
     public function region(): BelongsTo
     {
         return $this->belongsTo(Region::class, 'region_id');
+    }
+
+    public function sourcePhase(): BelongsTo
+    {
+        return $this->belongsTo(FestEventPhase::class, 'source_phase_id');
     }
 
     public function stage(): BelongsTo

@@ -52,11 +52,13 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({ school: Object, events: Object });
 
-function destroy(event) {
-    if (!confirm(`Delete "${event.title}"?`)) return;
+async function destroy(event) {
+    if (!(await confirm({ message: `Delete "${event.title}"?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/events/${event.id}`);
 }
 </script>

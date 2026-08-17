@@ -1,12 +1,14 @@
 <nav x-data="{ open: false }" class="sticky top-0 z-50 text-white shadow"
      style="background-color: var(--color-primary)">
     <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
-        <a href="/" class="flex items-center gap-3">
+        <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 min-w-0">
             @if(isset($tenant) && !empty($logo = \App\Support\TenantBranding::logoUrl($tenant)))
-                <img loading="lazy" src="{{ $logo }}" class="h-10 brightness-0 invert" alt="{{ $tenant->name }}">
-            @else
-                <span class="text-xl font-bold font-heading text-white">{{ $tenant->name ?? 'School' }}</span>
+                <img loading="lazy" src="{{ $logo }}" class="h-10 w-auto shrink-0 brightness-0 invert" alt="{{ $tenant->name }}">
             @endif
+            <div class="min-w-0">
+                <p class="font-heading font-extrabold text-base sm:text-lg text-white leading-tight tracking-tight truncate">{{ $tenant->name ?? 'Sahodaya' }}</p>
+                <p class="text-[10px] sm:text-xs font-bold text-amber-300 uppercase tracking-widest leading-none hidden sm:block">CBSE Sahodaya Network</p>
+            </div>
         </a>
 
         <div class="hidden md:flex items-center gap-6">

@@ -421,6 +421,9 @@ import { useForm, router } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import CertificateLiveCanvas from '@/Components/certificates/CertificateLiveCanvas.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -665,8 +668,8 @@ function upload() {
     form.post(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates`, options);
 }
 
-function remove(template) {
-    if (!confirm(`Delete ${template.certificate_type} template for ${template.event_type}?`)) return;
+async function remove(template) {
+    if (!(await confirm({ message: `Delete ${template.certificate_type} template for ${template.event_type}?` }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates/${template.id}`, {
         preserveScroll: true,
     });

@@ -173,7 +173,7 @@ class SchoolUserScopeService
     {
         $scopes = $this->scopesForUser($user->id, $schoolId);
         if ($scopes === []) {
-            return "/school-admin/{$schoolId}";
+            return "/school-admin/{$schoolId}/unassigned";
         }
 
         $first = $scopes[0];

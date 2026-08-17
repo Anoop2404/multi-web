@@ -160,6 +160,7 @@ import { Link, useForm, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const certAlert = ref('');
 
@@ -175,6 +176,7 @@ const props = defineProps({
 const searchQuery = ref('');
 const selectedIds = ref([]);
 const isBulkSending = ref(false);
+const { confirm } = useConfirm();
 
 const testEmailForm = useForm({
     test_email: '',
@@ -211,8 +213,8 @@ function sendTestEmail() {
     });
 }
 
-function bulkSendAll() {
-    if (!confirm(`Send official certificate PDF emails to all ${props.stats.eligible} eligible teacher(s)?`)) return;
+async function bulkSendAll() {
+    if (!(await confirm({ message: `Send official certificate PDF emails to all ${props.stats.eligible} eligible teacher(s)?`, destructive: false }))) return;
     isBulkSending.value = true;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/certificates/bulk-send-email`, {}, {
         preserveScroll: true,
@@ -220,9 +222,9 @@ function bulkSendAll() {
     });
 }
 
-function bulkSendSelected() {
+async function bulkSendSelected() {
     if (!selectedIds.value.length) return;
-    if (!confirm(`Send certificate PDF emails to ${selectedIds.value.length} selected teacher(s)?`)) return;
+    if (!(await confirm({ message: `Send certificate PDF emails to ${selectedIds.value.length} selected teacher(s)?`, destructive: false }))) return;
     isBulkSending.value = true;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/certificates/bulk-send-email`, {
         registration_ids: selectedIds.value,
@@ -232,8 +234,8 @@ function bulkSendSelected() {
     });
 }
 
-function sendSingleEmail(row) {
-    if (!confirm(`Send certificate PDF email to ${row.teacher_name}?`)) return;
+async function sendSingleEmail(row) {
+    if (!(await confirm({ message: `Send certificate PDF email to ${row.teacher_name}?`, destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/certificates/${row.id}/send-single-email`, {}, {
         preserveScroll: true,
     });

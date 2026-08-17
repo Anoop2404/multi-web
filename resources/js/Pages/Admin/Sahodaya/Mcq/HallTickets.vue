@@ -192,6 +192,7 @@ import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqHallTicketPreview from '@/Components/sahodaya/McqHallTicketPreview.vue';
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
 import FormField from '@/Components/ui/FormField.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -209,6 +210,7 @@ const props = defineProps({
 });
 
 const searchQuery = ref('');
+const { confirm } = useConfirm();
 const ticketsPage = ref(1);
 const ticketsPageSize = ref(50);
 const logoInput = ref(null);
@@ -335,8 +337,8 @@ function publish() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/publish`, {}, { preserveScroll: true });
 }
 
-function unpublish() {
-    if (!window.confirm('Hide hall tickets from schools and candidates again?')) return;
+async function unpublish() {
+    if (!(await confirm({ message: 'Hide hall tickets from schools and candidates again?', destructive: true }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/unpublish`, {}, { preserveScroll: true });
 }
 </script>

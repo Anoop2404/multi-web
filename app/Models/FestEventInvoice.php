@@ -11,7 +11,7 @@ class FestEventInvoice extends Model
     use BelongsToCentralTenant;
 
     protected $fillable = [
-        'event_id', 'school_id', 'invoice_number',
+        'event_id', 'school_id', 'registration_batch_id', 'billing_key', 'invoice_number',
         'school_registration_fee', 'participation_fee', 'total_amount',
         'participation_item_count', 'breakdown_json', 'status', 'issued_at', 'issued_by',
     ];
@@ -32,6 +32,11 @@ class FestEventInvoice extends Model
     public function school(): BelongsTo
     {
         return $this->belongsToCentralTenant('school_id');
+    }
+
+    public function registrationBatch(): BelongsTo
+    {
+        return $this->belongsTo(FestRegistrationBatch::class, 'registration_batch_id');
     }
 
     public static function generateNumber(FestEvent $event): string

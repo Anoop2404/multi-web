@@ -54,6 +54,7 @@ trait BuildsMembershipExports
             ->orderBy($sortColumn, $filters['dir'] ?? 'asc');
 
         $this->applySchoolSearchAndDates($query, $filters);
+        $this->applyMembershipRegionScope($query);
 
         return $query;
     }
@@ -65,8 +66,18 @@ trait BuildsMembershipExports
             ->orderBy('name');
 
         $this->applySchoolSearchAndDates($query, $filters);
+        $this->applyMembershipRegionScope($query);
 
         return $query;
+    }
+
+    /** Narrows a Tenant (school) query to the current user's region(s), if they're scoped. */
+    private function applyMembershipRegionScope(Builder $query): void
+    {
+        $scope = $this->membershipRegionScopeOrNull();
+        if ($scope !== null) {
+            $query->whereIn('id', $scope);
+        }
     }
 
     protected function paymentsQuery(string $sahodayaId, array $schoolIds, array $filters): Builder

@@ -3,7 +3,7 @@
      x-init="window.addEventListener('scroll', () => { scrolled = window.scrollY > 50; })"
      :class="scrolled ? 'bg-white shadow-sm' : 'bg-transparent'">
     <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
-        <a href="/" class="flex items-center gap-3">
+        <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3">
             @if(!empty($logo))
             <img loading="lazy" src="{{ $logo }}" class="h-10" alt="{{ $tenant->name }}"
                  :class="scrolled ? '' : 'brightness-0 invert'">

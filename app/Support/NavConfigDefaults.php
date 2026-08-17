@@ -55,7 +55,14 @@ class NavConfigDefaults
                 ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
                 ['label' => 'About', 'url' => '/#about-sahodaya', 'external' => false, 'children' => []],
                 ['label' => 'Programmes', 'url' => '/#programmes', 'external' => false, 'children' => []],
-                ['label' => 'Live Results', 'url' => '/fest', 'external' => false, 'children' => []],
+                [
+                    'label' => 'Events & Results', 'url' => '/fest', 'external' => false,
+                    'children' => [
+                        ['label' => 'All Events & Schedule', 'url' => '/fest', 'external' => false],
+                        ['label' => 'Live Scoreboards', 'url' => '/scoreboard', 'external' => false],
+                        ['label' => 'MCQ Talent Search Papers', 'url' => '/mcq/papers', 'external' => false],
+                    ],
+                ],
                 ['label' => 'Office Bearers', 'url' => '/#office-bearers', 'external' => false, 'children' => []],
                 ['label' => 'Member Schools', 'url' => '/#member-schools', 'external' => false, 'children' => []],
                 [

@@ -85,15 +85,18 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
 import { inject } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const { lifecycle, suggestedStatus, lifecycleLinks, lifecycleForm, saveLifecycle, schoolVerifications, mandatoryGaps, event, sahodaya } = inject('eventSettings');
+
+const { prompt } = useConfirm();
 
 function onManualFile(e) {
     lifecycleForm.manual_pdf = e.target.files?.[0] ?? null;
 }
 
-function toggleVerification(row, verified) {
-    const notes = verified ? (window.prompt('Verification notes (optional)') || '') : '';
+async function toggleVerification(row, verified) {
+    const notes = verified ? ((await prompt({ message: 'Verification notes (optional)', inputMultiline: true, inputRequired: false })) || '') : '';
     router.post(`/sahodaya-admin/${sahodaya.id}/events/${event.id}/school-verifications/${row.school_id}`, {
         documents_verified: verified,
         notes,

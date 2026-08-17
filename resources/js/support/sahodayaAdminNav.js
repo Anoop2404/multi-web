@@ -131,6 +131,7 @@ export function sahodayaMembershipScopedNav(sahodayaId, options = {}) {
                 { label: 'Membership fees', href: `${base}/membership/payments`, icon: 'credit-card', badge: pendingPaymentsCount },
                 { label: 'Student verification', href: `${base}/students/verification${unverifiedStudentsCount ? '?verification=unverified' : ''}`, icon: 'users', badge: unverifiedStudentsCount },
                 { label: 'Teacher verification', href: `${base}/teachers/verification`, icon: 'users' },
+                { label: 'Credentials', href: `${base}/credentials`, icon: 'shield' },
             ],
         },
         {
@@ -380,6 +381,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
                 { label: 'Membership fees', href: `${base}/membership/payments`, icon: 'credit-card', badge: pendingPaymentsCount },
                 { label: 'Student verification', href: `${base}/students/verification${unverifiedStudentsCount ? '?verification=unverified' : ''}`, icon: 'users', badge: unverifiedStudentsCount },
                 { label: 'Teacher verification', href: `${base}/teachers/verification`, icon: 'users' },
+                { label: 'Credentials', href: `${base}/credentials`, icon: 'shield' },
             ],
         });
 

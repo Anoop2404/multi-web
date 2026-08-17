@@ -123,6 +123,7 @@ import { Link, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -135,6 +136,8 @@ const props = defineProps({
 });
 
 const statusFilter = ref(props.filters?.status ?? 'open');
+
+const { confirm } = useConfirm();
 
 const createForm = useForm({
     vendor_name: '',
@@ -164,15 +167,15 @@ function createPayable() {
     });
 }
 
-function markPaid(id, balance) {
-    if (!confirm(`Record payment of ₹${fmt(balance)}?`)) return;
+async function markPaid(id, balance) {
+    if (!(await confirm({ message: `Record payment of ₹${fmt(balance)}?`, destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/finance/payables/${id}/pay`, {
         amount: balance,
     }, { preserveScroll: true });
 }
 
-function cancelPayable(id) {
-    if (!confirm('Cancel this payable?')) return;
+async function cancelPayable(id) {
+    if (!(await confirm({ message: 'Cancel this payable?', destructive: true }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/finance/payables/${id}/cancel`, {}, { preserveScroll: true });
 }
 </script>

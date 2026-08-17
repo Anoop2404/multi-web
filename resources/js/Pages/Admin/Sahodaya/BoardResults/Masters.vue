@@ -171,6 +171,9 @@ import { Link, useForm, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import SubjectPicker from '@/Components/ui/SubjectPicker.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -223,8 +226,8 @@ function createSubject() {
     });
 }
 
-function removeSubject(subj) {
-    if (!window.confirm(`Remove subject "${subj.label}"?`)) return;
+async function removeSubject(subj) {
+    if (!(await confirm({ message: `Remove subject "${subj.label}"?` }))) return;
     router.delete(`${base.value}/subjects/${subj.id}`, { preserveScroll: true });
 }
 
@@ -258,8 +261,8 @@ function saveStream(s) {
     }, { preserveScroll: true });
 }
 
-function removeStream(s) {
-    if (!window.confirm(`Remove or deactivate stream ${s.code}?`)) return;
+async function removeStream(s) {
+    if (!(await confirm({ message: `Remove or deactivate stream ${s.code}?` }))) return;
     router.delete(`${base.value}/streams/${s.id}`, { preserveScroll: true });
 }
 </script>

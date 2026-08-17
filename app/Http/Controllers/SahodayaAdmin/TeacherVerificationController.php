@@ -39,9 +39,9 @@ class TeacherVerificationController extends SahodayaAdminController
             'page'             => 'nullable|integer|min:1',
         ]);
 
-        $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)
-            ->where('type', 'school')
-            ->pluck('id');
+        $schoolIds = $this->membershipRegionScopedSchoolIds(
+            Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id')->all()
+        );
 
         $base = Teacher::query()
             ->whereIn('tenant_id', $schoolIds)
@@ -171,6 +171,7 @@ class TeacherVerificationController extends SahodayaAdminController
     {
         $this->assertStaffCan('membership.manage');
         abort_if($teacher->tenant?->parent_id !== $this->sahodaya->id, 403);
+        abort_if($this->membershipRegionScopedSchoolIds([$teacher->tenant_id]) === [], 403);
 
         if ($teacher->verified_at) {
             return back()->with('success', 'Teacher is already verified.');
@@ -202,6 +203,7 @@ class TeacherVerificationController extends SahodayaAdminController
     {
         $this->assertStaffCan('membership.manage');
         abort_if($teacher->tenant?->parent_id !== $this->sahodaya->id, 403);
+        abort_if($this->membershipRegionScopedSchoolIds([$teacher->tenant_id]) === [], 403);
 
         $data = $request->validate(['reason' => 'required|string|max:500']);
 
@@ -238,7 +240,9 @@ class TeacherVerificationController extends SahodayaAdminController
             'school_id'             => 'nullable|string',
         ]);
 
-        $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id');
+        $schoolIds = $this->membershipRegionScopedSchoolIds(
+            Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id')->all()
+        );
 
         if (! empty($data['teacher_ids'])) {
             $query = Teacher::whereIn('tenant_id', $schoolIds)

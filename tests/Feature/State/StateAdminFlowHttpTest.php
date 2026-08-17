@@ -129,6 +129,43 @@ class StateAdminFlowHttpTest extends TestCase
             ->assertDontSee('Rejected Finalist');
     }
 
+    public function test_state_admin_can_view_state_program_show_page_with_propagations(): void
+    {
+        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false]);
+        $admin->assignRole('state_admin');
+
+        $program = FestStateProgram::create([
+            'title' => 'State Program Show Test',
+            'event_type' => 'kalotsavam',
+            'conduct_levels' => ['sahodaya', 'state'],
+            'status' => 'published',
+        ]);
+        $sahodaya = Tenant::create([
+            'id' => 'test-show-sahodaya',
+            'name' => 'Show Page Sahodaya',
+            'type' => 'sahodaya',
+            'is_active' => true,
+        ]);
+
+        \App\Models\FestStateProgramPropagation::create([
+            'state_program_id' => $program->id,
+            'sahodaya_id' => $sahodaya->id,
+            'tenant_event_id' => 34,
+            'level_round' => 'sahodaya',
+        ]);
+
+        $this->actingAs($admin)
+            ->get("/admin/state-programs/{$program->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('StatePrograms/Show', false)
+                ->has('allSahodayas', 1)
+                ->where('allSahodayas.0.id', $sahodaya->id)
+                ->where('allSahodayas.0.deployed', true)
+                ->where('allSahodayas.0.tenant_event_id', 34)
+                ->where('allSahodayas.0.sahodaya_customized_at', null));
+    }
+
     public function test_dedicated_state_domain_exposes_domain_local_action_urls(): void
     {
         $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false]);

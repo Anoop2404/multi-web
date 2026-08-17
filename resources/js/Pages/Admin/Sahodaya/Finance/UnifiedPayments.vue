@@ -222,6 +222,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -234,6 +235,7 @@ const props = defineProps({
 });
 
 const page = usePage();
+const { confirm, prompt } = useConfirm();
 const expanded = ref({});
 const resending = ref(null);
 const reversing = ref(null);
@@ -332,11 +334,11 @@ function rowKey(p) {
     return `${p.type}-${p.id}`;
 }
 
-function reverseReceipt(p) {
+async function reverseReceipt(p) {
     if (!p.fee_receipt_id) return;
-    const reason = window.prompt('Reason for reversal (optional):');
+    const reason = await prompt({ message: 'Reason for reversal (optional):', inputMultiline: true, inputRequired: false });
     if (reason === null) return;
-    if (!window.confirm('Reverse this approved receipt and post compensating ledger entries?')) return;
+    if (!(await confirm({ message: 'Reverse this approved receipt and post compensating ledger entries?', destructive: true }))) return;
 
     reversing.value = rowKey(p);
     router.post(`/sahodaya-admin/${props.sahodaya.id}/finance/payments/receipts/${p.fee_receipt_id}/reverse`, {

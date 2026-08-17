@@ -98,6 +98,9 @@
 import { reactive, ref } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -142,13 +145,13 @@ function saveRow(row) {
     }, { preserveScroll: true });
 }
 
-function removeRow(row) {
-    if (!confirm(`Remove competition type "${row.label}"?`)) return;
+async function removeRow(row) {
+    if (!(await confirm({ message: `Remove competition type "${row.label}"?` }))) return;
     router.delete(`${base}/${row.id}`, { preserveScroll: true });
 }
 
-function resetDefaults() {
-    if (!confirm('Reset system competition types to defaults? Custom types are kept.')) return;
+async function resetDefaults() {
+    if (!(await confirm({ message: 'Reset system competition types to defaults? Custom types are kept.', destructive: false }))) return;
     router.post(`${base}/reset-defaults`, {}, { preserveScroll: true });
 }
 </script>

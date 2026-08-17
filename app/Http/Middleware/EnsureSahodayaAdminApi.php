@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Support\EventRegionAdminScope;
+use App\Http\Middleware\Concerns\ResolvesSahodayaAdminScope;
 use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -10,6 +10,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureSahodayaAdminApi
 {
+    use ResolvesSahodayaAdminScope;
+
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
@@ -49,36 +51,21 @@ class EnsureSahodayaAdminApi
             }
         }
 
-        $hasEventAdmin = $user->hasRole('event_admin') && ! $user->hasRole('sahodaya_admin');
-        $hasRegionAdmin = $user->hasRole('region_admin') && ! $user->hasRole('sahodaya_admin');
+        // Delegates to ResolvesSahodayaAdminScope (App\Http\Middleware\Concerns) so this
+        // stays byte-for-byte in sync with EnsureSahodayaAdmin (web middleware) — see that
+        // trait's docblock for the gap-G1 rationale (§10.1 of the remediation plan requires
+        // API and web middleware to produce equivalent allow/deny decisions).
+        $scope = $this->resolveSahodayaAdminScope($request, $user);
 
-        if ($hasEventAdmin || $hasRegionAdmin) {
-            // Delegates to EventRegionAdminScope (App\Support) so this stays byte-for-byte
-            // in sync with EnsureSahodayaAdmin (web middleware) — see that class's docblock
-            // for the gap-G1 rationale (§10.1 of the remediation plan requires API and web
-            // middleware to produce equivalent allow/deny decisions).
-            $scopes = EventRegionAdminScope::resolve($user, $hasEventAdmin, $hasRegionAdmin);
-            $allowedEventIds = $scopes['eventIds'];
-            $allowedRegionScopes = $scopes['regionScopes'];
-
-            $requestedEventId = EventRegionAdminScope::resolveRouteEventId($request);
-
-            if ($requestedEventId !== null) {
-                $allowed = in_array($requestedEventId, $allowedEventIds, true);
-
-                if (! $allowed && $allowedRegionScopes !== []) {
-                    $allowed = EventRegionAdminScope::matchesRegionScope($requestedEventId, $allowedRegionScopes);
-                }
-
-                if (! $allowed) {
-                    return response()->json(['message' => 'You are not assigned to this event.'], 403);
-                }
-            } elseif (! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
+        if ($scope['applies']) {
+            if ($scope['denialReason'] === 'not_assigned') {
+                return response()->json(['message' => 'You are not assigned to this event.'], 403);
+            } elseif ($scope['denialReason'] === 'unsafe_method') {
                 return response()->json(['message' => 'Event/region admins can only modify their assigned events.'], 403);
             }
 
-            $request->attributes->set('eventAdminEventIds', $allowedEventIds);
-            $request->attributes->set('regionAdminScopes', $allowedRegionScopes);
+            $request->attributes->set('eventAdminEventIds', $scope['allowedEventIds']);
+            $request->attributes->set('regionAdminScopes', $scope['allowedRegionScopes']);
         }
 
         return $next($request);

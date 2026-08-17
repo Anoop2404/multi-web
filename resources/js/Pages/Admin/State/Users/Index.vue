@@ -101,6 +101,9 @@
 import { ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({ users: Array, assignableRoles: Array });
 
@@ -131,8 +134,8 @@ function saveEdit() {
     });
 }
 
-function remove(user) {
-    if (!confirm(`Remove ${user.name}?`)) return;
+async function remove(user) {
+    if (!(await confirm({ message: `Remove ${user.name}?`, destructive: true }))) return;
     router.delete(`/admin/state-users/${user.id}`, { preserveScroll: true });
 }
 </script>

@@ -16,7 +16,7 @@ class TrainingApiController extends SahodayaApiController
         return response()->json(['data' => $programs]);
     }
 
-    public function show(TrainingProgram $program)
+    public function show(string $tenantId, TrainingProgram $program)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 

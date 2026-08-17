@@ -37,12 +37,18 @@ class FestEventPhaseService
             'code' => $data['code'] ?? null,
             'sort_order' => $data['sort_order'] ?? ($maxOrder + 1),
             'is_default' => $isDefault,
+            'registration_open' => $data['registration_open'] ?? null,
+            'registration_close' => $data['registration_close'] ?? null,
+            'school_registration_fee_share' => $data['school_registration_fee_share'] ?? null,
+            'registration_batch_id' => $data['registration_batch_id'] ?? null,
+            'is_regional' => (bool) ($data['is_regional'] ?? false),
+            'result_publish_mode' => $data['result_publish_mode'] ?? 'all_regions',
         ]);
     }
 
     public function updatePhase(FestEventPhase $phase, array $data): FestEventPhase
     {
-        $isDefault = array_key_exists('is_default', $data) ? (bool) $data['is_default'] : $phase->is_default;
+        $isDefault = array_key_exists('is_default', $data) ? (bool) $data['is_default'] : (bool) ($phase->is_default ?? false);
 
         if ($isDefault && ! $phase->is_default) {
             $this->clearOtherDefaults($phase->event, $phase->id);
@@ -68,6 +74,11 @@ class FestEventPhaseService
             'starts_at', 'ends_at', 'registration_open', 'registration_close',
             'registration_locked', 'food_cutoff_at', 'scoring_locked',
             'schedule_published', 'results_published', 'appeals_open', 'appeal_deadline_at',
+            // Not a lifecycle field in the LIFE-05 sense, but same "allow-list, only write if
+            // explicitly present" shape fits it — see FestEventPhase::school_registration_fee_share
+            // and docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3 item 4.
+            'school_registration_fee_share',
+            'registration_batch_id', 'is_regional', 'result_publish_mode',
         ];
 
         $payload = [
@@ -129,11 +140,16 @@ class FestEventPhaseService
     public function deletePhase(FestEventPhase $phase, bool $force = false): void
     {
         $itemCount = $phase->items()->count();
+        $operationalDataExists = \App\Models\FestEvent::where('source_phase_id', $phase->id)
+            ->where(function ($query) {
+                $query->whereHas('registrations')->orWhereHas('results');
+            })
+            ->exists();
 
         abort_if(
-            $itemCount > 0 && ! $force,
+            ($itemCount > 0 || $operationalDataExists || $phase->regionSelections()->exists()) && ! $force,
             422,
-            "This phase has {$itemCount} item(s) assigned — pass force to delete anyway and unassign them, or reassign the items to another phase first."
+            "This phase has assigned items, region selections, or operational data. Migrate those records before deleting it."
         );
 
         $phase->delete();

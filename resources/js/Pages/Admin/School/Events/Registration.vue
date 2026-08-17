@@ -25,7 +25,7 @@
 
         <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
 
-        <div v-if="schoolRegion?.applies" class="mb-5 max-w-2xl">
+        <div v-if="schoolRegion?.applies && !event?.uses_registration_batch_billing" class="mb-5 max-w-2xl">
             <div v-if="schoolRegion.region && !showChangeRegion" class="notice-banner notice-banner--info text-sm flex flex-wrap items-center gap-3 justify-between">
                 <p>Your {{ programLabel }} region: <strong>{{ schoolRegion.region }}</strong>.</p>
                 <button type="button" class="link-brand font-semibold text-xs shrink-0" @click="showChangeRegion = true">Change region →</button>
@@ -57,6 +57,11 @@
                                     :is-sports="isSports"
                                     :current-step="getTab(event.id) === 'athletes' ? 'event-reg' : (getTab(event.id) === 'items' ? 'item-reg' : 'payment')"
                                     @select-step="step => setTab(event.id, step.tab)" />
+
+        <PhasedRegionBillingPanel v-if="event?.uses_registration_batch_billing"
+                                  :event="event"
+                                  :school-id="school.id"
+                                  :program-prefix="programPrefix" />
 
         <div v-if="showBulkImport && events.length" class="card mb-5 max-w-2xl text-sm border-indigo-100">
             <div class="flex items-center justify-between gap-2 mb-3">
@@ -555,7 +560,7 @@
                 </form>
 
                 <EventBillingPanel
-                    v-if="event.fee_required && (event.uses_per_head_billing ? event.school_head_fees?.length : event.school_fee)"
+                    v-if="!event.uses_registration_batch_billing && event.fee_required && (event.uses_per_head_billing ? event.school_head_fees?.length : (event.uses_per_phase_billing ? event.school_phase_fees?.length : event.school_fee))"
                     v-show="getTab(event.id) === 'payment'"
                     :event="event"
                     :school-id="school.id"
@@ -572,6 +577,9 @@
                     :head-payment-ref-map="headPaymentRefs"
                     :head-payment-bank-map="headPaymentBanks"
                     :head-payment-amount-map="headPaymentAmounts"
+                    :phase-payment-ref-map="phasePaymentRefs"
+                    :phase-payment-bank-map="phasePaymentBanks"
+                    :phase-payment-amount-map="phasePaymentAmounts"
                     @upload-event-payment="uploadEventPayment(event)"
                     @set-event-file="file => eventPaymentFiles[event.id] = file"
                     @update-event-ref="refVal => eventPaymentRefs[event.id] = refVal"
@@ -582,6 +590,11 @@
                     @update-head-ref="(headId, refVal) => headPaymentRefs[headPaymentKey(event.id, headId)] = refVal"
                     @update-head-bank="(headId, bankVal) => headPaymentBanks[headPaymentKey(event.id, headId)] = bankVal"
                     @update-head-amount="(headId, amountVal) => headPaymentAmounts[headPaymentKey(event.id, headId)] = amountVal"
+                    @upload-phase-payment="phaseFee => uploadPhasePayment(event, phaseFee)"
+                    @set-phase-file="(phaseId, file) => setPhasePaymentFile(event.id, phaseId, file)"
+                    @update-phase-ref="(phaseId, refVal) => phasePaymentRefs[phasePaymentKey(event.id, phaseId)] = refVal"
+                    @update-phase-bank="(phaseId, bankVal) => phasePaymentBanks[phasePaymentKey(event.id, phaseId)] = bankVal"
+                    @update-phase-amount="(phaseId, amountVal) => phasePaymentAmounts[phasePaymentKey(event.id, phaseId)] = amountVal"
                 />
                 <p v-else-if="canRegister(event) && !event.fee_required" class="text-xs text-gray-400 mt-4 border-t border-gray-100 pt-4">No fee for this round</p>
                 </div>
@@ -607,9 +620,12 @@ import SportsEventAthletesPanel from '@/Components/school/SportsEventAthletesPan
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
 import SchoolEventWorkflowStepper from '@/Components/school/SchoolEventWorkflowStepper.vue';
 import EventBillingPanel from '@/Components/school/EventBillingPanel.vue';
+import PhasedRegionBillingPanel from '@/Components/school/PhasedRegionBillingPanel.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { genderLabel } from '@/support/festItemEligibility.js';
 import { studentDisplayName } from '@/support/studentDisplay.js';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const alertMessage = ref('');
 
@@ -1023,6 +1039,10 @@ const headPaymentFiles = reactive({});
 const headPaymentRefs = reactive({});
 const headPaymentBanks = reactive({});
 const headPaymentAmounts = reactive({});
+const phasePaymentFiles = reactive({});
+const phasePaymentRefs = reactive({});
+const phasePaymentBanks = reactive({});
+const phasePaymentAmounts = reactive({});
 const editingRegistrationId = reactive({});
 const itemSearch = reactive({});
 const itemCategoryFilter = reactive({});
@@ -1041,6 +1061,10 @@ function itemFormKey(eventId, itemId) {
 
 function headPaymentKey(eventId, headId) {
     return `${eventId}:${headId}`;
+}
+
+function phasePaymentKey(eventId, phaseId) {
+    return `${eventId}:${phaseId}`;
 }
 
 for (const e of props.events) {
@@ -1566,8 +1590,8 @@ function canWithdraw(reg) {
     return event.status === 'registration_open' || reg.status === 'submitted';
 }
 
-function withdraw(id) {
-    if (!confirm('Cancel this registration?')) return;
+async function withdraw(id) {
+    if (!(await confirm({ message: 'Cancel this registration?', destructive: true }))) return;
     router.post(`${programBase.value}/registrations/${id}/withdraw`, {}, { preserveScroll: true });
 }
 
@@ -2048,6 +2072,34 @@ function uploadHeadPayment(event, headFee) {
         bank_name: headPaymentBanks[key],
         amount: headPaymentAmounts[key],
         head_id: headFee.head_id,
+    }, { forceFormData: true, preserveScroll: true });
+}
+
+function setPhasePaymentFile(eventId, phaseId, file) {
+    phasePaymentFiles[phasePaymentKey(eventId, phaseId)] = file;
+}
+
+// Mirrors uploadHeadPayment() above — same shared payment route, distinguished by
+// phase_id instead of head_id. Independent per phase: uploading for one phase never
+// touches another phase's fee record (each phase has its own FestSchoolEventFee row
+// via phase_id — see docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3/§9).
+function uploadPhasePayment(event, phaseFee) {
+    const key = phasePaymentKey(event.id, phaseFee.phase_id);
+    const files = phasePaymentFiles[key];
+    if (!files || !files.length) {
+        alertMessage.value = 'Choose a payment proof file for this phase first.';
+        return;
+    }
+    if (!phasePaymentRefs[key] || !phasePaymentBanks[key] || !phasePaymentAmounts[key]) {
+        alertMessage.value = 'Enter the transaction reference, bank name, and amount paid before uploading.';
+        return;
+    }
+    router.post(`${programBase.value}/events/${event.id}/payment`, {
+        payment_proof: files,
+        transaction_ref: phasePaymentRefs[key],
+        bank_name: phasePaymentBanks[key],
+        amount: phasePaymentAmounts[key],
+        phase_id: phaseFee.phase_id,
     }, { forceFormData: true, preserveScroll: true });
 }
 

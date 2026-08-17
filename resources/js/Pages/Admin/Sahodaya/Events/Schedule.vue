@@ -107,6 +107,7 @@ import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -125,6 +126,8 @@ function onScheduleFile(e) {
     scheduleImportFile.value = e.target.files[0] ?? null;
 }
 
+const { confirm } = useConfirm();
+
 function importSchedule() {
     scheduleImportForm.file = scheduleImportFile.value;
     scheduleImportForm.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/schedule/import`, {
@@ -133,8 +136,8 @@ function importSchedule() {
     });
 }
 
-function removeSlot(id) {
-    if (!confirm('Remove this schedule slot?')) return;
+async function removeSlot(id) {
+    if (!(await confirm({ message: 'Remove this schedule slot?' }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/schedule/${id}`, { preserveScroll: true });
 }
 

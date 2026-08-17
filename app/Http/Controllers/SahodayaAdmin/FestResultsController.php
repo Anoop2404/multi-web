@@ -201,6 +201,19 @@ class FestResultsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        if ($event->usesPhasedRegionalBilling()) {
+            app(\App\Services\Events\FestPhasePublicationService::class)
+                ->publishResults($event, $request->user()?->id);
+            app(FestCertificateService::class)->generateForEvent($event);
+            app(FestCertificateService::class)->generateParticipationForEvent($event);
+            app(FestCmsAutoPush::class)->pushScoreboard($event->rootEvent());
+            app(FestEventNotifier::class)->resultsPublished($event);
+            FestScoreboardUpdated::dispatch($event->rootEvent()->fresh());
+            $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.phase_published', 'Operational phase results published');
+
+            return back()->with('success', 'Results published for this phase/region.');
+        }
+
         // Verifies (across every region/finale child too, not just the hub itself — see
         // EventLifecycleGate::assertAllParticipantsMarked() and FestJudgeGateService::
         // assertCanPublish()) that marking is actually complete before a hub-level publish
@@ -257,6 +270,14 @@ class FestResultsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_unless($event->results_published, 422, 'Results are not published.');
+
+        if ($event->usesPhasedRegionalBilling()) {
+            app(\App\Services\Events\FestPhasePublicationService::class)->unpublishResults($event);
+            app(FestEventNotifier::class)->resultsUnpublished($event);
+            $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.phase_unpublished', 'Operational phase results unpublished');
+
+            return back()->with('success', 'Results unpublished for this phase/region.');
+        }
 
         $event->update([
             'results_published' => false,

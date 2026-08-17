@@ -124,6 +124,8 @@ import { computed } from 'vue';
 import { Link, useForm, router, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     event: Object, bill: Object,
@@ -147,8 +149,8 @@ const remainingForSelected = computed(() => {
 function addItem() {
     itemForm.post(`${base.value}/items`, { preserveScroll: true, onSuccess: () => itemForm.reset() });
 }
-function removeItem(oi) {
-    if (!confirm(`Remove ${oi.item_name} (x${oi.quantity})?`)) return;
+async function removeItem(oi) {
+    if (!(await confirm({ message: `Remove ${oi.item_name} (x${oi.quantity})?`, destructive: true }))) return;
     router.delete(`${base.value}/items/${oi.id}`, { preserveScroll: true });
 }
 
@@ -157,8 +159,8 @@ function recordPayment() {
     paymentForm.post(`${base.value}/payments`, { preserveScroll: true, onSuccess: () => paymentForm.reset() });
 }
 
-function settle() {
-    if (!confirm('Mark this bill as settled?')) return;
+async function settle() {
+    if (!(await confirm({ message: 'Mark this bill as settled?', destructive: false }))) return;
     router.post(`${base.value}/settle`, {}, { preserveScroll: true });
 }
 function reopen() {

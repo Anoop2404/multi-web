@@ -273,6 +273,9 @@ import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsRepo
 import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { prompt } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -374,9 +377,13 @@ function verifyStudent(row) {
     );
 }
 
-function rejectStudent(row) {
+async function rejectStudent(row) {
     if (!row.board_result_id) return;
-    const reason = window.prompt(`Rejection reason for ${row.student_name}:`, row.rejection_reason || 'Marksheet mismatch or invalid document.');
+    const reason = await prompt({
+        message: `Rejection reason for ${row.student_name}:`,
+        inputValue: row.rejection_reason || 'Marksheet mismatch or invalid document.',
+        inputMultiline: true,
+    });
     if (reason === null) return;
 
     router.post(

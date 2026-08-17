@@ -64,8 +64,11 @@ import { router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import { formatDateTime } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, requests: { type: Array, default: () => [] } });
+
+const { prompt } = useConfirm();
 
 const pendingCount = computed(() => props.requests.filter(r => r.status === 'pending').length);
 const approvedCount = computed(() => props.requests.filter(r => r.status === 'approved').length);
@@ -77,13 +80,13 @@ function statusClass(status) {
     return 'text-amber-700 font-semibold';
 }
 
-function approve(r) {
-    const note = prompt('Optional note for this approval:') ?? '';
+async function approve(r) {
+    const note = (await prompt({ message: 'Optional note for this approval:', inputMultiline: true, inputRequired: false })) ?? '';
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/attendance-corrections/${r.id}/approve`, { review_note: note || null }, { preserveScroll: true });
 }
 
-function reject(r) {
-    const note = prompt('Reason for rejecting (optional):') ?? '';
+async function reject(r) {
+    const note = (await prompt({ message: 'Reason for rejecting (optional):', inputMultiline: true, inputRequired: false })) ?? '';
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/attendance-corrections/${r.id}/reject`, { review_note: note || null }, { preserveScroll: true });
 }
 </script>

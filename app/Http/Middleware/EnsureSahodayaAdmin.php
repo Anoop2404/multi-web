@@ -3,7 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Middleware\Concerns\RedirectsUnauthenticated;
-use App\Support\EventRegionAdminScope;
+use App\Http\Middleware\Concerns\ResolvesSahodayaAdminScope;
 use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -12,6 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
 class EnsureSahodayaAdmin
 {
     use RedirectsUnauthenticated;
+    use ResolvesSahodayaAdminScope;
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -60,33 +61,20 @@ class EnsureSahodayaAdmin
         // region_id. Users with a broader role (sahodaya_admin, etc.) bypass all of
         // this even if they also happen to hold event_admin/region_admin.
         //
-        // See docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.3.
-        $hasEventAdmin = $user->hasRole('event_admin') && ! $user->hasRole('sahodaya_admin');
-        $hasRegionAdmin = $user->hasRole('region_admin') && ! $user->hasRole('sahodaya_admin');
+        // See docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.3. The actual scope
+        // resolution below is shared with EnsureSahodayaAdminApi via
+        // ResolvesSahodayaAdminScope — see that trait's docblock.
+        $scope = $this->resolveSahodayaAdminScope($request, $user);
 
-        if ($hasEventAdmin || $hasRegionAdmin) {
-            $scopes = EventRegionAdminScope::resolve($user, $hasEventAdmin, $hasRegionAdmin);
-            $allowedEventIds = $scopes['eventIds'];
-            $allowedRegionScopes = $scopes['regionScopes'];
-
-            $requestedEventId = EventRegionAdminScope::resolveRouteEventId($request);
-
-            if ($requestedEventId !== null) {
-                $allowed = in_array($requestedEventId, $allowedEventIds, true);
-
-                if (! $allowed && $allowedRegionScopes !== []) {
-                    $allowed = EventRegionAdminScope::matchesRegionScope($requestedEventId, $allowedRegionScopes);
-                }
-
-                if (! $allowed) {
-                    abort(403, 'You are not assigned to this event.');
-                }
-            } elseif (! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
+        if ($scope['applies']) {
+            if ($scope['denialReason'] === 'not_assigned') {
+                abort(403, 'You are not assigned to this event.');
+            } elseif ($scope['denialReason'] === 'unsafe_method') {
                 abort(403, 'Event/region admins can only modify their assigned events.');
             }
 
-            $request->attributes->set('eventAdminEventIds', $allowedEventIds);
-            $request->attributes->set('regionAdminScopes', $allowedRegionScopes);
+            $request->attributes->set('eventAdminEventIds', $scope['allowedEventIds']);
+            $request->attributes->set('regionAdminScopes', $scope['allowedRegionScopes']);
         }
 
         return $next($request);

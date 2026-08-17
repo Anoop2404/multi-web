@@ -1,8 +1,9 @@
 <nav class="sticky top-0 z-50 border-b border-white/10 bg-white/80 backdrop-blur-lg shadow-sm"
-     x-data="{ open: false, academicOpen: false }">
+     x-data="{ open: false, academicOpen: false }"
+     x-init="window.addEventListener('scroll', () => { academicOpen = false; })">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16 lg:h-[4.25rem]">
-            <a href="/" class="flex items-center gap-3 min-w-0">
+            <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 min-w-0">
                 @if(!empty($logo))
                     <img src="{{ $logo }}" alt="{{ $tenant->name }}" class="h-10 w-auto shrink-0">
                 @endif

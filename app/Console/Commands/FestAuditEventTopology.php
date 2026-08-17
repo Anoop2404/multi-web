@@ -8,6 +8,9 @@ use App\Models\FestEventStaff;
 use App\Models\FestMark;
 use App\Models\FestRegistration;
 use App\Models\FestSchedule;
+use App\Models\FestPhaseRegion;
+use App\Models\FestRegistrationBatch;
+use App\Models\FestSchoolPhaseRegionSelection;
 use App\Models\SchoolRegionAssignment;
 use App\Models\Tenant;
 use App\Support\AcademicYear;
@@ -103,6 +106,7 @@ class FestAuditEventTopology extends Command
             $this->auditSportsMisconfiguration($tenant, $root);
             $this->auditPhaseDrift($tenant, $root);
             $this->auditSchoolPartitionVsRegionAssignment($tenant, $root);
+            $this->auditPhasedRegionalBilling($tenant, $root);
         }
 
         $this->auditRegionAdminStaffing($tenant);
@@ -165,14 +169,14 @@ class FestAuditEventTopology extends Command
     {
         $dupes = FestEvent::where('parent_event_id', $root->id)
             ->whereNotNull('region_id')
-            ->selectRaw('region_id, partition_role, count(*) as c')
-            ->groupBy('region_id', 'partition_role')
+            ->selectRaw('region_id, partition_role, source_phase_id, count(*) as c')
+            ->groupBy('region_id', 'partition_role', 'source_phase_id')
             ->having('c', '>', 1)
             ->get();
 
         foreach ($dupes as $dupe) {
             $this->addFinding($tenant->id, $root->id, 'duplicate_region_children',
-                "Parent '{$root->title}' has {$dupe->c} children for region_id={$dupe->region_id} role={$dupe->partition_role}.");
+                "Parent '{$root->title}' has {$dupe->c} children for region_id={$dupe->region_id} role={$dupe->partition_role} source_phase_id={$dupe->source_phase_id}.");
         }
     }
 
@@ -220,6 +224,10 @@ class FestAuditEventTopology extends Command
             return;
         }
 
+        if ($root->usesPhasedRegionalBilling()) {
+            return;
+        }
+
         $parentPhaseCodes = FestEventPhase::where('event_id', $root->id)->pluck('code')->filter()->unique()->sort()->values();
 
         $children = FestEvent::where('parent_event_id', $root->id)->where('partition_role', 'region')->get();
@@ -234,6 +242,63 @@ class FestAuditEventTopology extends Command
             }
 
         }
+    }
+
+    private function auditPhasedRegionalBilling(Tenant $tenant, FestEvent $root): void
+    {
+        if (! $root->usesPhasedRegionalBilling()) {
+            return;
+        }
+
+        // Phase/batch codes are Sahodaya-defined (each Sahodaya using phased regional
+        // billing configures its own batches and phases via FestRegistrationBatchController/
+        // FestEventPhaseController — there is no longer one canonical MCS-2026-specific
+        // shape), so there is no fixed "expected" list to diff against here. The checks
+        // below instead verify the structural invariants every phased-regional-billing
+        // event must satisfy regardless of how many batches/phases it defines.
+        if (FestRegistrationBatch::where('event_id', $root->id)->count() === 0) {
+            $this->addFinding($tenant->id, $root->id, 'mcs_missing_registration_batch', 'Event uses phased regional billing but has no registration/payment batch defined.');
+        }
+
+        $phases = FestEventPhase::where('event_id', $root->id)->get()->keyBy('code');
+        if ($phases->isEmpty()) {
+            $this->addFinding($tenant->id, $root->id, 'mcs_missing_phase', 'Event uses phased regional billing but has no conduct phase defined.');
+        }
+
+        foreach ($phases as $phase) {
+            if (! $phase->registration_batch_id) {
+                $this->addFinding($tenant->id, $root->id, 'mcs_phase_missing_batch', "Phase {$phase->name} has no registration/payment batch.");
+            }
+
+            $expectedRegionIds = $phase->isRegional()
+                ? FestPhaseRegion::where('phase_id', $phase->id)->where('enabled', true)->pluck('region_id')
+                : collect([null]);
+            if ($phase->isRegional() && $expectedRegionIds->isEmpty()) {
+                $this->addFinding($tenant->id, $root->id, 'mcs_regional_phase_without_regions', "Regional phase {$phase->name} has no enabled regions.");
+            }
+
+            foreach ($expectedRegionIds as $regionId) {
+                $leafCount = FestEvent::where('parent_event_id', $root->id)
+                    ->where('source_phase_id', $phase->id)
+                    ->where('region_id', $regionId)
+                    ->count();
+                if ($leafCount !== 1) {
+                    $this->addFinding($tenant->id, $root->id, 'mcs_operational_leaf_mismatch', "Phase {$phase->name}, region ".($regionId ?? 'common')." has {$leafCount} operational leaves; expected 1.");
+                }
+            }
+        }
+
+        FestSchoolPhaseRegionSelection::where('event_id', $root->id)
+            ->get()
+            ->each(function ($selection) use ($tenant, $root) {
+                $allowed = FestPhaseRegion::where('phase_id', $selection->phase_id)
+                    ->where('region_id', $selection->region_id)
+                    ->where('enabled', true)
+                    ->exists();
+                if (! $allowed) {
+                    $this->addFinding($tenant->id, $root->id, 'mcs_invalid_school_phase_region', "School {$selection->school_id} selects a disabled region for phase #{$selection->phase_id}.");
+                }
+            });
     }
 
     private function auditSchoolPartitionVsRegionAssignment(Tenant $tenant, FestEvent $root): void
@@ -285,6 +350,15 @@ class FestAuditEventTopology extends Command
                     "FestEventStaff #{$staff->id} (user #{$staff->user_id}) has duty=region_admin on event #{$staff->event_id} with no region_id. G1 — was blocked by the Phase 1 middleware fix, but the row itself should still be corrected or removed.");
 
                 continue;
+            }
+
+
+            if ($staff->source_phase_id && ! FestPhaseRegion::where('phase_id', $staff->source_phase_id)
+                ->where('region_id', $staff->region_id)
+                ->where('enabled', true)
+                ->exists()) {
+                $this->addFinding($tenant->id, $staff->event_id, 'region_admin_invalid_phase_region',
+                    "FestEventStaff #{$staff->id} is assigned to a phase/region pair that is not enabled.");
             }
 
             $event = FestEvent::find($staff->event_id);

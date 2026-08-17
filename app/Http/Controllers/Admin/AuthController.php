@@ -492,7 +492,7 @@ class AuthController extends Controller
             return "/portal/teacher/{$user->tenant_id}";
         }
 
-        if ($user->hasAnyRole(['mark_entry_coordinator', 'mark_entry_admin']) && $user->tenant_id) {
+        if ($user->hasRole('mark_entry_coordinator') && $user->tenant_id) {
             return "/portal/fest-coordinator/{$user->tenant_id}";
         }
 

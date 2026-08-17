@@ -4,6 +4,9 @@ namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestEventPhase;
+use App\Models\FestRegistrationBatch;
+use App\Models\FestSchoolPhaseRegionSelection;
 use App\Models\FestGroup;
 use App\Models\FestItemHead;
 use App\Models\FestParticipant;
@@ -641,8 +644,9 @@ class FestRegistrationController extends SchoolAdminController
         $usage = $limitService->usageForSchool($this->school->id);
         $schedule = $feeService->resolveSchedule($event);
         $itemFeeResolver = app(FestItemFeeResolver::class);
-        $schoolFee = FestSchoolEventFee::where('event_id', $event->id)
+        $schoolFee = FestSchoolEventFee::where('event_id', $feeService->feeOwnerEvent($event)->id)
             ->where('school_id', $this->school->id)
+            ->when($event->usesPhasedRegionalBilling(), fn ($query) => $query->whereNull('registration_batch_id'))
             ->first();
 
         // Previously recalculated (and wrote to fest_school_event_fees) on every single
@@ -734,6 +738,98 @@ class FestRegistrationController extends SchoolAdminController
                 ];
             })->values()->all());
         }
+
+        // Phase-billed Kalotsavam events (phase_mode_enabled, e.g. MCS's Level 1 / Level 2
+        // staggered registration) — mirrors the per-head block just above, keyed on phase_id
+        // instead of head_id. See FestSchoolEventFeeService::usesPerPhaseBilling()/
+        // recalculateForPhase() and docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3/§9.
+        $usesPerPhase = $feeService->usesPerPhaseBilling($event);
+        $event->setAttribute('uses_per_phase_billing', $usesPerPhase);
+        $event->setAttribute('school_phase_fees', []);
+        if ($usesPerPhase && $feeService->feeRequired($event)) {
+            $existingPhaseFees = FestSchoolEventFee::where('event_id', $event->id)
+                ->where('school_id', $this->school->id)
+                ->whereNotNull('phase_id')
+                ->get();
+            $phaseFees = $existingPhaseFees->isNotEmpty()
+                ? $existingPhaseFees
+                : $feeService->recalculateAllPhasesForSchool($event, $this->school->id);
+            $phasesById = FestEventPhase::where('event_id', $event->id)->get()->keyBy('id');
+            $event->setAttribute('school_phase_fees', $phaseFees->map(function (FestSchoolEventFee $fee) use ($feeService, $event, $schedule, $phasesById) {
+                $phase = $phasesById->get($fee->phase_id);
+
+                return [
+                    'id' => $fee->id,
+                    'phase_id' => $fee->phase_id,
+                    'phase_name' => $phase?->name ?? 'Phase',
+                    'school_registration_fee' => (float) $fee->school_registration_fee,
+                    'participation_fee' => (float) $fee->participation_fee,
+                    'participation_item_count' => (int) $fee->participation_item_count,
+                    'total_due' => (float) $fee->total_due,
+                    'amount_paid' => (float) $fee->amount_paid,
+                    'outstanding' => (float) $fee->outstandingBalance(),
+                    'status' => $fee->status,
+                    'breakdown' => $feeService->breakdown($event, $fee, $schedule),
+                    'rejection_reason' => $fee->status === 'rejected'
+                        ? $fee->receipts()->where('status', 'rejected')->latest('id')->value('rejection_reason')
+                        : null,
+                    'receipt_history' => $this->receiptHistoryPayload($fee),
+                ];
+            })->values()->all());
+        }
+
+        $usesBatchBilling = $event->usesPhasedRegionalBilling();
+        $event->setAttribute('uses_registration_batch_billing', $usesBatchBilling);
+        $event->setAttribute('school_registration_batch_fees', []);
+        $event->setAttribute('phase_region_options', []);
+        if ($usesBatchBilling) {
+            $root = $event->rootEvent();
+            $batchFees = app(\App\Services\Events\FestRegistrationBatchFeeService::class)
+                ->recalculateAll($root, $this->school->id);
+            $event->setAttribute('school_registration_batch_fees', $batchFees->map(fn (FestSchoolEventFee $fee) => [
+                'id' => $fee->id,
+                'registration_batch_id' => $fee->registration_batch_id,
+                'batch_code' => $fee->registrationBatch?->code,
+                'batch_name' => $fee->registrationBatch?->name ?? 'Registration level',
+                'registration_open' => $fee->registrationBatch?->registration_open?->toIso8601String(),
+                'registration_close' => $fee->registrationBatch?->registration_close?->toIso8601String(),
+                'payment_due_at' => $fee->registrationBatch?->payment_due_at?->toIso8601String(),
+                'school_registration_fee' => (float) $fee->school_registration_fee,
+                'participation_fee' => (float) $fee->participation_fee,
+                'participation_item_count' => (int) $fee->participation_item_count,
+                'total_due' => (float) $fee->total_due,
+                'amount_paid' => (float) $fee->amount_paid,
+                'outstanding' => (float) $fee->outstandingBalance(),
+                'status' => $fee->status,
+                'lines' => $fee->lines->map(fn ($line) => $line->only(['line_type', 'label', 'quantity', 'unit_amount', 'amount', 'meta']))->values(),
+                'receipt_history' => $this->receiptHistoryPayload($fee),
+            ])->values()->all());
+
+            $selections = FestSchoolPhaseRegionSelection::where('event_id', $root->id)
+                ->where('school_id', $this->school->id)
+                ->get()
+                ->keyBy('phase_id');
+            $event->setAttribute('phase_region_options', $root->phases()
+                ->where('is_regional', true)
+                ->with('allowedRegions.region')
+                ->get()
+                ->map(fn (FestEventPhase $phase) => [
+                    'phase_id' => $phase->id,
+                    'phase_name' => $phase->name,
+                    'selection' => ($selection = $selections->get($phase->id)) ? [
+                        'region_id' => $selection->region_id,
+                        'locked' => $selection->locked_at !== null,
+                    ] : null,
+                    'regions' => $phase->allowedRegions->where('enabled', true)->map(fn ($allowed) => [
+                        'id' => $allowed->region_id,
+                        'name' => $allowed->region?->name,
+                        'code' => $allowed->region?->code,
+                        'venue' => $allowed->venue,
+                        'conduct_start_at' => $allowed->conduct_start_at?->toIso8601String(),
+                    ])->values(),
+                ])->values());
+        }
+
         $feeRequired = $feeService->feeRequired($event);
         $enabledItems = $event->items->filter(fn ($i) => ($i->is_enabled ?? true));
         if ($headId !== null) {
@@ -976,6 +1072,8 @@ class FestRegistrationController extends SchoolAdminController
         abort_unless($feeService->feeRequired($event), 422, 'This event does not require a fee.');
 
         $usesPerHead = $feeService->usesPerHeadBilling($event);
+        $usesPerPhase = $feeService->usesPerPhaseBilling($event);
+        $usesBatchBilling = $event->usesPhasedRegionalBilling();
 
         // payment_proof now accepts up to 5 images for ONE payment (e.g. a UTR screenshot
         // + a bank statement page) — the first becomes the receipt's primary file_path
@@ -996,6 +1094,13 @@ class FestRegistrationController extends SchoolAdminController
             'bank_name'        => 'required|string|max:100',
             'amount'           => 'required|numeric|min:0.01',
             'head_id'          => ($usesPerHead ? 'required' : 'nullable').'|integer|exists:fest_item_heads,id',
+            // Phase-billed events (see usesPerPhaseBilling()) work the same way as
+            // per-head ones — the school picks a phase's payment card, which posts here
+            // with phase_id set instead of head_id. The two are mutually exclusive today
+            // (an event uses one billing shape or the other), so both stay optional
+            // unless their own flag requires them.
+            'phase_id'         => ($usesPerPhase ? 'required' : 'nullable').'|integer|exists:fest_event_phases,id',
+            'registration_batch_id' => ($usesBatchBilling ? 'required' : 'nullable').'|integer|exists:fest_registration_batches,id',
         ]);
 
         $proofFiles = $request->file('payment_proof');
@@ -1011,7 +1116,22 @@ class FestRegistrationController extends SchoolAdminController
         $bankName = $data['bank_name'] ?? null;
         $amount = isset($data['amount']) ? (float) $data['amount'] : null;
 
-        if ($usesPerHead) {
+        if ($usesBatchBilling) {
+            $batch = FestRegistrationBatch::where('event_id', $event->rootEvent()->id)
+                ->findOrFail((int) $data['registration_batch_id']);
+            app(\App\Services\Events\FestRegistrationBatchFeeService::class)->attachPayment(
+                $event,
+                $this->school->id,
+                $batch->id,
+                $primaryProof,
+                $request->user()->id,
+                $transactionRef,
+                $bankName,
+                $amount,
+                $extraProofs,
+            );
+            $contextLabel = $event->title.' — '.$batch->name.' fee';
+        } elseif ($usesPerHead) {
             $feeService->attachPaymentForHead(
                 $event,
                 $this->school->id,
@@ -1024,6 +1144,19 @@ class FestRegistrationController extends SchoolAdminController
                 $extraProofs,
             );
             $contextLabel = $event->title.' — '.((FestItemHead::find($data['head_id'])?->name) ?? 'head').' fee';
+        } elseif ($usesPerPhase) {
+            $feeService->attachPaymentForPhase(
+                $event,
+                $this->school->id,
+                (int) $data['phase_id'],
+                $primaryProof,
+                $request->user()->id,
+                $transactionRef,
+                $bankName,
+                $amount,
+                $extraProofs,
+            );
+            $contextLabel = $event->title.' — '.((FestEventPhase::find($data['phase_id'])?->name) ?? 'phase').' fee';
         } else {
             $feeService->attachPayment(
                 $event,
@@ -1050,9 +1183,12 @@ class FestRegistrationController extends SchoolAdminController
 
         app(PlatformAuditLogger::class)->festFeeProofUploaded($event, $this->school->id);
 
-        return back()->with('success', $usesPerHead
-            ? 'Payment proof uploaded for this Event Head.'
-            : 'Payment proof uploaded for this event.');
+        return back()->with('success', match (true) {
+            $usesBatchBilling => 'Payment proof uploaded for this registration level.',
+            $usesPerHead => 'Payment proof uploaded for this Event Head.',
+            $usesPerPhase => 'Payment proof uploaded for this phase.',
+            default => 'Payment proof uploaded for this event.',
+        });
     }
 
     public function feeReceipt(Request $request, string $tenantId, FestEvent $event, string $program)
@@ -1068,12 +1204,25 @@ class FestRegistrationController extends SchoolAdminController
             ->where('school_id', $this->school->id)
             ->with('feeReceipt');
 
-        if ($feeService->usesPerHeadBilling($event)) {
+        if ($event->usesPhasedRegionalBilling()) {
+            $batchId = (int) $request->query('registration_batch_id');
+            abort_unless($batchId > 0, 422, 'Select which registration-level receipt to view.');
+            $query->where('registration_batch_id', $batchId);
+        } elseif ($feeService->usesPerHeadBilling($event)) {
             $headId = (int) $request->query('head_id');
             abort_unless($headId > 0, 422, 'Select which Event Head receipt to view.');
             $query->where('head_id', $headId);
-        } elseif (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'head_id')) {
-            $query->whereNull('head_id');
+        } elseif ($feeService->usesPerPhaseBilling($event)) {
+            $phaseId = (int) $request->query('phase_id');
+            abort_unless($phaseId > 0, 422, 'Select which phase receipt to view.');
+            $query->where('phase_id', $phaseId);
+        } else {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'head_id')) {
+                $query->whereNull('head_id');
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'phase_id')) {
+                $query->whereNull('phase_id');
+            }
         }
 
         $schoolFee = $query->firstOrFail();
@@ -1081,11 +1230,18 @@ class FestRegistrationController extends SchoolAdminController
         $receipt = $schoolFee->feeReceipt;
         abort_if(! $receipt || $receipt->status !== 'approved', 403, 'Receipt is not yet approved.');
 
+        $batchRegistrationIds = $schoolFee->registration_batch_id
+            ? $schoolFee->lines()->get()->pluck('meta')->map(fn ($meta) => $meta['registration_id'] ?? null)->filter()->all()
+            : null;
         $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->whereIn('status', ['submitted', 'approved'])
+            ->when($batchRegistrationIds !== null, fn ($query) => $query->whereIn('id', $batchRegistrationIds))
             ->when($schoolFee->head_id, function ($q) use ($schoolFee) {
                 $q->whereHas('item', fn ($iq) => $iq->where('head_id', $schoolFee->head_id));
+            })
+            ->when($schoolFee->phase_id, function ($q) use ($schoolFee) {
+                $q->whereHas('item', fn ($iq) => $iq->where('phase_id', $schoolFee->phase_id));
             })
             ->with('item')
             ->get();
@@ -1106,7 +1262,11 @@ class FestRegistrationController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $sahodaya = \App\Models\Tenant::findOrFail($this->school->parent_id);
-        $invoice = $invoiceService->issueForSchool($event, $this->school);
+        $batchId = $event->usesPhasedRegionalBilling()
+            ? (int) $request->query('registration_batch_id')
+            : null;
+        abort_if($event->usesPhasedRegionalBilling() && ! $batchId, 422, 'Select Level 1 or Level 2.');
+        $invoice = $invoiceService->issueForSchool($event, $this->school, registrationBatchId: $batchId);
 
         $pdf = Pdf::loadView('fest.finance.invoice', $invoiceService->invoiceViewData($event, $invoice, $sahodaya));
 
@@ -1256,9 +1416,11 @@ class FestRegistrationController extends SchoolAdminController
             return back()->with('error', 'Fest registration is closed for your school.');
         }
 
-        abort_if($event->registration_locked, 422, 'Registration is locked for this event.');
-        abort_if(! $event->isRegistrationOpen(), 422, 'Registration is closed for this event.');
-        \App\Services\Events\EventLifecycleGate::allowRegistration($event);
+        if (! $event->usesPhasedRegionalBilling()) {
+            abort_if($event->registration_locked, 422, 'Registration is locked for this event.');
+            abort_if(! $event->isRegistrationOpen(), 422, 'Registration is closed for this event.');
+            \App\Services\Events\EventLifecycleGate::allowRegistration($event);
+        }
 
         $result = $importService->importFromSpreadsheet(
             $event,

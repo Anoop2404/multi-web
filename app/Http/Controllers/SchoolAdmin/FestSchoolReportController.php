@@ -11,6 +11,7 @@ use App\Models\FestRegistration;
 use App\Models\Tenant;
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsFestIdCardResponses;
 use App\Services\Events\FestParticipationLimitService;
+use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestIdCardService;
 use App\Services\Events\FestRegistrationRegisterService;
 use App\Services\Events\FestReportService;
@@ -125,6 +126,7 @@ class FestSchoolReportController extends SchoolAdminController
     public function eventHub(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        $this->assertProgramMatchesEvent($event, $program);
 
         $meta = SchoolFestProgram::meta($program);
 
@@ -145,6 +147,24 @@ class FestSchoolReportController extends SchoolAdminController
         $prefix = ProgramRouteMap::prefixFromSlug($program);
 
         return ProgramRouteMap::schoolBase($this->school->id, $prefix)."/reports/{$event->id}";
+    }
+
+    /**
+     * EVENT_REPORTS_FIX_TODO_2026_08_14.md Milestone 2.1 / audit P0 "School report URLs do
+     * not bind the program to the event type" — eventHub() and export() previously
+     * verified only that the event belongs to the school's own Sahodaya, never that the
+     * route's {program} segment (kalotsav/sports-meet/kids-fest/...) actually matches the
+     * event's own event_type. A Kalotsav event's id could be requested through the Sports
+     * Meet program URL and still resolve, mixing report layouts/exports meant for one
+     * event type onto data from another. Scoped to these two entry points for now
+     * (matches the audit's specific P0 evidence); rolling this out to every other method
+     * in this controller is the rest of Milestone 2.1, not part of the P0 fix.
+     */
+    private function assertProgramMatchesEvent(FestEvent $event, string $program): void
+    {
+        $expectedEventType = SchoolFestProgram::meta($program)['eventType'];
+
+        abort_unless($event->event_type === $expectedEventType, 404, 'This report is not available for that event type.');
     }
 
     public function participation(Request $request, string $tenantId, FestEvent $event, string $program)
@@ -1409,10 +1429,34 @@ class FestSchoolReportController extends SchoolAdminController
     public function export(Request $request, string $tenantId, FestEvent $event, string $exportType, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        $this->assertProgramMatchesEvent($event, $program);
 
         $catalog = collect(FestReportCatalog::exports($this->school->parent_id, $event->id))->firstWhere('id', $exportType);
         abort_unless(is_array($catalog), 404, "Unknown report export: {$exportType}.");
 
+        // EVENT_REPORTS_FIX_TODO_2026_08_14.md Milestone 1.1 (P0 "School users can request
+        // cross-school fest exports") — exports() above is the same Sahodaya-wide catalog
+        // used by the Sahodaya admin report controller; its 'audience' field means "staff
+        // vs public", never "safe to show one school every other school's data". A known,
+        // cataloged export id used to be enough to pass this method. Now it must ALSO be
+        // on the explicit school-safe allowlist — fail closed (403), not a guess.
+        abort_unless(
+            FestReportCatalog::isSchoolSafe($exportType),
+            403,
+            "This report is not available to schools: {$exportType}."
+        );
+
+        EventLifecycleGate::allowReportLifecyclePhase(
+            $event,
+            $catalog['phase'] ?? 'before',
+            (bool) $request->user()?->can('fest.reports.lifecycle_override'),
+        );
+
+        EventLifecycleGate::allowResultReport($event, $exportType);
+
+        // Force the authenticated school's own id — request-supplied school_id (if any)
+        // is discarded by this merge(), never trusted (Milestone 1.1: "Prevent request
+        // parameters from overriding the authenticated school scope").
         $request->merge(['school_id' => $this->school->id]);
 
         return (new FestReportService($event))->export($exportType, $request);
@@ -1631,4 +1675,3 @@ class FestSchoolReportController extends SchoolAdminController
         }, $students);
     }
 }
-

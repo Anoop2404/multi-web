@@ -134,6 +134,7 @@ import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
 import { festMarkPortalPaths, festOpsEventNav } from '@/support/festOpsPortalNav.js';
 import { festCoordinatorPortalNavItems } from '@/support/festCoordinatorPortalNav.js';
 import { useFestMarkEntryDisplay } from '@/composables/useFestMarkEntryDisplay.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -148,6 +149,8 @@ const props = defineProps({
     selectedHeadId: { type: [String, Number], default: null },
     selectedItemId: { type: [String, Number], default: null },
 });
+
+const { confirm } = useConfirm();
 
 const portalPaths = computed(() =>
     festMarkPortalPaths(props.sahodaya.id, props.event.id, props.festOpsBase),
@@ -207,8 +210,8 @@ function saveMark(participant, item) {
     router.post(portalPaths.value.marksPostUrl, buildMarkPayload(participant, item, markForms), { preserveScroll: true });
 }
 
-function autoRank(item) {
-    if (!item?.id || !confirm(`Auto-rank "${item.title}" from measurements? Absent athletes are skipped.`)) {
+async function autoRank(item) {
+    if (!item?.id || !(await confirm({ message: `Auto-rank "${item.title}" from measurements? Absent athletes are skipped.`, destructive: false }))) {
         return;
     }
 

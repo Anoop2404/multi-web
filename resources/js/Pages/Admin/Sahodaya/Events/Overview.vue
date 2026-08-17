@@ -354,6 +354,7 @@ import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue
 import FormGrid from '@/Components/ui/FormGrid.vue';
 import FormField from '@/Components/ui/FormField.vue';
 import CheckboxField from '@/Components/ui/CheckboxField.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -379,13 +380,14 @@ const topologyForm = useForm({
     combine_regions_at_finale: props.event.combine_regions_at_finale ?? true,
 });
 const regionSync = useForm({});
+const { confirm } = useConfirm();
 
 function updateTopology() {
     topologyForm.post(`${base}/conduct-topology`, { preserveScroll: true });
 }
 
-function syncRegionPartitions() {
-    if (!confirm('Create a partition per membership region and assign schools by their region? Existing region partitions are kept.')) return;
+async function syncRegionPartitions() {
+    if (!(await confirm({ message: 'Create a partition per membership region and assign schools by their region? Existing region partitions are kept.', destructive: false }))) return;
     regionSync.post(`${base}/sync-region-partitions`, { preserveScroll: true });
 }
 

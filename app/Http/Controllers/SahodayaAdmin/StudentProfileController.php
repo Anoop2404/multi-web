@@ -15,6 +15,7 @@ class StudentProfileController extends SahodayaAdminController
     public function show(string $tenantId, Student $student)
     {
         abort_if($student->tenant?->parent_id !== $this->sahodaya->id, 404);
+        abort_if($this->membershipRegionScopedSchoolIds([$student->tenant_id]) === [], 404);
 
         $student->load([
             'schoolClass.classCategory',
@@ -39,6 +40,7 @@ class StudentProfileController extends SahodayaAdminController
     {
         $this->assertStaffCan('membership.manage');
         abort_if($student->tenant?->parent_id !== $this->sahodaya->id, 403);
+        abort_if($this->membershipRegionScopedSchoolIds([$student->tenant_id]) === [], 403);
 
         return $this->provisionStudentPortalLogin($student);
     }
@@ -47,13 +49,37 @@ class StudentProfileController extends SahodayaAdminController
     {
         $this->assertStaffCan('membership.manage');
         abort_if($student->tenant?->parent_id !== $this->sahodaya->id, 403);
+        abort_if($this->membershipRegionScopedSchoolIds([$student->tenant_id]) === [], 403);
 
         return $this->resetStudentPortalPassword($student, request()->user()?->id);
+    }
+
+    /** On-demand reveal of the stored plaintext portal password — not sent in the initial page payload. */
+    public function revealPortalPassword(string $tenantId, Student $student)
+    {
+        abort_if($student->tenant?->parent_id !== $this->sahodaya->id, 404);
+        abort_if($this->membershipRegionScopedSchoolIds([$student->tenant_id]) === [], 404);
+        $this->assertStaffCan('membership.manage');
+
+        $student->loadMissing('user:id,username,plain_password');
+
+        app(\App\Services\Audit\PlatformAuditLogger::class)->log(
+            'credential.viewed',
+            "Student portal password viewed: {$student->name}",
+            $student,
+            ['student_id' => $student->id],
+        );
+
+        return response()->json([
+            'username' => $student->user?->username ?? $student->reg_no,
+            'password' => $student->user?->plain_password,
+        ]);
     }
 
     public function showPhoto(string $tenantId, Student $student)
     {
         abort_if($student->tenant?->parent_id !== $this->sahodaya->id, 404);
+        abort_if($this->membershipRegionScopedSchoolIds([$student->tenant_id]) === [], 404);
         abort_unless($student->photo, 404);
 
         $school = Tenant::findOrFail($student->tenant_id);
@@ -93,7 +119,6 @@ class StudentProfileController extends SahodayaAdminController
             'verified_by'      => $student->verifiedBy?->name ?? $student->verifiedBy?->email,
             'has_portal_login' => $student->user_id !== null,
             'portal_username'  => $student->user?->username ?? $student->reg_no,
-            'portal_password'  => $student->user?->plain_password,
             'photo_url'        => $student->sahodayaPhotoUrl($this->sahodaya->id),
             'school_id'        => $school->id,
             'school_name'      => $school->name,

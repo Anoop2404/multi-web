@@ -96,7 +96,7 @@ class BoardResultsControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
-            ->component('School/BoardResults/Index', false)
+            ->component('School/BoardResults/Workspace', false)
             ->has('academicYearOptions', 2)
             ->where('academicYearOptions.1.label', '2025-26')
             ->where('academicYearOptions.1.entry_status', 'open')
@@ -244,6 +244,7 @@ class BoardResultsControllerTest extends TestCase
         $existing = Topper::create([
             'board_result_id' => $boardResult->id,
             'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_SUBJECT,
             'name' => 'Original Student',
             'roll_no' => '1001',
             'gender' => 'male',
@@ -314,7 +315,8 @@ class BoardResultsControllerTest extends TestCase
         $created->refresh();
         $this->assertSame('Revised Subject Leader', $created->name);
         $this->assertSame(99.0, (float) $created->subject_marks['Physics']);
-        $this->assertSame(2, Topper::where('board_result_id', $boardResult->id)->count());
+        // Omitting 1001 from the Physics batch removed 1001 from Physics, leaving 1 topper row
+        $this->assertSame(1, Topper::where('board_result_id', $boardResult->id)->count());
 
         $this->actingAs($admin)->put(
             "/school-admin/{$school->id}/board-results/{$boardResult->id}/toppers/{$created->id}",
@@ -471,7 +473,7 @@ class BoardResultsControllerTest extends TestCase
             ->get("/school-admin/{$school->id}/board-results/{$boardResult10->id}/toppers")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('School/BoardResults/Toppers', false)
+                ->component('School/BoardResults/Workspace', false)
                 ->where('topperCount', 10)
                 ->where('isClass12', false));
 
@@ -479,7 +481,7 @@ class BoardResultsControllerTest extends TestCase
             ->get("/school-admin/{$school->id}/board-results/{$boardResult12->id}/toppers")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('School/BoardResults/Toppers', false)
+                ->component('School/BoardResults/Workspace', false)
                 ->where('topperCount', 30)
                 ->where('isClass12', true));
 
@@ -517,5 +519,256 @@ class BoardResultsControllerTest extends TestCase
                 ->component('Sahodaya/BoardResults/Verification', false)
                 ->where('results.total', 2)
                 ->where('schoolNames.'.$school->id, 'Test School'));
+    }
+
+    public function test_subject_wise_batch_matches_existing_topper_by_roll_no_even_when_admission_no_is_passed_or_unmatched(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['school' => $school, 'year' => $year, 'admin' => $admin] = $this->createSchoolContext();
+
+        $boardResult = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 10,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'examination_type' => BoardResult::EXAM_AISSE,
+            'status' => BoardResult::STATUS_DRAFT,
+        ]);
+
+        $existing = Topper::create([
+            'board_result_id' => $boardResult->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_SUBJECT,
+            'name' => 'RAFA FATHIMA V C',
+            'roll_no' => '24640189',
+            'admission_no' => null,
+            'gender' => 'female',
+            'rank' => 1,
+        ]);
+
+        TopperSubjectMark::create([
+            'topper_id' => $existing->id,
+            'tenant_id' => $school->id,
+            'subject_label' => 'Mathematics',
+            'marks' => 95,
+        ]);
+
+        $response = $this->actingAs($admin)->post("/school-admin/{$school->id}/board-results/{$boardResult->id}/subject-toppers/batch", [
+            'subject' => 'Science',
+            'rows' => [
+                [
+                    'name' => 'RAFA FATHIMA V C',
+                    'gender' => 'female',
+                    'roll_no' => '24640189',
+                    'admission_no' => 'ADM-999',
+                    'marks' => 98,
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame(1, Topper::where('board_result_id', $boardResult->id)->subjectEntries()->count());
+
+        $existing->refresh();
+        $this->assertSame('24640189', $existing->roll_no);
+        $this->assertSame('ADM-999', $existing->admission_no);
+        $this->assertSame(95.0, (float) $existing->subject_marks['Mathematics']);
+        $this->assertSame(98.0, (float) $existing->subject_marks['Science']);
+    }
+
+    public function test_subject_wise_batch_returns_validation_error_when_roll_no_conflicts_with_another_student(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['school' => $school, 'year' => $year, 'admin' => $admin] = $this->createSchoolContext();
+
+        $boardResult = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 10,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'examination_type' => BoardResult::EXAM_AISSE,
+            'status' => BoardResult::STATUS_DRAFT,
+        ]);
+
+        Topper::create([
+            'board_result_id' => $boardResult->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_SUBJECT,
+            'name' => 'Student One',
+            'roll_no' => '24640189',
+            'gender' => 'female',
+            'rank' => 1,
+        ]);
+
+        Topper::create([
+            'board_result_id' => $boardResult->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_SUBJECT,
+            'name' => 'Student Two',
+            'roll_no' => '24640190',
+            'gender' => 'male',
+            'rank' => 2,
+        ]);
+
+        $response = $this->actingAs($admin)->post("/school-admin/{$school->id}/board-results/{$boardResult->id}/subject-toppers/batch", [
+            'subject' => 'Science',
+            'rows' => [
+                [
+                    'topper_id' => Topper::where('roll_no', '24640190')->first()->id,
+                    'name' => 'Student Two',
+                    'gender' => 'male',
+                    'roll_no' => '24640189',
+                    'marks' => 90,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors(['rows.0.roll_no']);
+    }
+
+    public function test_subject_wise_batch_prevents_duplicate_roll_no_when_updating_student_previously_without_roll_no(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['school' => $school, 'year' => $year, 'admin' => $admin] = $this->createSchoolContext();
+
+        $boardResult = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 12,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'examination_type' => BoardResult::EXAM_AISSCE,
+            'status' => BoardResult::STATUS_DRAFT,
+        ]);
+
+        Topper::create([
+            'board_result_id' => $boardResult->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_SUBJECT,
+            'name' => 'Existing Student With Roll',
+            'roll_no' => '24641621',
+            'gender' => 'female',
+            'rank' => 1,
+        ]);
+
+        $studentWithoutRoll = Topper::create([
+            'board_result_id' => $boardResult->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_SUBJECT,
+            'name' => 'ARATHY M V',
+            'roll_no' => null,
+            'gender' => 'female',
+            'rank' => 2,
+        ]);
+
+        $response = $this->actingAs($admin)->post("/school-admin/{$school->id}/board-results/{$boardResult->id}/subject-toppers/batch", [
+            'subject' => 'Malayalam',
+            'rows' => [
+                [
+                    'topper_id' => $studentWithoutRoll->id,
+                    'name' => 'ARATHY M V',
+                    'gender' => 'female',
+                    'roll_no' => '24641621',
+                    'marks' => 98,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors();
+    }
+
+    public function test_subject_wise_batch_removes_omitted_students_for_subject(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['school' => $school, 'year' => $year, 'admin' => $admin] = $this->createSchoolContext();
+
+        $boardResult = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 12,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'examination_type' => BoardResult::EXAM_AISSCE,
+            'status' => BoardResult::STATUS_DRAFT,
+        ]);
+
+        $studentA = Topper::create([
+            'board_result_id' => $boardResult->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_SUBJECT,
+            'name' => 'Student A',
+            'roll_no' => '1001',
+            'gender' => 'female',
+            'rank' => 1,
+        ]);
+        TopperSubjectMark::create(['topper_id' => $studentA->id, 'tenant_id' => $school->id, 'subject_label' => 'Malayalam', 'marks' => 95]);
+
+        $studentB = Topper::create([
+            'board_result_id' => $boardResult->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_SUBJECT,
+            'name' => 'Student B',
+            'roll_no' => '1002',
+            'gender' => 'male',
+            'rank' => 2,
+        ]);
+        TopperSubjectMark::create(['topper_id' => $studentB->id, 'tenant_id' => $school->id, 'subject_label' => 'Malayalam', 'marks' => 90]);
+
+        $response = $this->actingAs($admin)->post("/school-admin/{$school->id}/board-results/{$boardResult->id}/subject-toppers/batch", [
+            'subject' => 'Malayalam',
+            'rows' => [
+                [
+                    'topper_id' => $studentA->id,
+                    'name' => 'Student A',
+                    'gender' => 'female',
+                    'roll_no' => '1001',
+                    'marks' => 95,
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect()->assertSessionHas('success');
+        $this->assertDatabaseHas('toppers', ['id' => $studentA->id]);
+        $this->assertDatabaseMissing('toppers', ['id' => $studentB->id]);
+    }
+
+    public function test_subject_topper_individual_removal_succeeds_without_percentage_field(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['school' => $school, 'year' => $year, 'admin' => $admin] = $this->createSchoolContext();
+
+        $boardResult = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 12,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'examination_type' => BoardResult::EXAM_AISSCE,
+            'status' => BoardResult::STATUS_DRAFT,
+        ]);
+
+        $student = Topper::create([
+            'board_result_id' => $boardResult->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_SUBJECT,
+            'name' => 'Multi Subject Student',
+            'roll_no' => '1003',
+            'gender' => 'female',
+            'percentage' => null,
+            'rank' => 1,
+        ]);
+        TopperSubjectMark::create(['topper_id' => $student->id, 'tenant_id' => $school->id, 'subject_label' => 'Physics', 'marks' => 98]);
+        TopperSubjectMark::create(['topper_id' => $student->id, 'tenant_id' => $school->id, 'subject_label' => 'Malayalam', 'marks' => 92]);
+
+        $response = $this->actingAs($admin)->put("/school-admin/{$school->id}/board-results/{$boardResult->id}/toppers/{$student->id}", [
+            'id' => $student->id,
+            'name' => 'Multi Subject Student',
+            'gender' => 'female',
+            'roll_no' => '1003',
+            'percentage' => null,
+            'subject_marks' => ['Physics' => 98],
+        ]);
+
+        $response->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('toppers', ['id' => $student->id]);
+        $this->assertDatabaseMissing('topper_subject_marks', ['topper_id' => $student->id, 'subject_label' => 'Malayalam']);
+        $this->assertDatabaseHas('topper_subject_marks', ['topper_id' => $student->id, 'subject_label' => 'Physics']);
     }
 }

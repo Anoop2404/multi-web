@@ -75,6 +75,9 @@
 import { reactive } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -119,8 +122,8 @@ function saveRow(row) {
     }, { preserveScroll: true });
 }
 
-function removeRow(row) {
-    if (!confirm(`Remove area "${row.name}"?`)) return;
+async function removeRow(row) {
+    if (!(await confirm({ message: `Remove area "${row.name}"?` }))) return;
     router.delete(`${base}/${row.id}`, { preserveScroll: true });
 }
 </script>

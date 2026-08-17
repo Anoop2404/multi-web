@@ -93,6 +93,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { reactive } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -105,6 +106,8 @@ const props = defineProps({
     filters: Object,
     statusCounts: Object,
 });
+
+const { prompt } = useConfirm();
 
 const filterForm = reactive({
     status: props.filters?.status ?? 'pending',
@@ -143,8 +146,8 @@ function statusClass(status) {
     }[status] ?? 'bg-slate-100 text-slate-600';
 }
 
-function resolve(appealId, status) {
-    const note = status === 'rejected' ? prompt('Rejection note (optional):') : null;
+async function resolve(appealId, status) {
+    const note = status === 'rejected' ? await prompt({ message: 'Rejection note (optional):', inputMultiline: true, inputRequired: false }) : null;
     if (status === 'rejected' && note === null) return;
 
     router.post(`/sahodaya-admin/${props.sahodaya.id}/fest/appeals/${appealId}/resolve`, {

@@ -226,8 +226,10 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import InputError from '@/Components/ui/InputError.vue';
 import { PROGRAM_SLUGS, SAHODAYA_PROGRAMS, sahodayaProgramHref } from '@/support/sahodayaPrograms.js';
 import { isNavProgramVisible } from '@/support/sahodayaAdminNav.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const page = usePage();
+const { confirm } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -326,8 +328,8 @@ function toggleNavHidden(event) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}/toggle-nav-hidden`, {}, { preserveScroll: true });
 }
 
-function deleteEvent(event) {
-    if (!window.confirm(`Delete "${event.title}"? This cannot be undone. Any sub-regions under it will be deleted too.`)) {
+async function deleteEvent(event) {
+    if (!(await confirm({ message: `Delete "${event.title}"? This cannot be undone. Any sub-regions under it will be deleted too.` }))) {
         return;
     }
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}`, { preserveScroll: true });

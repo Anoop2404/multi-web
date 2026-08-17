@@ -378,8 +378,16 @@
                                 <td class="px-4 py-3 font-medium text-gray-800">{{ admin.name }}</td>
                                 <td class="px-4 py-3 font-mono text-gray-800 text-xs select-all">{{ admin.username || admin.email }}</td>
                                 <td class="px-4 py-3 font-mono text-xs select-all">
-                                    <span v-if="admin.password" class="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">{{ admin.password }}</span>
-                                    <span v-else class="text-amber-700" title="Set or reset the password below to store a recoverable copy">Not stored — set a new password to show</span>
+                                    <button v-if="revealedPasswords[admin.id]" type="button" @click="revealPassword(admin)"
+                                            class="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded" title="Click to hide">
+                                        {{ revealedPasswords[admin.id] }}
+                                    </button>
+                                    <span v-else-if="!admin.has_password" class="text-amber-700" title="Set or reset the password below to store a recoverable copy">Not stored — set a new password to show</span>
+                                    <button v-else type="button" @click="revealPassword(admin)"
+                                            :disabled="revealingId === admin.id"
+                                            class="link-brand text-xs">
+                                        {{ revealingId === admin.id ? 'Loading…' : 'Show password' }}
+                                    </button>
                                 </td>
                                 <td class="px-4 py-3 text-right space-x-2">
                                     <button type="button" @click="editAdmin(admin)"
@@ -554,6 +562,9 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     tenant: Object,
@@ -642,9 +653,9 @@ const eraseStudentsConfirmMatches = computed(() =>
     eraseStudentsForm.confirm_school_name.trim().toLowerCase() === (props.tenant?.name ?? '').trim().toLowerCase(),
 );
 
-function eraseStudents() {
+async function eraseStudents() {
     if (! eraseStudentsConfirmMatches.value) return;
-    if (! confirm(`Permanently erase EVERY student record for "${props.tenant.name}"? This can be restored afterwards from the Danger zone if needed, but the data will not be visible anywhere until it is.`)) {
+    if (! (await confirm({ message: `Permanently erase EVERY student record for "${props.tenant.name}"? This can be restored afterwards from the Danger zone if needed, but the data will not be visible anywhere until it is.`, destructive: true }))) {
         return;
     }
 
@@ -664,8 +675,8 @@ function formatDateTime(value) {
     return new Date(value).toLocaleString();
 }
 
-function restoreErasure(batch) {
-    if (! confirm(`Restore ${batch.student_count} erased student record(s) for "${props.tenant.name}"? This reinserts them exactly as they were.`)) {
+async function restoreErasure(batch) {
+    if (! (await confirm({ message: `Restore ${batch.student_count} erased student record(s) for "${props.tenant.name}"? This reinserts them exactly as they were.`, destructive: false }))) {
         return;
     }
 
@@ -686,8 +697,8 @@ function membershipStatusClass(status) {
     }[status] || 'bg-gray-100 text-gray-600';
 }
 
-function rejectSchool() {
-    if (! confirm(`Reject "${props.tenant.name}"? The school admin will be notified by email.`)) {
+async function rejectSchool() {
+    if (! (await confirm({ message: `Reject "${props.tenant.name}"? The school admin will be notified by email.`, destructive: true }))) {
         return;
     }
 
@@ -696,8 +707,8 @@ function rejectSchool() {
     });
 }
 
-function deleteTenant() {
-    if (! confirm(`Permanently delete "${props.tenant.name}" and its admin account(s)? This cannot be undone.`)) {
+async function deleteTenant() {
+    if (! (await confirm({ message: `Permanently delete "${props.tenant.name}" and its admin account(s)? This cannot be undone.`, destructive: true }))) {
         return;
     }
 
@@ -755,9 +766,31 @@ function searchLogin() {
     });
 }
 
-function removeAdmin(admin) {
+const revealedPasswords = ref({});
+const revealingId = ref(null);
+
+async function revealPassword(admin) {
+    if (revealedPasswords.value[admin.id]) {
+        delete revealedPasswords.value[admin.id];
+        return;
+    }
+
+    revealingId.value = admin.id;
+    try {
+        const response = await fetch(`/admin/tenants/${props.tenant.id}/portal-admin/${admin.id}/reveal-password`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        const data = await response.json();
+        revealedPasswords.value = { ...revealedPasswords.value, [admin.id]: data.password || '(not stored)' };
+    } finally {
+        revealingId.value = null;
+    }
+}
+
+async function removeAdmin(admin) {
     const label = props.tenant.type === 'school' ? 'school admin' : 'Sahodaya admin';
-    if (! confirm(`Remove ${label} ${admin.email}?`)) {
+    if (! (await confirm({ message: `Remove ${label} ${admin.email}?`, destructive: true }))) {
         return;
     }
 

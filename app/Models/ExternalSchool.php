@@ -21,9 +21,18 @@ class ExternalSchool extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'external_sahodaya_id', 'name', 'contact_name', 'contact_phone',
-        'access_code', 'status',
+        'external_sahodaya_id', 'name', 'username', 'contact_name', 'contact_phone',
+        'access_code', 'password', 'plain_password', 'status',
     ];
+
+    protected $hidden = ['password'];
+
+    protected function casts(): array
+    {
+        return [
+            'password' => 'hashed',
+        ];
+    }
 
     public function sahodaya(): BelongsTo
     {
@@ -33,6 +42,11 @@ class ExternalSchool extends Model
     public function isActive(): bool
     {
         return $this->status === 'active';
+    }
+
+    public function hasLogin(): bool
+    {
+        return $this->username !== null && $this->password !== null;
     }
 
     public static function generateAccessCode(): string

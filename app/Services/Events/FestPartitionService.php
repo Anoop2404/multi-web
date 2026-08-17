@@ -6,6 +6,7 @@ use App\Models\FestCateringOrder;
 use App\Models\FestEvent;
 use App\Models\FestFoodBill;
 use App\Models\FestFoodCoupon;
+use App\Models\FestRegistration;
 use App\Models\Tenant;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -136,6 +137,13 @@ class FestPartitionService
     /**
      * Combined school points across configured child partitions.
      *
+     * §7.3a note (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): this sums a
+     * school's points across sibling *region-partition* events for ONE phase (or one
+     * non-phased hub) — e.g. Tirur + Manjeri region children combined into a single
+     * standing. It does NOT sum across *phases* of the same event — that is a separate
+     * aggregation axis handled by FestPhaseScoreboardService, which reuses the shared
+     * aggregateScoreboardAcrossPartitions() loop below rather than duplicating it.
+     *
      * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
      */
     public function combinedScoreboard(FestEvent $hub): array
@@ -143,21 +151,97 @@ class FestPartitionService
         $config = $this->aggregationConfig($hub);
         $includeRoles = $config['include_roles'] ?? ['region', 'finale', 'cluster'];
 
+        $partitions = $this->partitions($hub)->filter(function (FestEvent $partition) use ($includeRoles) {
+            $role = $this->partitionRole($partition);
+
+            return ! $role || in_array($role, $includeRoles, true);
+        });
+
+        return $this->aggregateScoreboardAcrossPartitions(
+            $partitions,
+            fn (FestEvent $partition) => EventContext::for($partition)->scoreboardBySchoolForEvent()
+        );
+    }
+
+    /**
+     * Shared aggregation loop: sum school points across an arbitrary set of partition
+     * events, given a per-partition scoreboard source callback, then rank the totals.
+     *
+     * Extracted from combinedScoreboard() (§7.3a, 2026-08-15) so FestPhaseScoreboardService
+     * can reuse the exact same "sum rows from N partitions, then rank" mechanics for its
+     * regional-phase case — scoped to a phase's region-partition children with a
+     * phase-filtered scoreboard source, instead of combinedScoreboard()'s whole-event
+     * source — without duplicating the accumulation/ranking logic.
+     *
+     * @param  Collection<int, FestEvent>  $partitions
+     * @param  callable(FestEvent): list<array{school_id: string, total_points: int}>  $scoreboardSource
+     * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
+     */
+    public function aggregateScoreboardAcrossPartitions(Collection $partitions, callable $scoreboardSource): array
+    {
         $totals = [];
 
-        foreach ($this->partitions($hub) as $partition) {
-            $role = $this->partitionRole($partition);
-            if ($role && ! in_array($role, $includeRoles, true)) {
-                continue;
-            }
-
-            foreach (EventContext::for($partition)->scoreboardBySchoolForEvent() as $row) {
+        foreach ($partitions as $partition) {
+            foreach ($scoreboardSource($partition) as $row) {
                 $sid = $row['school_id'];
                 $totals[$sid] = ($totals[$sid] ?? 0) + (int) $row['total_points'];
             }
         }
 
         return $this->rankSchoolTotals($totals);
+    }
+
+    /**
+     * Per-region summary cards for the hub's drill-down panel (Phase 4, §2.5 of
+     * docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md — "a full Sahodaya admin can
+     * inspect one region's data without leaving the hub page"). Reuses the exact
+     * same items/registrations/results_published/schools/athletes numbers that
+     * FestEventController::show() already computes for a single event's own
+     * Overview page — just run once per region partition, so the drill-down cards
+     * stay consistent with what an admin would see after navigating into the
+     * region's own page.
+     *
+     * @return list<array{
+     *     id: int, title: string, label: string, status: string,
+     *     results_published: bool, venue: ?string, partition_role: ?string,
+     *     items_count: int, registrations_count: int,
+     *     schools_count: ?int, athletes_count: ?int,
+     * }>
+     */
+    public function regionDrillDownSummary(FestEvent $hub): array
+    {
+        $regionPartitions = $this->partitions($hub)->filter(
+            fn (FestEvent $p) => $this->partitionRole($p) === 'region'
+        );
+
+        return $regionPartitions->map(function (FestEvent $partition) {
+            $summary = [
+                'id'                  => $partition->id,
+                'title'               => $partition->title,
+                'label'               => $partition->cluster_label ?? $partition->title,
+                'status'              => $partition->status,
+                'results_published'   => (bool) $partition->results_published,
+                'venue'               => $partition->venue,
+                'partition_role'      => $this->partitionRole($partition),
+                'items_count'         => $partition->items()->count(),
+                'registrations_count' => $partition->registrations()->count(),
+                'schools_count'       => null,
+                'athletes_count'      => null,
+            ];
+
+            if ($partition->event_type === 'sports') {
+                $regs = $partition->registrations()
+                    ->whereIn('status', FestRegistration::ACTIVE_STATUSES)
+                    ->with('participants')
+                    ->get();
+                $summary['schools_count'] = $regs->pluck('school_id')->unique()->count();
+                $summary['athletes_count'] = $regs->flatMap(fn ($r) => $r->participants ?? [])
+                    ->filter(fn ($p) => $p->participant_role !== 'standby')
+                    ->count();
+            }
+
+            return $summary;
+        })->values()->all();
     }
 
     /** @return array<string, mixed> */
@@ -375,8 +459,15 @@ class FestPartitionService
         ];
     }
 
-    /** @param array<string, int> $totals */
-    private function rankSchoolTotals(array $totals): array
+    /**
+     * Turn a school_id => points totals map into ranked rows with school names.
+     * Public: shared by combinedScoreboard()/aggregateScoreboardAcrossPartitions() here
+     * and by FestPhaseScoreboardService::cumulativeOverall() (§7.3a) for its own
+     * sum-across-phases totals map, so both aggregation axes rank identically.
+     *
+     * @param array<string, int> $totals
+     */
+    public function rankSchoolTotals(array $totals): array
     {
         if ($totals === []) {
             return [];

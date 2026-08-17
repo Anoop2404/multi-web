@@ -108,6 +108,7 @@ import MembershipWorkflowNav from '@/Components/school/MembershipWorkflowNav.vue
 import TrackStatusPill from '@/Components/ui/TrackStatusPill.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     school: Object,
@@ -122,6 +123,8 @@ const props = defineProps({
 const canSubmit = computed(() =>
     ['pending', 'rejected'].includes(props.submission?.full_records_status),
 );
+
+const { confirm } = useConfirm();
 
 const searchInput = ref(props.search);
 let searchTimeout = null;
@@ -138,8 +141,8 @@ function onSearchInput() {
     }, 300);
 }
 
-function submit() {
-    if (!confirm(`Submit ${props.studentTotal} student record(s) for Sahodaya review?`)) return;
+async function submit() {
+    if (!(await confirm({ message: `Submit ${props.studentTotal} student record(s) for Sahodaya review?`, destructive: false }))) return;
     router.post(`/school-admin/${props.school.id}/registration/submit-track`, { track: 'full_records' });
 }
 </script>

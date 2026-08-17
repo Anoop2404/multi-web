@@ -602,33 +602,33 @@ class TenantController extends Controller
         });
     }
 
-    public function saveSahodayaAdmin(Request $request, Tenant $tenant)
+    public function saveSahodayaAdmin(Request $request, Tenant $tenant, PlatformAuditLogger $audit)
     {
         abort_if($tenant->type !== 'sahodaya', 404);
 
-        return $this->savePortalAdmin($request, $tenant, 'sahodaya_admin');
+        return $this->savePortalAdmin($request, $tenant, 'sahodaya_admin', $audit);
     }
 
-    public function saveSchoolAdmin(Request $request, Tenant $tenant)
+    public function saveSchoolAdmin(Request $request, Tenant $tenant, PlatformAuditLogger $audit)
     {
         abort_if($tenant->type !== 'school', 404);
 
-        return $this->savePortalAdmin($request, $tenant, 'school_admin');
+        return $this->savePortalAdmin($request, $tenant, 'school_admin', $audit);
     }
 
-    public function destroySahodayaAdmin(Tenant $tenant, int $user)
+    public function destroySahodayaAdmin(Tenant $tenant, int $user, PlatformAuditLogger $audit)
     {
-        return $this->destroyPortalAdmin($tenant, $user, 'sahodaya', 'sahodaya_admin');
+        return $this->destroyPortalAdmin($tenant, $user, 'sahodaya', 'sahodaya_admin', $audit);
     }
 
-    public function destroySchoolAdmin(Tenant $tenant, int $user)
+    public function destroySchoolAdmin(Tenant $tenant, int $user, PlatformAuditLogger $audit)
     {
-        return $this->destroyPortalAdmin($tenant, $user, 'school', 'school_admin');
+        return $this->destroyPortalAdmin($tenant, $user, 'school', 'school_admin', $audit);
     }
 
-    private function savePortalAdmin(Request $request, Tenant $tenant, string $role): \Illuminate\Http\RedirectResponse
+    private function savePortalAdmin(Request $request, Tenant $tenant, string $role, PlatformAuditLogger $audit): \Illuminate\Http\RedirectResponse
     {
-        return TenantAuth::withTenantUsers($tenant, function () use ($request, $tenant, $role) {
+        return TenantAuth::withTenantUsers($tenant, function () use ($request, $tenant, $role, $audit) {
             $existingId = $request->input('user_id');
             $label = $role === 'sahodaya_admin' ? 'Sahodaya admin' : 'School admin';
 
@@ -688,20 +688,23 @@ class TenantController extends Controller
 
             $user->syncRoles([$role]);
 
+            $existingId ? $audit->userUpdated($user) : $audit->userCreated($user);
+
             $message = $existingId ? "{$label} login updated." : "{$label} account created.";
 
             return redirect()->route('admin.tenants.show', $tenant)->with('success', $message);
         });
     }
 
-    private function destroyPortalAdmin(Tenant $tenant, int $userId, string $tenantType, string $role): \Illuminate\Http\RedirectResponse
+    private function destroyPortalAdmin(Tenant $tenant, int $userId, string $tenantType, string $role, PlatformAuditLogger $audit): \Illuminate\Http\RedirectResponse
     {
         abort_if($tenant->type !== $tenantType, 404);
 
-        return TenantAuth::withTenantUsers($tenant, function () use ($tenant, $userId, $role) {
+        return TenantAuth::withTenantUsers($tenant, function () use ($tenant, $userId, $role, $audit) {
             $user = User::query()->where('tenant_id', $tenant->id)->findOrFail($userId);
             abort_if(! $user->hasRole($role), 404);
 
+            $audit->userDeleted($user);
             $user->delete();
 
             $label = $role === 'sahodaya_admin' ? 'Sahodaya admin' : 'School admin';
@@ -795,7 +798,6 @@ class TenantController extends Controller
                 $admins = $this->portalAdmins($tenant, $role);
                 $primary = $admins[0] ?? null;
                 $tenant->setAttribute('login_username', $primary['username'] ?? null);
-                $tenant->setAttribute('login_password', $primary['password'] ?? null);
                 $tenant->setAttribute('portal_admins', $admins);
 
                 return $tenant;
@@ -912,7 +914,12 @@ class TenantController extends Controller
         }
     }
 
-    /** @return list<array{id: int, name: string, email: string, username: string, password: ?string, created_at: ?string}> */
+    /**
+     * Deliberately does NOT include the plaintext password — see revealPortalAdminPassword()
+     * for the on-demand, audit-logged reveal instead of shipping it in every page payload.
+     *
+     * @return list<array{id: int, name: string, email: string, username: string, has_password: bool, created_at: ?string}>
+     */
     private function portalAdmins(Tenant $tenant, string $role): array
     {
         try {
@@ -933,18 +940,38 @@ class TenantController extends Controller
                     ->orderBy('name')
                     ->get($columns)
                     ->map(fn (User $user) => [
-                        'id'         => $user->id,
-                        'name'       => $user->name,
-                        'email'      => $user->email,
-                        'username'   => $user->username ?: ($user->email ?? ''),
-                        'password'   => $hasPlain ? ($user->plain_password ?: null) : null,
-                        'created_at' => $user->created_at?->toIso8601String(),
+                        'id'           => $user->id,
+                        'name'         => $user->name,
+                        'email'        => $user->email,
+                        'username'     => $user->username ?: ($user->email ?? ''),
+                        'has_password' => $hasPlain && (bool) $user->plain_password,
+                        'created_at'   => $user->created_at?->toIso8601String(),
                     ])
                     ->all();
             }) ?? [];
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    /** On-demand, audit-logged reveal of one portal admin's stored plaintext password. */
+    public function revealPortalAdminPassword(Tenant $tenant, int $userId, PlatformAuditLogger $audit)
+    {
+        return TenantAuth::withTenantUsers($tenant, function () use ($tenant, $userId, $audit) {
+            $user = User::query()->where('tenant_id', $tenant->id)->findOrFail($userId);
+
+            $audit->log(
+                'credential.viewed',
+                "Portal admin password viewed for {$tenant->name}",
+                $tenant,
+                ['user_id' => $user->id, 'username' => $user->username],
+            );
+
+            return response()->json([
+                'username' => $user->username ?: $user->email,
+                'password' => $user->plain_password,
+            ]);
+        });
     }
 
     /** @return array{query: string, matches: list<array<string, mixed>>, searched: bool, message: ?string} */

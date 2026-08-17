@@ -7,6 +7,8 @@ use App\Models\FestEvent;
 use App\Models\FestEventStaff;
 use App\Models\McqExam;
 use App\Models\McqExamStaff;
+use App\Models\Region;
+use App\Models\StaffRegionAssignment;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Auth\TenantUserProvisioner;
 use App\Services\Auth\UserCredentialService;
@@ -51,11 +53,17 @@ class TenantUserController extends SahodayaAdminController
                         'exam_title' => $s->exam?->title,
                         'role'       => $s->role,
                     ])->values()->all(),
+                'region_ids' => StaffRegionAssignment::forTenant($this->sahodaya->id)
+                    ->forUser($u->id)
+                    ->pluck('region_id')
+                    ->values()
+                    ->all(),
             ]);
 
         return $this->inertia('Sahodaya/Users/Index', [
             'users'           => $users,
             'assignableRoles' => $this->roleOptions($roles),
+            'regions'         => Region::forTenant($this->sahodaya->id)->active()->orderBy('sort_order')->get(['id', 'name']),
             'permissions'     => TenantUserCatalog::allPermissions(),
             'permissionLabels'=> $this->permissionLabels(),
             'permissionRoles' => TenantUserCatalog::sahodayaPermissionRoles(),
@@ -99,6 +107,8 @@ class TenantUserController extends SahodayaAdminController
             'exam_staff_role'    => 'nullable|in:controller,staff',
             'event_admin_event_ids'   => 'array',
             'event_admin_event_ids.*' => 'exists:fest_events,id',
+            'region_ids'   => 'array',
+            'region_ids.*' => [Rule::exists('regions', 'id')->where('tenant_id', $this->sahodaya->id)],
         ]);
 
         $perms = $data['permissions'] ?? $provisioner->defaultPermissionsForRoles($data['roles'], 'sahodaya');
@@ -118,6 +128,7 @@ class TenantUserController extends SahodayaAdminController
         $this->syncEventStaffAssignment($user, $data);
         $this->syncEventAdminAssignment($user, $data);
         $this->syncExamStaffAssignment($user, $data);
+        $this->syncMembershipRegionAssignment($user, $data, $request->user()?->id);
 
         $audit->userCreated($user);
 
@@ -152,6 +163,8 @@ class TenantUserController extends SahodayaAdminController
             'exam_staff_role'    => 'nullable|in:controller,staff',
             'event_admin_event_ids'   => 'array',
             'event_admin_event_ids.*' => 'exists:fest_events,id',
+            'region_ids'   => 'array',
+            'region_ids.*' => [Rule::exists('regions', 'id')->where('tenant_id', $this->sahodaya->id)],
         ]);
 
         $password = $data['password'] ?? null;
@@ -172,6 +185,7 @@ class TenantUserController extends SahodayaAdminController
         $this->syncEventStaffAssignment($updated, $data);
         $this->syncEventAdminAssignment($updated, $data);
         $this->syncExamStaffAssignment($updated, $data);
+        $this->syncMembershipRegionAssignment($updated, $data, $request->user()?->id);
 
         $audit->userUpdated($updated);
 
@@ -276,6 +290,33 @@ class TenantUserController extends SahodayaAdminController
             ['exam_id' => $examId, 'user_id' => $user->id],
             ['role' => $role],
         );
+    }
+
+    /**
+     * Region restriction for Membership/Student data — independent of any role. Available to
+     * any user regardless of which roles they hold; empty means unrestricted (see
+     * SahodayaAdminController::membershipRegionScopedSchoolIds()).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function syncMembershipRegionAssignment(User $user, array $data, ?int $assignedByUserId): void
+    {
+        $regionIds = array_values(array_unique(array_map('intval', $data['region_ids'] ?? [])));
+
+        StaffRegionAssignment::where('tenant_id', $this->sahodaya->id)
+            ->where('user_id', $user->id)
+            ->whereNotIn('region_id', $regionIds ?: [0])
+            ->delete();
+
+        foreach ($regionIds as $regionId) {
+            StaffRegionAssignment::firstOrCreate([
+                'tenant_id'  => $this->sahodaya->id,
+                'user_id'    => $user->id,
+                'region_id'  => $regionId,
+            ], [
+                'assigned_by_user_id' => $assignedByUserId,
+            ]);
+        }
     }
 
     /** @param  list<string>  $roles */

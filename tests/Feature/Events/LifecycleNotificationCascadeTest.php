@@ -71,8 +71,7 @@ class LifecycleNotificationCascadeTest extends TestCase
     {
         ['sahodaya' => $sahodaya, 'school' => $school] = $this->makeSahodayaAndSchool();
 
-        NotificationTemplate::create([
-            'slug'          => 'fest.results.unpublished',
+        NotificationTemplate::updateOrCreate(['slug' => 'fest.results.unpublished'], [
             'title'         => 'Results unpublished',
             'body_template' => 'Results for {{event_title}} were unpublished.',
             'channels_json' => ['in_app'],
@@ -168,15 +167,13 @@ class LifecycleNotificationCascadeTest extends TestCase
     {
         ['sahodaya' => $sahodaya, 'school' => $school] = $this->makeSahodayaAndSchool();
 
-        NotificationTemplate::create([
-            'slug'          => 'fest.registration.needs_reapproval',
+        NotificationTemplate::updateOrCreate(['slug' => 'fest.registration.needs_reapproval'], [
             'title'         => 'Needs re-approval',
             'body_template' => 'Roster changed for {{event_title}}.',
             'channels_json' => ['in_app'],
             'is_active'     => true,
         ]);
-        NotificationTemplate::create([
-            'slug'          => 'fest.registration.needs_reapproval_admin',
+        NotificationTemplate::updateOrCreate(['slug' => 'fest.registration.needs_reapproval_admin'], [
             'title'         => 'Registration needs re-approval (admin)',
             'body_template' => 'A school changed its roster for {{event_title}}.',
             'channels_json' => ['in_app'],
@@ -233,8 +230,7 @@ class LifecycleNotificationCascadeTest extends TestCase
     {
         ['sahodaya' => $sahodaya, 'school' => $school] = $this->makeSahodayaAndSchool();
 
-        NotificationTemplate::create([
-            'slug'          => 'fest.registration.needs_reapproval',
+        NotificationTemplate::updateOrCreate(['slug' => 'fest.registration.needs_reapproval'], [
             'title'         => 'Needs re-approval',
             'body_template' => 'Roster changed for {{event_title}}.',
             'channels_json' => ['in_app'],
@@ -287,8 +283,7 @@ class LifecycleNotificationCascadeTest extends TestCase
     {
         ['sahodaya' => $sahodaya, 'school' => $school] = $this->makeSahodayaAndSchool();
 
-        NotificationTemplate::create([
-            'slug'          => 'fest.registration.submitted_admin',
+        NotificationTemplate::updateOrCreate(['slug' => 'fest.registration.submitted_admin'], [
             'title'         => 'New registration submitted',
             'body_template' => 'A new registration for {{event_title}} needs review.',
             'channels_json' => ['in_app'],

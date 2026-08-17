@@ -71,6 +71,7 @@ import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
 import { festOpsEventNav } from '@/support/festOpsPortalNav.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, event: Object, registrations: Array,
@@ -80,6 +81,8 @@ const props = defineProps({
     selectedHeadId: { type: [String, Number], default: null },
     selectedItemId: { type: [String, Number], default: null },
 });
+
+const { confirm } = useConfirm();
 
 const selectedIds = ref([]);
 
@@ -118,8 +121,8 @@ function bulkApprove() {
     });
 }
 
-function bulkReject() {
-    if (!confirm(`Reject ${selectedIds.value.length} registration(s)?`)) return;
+async function bulkReject() {
+    if (!(await confirm({ message: `Reject ${selectedIds.value.length} registration(s)?` }))) return;
     router.post(`${base.value}/registrations/bulk-reject`, { registration_ids: selectedIds.value }, {
         preserveScroll: true, onSuccess: () => { selectedIds.value = []; },
     });

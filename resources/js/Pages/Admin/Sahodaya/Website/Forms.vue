@@ -51,6 +51,7 @@
 <script setup>
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -61,12 +62,13 @@ const props = defineProps({
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/website/forms`;
 const form = useForm({ name: '', notify_email: '' });
+const { confirm } = useConfirm();
 
 function create() {
     form.post(base, { preserveScroll: true, onSuccess: () => form.reset() });
 }
-function remove(f) {
-    if (!confirm(`Remove form "${f.name}"?`)) return;
+async function remove(f) {
+    if (!(await confirm({ message: `Remove form "${f.name}"?` }))) return;
     router.delete(`${base}/${f.id}`, { preserveScroll: true });
 }
 </script>

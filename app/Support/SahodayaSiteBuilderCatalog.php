@@ -21,7 +21,7 @@ class SahodayaSiteBuilderCatalog
         'circulars'             => ['category-filter', 'accordion'],
         'testimonials_sahodaya' => ['principal-quotes'],
         'useful_links'          => ['icon-grid'],
-        'gallery'               => ['masonry-grid', 'carousel', 'album-based'],
+        'gallery'               => ['grid', 'masonry-grid', 'carousel', 'album-based'],
         'contact'               => ['side-by-side', 'stacked', 'with-whatsapp'],
         'newsletter'            => ['subscribe-form'],
         'sahodaya_home'         => ['dashboard'],

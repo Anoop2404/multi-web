@@ -47,6 +47,8 @@
 <script setup>
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -60,8 +62,8 @@ const form = useForm({ name: '', slug: '' });
 function create() {
     form.post(base, { preserveScroll: true, onSuccess: () => form.reset() });
 }
-function remove(s) {
-    if (!confirm(`Remove microsite "${s.name}" and all ${s.sections_count ?? 0} of its sections?\n\nThis cannot be undone.`)) return;
+async function remove(s) {
+    if (!(await confirm({ message: `Remove microsite "${s.name}" and all ${s.sections_count ?? 0} of its sections?\n\nThis cannot be undone.`, destructive: true }))) return;
     router.delete(`${base}/${s.id}`, { preserveScroll: true });
 }
 </script>

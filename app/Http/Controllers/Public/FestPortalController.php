@@ -16,6 +16,7 @@ use App\Models\FestSchedule;
 use App\Models\Tenant;
 use App\Services\Events\EventContext;
 use App\Services\Events\EventLifecycleGate;
+use App\Services\Events\FestPhaseScoreboardService;
 use App\Services\Events\FestPublicVisibilityService;
 use App\Services\Events\FestWinnerPosterService;
 use App\Services\Events\PublicFestScoreboardService;
@@ -31,6 +32,7 @@ class FestPortalController extends Controller
     public function __construct(
         private FestPublicVisibilityService $visibility,
         private PublicFestScoreboardService $scoreboards,
+        private FestPhaseScoreboardService $phaseScoreboards,
     ) {}
 
     public function index()
@@ -115,7 +117,11 @@ class FestPortalController extends Controller
         }
 
         $event = $rootEvent;
-        abort_unless($event->results_published, 404);
+        abort_unless(
+            $event->results_published
+                || ($event->usesPhasedRegionalBilling() && $event->phases()->where('results_published', true)->exists()),
+            404
+        );
 
         $selectedScope = $this->scoreboards->resolveScope(
             $event,
@@ -164,6 +170,22 @@ class FestPortalController extends Controller
             ])
             ->all();
 
+        // §7.3a (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): a phased event's
+        // "Overall" school board is the progressive sum of every published phase's
+        // points, not the region-partition combine PublicFestScoreboardService already
+        // does for $schoolBoard below. Only applies to the whole-event 'overall' scope —
+        // an individual region/cluster/finale scope keeps its own normal board — and only
+        // when this event actually has FestEventPhase rows; every other event (the
+        // default, phase-less case) falls through to exactly today's $schoolBoard.
+        $usesPhases = $this->phaseScoreboards->usesPhases($event);
+        $isOverallScope = ($selectedScope['role'] ?? null) === 'overall';
+        $phaseCumulativeBoard = ($usesPhases && $isOverallScope)
+            ? $this->phaseScoreboards->cumulativeOverallWithContributions($event)
+            : null;
+        $phaseBreakdown = ($usesPhases && $isOverallScope)
+            ? $this->phaseScoreboards->phaseBreakdown($event)
+            : [];
+
         // A partitioned hub's marks live on its region/finale children, not the hub's own
         // event_id — without this expansion, a partitioned hub's public results page
         // showed zero item results even after results_published was cascaded true.
@@ -203,6 +225,9 @@ class FestPortalController extends Controller
             'event' => $event,
             'tab' => $tab,
             'schoolBoard' => $this->scoreboards->scoreboard($event, $selectedScope),
+            'usesPhases' => $usesPhases,
+            'phaseCumulativeBoard' => $phaseCumulativeBoard,
+            'phaseBreakdown' => $phaseBreakdown,
             'categoryBoards' => $categoryBoards,
             'itemResults' => $itemResults,
             'individualResults' => $individualResults,
@@ -230,7 +255,11 @@ class FestPortalController extends Controller
         }
 
         $event = $rootEvent;
-        EventLifecycleGate::allowPublicSchedule($event);
+        if (! $event->usesPhasedRegionalBilling()) {
+            EventLifecycleGate::allowPublicSchedule($event);
+        } else {
+            abort_unless($event->phases()->where('schedule_published', true)->exists(), 404);
+        }
         $selectedScope = $this->scoreboards->resolveScope(
             $event,
             $this->stringQuery($request, 'scope'),
@@ -251,7 +280,9 @@ class FestPortalController extends Controller
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
-        EventLifecycleGate::allowPublicSchedule($event);
+        if (! $event->usesPhasedRegionalBilling()) {
+            EventLifecycleGate::allowPublicSchedule($event);
+        }
         $itemEvent = FestEvent::where('tenant_id', $tenant->id)->findOrFail($item->event_id);
         abort_unless($itemEvent->schedule_published, 404);
 
@@ -265,7 +296,7 @@ class FestPortalController extends Controller
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
-        abort_unless($event->results_published, 404);
+        abort_unless($this->rootResultsAvailable($event), 404);
         $itemEvent = FestEvent::where('tenant_id', $tenant->id)->findOrFail($item->event_id);
         abort_unless($itemEvent->results_published, 404);
 
@@ -300,7 +331,7 @@ class FestPortalController extends Controller
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
         abort_if($mark->event_id !== $item->event_id || $mark->item_id !== $item->id, 404);
-        abort_unless($event->results_published, 404);
+        abort_unless($this->rootResultsAvailable($event), 404);
         $itemEvent = FestEvent::where('tenant_id', $tenant->id)->findOrFail($item->event_id);
         abort_unless($itemEvent->results_published, 404);
         abort_if(! in_array((int) $mark->position, [1, 2, 3], true), 404);
@@ -318,7 +349,7 @@ class FestPortalController extends Controller
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
-        abort_unless($event->results_published, 404);
+        abort_unless($this->rootResultsAvailable($event), 404);
         $itemEvent = FestEvent::where('tenant_id', $tenant->id)->findOrFail($item->event_id);
         abort_unless($itemEvent->results_published, 404);
 
@@ -626,6 +657,12 @@ class FestPortalController extends Controller
             ->where('id', $eventId)
             ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])
             ->firstOrFail();
+    }
+
+    private function rootResultsAvailable(FestEvent $event): bool
+    {
+        return (bool) $event->results_published
+            || ($event->usesPhasedRegionalBilling() && $event->phases()->where('results_published', true)->exists());
     }
 
     private function stringQuery(Request $request, string $key): ?string

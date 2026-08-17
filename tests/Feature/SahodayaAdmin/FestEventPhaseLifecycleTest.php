@@ -4,6 +4,9 @@ namespace Tests\Feature\SahodayaAdmin;
 
 use App\Models\FestEvent;
 use App\Models\FestEventPhase;
+use App\Models\FestEventItem;
+use App\Services\Events\EventLifecycleGate;
+use App\Services\Events\FestPhaseLifecycleService;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Models\User;
@@ -138,5 +141,54 @@ class FestEventPhaseLifecycleTest extends TestCase
 
         $this->assertTrue($lifecycle->results_published);
         $this->assertSame('phase:'.$phase->id, $lifecycle->source);
+    }
+
+    public function test_phase_mode_uses_the_item_phase_instead_of_the_closed_event_status(): void
+    {
+        ['event' => $event, 'phase' => $phase] = $this->makeEventWithPhase();
+        $event->update(['status' => 'draft']);
+        $phase->update([
+            'status' => 'registration_open',
+            'registration_open' => now()->subDay(),
+            'registration_close' => now()->addDay(),
+            'registration_locked' => false,
+        ]);
+        $item = FestEventItem::create([
+            'event_id' => $event->id,
+            'phase_id' => $phase->id,
+            'title' => 'Phase-owned registration item',
+            'category' => 'general',
+            'is_enabled' => true,
+        ]);
+
+        EventLifecycleGate::allowRegistrationForItem($event->fresh(), $item);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_foreign_phase_id_fails_closed_for_phase_filtered_reports(): void
+    {
+        ['event' => $event] = $this->makeEventWithPhase();
+
+        $otherEvent = FestEvent::create([
+            'tenant_id' => $event->tenant_id,
+            'title' => 'Other Phase Event',
+            'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya',
+            'status' => 'published',
+            'phase_mode_enabled' => true,
+        ]);
+        $foreignPhase = FestEventPhase::create([
+            'event_id' => $otherEvent->id,
+            'name' => 'Published Foreign Phase',
+            'status' => 'completed',
+            'results_published' => true,
+        ]);
+
+        $lifecycle = app(FestPhaseLifecycleService::class)
+            ->effectiveLifecycleForPhase($event, $foreignPhase->id);
+
+        $this->assertFalse($lifecycle->results_published);
+        $this->assertSame('closed:phase_not_found', $lifecycle->source);
     }
 }

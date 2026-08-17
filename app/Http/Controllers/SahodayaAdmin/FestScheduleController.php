@@ -4,8 +4,8 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Support\FestPageActivity;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestParticipant;
-use App\Models\FestRegistration;
 use App\Models\FestSchedule;
 use App\Models\FestStage;
 use App\Models\FestVenue;
@@ -28,6 +28,8 @@ class FestScheduleController extends SahodayaAdminController
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->where('status', 'approved'))
+            ->where(fn ($q) => $q->where('participant_role', 'performer')->orWhereNull('participant_role'))
+            ->whereNull('disqualified_at')
             ->with(['registration.item', 'student', 'teacher', 'group'])
             ->get();
 
@@ -69,6 +71,17 @@ class FestScheduleController extends SahodayaAdminController
             'sort_order'     => 'nullable|integer|min:0',
         ]);
 
+        $item = FestEventItem::where('event_id', $event->id)->findOrFail($data['item_id']);
+
+        if (! empty($data['participant_id'])) {
+            $participant = FestParticipant::with('registration')->findOrFail($data['participant_id']);
+            abort_if($participant->registration?->event_id !== $event->id, 403);
+            abort_if($participant->registration?->item_id !== $item->id, 422, 'The participant is not registered for this item.');
+            abort_if($participant->registration?->status !== 'approved', 422, 'Only approved participants can be scheduled.');
+            abort_if($participant->participant_role === 'standby', 422, 'Standby participants cannot be scheduled.');
+            abort_if($participant->disqualified_at !== null, 422, 'Disqualified participants cannot be scheduled.');
+        }
+
         if (! empty($data['stage_id'])) {
             $stage = FestStage::where('event_id', $event->id)->findOrFail($data['stage_id']);
             $data['stage'] = $stage->name;
@@ -79,6 +92,7 @@ class FestScheduleController extends SahodayaAdminController
 
         FestSchedule::updateOrCreate(
             [
+                'event_id'       => $event->id,
                 'item_id'        => $data['item_id'],
                 'participant_id' => $data['participant_id'] ?? null,
             ],
@@ -111,6 +125,8 @@ class FestScheduleController extends SahodayaAdminController
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->where('status', 'approved'))
+            ->where(fn ($q) => $q->where('participant_role', 'performer')->orWhereNull('participant_role'))
+            ->whereNull('disqualified_at')
             ->with('registration.item')
             ->get()
             ->sortBy(fn ($p) => [$p->registration->item_id, $p->chest_no ?? 9999, $p->id]);
@@ -156,10 +172,14 @@ class FestScheduleController extends SahodayaAdminController
             (count($clashes) + count($stageConflicts)).' schedule clash(es) must be resolved before publishing.'
         );
 
-        $event->update(['schedule_published' => true]);
+        if ($event->usesPhasedRegionalBilling()) {
+            app(\App\Services\Events\FestPhasePublicationService::class)->publishSchedule($event);
+        } else {
+            $event->update(['schedule_published' => true]);
 
-        app(\App\Services\Events\FestRegionPartitionService::class)
-            ->cascadeLifecycleToChildren($event, ['schedule_published' => true]);
+            app(\App\Services\Events\FestRegionPartitionService::class)
+                ->cascadeLifecycleToChildren($event, ['schedule_published' => true]);
+        }
 
         $audit->festEvent($event, FestPageActivity::SCHEDULE, 'fest.schedule.published', 'Schedule published to public portal');
 
@@ -172,10 +192,14 @@ class FestScheduleController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $event->update(['schedule_published' => false]);
+        if ($event->usesPhasedRegionalBilling()) {
+            app(\App\Services\Events\FestPhasePublicationService::class)->unpublishSchedule($event);
+        } else {
+            $event->update(['schedule_published' => false]);
 
-        app(\App\Services\Events\FestRegionPartitionService::class)
-            ->cascadeLifecycleToChildren($event, ['schedule_published' => false]);
+            app(\App\Services\Events\FestRegionPartitionService::class)
+                ->cascadeLifecycleToChildren($event, ['schedule_published' => false]);
+        }
 
         $audit->festEvent($event, FestPageActivity::SCHEDULE, 'fest.schedule.unpublished', 'Schedule hidden from public portal');
 

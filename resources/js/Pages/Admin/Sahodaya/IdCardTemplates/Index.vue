@@ -203,6 +203,7 @@
 import { useForm, router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -215,6 +216,7 @@ const props = defineProps({
 });
 
 const editingId = ref(null);
+const { confirm } = useConfirm();
 const editingTemplate = ref(null);
 
 const selectedEventItems = computed(() => {
@@ -314,8 +316,8 @@ function upload() {
     form.post(`/sahodaya-admin/${props.sahodaya.id}/id-card-templates`, options);
 }
 
-function remove(template) {
-    if (!confirm(`Delete ID card template "${template.title || 'Untitled'}"?`)) return;
+async function remove(template) {
+    if (!(await confirm({ message: `Delete ID card template "${template.title || 'Untitled'}"?`, destructive: true }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/id-card-templates/${template.id}`, {
         preserveScroll: true,
     });

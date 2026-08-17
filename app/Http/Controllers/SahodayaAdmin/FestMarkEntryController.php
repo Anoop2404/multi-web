@@ -140,8 +140,6 @@ class FestMarkEntryController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        EventLifecycleGate::allowMarkEntry($event);
-
         $data = $request->validate([
             'participant_id'    => 'required|exists:fest_participants,id',
             'item_id'           => 'required|exists:fest_event_items,id',
@@ -155,6 +153,10 @@ class FestMarkEntryController extends SahodayaAdminController
         ]);
 
         $item = FestEventItem::find($data['item_id']);
+
+        // Now phase-aware — no-op while phase_mode_enabled is off (see EventLifecycleGate). Reordered validate() before the gate so a malformed item_id 422s on validation, not the business-rule check.
+        EventLifecycleGate::allowMarkEntryForItem($event, $item);
+
         $judgeScores = $data['judge_scores'] ?? null;
         unset($data['judge_scores']);
 

@@ -224,6 +224,9 @@ import { Link, router } from '@inertiajs/vue3';
 import { reactive, computed, defineComponent, h, ref } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm, prompt } = useConfirm();
 
 const alertMessage = ref('');
 
@@ -308,8 +311,8 @@ function formatDate(d) {
     return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function verifyPayment(payment) {
-    if (! confirm(`Verify payment of ₹${Number(payment.amount).toLocaleString('en-IN')} from ${payment.school?.name}?`)) {
+async function verifyPayment(payment) {
+    if (! (await confirm({ message: `Verify payment of ₹${Number(payment.amount).toLocaleString('en-IN')} from ${payment.school?.name}?`, destructive: false }))) {
         return;
     }
 
@@ -318,8 +321,8 @@ function verifyPayment(payment) {
     });
 }
 
-function rejectPayment(payment) {
-    const reason = window.prompt(`Reject payment from ${payment.school?.name}? Enter a reason:`);
+async function rejectPayment(payment) {
+    const reason = await prompt({ message: `Reject payment from ${payment.school?.name}? Enter a reason:`, inputMultiline: true, inputRequired: false });
     if (reason === null) {
         return;
     }

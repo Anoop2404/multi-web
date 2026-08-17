@@ -336,6 +336,7 @@ import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
 import FestHeadItemInfoPanel from '@/Components/fest/FestHeadItemInfoPanel.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -358,6 +359,7 @@ const props = defineProps({
 });
 
 const promoteForm = useForm({ next_event_id: props.suggestedNextId ?? '' });
+const { confirm } = useConfirm();
 const publishModalOpen = ref(false);
 const statusFilter = ref('all');
 
@@ -485,18 +487,18 @@ function publishEvent() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/publish`, {}, { preserveScroll: true });
 }
 
-function unpublishEvent() {
-    if (!confirm('Unpublish all event results? Schools will no longer see event-wide published results.')) return;
+async function unpublishEvent() {
+    if (!(await confirm({ message: 'Unpublish all event results? Schools will no longer see event-wide published results.', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/unpublish`, {}, { preserveScroll: true });
 }
 
-function publishItem(itemId) {
-    if (!confirm('Publish results for this item? Schools with participants will see marks for this item.')) return;
+async function publishItem(itemId) {
+    if (!(await confirm({ message: 'Publish results for this item? Schools with participants will see marks for this item.', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/items/${itemId}/publish`, {}, { preserveScroll: true });
 }
 
-function unpublishItem(itemId) {
-    if (!confirm('Unpublish this item? Schools will no longer see these results unless the full event is published.')) return;
+async function unpublishItem(itemId) {
+    if (!(await confirm({ message: 'Unpublish this item? Schools will no longer see these results unless the full event is published.', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/items/${itemId}/unpublish`, {}, { preserveScroll: true });
 }
 
@@ -510,8 +512,8 @@ function promoteAuto() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/promote-auto`, {}, { preserveScroll: true });
 }
 
-function revoke(id) {
-    if (!confirm('Revoke this promotion and cancel the next-level registration?')) return;
+async function revoke(id) {
+    if (!(await confirm({ message: 'Revoke this promotion and cancel the next-level registration?' }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/qualifications/${id}/revoke`, {}, { preserveScroll: true });
 }
 
@@ -522,9 +524,9 @@ function switchSportEvent(evt) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${nextEventId}/results`);
 }
 
-function bulkPublishItems() {
+async function bulkPublishItems() {
     if (!selectedPublishIds.value.length) return;
-    if (!confirm(`Publish results for ${selectedPublishIds.value.length} selected item(s)?`)) return;
+    if (!(await confirm({ message: `Publish results for ${selectedPublishIds.value.length} selected item(s)?`, destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/items/bulk-publish`, {
         item_ids: selectedPublishIds.value,
     }, { preserveScroll: true, onSuccess: () => { selectedPublishIds.value = []; } });

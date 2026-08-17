@@ -103,6 +103,7 @@ import { ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { formatDateTime, formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -121,6 +122,8 @@ const statusTabs = [
     { key: 'rejected', label: 'Rejected' },
     { key: 'all', label: 'All' },
 ];
+
+const { confirm, prompt } = useConfirm();
 
 const search = ref(props.search);
 let searchTimeout = null;
@@ -152,13 +155,13 @@ function onSearchInput() {
     }, 350);
 }
 
-function approve(schoolFeeId) {
-    if (!confirm('Approve this batch fee and issue hall tickets for all registered students from this school?')) return;
+async function approve(schoolFeeId) {
+    if (!(await confirm({ message: 'Approve this batch fee and issue hall tickets for all registered students from this school?', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq/payments/${schoolFeeId}/approve`, {}, { preserveScroll: true });
 }
 
-function reject(schoolFeeId) {
-    const reason = prompt('Rejection reason for the school:');
+async function reject(schoolFeeId) {
+    const reason = await prompt({ message: 'Rejection reason for the school:', inputMultiline: true });
     if (!reason?.trim()) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq/payments/${schoolFeeId}/reject`, {
         rejection_reason: reason.trim(),

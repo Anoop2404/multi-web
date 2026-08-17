@@ -238,6 +238,40 @@ class GroupAdminController extends Controller
         );
     }
 
+    public function festResults(Request $request, string $tenantId)
+    {
+        $school = Tenant::findOrFail($tenantId);
+        $classIds = $this->assignedClassIds($request->user(), $tenantId);
+
+        $studentIds = Student::where('tenant_id', $tenantId)
+            ->when($classIds !== null, fn ($q) => $q->whereIn('school_class_id', $classIds))
+            ->active()
+            ->pluck('id');
+
+        $registrations = FestRegistration::where('school_id', $tenantId)
+            ->whereHas('participants', fn ($q) => $q->whereIn('student_id', $studentIds))
+            ->where('status', 'approved')
+            ->with(['event:id,title,results_published', 'item:id,title,code', 'participants.student:id,name,reg_no', 'result'])
+            ->get()
+            ->filter(fn ($reg) => $reg->event?->results_published)
+            ->values()
+            ->map(fn ($reg) => [
+                'id' => $reg->id,
+                'event_title' => $reg->event?->title,
+                'item_name' => $reg->item?->title,
+                'item_code' => $reg->item?->code,
+                'students' => $reg->participants->map(fn ($p) => $p->student?->name)->filter()->join(', '),
+                'place' => $reg->result?->place ?? '-',
+                'grade' => $reg->result?->grade ?? '-',
+                'points' => $reg->result?->points ?? 0,
+            ]);
+
+        return inertia('Portal/Group/Results', [
+            'school' => $school->only('id', 'name'),
+            'results' => $registrations,
+        ]);
+    }
+
     /**
      * Returns class IDs this group_admin is allowed to see.
      * null = all classes (for school_admin / superadmin accessing this portal).

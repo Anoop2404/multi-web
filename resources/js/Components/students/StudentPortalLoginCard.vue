@@ -35,7 +35,7 @@
                 <div class="portal-cred-item">
                     <span class="portal-cred-label">Password</span>
                     <span class="portal-cred-value font-mono">
-                        {{ storedPassword || (student.has_portal_login ? '—' : 'Not set') }}
+                        {{ student.has_portal_login ? '••••••••' : 'Not set' }}
                     </span>
                 </div>
                 <div class="portal-cred-item">
@@ -69,7 +69,7 @@
                 </div>
                 <div class="flex justify-between gap-3">
                     <span class="text-slate-500">Password</span>
-                    <span class="font-mono font-semibold text-emerald-800">{{ visiblePassword || '—' }}</span>
+                    <span class="font-mono font-semibold text-emerald-800">{{ revealing ? 'Loading…' : (visiblePassword || '—') }}</span>
                 </div>
             </div>
             <div class="flex justify-end gap-2 flex-wrap">
@@ -92,24 +92,28 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     student: { type: Object, required: true },
     provisionUrl: { type: String, required: true },
     resetUrl: { type: String, required: true },
+    revealUrl: { type: String, default: null },
     portalLoginUrl: { type: String, default: '/portal/login' },
 });
+
+const { confirm } = useConfirm();
 
 const page = usePage();
 const showModal = ref(false);
 const displayPassword = ref(null);
+const revealing = ref(false);
 
 const provisionForm = useForm({});
 const resetForm = useForm({});
 
 const portalUsername = computed(() => props.student.portal_username || props.student.reg_no || null);
-const storedPassword = computed(() => props.student.portal_password ?? null);
-const visiblePassword = computed(() => displayPassword.value ?? storedPassword.value);
+const visiblePassword = computed(() => displayPassword.value);
 
 function applyFlashCredentials() {
     const creds = page.props.flash?.newCredentials;
@@ -127,9 +131,22 @@ function applyFlashCredentials() {
 
 watch(() => page.props.flash?.newCredentials, applyFlashCredentials, { immediate: true });
 
-function openCredentials() {
-    displayPassword.value = storedPassword.value;
+async function openCredentials() {
     showModal.value = true;
+    if (! props.revealUrl) return;
+
+    revealing.value = true;
+    displayPassword.value = null;
+    try {
+        const response = await fetch(props.revealUrl, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        const data = await response.json();
+        displayPassword.value = data.password;
+    } finally {
+        revealing.value = false;
+    }
 }
 
 function closeModal() {
@@ -146,8 +163,8 @@ function createLogin() {
     provisionForm.post(props.provisionUrl, { preserveScroll: true, onSuccess: onPortalActionSuccess });
 }
 
-function resetPassword() {
-    if (! confirm(`Reset portal password for ${props.student.name}?`)) return;
+async function resetPassword() {
+    if (! (await confirm({ message: `Reset portal password for ${props.student.name}?`, destructive: false }))) return;
     resetForm.post(props.resetUrl, { preserveScroll: true, onSuccess: onPortalActionSuccess });
 }
 </script>

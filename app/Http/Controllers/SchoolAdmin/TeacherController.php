@@ -56,7 +56,7 @@ class TeacherController extends SchoolAdminController
                     'photo_url' => $t->photoUrl(),
                     'portal_email' => $t->user?->email,
                     'portal_username' => $t->login_code ?? $t->user?->username,
-                    'portal_password' => $t->user?->plain_password,
+                    'has_portal_password' => (bool) $t->user?->plain_password,
                 ];
             });
 
@@ -806,6 +806,26 @@ class TeacherController extends SchoolAdminController
         abort_if($teacher->tenant_id !== $this->school->id, 403);
 
         return $this->resetTeacherPortalPassword($teacher, request()->user()?->id);
+    }
+
+    /** On-demand reveal of the stored plaintext portal password — not sent in the initial page payload. */
+    public function revealPortalPassword(string $tenantId, Teacher $teacher, PlatformAuditLogger $audit)
+    {
+        abort_if($teacher->tenant_id !== $this->school->id, 403);
+
+        $teacher->loadMissing('user:id,username,plain_password');
+
+        $audit->log(
+            'credential.viewed',
+            "Teacher portal password viewed: {$teacher->name}",
+            $teacher,
+            ['teacher_id' => $teacher->id],
+        );
+
+        return response()->json([
+            'username' => $teacher->login_code ?? $teacher->user?->username,
+            'password' => $teacher->user?->plain_password,
+        ]);
     }
 
     public function destroy(string $tenantId, Teacher $teacher, PlatformAuditLogger $audit)

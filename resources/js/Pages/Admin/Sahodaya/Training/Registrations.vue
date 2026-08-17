@@ -224,6 +224,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import SahodayaDataTable from '@/Components/SahodayaDataTable.vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -249,6 +250,8 @@ const props = defineProps({
         }),
     },
 });
+
+const { confirm, prompt } = useConfirm();
 
 const columns = [
     { key: 'teacher', label: 'Teacher', sortable: true },
@@ -377,7 +380,7 @@ function canCancel(r) {
     return !['cancelled', 'completed'].includes(r.status);
 }
 
-function cancelRegistration(registration) {
+async function cancelRegistration(registration) {
     // A reason is only needed when this registration actually has money against it
     // (approved or partial) — see TrainingSchoolFeeService::syncForSchool() /
     // creditForCancelledIndividualRegistration(), which only issue a fee credit when a
@@ -386,12 +389,13 @@ function cancelRegistration(registration) {
 
     let reason = null;
     if (hasMoney) {
-        reason = prompt(
-            `Cancel registration for ${registration.teacher?.name || 'this teacher'}? This registration has a paid/partial fee — `
-            + `cancelling will record a fee credit for the school. Reason (required):`
-        );
+        reason = await prompt({
+            message: `Cancel registration for ${registration.teacher?.name || 'this teacher'}? This registration has a paid/partial fee — `
+                + `cancelling will record a fee credit for the school. Reason (required):`,
+            inputMultiline: true,
+        });
         if (!reason) return;
-    } else if (!confirm(`Cancel registration for ${registration.teacher?.name || 'this teacher'}? A waitlisted participant may be promoted.`)) {
+    } else if (!(await confirm({ message: `Cancel registration for ${registration.teacher?.name || 'this teacher'}? A waitlisted participant may be promoted.` }))) {
         return;
     }
 

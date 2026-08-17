@@ -1,5 +1,10 @@
 /** MCQ exam operations portal navigation. */
-export function examPortalNavItems(sahodayaId, examId = null) {
+export function examPortalNavItems(sahodayaId, examId = null, options = {}) {
+    const role = typeof options === 'string' ? options : (options.role ?? null);
+    const canEnterMarks = typeof options === 'object' && options.canEnterMarks !== undefined 
+        ? options.canEnterMarks 
+        : (role !== 'exam_staff');
+
     const base = `/portal/exam/${sahodayaId}`;
     const items = [{ href: base, label: examId ? 'My exams' : 'Dashboard', exact: !examId }];
 
@@ -11,8 +16,11 @@ export function examPortalNavItems(sahodayaId, examId = null) {
     items.push(
         { href: `${examBase}/attendance`, label: 'Attendance' },
         { href: `${examBase}/supervision`, label: 'Supervision' },
-        { href: `${examBase}/marks`, label: 'Mark entry' },
     );
+
+    if (canEnterMarks) {
+        items.push({ href: `${examBase}/marks`, label: 'Mark entry' });
+    }
 
     return items;
 }

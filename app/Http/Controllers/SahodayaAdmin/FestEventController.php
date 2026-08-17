@@ -502,10 +502,12 @@ class FestEventController extends SahodayaAdminController
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $isPartitionedHub = $partitionService->isPartitionedHub($event);
+
         return $this->inertia('Sahodaya/Events/Levels', $ctx + [
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::LEVELS),
             'conductMode' => $partitionService->conductMode($event),
-            'isPartitionedHub' => $partitionService->isPartitionedHub($event),
+            'isPartitionedHub' => $isPartitionedHub,
             'partitions' => $partitionService->partitions($event)->map(fn ($p) => [
                 'id' => $p->id,
                 'title' => $p->title,
@@ -516,6 +518,11 @@ class FestEventController extends SahodayaAdminController
             'conductPresets' => array_keys(config('fest_conduct_presets', [])),
             'memberSchools' => $memberSchools,
             'schoolPartitions' => $schoolPartitionService->assignmentsForHub($event),
+            // Hub drill-down panel — Phase 4 / §2.5 of
+            // docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md. Only meaningful (and
+            // only computed) when this event is actually a partitioned hub with
+            // region children; empty array otherwise so the panel stays hidden.
+            'regionDrillDown' => $isPartitionedHub ? $partitionService->regionDrillDownSummary($event) : [],
         ]);
     }
 

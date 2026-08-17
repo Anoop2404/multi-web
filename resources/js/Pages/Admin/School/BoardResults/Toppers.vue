@@ -554,6 +554,8 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { computed, ref } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     school:             Object,
@@ -820,8 +822,8 @@ function submitSubjectTopper() {
     });
 }
 
-function removeSubjectTopper(row) {
-    if (!confirm(`Remove subject topper "${row.name}" for ${row.subject}?`)) return;
+async function removeSubjectTopper(row) {
+    if (!(await confirm({ message: `Remove subject topper "${row.name}" for ${row.subject}?`, destructive: true }))) return;
 
     const existing = (props.boardResult.toppers ?? []).find((t) =>
         t.id === row.topper_id
@@ -919,8 +921,8 @@ function submitEdit() {
         });
 }
 
-function remove(t) {
-    if (!confirm(`Remove topper "${t.name}"?`)) return;
+async function remove(t) {
+    if (!(await confirm({ message: `Remove topper "${t.name}"?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${t.id}`);
 }
 

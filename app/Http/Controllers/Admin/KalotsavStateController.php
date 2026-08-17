@@ -44,11 +44,11 @@ class KalotsavStateController extends Controller
         abort_unless($stateProgram->event_type === 'kalolsavam', 404);
 
         $propagations = FestStateProgramPropagation::where('state_program_id', $stateProgram->id)
-            ->with('sahodaya:id,name')
+            ->with('sahodaya')
             ->get();
 
         $clusterResults = $propagations->map(function (FestStateProgramPropagation $prop) {
-            if (! $prop->tenant_event_id) {
+            if (! $prop->tenant_event_id || ! $prop->sahodaya) {
                 return [
                     'sahodaya' => $prop->sahodaya?->name,
                     'level'    => $prop->level_round,
@@ -57,15 +57,27 @@ class KalotsavStateController extends Controller
                 ];
             }
 
-            $event = FestEvent::find($prop->tenant_event_id);
+            $eventData = \App\Support\TenancyDatabase::whenDatabaseReady($prop->sahodaya, function () use ($prop) {
+                $event = FestEvent::find($prop->tenant_event_id);
+                if (! $event) {
+                    return null;
+                }
+
+                return [
+                    'id'                  => $event->id,
+                    'title'               => $event->title,
+                    'results_published'   => (bool) $event->results_published,
+                    'registrations_count' => FestMark::where('event_id', $event->id)->count(),
+                ];
+            });
 
             return [
                 'sahodaya'           => $prop->sahodaya?->name,
                 'level'              => $prop->level_round,
-                'event_id'           => $event?->id,
-                'event_title'        => $event?->title,
-                'results_published'  => (bool) $event?->results_published,
-                'registrations_count'=> $event ? FestMark::where('event_id', $event->id)->count() : 0,
+                'event_id'           => $eventData['id'] ?? null,
+                'event_title'        => $eventData['title'] ?? null,
+                'results_published'  => $eventData['results_published'] ?? false,
+                'registrations_count'=> $eventData['registrations_count'] ?? 0,
             ];
         });
 

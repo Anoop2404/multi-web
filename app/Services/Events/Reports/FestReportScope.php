@@ -33,6 +33,7 @@ final class FestReportScope
         public readonly array $schoolIds,
         public readonly array $includedPartitionRoles,
         public readonly bool $isActorRestricted,
+        public readonly ?int $registrationBatchId = null,
     ) {}
 
     public function isEmpty(): bool

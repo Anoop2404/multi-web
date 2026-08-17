@@ -45,6 +45,9 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { prompt } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -61,8 +64,8 @@ function approve(req) {
     router.post(`/school-admin/${props.school.id}/students/pending-change-requests/${req.id}/approve`);
 }
 
-function reject(req) {
-    const note = window.prompt('Rejection note (optional)') ?? '';
+async function reject(req) {
+    const note = (await prompt({ message: 'Rejection note (optional)', inputMultiline: true, inputRequired: false })) ?? '';
     router.post(`/school-admin/${props.school.id}/students/pending-change-requests/${req.id}/reject`, {
         resolution_note: note,
     });

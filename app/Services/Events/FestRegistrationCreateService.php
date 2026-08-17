@@ -15,6 +15,7 @@ use App\Services\Events\EventLifecycleGate;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class FestRegistrationCreateService
 {
@@ -38,7 +39,9 @@ class FestRegistrationCreateService
         abort_if($school->parent_id !== $event->tenant_id, 403);
         abort_if($item->event_id !== $event->id, 403);
 
-        app(FestRegionPartitionService::class)->assertRegionSelected($event, $school);
+        if (! $event->rootEvent()->usesPhasedRegionalBilling()) {
+            app(FestRegionPartitionService::class)->assertRegionSelected($event, $school);
+        }
 
         $router = app(FestRegistrationRouterService::class);
         $targetEvent = $router->resolveTargetEvent($event, $item, $school->id);
@@ -79,14 +82,11 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['registration' => 'Fest registration is closed for this school.']);
         }
 
-        if ($event->registration_locked) {
-            throw ValidationException::withMessages(['registration' => 'Registration is locked for this event.']);
+        try {
+            EventLifecycleGate::allowRegistrationForItem($event, $item);
+        } catch (HttpException $e) {
+            throw ValidationException::withMessages(['registration' => $e->getMessage()]);
         }
-
-        if (! $event->isRegistrationOpen()) {
-            throw ValidationException::withMessages(['registration' => 'Registration is closed for this event.']);
-        }
-        EventLifecycleGate::allowRegistration($event);
 
         if ($event->event_type === 'teacher_fest') {
             return $this->createTeacherRegistration($event, $item, $school, $performerIds);
@@ -195,6 +195,11 @@ class FestRegistrationCreateService
                     'status'       => 'submitted',
                     'submitted_at' => $waitlisted ? null : now(),
                 ]);
+
+                if ($event->rootEvent()->usesPhasedRegionalBilling() && $item->phase) {
+                    app(FestSchoolPhaseRegionService::class)
+                        ->lockForRegistration($event, $item->phase, $school->id);
+                }
 
                 $groupId = null;
                 if ($isGroup) {
@@ -583,6 +588,12 @@ class FestRegistrationCreateService
                     'submitted_at' => now(),
                 ]);
 
+
+                if ($event->rootEvent()->usesPhasedRegionalBilling() && $item->phase) {
+                    app(FestSchoolPhaseRegionService::class)
+                        ->lockForRegistration($event, $item->phase, $school->id);
+                }
+
                 foreach ($teacherIds as $teacherId) {
                     abort_if(Teacher::where('id', $teacherId)->where('tenant_id', $school->id)->doesntExist(), 403);
                     FestParticipant::create([
@@ -594,6 +605,9 @@ class FestRegistrationCreateService
                 }
 
                 app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
+                foreach ($registration->fresh(['participants'])->participants as $participant) {
+                    app(FestNumberingService::class)->assignParticipantNumbers($participant);
+                }
                 app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
 
                 return $registration->load(['participants.teacher', 'item']);

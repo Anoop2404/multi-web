@@ -270,6 +270,8 @@ import SubjectMarksPreviewModal from '@/Components/BoardResults/SubjectMarksPrev
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -571,8 +573,8 @@ function saveStudent() {
     });
 }
 
-function removeStudent(t) {
-    if (!confirm(`Remove Full A1 achiever "${t.name}"?`)) return;
+async function removeStudent(t) {
+    if (!(await confirm({ message: `Remove Full A1 achiever "${t.name}"?`, destructive: true }))) return;
 
     router.delete(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${t.id}`, {
         preserveScroll: true,

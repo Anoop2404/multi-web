@@ -440,6 +440,7 @@ import FormField from '@/Components/ui/FormField.vue';
 import InputError from '@/Components/ui/InputError.vue';
 
 import { sahodayaProgramHref } from '@/support/sahodayaPrograms.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -536,12 +537,14 @@ function createEvent() {
     });
 }
 
+const { confirm } = useConfirm();
+
 function toggleNavHidden(event) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}/toggle-nav-hidden`, {}, { preserveScroll: true });
 }
 
-function deleteEvent(event) {
-    if (!window.confirm(`Delete "${event.title}"? This cannot be undone. A sports season deletes its child sport events too. Anything with registrations is blocked — hide it instead.`)) {
+async function deleteEvent(event) {
+    if (!(await confirm({ message: `Delete "${event.title}"? This cannot be undone. A sports season deletes its child sport events too. Anything with registrations is blocked — hide it instead.` }))) {
         return;
     }
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}`, { preserveScroll: true });

@@ -256,6 +256,9 @@
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>
                         <div class="font-bold" style="color: #0f172a; font-size: 10px;">{{ $row['school_name'] }}</div>
+                        @if(!empty($row['registration_batch']))
+                            <div style="font-size: 8.5px; color: #4338ca; font-weight: bold;">Payment level: {{ $row['registration_batch'] }}</div>
+                        @endif
                         @if(!empty($row['breakdown']['items']))
                             <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 8.5px;">
                                 @foreach($row['breakdown']['items'] as $itemLine)

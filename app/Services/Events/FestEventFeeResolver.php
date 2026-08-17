@@ -147,6 +147,15 @@ class FestEventFeeResolver
             return "₹{$amount} per participating student";
         }
 
+        if ($model === 'student_count_slab') {
+            $slabs = $schedule['student_count_slabs'] ?? [];
+            if ($slabs === []) {
+                return 'Stepped fee by total registered students (no slabs configured yet)';
+            }
+
+            return 'Stepped fee by total registered students ('.count($slabs).' slab'.(count($slabs) === 1 ? '' : 's').' configured)';
+        }
+
         if ($model === 'sports_composite') {
             $school = (float) ($schedule['school_registration_flat'] ?? 2000);
             $student = (float) ($schedule['per_student_amount'] ?? 300);
@@ -326,6 +335,13 @@ class FestEventFeeResolver
                 'charge_standbys' => (bool) ($input['charge_standbys'] ?? false),
                 'team_standby_fee_amount' => isset($input['team_standby_fee_amount']) && $input['team_standby_fee_amount'] !== ''
                     ? (float) $input['team_standby_fee_amount'] : null,
+                // Phase L — event-wide default for the group/team per-participant surcharge
+                // (flat_fee + rate × actual FestGroup participant count); a per-item override
+                // on FestEventItem wins over this. See FestItemFeeResolver::groupItemSurchargeAmount().
+                'group_item_flat_fee' => isset($input['group_item_flat_fee']) && $input['group_item_flat_fee'] !== ''
+                    ? (float) $input['group_item_flat_fee'] : null,
+                'group_item_per_participant_rate' => isset($input['group_item_per_participant_rate']) && $input['group_item_per_participant_rate'] !== ''
+                    ? (float) $input['group_item_per_participant_rate'] : null,
             ], $input);
         }
 
@@ -359,6 +375,15 @@ class FestEventFeeResolver
             return $this->applySchoolFeeCap($normalized, $input);
         }
 
+        if ($feeModel === 'student_count_slab') {
+            $normalized = [
+                'fee_model' => 'student_count_slab',
+                'student_count_slabs' => $this->normalizeStudentCountSlabs($input['student_count_slabs'] ?? []),
+            ];
+
+            return $this->applySchoolFeeCap($normalized, $input);
+        }
+
         if ($feeModel === 'sports_composite') {
             return $this->applySchoolFeeCap([
                 'fee_model' => 'sports_composite',
@@ -370,24 +395,72 @@ class FestEventFeeResolver
                     ? (int) $input['included_items_per_student'] : 2,
                 'default_item_fee' => isset($input['default_item_fee']) && $input['default_item_fee'] !== ''
                     ? (float) $input['default_item_fee'] : null,
+                // Phase L — same per-Sahodaya toggle used by the item_catalog model above:
+                // whether standby participants count toward the group/team per-participant
+                // surcharge (FestSportsCompositeFeeService's team-fee branch).
+                'charge_standbys' => (bool) ($input['charge_standbys'] ?? false),
+                'group_item_flat_fee' => isset($input['group_item_flat_fee']) && $input['group_item_flat_fee'] !== ''
+                    ? (float) $input['group_item_flat_fee'] : null,
+                'group_item_per_participant_rate' => isset($input['group_item_per_participant_rate']) && $input['group_item_per_participant_rate'] !== ''
+                    ? (float) $input['group_item_per_participant_rate'] : null,
             ], $input);
         }
 
         return [];
     }
 
-    /** @return array<string, float> */
+    /**
+     * N-tier school registration map, keyed by whatever tier label the school ends up
+     * resolving to (see App\Support\SchoolClassCategoryResolver::feeTierFor()) — no
+     * longer hard-limited to exactly 'secondary'/'senior_secondary'. Any string key with
+     * a numeric amount is kept, so an admin can add/remove tier rows freely from the
+     * fee-settings UI while events that only ever submitted the original two keys
+     * normalize identically to before.
+     *
+     * @return array<string, float>
+     */
     private function normalizeSchoolRegistration(array $input): array
     {
         $normalized = [];
 
-        foreach (['secondary', 'senior_secondary'] as $key) {
-            if (isset($input[$key]) && $input[$key] !== '') {
-                $normalized[$key] = (float) $input[$key];
+        foreach ($input as $key => $value) {
+            if (! is_string($key) || $key === '' || $value === null || $value === '' || ! is_numeric($value)) {
+                continue;
             }
+            $normalized[$key] = (float) $value;
         }
 
         return $normalized;
+    }
+
+    /**
+     * 'student_count_slab' fee model's slab table — a list of {min_count, max_count,
+     * amount} rows, sorted ascending by min_count. max_count === null means "and above".
+     * Lives entirely in fee_settings, scoped to one Sahodaya's one event just like every
+     * other fee model here — see docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §7.4.
+     *
+     * @return array<int, array{min_count: int, max_count: ?int, amount: float}>
+     */
+    private function normalizeStudentCountSlabs(array $input): array
+    {
+        $normalized = [];
+
+        foreach ($input as $row) {
+            if (! is_array($row) || ! isset($row['amount']) || $row['amount'] === '' || ! is_numeric($row['amount'])) {
+                continue;
+            }
+
+            $normalized[] = [
+                'min_count' => isset($row['min_count']) && $row['min_count'] !== '' ? (int) $row['min_count'] : 0,
+                'max_count' => isset($row['max_count']) && $row['max_count'] !== '' && $row['max_count'] !== null
+                    ? (int) $row['max_count'] : null,
+                'amount' => (float) $row['amount'],
+            ];
+        }
+
+        usort($normalized, fn ($a, $b) => $a['min_count'] <=> $b['min_count']);
+
+        return array_values($normalized);
     }
 
     /** @param  array<string, mixed>  $normalized */

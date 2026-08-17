@@ -206,6 +206,9 @@ import { computed, reactive, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { prompt } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -293,8 +296,8 @@ function act(r, action) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/board-results/${r.id}/${action}`, {}, { preserveScroll: true });
 }
 
-function reject(r) {
-    const reason = window.prompt('Rejection reason (required):');
+async function reject(r) {
+    const reason = await prompt({ message: 'Rejection reason (required):', inputMultiline: true });
     if (!reason) return;
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/board-results/${r.id}/reject`,

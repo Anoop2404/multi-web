@@ -236,6 +236,7 @@ import { computed } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -263,6 +264,8 @@ function fmt(v) {
     return Number(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+const { confirm, prompt } = useConfirm();
+
 function approve(row) {
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/registrations/${row.id}/fee/approve`,
@@ -271,8 +274,8 @@ function approve(row) {
     );
 }
 
-function reject(row) {
-    const reason = window.prompt('Rejection reason (optional):') ?? '';
+async function reject(row) {
+    const reason = await prompt({ message: 'Rejection reason (optional):', inputMultiline: true, inputRequired: false }) ?? '';
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/registrations/${row.id}/fee/reject`,
         { rejection_reason: reason || null },
@@ -280,8 +283,8 @@ function reject(row) {
     );
 }
 
-function record(row) {
-    const ref = window.prompt('Transaction ref / note (optional):') ?? '';
+async function record(row) {
+    const ref = await prompt({ message: 'Transaction ref / note (optional):', inputRequired: false }) ?? '';
     if (ref === null) return;
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/registrations/${row.id}/fee/record`,
@@ -293,8 +296,8 @@ function record(row) {
     );
 }
 
-function approveSchool(sf) {
-    if (!window.confirm(`Approve batch fee and confirm all teachers from ${sf.school_name}?`)) return;
+async function approveSchool(sf) {
+    if (!(await confirm({ message: `Approve batch fee and confirm all teachers from ${sf.school_name}?`, destructive: false }))) return;
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/school-fees/${sf.id}/approve`,
         {},
@@ -302,8 +305,8 @@ function approveSchool(sf) {
     );
 }
 
-function rejectSchool(sf) {
-    const reason = window.prompt('Rejection reason:') ?? '';
+async function rejectSchool(sf) {
+    const reason = await prompt({ message: 'Rejection reason:', inputMultiline: true }) ?? '';
     if (reason === null) return;
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/school-fees/${sf.id}/reject`,

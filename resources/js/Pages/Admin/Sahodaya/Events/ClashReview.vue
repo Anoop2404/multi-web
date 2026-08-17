@@ -40,6 +40,7 @@
 <script setup>
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -48,13 +49,14 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/clash-requests`;
+const { prompt } = useConfirm();
 
 function approve(r) {
     router.post(`${base}/${r.id}/approve`, {}, { preserveScroll: true });
 }
 
-function reject(r) {
-    const note = window.prompt('Rejection note (optional)') || '';
+async function reject(r) {
+    const note = (await prompt({ message: 'Rejection note (optional)', inputMultiline: true, inputRequired: false })) || '';
     router.post(`${base}/${r.id}/reject`, { resolution_note: note }, { preserveScroll: true });
 }
 </script>

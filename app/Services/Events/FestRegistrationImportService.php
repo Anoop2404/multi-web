@@ -4,13 +4,12 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
-use App\Models\FestGroup;
-use App\Models\FestParticipant;
-use App\Models\FestRegistration;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\Tenant;
 use App\Support\ExcelImport;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class FestRegistrationImportService
 {
@@ -62,8 +61,7 @@ class FestRegistrationImportService
         $imported = 0;
         $skipped = 0;
         $errors = [];
-        $limitService = new FestParticipationLimitService($event);
-        $eligibilityService = app(FestRegistrationEligibilityService::class);
+        $createService = app(FestRegistrationCreateService::class);
 
         // Previously looked up one Student/Teacher row per reg_no, individually, inside
         // the loop below — a school importing a few hundred rows ran a few hundred
@@ -126,32 +124,14 @@ class FestRegistrationImportService
                     continue;
                 }
 
-                $teacherRegistration = FestRegistration::create([
-                    'event_id'     => $event->id,
-                    'item_id'      => $item->id,
-                    'school_id'    => $school->id,
-                    'status'       => 'submitted',
-                    'submitted_at' => now(),
-                ])->tap(function (FestRegistration $registration) use ($teacherIds) {
-                    foreach ($teacherIds as $teacherId) {
-                        FestParticipant::create([
-                            'registration_id'  => $registration->id,
-                            'teacher_id'       => $teacherId,
-                            'participant_type' => 'teacher',
-                            'participant_role' => 'performer',
-                        ]);
-                    }
-                });
+                try {
+                    $registration = $createService->createForSchool($event, $item, $school, $teacherIds);
+                    app(FestEventNotifier::class)->registrationSubmittedAdmin($registration->fresh(['event', 'item']));
+                } catch (ValidationException|HttpException $e) {
+                    $errors[] = "Item {$item->title}: ".$this->importErrorMessage($e);
+                    $skipped++;
 
-                // Bulk CSV import previously skipped the same post-create wiring the normal
-                // register-one-item form does (FestRegistrationCreateService::createForSchool()),
-                // so imported rows never got an event-level FestLevelRegistration and never got
-                // item/chest registration numbers assigned — imported students silently showed
-                // as "not registered" on the Step 1 Event Registration page despite having a
-                // real item registration.
-                app(FestLevelRegistrationService::class)->syncRegistration($teacherRegistration->fresh(['participants']));
-                foreach ($teacherRegistration->fresh(['participants'])->participants as $participant) {
-                    app(FestNumberingService::class)->assignParticipantNumbers($participant);
+                    continue;
                 }
 
                 $imported++;
@@ -206,80 +186,36 @@ class FestRegistrationImportService
                 continue;
             }
 
-            $limitErrors = $limitService->validateRegistration($item, $school->id, $performerIds, $standbyIds);
-            if ($limitErrors) {
-                $errors[] = implode(' ', $limitErrors);
+            try {
+                $registration = $createService->createForSchool(
+                    $event,
+                    $item,
+                    $school,
+                    $performerIds,
+                    $standbyIds,
+                    $group['team_name'] ?: null,
+                );
+                app(FestEventNotifier::class)->registrationSubmittedAdmin($registration->fresh(['event', 'item']));
+            } catch (ValidationException|HttpException $e) {
+                $errors[] = "Item {$item->title}: ".$this->importErrorMessage($e);
                 $skipped++;
 
                 continue;
-            }
-
-            $eligibilityErrors = $eligibilityService->validateStudents(
-                $event,
-                $item,
-                array_merge($performerIds, $standbyIds)
-            );
-            if ($eligibilityErrors) {
-                $errors[] = implode(' ', $eligibilityErrors);
-                $skipped++;
-
-                continue;
-            }
-
-            $registration = FestRegistration::create([
-                'event_id'     => $event->id,
-                'item_id'      => $item->id,
-                'school_id'    => $school->id,
-                'status'       => 'submitted',
-                'submitted_at' => now(),
-            ]);
-
-            $groupId = null;
-            if ($isGroup) {
-                $festGroup = FestGroup::create([
-                    'registration_id' => $registration->id,
-                    'team_name'       => $group['team_name'],
-                ]);
-                $groupId = $festGroup->id;
-            }
-
-            foreach ($performerIds as $studentId) {
-                FestParticipant::create([
-                    'registration_id'  => $registration->id,
-                    'group_id'         => $groupId,
-                    'student_id'       => $studentId,
-                    'participant_type' => 'student',
-                    'participant_role' => 'performer',
-                ]);
-            }
-
-            foreach ($standbyIds as $studentId) {
-                FestParticipant::create([
-                    'registration_id'  => $registration->id,
-                    'group_id'         => $groupId,
-                    'student_id'       => $studentId,
-                    'participant_type' => 'student',
-                    'participant_role' => 'standby',
-                ]);
-            }
-
-            // Same post-create wiring as FestRegistrationCreateService::createForSchool() —
-            // without this, imported students never get an event-level FestLevelRegistration
-            // (or item/chest registration numbers), so they show as "not registered" on the
-            // Step 1 Event Registration page despite having a real item registration.
-            app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
-            foreach ($registration->fresh(['participants'])->participants as $participant) {
-                app(FestNumberingService::class)->assignParticipantNumbers($participant);
             }
 
             $imported++;
         }
 
-        if ($imported > 0) {
-            app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+        return compact('imported', 'skipped', 'errors');
+    }
+
+    private function importErrorMessage(ValidationException|HttpException $exception): string
+    {
+        if ($exception instanceof ValidationException) {
+            return collect($exception->errors())->flatten()->first() ?? 'Registration could not be imported.';
         }
 
-        return compact('imported', 'skipped', 'errors');
+        return $exception->getMessage();
     }
 
     /** @param array<string, string> $row */

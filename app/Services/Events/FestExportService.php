@@ -12,14 +12,25 @@ use App\Models\Tenant;
 use App\Support\ExcelExport;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Services\Events\Reports\FestReportScope;
 
 class FestExportService
 {
-    public function registrations(FestEvent $event): StreamedResponse
+    /**
+     * $schoolId (EVENT_REPORTS_FIX_TODO_2026_08_14.md Milestone 1.2): when given, scopes
+     * to that one school only. FestSchoolReportController::export() always passes the
+     * authenticated school's id here — before this fix, this method had no school
+     * parameter at all, so every school admin's "Registrations (spreadsheet)" export
+     * silently returned every school's registrations, chest numbers, and fee status for
+     * the whole event. $schoolId stays optional because FestReportController (Sahodaya
+     * admin side) also calls this method and legitimately wants the full event.
+     */
+    public function registrations(FestEvent $event, ?string $schoolId = null): StreamedResponse
     {
         $schools = $this->schoolNames($event);
 
         $rows = FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->with(['item', 'participants.student', 'participants.teacher', 'feeReceipt'])
             ->orderBy('school_id')
             ->get()
@@ -42,11 +53,13 @@ class FestExportService
         );
     }
 
-    public function results(FestEvent $event): StreamedResponse
+    /** $schoolId: see registrations() above — same Milestone 1.2 fix, same reasoning. */
+    public function results(FestEvent $event, ?string $schoolId = null): StreamedResponse
     {
         $schools = $this->schoolNames($event);
 
         $rows = FestMark::whereIn('fest_marks.event_id', $event->reportableEventIds())
+            ->when($schoolId, fn ($q) => $q->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId)))
             ->with(['participant.student', 'participant.teacher', 'participant.registration.item', 'item'])
             ->join('fest_event_items', 'fest_marks.item_id', '=', 'fest_event_items.id')
             ->orderBy('fest_event_items.title')
@@ -121,13 +134,23 @@ class FestExportService
         );
     }
 
-    public function fees(FestEvent $event): StreamedResponse
+    /** $schoolId: see registrations() above — same Milestone 1.2 fix, same reasoning. */
+    public function fees(FestEvent $event, ?string $schoolId = null, ?FestReportScope $scope = null): StreamedResponse
     {
-        $schoolIds = FestSchoolEventFee::where('event_id', $event->id)->pluck('school_id')->unique();
+        $feeEventId = $scope?->rootEvent->id ?? $event->rootEvent()->id;
+        $schoolIds = FestSchoolEventFee::where('event_id', $feeEventId)
+            ->when($scope?->registrationBatchId, fn ($q) => $q->where('registration_batch_id', $scope->registrationBatchId))
+            ->when($scope?->isActorRestricted, fn ($q) => $q->whereIn('school_id', $scope->schoolIds))
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->pluck('school_id')->unique();
         $schools = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
         $hasCompositeColumns = Schema::hasColumn('fest_school_event_fees', 'student_registration_fee');
 
-        $rows = FestSchoolEventFee::where('event_id', $event->id)
+        $rows = FestSchoolEventFee::where('event_id', $feeEventId)
+            ->when($event->usesPhasedRegionalBilling() && ! $scope?->registrationBatchId, fn ($q) => $q->whereNotNull('registration_batch_id'))
+            ->when($scope?->registrationBatchId, fn ($q) => $q->where('registration_batch_id', $scope->registrationBatchId))
+            ->when($scope?->isActorRestricted, fn ($q) => $q->whereIn('school_id', $scope->schoolIds))
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->with('feeReceipt')
             ->orderBy('school_id')
             ->get()
@@ -172,16 +195,26 @@ class FestExportService
         );
     }
 
-    public function feeBreakdown(FestEvent $event): StreamedResponse
+    /** $schoolId: see registrations() above — same Milestone 1.2 fix, same reasoning. */
+    public function feeBreakdown(FestEvent $event, ?string $schoolId = null, ?FestReportScope $scope = null): StreamedResponse
     {
         if (! Schema::hasTable('fest_school_event_fee_lines')) {
-            return $this->fees($event);
+            return $this->fees($event, $schoolId, $scope);
         }
 
-        $schoolIds = FestSchoolEventFee::where('event_id', $event->id)->pluck('school_id')->unique();
+        $feeEventId = $scope?->rootEvent->id ?? $event->rootEvent()->id;
+        $schoolIds = FestSchoolEventFee::where('event_id', $feeEventId)
+            ->when($scope?->registrationBatchId, fn ($q) => $q->where('registration_batch_id', $scope->registrationBatchId))
+            ->when($scope?->isActorRestricted, fn ($q) => $q->whereIn('school_id', $scope->schoolIds))
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->pluck('school_id')->unique();
         $schools = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
 
-        $rows = FestSchoolEventFee::where('event_id', $event->id)
+        $rows = FestSchoolEventFee::where('event_id', $feeEventId)
+            ->when($event->usesPhasedRegionalBilling() && ! $scope?->registrationBatchId, fn ($q) => $q->whereNotNull('registration_batch_id'))
+            ->when($scope?->registrationBatchId, fn ($q) => $q->where('registration_batch_id', $scope->registrationBatchId))
+            ->when($scope?->isActorRestricted, fn ($q) => $q->whereIn('school_id', $scope->schoolIds))
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->with('lines')
             ->orderBy('school_id')
             ->get()
@@ -216,9 +249,12 @@ class FestExportService
         );
     }
 
-    public function studentEventRegistrations(FestEvent $event): StreamedResponse
+    /** $schoolId: see registrations() above — same Milestone 1.2 fix, same reasoning. */
+    public function studentEventRegistrations(FestEvent $event, ?string $schoolId = null, ?FestReportScope $scope = null): StreamedResponse
     {
-        $rows = \App\Models\FestLevelRegistration::whereIn('event_id', $event->reportableEventIds())
+        $rows = \App\Models\FestLevelRegistration::whereIn('event_id', $scope?->eventIds ?? $event->reportableEventIds())
+            ->when($scope?->isActorRestricted, fn ($q) => $q->whereIn('school_id', $scope->schoolIds))
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->with(['student:id,name,reg_no', 'school:id,name'])
             ->orderBy('registration_number')
             ->get()

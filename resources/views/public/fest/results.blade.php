@@ -42,6 +42,53 @@
         </nav>
 
         @if($tab === 'school')
+            {{-- §7.3a (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): phased events show
+                 the cumulative overall (sum of every published phase's points, revealed
+                 progressively as phases publish) instead of the plain school board.
+                 $phaseCumulativeBoard is null for every non-phased event and for any
+                 non-'overall' scope — falls straight through to the unchanged table below,
+                 exactly today's display. --}}
+            @if(($phaseCumulativeBoard ?? null) !== null)
+                <div class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <p class="text-sm font-semibold text-amber-800">Cumulative overall standing</p>
+                    <p class="text-xs text-amber-700 mt-1">
+                        Running total across published phases so far —
+                        @if(count($phaseBreakdown ?? []))
+                            {{ collect($phaseBreakdown)->map(fn ($p) => $p['name'].($p['results_published'] ? '' : ' (not yet published)'))->implode(', ') }}.
+                        @else
+                            no phases published yet.
+                        @endif
+                    </p>
+                </div>
+                <div class="bg-white border rounded-2xl overflow-hidden shadow-sm">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                            <tr>
+                                <th class="p-3">Rank</th>
+                                <th class="p-3">School</th>
+                                @foreach(collect($phaseBreakdown ?? [])->where('results_published', true) as $phase)
+                                    <th class="p-3 text-right">{{ $phase['name'] }}</th>
+                                @endforeach
+                                <th class="p-3 text-right">Cumulative Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($phaseCumulativeBoard as $row)
+                                <tr class="border-t">
+                                    <td class="p-3 font-bold text-amber-700">#{{ $row['rank'] }}</td>
+                                    <td class="p-3 font-semibold">{{ $row['school_name'] }}</td>
+                                    @foreach(collect($phaseBreakdown ?? [])->where('results_published', true) as $phase)
+                                        <td class="p-3 text-right font-mono">{{ $row['phase_points'][$phase['phase_id']] ?? 0 }}</td>
+                                    @endforeach
+                                    <td class="p-3 text-right font-mono">{{ $row['total_points'] }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="{{ 3 + collect($phaseBreakdown ?? [])->where('results_published', true)->count() }}" class="p-8 text-center text-gray-400">No phase results published yet.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            @else
             <div class="bg-white border rounded-2xl overflow-hidden shadow-sm">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
@@ -60,6 +107,7 @@
                     </tbody>
                 </table>
             </div>
+            @endif
         @elseif($tab === 'category')
             <div class="grid lg:grid-cols-2 gap-5">
                 @forelse($categoryBoards as $board)

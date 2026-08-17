@@ -21,6 +21,14 @@ class FestFoodOrderController extends SchoolAdminController
         // ordering previously had zero partition awareness (see Phase 1 audit — "Reject
         // direct hub and sibling-region ... food ... requests").
         app(FestRegistrationRouterService::class)->assertSchoolCanAccess($event, $this->school->id);
+
+        if ($event->phase_mode_enabled && $event->source_phase_id) {
+            $phase = \App\Models\FestEventPhase::where('event_id', $event->id)
+                ->where('source_phase_id', $event->source_phase_id)
+                ->first();
+            $cutoff = $phase?->food_cutoff_at;
+            abort_if($cutoff && now()->gt($cutoff), 422, 'Food ordering has closed for this competition phase.');
+        }
     }
 
     public function show(string $tenantId, FestEvent $event)

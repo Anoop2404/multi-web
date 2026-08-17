@@ -82,6 +82,7 @@
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, reactive, watch } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -96,6 +97,7 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/taxonomy-masters`;
+const { confirm } = useConfirm();
 const programQuery = computed(() => (props.program?.slug ? `&program=${props.program.slug}` : ''));
 const form = useForm({
     dimension: props.dimension,
@@ -124,13 +126,13 @@ function saveRow(row) {
     router.put(`${base}/${row.id}`, editRows[row.id], { preserveScroll: true });
 }
 
-function removeRow(row) {
-    if (! confirm('Remove this master entry?')) return;
+async function removeRow(row) {
+    if (! (await confirm({ message: 'Remove this master entry?' }))) return;
     router.delete(`${base}/${row.id}`, { preserveScroll: true });
 }
 
-function resetDefaults() {
-    if (! confirm('Reset this category to system defaults? Custom entries will be removed.')) return;
+async function resetDefaults() {
+    if (! (await confirm({ message: 'Reset this category to system defaults? Custom entries will be removed.' }))) return;
     router.post(`${base}/reset-defaults`, { dimension: props.dimension }, { preserveScroll: true });
 }
 </script>

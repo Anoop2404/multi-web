@@ -12,4 +12,5 @@
     'items'     => $navConfig['items'] ?? [],
     'logo'      => $logo,
     'navConfig' => $navConfig,
+    'homeUrl'   => $homeUrl ?? '/',
 ])

@@ -160,14 +160,28 @@ class FestItemSyncService
 
     /**
      * Copy items from hub to partition child, filtering by partition role when configured.
+     *
+     * §7.3 item 5 (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): optional
+     * $phase parameter, added on top of the pre-existing signature. Every caller that
+     * already existed before this change passes 3 arguments, so $phase defaults to
+     * null — and null preserves the exact existing behavior (copy every item that
+     * passes the $partitionRole filter, regardless of which phase it belongs to).
+     * Omitting $phase is always safe.
+     *
+     * When a caller DOES pass $phase (the owning regional FestEventPhase on the hub —
+     * see FestRegionPartitionService::syncPartitionsFromRegionsForPhase()), items are
+     * ADDITIONALLY required to belong to that exact phase (item.phase_id === phase.id)
+     * before being copied — so an Off Stage region child receives only Off Stage items,
+     * not Sargadhara items, even though both phases share the same "region" children on
+     * the hub.
      */
-    public function copyItemsToPartition(FestEvent $hub, FestEvent $child, string $partitionRole): int
+    public function copyItemsToPartition(FestEvent $hub, FestEvent $child, string $partitionRole, ?FestEventPhase $phase = null): int
     {
         $hub->loadMissing('items');
         $count = 0;
 
         foreach ($hub->items as $item) {
-            if ($this->copyItemToPartition($hub, $item, $child, $partitionRole)) {
+            if ($this->copyItemToPartition($hub, $item, $child, $partitionRole, $phase)) {
                 $count++;
             }
         }
@@ -180,7 +194,15 @@ class FestItemSyncService
         FestEventItem $item,
         FestEvent $child,
         string $partitionRole,
+        ?FestEventPhase $phase = null,
     ): ?FestEventItem {
+        // §7.3 item 5: when $phase is given, only that phase's own items are eligible —
+        // see copyItemsToPartition()'s docblock above for the backward-compat guarantee
+        // ($phase omitted/null never filters by phase at all, matching today's behavior).
+        if ($phase !== null && (int) ($item->phase_id ?? 0) !== (int) $phase->id) {
+            return null;
+        }
+
         if (! $this->itemEnabledForPartition($hub, $item, $partitionRole)) {
             return null;
         }
@@ -350,11 +372,21 @@ class FestItemSyncService
             return null;
         }
 
-        $targetPhase = $sourcePhase->code
-            ? FestEventPhase::where('event_id', $target->id)->where('code', $sourcePhase->code)->first()
-            : FestEventPhase::where('event_id', $target->id)->where('name', $sourcePhase->name)->whereNull('code')->first();
+        $canonicalSource = $sourcePhase->sourcePhase ?: $sourcePhase;
+
+        $targetPhase = FestEventPhase::where('event_id', $target->id)
+            ->where('source_phase_id', $canonicalSource->id)
+            ->first();
+
+        $targetPhase ??= $canonicalSource->code
+            ? FestEventPhase::where('event_id', $target->id)->where('code', $canonicalSource->code)->first()
+            : FestEventPhase::where('event_id', $target->id)->where('name', $canonicalSource->name)->whereNull('code')->first();
 
         if ($targetPhase) {
+            if (! $targetPhase->source_phase_id) {
+                $targetPhase->update(['source_phase_id' => $canonicalSource->id]);
+            }
+
             return $targetPhase->id;
         }
 
@@ -362,10 +394,27 @@ class FestItemSyncService
 
         return FestEventPhase::create([
             'event_id'   => $target->id,
-            'name'       => $sourcePhase->name,
-            'code'       => $sourcePhase->code,
-            'sort_order' => $sourcePhase->sort_order ?? ($maxOrder + 1),
-            'is_default' => false,
+            'source_phase_id' => $canonicalSource->id,
+            'registration_batch_id' => $canonicalSource->registration_batch_id,
+            'name'       => $canonicalSource->name,
+            'code'       => $canonicalSource->code,
+            'sort_order' => $canonicalSource->sort_order ?? ($maxOrder + 1),
+            'is_default' => true,
+            'is_regional' => $canonicalSource->is_regional,
+            'region_partition_group' => $canonicalSource->region_partition_group,
+            'result_publish_mode' => $canonicalSource->result_publish_mode ?? 'all_regions',
+            'starts_at' => $canonicalSource->starts_at,
+            'ends_at' => $canonicalSource->ends_at,
+            'registration_open' => $canonicalSource->registration_open,
+            'registration_close' => $canonicalSource->registration_close,
+            'registration_locked' => $canonicalSource->registration_locked,
+            'food_cutoff_at' => $canonicalSource->food_cutoff_at,
+            'status' => $canonicalSource->status,
+            'scoring_locked' => $canonicalSource->scoring_locked,
+            'schedule_published' => $canonicalSource->schedule_published,
+            'results_published' => $canonicalSource->results_published,
+            'appeals_open' => $canonicalSource->appeals_open,
+            'appeal_deadline_at' => $canonicalSource->appeal_deadline_at,
         ])->id;
     }
 
@@ -437,6 +486,8 @@ class FestItemSyncService
             'venue_type'         => $item->venue_type,
             'competition_format' => $item->competition_format,
             'sport_discipline'   => $item->sport_discipline,
+            'ranking_direction'  => $item->ranking_direction,
+            'result_method'      => $item->result_method,
             'duration_minutes'   => $item->duration_minutes,
             'criteria_json'      => $item->criteria_json,
             'participant_type'   => $item->participant_type,
@@ -448,6 +499,15 @@ class FestItemSyncService
             'min_group_size'     => $item->min_group_size,
             'max_group_size'     => $item->max_group_size,
             'qualify_count'      => $item->qualify_count,
+            'fee_amount'         => $item->fee_amount,
+            'group_item_flat_fee' => $item->group_item_flat_fee,
+            'group_item_per_participant_rate' => $item->group_item_per_participant_rate,
+            'is_enabled'         => $item->is_enabled,
+            'is_mandatory'       => $item->is_mandatory,
+            'quota_eligible'     => $item->quota_eligible,
+            'tiebreak_mode'      => $item->tiebreak_mode,
+            'tiebreak_secondary' => $item->tiebreak_secondary,
+            'mark_judge_count'   => $item->mark_judge_count,
             'display_order'      => $item->display_order,
         ];
     }

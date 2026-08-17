@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestJudgeAssignment;
 use App\Models\FestJudgeScore;
 use App\Models\FestParticipant;
@@ -139,7 +140,10 @@ class JudgeDashboardController extends Controller
             abort(403, 'You are not assigned to this item.');
         }
 
-        EventLifecycleGate::allowMarkEntry($event);
+        $item = FestEventItem::find($data['item_id']);
+
+        // Now phase-aware — no-op while phase_mode_enabled is off (see EventLifecycleGate). Reordered validate() before the gate so a malformed item_id 422s on validation, not the business-rule check.
+        EventLifecycleGate::allowMarkEntryForItem($event, $item);
 
         $result = $judgeScores->save($event, $data, $user->id);
 

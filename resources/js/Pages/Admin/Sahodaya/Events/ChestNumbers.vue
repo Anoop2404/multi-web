@@ -146,6 +146,7 @@ import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -190,24 +191,26 @@ const csvUrl = computed(() =>
     props.selectedItemId ? `${base.value}/csv?item_id=${props.selectedItemId}` : `${base.value}/csv`,
 );
 
+const { confirm } = useConfirm();
+
 function postAction(path) {
     if (!props.selectedItemId) return;
     router.post(path, { item_id: props.selectedItemId }, { preserveScroll: true });
 }
 function generate() { postAction(`${base.value}/generate`); }
 function assignItemReg() { postAction(`${base.value}/assign-item-ids`); }
-function clearEntireEventChests() {
-    if (!confirm(`Are you sure you want to reset and clear ALL chest numbers across the ENTIRE event "${props.event.title}"?\n\nThis will wipe chest numbers for all items so numbering starts back at 100.`)) return;
+async function clearEntireEventChests() {
+    if (!(await confirm({ message: `Are you sure you want to reset and clear ALL chest numbers across the ENTIRE event "${props.event.title}"?\n\nThis will wipe chest numbers for all items so numbering starts back at 100.` }))) return;
 
     router.post(`${base.value}/clear-all`, {}, { preserveScroll: true });
 }
-function clearAllChests() {
-    if (!confirm(`Are you sure you want to clear chest numbers for item "${props.selectedItem?.title || ''}"?`)) return;
+async function clearAllChests() {
+    if (!(await confirm({ message: `Are you sure you want to clear chest numbers for item "${props.selectedItem?.title || ''}"?` }))) return;
 
     router.post(`${base.value}/clear-all`, { item_id: props.selectedItemId }, { preserveScroll: true });
 }
-function clearChest(id) {
-    if (!confirm('Clear chest number?')) return;
+async function clearChest(id) {
+    if (!(await confirm({ message: 'Clear chest number?' }))) return;
     router.post(`${base.value}/${id}/clear`, {}, { preserveScroll: true });
 }
 function reveal(id) {

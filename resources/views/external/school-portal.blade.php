@@ -8,9 +8,15 @@
 
         <div class="portal-card">
             <div class="portal-card-header" style="flex-direction:column;align-items:flex-start;gap:.25rem;">
-                <p class="portal-card-sub" style="text-transform:uppercase;letter-spacing:.06em;font-size:.7rem;">
-                    {{ $school->sahodaya->program->title ?? 'State Kalolsavam' }} · {{ $school->sahodaya->name }}
-                </p>
+                <div style="width:100%;display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;">
+                    <p class="portal-card-sub" style="text-transform:uppercase;letter-spacing:.06em;font-size:.7rem;">
+                        {{ $school->sahodaya->program->title ?? 'State Kalolsavam' }} · {{ $school->sahodaya->name }}
+                    </p>
+                    <form method="POST" action="{{ route('state.external.school.logout') }}">
+                        @csrf
+                        <button type="submit" style="background:none;border:none;color:#64748b;font-size:.75rem;font-weight:600;cursor:pointer;">Log out</button>
+                    </form>
+                </div>
                 <h1 class="portal-card-title">{{ $school->name }}</h1>
                 <p class="portal-card-sub">Add each of your qualified students below, one item at a time.</p>
             </div>
@@ -29,7 +35,7 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('state.external.school.entries.store', $school->access_code) }}" class="portal-form">
+                <form method="POST" action="{{ route('state.external.school.entries.store') }}" class="portal-form">
                     @csrf
                     <p class="portal-form-section-title" style="margin-top:0;">Add a student</p>
                     <div class="field-grid field-grid-2">
@@ -97,7 +103,7 @@
                                     <td style="padding:.5rem .25rem;color:#64748b;">{{ $entry->position ?? '—' }}</td>
                                     <td style="padding:.5rem .25rem;text-align:right;">
                                         @if($entry->intake?->status === 'draft')
-                                        <form method="POST" action="{{ route('state.external.school.entries.destroy', [$school->access_code, $entry->id]) }}"
+                                        <form method="POST" action="{{ route('state.external.school.entries.destroy', $entry->id) }}"
                                               onsubmit="return confirm('Remove {{ $entry->student_name }} from {{ $entry->item_name ?? $entry->item_code }}?');">
                                             @csrf
                                             @method('DELETE')
@@ -122,7 +128,7 @@
         </div>
 
         <p class="portal-footer-note">
-            Keep this link and your access code ({{ $school->access_code }}) safe — anyone with it can manage your entries.
+            Signed in as <strong>{{ $school->username }}</strong>. Keep your username and password private — anyone with them can manage your entries.
         </p>
     </div>
 </div>

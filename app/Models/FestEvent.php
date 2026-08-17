@@ -51,7 +51,7 @@ class FestEvent extends Model
         'notification_settings',
         'strict_item_payment_gating',
         'food_payee_type', 'food_host_school_id', 'require_payment_for_coupons',
-        'phase_mode_enabled',
+        'phase_mode_enabled', 'workflow_mode', 'source_phase_id', 'registration_batch_id', 'workflow_leaf_key',
     ];
 
     protected $attributes = [
@@ -770,5 +770,30 @@ class FestEvent extends Model
     public function phases(): HasMany
     {
         return $this->hasMany(FestEventPhase::class, 'event_id')->orderBy('sort_order');
+    }
+
+    public function registrationBatches(): HasMany
+    {
+        return $this->hasMany(FestRegistrationBatch::class, 'event_id')->orderBy('sort_order');
+    }
+
+    public function sourcePhase(): BelongsTo
+    {
+        return $this->belongsTo(FestEventPhase::class, 'source_phase_id');
+    }
+
+    public function registrationBatch(): BelongsTo
+    {
+        return $this->belongsTo(FestRegistrationBatch::class, 'registration_batch_id');
+    }
+
+    public function schoolPhaseRegionSelections(): HasMany
+    {
+        return $this->hasMany(FestSchoolPhaseRegionSelection::class, 'event_id');
+    }
+
+    public function usesPhasedRegionalBilling(): bool
+    {
+        return $this->rootEvent()->workflow_mode === 'phased_regional_billing';
     }
 }

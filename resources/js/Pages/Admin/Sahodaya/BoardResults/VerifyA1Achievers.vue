@@ -106,6 +106,9 @@ import { computed } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -119,13 +122,13 @@ const props = defineProps({
 
 const pageTitle = computed(() => `Verify Full A1 Achievers - Class ${props.selectedClass === 12 ? 'XII' : 'X'}`);
 
-function verifyTopper(t) {
-    if (!confirm(`Are you sure you want to verify the marksheet for ${t.name}?`)) return;
+async function verifyTopper(t) {
+    if (!(await confirm({ message: `Are you sure you want to verify the marksheet for ${t.name}?`, destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/board-results/${t.board_result_id}/toppers/${t.id}/verify-marksheet`);
 }
 
-function rejectTopper(t) {
-    const reason = prompt(`Rejection reason for ${t.name}:`);
+async function rejectTopper(t) {
+    const reason = await prompt({ message: `Rejection reason for ${t.name}:`, inputMultiline: true });
     if (reason === null) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/board-results/${t.board_result_id}/toppers/${t.id}/reject-marksheet`, {
         reason: reason || 'Marksheet verification failed.'

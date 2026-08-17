@@ -273,6 +273,7 @@ import { Link, router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import { formatAgeLabel } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -288,6 +289,7 @@ const props = defineProps({
 
 const page = usePage();
 const base = `/sahodaya-admin/${props.sahodaya.id}/students/verification`;
+const { confirm } = useConfirm();
 const f = reactive({ ...props.filters });
 const selectedIds = ref([]);
 const rejectingStudent = ref(null);
@@ -403,18 +405,18 @@ function bulkVerifyPage() {
     router.post(`${base}/bulk-verify`, { student_ids: ids }, { preserveScroll: true });
 }
 
-function bulkVerifySchool() {
+async function bulkVerifySchool() {
     if (!props.selectedSchool || !schoolPendingCount.value) return;
-    if (!confirm(`Verify all ${schoolPendingCount.value} pending student(s) at ${props.selectedSchool.name}?`)) return;
+    if (!(await confirm({ message: `Verify all ${schoolPendingCount.value} pending student(s) at ${props.selectedSchool.name}?`, destructive: false }))) return;
     router.post(`${base}/bulk-verify`, {
         verify_all_unverified: true,
         school_id: props.selectedSchool.id,
     }, { preserveScroll: true });
 }
 
-function bulkVerifySchoolRow(row) {
+async function bulkVerifySchoolRow(row) {
     if (!row.unverified) return;
-    if (!confirm(`Verify all ${row.unverified} pending student(s) at ${row.name}?`)) return;
+    if (!(await confirm({ message: `Verify all ${row.unverified} pending student(s) at ${row.name}?`, destructive: false }))) return;
     router.post(`${base}/bulk-verify`, {
         verify_all_unverified: true,
         school_id: row.id,

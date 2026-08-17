@@ -44,6 +44,10 @@ class EventLifecycleGate
      */
     public static function allowRegistrationForItem(FestEvent $event, ?FestEventItem $item = null): void
     {
+        if ($item && $item->event_id !== $event->id) {
+            throw new HttpException(403, 'The item does not belong to this event.');
+        }
+
         if (! $event->phase_mode_enabled || ! $item) {
             self::allowRegistration($event);
 
@@ -52,8 +56,16 @@ class EventLifecycleGate
 
         $lifecycle = app(FestPhaseLifecycleService::class)->effectiveLifecycleForItem($item);
 
+        if (! ($lifecycle->registration_batch_open ?? true)) {
+            throw new HttpException(422, 'Registration is not open for this item\'s payment level.');
+        }
+
         if ($lifecycle->registration_locked) {
             throw new HttpException(422, 'Registration is locked for this item\'s competition phase.');
+        }
+
+        if (! in_array($lifecycle->status, ['registration_open', 'published'], true)) {
+            throw new HttpException(422, 'Registration is not open for this item\'s competition phase.');
         }
 
         $now = now();
@@ -106,6 +118,15 @@ class EventLifecycleGate
         };
     }
 
+    public static function allowReportLifecyclePhase(FestEvent $event, string $phase, bool $override = false): void
+    {
+        if ($override || in_array($phase, self::allowedReportPhases($event), true)) {
+            return;
+        }
+
+        throw new HttpException(403, 'This report is not available yet for the current event lifecycle.');
+    }
+
     public static function allowMarkEntry(FestEvent $event): void
     {
         if ($event->scoring_locked) {
@@ -126,6 +147,10 @@ class EventLifecycleGate
      */
     public static function allowMarkEntryForItem(FestEvent $event, ?FestEventItem $item = null): void
     {
+        if ($item && $item->event_id !== $event->id) {
+            throw new HttpException(403, 'The item does not belong to this event.');
+        }
+
         if (! $event->phase_mode_enabled || ! $item) {
             self::allowMarkEntry($event);
 
@@ -136,6 +161,35 @@ class EventLifecycleGate
 
         if ($lifecycle->scoring_locked) {
             throw new HttpException(422, 'Scoring is locked for this item\'s competition phase.');
+        }
+
+        if (! in_array($lifecycle->status, ['ongoing', 'registration_open', 'published'], true)) {
+            throw new HttpException(422, 'Mark entry is not allowed in this item\'s current competition phase.');
+        }
+    }
+
+    public static function allowAppealForParticipant(FestEvent $event, FestParticipant $participant): void
+    {
+        $participant->loadMissing('registration.item');
+        $item = $participant->registration?->item;
+        if (! $item || $participant->registration?->event_id !== $event->id) {
+            throw new HttpException(403, 'Participant does not belong to this operational event.');
+        }
+
+        if (! $event->phase_mode_enabled) {
+            if (! $event->appeals_open) {
+                throw new HttpException(422, 'Appeals are not open for this event.');
+            }
+
+            return;
+        }
+
+        $lifecycle = app(FestPhaseLifecycleService::class)->effectiveLifecycleForItem($item);
+        if (! $lifecycle->results_published || ! $lifecycle->appeals_open) {
+            throw new HttpException(422, 'Appeals are not open for this competition phase.');
+        }
+        if ($lifecycle->appeal_deadline_at && now()->gt($lifecycle->appeal_deadline_at)) {
+            throw new HttpException(422, 'The appeal deadline for this competition phase has passed.');
         }
     }
 

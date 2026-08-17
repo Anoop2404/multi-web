@@ -22,6 +22,10 @@ class FestQualificationService
   public function promoteWinners(FestEvent $fromEvent, FestEvent $toEvent): array
   {
     abort_if($fromEvent->tenant_id !== $toEvent->tenant_id, 422, 'Events must belong to the same Sahodaya.');
+    if ($fromEvent->usesPhasedRegionalBilling()) {
+      abort_if(! $fromEvent->parent_event_id || ! $fromEvent->source_phase_id, 422, 'Promote from a published operational phase/region event, not the MCS root.');
+      abort_unless($fromEvent->results_published, 422, 'Publish this phase/region before promoting qualifiers.');
+    }
 
     $promoted = 0;
     $skipped = 0;

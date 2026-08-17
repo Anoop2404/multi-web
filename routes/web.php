@@ -108,6 +108,8 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::get('/{stateProgram}/external-sahodayas', [\App\Http\Controllers\Admin\ExternalSahodayaController::class, 'index'])->name('external-sahodayas.index');
             Route::post('/{stateProgram}/external-sahodayas', [\App\Http\Controllers\Admin\ExternalSahodayaController::class, 'store'])->name('external-sahodayas.store');
             Route::post('/external-sahodayas/{externalSahodaya}/toggle-status', [\App\Http\Controllers\Admin\ExternalSahodayaController::class, 'toggleStatus'])->name('external-sahodayas.toggle-status');
+            Route::get('/external-sahodayas/{externalSahodaya}/schools', [\App\Http\Controllers\Admin\ExternalSchoolController::class, 'index'])->name('external-schools.index');
+            Route::post('/external-schools/{externalSchool}/reset-password', [\App\Http\Controllers\Admin\ExternalSchoolController::class, 'resetPassword'])->name('external-schools.reset-password');
         });
 
         Route::prefix('kalotsav')->name('kalotsav.')->group(function () {
@@ -178,6 +180,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     Route::delete('tenants/{tenant}/sahodaya-admin/{user}', [TenantController::class, 'destroySahodayaAdmin'])->name('tenants.sahodaya-admin.destroy');
     Route::post('tenants/{tenant}/school-admin', [TenantController::class, 'saveSchoolAdmin'])->name('tenants.school-admin.store');
     Route::delete('tenants/{tenant}/school-admin/{user}', [TenantController::class, 'destroySchoolAdmin'])->name('tenants.school-admin.destroy');
+    Route::get('tenants/{tenant}/portal-admin/{userId}/reveal-password', [TenantController::class, 'revealPortalAdminPassword'])->name('tenants.portal-admin.reveal-password');
     Route::post('tenants/{tenant}/reject-membership', [TenantController::class, 'rejectMembership'])->name('tenants.reject-membership');
     Route::delete('tenants/{tenant}/erase-students', [TenantController::class, 'eraseStudents'])->name('tenants.erase-students');
     Route::post('tenants/{tenant}/erasure-batches/{batchId}/restore', [TenantController::class, 'restoreErasedStudents'])->name('tenants.erasure-batches.restore');
@@ -317,6 +320,7 @@ Route::prefix('school-admin/{tenantId}')
     ->group(function () {
 
     Route::get('/',          [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/unassigned', [DashboardController::class, 'unassigned'])->name('unassigned');
     Route::post('/setup/dismiss-wizard', [DashboardController::class, 'dismissSetupWizard'])->name('setup.dismiss-wizard');
     Route::redirect('/audit', '/audit-logs');
     Route::get('/audit-logs', [SchoolAuditLogController::class, 'index'])->name('audit-logs.index');
@@ -376,6 +380,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/students/photo-naming-list',                  [StudentController::class, 'photoNamingList'])->name('students.photo-naming-list');
     Route::post('/students/{student}/portal-login', [StudentController::class, 'provisionPortal'])->name('students.portal-login');
     Route::post('/students/{student}/reset-portal-password', [StudentController::class, 'resetPortalPassword'])->name('students.reset-portal-password');
+    Route::get('/students/{student}/reveal-portal-password', [StudentController::class, 'revealPortalPassword'])->name('students.reveal-portal-password');
 
     Route::get('/users/profile-change-requests', [\App\Http\Controllers\SchoolAdmin\UserProfileChangeRequestController::class, 'index'])->name('users.profile-change-requests');
     Route::post('/users/profile-change-requests/{changeRequest}/approve', [\App\Http\Controllers\SchoolAdmin\UserProfileChangeRequestController::class, 'approve'])->name('users.profile-change-requests.approve');
@@ -469,6 +474,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/teachers/provision-all-portals', [TeacherController::class, 'provisionAllPortals'])->name('teachers.provision-all-portals');
     Route::post('/teachers/send-all-credentials-mail', [TeacherController::class, 'sendAllCredentialsMail'])->name('teachers.send-all-credentials-mail');
     Route::post('/teachers/{teacher}/reset-portal-password', [TeacherController::class, 'resetPortalPassword'])->name('teachers.reset-portal-password');
+    Route::get('/teachers/{teacher}/reveal-portal-password', [TeacherController::class, 'revealPortalPassword'])->name('teachers.reveal-portal-password');
     Route::get('/teachers/{teacher}/photo', [TeacherController::class, 'showPhoto'])->name('teachers.photo');
     Route::post('/teachers/{teacher}/photo', [TeacherController::class, 'updatePhoto'])->name('teachers.photo.upload');
     Route::post('/teachers/photos-zip', [TeacherController::class, 'uploadPhotosZip'])->name('teachers.photos-zip');
@@ -778,11 +784,15 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/setup/complete', [\App\Http\Controllers\SahodayaAdmin\SetupWizardController::class, 'complete'])->name('setup.complete');
         Route::post('/setup/dismiss', [\App\Http\Controllers\SahodayaAdmin\SetupWizardController::class, 'dismiss'])->name('setup.dismiss');
 
+        Route::get('/credentials', [\App\Http\Controllers\SahodayaAdmin\CredentialsHubController::class, 'index'])->name('credentials.index');
+
         Route::get('/schools', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'index'])->name('schools.index');
         Route::get('/schools/applications', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'applications'])->name('schools.applications');
         Route::post('/schools/applications/bulk-approve', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkApprove'])->name('schools.applications.bulk-approve');
         Route::post('/schools/applications/bulk-reject', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkReject'])->name('schools.applications.bulk-reject');
         Route::post('/schools/bulk-cancel-membership', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkCancelMembership'])->name('schools.bulk-cancel-membership');
+        Route::post('/schools/bulk-reset-password', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkResetPassword'])->name('schools.bulk-reset-password');
+        Route::post('/schools/bulk-send-credentials', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkSendCredentials'])->name('schools.bulk-send-credentials');
         Route::get('/schools/export', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'export'])->name('schools.export');
         Route::get('/schools/{school}/students', [\App\Http\Controllers\SahodayaAdmin\SchoolStudentsController::class, 'show'])->name('schools.students');
         Route::get('/schools/{school}', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'show'])->name('schools.show');
@@ -837,6 +847,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/students/{student}/photo', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'showPhoto'])->name('students.photo');
         Route::post('/students/{student}/portal-login', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'provisionPortal'])->name('students.portal-login');
         Route::post('/students/{student}/reset-portal-password', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'resetPortalPassword'])->name('students.reset-portal-password');
+        Route::get('/students/{student}/reveal-portal-password', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'revealPortalPassword'])->name('students.reveal-portal-password');
         Route::post('/students/{student}/verify', [\App\Http\Controllers\SahodayaAdmin\StudentVerificationController::class, 'verify'])->name('students.verification.verify');
         Route::post('/students/{student}/reject', [\App\Http\Controllers\SahodayaAdmin\StudentVerificationController::class, 'reject'])->name('students.verification.reject');
 
@@ -844,6 +855,11 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/teachers/verification/bulk-verify', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'bulkVerify'])->name('teachers.verification.bulk');
         Route::post('/teachers/{teacher}/verify', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'verify'])->name('teachers.verification.verify');
         Route::post('/teachers/{teacher}/reject', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'reject'])->name('teachers.verification.reject');
+        Route::get('/teachers/{teacher}', [\App\Http\Controllers\SahodayaAdmin\TeacherProfileController::class, 'show'])->name('teachers.show');
+        Route::get('/teachers/{teacher}/photo', [\App\Http\Controllers\SahodayaAdmin\TeacherProfileController::class, 'showPhoto'])->name('teachers.photo');
+        Route::post('/teachers/{teacher}/portal-login', [\App\Http\Controllers\SahodayaAdmin\TeacherProfileController::class, 'provisionPortal'])->name('teachers.portal-login');
+        Route::post('/teachers/{teacher}/reset-portal-password', [\App\Http\Controllers\SahodayaAdmin\TeacherProfileController::class, 'resetPortalPassword'])->name('teachers.reset-portal-password');
+        Route::get('/teachers/{teacher}/reveal-portal-password', [\App\Http\Controllers\SahodayaAdmin\TeacherProfileController::class, 'revealPortalPassword'])->name('teachers.reveal-portal-password');
 
         Route::prefix('finance')->name('finance.')->group(function () {
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\FinanceHubController::class, 'index'])->name('hub');
@@ -1040,6 +1056,12 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/phases/{phase}/quick-status', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'quickStatus'])->name('phases.quick-status');
             Route::delete('/{event}/phases/{phase}', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'destroy'])->name('phases.destroy');
             Route::post('/{event}/phases/assign-items', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'assignItems'])->name('phases.assign-items');
+            Route::post('/{event}/registration-batches', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'store'])->name('registration-batches.store');
+            Route::put('/{event}/registration-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'update'])->name('registration-batches.update');
+            Route::delete('/{event}/registration-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'destroy'])->name('registration-batches.destroy');
+            Route::post('/{event}/phased-workflow/sync-topology', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'syncTopology'])->name('phased-workflow.sync-topology');
+            Route::post('/{event}/phases/{phase}/regions', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'syncPhaseRegions'])->name('phases.regions.sync');
+            Route::post('/{event}/phases/{phase}/schools/{schoolId}/region', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'overrideSchoolRegion'])->name('phases.schools.region.override');
             Route::post('/{event}/submit-state-qualifiers', [\App\Http\Controllers\SahodayaAdmin\StateQualifierSubmissionController::class, 'store'])->name('submit-state-qualifiers');
             // WP-04 manual State nomination workspace (master plan §27) — additive; a
             // Sahodaya only sees these if its event has a state_program_id at all, and
@@ -1509,12 +1531,12 @@ Route::middleware('web')->group(function () {
     Route::get('/portal/login', [AuthController::class, 'showPortalLogin'])->name('portal.login');
     Route::get('/portal/s/{schoolCode}/login', [\App\Http\Controllers\Portal\PortalLoginController::class, 'school'])->name('portal.login.school');
     Route::get('/portal/forgot-password', [AuthController::class, 'showForgotPassword'])->name('portal.password.request');
-    Route::post('/portal/forgot-password', [AuthController::class, 'sendResetLink'])->name('portal.password.email');
+    Route::post('/portal/forgot-password', [AuthController::class, 'sendResetLink'])->middleware('throttle:10,1')->name('portal.password.email');
     Route::get('/portal/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('portal.password.reset');
-    Route::post('/portal/reset-password', [AuthController::class, 'resetPassword'])->name('portal.password.update');
+    Route::post('/portal/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:10,1')->name('portal.password.update');
     // Laravel's default password reset notification expects these route names.
     Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
-    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:10,1')->name('password.update');
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:20,1')
         ->name('login.post');
@@ -1670,6 +1692,7 @@ Route::prefix('portal/group/{tenantId}')
         Route::get('/fest/schedule', [\App\Http\Controllers\Portal\GroupAdminController::class, 'festSchedule'])->name('fest.schedule');
         Route::get('/fest/clashes', [\App\Http\Controllers\Portal\GroupAdminController::class, 'festClashes'])->name('fest.clashes');
         Route::get('/fest/admit-cards', [\App\Http\Controllers\Portal\GroupAdminController::class, 'festAdmitCards'])->name('fest.admit-cards');
+        Route::get('/fest/results', [\App\Http\Controllers\Portal\GroupAdminController::class, 'festResults'])->name('fest.results');
         Route::get('/fest/{event}/admit-cards/download', [\App\Http\Controllers\Portal\GroupAdminController::class, 'downloadAdmitCards'])->name('fest.admit-cards.download');
     });
 
@@ -1692,6 +1715,7 @@ Route::prefix('portal/student/{tenantId}')
         Route::get('/mcq/{registration}/exam', [\App\Http\Controllers\Portal\StudentMcqController::class, 'showExam'])->name('mcq.exam');
         Route::post('/mcq/{registration}/start', [\App\Http\Controllers\Portal\StudentMcqController::class, 'startExam'])->name('mcq.start');
         Route::post('/mcq/{registration}/save-answers', [\App\Http\Controllers\Portal\StudentMcqController::class, 'saveAnswer'])->name('mcq.save-answers');
+        Route::post('/mcq/{registration}/proctor-event', [\App\Http\Controllers\Portal\StudentMcqController::class, 'recordProctorEvent'])->middleware('throttle:30,1')->name('mcq.proctor-event');
         Route::post('/mcq/{registration}/submit', [\App\Http\Controllers\Portal\StudentMcqController::class, 'submitExam'])->name('mcq.submit');
         Route::get('/profile', [\App\Http\Controllers\Portal\StudentProfileController::class, 'edit'])->name('profile');
         Route::put('/profile', [\App\Http\Controllers\Portal\StudentProfileController::class, 'update'])->name('profile.update');
@@ -1728,9 +1752,19 @@ Route::prefix('state/external')->name('state.external.')->middleware(['web', 'th
     Route::post('/{code}/schools', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'storeSchool'])->name('sahodaya.schools.store');
     Route::post('/{code}/submit', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'submit'])->name('sahodaya.submit');
 
-    Route::get('/school/{code}', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'show'])->name('school.show');
-    Route::post('/school/{code}/entries', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'store'])->name('school.entries.store');
-    Route::delete('/school/{code}/entries/{entry}', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'destroy'])->name('school.entries.destroy');
+    Route::get('/school/login', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'showLogin'])->name('school.login');
+    Route::post('/school/login', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'login'])->name('school.login.submit');
+    Route::post('/school/logout', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'logout'])->name('school.logout');
+
+    Route::middleware('external.school.portal')->group(function () {
+        Route::get('/school/portal', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'show'])->name('school.show');
+        Route::post('/school/portal/entries', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'store'])->name('school.entries.store');
+        Route::delete('/school/portal/entries/{entry}', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'destroy'])->name('school.entries.destroy');
+    });
+
+    // Permanent fallback for already-shared {code} links — auto-establishes the same session
+    // a username/password login would. Kept static routes above this wildcard on purpose.
+    Route::get('/school/{code}', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'legacyCodeLogin'])->name('school.legacy');
 });
 
 Route::get('/state/results', [\App\Http\Controllers\Public\StatePublicResultsController::class, 'index'])
@@ -1743,4 +1777,3 @@ Route::get('/sports/entry-form', function (\Illuminate\Http\Request $request) {
     }
     return view('reports.sports-games-entry-form');
 })->middleware(['web'])->name('sports.entry-form');
-

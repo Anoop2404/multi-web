@@ -3,7 +3,7 @@
      x-data="{ open: false, activeSubmenu: null }">
     <div class="max-w-[1440px] mx-auto px-4 sm:px-8 py-3 sm:py-4 bg-white/95 rounded-[19px] shadow-lg flex items-center justify-center relative">
         @if(!empty($logo))
-        <a href="/" class="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 z-10 hidden sm:block">
+        <a href="{{ $homeUrl ?? '/' }}" class="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 z-10 hidden sm:block">
             <img src="{{ $logo }}" alt="{{ $tenant->name }}" class="h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover border-2 border-white shadow-md">
         </a>
         @endif

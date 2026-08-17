@@ -252,7 +252,10 @@ class CertificateTemplateController extends SahodayaAdminController
             'signatories.*.name'  => 'nullable|string|max:120',
             'signatories.*.designation' => 'nullable|string|max:120',
             'signatories.*.signature' => 'nullable|image|max:1024',
-            'signatories.*.signature_path' => 'nullable|string',
+            // Finding 2 fix (SECURITY_CODE_AUDIT_2026_08_11.md, 2026-08-15): signature_path is
+            // deliberately NOT accepted from client input here anymore (see normalizeSignatories()
+            // below) — it used to be read straight from this validated field, letting a
+            // sahodaya-admin reference another tenant's file path on the shared public disk.
             'layout_json'         => 'nullable|array',
             'layout_json.show_recipient_name' => 'nullable|boolean',
             'layout_json.show_participation_label' => 'nullable|boolean',
@@ -360,7 +363,11 @@ class CertificateTemplateController extends SahodayaAdminController
 
         $out = [];
         foreach ($input as $i => $row) {
-            $path = $row['signature_path'] ?? ($existing[$i]['signature_path'] ?? null);
+            // Finding 2 fix (SECURITY_CODE_AUDIT_2026_08_11.md, 2026-08-15): never take
+            // signature_path from client input (unlike logo_path/seal_path/background_path,
+            // it used to be — an IDOR letting a tenant reference another tenant's stored file).
+            // Resolved server-side only: the existing DB value, or a fresh upload below.
+            $path = $existing[$i]['signature_path'] ?? null;
             $file = $request->file("signatories.{$i}.signature");
             if ($file) {
                 $path = $file->store($dir, $disk);

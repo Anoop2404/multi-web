@@ -36,10 +36,15 @@
                                 <a :href="`${portalUrl}/${s.access_code}`" target="_blank" class="ml-2 text-indigo-600 hover:underline">Open portal ↗</a>
                             </p>
                         </div>
-                        <button type="button" @click="toggleStatus(s)" class="text-xs px-3 py-1.5 rounded-lg border"
-                                :class="s.status === 'active' ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'">
-                            {{ s.status === 'active' ? 'Disable' : 'Re-enable' }}
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <Link :href="`/admin/state-programs/external-sahodayas/${s.id}/schools`" class="text-xs px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                                Manage schools →
+                            </Link>
+                            <button type="button" @click="toggleStatus(s)" class="text-xs px-3 py-1.5 rounded-lg border"
+                                    :class="s.status === 'active' ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'">
+                                {{ s.status === 'active' ? 'Disable' : 'Re-enable' }}
+                            </button>
+                        </div>
                     </li>
                 </ul>
                 <p v-else class="text-sm text-gray-400">None added yet.</p>

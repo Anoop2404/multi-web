@@ -87,7 +87,6 @@ class FestEventPortalController extends SchoolAdminController
     public function storeAppeal(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
-        abort_unless($event->appeals_open, 422, 'Appeals are not open for this event.');
 
         $data = $request->validate([
             'participant_id' => 'required|exists:fest_participants,id',
@@ -97,19 +96,21 @@ class FestEventPortalController extends SchoolAdminController
         $participant = FestParticipant::findOrFail($data['participant_id']);
         abort_if($participant->registration->school_id !== $this->school->id, 403);
         abort_unless(in_array($participant->registration->event_id, $event->reportableEventIds(), true), 403);
+        $appealEvent = FestEvent::findOrFail($participant->registration->event_id);
+        \App\Services\Events\EventLifecycleGate::allowAppealForParticipant($appealEvent, $participant);
 
         // Prevent duplicate appeal for the same participant.
-        $existing = FestAppeal::where('event_id', $event->id)
+        $existing = FestAppeal::where('event_id', $appealEvent->id)
             ->where('participant_id', $participant->id)
             ->whereIn('status', ['pending', 'approved'])
             ->exists();
         abort_if($existing, 422, 'An active appeal already exists for this participant. Resolve or wait for the existing appeal to be processed.');
 
         FestAppeal::create([
-            'event_id'              => $event->id,
+            'event_id'              => $appealEvent->id,
             'participant_id'        => $participant->id,
             'reason'                => $data['reason'],
-            'fee_amount'            => $event->appeal_fee_amount,
+            'fee_amount'            => $appealEvent->appeal_fee_amount,
             'status'                => 'pending',
             'submitted_by_user_id'  => $request->user()->id,
         ]);

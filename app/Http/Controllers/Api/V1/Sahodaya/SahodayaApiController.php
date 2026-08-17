@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api\V1\Sahodaya;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Http\Controllers\SahodayaAdmin\Concerns\ScopesMembershipByRegion;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
 
 abstract class SahodayaApiController extends ApiController
 {
+    use ScopesMembershipByRegion;
+
     protected Tenant $sahodaya;
 
     public function __construct(Request $request)

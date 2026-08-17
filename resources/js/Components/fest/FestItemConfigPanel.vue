@@ -67,6 +67,7 @@
 <script setup>
 import { reactive, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodayaId: { type: [String, Number], required: true },
@@ -76,6 +77,8 @@ const props = defineProps({
     catalogUrl: { type: String, default: null },
     isSports: { type: Boolean, default: false },
 });
+
+const { confirm } = useConfirm();
 
 const saving = ref(false);
 const removing = ref(false);
@@ -122,8 +125,8 @@ function save() {
     });
 }
 
-function removeItem() {
-    if (!window.confirm(`Remove "${props.itemConfig.title}" from this event?`)) {
+async function removeItem() {
+    if (!(await confirm({ message: `Remove "${props.itemConfig.title}" from this event?` }))) {
         return;
     }
     removing.value = true;

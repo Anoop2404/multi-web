@@ -22,7 +22,7 @@ class FestEventStaffController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $assignments = FestEventStaff::where('event_id', $event->id)
-            ->with(['stage:id,name', 'venue:id,name', 'head:id,name', 'region:id,name'])
+            ->with(['stage:id,name', 'venue:id,name', 'head:id,name', 'region:id,name', 'sourcePhase:id,name'])
             ->get();
 
         $userIds = $assignments->pluck('user_id')->unique();
@@ -44,7 +44,7 @@ class FestEventStaffController extends SahodayaAdminController
             ->get(['id', 'name']);
 
         return $this->inertia('Sahodaya/Events/EventStaff', $this->withEventActivity($event, FestPageActivity::EVENT_STAFF, [
-            'event'       => $event->only('id', 'title', 'status', 'event_type'),
+            'event'       => $event->only('id', 'title', 'status', 'event_type', 'workflow_mode'),
             'assignments' => $assignments->map(fn (FestEventStaff $a) => [
                 'id'       => $a->id,
                 'duty'     => $a->duty,
@@ -53,14 +53,21 @@ class FestEventStaffController extends SahodayaAdminController
                 'venue_id' => $a->venue_id,
                 'head_id'  => $a->head_id,
                 'region_id'=> $a->region_id,
+                'source_phase_id' => $a->source_phase_id,
                 'user'     => $usersById->get($a->user_id),
                 'stage'    => $a->stage?->only('id', 'name'),
                 'venue'    => $a->venue?->only('id', 'name'),
                 'head'     => $a->head?->only('id', 'name'),
                 'region'   => $a->region?->only('id', 'name'),
+                'source_phase' => $a->sourcePhase?->only('id', 'name'),
             ]),
             'staffPool'   => $staffPool,
             'regionOptions' => $regionOptions,
+            'phaseOptions' => $event->usesPhasedRegionalBilling()
+                ? $event->rootEvent()->phases()
+                    ->where(fn ($query) => $query->where('is_regional', true)->orWhereNotNull('region_partition_group'))
+                    ->get(['id', 'name', 'is_regional'])
+                : collect(),
             'heads'       => Schema::hasTable('fest_item_heads')
                 ? FestItemHead::forTenant($this->sahodaya->id)
                     ->forEvent($event->id)
@@ -126,10 +133,29 @@ class FestEventStaffController extends SahodayaAdminController
                 'nullable',
                 Rule::in($regionIds),
             ],
+            'source_phase_id' => [
+                'nullable',
+                Rule::exists('fest_event_phases', 'id')->where('event_id', $event->rootEvent()->id),
+            ],
         ]);
 
         if ($data['duty'] !== 'stage') {
             $data['stage_id'] = null;
+        }
+
+        if ($data['duty'] !== 'region_admin') {
+            $data['source_phase_id'] = null;
+        } elseif (! empty($data['source_phase_id'])) {
+            $phase = $event->rootEvent()->phases()->findOrFail($data['source_phase_id']);
+            if (! $phase->isRegional()) {
+                return back()->withErrors(['source_phase_id' => 'Only a regional phase can be assigned with region scope.']);
+            }
+            if (! empty($data['region_id']) && ! $phase->allowedRegions()
+                ->where('region_id', $data['region_id'])
+                ->where('enabled', true)
+                ->exists()) {
+                return back()->withErrors(['region_id' => 'That region is not enabled for the selected phase.']);
+            }
         }
 
         $headScopedDuty = $data['duty'] === 'discipline'
@@ -158,6 +184,9 @@ class FestEventStaffController extends SahodayaAdminController
             $match['stage_id'] = $data['stage_id'] ?? null;
         } elseif ($headScopedDuty) {
             $match['head_id'] = $data['head_id'] ?? null;
+        } elseif ($data['duty'] === 'region_admin') {
+            $match['region_id'] = $data['region_id'] ?? null;
+            $match['source_phase_id'] = $data['source_phase_id'] ?? null;
         }
 
         FestEventStaff::firstOrCreate($match, [
@@ -165,6 +194,7 @@ class FestEventStaffController extends SahodayaAdminController
             'venue_id' => $data['venue_id'] ?? null,
             'head_id'  => $data['head_id'] ?? null,
             'region_id'=> $data['region_id'] ?? null,
+            'source_phase_id' => $data['source_phase_id'] ?? null,
         ]);
 
         $user = User::find($data['user_id']);

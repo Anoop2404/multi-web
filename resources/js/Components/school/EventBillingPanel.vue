@@ -1,11 +1,14 @@
 <template>
-    <div v-if="event.fee_required && (event.uses_per_head_billing ? event.school_head_fees?.length : event.school_fee)"
+    <div v-if="event.fee_required && (event.uses_per_head_billing ? event.school_head_fees?.length : (event.uses_per_phase_billing ? event.school_phase_fees?.length : event.school_fee))"
          class="mt-4 border-t border-gray-100 pt-4 space-y-3">
         <div>
             <p class="text-xs font-semibold text-slate-800">Event fees &amp; billing</p>
             <p class="text-xs text-slate-500 mt-0.5">
                 <template v-if="event.uses_per_head_billing">
                     Each section is billed separately — paying one does not clear another.
+                </template>
+                <template v-else-if="event.uses_per_phase_billing">
+                    Each phase (level) is billed and paid separately — paying one does not clear another.
                 </template>
                 <template v-else-if="event.event_type === 'sports'">
                     Fees for this sport event (school + student + item fees).
@@ -55,7 +58,24 @@
             @update-head-amount="(headId, amountVal) => $emit('update-head-amount', headId, amountVal)"
         />
 
-        <!-- Single-invoice path (non sports_composite) -->
+        <!-- Per-phase invoices (Kalotsavam phase_mode_enabled events billing per level) -->
+        <PhaseBillingInvoices
+            v-else-if="event.uses_per_phase_billing"
+            :event-id="event.id"
+            :phase-fees="event.school_phase_fees ?? []"
+            :school-fee="event.school_fee"
+            :program-base="programBase"
+            :phase-payment-ref-map="phasePaymentRefMap"
+            :phase-payment-bank-map="phasePaymentBankMap"
+            :phase-payment-amount-map="phasePaymentAmountMap"
+            @upload-phase-payment="$emit('upload-phase-payment', $event)"
+            @set-phase-file="(phaseId, file) => $emit('set-phase-file', phaseId, file)"
+            @update-phase-ref="(phaseId, refVal) => $emit('update-phase-ref', phaseId, refVal)"
+            @update-phase-bank="(phaseId, bankVal) => $emit('update-phase-bank', phaseId, bankVal)"
+            @update-phase-amount="(phaseId, amountVal) => $emit('update-phase-amount', phaseId, amountVal)"
+        />
+
+        <!-- Single-invoice path (non sports_composite, non phase-billed) -->
         <div v-else class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm">
             <ul v-if="itemFeeLines.length || schoolRegFee > 0 || studentRegLine" class="text-xs text-indigo-900 space-y-1">
                 <li v-if="schoolRegFee > 0" class="flex justify-between gap-4">
@@ -168,6 +188,7 @@
 <script setup>
 import { computed } from 'vue';
 import HeadBillingInvoices from '@/Components/school/HeadBillingInvoices.vue';
+import PhaseBillingInvoices from '@/Components/school/PhaseBillingInvoices.vue';
 import PaymentHistoryList from '@/Components/school/PaymentHistoryList.vue';
 
 const props = defineProps({
@@ -186,6 +207,9 @@ const props = defineProps({
     headPaymentRefMap: { type: Object, default: () => ({}) },
     headPaymentBankMap: { type: Object, default: () => ({}) },
     headPaymentAmountMap: { type: Object, default: () => ({}) },
+    phasePaymentRefMap: { type: Object, default: () => ({}) },
+    phasePaymentBankMap: { type: Object, default: () => ({}) },
+    phasePaymentAmountMap: { type: Object, default: () => ({}) },
 });
 
 defineEmits([
@@ -199,6 +223,11 @@ defineEmits([
     'update-head-ref',
     'update-head-bank',
     'update-head-amount',
+    'upload-phase-payment',
+    'set-phase-file',
+    'update-phase-ref',
+    'update-phase-bank',
+    'update-phase-amount',
 ]);
 
 // Real, authoritative figures from the school_fee record itself — not the item-only

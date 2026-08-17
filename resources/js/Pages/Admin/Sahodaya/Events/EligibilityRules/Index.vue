@@ -92,6 +92,7 @@
 import { ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -103,6 +104,7 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/eligibility-rules`;
+const { confirm } = useConfirm();
 const valuesText = ref('');
 
 const form = useForm({
@@ -158,8 +160,8 @@ function formatValues(json) {
     return JSON.stringify(json);
 }
 
-function removeRule(row) {
-    if (!confirm('Remove this eligibility rule?')) return;
+async function removeRule(row) {
+    if (!(await confirm({ message: 'Remove this eligibility rule?' }))) return;
     router.delete(`${base}/${row.id}`, { preserveScroll: true });
 }
 </script>

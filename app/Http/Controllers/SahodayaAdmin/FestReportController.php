@@ -21,10 +21,39 @@ class FestReportController extends SahodayaAdminController
 {
     use BuildsItemHeadReportContext;
     use ResolvesRegionAwareReportEvent;
+
+    private function reportScope(Request $request, FestEvent $event): \App\Services\Events\Reports\FestReportScope
+    {
+        $mode = $request->input('scope_mode');
+        if (! $mode) {
+            $mode = $request->integer('region_id')
+                ? 'region'
+                : (($event->parent_event_id === null && $event->usesPhasedRegionalBilling()) ? 'combined' : 'self');
+        }
+
+        return app(FestReportScopeResolver::class)->resolve($event, $request->user(), [
+            'mode' => $mode,
+            'region_id' => $request->integer('region_id') ?: null,
+            'competition_phase_id' => $request->integer('competition_phase_id') ?: null,
+            'registration_batch_id' => $request->integer('registration_batch_id') ?: null,
+            'school_id' => $request->input('school_id'),
+        ]);
+    }
+
+    private function scopedReportService(Request $request, FestEvent $event): FestReportService
+    {
+        return new FestReportService($event, $this->reportScope($request, $event));
+    }
+
+    private function scopedAnalytics(Request $request, FestEvent $event): \App\Services\Events\FestEventReportAnalyticsService
+    {
+        return new \App\Services\Events\FestEventReportAnalyticsService($event, $this->reportScope($request, $event));
+    }
     /** @return array<string, mixed> */
     protected function reportProps(string $tenantId, FestEvent $event, array $extra = []): array
     {
         $base = "/sahodaya-admin/{$tenantId}/events/{$event->id}";
+        $rootEvent = $event->rootEvent();
 
         $headContext = $this->itemHeadReportContext($event, null, $tenantId);
 
@@ -75,7 +104,8 @@ class FestReportController extends SahodayaAdminController
             ->all();
 
         $isPartitionedParent = $event->parent_event_id === null
-            && count($regionChildren) > 0;
+            && count($regionChildren) > 0
+            && ! $rootEvent->usesPhasedRegionalBilling();
 
         return array_merge([
             'event'               => $event->only([
@@ -91,9 +121,29 @@ class FestReportController extends SahodayaAdminController
             'isPartitionedParent' => $isPartitionedParent,
             'regionChildren'      => $regionChildren,
             'childEvents'         => $event->sportEventDropdownOptions(),
+            'competitionPhases'   => $rootEvent->usesPhasedRegionalBilling()
+                ? $rootEvent->phases()->get(['id', 'name', 'code', 'is_regional'])
+                : collect(),
+            'registrationBatches' => $rootEvent->usesPhasedRegionalBilling()
+                ? $rootEvent->registrationBatches()->get(['id', 'name', 'code'])
+                : collect(),
+            'reportScopeSelection' => [
+                'competition_phase_id' => request()->integer('competition_phase_id') ?: null,
+                'registration_batch_id' => request()->integer('registration_batch_id') ?: null,
+                'region_id' => request()->integer('region_id') ?: null,
+                'scope_mode' => request()->input('scope_mode', $rootEvent->usesPhasedRegionalBilling() ? 'combined' : 'self'),
+            ],
         ], $headContext, $extra);
     }
 
+    /**
+     * Deliberately excluded from the regionAwareTargetEvent() retrofit (plan §4.4/Phase
+     * 3, second pass): this is the Hub landing page — pure navigation, not a data
+     * export. It renders $event as-is (already narrowed to the actor's own region child
+     * by ResolveRegionScopedReportEvent when applicable); its 'interactive' catalog is
+     * just a list of report page links, and nothing here runs
+     * reportableEventIds()/reportableItemIds().
+     */
     public function index(string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -122,8 +172,13 @@ class FestReportController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_unless($event->event_type === 'sports', 404);
 
+        // Region-wise retrofit (plan §4.4/Phase 3, second pass): same
+        // regionAwareTargetEvent() isolation as schoolDetailed/itemSchedule/etc. —
+        // navigationForEvent() computes head/item participant counts via
+        // $event->reportableEventIds()/reportableItemIds(), which otherwise pulled every
+        // region's combined counts in for a hub opened directly (or with ?region_id=).
         $navService = app(\App\Services\Events\FestHeadItemNavigationService::class);
-        $nav = $navService->navigationForEvent($event);
+        $nav = $navService->navigationForEvent($this->regionAwareTargetEvent($request, $event));
 
         $headId = $this->resolveHeadQueryParam($request->query('head_id'));
         $itemId = $request->integer('item_id') ?: null;
@@ -148,12 +203,20 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
-    public function downloads(string $tenantId, FestEvent $event, string $phase)
+    public function downloads(Request $request, string $tenantId, FestEvent $event, string $phase)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_unless(in_array($phase, ['before', 'during', 'after'], true), 404);
 
-        $service = new FestReportService($event);
+        // Region-wise retrofit (plan §4.4/Phase 3, second pass): same
+        // regionAwareTargetEvent() isolation as itemSchedule/schoolDetailed/etc. — the
+        // schools()/scheduleStages()/heads lookups below resolve via
+        // reportableEventIds(), which otherwise pulled every region's combined rows in
+        // for a hub opened directly (or with ?region_id=). $event itself stays
+        // untouched for reportProps()'s nav/regionChildren and for URL building, same as
+        // every other retrofitted method.
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $service = $this->scopedReportService($request, $targetEvent);
         $allowedPhases = EventLifecycleGate::allowedReportPhases($event);
         $currentPhase = EventLifecycleGate::currentReportPhase($event);
 
@@ -194,9 +257,9 @@ class FestReportController extends SahodayaAdminController
             'items'                    => $service->items()->map->only(['id', 'title', 'class_group']),
             'heads'                    => $event->event_type === 'sports'
                 ? ($event->isSportsSeasonEvent()
-                    ? FestEvent::where('parent_event_id', $event->id)->ofType('sports')->orderBy('sort_order')->orderBy('title')->get(['id', 'title'])->map(fn ($e) => ['id' => $e->id, 'name' => $e->title])->values()
-                    : collect([['id' => $event->id, 'name' => $event->title]]))
-                : \App\Models\FestItemHead::forTenant($this->sahodaya->id)->forEvent($event->id)->orderBy('sort_order')->get(['id', 'name']),
+                    ? FestEvent::where('parent_event_id', $targetEvent->id)->ofType('sports')->orderBy('sort_order')->orderBy('title')->get(['id', 'title'])->map(fn ($e) => ['id' => $e->id, 'name' => $e->title])->values()
+                    : collect([['id' => $targetEvent->id, 'name' => $targetEvent->title]]))
+                : \App\Models\FestItemHead::forTenant($this->sahodaya->id)->forEvent($targetEvent->id)->orderBy('sort_order')->get(['id', 'name']),
             'stages'                   => $service->scheduleStages()->map(fn ($s) => ['id' => $s->id, 'name' => $s->name]),
             'classGroups'              => FestReportService::classGroups($event),
             'currentPhase'             => $currentPhase,
@@ -204,6 +267,12 @@ class FestReportController extends SahodayaAdminController
         ]));
     }
 
+    /**
+     * Deliberately excluded from the regionAwareTargetEvent() retrofit (plan §4.4/Phase
+     * 3, second pass): this reads no report data — it's a dead-end redirect to Event
+     * settings → Participation, keyed only by $event->id for the URL. Nothing here runs
+     * reportableEventIds()/reportableItemIds() or otherwise varies by region.
+     */
     public function storeRule(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -222,7 +291,7 @@ class FestReportController extends SahodayaAdminController
         // resolves through it instead of reading $event's own
         // reportableEventIds()/reportableItemIds(), which otherwise pulled the hub's
         // uncopied rows in alongside the child's.
-        $service = new FestReportService($this->regionAwareTargetEvent($request, $event));
+        $service = $this->scopedReportService($request, $this->regionAwareTargetEvent($request, $event));
         $schoolId = $request->input('school_id');
         $classGroup = $request->input('class_group');
         $grouped = [];
@@ -274,7 +343,7 @@ class FestReportController extends SahodayaAdminController
             $targetEvent = FestEvent::findOrFail($scope->eventIds[0]);
         }
 
-        $service = new FestReportService($targetEvent);
+        $service = $this->scopedReportService($request, $targetEvent);
 
         return $this->inertia('Sahodaya/Events/Reports/OverallRanking', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rankings'       => $service->schoolRankingRows()->values(),
@@ -298,7 +367,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($this->regionAwareTargetEvent($request, $event));
+        $service = $this->scopedReportService($request, $this->regionAwareTargetEvent($request, $event));
         $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
 
         $regs = $service->activeRegistrations();
@@ -324,7 +393,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($this->regionAwareTargetEvent($request, $event));
+        $service = $this->scopedReportService($request, $this->regionAwareTargetEvent($request, $event));
         $data = $service->markEntryStatusSummary();
 
         return $this->inertia('Sahodaya/Events/Reports/MarkEntryStatus', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
@@ -338,7 +407,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($this->regionAwareTargetEvent($request, $event));
+        $service = $this->scopedReportService($request, $this->regionAwareTargetEvent($request, $event));
         $schoolId = $request->input('school_id');
         $clashes = $service->scheduleClashRows($schoolId);
 
@@ -357,7 +426,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($this->regionAwareTargetEvent($request, $event));
+        $service = $this->scopedReportService($request, $this->regionAwareTargetEvent($request, $event));
         $date = $request->input('date');
         $stageId = $request->integer('stage_id') ?: null;
         $rows = $service->itemScheduleRows($date, $stageId);
@@ -384,7 +453,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
         $rows = $analytics->itemRegistrationRows();
 
         return $this->inertia('Sahodaya/Events/Reports/ItemCounts', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
@@ -400,7 +469,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
 
         return $this->inertia('Sahodaya/Events/Reports/DisciplineRegistration', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'   => $analytics->disciplineRegistrationRows(),
@@ -416,7 +485,7 @@ class FestReportController extends SahodayaAdminController
             app(\App\Services\Events\FestItemHeadService::class)->syncEventHeads($event);
         }
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
         $headId = $request->input('head_id') !== null && $request->input('head_id') !== ''
             ? ($request->input('head_id') === 'other' ? 0 : $request->integer('head_id'))
             : null;
@@ -426,7 +495,7 @@ class FestReportController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/Reports/HeadWiseParticipants', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'summary'        => $analytics->headRegistrationSummary($schoolId),
             'rows'           => $analytics->headWiseParticipantRows($headId ?: null, $schoolId),
-            'schools'        => (new FestReportService($event))->schools(),
+            'schools'        => $this->scopedReportService($request, $event)->schools(),
             'filterHeadId'   => $request->input('head_id') ?: null,
             'filterItemId'   => $itemId,
             'filterSchoolId' => $schoolId,
@@ -442,7 +511,7 @@ class FestReportController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($event->event_type === 'sports', 404);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
         $areaId = $request->input('area_id') !== null && $request->input('area_id') !== ''
             ? ($request->input('area_id') === 'other' ? 0 : $request->integer('area_id'))
             : null;
@@ -457,7 +526,7 @@ class FestReportController extends SahodayaAdminController
             'summary'        => $analytics->areaWiseSummary($schoolId),
             'rows'           => $analytics->areaWiseParticipantRows($areaId, $schoolId),
             'areas'          => $areas,
-            'schools'        => (new FestReportService($event))->schools(),
+            'schools'        => $this->scopedReportService($request, $event)->schools(),
             'filterAreaId'   => $request->input('area_id') ?: null,
             'filterSchoolId' => $schoolId,
             'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/area-wise-participants?'.http_build_query(array_filter([
@@ -471,13 +540,13 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
         $schoolId = $request->input('school_id');
         $data = $analytics->ageGroupMatrix($schoolId ?: null);
 
         return $this->inertia('Sahodaya/Events/Reports/AgeGroupMatrix', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'matrix'         => $data,
-            'schools'        => (new FestReportService($event))->schools(),
+            'schools'        => $this->scopedReportService($request, $event)->schools(),
             'filterSchoolId' => $schoolId,
             'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/age-group-matrix?'.http_build_query(array_filter(['school_id' => $schoolId])),
         ])));
@@ -490,7 +559,7 @@ class FestReportController extends SahodayaAdminController
         // Payment/fee report — same reportableEventIds() resolution issue as the six
         // report builders in FestReportCatalog::REGION_ID_AWARE_IDS, found when auditing
         // those; feeCollectionRows()/feeCollectionByHeadRows() have the same shape.
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
         $rows = $analytics->feeCollectionRows();
         $regionId = $request->integer('region_id') ?: null;
 
@@ -647,7 +716,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
         $rows = $analytics->assignmentCompletenessRows();
 
         return $this->inertia('Sahodaya/Events/Reports/AssignmentCompleteness', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
@@ -661,14 +730,14 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        return (new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event)))->exportAssignmentCompleteness();
+        return ($this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event)))->exportAssignmentCompleteness();
     }
 
     public function numberingRegister(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
 
         return $this->inertia('Sahodaya/Events/Reports/NumberingRegister', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'   => $analytics->numberingRegisterRows(),
@@ -680,19 +749,19 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        return (new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event)))->exportNumberingRegister();
+        return ($this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event)))->exportNumberingRegister();
     }
 
     public function pendingApprovals(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
         $schoolId = $request->input('school_id');
 
         return $this->inertia('Sahodaya/Events/Reports/PendingApprovals', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'           => $analytics->pendingApprovalRows($schoolId ?: null),
-            'schools'        => (new FestReportService($event))->schools(),
+            'schools'        => $this->scopedReportService($request, $event)->schools(),
             'filterSchoolId' => $schoolId,
             'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/pending-approvals/export?'.http_build_query(array_filter([
                 'school_id' => $schoolId,
@@ -705,7 +774,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        return (new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event)))
+        return ($this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event)))
             ->exportPendingApprovals($request->input('school_id'));
     }
 
@@ -714,8 +783,8 @@ class FestReportController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $targetEvent = $this->regionAwareTargetEvent($request, $event);
-        $service = new FestReportService($targetEvent);
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($targetEvent);
+        $service = $this->scopedReportService($request, $targetEvent);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
         $schoolId = $request->input('school_id');
         $search = $request->input('search');
         $studentId = $request->integer('student_id') ?: null;
@@ -748,7 +817,7 @@ class FestReportController extends SahodayaAdminController
             app(\App\Services\Events\FestItemHeadService::class)->syncEventHeads($event);
         }
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
         $itemId = $request->integer('item_id') ?: null;
         $participants = $itemId ? $analytics->itemWiseBrowserRows($itemId) : [];
 
@@ -805,7 +874,7 @@ class FestReportController extends SahodayaAdminController
             ? $this->regionAwareTargetEvent($request, $event)
             : $event;
 
-        return (new FestReportService($targetEvent))->export($exportType, $request);
+        return $this->scopedReportService($request, $targetEvent)->export($exportType, $request);
     }
 
     /**
@@ -828,16 +897,10 @@ class FestReportController extends SahodayaAdminController
      */
     private function enforceReportLifecyclePhase(FestEvent $event, string $phase, Request $request): void
     {
-        $allowed = EventLifecycleGate::allowedReportPhases($event);
-
-        if (in_array($phase, $allowed, true)) {
-            return;
-        }
-
-        if ($request->user()?->can('fest.reports.lifecycle_override')) {
-            return;
-        }
-
-        abort(403, 'This report is not available yet for the current event lifecycle.');
+        EventLifecycleGate::allowReportLifecyclePhase(
+            $event,
+            $phase,
+            (bool) $request->user()?->can('fest.reports.lifecycle_override'),
+        );
     }
 }

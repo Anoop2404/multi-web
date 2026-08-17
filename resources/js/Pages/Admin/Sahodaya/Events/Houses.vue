@@ -50,6 +50,7 @@ import { reactive } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -57,6 +58,7 @@ const props = defineProps({
     activityLogs: { type: Array, default: () => [] },
 });
 
+const { confirm } = useConfirm();
 const houseForm = useForm({ name: '', color: '', motto: '' });
 const assignForms = reactive({});
 
@@ -83,8 +85,8 @@ function assign(houseId) {
     }, { preserveScroll: true, onSuccess: () => { assignForms[houseId] = ''; } });
 }
 
-function removeHouse(id) {
-    if (!confirm('Remove this house?')) return;
+async function removeHouse(id) {
+    if (!(await confirm({ message: 'Remove this house?' }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/houses/${id}`, { preserveScroll: true });
 }
 </script>

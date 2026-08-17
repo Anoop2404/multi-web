@@ -657,8 +657,6 @@ class FestEventOpsController extends Controller
         abort_if($event->tenant_id !== $tenantId, 403);
         $this->authorizeDuty($request, $event->id, 'marks');
 
-        EventLifecycleGate::allowMarkEntry($event);
-
         $data = $request->validate([
             'participant_id'    => 'required|exists:fest_participants,id',
             'item_id'           => 'required|exists:fest_event_items,id',
@@ -668,6 +666,11 @@ class FestEventOpsController extends Controller
             'measurement_value' => 'nullable|string|max:50',
             'measurement_unit'  => 'nullable|string|max:20',
         ]);
+
+        $item = FestEventItem::find($data['item_id']);
+
+        // Now phase-aware — no-op while phase_mode_enabled is off (see EventLifecycleGate). Reordered validate() before the gate so a malformed item_id 422s on validation, not the business-rule check.
+        EventLifecycleGate::allowMarkEntryForItem($event, $item);
 
         app(FestMarkEntryScopeService::class)->assertCanEnterMark($request->user(), $event, (int) $data['item_id']);
 

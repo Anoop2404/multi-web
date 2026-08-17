@@ -2,8 +2,8 @@
     $theme = $tenantTheme ?? [];
     $extractFont = fn (?string $value) => trim(explode(',', $value ?? '')[0] ?? '');
     $fonts = array_values(array_unique(array_filter([
-        $extractFont($theme['font_heading'] ?? null),
-        $extractFont($theme['font_body'] ?? null),
+        $extractFont($theme['display_font'] ?? $theme['font_heading'] ?? 'Manrope'),
+        $extractFont($theme['body_font'] ?? $theme['font_body'] ?? 'Inter'),
     ])));
 
     $families = collect($fonts)

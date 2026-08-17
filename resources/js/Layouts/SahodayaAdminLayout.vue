@@ -99,7 +99,7 @@
                 </div>
             </header>
 
-            <main class="sa-main flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isReadOnlyStaff }">
+            <main class="sa-main flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isReadOnlyStaff }" :inert="isReadOnlyStaff">
                 <StaffReadOnlyBanner v-if="isReadOnlyStaff" />
                 <FlashBanner />
                 <ValidationBanner />

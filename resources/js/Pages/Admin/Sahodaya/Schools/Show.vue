@@ -279,7 +279,9 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, defineComponent, h, ref } from 'vue';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
+const { confirm, prompt } = useConfirm();
 const alertMessage = ref('');
 
 const props = defineProps({
@@ -301,9 +303,9 @@ const canDeleteSchool = computed(() =>
     deleteReason.value.trim() !== '' && deleteConfirmName.value === props.school.name,
 );
 
-function deleteSchool() {
+async function deleteSchool() {
     if (!canDeleteSchool.value || deleteProcessing.value) return;
-    if (!confirm(`Permanently delete "${props.school.name}" and all related data? This cannot be undone.`)) return;
+    if (!(await confirm({ message: `Permanently delete "${props.school.name}" and all related data? This cannot be undone.` }))) return;
 
     deleteProcessing.value = true;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}`, {
@@ -315,16 +317,16 @@ function deleteSchool() {
     });
 }
 
-function toggleFestRegistration() {
+async function toggleFestRegistration() {
     const action = props.school.fest_registration_closed ? 'reopen' : 'close';
-    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} fest registration for this school?`)) return;
+    if (!(await confirm({ message: `${action.charAt(0).toUpperCase() + action.slice(1)} fest registration for this school?`, destructive: action === 'close' }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/toggle-fest-registration`, {}, { preserveScroll: true });
 }
 
-function saveSchoolEmail() {
+async function saveSchoolEmail() {
     const nextEmail = schoolEmail.value.trim();
     if (!nextEmail) return;
-    if (!confirm(`Update the school email to ${nextEmail}? This will also update the login email.`)) return;
+    if (!(await confirm({ message: `Update the school email to ${nextEmail}? This will also update the login email.`, destructive: false }))) return;
 
     emailProcessing.value = true;
     router.put(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/email`, {
@@ -335,9 +337,9 @@ function saveSchoolEmail() {
     });
 }
 
-function resendSchoolCredentials() {
+async function resendSchoolCredentials() {
     if (!props.school.has_login) return;
-    if (!confirm(`Resend the current credentials for ${props.school.name}?`)) return;
+    if (!(await confirm({ message: `Resend the current credentials for ${props.school.name}?`, destructive: false }))) return;
 
     credentialProcessing.value = true;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/resend-credentials`, {}, {
@@ -346,9 +348,9 @@ function resendSchoolCredentials() {
     });
 }
 
-function resetSchoolPassword() {
+async function resetSchoolPassword() {
     if (!props.school.has_login) return;
-    if (!confirm(`Reset the password for ${props.school.name}? A new temporary password will be emailed.`)) return;
+    if (!(await confirm({ message: `Reset the password for ${props.school.name}? A new temporary password will be emailed.` }))) return;
 
     credentialProcessing.value = true;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/reset-password`, {}, {
@@ -357,33 +359,35 @@ function resetSchoolPassword() {
     });
 }
 
-function approveSchool() {
-    if (!confirm(`Approve ${props.school.name}?`)) return;
+async function approveSchool() {
+    if (!(await confirm({ message: `Approve ${props.school.name}?`, destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/approve`, {}, { preserveScroll: true });
 }
 
-function rejectSchool() {
-    const reason = prompt('Rejection reason:');
+async function rejectSchool() {
+    const reason = await prompt({ message: 'Rejection reason:', inputMultiline: true });
     if (!reason?.trim()) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/reject`, { reason }, { preserveScroll: true });
 }
 
-function cancelMembership() {
-    const reason = prompt(`Reason for cancelling membership — ${props.school.name}?`);
+async function cancelMembership() {
+    const reason = await prompt({ message: `Reason for cancelling membership — ${props.school.name}?`, inputMultiline: true });
     if (!reason?.trim()) return;
-    if (!confirm(`Cancel membership for "${props.school.name}"? They will be removed from approved member schools.`)) return;
+    if (!(await confirm({ message: `Cancel membership for "${props.school.name}"? They will be removed from approved member schools.` }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/cancel-membership`, {
         reason: reason.trim(),
     }, { preserveScroll: true });
 }
 
-function cancelMembershipWithSettlement() {
-    const settlementInput = prompt(
-        `Cancel membership for "${props.school.name}"?\n\n` +
-        `This school has a verified payment. How should this be settled?\n` +
-        `Type "1" for Credit (toward next year)\n` +
-        `Type "2" for Forfeit (no credit)`
-    );
+async function cancelMembershipWithSettlement() {
+    const settlementInput = await prompt({
+        message:
+            `Cancel membership for "${props.school.name}"?\n\n` +
+            `This school has a verified payment. How should this be settled?\n` +
+            `Type "1" for Credit (toward next year)\n` +
+            `Type "2" for Forfeit (no credit)`,
+        inputPlaceholder: '1 or 2',
+    });
 
     if (!settlementInput) return;
 
@@ -397,7 +401,7 @@ function cancelMembershipWithSettlement() {
         return;
     }
 
-    const reason = prompt(`Reason for cancelling membership — ${props.school.name}?`);
+    const reason = await prompt({ message: `Reason for cancelling membership — ${props.school.name}?`, inputMultiline: true });
     if (!reason?.trim()) return;
 
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/cancel-membership`, {

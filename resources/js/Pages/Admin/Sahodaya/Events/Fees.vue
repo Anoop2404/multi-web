@@ -190,6 +190,9 @@
                                 <div v-if="row.head" class="text-[11px] font-semibold text-indigo-700 mt-0.5">
                                     Head: {{ row.head }}
                                 </div>
+                                <div v-if="row.registration_batch" class="text-[11px] font-semibold text-indigo-700 mt-0.5">
+                                    Payment level: {{ row.registration_batch }}
+                                </div>
                             </td>
                             <td class="p-3.5 text-xs">
                                 <template v-if="event.event_type === 'sports' && row.sports_participation">
@@ -550,6 +553,7 @@ import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -557,6 +561,8 @@ const props = defineProps({
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
 });
+
+const { confirm, prompt } = useConfirm();
 
 function switchSportEvent(evt) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/fees`);
@@ -688,9 +694,9 @@ const filteredRows = computed(() => {
     return rows;
 });
 
-function approve(id, schoolName = '') {
+async function approve(id, schoolName = '') {
     const targetName = schoolName || activeProofModalRow.value?.school || 'this school';
-    if (!confirm(`Are you sure you want to approve/verify the fee payment for "${targetName}"?`)) {
+    if (!(await confirm({ message: `Are you sure you want to approve/verify the fee payment for "${targetName}"?`, destructive: false }))) {
         return;
     }
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${id}/approve`, {}, {
@@ -699,9 +705,9 @@ function approve(id, schoolName = '') {
     });
 }
 
-function reject(id, schoolName = '') {
+async function reject(id, schoolName = '') {
     const targetName = schoolName || activeProofModalRow.value?.school || 'this school';
-    const reason = prompt(`Rejection / Reversal confirmation for "${targetName}".\n\nPlease enter reason for rejecting or reversing this payment (optional):`);
+    const reason = await prompt({ message: `Rejection / Reversal confirmation for "${targetName}".\n\nPlease enter reason for rejecting or reversing this payment (optional):`, inputMultiline: true, inputRequired: false });
     if (reason === null) return;
 
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${id}/reject`, {
@@ -712,8 +718,8 @@ function reject(id, schoolName = '') {
     });
 }
 
-function recalculateFee(id, schoolName = '') {
-    if (!confirm(`Recalculate event fee for "${schoolName || 'this school'}" from current registered items?`)) {
+async function recalculateFee(id, schoolName = '') {
+    if (!(await confirm({ message: `Recalculate event fee for "${schoolName || 'this school'}" from current registered items?`, destructive: false }))) {
         return;
     }
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${id}/recalculate`, {}, { preserveScroll: true });
@@ -723,12 +729,13 @@ function partialShortfall(row) {
     return fmt(Math.max(0, Number(row.total_due) - Number(row.amount_paid ?? 0)));
 }
 
-function forceApprove(row) {
-    const reason = prompt(
-        `CONFIRM FORCE APPROVAL for "${row.school}":\n\n`
+async function forceApprove(row) {
+    const reason = await prompt({
+        message: `CONFIRM FORCE APPROVAL for "${row.school}":\n\n`
         + `This waives ₹${partialShortfall(row)} (the gap between total due and amount paid) and approves the school's registrations.\n`
-        + `Only do this if the uploaded receipt genuinely covers their current items. Reason (required):`
-    );
+        + `Only do this if the uploaded receipt genuinely covers their current items. Reason (required):`,
+        inputMultiline: true,
+    });
     if (!reason) return;
 
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${row.id}/force-approve`, {

@@ -72,6 +72,8 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { useForm, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -95,8 +97,8 @@ function uploadPhotos(album, event) {
     });
 }
 
-function deleteAlbum(album) {
-    if (!confirm(`Delete album "${album.title}" and all its photos?`)) return;
+async function deleteAlbum(album) {
+    if (!(await confirm({ message: `Delete album "${album.title}" and all its photos?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/gallery/albums/${album.id}`);
 }
 

@@ -15,7 +15,6 @@ class PortalFestAppealController extends Controller
     public function storeStudent(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== Tenant::findOrFail($tenantId)->parent_id, 403);
-        abort_unless($event->appeals_open, 422, 'Appeals are not open for this event.');
 
         $student = $request->attributes->get('portalStudent');
 
@@ -27,6 +26,7 @@ class PortalFestAppealController extends Controller
         $participant = FestParticipant::findOrFail($data['participant_id']);
         abort_if($participant->student_id !== $student->id, 403);
         abort_if($participant->registration?->event_id !== $event->id, 403);
+        \App\Services\Events\EventLifecycleGate::allowAppealForParticipant($event, $participant);
 
         FestAppeal::create([
             'event_id'             => $event->id,
@@ -48,7 +48,6 @@ class PortalFestAppealController extends Controller
     public function storeTeacher(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== Tenant::findOrFail($tenantId)->parent_id, 403);
-        abort_unless($event->appeals_open, 422, 'Appeals are not open for this event.');
 
         $teacher = $request->attributes->get('portalTeacher');
 
@@ -60,6 +59,7 @@ class PortalFestAppealController extends Controller
         $participant = FestParticipant::findOrFail($data['participant_id']);
         abort_if($participant->teacher_id !== $teacher->id, 403);
         abort_if($participant->registration?->event_id !== $event->id, 403);
+        \App\Services\Events\EventLifecycleGate::allowAppealForParticipant($event, $participant);
 
         FestAppeal::create([
             'event_id'             => $event->id,

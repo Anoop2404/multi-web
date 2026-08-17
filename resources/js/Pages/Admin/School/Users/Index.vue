@@ -336,6 +336,9 @@ import { ref, watch, computed } from 'vue';
 import { Link, useForm, router, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import EventScopePicker from '@/Components/school/EventScopePicker.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -492,13 +495,13 @@ function saveEdit() {
     });
 }
 
-function resetPw(user) {
-    if (!confirm(`Reset password for ${user.name}?`)) return;
+async function resetPw(user) {
+    if (!(await confirm({ message: `Reset password for ${user.name}?`, destructive: false }))) return;
     router.post(`/school-admin/${props.school.id}/users/${user.id}/reset-password`, {}, { preserveScroll: true });
 }
 
-function remove(user) {
-    if (!confirm(`Remove ${user.name}?`)) return;
+async function remove(user) {
+    if (!(await confirm({ message: `Remove ${user.name}?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/users/${user.id}`, { preserveScroll: true });
 }
 </script>

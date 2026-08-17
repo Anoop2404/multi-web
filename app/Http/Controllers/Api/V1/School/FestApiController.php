@@ -103,7 +103,9 @@ class FestApiController extends SchoolApiController
 
         $event = FestEvent::findOrFail($data['event_id']);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
-        EventLifecycleGate::allowRegistration($event);
+        if (! $event->usesPhasedRegionalBilling()) {
+            EventLifecycleGate::allowRegistration($event);
+        }
 
         $result = $importService->importFromCsv(
             $event,

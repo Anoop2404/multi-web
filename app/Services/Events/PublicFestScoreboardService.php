@@ -59,6 +59,42 @@ class PublicFestScoreboardService
             'schedule_published' => $this->overallScheduleIsPublished($root),
         ]];
 
+        if ($root->usesPhasedRegionalBilling()) {
+            foreach ($root->phases()->with(['allowedRegions.region'])->get() as $phase) {
+                $leaves = FestEvent::where('parent_event_id', $root->id)
+                    ->where('source_phase_id', $phase->id)
+                    ->with('region:id,name,code')
+                    ->get();
+                $scopes[] = [
+                    'key' => 'phase:'.$phase->id,
+                    'label' => $phase->name.' — Combined',
+                    'role' => 'phase',
+                    'event_id' => null,
+                    'event_ids' => $leaves->where('results_published', true)->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+                    'source_phase_id' => $phase->id,
+                    'region_id' => null,
+                    'results_published' => (bool) $phase->results_published,
+                    'schedule_published' => (bool) $phase->schedule_published,
+                ];
+
+                foreach ($leaves->whereNotNull('region_id') as $leaf) {
+                    $scopes[] = [
+                        'key' => 'phase:'.$phase->id.':region:'.$leaf->region_id,
+                        'label' => $phase->name.' — '.($leaf->region?->name ?? $leaf->cluster_label),
+                        'role' => 'region',
+                        'event_id' => (int) $leaf->id,
+                        'event_ids' => [(int) $leaf->id],
+                        'source_phase_id' => $phase->id,
+                        'region_id' => (int) $leaf->region_id,
+                        'results_published' => (bool) $leaf->results_published,
+                        'schedule_published' => (bool) $leaf->schedule_published,
+                    ];
+                }
+            }
+
+            return $scopes;
+        }
+
         foreach ($this->partitions->partitions($root) as $partition) {
             $key = $this->partitions->partitionKey($partition);
             if (! $key) {
@@ -100,9 +136,11 @@ class PublicFestScoreboardService
         $scope = collect($this->scopes($root))->firstWhere('key', $requestedScope);
         abort_unless($scope, 404);
 
-        $eventIds = $scope['event_id']
+        $eventIds = isset($scope['event_ids'])
+            ? $scope['event_ids']
+            : ($scope['event_id']
             ? [(int) $scope['event_id']]
-            : $this->overallEventIds($root);
+            : $this->overallEventIds($root));
 
         return $scope + ['event_ids' => $eventIds];
     }
@@ -110,6 +148,15 @@ class PublicFestScoreboardService
     /** @return list<int> */
     private function overallEventIds(FestEvent $root): array
     {
+        if ($root->usesPhasedRegionalBilling()) {
+            $publishedPhaseIds = $root->phases()->where('results_published', true)->pluck('id');
+
+            return FestEvent::where('parent_event_id', $root->id)
+                ->whereIn('source_phase_id', $publishedPhaseIds)
+                ->where('results_published', true)
+                ->pluck('id')->map(fn ($id) => (int) $id)->all();
+        }
+
         if (! $this->partitions->isPartitionedHub($root)) {
             return [(int) $root->id];
         }
@@ -135,6 +182,10 @@ class PublicFestScoreboardService
 
     private function overallIsPublished(FestEvent $root): bool
     {
+        if ($root->usesPhasedRegionalBilling()) {
+            return $root->phases()->where('results_published', true)->exists();
+        }
+
         if (! $root->results_published) {
             return false;
         }
@@ -155,6 +206,10 @@ class PublicFestScoreboardService
 
     private function overallScheduleIsPublished(FestEvent $root): bool
     {
+        if ($root->usesPhasedRegionalBilling()) {
+            return $root->phases()->where('schedule_published', true)->exists();
+        }
+
         if (! $root->schedule_published) {
             return false;
         }
@@ -209,6 +264,17 @@ class PublicFestScoreboardService
         $root = $this->rootEvent($event);
 
         if (! $category) {
+            if ($root->usesPhasedRegionalBilling()) {
+                if (($scope['role'] ?? null) === 'phase' && ! empty($scope['source_phase_id'])) {
+                    $phase = $root->phases()->findOrFail($scope['source_phase_id']);
+
+                    return app(FestPhaseScoreboardService::class)->phaseScoreboard($phase);
+                }
+                if (($scope['role'] ?? null) === 'overall') {
+                    return app(FestPhaseScoreboardService::class)->cumulativeOverall($root);
+                }
+            }
+
             if ($scope['event_id']) {
                 $partition = FestEvent::where('tenant_id', $root->tenant_id)
                     ->findOrFail($scope['event_id']);

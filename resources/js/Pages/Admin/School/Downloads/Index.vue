@@ -82,6 +82,8 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { useForm, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     school:    Object,
@@ -113,8 +115,8 @@ function upload() {
     });
 }
 
-function remove(dl) {
-    if (!confirm(`Remove "${dl.title}"?`)) return;
+async function remove(dl) {
+    if (!(await confirm({ message: `Remove "${dl.title}"?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/downloads/${dl.id}`);
 }
 </script>

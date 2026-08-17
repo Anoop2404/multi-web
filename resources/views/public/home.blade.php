@@ -5,30 +5,15 @@
     @forelse($sections as $section)
         @php
             [$sectionType, $variant] = SectionVariantResolver::path($section->section_type, $section->variant);
-            $anchor = str_replace('_', '-', $section->section_type);
         @endphp
-        @php
-            $layout = !empty($previewMode) ? ($section->layout_json ?? []) : $section->publicLayout();
-            $isV2Section = ($experience['experience_version'] ?? 'v1') === 'v2' || !empty($layout);
-            $frameClasses = $isV2Section
-                ? collect([
-                    'site-section-frame',
-                    'site-section-width-'.($layout['width'] ?? 'standard'),
-                    'site-section-spacing-'.($layout['spacing'] ?? 'standard'),
-                    'site-section-surface-'.($layout['surface'] ?? 'canvas'),
-                    'site-section-heading-'.($layout['heading_alignment'] ?? 'left'),
-                    'site-section-media-'.($layout['media_treatment'] ?? 'natural'),
-                ])->implode(' ')
-                : 'legacy-site-section';
-        @endphp
-        <div id="{{ $anchor }}" class="{{ $frameClasses }} scroll-mt-24" data-section-type="{{ $section->section_type }}">
+        <x-site-section-frame :section="$section" :experience="$experience ?? []" :preview-mode="!empty($previewMode)" default-width="standard">
         @includeIf("sections.{$sectionType}.{$variant}", [
             'config'  => (!empty($previewMode) ? ($section->config ?? []) : $section->publicConfig()),
             'section' => $section,
             'tenant'  => $tenant,
             'logo'    => $logo ?? \App\Support\TenantBranding::logoUrl($tenant),
         ])
-        </div>
+        </x-site-section-frame>
     @empty
         <div class="min-h-screen flex items-center justify-center text-gray-400">
             <p>This site is being set up. Please check back soon.</p>

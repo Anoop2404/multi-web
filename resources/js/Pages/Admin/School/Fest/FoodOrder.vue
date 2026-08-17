@@ -110,6 +110,8 @@ import { computed, reactive } from 'vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     event: Object,
@@ -147,8 +149,8 @@ function addItem(item) {
     itemForm.quantity = requested;
     itemForm.post(`${base}/items`, { preserveScroll: true });
 }
-function removeItem(oi) {
-    if (!confirm(`Remove ${oi.item_name} (x${oi.quantity})?`)) return;
+async function removeItem(oi) {
+    if (!(await confirm({ message: `Remove ${oi.item_name} (x${oi.quantity})?`, destructive: true }))) return;
     router.delete(`${base}/items/${oi.id}`, { preserveScroll: true });
 }
 

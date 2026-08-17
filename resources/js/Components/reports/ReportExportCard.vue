@@ -118,9 +118,20 @@ const props = defineProps({
 
 const emit = defineEmits(['update:param']);
 
-const previewHref = computed(() =>
+function appendParams(href) {
+    if (!href) return href;
+    const [path, existing = ''] = href.split('?');
+    const query = new URLSearchParams(existing);
+    Object.entries(props.paramValues ?? {})
+        .filter(([, value]) => value !== '' && value != null)
+        .forEach(([key, value]) => query.set(key, value));
+    const suffix = query.toString();
+    return path + (suffix ? `?${suffix}` : '');
+}
+
+const previewHref = computed(() => appendParams(
     props.exp.previewHref ?? previewHrefForExport(props.exp.id, props.reportsBase),
-);
+));
 
 const pdfPreviewHref = computed(() => {
     if (previewHref.value) return null;
@@ -140,13 +151,7 @@ const missingParams = computed(() =>
 );
 
 const downloadHref = computed(() => {
-    const q = new URLSearchParams(
-        Object.fromEntries(
-            Object.entries(props.paramValues ?? {}).filter(([, v]) => v !== '' && v != null),
-        ),
-    );
-    const qs = q.toString();
-    return props.exp.href + (qs ? `?${qs}` : '');
+    return appendParams(props.exp.href);
 });
 
 function emitParam(key, value) {

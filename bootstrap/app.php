@@ -69,6 +69,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'teacher.portal'    => \App\Http\Middleware\EnsureTeacherPortal::class,
             'judge.portal'      => \App\Http\Middleware\EnsureJudgePortal::class,
             'exam.portal'       => \App\Http\Middleware\EnsureExamPortal::class,
+            'external.school.portal' => \App\Http\Middleware\EnsureExternalSchoolPortalAuth::class,
             'fest.mark.coordinator' => \App\Http\Middleware\EnsureFestMarkCoordinator::class,
             'password.change'       => \App\Http\Middleware\EnsurePasswordChanged::class,
             'event.coordinator'     => \App\Http\Middleware\EventCoordinatorScope::class,

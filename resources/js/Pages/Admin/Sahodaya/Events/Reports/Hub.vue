@@ -12,8 +12,33 @@
 
             <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="hub" />
 
+            <div v-if="competitionPhases.length" class="card mb-4 !py-4">
+                <div class="grid gap-3 md:grid-cols-4 items-end">
+                    <label class="text-xs font-semibold text-slate-600">Competition phase
+                        <select v-model="scopePhaseId" class="field mt-1 text-sm w-full">
+                            <option value="">All published phases</option>
+                            <option v-for="item in competitionPhases" :key="item.id" :value="item.id">{{ item.name }}</option>
+                        </select>
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600">Region
+                        <select v-model="scopeRegionId" class="field mt-1 text-sm w-full">
+                            <option value="">Combined</option>
+                            <option v-for="item in regions" :key="item.id" :value="item.id">{{ item.name }}</option>
+                        </select>
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600">Registration / payment level
+                        <select v-model="scopeBatchId" class="field mt-1 text-sm w-full">
+                            <option value="">All levels</option>
+                            <option v-for="item in registrationBatches" :key="item.id" :value="item.id">{{ item.name }}</option>
+                        </select>
+                    </label>
+                    <button type="button" class="btn-primary text-sm" @click="applyReportScope">Apply report scope</button>
+                </div>
+                <p class="mt-2 text-xs text-slate-500">Every report and export keeps this phase, region and payment-level scope.</p>
+            </div>
+
             <!-- Sport Event / Region Switcher -->
-            <div v-if="childEvents.length" class="card mb-4 !py-3">
+            <div v-if="childEvents.length && !competitionPhases.length" class="card mb-4 !py-3">
                 <div class="flex flex-wrap gap-3 items-center">
                     <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Sport Event / Region:</label>
                     <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
@@ -208,6 +233,10 @@ const props = defineProps({
     isPartitionedParent: { type: Boolean, default: false },
     regionChildren: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
+    regions: { type: Array, default: () => [] },
+    competitionPhases: { type: Array, default: () => [] },
+    registrationBatches: { type: Array, default: () => [] },
+    reportScopeSelection: { type: Object, default: () => ({}) },
 });
 
 function switchSportEvent(evt) {
@@ -217,8 +246,34 @@ function switchSportEvent(evt) {
 const categoryMeta = REPORT_CATEGORIES;
 const searchQuery = ref('');
 const activeCategory = ref(null);
+const scopePhaseId = ref(props.reportScopeSelection.competition_phase_id || '');
+const scopeRegionId = ref(props.reportScopeSelection.region_id || '');
+const scopeBatchId = ref(props.reportScopeSelection.registration_batch_id || '');
 
 const reportsBase = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports`);
+
+function scopeParams() {
+    return {
+        scope_mode: scopeRegionId.value ? 'region' : 'combined',
+        competition_phase_id: scopePhaseId.value || undefined,
+        registration_batch_id: scopeBatchId.value || undefined,
+        region_id: scopeRegionId.value || undefined,
+    };
+}
+
+function applyReportScope() {
+    router.get(reportsBase.value, scopeParams(), { preserveState: false });
+}
+
+function withReportScope(report) {
+    if (!report?.href || !props.competitionPhases.length) return report;
+    const [path, query = ''] = report.href.split('?');
+    const params = new URLSearchParams(query);
+    Object.entries(scopeParams()).forEach(([key, value]) => {
+        if (value !== undefined) params.set(key, value);
+    });
+    return { ...report, href: `${path}?${params.toString()}` };
+}
 
 const categoryOptions = computed(() =>
     REPORT_CATEGORY_ORDER
@@ -228,7 +283,7 @@ const categoryOptions = computed(() =>
 
 /** Build ordered category groups from a flat list of interactive pages. */
 function buildOrderedGroups(pages, isSports) {
-    let list = (pages ?? []).map((r) => enrichInteractiveReport(r, isSports));
+    let list = (pages ?? []).map((r) => withReportScope(enrichInteractiveReport(r, isSports)));
     if (!props.hasItemHeads) {
         list = list.filter((p) => p.id !== 'head-wise-participants' && p.id !== 'discipline-registration');
     }
@@ -240,7 +295,7 @@ function buildOrderedGroups(pages, isSports) {
 
 /** Combined (parent event) interactive groups, with search/category filter applied. */
 const orderedGroups = computed(() => {
-    let list = (props.interactive ?? []).map((r) => enrichInteractiveReport(r, props.event?.event_type === 'sports'));
+    let list = (props.interactive ?? []).map((r) => withReportScope(enrichInteractiveReport(r, props.event?.event_type === 'sports')));
     if (!props.hasItemHeads) {
         list = list.filter((p) => p.id !== 'head-wise-participants' && p.id !== 'discipline-registration');
     }

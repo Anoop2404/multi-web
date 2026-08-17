@@ -14,11 +14,21 @@ class StateAdminDashboardController extends Controller
 {
     public function index(StateDashboardService $dashboard): Response
     {
-        $programs = FestStateProgram::query()->get();
-        $remittances = StateRemittance::query()->get();
+        // State-level "current" academic year: the state-wide active AcademicYearRecord if one
+        // is set, otherwise the calendar-derived year (AcademicYear::forSahodaya(null) checks
+        // activeRecordLabel() first, same as the previous activeAcademicYear computation below).
+        // This is the same value already shown to the user as the "Academic year" badge — scope
+        // the dashboard's data to match it instead of mixing every year's programs/remittances
+        // together. There's no state-level year selector in the UI yet (see
+        // resources/js/Pages/Admin/State/Dashboard.vue), so this is the simplest correct default
+        // rather than a full year-switcher.
+        $academicYear = AcademicYear::forSahodaya(null);
+
+        $programs = FestStateProgram::query()->where('academic_year', $academicYear)->get();
+        $remittances = StateRemittance::query()->where('academic_year', $academicYear)->get();
 
         return inertia('State/Dashboard', [
-            'activeAcademicYear' => AcademicYear::activeRecordLabel() ?? AcademicYear::current(),
+            'activeAcademicYear' => $academicYear,
             'stats' => [
                 'total_programs'       => $programs->count(),
                 'draft_programs'       => $programs->where('status', 'draft')->count(),

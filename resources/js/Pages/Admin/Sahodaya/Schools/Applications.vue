@@ -100,6 +100,7 @@ import EmptyState from '@/Components/ui/EmptyState.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String,
@@ -108,6 +109,7 @@ const props = defineProps({
     schools: Object, filters: Object,
 });
 
+const { confirm, prompt } = useConfirm();
 const filterForm = reactive({ search: props.filters?.search ?? '' });
 const selectedIds = ref([]);
 const bulkForm = useForm({ school_ids: [], reason: '' });
@@ -139,20 +141,20 @@ function clearSelection() {
     selectedIds.value = [];
 }
 
-function approveOne(schoolId) {
-    if (!confirm('Approve this school application?')) return;
+async function approveOne(schoolId) {
+    if (!(await confirm({ message: 'Approve this school application?', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${schoolId}/approve`, {}, { preserveScroll: true });
 }
 
-function rejectOne(schoolId) {
-    const reason = prompt('Rejection reason:');
+async function rejectOne(schoolId) {
+    const reason = await prompt({ message: 'Rejection reason:', inputMultiline: true });
     if (!reason?.trim()) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${schoolId}/reject`, { reason }, { preserveScroll: true });
 }
 
-function bulkApprove() {
+async function bulkApprove() {
     if (!selectedIds.value.length) return;
-    if (!confirm(`Approve ${selectedIds.value.length} school application(s)?`)) return;
+    if (!(await confirm({ message: `Approve ${selectedIds.value.length} school application(s)?`, destructive: false }))) return;
     bulkForm.school_ids = [...selectedIds.value];
     bulkForm.post(`/sahodaya-admin/${props.sahodaya.id}/schools/applications/bulk-approve`, {
         preserveScroll: true,
@@ -160,9 +162,9 @@ function bulkApprove() {
     });
 }
 
-function bulkReject() {
+async function bulkReject() {
     if (!selectedIds.value.length) return;
-    const reason = prompt('Rejection reason for all selected schools:');
+    const reason = await prompt({ message: 'Rejection reason for all selected schools:', inputMultiline: true });
     if (!reason?.trim()) return;
     bulkForm.school_ids = [...selectedIds.value];
     bulkForm.reason = reason;

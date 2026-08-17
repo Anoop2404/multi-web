@@ -84,6 +84,8 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -123,8 +125,8 @@ function feature(a) {
     router.patch(`/school-admin/${props.school.id}/alumni/${a.id}/feature`, {}, { preserveScroll: true });
 }
 
-function remove(a) {
-    if (!confirm(`Remove alumni "${a.name}"?`)) return;
+async function remove(a) {
+    if (!(await confirm({ message: `Remove alumni "${a.name}"?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/alumni/${a.id}`);
 }
 </script>

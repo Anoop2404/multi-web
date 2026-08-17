@@ -183,6 +183,7 @@ import { reactive, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -202,6 +203,7 @@ const filterForm = reactive({
     school_id: props.filters.school_id || '',
 });
 const busyKey = ref('');
+const { confirm } = useConfirm();
 const base = `/sahodaya-admin/${props.sahodaya.id}/finance/payment-reconciliation`;
 
 function fmt(value) {
@@ -227,9 +229,9 @@ function clearFilters() {
     applyFilters();
 }
 
-function recordCredit(row) {
+async function recordCredit(row) {
     const message = `Record ₹${fmt(row.unreconciled)} as credit owed to ${row.school_name}? This posts an audited ledger entry and does not change the original receipt.`;
-    if (!window.confirm(message)) return;
+    if (!(await confirm({ message, destructive: false }))) return;
 
     busyKey.value = rowKey(row);
     router.post(`${base}/record-credit`, {
@@ -242,8 +244,8 @@ function recordCredit(row) {
     });
 }
 
-function refreshPaid(row) {
-    if (!window.confirm(`Recalculate the stored paid total for ${row.school_name} from approved receipts?`)) return;
+async function refreshPaid(row) {
+    if (!(await confirm({ message: `Recalculate the stored paid total for ${row.school_name} from approved receipts?`, destructive: false }))) return;
     busyKey.value = rowKey(row);
     router.post(`${base}/refresh-paid-state`, {
         carrier_type: row.carrier_type,
@@ -254,8 +256,8 @@ function refreshPaid(row) {
     });
 }
 
-function repostReceipt(issue) {
-    if (!window.confirm(`Rebuild the ledger journal for receipt ${issue.receipt_number || `#${issue.receipt_id}`}?`)) return;
+async function repostReceipt(issue) {
+    if (!(await confirm({ message: `Rebuild the ledger journal for receipt ${issue.receipt_number || `#${issue.receipt_id}`}?`, destructive: false }))) return;
     busyKey.value = `receipt-${issue.receipt_id}`;
     router.post(`${base}/receipts/${issue.receipt_id}/repost`, {}, {
         preserveScroll: true,

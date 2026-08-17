@@ -9,6 +9,7 @@ return [
         'flat_school' => 'Flat per school',
         'per_item' => 'Flat per item',
         'per_student' => 'Per participating student',
+        'student_count_slab' => 'Student count slab (stepped fee by total registered students)',
     ],
 
     'class_group_labels' => [], // deprecated — use FestClassGroupScheme::labels()

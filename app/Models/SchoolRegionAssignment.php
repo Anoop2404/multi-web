@@ -12,6 +12,11 @@ class SchoolRegionAssignment extends Model
 
     protected $fillable = [
         'tenant_id', 'region_id', 'school_id', 'academic_year', 'source', 'assigned_by_user_id',
+        // §7.3 item 1 (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): nullable
+        // group namespace (e.g. 'off_stage', 'sargadhara') a row belongs to. NULL means
+        // the legacy Sahodaya-wide row — see the column's migration docblock and
+        // FestRegionPartitionService::schoolRegion() for the full backward-compat story.
+        'partition_group',
     ];
 
     public function region(): BelongsTo
@@ -36,5 +41,17 @@ class SchoolRegionAssignment extends Model
     public function scopeForYear($query, string $academicYear)
     {
         return $query->where('academic_year', $academicYear);
+    }
+
+    /**
+     * §7.3 item 3 (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15). Scope to a
+     * specific regional phase's group namespace, or to the legacy Sahodaya-wide rows
+     * when $partitionGroup is null (Laravel's query builder turns where('partition_group',
+     * null) into a `partition_group IS NULL` clause automatically, matching exactly the
+     * rows every pre-existing caller of this model already relies on).
+     */
+    public function scopeForPartitionGroup($query, ?string $partitionGroup)
+    {
+        return $query->where('partition_group', $partitionGroup);
     }
 }

@@ -120,6 +120,7 @@
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { ref, defineComponent, h } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya:                Object,
@@ -130,6 +131,7 @@ const props = defineProps({
     bearers:                 { type: Array, default: () => [] },
 });
 
+const { confirm } = useConfirm();
 const editing        = ref(null);
 const showRolePicker = ref(false);
 
@@ -183,8 +185,8 @@ function save() {
     }
 }
 
-function remove(b) {
-    if (!confirm(`Remove "${b.name}" from office bearers?`)) return;
+async function remove(b) {
+    if (!(await confirm({ message: `Remove "${b.name}" from office bearers?` }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/office-bearers/${b.id}`);
 }
 

@@ -142,6 +142,8 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import { reactive, ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -204,8 +206,8 @@ function save() {
     }
 }
 
-function remove(item) {
-    if (!confirm(`Delete "${item.title}"?`)) return;
+async function remove(item) {
+    if (!(await confirm({ message: `Delete "${item.title}"?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/achievements/${item.id}`);
 }
 </script>

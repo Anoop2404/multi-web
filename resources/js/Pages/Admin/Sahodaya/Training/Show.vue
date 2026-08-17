@@ -480,6 +480,7 @@ import { useForm, router, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { formatDateTime } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -499,6 +500,7 @@ const props = defineProps({
 });
 
 const ec = props.program.eligibility_config ?? {};
+const { confirm } = useConfirm();
 
 const assignedIds = computed(() => new Set((props.program.resource_persons || []).map((p) => p.id)));
 const assignablePersons = computed(() =>
@@ -656,8 +658,8 @@ function saveSession() {
     );
 }
 
-function deleteSession(session) {
-    if (!window.confirm(`Delete session "${session.title}"? Related session attendance will be removed.`)) return;
+async function deleteSession(session) {
+    if (!(await confirm({ message: `Delete session "${session.title}"? Related session attendance will be removed.` }))) return;
     router.delete(
         `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/sessions/${session.id}`,
         { preserveScroll: true },
@@ -671,16 +673,16 @@ function assignPerson() {
     });
 }
 
-function unassignPerson(person) {
-    if (!window.confirm(`Remove ${person.name} from this program?`)) return;
+async function unassignPerson(person) {
+    if (!(await confirm({ message: `Remove ${person.name} from this program?` }))) return;
     router.delete(
         `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/resource-persons/${person.id}`,
         { preserveScroll: true },
     );
 }
 
-function regenerateQr() {
-    if (!window.confirm('Regenerate QR tokens? Existing printed QR codes and links will stop working.')) return;
+async function regenerateQr() {
+    if (!(await confirm({ message: 'Regenerate QR tokens? Existing printed QR codes and links will stop working.' }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/qr/regenerate`, {}, { preserveScroll: true });
 }
 </script>

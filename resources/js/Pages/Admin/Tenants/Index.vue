@@ -70,8 +70,8 @@
                         <td class="px-4 py-3 font-mono text-xs text-gray-800 select-all">
                             {{ tenant.login_username || '—' }}
                         </td>
-                        <td class="px-4 py-3 font-mono text-xs select-all">
-                            <span v-if="tenant.login_password" class="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">{{ tenant.login_password }}</span>
+                        <td class="px-4 py-3 font-mono text-xs">
+                            <span v-if="tenant.login_username" class="text-slate-400 italic">View on detail page</span>
                             <span v-else class="text-amber-600">—</span>
                         </td>
                         <td class="px-4 py-3">

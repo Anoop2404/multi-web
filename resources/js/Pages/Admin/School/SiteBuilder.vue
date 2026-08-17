@@ -410,6 +410,9 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { ref, reactive, computed, defineComponent, h } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school:                  Object,
@@ -661,7 +664,7 @@ async function saveSection(section) {
 async function switchVariant(section, newVariant) {
     if (newVariant === section.variant) return;
     const msg = `Switch from "${section.variant}" to "${newVariant}"?\n\nCurrent content will be archived and you can restore it any time.`;
-    if (!confirm(msg)) return;
+    if (!(await confirm({ message: msg, destructive: false }))) return;
     const updated = await apiPatch(`/sections/${section.id}`, { variant: newVariant });
     const idx = sections.value.findIndex(s => s.id === section.id);
     if (idx !== -1) Object.assign(sections.value[idx], updated);
@@ -676,7 +679,7 @@ function restoreArchived(section, archiveIdx) {
 }
 
 async function removeSection(section) {
-    if (!confirm(`Delete the "${sectionTypeLabel(section.section_type)} / ${section.variant}" section?\n\nThis cannot be undone.`)) return;
+    if (!(await confirm({ message: `Delete the "${sectionTypeLabel(section.section_type)} / ${section.variant}" section?\n\nThis cannot be undone.`, destructive: true }))) return;
     await apiDelete(`/sections/${section.id}`);
     sections.value = sections.value.filter(s => s.id !== section.id);
 }

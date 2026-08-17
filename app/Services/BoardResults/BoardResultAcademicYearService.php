@@ -91,8 +91,8 @@ class BoardResultAcademicYearService
             ->toArray();
 
         $filtered = array_filter($allOptions, function (array $opt) use ($populatedYears) {
-            // Keep if admin checked "Enable data entry" OR if there is data for this year
-            return $opt['board_entry_enabled'] === true || in_array($opt['label'], $populatedYears, true);
+            // Keep if data entry window is open, or admin checked "Enable data entry", OR if there is data for this year
+            return ($opt['entry_status'] ?? '') === 'open' || $opt['board_entry_enabled'] === true || in_array($opt['label'], $populatedYears, true);
         });
 
         return array_values($filtered);

@@ -27,7 +27,7 @@ class FcmPushService
         $serverKey = config('services.fcm.server_key');
 
         if (! $serverKey) {
-            Log::info('FCM push skipped (no server key)', compact('title', 'body', 'token'));
+            Log::info('FCM push skipped (no server key)', ['title' => $title, 'body' => $body, 'token' => $this->maskToken($token)]);
 
             return;
         }
@@ -60,9 +60,19 @@ class FcmPushService
         curl_close($ch);
 
         if ($error) {
-            Log::warning('FCM push failed', ['error' => $error, 'token' => $token]);
+            Log::warning('FCM push failed', ['error' => $error, 'token' => $this->maskToken($token)]);
         } else {
-            Log::debug('FCM push sent', ['response' => $response, 'token' => $token]);
+            Log::debug('FCM push sent', ['response' => $response, 'token' => $this->maskToken($token)]);
         }
+    }
+
+    /**
+     * Finding 5 fix (SECURITY_CODE_AUDIT_2026_08_11.md, 2026-08-15): FCM tokens are
+     * semi-sensitive per-device identifiers — log a truncated form instead of the full
+     * value, so log access alone can't be used to send spoofed pushes to a device.
+     */
+    private function maskToken(string $token): string
+    {
+        return substr($token, 0, 12).'…';
     }
 }

@@ -159,6 +159,7 @@ import { computed, ref, watch, watchEffect } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     event: { type: Object, required: true },
@@ -170,6 +171,8 @@ const props = defineProps({
     studentEventRegFee: { type: Number, default: 0 },
     schoolClasses: { type: Array, default: () => [] },
 });
+
+const { confirm } = useConfirm();
 
 const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'];
 const alertMessage = ref('');
@@ -447,8 +450,8 @@ function submit() {
 // counterpart to registering them above. Backend rejects this (with a flash error) while
 // the student still has an active item registration under this event; cancel those first.
 // See FestEventRegistrationService::withdrawStudent().
-function unregisterStudent(studentId) {
-    if (!confirm("Remove this student's event registration?")) return;
+async function unregisterStudent(studentId) {
+    if (!(await confirm({ message: "Remove this student's event registration?" }))) return;
     router.delete(`${props.registerUrl}/${studentId}`, {
         preserveScroll: true,
         onSuccess: () => router.reload({ only: ['events', 'studentsByEvent', 'students'] }),

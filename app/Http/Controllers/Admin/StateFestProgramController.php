@@ -63,8 +63,10 @@ class StateFestProgramController extends Controller
                 // Sahodayas have locally overridden the state-seeded event fields.
                 $customizedAt = null;
                 if ($prop?->tenant_event_id) {
-                    $customizedAt = \App\Models\FestEvent::where('id', $prop->tenant_event_id)
-                        ->value('sahodaya_customized_at');
+                    $customizedAt = \App\Support\TenancyDatabase::whenDatabaseReady($s, function () use ($prop) {
+                        return \App\Models\FestEvent::where('id', $prop->tenant_event_id)
+                            ->value('sahodaya_customized_at');
+                    });
                 }
 
                 return [

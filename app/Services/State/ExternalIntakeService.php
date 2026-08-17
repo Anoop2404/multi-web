@@ -8,6 +8,7 @@ use App\Models\FestStateProgram;
 use App\Models\State\StateQualifierEntry;
 use App\Models\State\StateQualifierIntake;
 use App\Models\User;
+use App\Services\Auth\UserCredentialService;
 use App\Services\Notifications\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,6 +23,8 @@ use Illuminate\Support\Str;
  */
 class ExternalIntakeService
 {
+    public function __construct(private UserCredentialService $credentials) {}
+
     public function createSahodaya(FestStateProgram $program, array $data): ExternalSahodaya
     {
         return ExternalSahodaya::create([
@@ -37,13 +40,33 @@ class ExternalIntakeService
 
     public function addSchool(ExternalSahodaya $sahodaya, array $data): ExternalSchool
     {
+        $plainPassword = $this->credentials->generateTemporaryPassword();
+
         return $sahodaya->schools()->create([
-            'name'          => $data['name'],
-            'contact_name'  => $data['contact_name'] ?? null,
-            'contact_phone' => $data['contact_phone'] ?? null,
-            'access_code'   => ExternalSchool::generateAccessCode(),
-            'status'        => 'active',
+            'name'           => $data['name'],
+            'username'       => $this->generateSchoolUsername($data['name']),
+            'contact_name'   => $data['contact_name'] ?? null,
+            'contact_phone'  => $data['contact_phone'] ?? null,
+            'access_code'    => ExternalSchool::generateAccessCode(),
+            'password'       => $plainPassword,
+            'plain_password' => $plainPassword,
+            'status'         => 'active',
         ]);
+    }
+
+    /** Slugified from the school name, with a numeric suffix on collision. */
+    private function generateSchoolUsername(string $name): string
+    {
+        $base = Str::slug($name, '.') ?: 'school';
+        $username = $base;
+        $suffix = 1;
+
+        while (ExternalSchool::where('username', $username)->exists()) {
+            $suffix++;
+            $username = "{$base}{$suffix}";
+        }
+
+        return $username;
     }
 
     /**

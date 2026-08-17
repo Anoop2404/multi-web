@@ -1,7 +1,7 @@
 <nav class="bg-white shadow-sm sticky top-0 z-50" x-data="{ open: false }">
     <div class="max-w-7xl mx-auto px-4">
         <div class="flex items-center justify-center py-4">
-            <a href="/" class="flex items-center gap-3">
+            <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3">
                 @if(!empty($logo))
                 <img loading="lazy" src="{{ $logo }}" class="h-12" alt="{{ $tenant->name }}">
                 @else

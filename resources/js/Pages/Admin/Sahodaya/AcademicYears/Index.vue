@@ -201,6 +201,7 @@
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { router } from '@inertiajs/vue3';
 import { ref, reactive } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya:           Object,
@@ -214,6 +215,8 @@ const props = defineProps({
     currentFy:          Object,
     suggestedYears:     Array,
 });
+
+const { confirm } = useConfirm();
 
 const activeTab = ref('academic');
 const tabs = [
@@ -240,13 +243,13 @@ function createAcademicYear() {
     });
 }
 
-function activateYear(ay) {
-    if (!confirm(`Activate academic year ${ay.label}? The currently active year will be closed.`)) return;
+async function activateYear(ay) {
+    if (!(await confirm({ message: `Activate academic year ${ay.label}? The currently active year will be closed.`, destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/academic-years/${ay.id}/activate`);
 }
 
-function closeYear(ay) {
-    if (!confirm(`Close academic year ${ay.label}? This cannot be undone.`)) return;
+async function closeYear(ay) {
+    if (!(await confirm({ message: `Close academic year ${ay.label}? This cannot be undone.` }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/academic-years/${ay.id}/close`);
 }
 

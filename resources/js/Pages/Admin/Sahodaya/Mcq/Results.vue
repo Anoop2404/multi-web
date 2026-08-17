@@ -156,8 +156,11 @@ import { computed, reactive, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, gradeBands: { type: Array, default: () => [] } });
+
+const { confirm, prompt } = useConfirm();
 
 const regSearch = ref('');
 const resultsPage = ref(1);
@@ -231,8 +234,8 @@ function unpublishResults() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/unpublish-results`, {}, { preserveScroll: true });
 }
 
-function generateCertificates() {
-    if (!confirm('Generate certificates for all eligible students with published results?')) return;
+async function generateCertificates() {
+    if (!(await confirm({ message: 'Generate certificates for all eligible students with published results?', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/certificates/generate`, {}, { preserveScroll: true });
 }
 
@@ -240,8 +243,8 @@ function approveFee(registrationId) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registrationId}/fee/approve`, {}, { preserveScroll: true });
 }
 
-function rejectFee(registrationId) {
-    const reason = prompt('Rejection reason (optional):');
+async function rejectFee(registrationId) {
+    const reason = await prompt({ message: 'Rejection reason (optional):', inputMultiline: true, inputRequired: false });
     if (reason === null) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registrationId}/fee/reject`, { rejection_reason: reason }, { preserveScroll: true });
 }
@@ -250,8 +253,8 @@ function canCancelRegistration(r) {
     return !['started', 'submitted', 'cancelled'].includes(r.status);
 }
 
-function cancelRegistration(registrationId) {
-    const reason = prompt('Reason for cancelling this registration (required):');
+async function cancelRegistration(registrationId) {
+    const reason = await prompt({ message: 'Reason for cancelling this registration (required):', inputMultiline: true });
     if (!reason) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registrationId}/cancel`, { reason }, { preserveScroll: true });
 }

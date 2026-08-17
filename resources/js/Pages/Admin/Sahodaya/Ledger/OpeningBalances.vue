@@ -95,6 +95,7 @@
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -107,6 +108,8 @@ const props = defineProps({
 });
 
 const financialYearId = ref(String(props.filterFinancialYearId ?? props.academicYears[0]?.id ?? ''));
+
+const { confirm } = useConfirm();
 
 const form = useForm({
     financial_year_id: props.filterFinancialYearId,
@@ -130,8 +133,8 @@ function saveOpening() {
     });
 }
 
-function remove(id) {
-    if (!confirm('Remove this opening balance and its ledger entries?')) return;
+async function remove(id) {
+    if (!(await confirm({ message: 'Remove this opening balance and its ledger entries?', destructive: true }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/ledger/opening-balances/${id}`, { preserveScroll: true });
 }
 

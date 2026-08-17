@@ -122,6 +122,7 @@
 import { Link, router } from '@inertiajs/vue3';
 import { reactive, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -135,6 +136,7 @@ const props = defineProps({
 const linkSchoolId = reactive({});
 const linkingId = ref(null);
 const rejectingId = ref(null);
+const { prompt } = useConfirm();
 
 function linkSchool(row) {
     const schoolId = linkSchoolId[row.id];
@@ -150,8 +152,8 @@ function linkSchool(row) {
     );
 }
 
-function rejectSchool(row) {
-    const reason = window.prompt(`Reject pending school "${row.school_name}"? Optional reason:`) ?? undefined;
+async function rejectSchool(row) {
+    const reason = await prompt({ message: `Reject pending school "${row.school_name}"? Optional reason:`, inputRequired: false }) ?? undefined;
     if (reason === undefined) return;
     rejectingId.value = row.id;
     router.post(

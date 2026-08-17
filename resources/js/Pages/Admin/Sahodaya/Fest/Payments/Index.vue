@@ -47,6 +47,7 @@
                                 <a v-if="fee.event_fees_url" :href="fee.event_fees_url" class="link-brand font-medium">{{ fee.event_title }}</a>
                                 <span v-else class="font-medium">{{ fee.event_title }}</span>
                                 <p v-if="fee.level_round" class="text-[10px] text-slate-500 capitalize">{{ fee.level_round }}</p>
+                                <p v-if="fee.billing_level" class="text-[10px] font-semibold text-indigo-700">{{ fee.billing_level }}</p>
                             </td>
                             <td class="text-xs">{{ fee.program_label }}</td>
                             <td>{{ (fee.school_name || '').toUpperCase() }}</td>
@@ -75,6 +76,7 @@
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { formatDateTime } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -86,6 +88,8 @@ const props = defineProps({
     programFilter: { type: String, default: null },
     programOptions: { type: Array, default: () => [] },
 });
+
+const { confirm, prompt } = useConfirm();
 
 const statusTabs = [
     { key: 'pending', label: 'Pending' },
@@ -104,13 +108,13 @@ function paymentsHref(overrides = {}) {
     return `/sahodaya-admin/${props.sahodaya.id}/fest/payments?${params.toString()}`;
 }
 
-function approve(schoolEventFeeId) {
-    if (!confirm('Approve this school event fee and post it to the event income account?')) return;
+async function approve(schoolEventFeeId) {
+    if (!(await confirm({ message: 'Approve this school event fee and post it to the event income account?', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/fest/payments/${schoolEventFeeId}/approve`, {}, { preserveScroll: true });
 }
 
-function reject(schoolEventFeeId) {
-    const reason = prompt('Rejection reason (optional):');
+async function reject(schoolEventFeeId) {
+    const reason = await prompt({ message: 'Rejection reason (optional):', inputMultiline: true, inputRequired: false });
     if (reason === null) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/fest/payments/${schoolEventFeeId}/reject`, {
         rejection_reason: reason || null,

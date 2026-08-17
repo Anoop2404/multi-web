@@ -22,7 +22,7 @@ return [
             'buttons' => 'solid', 'images' => 'documentary', 'motion' => 'restrained',
             'navigation' => 'directory', 'footer' => 'directory',
         ],
-        'widgets' => ['ticker' => false, 'admission_banner' => false, 'social_strip' => false],
+        'widgets' => ['news_ticker' => false, 'admission_banner' => false, 'social_strip' => false],
         'sections' => [
             ['section_type' => 'hero', 'variant' => 'gradient-split', 'config' => ['eyebrow' => 'CBSE school network', 'heading' => '{{name}}', 'subheading' => 'Find schools, programmes and shared opportunities across {{region}}.', 'primary_label' => 'Find a member school', 'primary_url' => '#member-schools', 'secondary_label' => 'Membership services', 'secondary_url' => '/school-register'], 'layout' => ['width' => 'wide', 'spacing' => 'spacious', 'surface' => 'primary', 'heading_alignment' => 'left']],
             ['section_type' => 'statistics', 'variant' => 'counter-strip', 'config' => ['heading' => 'Our network at a glance'], 'layout' => ['width' => 'wide', 'spacing' => 'compact', 'surface' => 'canvas', 'heading_alignment' => 'center']],
@@ -30,6 +30,7 @@ return [
             ['section_type' => 'about_sahodaya', 'variant' => 'with-stats', 'config' => ['eyebrow' => 'About the network', 'heading' => 'Stronger schools through collaboration'], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'canvas', 'heading_alignment' => 'left']],
             ['section_type' => 'events_programs', 'variant' => 'upcoming-cards', 'config' => ['eyebrow' => 'What is next', 'heading' => 'Upcoming programmes'], 'layout' => ['width' => 'wide', 'spacing' => 'standard', 'surface' => 'canvas', 'heading_alignment' => 'left']],
             ['section_type' => 'office_bearers', 'variant' => 'modern-grid', 'config' => ['heading' => 'Network leadership'], 'layout' => ['width' => 'wide', 'spacing' => 'standard', 'surface' => 'muted', 'heading_alignment' => 'center']],
+            ['section_type' => 'gallery', 'variant' => 'grid', 'config' => ['heading' => 'Sahodaya Event Gallery'], 'layout' => ['width' => 'wide', 'spacing' => 'spacious', 'surface' => 'dark', 'heading_alignment' => 'left']],
             ['section_type' => 'news_circulars', 'variant' => 'modern-feed', 'config' => ['heading' => 'Latest updates'], 'layout' => ['width' => 'standard', 'spacing' => 'standard', 'surface' => 'canvas', 'heading_alignment' => 'left']],
             $commonContact,
         ],
@@ -49,7 +50,7 @@ return [
             'buttons' => 'solid', 'images' => 'vibrant', 'motion' => 'expressive',
             'navigation' => 'event', 'footer' => 'event',
         ],
-        'widgets' => ['ticker' => true, 'admission_banner' => false, 'social_strip' => true],
+        'widgets' => ['news_ticker' => true, 'admission_banner' => false, 'social_strip' => true],
         'sections' => [
             ['section_type' => 'hero', 'variant' => 'event-promo', 'config' => ['eyebrow' => 'Season hub', 'heading' => '{{name}} Events', 'subheading' => 'Registrations, schedules and results—kept in one live view.', 'primary_label' => 'View active programme', 'primary_url' => '#action-hub'], 'layout' => ['width' => 'full', 'spacing' => 'compact', 'surface' => 'dark', 'heading_alignment' => 'left']],
             ['section_type' => 'sahodaya_action_hub', 'variant' => 'seasonal', 'config' => ['heading' => 'What do you need today?', 'subheading' => 'Quick access changes with the current event stage.'], 'layout' => ['width' => 'wide', 'spacing' => 'compact', 'surface' => 'canvas', 'heading_alignment' => 'left']],
@@ -76,7 +77,7 @@ return [
             'buttons' => 'understated', 'images' => 'documentary', 'motion' => 'restrained',
             'navigation' => 'editorial', 'footer' => 'editorial',
         ],
-        'widgets' => ['ticker' => false, 'admission_banner' => false, 'social_strip' => false],
+        'widgets' => ['news_ticker' => false, 'admission_banner' => false, 'social_strip' => false],
         'sections' => [
             ['section_type' => 'hero', 'variant' => 'with-quicklinks', 'config' => ['eyebrow' => 'Academic network', 'heading' => 'Resources for better teaching and leadership', 'subheading' => '{{name}} brings circulars, training and academic dates together.', 'primary_label' => 'Search resources', 'primary_url' => '#resource-centre'], 'layout' => ['width' => 'wide', 'spacing' => 'spacious', 'surface' => 'canvas', 'heading_alignment' => 'left']],
             ['section_type' => 'resource_centre', 'variant' => 'search-grid', 'config' => ['heading' => 'Resource centre', 'subheading' => 'Search circulars and downloads by keyword, year or category.'], 'layout' => ['width' => 'wide', 'spacing' => 'standard', 'surface' => 'muted', 'heading_alignment' => 'left']],
@@ -103,7 +104,7 @@ return [
             'buttons' => 'bordered', 'images' => 'formal', 'motion' => 'restrained',
             'navigation' => 'institutional', 'footer' => 'institutional',
         ],
-        'widgets' => ['ticker' => false, 'admission_banner' => false, 'social_strip' => false],
+        'widgets' => ['news_ticker' => false, 'admission_banner' => false, 'social_strip' => false],
         'sections' => [
             ['section_type' => 'hero', 'variant' => 'full-bleed', 'config' => ['eyebrow' => 'Confederation', 'heading' => '{{name}}', 'subheading' => 'Shared leadership for CBSE schools across {{region}}.', 'primary_label' => 'Explore our governance', 'primary_url' => '#governance'], 'layout' => ['width' => 'full', 'spacing' => 'spacious', 'surface' => 'dark', 'heading_alignment' => 'left']],
             ['section_type' => 'about_sahodaya', 'variant' => 'with-timeline', 'config' => ['heading' => 'Our mandate and journey'], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'canvas', 'heading_alignment' => 'left']],

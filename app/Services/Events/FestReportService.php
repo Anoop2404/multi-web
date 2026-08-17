@@ -23,12 +23,46 @@ use App\Support\TenantBranding;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Services\Events\Reports\FestReportScope;
 
 class FestReportService
 {
     private bool $preview = false;
 
-    public function __construct(public FestEvent $event) {}
+    public function __construct(public FestEvent $event, private ?FestReportScope $scope = null) {}
+
+    /** @return list<int> */
+    private function eventIds(): array
+    {
+        return $this->scope?->eventIds ?? $this->event->reportableEventIds();
+    }
+
+    /** @return list<int> */
+    private function itemIdsFor(?int $requestedItemId = null): array
+    {
+        $ids = $requestedItemId
+            ? $this->event->reportableItemIds([$requestedItemId])
+            : ($this->scope?->itemIds ?? FestEventItem::whereIn('event_id', $this->eventIds())->pluck('id')->map(fn ($id) => (int) $id)->all());
+
+        if ($this->scope) {
+            $ids = array_values(array_intersect($ids, $this->scope->itemIds));
+        }
+
+        return $ids;
+    }
+
+    private function scopedSchoolId(?string $requestedSchoolId): ?string
+    {
+        if (! $this->scope?->isActorRestricted) {
+            return $requestedSchoolId;
+        }
+
+        if ($requestedSchoolId !== null && ! in_array($requestedSchoolId, $this->scope->schoolIds, true)) {
+            abort(403, 'School is outside your report scope.');
+        }
+
+        return $requestedSchoolId;
+    }
 
     /**
      * Sahodaya branding (org name + logo data URI) for PDF report headers.
@@ -47,14 +81,16 @@ class FestReportService
 
     public function schools(): Collection
     {
-        $ids = FestRegistration::whereIn('event_id', $this->event->reportableEventIds())->pluck('school_id')->unique();
+        $ids = FestRegistration::whereIn('event_id', $this->eventIds())
+            ->when($this->scope?->isActorRestricted, fn ($query) => $query->whereIn('school_id', $this->scope->schoolIds))
+            ->pluck('school_id')->unique();
 
         return Tenant::whereIn('id', $ids)->orderBy('name')->get(['id', 'name']);
     }
 
     public function items(): Collection
     {
-        return $this->event->items()->with('head:id,name')->orderBy('display_order')->get();
+        return FestEventItem::whereIn('id', $this->itemIdsFor())->with('head:id,name')->orderBy('display_order')->get();
     }
 
     /** @return array<string, string> */
@@ -65,7 +101,10 @@ class FestReportService
 
     public function approvedRegistrations(?string $classGroup = null, ?string $schoolId = null)
     {
-        return FestRegistration::whereIn('event_id', $this->event->reportableEventIds())
+        $schoolId = $this->scopedSchoolId($schoolId);
+
+        return FestRegistration::whereIn('event_id', $this->eventIds())
+            ->when($this->scope?->isActorRestricted, fn ($q) => $q->whereIn('school_id', $this->scope->schoolIds))
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->when($classGroup, fn ($q) => $q->whereHas('item', fn ($i) => $i->where('class_group', $classGroup)))
@@ -76,7 +115,10 @@ class FestReportService
 
     public function activeRegistrations(?string $classGroup = null, ?string $schoolId = null)
     {
-        return FestRegistration::whereIn('event_id', $this->event->reportableEventIds())
+        $schoolId = $this->scopedSchoolId($schoolId);
+
+        return FestRegistration::whereIn('event_id', $this->eventIds())
+            ->when($this->scope?->isActorRestricted, fn ($q) => $q->whereIn('school_id', $this->scope->schoolIds))
             ->active()
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->when($classGroup, fn ($q) => $q->whereHas('item', fn ($i) => $i->where('class_group', $classGroup)))
@@ -93,14 +135,17 @@ class FestReportService
         ?int $teacherId = null,
         bool $approvedOnly = false,
     ) {
+        $schoolId = $this->scopedSchoolId($schoolId);
+
         return FestParticipant::query()
             ->when($studentId, fn ($q) => $q->where('student_id', $studentId))
             ->when($teacherId, fn ($q) => $q->where('teacher_id', $teacherId))
             ->whereHas('registration', function ($q) use ($itemId, $classGroup, $schoolId, $approvedOnly) {
-                $q->whereIn('event_id', $this->event->reportableEventIds())
+                $q->whereIn('event_id', $this->eventIds())
+                    ->when($this->scope?->isActorRestricted, fn ($q2) => $q2->whereIn('school_id', $this->scope->schoolIds))
                     ->when($approvedOnly, fn ($q2) => $q2->where('status', 'approved'), fn ($q2) => $q2->active())
                     ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId))
-                    ->when($itemId, fn ($q2) => $q2->whereIn('item_id', $this->event->reportableItemIds([$itemId])))
+                    ->when($itemId, fn ($q2) => $q2->whereIn('item_id', $this->itemIdsFor($itemId)))
                     ->when($classGroup, fn ($q2) => $q2->whereHas('item', fn ($i) => $i->where('class_group', $classGroup)));
             })
             ->with(['group', 'registration.event', 'registration.item.head', 'registration.school', 'student.schoolClass.classCategory', 'teacher'])
@@ -110,8 +155,14 @@ class FestReportService
 
     public function marks(?string $schoolId = null, ?int $itemId = null, ?string $classGroup = null)
     {
-        return FestMark::whereIn('event_id', $this->event->reportableEventIds())
-            ->when($itemId, fn ($q) => $q->whereIn('item_id', $this->event->reportableItemIds([$itemId])))
+        $schoolId = $this->scopedSchoolId($schoolId);
+
+        return FestMark::whereIn('event_id', $this->eventIds())
+            ->when($this->scope?->isActorRestricted, fn ($q) => $q->whereHas(
+                'participant.registration',
+                fn ($registration) => $registration->whereIn('school_id', $this->scope->schoolIds)
+            ))
+            ->when($itemId, fn ($q) => $q->whereIn('item_id', $this->itemIdsFor($itemId)))
             ->when($classGroup, fn ($q) => $q->whereHas('item', fn ($i) => $i->where('class_group', $classGroup)))
             ->when($schoolId, fn ($q) => $q->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId)))
             ->with(['participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'item'])
@@ -135,12 +186,13 @@ class FestReportService
      */
     public function markEntryStatusRows(?string $schoolId = null): array
     {
+        $schoolId = $this->scopedSchoolId($schoolId);
         $items = $this->items();
         if ($items->isEmpty()) {
             return [];
         }
 
-        $eventIds = $this->event->reportableEventIds();
+        $eventIds = $this->eventIds();
 
         // Every item across the reportable event family (partition children/season-hub
         // children included), fetched once so each row's expanded id group can be
@@ -178,6 +230,7 @@ class FestReportService
             ->whereIn('fest_registrations.event_id', $eventIds)
             ->whereIn('fest_registrations.item_id', $allGroupItemIds)
             ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
+            ->when($this->scope?->isActorRestricted, fn ($q) => $q->whereIn('fest_registrations.school_id', $this->scope->schoolIds))
             ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
             ->selectRaw('fest_participants.id as participant_id, fest_registrations.item_id as item_id')
             ->get()
@@ -284,7 +337,7 @@ class FestReportService
 
     public function scheduleStages(): Collection
     {
-        return \App\Models\FestStage::whereIn('event_id', $this->event->reportableEventIds())
+        return \App\Models\FestStage::whereIn('event_id', $this->eventIds())
             ->with('venue:id,name')
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -296,7 +349,7 @@ class FestReportService
         $ctx = EventContext::for($this->event);
         $board = collect($ctx->scoreboardBySchool());
 
-        $marks = FestMark::whereIn('event_id', $this->event->reportableEventIds())
+        $marks = FestMark::whereIn('event_id', $this->eventIds())
             ->whereNotNull('position')
             ->with('participant.registration')
             ->get();
@@ -325,16 +378,18 @@ class FestReportService
         EventLifecycleGate::allowReportExport($this->event, $type, $audience);
         EventLifecycleGate::allowResultReport($this->event, $type);
 
+        $analytics = fn () => new FestEventReportAnalyticsService($this->event, $this->scope);
+
         return match ($type) {
-            'registrations' => $this->registrationsXls(),
+            'registrations' => $this->registrationsXls($request->input('school_id')),
             'category-wise-students' => $this->categoryWiseStudentsXls($request),
             'item-participants' => $this->itemParticipantsXls($request),
             'student-wise-report' => $this->studentWiseReportXls($request),
             'student-wise-pdf' => $this->studentWisePdf($request),
-            'results' => $this->resultsXls(),
-            'fees' => app(FestExportService::class)->fees($this->event),
-            'fee-breakdown' => app(FestExportService::class)->feeBreakdown($this->event),
-            'student-event-registrations' => app(FestExportService::class)->studentEventRegistrations($this->event),
+            'results' => $this->resultsXls($request->input('school_id')),
+            'fees' => app(FestExportService::class)->fees($this->event, $request->input('school_id'), $this->scope),
+            'fee-breakdown' => app(FestExportService::class)->feeBreakdown($this->event, $request->input('school_id'), $this->scope),
+            'student-event-registrations' => app(FestExportService::class)->studentEventRegistrations($this->event, $request->input('school_id'), $this->scope),
             'registration-list' => $this->registrationListPdf($request),
             'school-wise' => $this->schoolWisePdf($request),
             'overall-ranking' => $this->overallRankingPdf(),
@@ -361,32 +416,32 @@ class FestReportService
             'admit-cards' => $this->admitCardsPdf($request),
             'sahodaya-ranking' => $this->sahodayaRankingPdf(),
             'student-participation' => $this->studentParticipationXls($request),
-            'discipline-registration' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportDisciplineRegistration(),
-            'age-group-matrix' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportAgeGroupMatrix($request->input('school_id')),
-            'fee-pending-schools' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportFeePendingSchools(),
-            'head-wise-participants' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportHeadWiseParticipants(
+            'discipline-registration' => $analytics()->exportDisciplineRegistration(),
+            'age-group-matrix' => $analytics()->exportAgeGroupMatrix($request->input('school_id')),
+            'fee-pending-schools' => $analytics()->exportFeePendingSchools(),
+            'head-wise-participants' => $analytics()->exportHeadWiseParticipants(
                 $request->integer('head_id') ?: null,
                 $request->input('school_id'),
             ),
-            'area-wise-participants' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportAreaWiseParticipants(
+            'area-wise-participants' => $analytics()->exportAreaWiseParticipants(
                 $request->input('area_id') !== null && $request->input('area_id') !== ''
                     ? ($request->input('area_id') === 'other' ? 0 : $request->integer('area_id'))
                     : null,
                 $request->input('school_id'),
             ),
-            'team-squad-sheets' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->teamSquadPdf($request->input('school_id')),
-            'medal-tally' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->medalTallyPdf(),
-            'assignment-completeness' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportAssignmentCompleteness($request->input('school_id')),
-            'numbering-register' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportNumberingRegister($request->input('school_id')),
-            'pending-approvals' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportPendingApprovals($request->input('school_id')),
-            'volunteer-roster' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportVolunteerRoster(),
-            'catering-by-school' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportCateringBySchool($request->input('school_id')),
-            'id-cards-by-head' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->idCardsByHeadPdf(
+            'team-squad-sheets' => $analytics()->teamSquadPdf($request->input('school_id')),
+            'medal-tally' => $analytics()->medalTallyPdf(),
+            'assignment-completeness' => $analytics()->exportAssignmentCompleteness($request->input('school_id')),
+            'numbering-register' => $analytics()->exportNumberingRegister($request->input('school_id')),
+            'pending-approvals' => $analytics()->exportPendingApprovals($request->input('school_id')),
+            'volunteer-roster' => $analytics()->exportVolunteerRoster(),
+            'catering-by-school' => $analytics()->exportCateringBySchool($request->input('school_id')),
+            'id-cards-by-head' => $analytics()->idCardsByHeadPdf(
                 $request->integer('head_id') ?: null,
                 $request->input('school_id'),
                 $request->input('template'),
             ),
-            'audit-log-extract' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportAuditLogExtract(),
+            'audit-log-extract' => $analytics()->exportAuditLogExtract(),
             'item-schedule' => $this->itemScheduleCsv($request),
             'item-schedule-pdf' => $this->itemSchedulePdf($request),
             default => abort(404, 'Unknown export type'),
@@ -447,14 +502,14 @@ class FestReportService
         })->all();
     }
 
-    private function registrationsXls(): StreamedResponse
+    private function registrationsXls(?string $schoolId = null): StreamedResponse
     {
-        return app(FestExportService::class)->registrations($this->event);
+        return app(FestExportService::class)->registrations($this->event, $schoolId);
     }
 
-    private function resultsXls(): StreamedResponse
+    private function resultsXls(?string $schoolId = null): StreamedResponse
     {
-        return app(FestExportService::class)->results($this->event);
+        return app(FestExportService::class)->results($this->event, $schoolId);
     }
 
     private function categoryWiseStudentsXls(Request $request): StreamedResponse
@@ -660,8 +715,8 @@ class FestReportService
         $itemId = $request->integer('item_id') ?: $this->items()->first()?->id;
         $topN = min(50, max(1, $request->integer('top_n') ?: 10));
 
-        $marks = FestMark::whereIn('event_id', $this->event->reportableEventIds())
-            ->when($itemId, fn ($q) => $q->whereIn('item_id', $this->event->reportableItemIds([$itemId])))
+        $marks = FestMark::whereIn('event_id', $this->eventIds())
+            ->when($itemId, fn ($q) => $q->whereIn('item_id', $this->itemIdsFor($itemId)))
             ->with(['participant.student', 'participant.registration.school', 'item'])
             ->orderBy('position')
             ->orderByDesc('score')
@@ -689,7 +744,7 @@ class FestReportService
         $date = $request->input('date', today()->toDateString());
         $audience = $this->reportAudience($request);
 
-        $schedules = FestSchedule::whereIn('event_id', $this->event->reportableEventIds())
+        $schedules = FestSchedule::whereIn('event_id', $this->eventIds())
             ->whereDate('scheduled_at', $date)
             ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event'])
             ->orderBy('scheduled_at')
@@ -994,8 +1049,8 @@ class FestReportService
             'max_marks' => is_array($c) ? ($c['max'] ?? 10) : 10,
         ]);
 
-        $schedule = FestSchedule::whereIn('event_id', $this->event->reportableEventIds())
-            ->whereIn('item_id', $this->event->reportableItemIds([$itemId]))
+        $schedule = FestSchedule::whereIn('event_id', $this->eventIds())
+            ->whereIn('item_id', $this->itemIdsFor($itemId))
             ->orderBy('scheduled_at')
             ->first();
 
@@ -1037,8 +1092,8 @@ class FestReportService
         abort_unless($itemId, 422, 'Select an item.');
 
         $item = FestEventItem::findOrFail($itemId);
-        $schedules = FestSchedule::whereIn('event_id', $this->event->reportableEventIds())
-            ->whereIn('item_id', $this->event->reportableItemIds([$itemId]))
+        $schedules = FestSchedule::whereIn('event_id', $this->eventIds())
+            ->whereIn('item_id', $this->itemIdsFor($itemId))
             ->with(['participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event'])
             ->orderBy('sort_order')
             ->orderBy('scheduled_at')
@@ -1073,9 +1128,9 @@ class FestReportService
         $itemId = $request->integer('item_id') ?: null;
 
         $query = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->whereIn('event_id', $this->event->reportableEventIds())
+            ->whereIn('event_id', $this->eventIds())
             ->whereNotIn('status', ['rejected', 'withdrawn'])
-            ->when($itemId, fn ($q2) => $q2->whereIn('item_id', $this->event->reportableItemIds([$itemId]))))
+            ->when($itemId, fn ($q2) => $q2->whereIn('item_id', $this->itemIdsFor($itemId))))
             ->with(['registration.item', 'registration.school', 'student', 'teacher'])
             ->orderBy('chest_no');
 
@@ -1182,7 +1237,7 @@ class FestReportService
 
     private function promotionsCsv(): StreamedResponse
     {
-        $quals = FestQualification::whereIn('event_id', $this->event->reportableEventIds())
+        $quals = FestQualification::whereIn('event_id', $this->eventIds())
             ->with(['participant.student', 'participant.registration.school', 'participant.registration.item', 'nextLevelEvent'])
             ->get();
 
@@ -1204,7 +1259,7 @@ class FestReportService
 
     private function promotionsPdf(): \Symfony\Component\HttpFoundation\Response
     {
-        $quals = FestQualification::whereIn('event_id', $this->event->reportableEventIds())
+        $quals = FestQualification::whereIn('event_id', $this->eventIds())
             ->with(['participant.student', 'participant.registration.school', 'participant.registration.item', 'nextLevelEvent'])
             ->get();
 
@@ -1223,14 +1278,14 @@ class FestReportService
         foreach ($schoolIds as $schoolId) {
             $name = Tenant::where('id', $schoolId)->value('name');
             $partIds = FestParticipant::whereHas('registration', fn ($q) => $q
-                ->whereIn('event_id', $this->event->reportableEventIds())
+                ->whereIn('event_id', $this->eventIds())
                 ->where('school_id', $schoolId))->pluck('id');
 
             $certs = Certificate::where('entity_type', FestParticipant::class)
                 ->whereIn('entity_id', $partIds)
                 ->count();
 
-            $marks = FestMark::whereIn('event_id', $this->event->reportableEventIds())
+            $marks = FestMark::whereIn('event_id', $this->eventIds())
                 ->whereHas('participant.registration', fn ($q) => $q->where('school_id', $schoolId))
                 ->get();
 

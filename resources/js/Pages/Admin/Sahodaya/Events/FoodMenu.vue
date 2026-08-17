@@ -160,6 +160,7 @@ import { Link, useForm, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -171,6 +172,7 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+const { confirm } = useConfirm();
 
 function syncToRegions() {
     router.post(`${base}/food-menu/sync-to-regions`, {}, { preserveScroll: true });
@@ -238,8 +240,8 @@ function saveEdit(item) {
         sort_order: editForm.sort_order || 0,
     }, { preserveScroll: true, onSuccess: () => { editingId.value = null; } });
 }
-function removeItem(item) {
-    if (!confirm(`Remove '${item.name}'? Schools who already ordered it keep their order history.`)) return;
+async function removeItem(item) {
+    if (!(await confirm({ message: `Remove '${item.name}'? Schools who already ordered it keep their order history.` }))) return;
     router.delete(`${base}/food-menu/${item.id}`, { preserveScroll: true });
 }
 

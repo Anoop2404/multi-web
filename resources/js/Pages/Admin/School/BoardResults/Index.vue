@@ -508,6 +508,8 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const alertMessage = ref('');
 
@@ -903,8 +905,8 @@ function saveSubjectTopper() {
     }
 }
 
-function removeSubjectTopper(row) {
-    if (!confirm(`Remove subject topper "${row.name}" for ${row.subject}?`)) return;
+async function removeSubjectTopper(row) {
+    if (!(await confirm({ message: `Remove subject topper "${row.name}" for ${row.subject}?`, destructive: true }))) return;
 
     const existing = (props.activeResult.toppers ?? []).find(
         (t) => t.name.toLowerCase() === row.name.toLowerCase()

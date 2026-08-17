@@ -133,7 +133,8 @@ class BoardResultController extends SchoolAdminController
             ? $results->first(fn (BoardResult $r) => $r->academic_year === $academicYear)
             : null;
 
-        return $this->inertia('School/BoardResults/Index', array_merge([
+        return $this->inertia('School/BoardResults/Workspace', array_merge([
+            'activeTab' => 'overview',
             'results' => $results,
             'academicYearOptions' => $academicYearOptions,
             'statuses' => [
@@ -418,18 +419,41 @@ class BoardResultController extends SchoolAdminController
 
     /**
      * Find the existing topper (from a collection) that a form row matches, using
-     * admission_no → roll_no → name as priority order. Returns null when no match.
+     * topper_id → roll_no → name as priority order. Returns null when no match.
      *
      * @param  \Illuminate\Support\Collection<int, Topper>|list<Topper>  $toppers
      * @param  array<string, mixed>  $row
      */
     private function matchTopper($toppers, array $row): ?Topper
     {
-        return (new \Illuminate\Support\Collection($toppers))->first(
-            fn (Topper $t) => (filled($row['admission_no'] ?? null) && $t->admission_no === $row['admission_no'])
-                || (blank($row['admission_no'] ?? null) && filled($row['roll_no'] ?? null) && $t->roll_no === $row['roll_no'])
-                || (blank($row['admission_no'] ?? null) && blank($row['roll_no'] ?? null) && strtolower($t->name) === strtolower($row['name']))
-        );
+        $topperId = filled($row['topper_id'] ?? null) ? (int) $row['topper_id'] : null;
+        $rollNo = filled($row['roll_no'] ?? null) ? trim((string) $row['roll_no']) : null;
+        $name = filled($row['name'] ?? null) ? trim((string) $row['name']) : null;
+
+        $collection = $toppers instanceof \Illuminate\Support\Collection ? $toppers : new \Illuminate\Support\Collection($toppers);
+
+        if ($topperId) {
+            $matched = $collection->firstWhere('id', $topperId);
+            if ($matched) {
+                return $matched;
+            }
+        }
+
+        if ($rollNo) {
+            $matched = $collection->first(fn (Topper $t) => filled($t->roll_no) && trim((string) $t->roll_no) === $rollNo);
+            if ($matched) {
+                return $matched;
+            }
+        }
+
+        if ($name) {
+            $matched = $collection->first(fn (Topper $t) => filled($t->name) && trim(strtolower((string) $t->name)) === strtolower($name));
+            if ($matched) {
+                return $matched;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -788,7 +812,8 @@ class BoardResultController extends SchoolAdminController
 
         $boardResult->load(['toppers.subjectMarks', 'toppers.examStream', 'uploads']);
 
-        return $this->inertia('School/BoardResults/SubjectToppers', array_merge([
+        return $this->inertia('School/BoardResults/Workspace', array_merge([
+            'activeTab' => 'subject-toppers',
             'boardResult' => $boardResult,
             'academicYear' => $academicYear,
             'academicYearOptions' => $academicYearOptions,
@@ -857,7 +882,8 @@ class BoardResultController extends SchoolAdminController
             ->filter()
             ->all();
 
-        return $this->inertia('School/BoardResults/FullA1Achievers', [
+        return $this->inertia('School/BoardResults/Workspace', [
+            'activeTab' => 'full-a1',
             'boardResult' => $boardResult,
             'academicYear' => $academicYear,
             'academicYearOptions' => $academicYearOptions,
@@ -945,56 +971,45 @@ class BoardResultController extends SchoolAdminController
             $submittedRollNos[$rollNo] = true;
         }
 
-        $response = DB::transaction(function () use ($data, $boardResult, $isClass12, $normalizedSubjectMarks) {
-            BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
+        try {
+            $response = DB::transaction(function () use ($data, $boardResult, $isClass12, $normalizedSubjectMarks) {
+                BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
 
-            $existing = Topper::where('board_result_id', $boardResult->id)
-                ->fullA1Entries()
-                ->get(['id', 'name', 'roll_no']);
+                $existing = Topper::where('board_result_id', $boardResult->id)
+                    ->fullA1Entries()
+                    ->get(['id', 'name', 'roll_no', 'admission_no']);
 
-            $created = 0;
-            $updated = 0;
+                $created = 0;
+                $updated = 0;
 
-            foreach ($data['rows'] as $i => $row) {
-                $name = trim($row['name']);
-                $topper = filled($row['topper_id'] ?? null)
-                    ? $existing->firstWhere('id', (int) $row['topper_id'])
-                    : $existing->first(
-                        fn (Topper $t) => (filled($row['roll_no'] ?? null) && $t->roll_no === $row['roll_no'])
-                            || strtolower($t->name) === strtolower($name)
-                    );
+                foreach ($data['rows'] as $i => $row) {
+                    $name = trim($row['name']);
+                    $topper = $this->matchTopper($existing, $row);
 
-                $attrs = [
-                    'name' => $name,
-                    'gender' => $row['gender'],
-                    'roll_no' => trim($row['roll_no']),
-                    'stream' => $isClass12 ? ($row['stream'] ?? null) : null,
-                    // Full A1 Achievers aren't ranked against each other — it's a
-                    // qualifying list, not a leaderboard. rank must stay NULL (not the
-                    // schema default of 1), because toppers_board_result_rank_unique is
-                    // a partial unique index on (board_result_id, rank) WHERE rank IS
-                    // NOT NULL that spans every entry_type for this board_result. Any
-                    // non-null rank here collides with whatever already holds that rank
-                    // (typically the Overall topper) — see the 23505 unique-violation
-                    // this caused when rank was omitted and fell back to the DB default.
-                    'rank' => null,
-                ];
+                    $attrs = [
+                        'name' => $name,
+                        'gender' => $row['gender'],
+                        'roll_no' => trim($row['roll_no']),
+                        'admission_no' => filled($row['admission_no'] ?? null) ? trim((string) $row['admission_no']) : null,
+                        'stream' => $isClass12 ? ($row['stream'] ?? null) : null,
+                        'rank' => null,
+                    ];
 
-                if ($topper) {
-                    $topper->update($attrs);
-                    $updated++;
-                } else {
-                    $topper = Topper::create(array_merge($attrs, [
-                        'board_result_id' => $boardResult->id,
-                        'tenant_id' => $this->school->id,
-                        'entry_type' => Topper::ENTRY_FULL_A1,
-                    ]));
-                    $existing->push($topper);
-                    $created++;
+                    if ($topper) {
+                        $topper->update($attrs);
+                        $updated++;
+                    } else {
+                        $topper = Topper::create(array_merge($attrs, [
+                            'board_result_id' => $boardResult->id,
+                            'tenant_id' => $this->school->id,
+                            'entry_type' => Topper::ENTRY_FULL_A1,
+                        ]));
+                        $existing->push($topper);
+                        $created++;
+                    }
+
+                    app(TopperSubjectMarkService::class)->sync($topper, $normalizedSubjectMarks[$i]);
                 }
-
-                app(TopperSubjectMarkService::class)->sync($topper, $normalizedSubjectMarks[$i]);
-            }
 
             app(DataChangeLogger::class)->event(
                 'created',
@@ -1012,6 +1027,11 @@ class BoardResultController extends SchoolAdminController
 
             return back()->with('success', implode(', ', $parts).' as Full A1 Achievers.');
         });
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            throw ValidationException::withMessages([
+                'rows' => 'A Full A1 Achiever record with the same Roll Number already exists in this result.',
+            ]);
+        }
 
         $this->invalidateCertificationIfNeeded($boardResult, $request, 'Full A1 Achievers updated by the school.');
 
@@ -1023,8 +1043,8 @@ class BoardResultController extends SchoolAdminController
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
         $boardResult->load(['toppers.subjectMarks', 'toppers.examStream', 'uploads']);
 
-        return $this->inertia('School/BoardResults/Toppers', array_merge(
-            ['boardResult' => $boardResult],
+        return $this->inertia('School/BoardResults/Workspace', array_merge(
+            ['activeTab' => 'toppers', 'boardResult' => $boardResult],
             $this->topperContext($boardResult),
         ));
     }
@@ -1255,108 +1275,174 @@ class BoardResultController extends SchoolAdminController
             'rows.*.name' => 'required|string|max:255',
             'rows.*.gender' => 'required|string|in:male,female,other',
             'rows.*.roll_no' => 'nullable|string|max:64',
+            'rows.*.admission_no' => 'nullable|string|max:64',
             'rows.*.marks' => 'required|numeric|min:0',
         ]);
 
         $subject = $data['subject'];
         $sahodayaId = (string) $this->school->parent_id;
 
-        $response = DB::transaction(function () use ($data, $boardResult, $sahodayaId, $subject) {
-            BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
+        try {
+            $response = DB::transaction(function () use ($data, $boardResult, $sahodayaId, $subject) {
+                BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
 
-            $nextRank = (int) (Topper::where('board_result_id', $boardResult->id)->max('rank') ?? 0) + 1;
-            $created = 0;
-            $updated = 0;
-            // Scoped to subject-only entries — matching against $boardResult->toppers
-            // (unscoped, all entry types) could otherwise attach these subject marks
-            // onto an existing 'overall' or 'full_a1' row for the same student instead
-            // of creating/updating its own distinct 'subject' row (#161 follow-up).
-            $workingToppers = Topper::where('board_result_id', $boardResult->id)
-                ->subjectEntries()
-                ->with('subjectMarks')
-                ->get();
+                $nextRank = (int) (Topper::where('board_result_id', $boardResult->id)->max('rank') ?? 0) + 1;
+                $created = 0;
+                $updated = 0;
+                $workingToppers = Topper::where('board_result_id', $boardResult->id)
+                    ->subjectEntries()
+                    ->with('subjectMarks')
+                    ->get();
 
-            // Validate roll_no uniqueness across all rows submitted AND existing toppers.
-            $submittedRollNos = [];
-            foreach ($data['rows'] as $i => $row) {
-                $rollNo = $row['roll_no'] ?? null;
-                if (blank($rollNo)) {
-                    continue;
-                }
-                // Check for duplicate within the submitted rows themselves.
-                if (isset($submittedRollNos[$rollNo])) {
-                    throw ValidationException::withMessages([
-                        "rows.{$i}.roll_no" => "Duplicate CBSE Roll No '{$rollNo}' for school '{$this->school->name}' within the same submission. Each roll number must be unique.",
-                    ]);
-                }
-                $submittedRollNos[$rollNo] = true;
-
-            }
-
-            foreach ($data['rows'] as $row) {
-                $name = trim($row['name']);
-                // Match by admission_no first (most reliable), then roll_no, then name
-                // as last resort — prevents duplicate-name collisions.
-                $topper = filled($row['topper_id'] ?? null)
-                    ? $workingToppers->firstWhere('id', (int) $row['topper_id'])
-                    : $workingToppers->first(
-                        fn (Topper $t) => (filled($row['admission_no'] ?? null) && $t->admission_no === $row['admission_no'])
-                        || (filled($row['roll_no'] ?? null) && $t->roll_no === $row['roll_no'])
-                        || strtolower($t->name) === strtolower($name)
-                    );
-
-                if ($topper) {
-                    $subjectMarks = $topper->subject_marks;
-                    $originalSubject = trim((string) ($row['original_subject'] ?? ''));
-                    if ($originalSubject !== '' && strcasecmp($originalSubject, $subject) !== 0) {
-                        unset($subjectMarks[$originalSubject]);
+                // Validate roll_no uniqueness across all rows submitted within the payload.
+                $submittedRollNos = [];
+                foreach ($data['rows'] as $i => $row) {
+                    $rollNo = filled($row['roll_no'] ?? null) ? trim((string) $row['roll_no']) : null;
+                    if (blank($rollNo)) {
+                        continue;
                     }
-                    $subjectMarks[$subject] = $row['marks'];
-
-                    $topper->update([
-                        'name' => $name,
-                        'gender' => $row['gender'],
-                        'roll_no' => filled($row['roll_no'] ?? null) ? $row['roll_no'] : $topper->roll_no,
-                    ]);
-                    app(TopperSubjectMarkService::class)->sync($topper, $subjectMarks);
-                    $updated++;
-                } else {
-                    $topper = Topper::create([
-                        'board_result_id' => $boardResult->id,
-                        'tenant_id' => $this->school->id,
-                        'entry_type' => Topper::ENTRY_SUBJECT,
-                        'name' => $name,
-                        'gender' => $row['gender'],
-                        'roll_no' => $row['roll_no'] ?? null,
-                        'percentage' => null,
-                        'marks_obtained' => null,
-                        'total_marks' => null,
-                        'rank' => $nextRank++,
-                    ]);
-                    app(TopperSubjectMarkService::class)->sync($topper, [$subject => $row['marks']]);
-                    $workingToppers->push($topper);
-                    $created++;
+                    if (isset($submittedRollNos[$rollNo])) {
+                        throw ValidationException::withMessages([
+                            "rows.{$i}.roll_no" => "Duplicate CBSE Roll No '{$rollNo}' for school '{$this->school->name}' within the same submission. Each roll number must be unique.",
+                        ]);
+                    }
+                    $submittedRollNos[$rollNo] = true;
                 }
+
+                $processedTopperIds = [];
+
+                foreach ($data['rows'] as $i => $row) {
+                    $name = trim($row['name']);
+                    $rollNo = filled($row['roll_no'] ?? null) ? trim((string) $row['roll_no']) : null;
+
+                    $topper = $this->matchTopper($workingToppers, $row);
+
+                    if ($topper) {
+                        if ($rollNo && trim((string) $topper->roll_no) !== $rollNo) {
+                            $conflict = Topper::query()
+                                ->where('board_result_id', $boardResult->id)
+                                ->subjectEntries()
+                                ->where('roll_no', $rollNo)
+                                ->where('id', '!=', $topper->id)
+                                ->exists();
+                            if ($conflict) {
+                                throw ValidationException::withMessages([
+                                    "rows.{$i}.roll_no" => "CBSE Roll No '{$rollNo}' is already assigned to another Subject topper in this result.",
+                                ]);
+                            }
+                        }
+
+                        $subjectMarks = $topper->subject_marks;
+                        $originalSubject = trim((string) ($row['original_subject'] ?? ''));
+                        if ($originalSubject !== '' && strcasecmp($originalSubject, $subject) !== 0) {
+                            unset($subjectMarks[$originalSubject]);
+                        }
+                        $subjectMarks[$subject] = $row['marks'];
+
+                        $topper->update([
+                            'name' => $name,
+                            'gender' => $row['gender'],
+                            'roll_no' => $rollNo ?? $topper->roll_no,
+                            'admission_no' => filled($row['admission_no'] ?? null) ? trim((string) $row['admission_no']) : $topper->admission_no,
+                        ]);
+                        app(TopperSubjectMarkService::class)->sync($topper, $subjectMarks);
+                        $processedTopperIds[] = (int) $topper->id;
+                        $updated++;
+                    } else {
+                        if ($rollNo) {
+                            $conflict = Topper::query()
+                                ->where('board_result_id', $boardResult->id)
+                                ->subjectEntries()
+                                ->where('roll_no', $rollNo)
+                                ->exists();
+                            if ($conflict) {
+                                throw ValidationException::withMessages([
+                                    "rows.{$i}.roll_no" => "CBSE Roll No '{$rollNo}' is already assigned to another Subject topper in this result.",
+                                ]);
+                            }
+                        }
+
+                        $topper = Topper::create([
+                            'board_result_id' => $boardResult->id,
+                            'tenant_id' => $this->school->id,
+                            'entry_type' => Topper::ENTRY_SUBJECT,
+                            'name' => $name,
+                            'gender' => $row['gender'],
+                            'roll_no' => $rollNo,
+                            'admission_no' => filled($row['admission_no'] ?? null) ? trim((string) $row['admission_no']) : null,
+                            'percentage' => null,
+                            'marks_obtained' => null,
+                            'total_marks' => null,
+                            'rank' => $nextRank++,
+                        ]);
+                        app(TopperSubjectMarkService::class)->sync($topper, [$subject => $row['marks']]);
+                        $workingToppers->push($topper);
+                        $processedTopperIds[] = (int) $topper->id;
+                        $created++;
+                    }
+                }
+
+                // Remove subject mark for any existing subject topper that had a mark for this subject
+                // but was omitted from the submitted rows (i.e. student removed from form for this subject).
+                $removedCount = 0;
+                foreach ($workingToppers as $workingTopper) {
+                    if (in_array((int) $workingTopper->id, $processedTopperIds, true)) {
+                        continue;
+                    }
+
+                    $marks = $workingTopper->subject_marks;
+                    $matchedKey = null;
+                    foreach (array_keys($marks) as $k) {
+                        if (strcasecmp($k, $subject) === 0) {
+                            $matchedKey = $k;
+                            break;
+                        }
+                    }
+
+                    if ($matchedKey !== null) {
+                        unset($marks[$matchedKey]);
+                        if (empty($marks)) {
+                            $workingTopper->delete();
+                        } else {
+                            app(TopperSubjectMarkService::class)->sync($workingTopper, $marks);
+                        }
+                        $removedCount++;
+                    }
+                }
+
+                app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
+
+                app(DataChangeLogger::class)->event(
+                    'created',
+                    "{$subject}: {$created} added, {$updated} updated, {$removedCount} removed",
+                    $this->school->id,
+                    'topper',
+                    $boardResult,
+                    ['subject' => $subject, 'created' => $created, 'updated' => $updated, 'removed' => $removedCount],
+                );
+
+                $msg = "Saved {$subject} toppers.";
+                if ($created > 0 && $updated > 0) {
+                    $msg = "{$subject}: {$created} student(s) added, {$updated} updated.";
+                } elseif ($created > 0) {
+                    $msg = "{$subject}: {$created} student(s) added.";
+                } elseif ($updated > 0) {
+                    $msg = "{$subject}: {$updated} student(s) updated.";
+                } elseif ($removedCount > 0) {
+                    $msg = "{$subject}: {$removedCount} student(s) removed.";
+                }
+
+                return back()->with('success', $msg);
+            });
+        } catch (\Illuminate\Database\UniqueConstraintViolationException|\Illuminate\Database\QueryException $e) {
+            if ($e instanceof \Illuminate\Database\QueryException && (string) $e->getCode() !== '23505' && ! str_contains($e->getMessage(), '23505')) {
+                throw $e;
             }
 
-            app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
-
-            app(DataChangeLogger::class)->event(
-                'created',
-                "{$subject}: {$created} added, {$updated} updated",
-                $this->school->id,
-                'topper',
-                $boardResult,
-                ['subject' => $subject, 'created' => $created, 'updated' => $updated],
-            );
-
-            $parts = array_filter([
-                $created ? "{$created} added" : null,
-                $updated ? "{$updated} updated" : null,
+            throw ValidationException::withMessages([
+                'rows' => 'One of the CBSE Roll Numbers in the form is already assigned to another Subject topper in this result.',
             ]);
-
-            return back()->with('success', implode(', ', $parts)." for {$subject}.");
-        });
+        }
 
         $this->invalidateCertificationIfNeeded($boardResult, $request, "Subject-wise toppers for {$subject} updated by the school.");
 
@@ -1370,12 +1456,14 @@ class BoardResultController extends SchoolAdminController
         bool $isClass12,
         ?Topper $exclude = null,
     ): array {
+        $isSubjectOnly = $exclude?->isSubjectOnly() || $request->input('entry_type') === Topper::ENTRY_SUBJECT;
+
         $rules = [
             'name' => 'required|string|max:255',
             'admission_no' => 'nullable|string|max:64',
             'roll_no' => 'nullable|string|max:64',
             'gender' => 'required|string|in:male,female,other',
-            'percentage' => 'required|numeric|min:0|max:100',
+            'percentage' => $isSubjectOnly ? 'nullable|numeric|min:0|max:100' : 'required|numeric|min:0|max:100',
             'total_marks' => 'nullable|integer|min:0',
             'marks_obtained' => 'nullable|numeric|min:0',
             'stream' => 'nullable|string|max:100',

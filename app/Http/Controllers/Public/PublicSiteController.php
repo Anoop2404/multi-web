@@ -54,17 +54,133 @@ class PublicSiteController extends Controller
     public function microsite(Request $request, string $slug)
     {
         $tenant = $this->resolveTenant();
-        $site = WebsiteSite::where('tenant_id', $tenant->id)
-            ->where('slug', $slug)
+        $site = WebsiteSite::where('slug', $slug)
             ->where('is_active', true)
-            ->where('is_primary', false)
             ->firstOrFail();
 
         return $this->renderPublic('public.home', $tenant, [
-            'sections' => $tenant->sections()->forPublic()->where('site_id', $site->id)->get(),
+            'sections' => WebsiteSite::find($site->id) ? \App\Models\SiteSection::where('site_id', $site->id)->forPublic()->get() : collect(),
             'microsite' => $site,
             'pageSeo' => $site->seo_json ?? [],
             'site' => $site,
+            'experience' => $this->experienceData($site),
+        ]);
+    }
+
+    public function micrositePage(Request $request, string $slug, string $page)
+    {
+        $tenant = $this->resolveTenant();
+        $site = WebsiteSite::where('slug', $slug)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $allSections = \App\Models\SiteSection::where('site_id', $site->id)->forPublic()->get();
+
+        $pageLower = strtolower($page);
+        switch ($pageLower) {
+            case 'about':
+                $pageConfig = [
+                    'title' => 'About Sahodaya',
+                    'eyebrow' => 'Network Vision & Leadership',
+                    'subheading' => 'Fostering academic excellence, teacher empowerment, and educational collaboration across CBSE institutions.',
+                    'section_types' => ['about_sahodaya', 'statistics'],
+                ];
+                break;
+            case 'member-schools':
+            case 'schools':
+            case 'directory':
+                $pageConfig = [
+                    'title' => 'Member Schools Directory',
+                    'eyebrow' => 'Affiliated Network',
+                    'subheading' => 'Explore 80+ CBSE affiliated member schools across districts in ' . ($tenant->name ?? 'the region') . '.',
+                    'section_types' => ['member_schools'],
+                ];
+                break;
+            case 'office-bearers':
+            case 'leadership':
+            case 'committee':
+                $pageConfig = [
+                    'title' => 'Office Bearers & Leadership',
+                    'eyebrow' => 'Executive Committee',
+                    'subheading' => 'Dedicated educational leaders guiding the vision, academic programmes, and governance of Sahodaya.',
+                    'section_types' => ['office_bearers'],
+                ];
+                break;
+            case 'gallery':
+            case 'photos':
+            case 'media':
+                $pageConfig = [
+                    'title' => 'Event & Media Gallery',
+                    'eyebrow' => 'Sahodaya Showcase',
+                    'subheading' => 'Highlights from Kalotsav cultural fests, sports championships, principal summits, and teacher workshops.',
+                    'section_types' => ['gallery'],
+                ];
+                break;
+            case 'announcements':
+            case 'news':
+            case 'circulars':
+                $pageConfig = [
+                    'title' => 'Official Circulars & Updates',
+                    'eyebrow' => 'Mandates & Notices',
+                    'subheading' => 'Latest CBSE guidelines, Sahodaya circulars, academic notices, and downloadable instructions.',
+                    'section_types' => ['news_circulars', 'downloads_sahodaya'],
+                ];
+                break;
+            case 'events':
+            case 'programmes':
+            case 'calendar':
+                $pageConfig = [
+                    'title' => 'Programmes & Event Calendar',
+                    'eyebrow' => 'What Is Next',
+                    'subheading' => 'Upcoming regional competitions, athletics meets, principal conclaves, and academic workshops.',
+                    'section_types' => ['events_programs'],
+                ];
+                break;
+            case 'downloads':
+            case 'resources':
+                $pageConfig = [
+                    'title' => 'Downloads & Resource Center',
+                    'eyebrow' => 'Official Documents',
+                    'subheading' => 'Downloadable affiliation forms, event rulebooks, syllabus guidelines, and circular archives.',
+                    'section_types' => ['downloads_sahodaya', 'news_circulars'],
+                ];
+                break;
+            case 'contact':
+            case 'secretariat':
+                $pageConfig = [
+                    'title' => 'Contact Secretariat',
+                    'eyebrow' => 'Connect With Us',
+                    'subheading' => 'Get in touch with our secretariat desk for membership enquiries, event details, and circular clarifications.',
+                    'section_types' => ['contact'],
+                ];
+                break;
+            default:
+                $pageConfig = [
+                    'title' => ucfirst(str_replace('-', ' ', $page)),
+                    'eyebrow' => 'Sahodaya Portal',
+                    'subheading' => 'Official page for ' . ($tenant->name ?? 'Sahodaya') . '.',
+                    'section_types' => [],
+                ];
+                break;
+        }
+
+        $filteredSections = $allSections->filter(function ($section) use ($pageConfig) {
+            return in_array($section->section_type, $pageConfig['section_types'], true);
+        });
+
+        // Fallback: if no matching section is assigned to site, show all sections except hero
+        if ($filteredSections->isEmpty() && !empty($pageConfig['section_types'])) {
+            $filteredSections = $allSections->reject(fn ($s) => $s->section_type === 'hero');
+        }
+
+        return $this->renderPublic('public.microsite.page', $tenant, [
+            'sections' => $filteredSections,
+            'allSections' => $allSections,
+            'microsite' => $site,
+            'site' => $site,
+            'pageConfig' => $pageConfig,
+            'activePage' => $page,
+            'pageSeo' => array_merge($site->seo_json ?? [], ['title' => $pageConfig['title'] . ' | ' . ($tenant->name ?? 'Sahodaya')]),
             'experience' => $this->experienceData($site),
         ]);
     }

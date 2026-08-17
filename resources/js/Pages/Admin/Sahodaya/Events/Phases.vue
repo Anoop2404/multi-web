@@ -10,6 +10,93 @@
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/levels`" class="link-brand text-sm">&larr; Back to Rounds & Levels</Link>
         </div>
 
+        <section class="card mb-6 max-w-5xl space-y-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h3 class="section-title">Payment batches</h3>
+                    <p class="section-desc">Group phases into payment levels (e.g. Level 1 / Level 2, each with its own school registration fee and invoice) so a school pays once per level instead of once per phase. Optional — skip this if the event just bills its flat registration fee.</p>
+                </div>
+                <button v-if="registrationBatches.length" type="button" class="btn-secondary text-sm" :disabled="topologyForm.processing" @click="syncTopology">Sync operational events</button>
+            </div>
+
+            <form v-if="showAddBatch" @submit.prevent="createBatch" class="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                <div class="grid grid-cols-2 gap-2">
+                    <input v-model="addBatchForm.name" class="field text-sm" placeholder="Batch name (e.g. Level 1)" required>
+                    <input v-model="addBatchForm.code" class="field text-sm uppercase" placeholder="Code (e.g. LEVEL_1)" required>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="text-xs text-slate-500">
+                        Registration opens
+                        <input v-model="addBatchForm.registration_open" type="datetime-local" class="field text-sm mt-0.5">
+                    </label>
+                    <label class="text-xs text-slate-500">
+                        Registration closes
+                        <input v-model="addBatchForm.registration_close" type="datetime-local" class="field text-sm mt-0.5">
+                    </label>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="text-xs text-slate-500">
+                        School base fee (₹)
+                        <input v-model.number="addBatchForm.school_base_fee" type="number" min="0" step="0.01" class="field text-sm mt-0.5">
+                    </label>
+                    <label class="text-xs text-slate-500">
+                        Invoice prefix
+                        <input v-model="addBatchForm.invoice_prefix" class="field text-sm mt-0.5" placeholder="e.g. MCS-L1">
+                    </label>
+                </div>
+                <p v-if="addBatchForm.errors.code" class="text-xs text-red-600">{{ addBatchForm.errors.code }}</p>
+                <div class="flex gap-2">
+                    <button type="submit" class="btn-primary text-sm" :disabled="addBatchForm.processing">Add batch</button>
+                    <button type="button" class="btn-ghost text-sm" @click="showAddBatch = false">Cancel</button>
+                </div>
+            </form>
+            <button v-else type="button" class="btn-secondary text-sm w-full" @click="showAddBatch = true">+ Add payment batch</button>
+
+            <div v-if="registrationBatches.length === 0" class="text-sm text-slate-400">
+                No payment batches yet — every phase bills through the event's own single registration fee.
+            </div>
+            <ul v-else class="divide-y divide-slate-100 text-sm">
+                <li v-for="batch in registrationBatches" :key="batch.id" class="py-2 flex items-center justify-between gap-2">
+                    <template v-if="editBatchId === batch.id">
+                        <div class="flex-1 space-y-2">
+                            <div class="grid grid-cols-2 gap-2">
+                                <input v-model="editBatchForm.name" class="field !py-1 !text-xs">
+                                <input v-model="editBatchForm.code" class="field !py-1 !text-xs uppercase">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input v-model.number="editBatchForm.school_base_fee" type="number" min="0" step="0.01" class="field !py-1 !text-xs" placeholder="School base fee">
+                                <input v-model="editBatchForm.invoice_prefix" class="field !py-1 !text-xs" placeholder="Invoice prefix">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input v-model="editBatchForm.registration_open" type="datetime-local" class="field !py-1 !text-xs">
+                                <input v-model="editBatchForm.registration_close" type="datetime-local" class="field !py-1 !text-xs">
+                            </div>
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                            <button type="button" class="text-xs font-semibold text-[#0f3d7a]" @click="saveBatchEdit(batch)">Save</button>
+                            <button type="button" class="text-xs text-slate-500" @click="editBatchId = null">Cancel</button>
+                        </div>
+                    </template>
+                    <template v-else>
+                        <div>
+                            <span class="font-semibold text-slate-700">{{ batch.name }}</span>
+                            <span class="ml-2 text-xs font-mono text-slate-400">{{ batch.code }}</span>
+                            <div class="text-xs text-slate-400 mt-0.5">
+                                <span v-if="batch.school_base_fee">₹{{ batch.school_base_fee }} base fee</span>
+                                <span v-if="batch.registration_open || batch.registration_close" class="ml-2">
+                                    Reg: {{ formatDate(batch.registration_open) }} &rarr; {{ formatDate(batch.registration_close) }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                            <button type="button" class="text-xs font-semibold text-[#0f3d7a]" @click="startBatchEdit(batch)">Edit</button>
+                            <button type="button" class="text-xs text-red-600" @click="removeBatch(batch)">Remove</button>
+                        </div>
+                    </template>
+                </li>
+            </ul>
+        </section>
+
         <div class="grid lg:grid-cols-2 gap-6 max-w-5xl">
             <div class="card space-y-4">
                 <h4 class="section-title">Phases ({{ phases.length }})</h4>
@@ -20,6 +107,27 @@
                         <input v-model="addForm.code" class="field text-sm" placeholder="Code (optional)">
                         <input v-model.number="addForm.sort_order" type="number" class="field text-sm" placeholder="Sort order">
                     </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="text-xs text-slate-500">
+                            Registration opens
+                            <input v-model="addForm.registration_open" type="datetime-local" class="field text-sm mt-0.5">
+                        </label>
+                        <label class="text-xs text-slate-500">
+                            Registration closes
+                            <input v-model="addForm.registration_close" type="datetime-local" class="field text-sm mt-0.5">
+                        </label>
+                    </div>
+                    <label class="text-xs text-slate-500 block">
+                        School registration fee collected by this phase (₹)
+                        <input v-model.number="addForm.school_registration_fee_share" type="number" min="0" step="0.01" class="field text-sm mt-0.5" placeholder="0.00 — leave blank if this phase charges none">
+                    </label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select v-model="addForm.registration_batch_id" class="field text-sm">
+                            <option :value="null">No payment level</option>
+                            <option v-for="batch in registrationBatches" :key="batch.id" :value="batch.id">{{ batch.name }}</option>
+                        </select>
+                        <label class="flex items-center gap-2 text-xs"><input v-model="addForm.is_regional" type="checkbox"> Regional phase</label>
+                    </div>
                     <div class="flex gap-2">
                         <button type="submit" class="btn-primary text-sm" :disabled="addForm.processing">Add phase</button>
                         <button type="button" class="btn-ghost text-sm" @click="showAdd = false">Cancel</button>
@@ -27,32 +135,80 @@
                 </form>
                 <button v-else type="button" class="btn-secondary text-sm w-full" @click="showAdd = true">+ Add phase</button>
 
+                <div v-if="feeShareWarning" class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    {{ feeShareWarning }}
+                </div>
+
                 <div v-if="phases.length === 0" class="text-sm text-slate-400">
                     No phases yet — every item runs as a single, unnamed phase.
                 </div>
                 <ul v-else class="divide-y divide-slate-100 text-sm">
-                    <li v-for="phase in phases" :key="phase.id" class="py-2 flex items-center justify-between gap-2">
-                        <template v-if="editId === phase.id">
-                            <div class="flex-1 grid grid-cols-2 gap-2">
-                                <input v-model="editForm.name" class="field !py-1 !text-xs">
-                                <input v-model="editForm.code" class="field !py-1 !text-xs" placeholder="Code">
+                    <li v-for="phase in phases" :key="phase.id" class="py-2">
+                        <div v-if="editId === phase.id" class="flex items-center justify-between gap-2">
+                            <div class="flex-1 space-y-2">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input v-model="editForm.name" class="field !py-1 !text-xs">
+                                    <input v-model="editForm.code" class="field !py-1 !text-xs" placeholder="Code">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <label class="text-[11px] text-slate-500">
+                                        Reg. opens
+                                        <input v-model="editForm.registration_open" type="datetime-local" class="field !py-1 !text-xs mt-0.5">
+                                    </label>
+                                    <label class="text-[11px] text-slate-500">
+                                        Reg. closes
+                                        <input v-model="editForm.registration_close" type="datetime-local" class="field !py-1 !text-xs mt-0.5">
+                                    </label>
+                                </div>
+                                <label class="text-[11px] text-slate-500 block">
+                                    School reg. fee share (₹)
+                                    <input v-model.number="editForm.school_registration_fee_share" type="number" min="0" step="0.01" class="field !py-1 !text-xs mt-0.5">
+                                </label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <select v-model="editForm.registration_batch_id" class="field !py-1 !text-xs">
+                                        <option :value="null">No payment level</option>
+                                        <option v-for="batch in registrationBatches" :key="batch.id" :value="batch.id">{{ batch.name }}</option>
+                                    </select>
+                                    <label class="flex items-center gap-2 text-[11px]"><input v-model="editForm.is_regional" type="checkbox"> Regional</label>
+                                </div>
                             </div>
                             <div class="flex gap-2 shrink-0">
                                 <button type="button" class="text-xs font-semibold text-[#0f3d7a]" @click="saveEdit(phase)">Save</button>
                                 <button type="button" class="text-xs text-slate-500" @click="editId = null">Cancel</button>
                             </div>
-                        </template>
-                        <template v-else>
+                        </div>
+                        <div v-else class="flex items-center justify-between gap-2">
                             <div>
                                 <span class="font-semibold text-slate-700">{{ phase.name }}</span>
                                 <span v-if="phase.code" class="ml-2 text-xs font-mono text-slate-400">{{ phase.code }}</span>
                                 <span class="ml-2 text-xs text-slate-400">{{ itemCountForPhase(phase.id) }} item(s)</span>
+                                <div class="text-xs text-slate-400 mt-0.5">
+                                    <span v-if="phase.registration_open || phase.registration_close">
+                                        Reg: {{ formatDate(phase.registration_open) }} &rarr; {{ formatDate(phase.registration_close) }}
+                                    </span>
+                                    <span v-if="phase.school_registration_fee_share" class="ml-2">
+                                        School fee: ₹{{ phase.school_registration_fee_share }}
+                                    </span>
+                                    <span v-if="phase.registration_batch" class="ml-2">{{ phase.registration_batch.name }}</span>
+                                    <span v-if="phase.is_regional" class="ml-2 text-indigo-600">Regional: {{ phase.allowed_regions?.filter((r) => r.enabled).map((r) => r.region?.name).join(', ') || 'not configured' }}</span>
+                                </div>
                             </div>
                             <div class="flex gap-2 shrink-0">
+                                <button v-if="phase.is_regional && regions.length" type="button" class="text-xs font-semibold text-indigo-600" @click="startRegionEdit(phase)">Regions</button>
                                 <button type="button" class="text-xs font-semibold text-[#0f3d7a]" @click="startEdit(phase)">Edit</button>
                                 <button type="button" class="text-xs text-red-600" @click="removePhase(phase)">Remove</button>
                             </div>
-                        </template>
+                        </div>
+                        <div v-if="regionEditId === phase.id" class="mt-2 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 space-y-2">
+                            <p class="text-xs font-semibold text-slate-600">Allowed regions for {{ phase.name }}</p>
+                            <select v-model="regionEditIds" multiple class="field text-sm min-h-24">
+                                <option v-for="region in regions" :key="region.id" :value="region.id">{{ region.name }}</option>
+                            </select>
+                            <div class="flex gap-2">
+                                <button type="button" class="btn-primary text-xs" :disabled="regionEditForm.processing" @click="saveRegionEdit(phase)">Save regions</button>
+                                <button type="button" class="btn-ghost text-xs" @click="regionEditId = null">Cancel</button>
+                            </div>
+                        </div>
                     </li>
                 </ul>
             </div>
@@ -108,6 +264,7 @@ import { computed, reactive, ref } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -116,25 +273,79 @@ const props = defineProps({
     event: Object,
     phases: { type: Array, default: () => [] },
     items: { type: Array, default: () => [] },
+    registrationBatches: { type: Array, default: () => [] },
+    regions: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+const { confirm } = useConfirm();
 
 const showAdd = ref(false);
 const editId = ref(null);
 const selectedItemIds = ref([]);
 const assignPhaseId = ref(null);
 
-const addForm = useForm({ name: '', code: '', sort_order: null, is_default: false });
-const editForm = reactive({ name: '', code: '' });
+const addForm = useForm({
+    name: '', code: '', sort_order: null, is_default: false,
+    registration_open: '', registration_close: '', school_registration_fee_share: null,
+    registration_batch_id: null, is_regional: false,
+});
+const editForm = reactive({ name: '', code: '', registration_open: '', registration_close: '', school_registration_fee_share: null, registration_batch_id: null, is_regional: false });
 const assignForm = useForm({ phase_id: null, item_ids: [] });
+
+// Payment batches — a Sahodaya defines however many of these it needs (0, 1, 2, or more),
+// with whatever codes/names/fees fit its own event. Creating the first one is what turns
+// on the phased/regional engine for this event (see FestRegistrationBatchController::store).
+const showAddBatch = ref(false);
+const editBatchId = ref(null);
+const addBatchForm = useForm({
+    name: '', code: '', school_base_fee: 0, invoice_prefix: '',
+    registration_open: '', registration_close: '',
+});
+const editBatchForm = reactive({ name: '', code: '', school_base_fee: 0, invoice_prefix: '', registration_open: '', registration_close: '' });
+
+// Per-phase allowed-region editing — posts to the existing generic
+// phases/{phase}/regions endpoint (FestPhasedWorkflowController::syncPhaseRegions), which
+// already accepts any phase and any region list, not just a fixed pair of phase names.
+const regionEditId = ref(null);
+const regionEditIds = ref([]);
+const regionEditForm = useForm({ region_ids: [] });
+
+const topologyForm = useForm({});
 
 const allSelected = computed(() => props.items.length > 0 && selectedItemIds.value.length === props.items.length);
 
 function itemCountForPhase(phaseId) {
     return props.items.filter((i) => i.phase_id === phaseId).length;
 }
+
+function formatDate(value) {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// Phase C: the event's flat school registration fee (event.school_registration_fee) can be
+// owned entirely by one phase or split across several via each phase's
+// school_registration_fee_share — see docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3 item 4. This
+// is a soft warning only (a Sahodaya may legitimately want some phases to charge nothing extra
+// beyond participation fees), not a validation block.
+const feeShareWarning = computed(() => {
+    const nominal = props.event?.school_registration_fee;
+    if (nominal === null || nominal === undefined || Number(nominal) === 0) return null;
+    if (props.phases.length === 0) return null;
+
+    const sharesSet = props.phases.some((p) => p.school_registration_fee_share !== null && p.school_registration_fee_share !== undefined);
+    if (!sharesSet) return null;
+
+    const total = props.phases.reduce((sum, p) => sum + Number(p.school_registration_fee_share || 0), 0);
+    const nominalNum = Number(nominal);
+    if (Math.abs(total - nominalNum) < 0.01) return null;
+
+    return total < nominalNum
+        ? `Phase fee shares add up to ₹${total.toFixed(2)}, short of the event's ₹${nominalNum.toFixed(2)} school registration fee.`
+        : `Phase fee shares add up to ₹${total.toFixed(2)}, more than the event's ₹${nominalNum.toFixed(2)} school registration fee.`;
+});
 
 function toggleSelectAll() {
     selectedItemIds.value = allSelected.value ? [] : props.items.map((i) => i.id);
@@ -152,7 +363,76 @@ function createPhase() {
 
 function startEdit(phase) {
     editId.value = phase.id;
-    Object.assign(editForm, { name: phase.name, code: phase.code });
+    Object.assign(editForm, {
+        name: phase.name,
+        code: phase.code,
+        registration_open: toDatetimeLocal(phase.registration_open),
+        registration_close: toDatetimeLocal(phase.registration_close),
+        school_registration_fee_share: phase.school_registration_fee_share ?? null,
+        registration_batch_id: phase.registration_batch_id ?? null,
+        is_regional: Boolean(phase.is_regional),
+    });
+}
+
+function syncTopology() {
+    topologyForm.post(`${base}/phased-workflow/sync-topology`, { preserveScroll: true });
+}
+
+function createBatch() {
+    addBatchForm.transform((data) => ({ ...data, code: (data.code || '').toUpperCase() })).post(`${base}/registration-batches`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            addBatchForm.reset();
+            showAddBatch.value = false;
+        },
+    });
+}
+
+function startBatchEdit(batch) {
+    editBatchId.value = batch.id;
+    Object.assign(editBatchForm, {
+        name: batch.name,
+        code: batch.code,
+        school_base_fee: Number(batch.school_base_fee ?? 0),
+        invoice_prefix: batch.invoice_prefix ?? '',
+        registration_open: toDatetimeLocal(batch.registration_open),
+        registration_close: toDatetimeLocal(batch.registration_close),
+    });
+}
+
+function saveBatchEdit(batch) {
+    router.put(`${base}/registration-batches/${batch.id}`, { ...editBatchForm, code: (editBatchForm.code || '').toUpperCase() }, {
+        preserveScroll: true,
+        onSuccess: () => { editBatchId.value = null; },
+    });
+}
+
+async function removeBatch(batch) {
+    if (!(await confirm({ message: `Remove payment batch "${batch.name}"? Only possible while no phase, operational event, or fee is attached to it.` }))) return;
+    router.delete(`${base}/registration-batches/${batch.id}`, { preserveScroll: true });
+}
+
+function startRegionEdit(phase) {
+    regionEditId.value = phase.id;
+    regionEditIds.value = (phase.allowed_regions || []).filter((r) => r.enabled).map((r) => r.region_id);
+}
+
+function saveRegionEdit(phase) {
+    regionEditForm.region_ids = regionEditIds.value;
+    regionEditForm.post(`${base}/phases/${phase.id}/regions`, {
+        preserveScroll: true,
+        onSuccess: () => { regionEditId.value = null; },
+    });
+}
+
+// datetime-local inputs need "YYYY-MM-DDTHH:mm", not the ISO string with seconds/timezone
+// that the backend sends back.
+function toDatetimeLocal(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function saveEdit(phase) {
@@ -162,8 +442,8 @@ function saveEdit(phase) {
     });
 }
 
-function removePhase(phase) {
-    if (!confirm(`Remove phase "${phase.name}"? Items in it become unassigned (no phase), nothing else changes.`)) return;
+async function removePhase(phase) {
+    if (!(await confirm({ message: `Remove phase "${phase.name}"? Items in it become unassigned (no phase), nothing else changes.` }))) return;
     router.delete(`${base}/phases/${phase.id}`, { preserveScroll: true });
 }
 

@@ -1166,6 +1166,8 @@ import McqSchoolWorkflowStepper from '@/Components/school/McqSchoolWorkflowStepp
 import { TALENT_SEARCH_EXAMS_LABEL } from '@/support/mcqSchoolLabels.js';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
 import { studentDisplayName } from '@/support/studentDisplay.js';
+import { useConfirm } from '@/composables/useConfirm';
+const { confirm, prompt } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -1687,8 +1689,8 @@ function registerSelectedTeachers() {
         onFinish: () => { bulkRegisteringTeachers.value = false; },
     });
 }
-function cancelTeacher(id, name) {
-    if (!window.confirm(`Cancel registration for ${name}?`)) return;
+async function cancelTeacher(id, name) {
+    if (!(await confirm({ message: `Cancel registration for ${name}?`, destructive: true }))) return;
     router.post(`${base.value}/cancel`, { teacher_id: id }, { preserveScroll: true });
 }
 
@@ -1716,8 +1718,8 @@ function registerSelected() {
     });
 }
 
-function cancelStudent(id, name) {
-    if (!window.confirm(`Cancel registration for ${name}? You can re-add them later.`)) return;
+async function cancelStudent(id, name) {
+    if (!(await confirm({ message: `Cancel registration for ${name}? You can re-add them later.`, destructive: true }))) return;
     router.post(`${base.value}/cancel`, { student_id: id }, { preserveScroll: true });
 }
 

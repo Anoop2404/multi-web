@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\SahodayaAdmin\Concerns\ScopesMembershipByRegion;
 use App\Models\FestEvent;
 use App\Models\Registration;
 use App\Models\Student;
@@ -20,6 +21,8 @@ use Illuminate\Http\Request;
 
 abstract class SahodayaAdminController extends Controller
 {
+    use ScopesMembershipByRegion;
+
     protected Tenant $sahodaya;
     protected bool $isStaff = false;
 

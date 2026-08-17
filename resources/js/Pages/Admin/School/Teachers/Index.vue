@@ -311,7 +311,8 @@
                 <div class="rounded-lg border bg-gray-50 p-3 text-sm space-y-2">
                     <p><span class="text-gray-500">Username:</span> <span class="font-mono font-semibold">{{ loginTeacher.portal_username || loginTeacher.login_code || '—' }}</span></p>
                     <p v-if="loginTeacher.portal_email"><span class="text-gray-500">Email:</span> <span class="font-mono">{{ loginTeacher.portal_email }}</span></p>
-                    <p v-if="visiblePassword">
+                    <p v-if="revealingLogin" class="text-xs text-gray-500">Loading…</p>
+                    <p v-else-if="visiblePassword">
                         <span class="text-gray-500">Password:</span>
                         <span class="font-mono font-bold text-emerald-800">{{ visiblePassword }}</span>
                     </p>
@@ -342,6 +343,9 @@ import FormGrid from '@/Components/ui/FormGrid.vue';
 import PortalCredentialsBanner from '@/Components/school/PortalCredentialsBanner.vue';
 import SubjectPicker from '@/Components/school/SubjectPicker.vue';
 import { useScrollToFirstError } from '@/composables/useScrollToFirstError.js';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -385,8 +389,8 @@ const provisioningAll = ref(false);
 const sendingAllMail = ref(false);
 const sendingMailId = ref(null);
 
-function provisionAllPortals() {
-    if (!confirm('Create portal login accounts for all unregistered teachers and email them their credentials?')) return;
+async function provisionAllPortals() {
+    if (!(await confirm({ message: 'Create portal login accounts for all unregistered teachers and email them their credentials?', destructive: false }))) return;
     provisioningAll.value = true;
     router.post(`/school-admin/${props.school.id}/teachers/provision-all-portals`, {}, {
         preserveScroll: true,
@@ -394,8 +398,8 @@ function provisionAllPortals() {
     });
 }
 
-function sendAllCredentialsMail() {
-    if (!confirm('Send credentials emails to all teachers with active portal accounts?')) return;
+async function sendAllCredentialsMail() {
+    if (!(await confirm({ message: 'Send credentials emails to all teachers with active portal accounts?', destructive: false }))) return;
     sendingAllMail.value = true;
     router.post(`/school-admin/${props.school.id}/teachers/send-all-credentials-mail`, {}, {
         preserveScroll: true,
@@ -412,7 +416,8 @@ function sendCredentialsMail(teacher) {
     });
 }
 
-const visiblePassword = computed(() => displayPassword.value ?? loginTeacher.value?.portal_password ?? null);
+const visiblePassword = computed(() => displayPassword.value);
+const revealingLogin = ref(false);
 const mode = ref('single');
 
 const form = useForm({
@@ -503,16 +508,29 @@ function submitProvision() {
     });
 }
 
-function openLogin(t) {
+async function openLogin(t) {
     loginTeacher.value = t;
-    displayPassword.value = t.portal_password ?? null;
+    displayPassword.value = null;
+    if (!t.has_portal_password) return;
+
+    revealingLogin.value = true;
+    try {
+        const response = await fetch(`/school-admin/${props.school.id}/teachers/${t.id}/reveal-portal-password`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        const data = await response.json();
+        displayPassword.value = data.password;
+    } finally {
+        revealingLogin.value = false;
+    }
 }
 function closeLogin() {
     loginTeacher.value = null;
     displayPassword.value = null;
 }
-function resetPortalPassword() {
-    if (!loginTeacher.value || !confirm(`Reset portal password for ${loginTeacher.value.name}?`)) return;
+async function resetPortalPassword() {
+    if (!loginTeacher.value || !(await confirm({ message: `Reset portal password for ${loginTeacher.value.name}?`, destructive: false }))) return;
     resetForm.post(`/school-admin/${props.school.id}/teachers/${loginTeacher.value.id}/reset-portal-password`, {
         preserveScroll: true,
         onSuccess: () => {
@@ -525,8 +543,8 @@ function resetPortalPassword() {
     });
 }
 
-function remove(teacher) {
-    if (!confirm(`Deactivate ${teacher.name}?`)) return;
+async function remove(teacher) {
+    if (!(await confirm({ message: `Deactivate ${teacher.name}?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/teachers/${teacher.id}`, { preserveScroll: true });
 }
 

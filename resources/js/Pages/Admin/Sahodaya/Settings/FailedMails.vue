@@ -254,6 +254,7 @@
 import { ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     logs: { type: Object, required: true },
@@ -261,6 +262,7 @@ const props = defineProps({
     summary: { type: Object, required: true },
 });
 
+const { confirm } = useConfirm();
 const searchQuery = ref(props.filters.search || '');
 const processingBulk = ref(false);
 const activeId = ref(null);
@@ -289,8 +291,8 @@ function handleRetry(log) {
     });
 }
 
-function handleBulkRetry() {
-    if (!confirm(`Are you sure you want to retry sending all ${props.summary.pending_count} pending failed emails?`)) {
+async function handleBulkRetry() {
+    if (!(await confirm({ message: `Are you sure you want to retry sending all ${props.summary.pending_count} pending failed emails?`, destructive: false }))) {
         return;
     }
     processingBulk.value = true;
@@ -302,15 +304,15 @@ function handleBulkRetry() {
     });
 }
 
-function handleCancel(log) {
-    if (!confirm(`Cancel email delivery attempt to ${log.recipient_email}?`)) {
+async function handleCancel(log) {
+    if (!(await confirm({ message: `Cancel email delivery attempt to ${log.recipient_email}?` }))) {
         return;
     }
     router.post(`${window.location.pathname}/${log.id}/cancel`, {}, { preserveScroll: true });
 }
 
-function handleDelete(log) {
-    if (!confirm('Permanently remove this failed email log entry?')) {
+async function handleDelete(log) {
+    if (!(await confirm({ message: 'Permanently remove this failed email log entry?' }))) {
         return;
     }
     router.delete(`${window.location.pathname}/${log.id}`, {}, { preserveScroll: true });

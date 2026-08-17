@@ -15,6 +15,7 @@ use App\Http\Controllers\SchoolAdmin\TeacherFestController;
 use App\Http\Controllers\SchoolAdmin\CustomFestController;
 use App\Http\Controllers\SchoolAdmin\TrainingController;
 use App\Http\Controllers\SchoolAdmin\TrainingRegistrationController;
+use App\Http\Middleware\EnsureSchoolFestProgramMatchesEvent;
 use Illuminate\Support\Facades\Route;
 
 $festProgramSlugs = 'kalotsav|sports-meet|kids-fest|teacher-fest|english-fest|science-fest|custom';
@@ -34,7 +35,7 @@ foreach ($festPrograms as $cfg) {
     $slug = $cfg['slug'];
     $controller = $cfg['controller'];
 
-    Route::prefix($prefix)->name("{$prefix}.")->group(function () use ($controller, $slug, $prefix) {
+    Route::prefix($prefix)->name("{$prefix}.")->middleware(EnsureSchoolFestProgramMatchesEvent::class)->group(function () use ($controller, $slug, $prefix) {
         Route::get('/', [$controller, 'hub'])->name('hub');
         Route::get('/my-events', [$controller, 'myEvents'])->name('my-events');
         Route::get('/registration', [$controller, 'registration'])->name('registration');
@@ -47,6 +48,9 @@ foreach ($festPrograms as $cfg) {
         Route::get('/events/{event}/eligible-students', [FestRegistrationController::class, 'eligibleStudents'])
             ->defaults('program', $slug)
             ->name('event.eligible-students');
+        Route::post('/events/{event}/phase-region', [\App\Http\Controllers\SchoolAdmin\FestPhaseRegionSelectionController::class, 'store'])
+            ->defaults('program', $slug)
+            ->name('event.phase-region');
         if ($prefix === 'sports') {
             Route::get('/item-registration', [FestRegistrationController::class, 'itemRegistrationEntry'])
                 ->defaults('program', $slug)

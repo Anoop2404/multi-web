@@ -64,6 +64,7 @@
                         :student="student"
                         :provision-url="`${base}/students/${student.id}/portal-login`"
                         :reset-url="`${base}/students/${student.id}/reset-portal-password`"
+                        :reveal-url="`${base}/students/${student.id}/reveal-portal-password`"
                         :portal-login-url="portalLoginUrl"
                     />
 

@@ -37,6 +37,18 @@
                 <DashboardStatCard label="Active classes" :value="summary?.total_classes ?? 0" icon="📚" tone="indigo" />
             </div>
 
+            <!-- Bulk credential actions -->
+            <div v-if="selectedIds.length" class="flex flex-wrap items-center gap-2 rounded-xl border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3">
+                <span class="text-sm font-semibold text-[#0f3d7a]">{{ selectedIds.length }} selected</span>
+                <button type="button" class="btn-primary text-sm" :disabled="bulkForm.processing" @click="bulkResetPassword">
+                    Reset password
+                </button>
+                <button type="button" class="btn-secondary text-sm" :disabled="bulkForm.processing" @click="bulkSendCredentials">
+                    Resend credentials
+                </button>
+                <button type="button" class="text-sm text-slate-500 ml-auto" @click="clearSelection">Clear</button>
+            </div>
+
             <!-- Filters -->
             <div class="filter-bar">
                 <div class="flex flex-wrap items-end gap-3">
@@ -76,51 +88,58 @@
             </div>
 
             <!-- School cards -->
+            <label v-if="schools.data?.length" class="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" :checked="allSelected" @change="toggleSelectAll">
+                Select all on page
+            </label>
             <div v-if="schools.data?.length" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <Link v-for="school in schools.data" :key="school.id"
-                      :href="`/sahodaya-admin/${sahodaya.id}/schools/${school.id}`"
-                      class="school-card group">
-                    <div class="flex items-start gap-4">
-                        <div class="school-card-avatar">{{ schoolInitials(school.name) }}</div>
-                        <div class="min-w-0 flex-1">
-                            <p class="truncate font-semibold text-slate-900 group-hover:text-[#0f3d7a]">{{ school.name }}</p>
-                            <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                                <p v-if="school.school_prefix" class="font-mono text-xs text-[#0f3d7a]">{{ school.school_prefix }}</p>
-                                <p v-else class="text-xs text-slate-400">No code set</p>
-                                <span v-if="school.is_non_affiliated"
-                                      class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
-                                    Non-affiliated
-                                </span>
-                                <span v-else
-                                      class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
-                                    Affiliated
-                                </span>
+                <div v-for="school in schools.data" :key="school.id" class="relative">
+                    <input type="checkbox" :value="school.id" v-model="selectedIds"
+                           class="absolute top-3 right-3 z-10 rounded border-slate-300 shadow-sm">
+                    <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/${school.id}`"
+                          class="school-card group">
+                        <div class="flex items-start gap-4">
+                            <div class="school-card-avatar">{{ schoolInitials(school.name) }}</div>
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate pr-6 font-semibold text-slate-900 group-hover:text-[#0f3d7a]">{{ school.name }}</p>
+                                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                                    <p v-if="school.school_prefix" class="font-mono text-xs text-[#0f3d7a]">{{ school.school_prefix }}</p>
+                                    <p v-else class="text-xs text-slate-400">No code set</p>
+                                    <span v-if="school.is_non_affiliated"
+                                          class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                        Non-affiliated
+                                    </span>
+                                    <span v-else
+                                          class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                        Affiliated
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="mt-3 space-y-1 text-xs text-slate-500">
-                        <p v-if="school.contact_email" class="truncate">✉ {{ school.contact_email }}</p>
-                        <p v-if="school.contact_phone">📞 {{ school.contact_phone }}</p>
-                        <p v-if="school.affiliation" class="font-mono">Aff. {{ school.affiliation }}</p>
-                        <p v-else-if="school.is_non_affiliated" class="text-amber-700">No CBSE affiliation no.</p>
-                    </div>
-
-                    <div class="school-card-metrics">
-                        <div class="school-card-metric">
-                            <p class="school-card-metric-value">{{ school.student_count ?? 0 }}</p>
-                            <p class="school-card-metric-label">Students</p>
+                        <div class="mt-3 space-y-1 text-xs text-slate-500">
+                            <p v-if="school.contact_email" class="truncate">✉ {{ school.contact_email }}</p>
+                            <p v-if="school.contact_phone">📞 {{ school.contact_phone }}</p>
+                            <p v-if="school.affiliation" class="font-mono">Aff. {{ school.affiliation }}</p>
+                            <p v-else-if="school.is_non_affiliated" class="text-amber-700">No CBSE affiliation no.</p>
                         </div>
-                        <div class="school-card-metric">
-                            <p class="school-card-metric-value">{{ school.classes_count ?? 0 }}</p>
-                            <p class="school-card-metric-label">Classes</p>
-                        </div>
-                    </div>
 
-                    <p class="mt-3 text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                        Joined {{ formatDate(school.created_at) }}
-                    </p>
-                </Link>
+                        <div class="school-card-metrics">
+                            <div class="school-card-metric">
+                                <p class="school-card-metric-value">{{ school.student_count ?? 0 }}</p>
+                                <p class="school-card-metric-label">Students</p>
+                            </div>
+                            <div class="school-card-metric">
+                                <p class="school-card-metric-value">{{ school.classes_count ?? 0 }}</p>
+                                <p class="school-card-metric-label">Classes</p>
+                            </div>
+                        </div>
+
+                        <p class="mt-3 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                            Joined {{ formatDate(school.created_at) }}
+                        </p>
+                    </Link>
+                </div>
             </div>
 
             <EmptyState v-else title="No verified schools found" description="Try adjusting your search or date filters." icon="🏫">
@@ -157,9 +176,10 @@
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import DashboardStatCard from '@/Components/ui/DashboardStatCard.vue';
 import EmptyState from '@/Components/ui/EmptyState.vue';
-import { Link, router } from '@inertiajs/vue3';
-import { reactive, computed } from 'vue';
+import { Link, router, useForm } from '@inertiajs/vue3';
+import { reactive, computed, ref } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String,
@@ -170,6 +190,44 @@ const props = defineProps({
     activeAcademicYear: { type: String, default: null },
     summary: { type: Object, default: () => ({}) },
 });
+
+const { confirm } = useConfirm();
+const selectedIds = ref([]);
+const bulkForm = useForm({ school_ids: [] });
+
+const allSelected = computed(() => {
+    const ids = (props.schools.data ?? []).map((s) => s.id);
+    return ids.length > 0 && ids.every((id) => selectedIds.value.includes(id));
+});
+
+function toggleSelectAll(event) {
+    const ids = (props.schools.data ?? []).map((s) => s.id);
+    selectedIds.value = event.target.checked ? ids : [];
+}
+
+function clearSelection() {
+    selectedIds.value = [];
+}
+
+async function bulkResetPassword() {
+    if (!selectedIds.value.length) return;
+    if (!(await confirm({ message: `Reset the password for ${selectedIds.value.length} school(s)? New temporary passwords will be emailed.` }))) return;
+    bulkForm.school_ids = [...selectedIds.value];
+    bulkForm.post(`/sahodaya-admin/${props.sahodaya.id}/schools/bulk-reset-password`, {
+        preserveScroll: true,
+        onSuccess: () => { selectedIds.value = []; bulkForm.reset(); },
+    });
+}
+
+async function bulkSendCredentials() {
+    if (!selectedIds.value.length) return;
+    if (!(await confirm({ message: `Resend current credentials to ${selectedIds.value.length} school(s)?`, destructive: false }))) return;
+    bulkForm.school_ids = [...selectedIds.value];
+    bulkForm.post(`/sahodaya-admin/${props.sahodaya.id}/schools/bulk-send-credentials`, {
+        preserveScroll: true,
+        onSuccess: () => { selectedIds.value = []; bulkForm.reset(); },
+    });
+}
 
 const filterForm = reactive({
     search:    props.filters?.search ?? '',

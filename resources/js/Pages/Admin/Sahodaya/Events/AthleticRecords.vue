@@ -92,6 +92,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
 import { formatDateTime } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -100,6 +101,7 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+const { confirm } = useConfirm();
 const sportsItems = computed(() => (props.event.items || []).filter(i => i.category === 'sports' || i.sport_discipline));
 const recordForm = useForm({
     item_id: '', class_group: 'open', gender: 'open',
@@ -110,8 +112,8 @@ const recordForm = useForm({
 function saveRecord() {
     recordForm.post(`${base}/athletic-records`, { preserveScroll: true, onSuccess: () => recordForm.reset('record_value', 'holder_name') });
 }
-function removeRecord(id) {
-    if (confirm('Remove this record?')) router.delete(`${base}/athletic-records/${id}`, { preserveScroll: true });
+async function removeRecord(id) {
+    if (await confirm({ message: 'Remove this record?' })) router.delete(`${base}/athletic-records/${id}`, { preserveScroll: true });
 }
 function togglePrize(id) {
     router.post(`${base}/record-breaks/${id}/toggle-prize`, {}, { preserveScroll: true });

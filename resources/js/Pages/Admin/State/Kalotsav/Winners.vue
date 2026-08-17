@@ -56,6 +56,9 @@
 import { ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { prompt } = useConfirm();
 
 defineProps({ program: Object, winners: { type: Array, default: () => [] } });
 
@@ -71,7 +74,7 @@ async function copyPosterLink(url) {
             }
         }, 2000);
     } catch {
-        window.prompt('Copy poster link:', url);
+        await prompt({ message: 'Copy poster link:', inputValue: url });
     }
 }
 </script>

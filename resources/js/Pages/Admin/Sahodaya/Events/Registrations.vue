@@ -366,6 +366,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import FestStudentPickerModal from '@/Components/school/FestStudentPickerModal.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -397,6 +398,7 @@ const filterDescription = computed(() => {
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+const { confirm, prompt } = useConfirm();
 
 function switchSportEvent(evt) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/registrations`);
@@ -671,11 +673,11 @@ function approve(id) {
     }, { preserveScroll: true });
 }
 
-function reject(id) {
-    const reason = prompt('Rejection reason (required):');
+async function reject(id) {
+    const reason = await prompt({ message: 'Rejection reason (required):', inputMultiline: true });
     if (!reason?.trim()) return;
 
-    if (confirm('Reject this registration?')) {
+    if (await confirm({ message: 'Reject this registration?' })) {
         router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${id}/reject`, {
             override_lifecycle: overrideLifecycle.value,
             rejection_reason: reason.trim(),
@@ -683,17 +685,18 @@ function reject(id) {
     }
 }
 
-function cancel(id) {
-    if (!confirm('Cancel this registration? The school will be notified.')) return;
+async function cancel(id) {
+    if (!(await confirm({ message: 'Cancel this registration? The school will be notified.' }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${id}/cancel`, {}, { preserveScroll: true });
 }
 
-function cancelWithRefund(id) {
-    const reason = prompt(
-        'This cancels the registration even though its fee was already paid and approved, and issues a fee '
+async function cancelWithRefund(id) {
+    const reason = await prompt({
+        message: 'This cancels the registration even though its fee was already paid and approved, and issues a fee '
         + 'credit to the school for the amount freed up. Only use this for a genuinely paid+approved registration '
-        + '— plain Cancel already handles everything else. Reason (required):'
-    );
+        + '— plain Cancel already handles everything else. Reason (required):',
+        inputMultiline: true,
+    });
     if (!reason) return;
 
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${id}/cancel-with-refund`, {
@@ -731,9 +734,9 @@ function clearSelection() {
     filterWideMode.value = false;
 }
 
-function runBulkApprove() {
+async function runBulkApprove() {
     if (filterWideMode.value) {
-        if (!confirm(`Approve all ${props.pendingMatchingCount} pending registration(s) matching the current school/item filter?`)) return;
+        if (!(await confirm({ message: `Approve all ${props.pendingMatchingCount} pending registration(s) matching the current school/item filter?`, destructive: false }))) return;
         router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-approve`, {
             school_id: form.school_id || undefined,
             item_id: form.item_id || undefined,
@@ -748,12 +751,12 @@ function runBulkApprove() {
     }, { preserveScroll: true, onSuccess: clearSelection });
 }
 
-function runBulkReject() {
-    const reason = prompt('Rejection reason for these registrations (optional):');
+async function runBulkReject() {
+    const reason = await prompt({ message: 'Rejection reason for these registrations (optional):', inputMultiline: true, inputRequired: false });
     if (reason === null) return; // User cancelled prompt
 
     if (filterWideMode.value) {
-        if (!confirm(`Reject all ${props.pendingMatchingCount} pending registration(s) matching the current school/item filter?`)) return;
+        if (!(await confirm({ message: `Reject all ${props.pendingMatchingCount} pending registration(s) matching the current school/item filter?` }))) return;
         router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-reject`, {
             school_id: form.school_id || undefined,
             item_id: form.item_id || undefined,
@@ -763,7 +766,7 @@ function runBulkReject() {
         return;
     }
 
-    if (!confirm(`Reject ${selectedIds.value.length} registration(s)?`)) return;
+    if (!(await confirm({ message: `Reject ${selectedIds.value.length} registration(s)?` }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-reject`, {
         registration_ids: selectedIds.value,
         override_lifecycle: overrideLifecycle.value,

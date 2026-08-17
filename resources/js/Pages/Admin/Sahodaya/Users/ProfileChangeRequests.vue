@@ -67,6 +67,7 @@
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -76,6 +77,8 @@ const props = defineProps({
     counts: Object,
     filterStatus: String,
 });
+
+const { confirm, prompt } = useConfirm();
 
 const statusTabs = [
     { key: 'pending', label: 'Pending' },
@@ -87,13 +90,13 @@ function setFilter(status) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/users/profile-change-requests`, { status }, { preserveState: true });
 }
 
-function approve(req) {
-    if (!confirm('Approve and apply this profile change?')) return;
+async function approve(req) {
+    if (!(await confirm({ message: 'Approve and apply this profile change?', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/users/profile-change-requests/${req.id}/approve`, {}, { preserveScroll: true });
 }
 
-function reject(req) {
-    const note = prompt('Reason for rejection (optional):');
+async function reject(req) {
+    const note = await prompt({ message: 'Reason for rejection (optional):', inputMultiline: true, inputRequired: false });
     if (note === null) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/users/profile-change-requests/${req.id}/reject`, { resolution_note: note }, { preserveScroll: true });
 }

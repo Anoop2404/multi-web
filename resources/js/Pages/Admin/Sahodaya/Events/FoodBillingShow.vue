@@ -142,6 +142,7 @@ import { Link, useForm, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -160,6 +161,8 @@ const payeeNote = computed(() => (
         : 'Payable to the Sahodaya.'
 ));
 
+const { confirm } = useConfirm();
+
 const itemForm = useForm({ menu_item_id: '', quantity: 1 });
 
 // Live remaining-quantity check against max_per_school for the currently selected item,
@@ -174,8 +177,8 @@ const remainingForSelected = computed(() => {
 function addItem() {
     itemForm.post(`${base}/items`, { preserveScroll: true, onSuccess: () => itemForm.reset() });
 }
-function removeItem(oi) {
-    if (!confirm(`Remove ${oi.item_name} (x${oi.quantity})?`)) return;
+async function removeItem(oi) {
+    if (!(await confirm({ message: `Remove ${oi.item_name} (x${oi.quantity})?` }))) return;
     router.delete(`${base}/items/${oi.id}`, { preserveScroll: true });
 }
 
@@ -184,8 +187,8 @@ function recordPayment() {
     paymentForm.post(`${base}/payments`, { preserveScroll: true, onSuccess: () => paymentForm.reset() });
 }
 
-function settle() {
-    if (!confirm('Mark this bill as settled?')) return;
+async function settle() {
+    if (!(await confirm({ message: 'Mark this bill as settled?', destructive: false }))) return;
     router.post(`${base}/settle`, {}, { preserveScroll: true });
 }
 function reopen() {

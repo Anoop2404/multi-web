@@ -18,7 +18,7 @@ class EventsApiController extends SahodayaApiController
         return response()->json(['data' => $events]);
     }
 
-    public function show(FestEvent $event)
+    public function show(string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 

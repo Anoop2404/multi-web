@@ -61,6 +61,33 @@
                             Edit head fees on Competition →
                         </Link>
                     </p>
+
+                    <div class="sm:col-span-2 border-t border-slate-100 pt-4 space-y-2">
+                        <h4 class="text-sm font-semibold text-slate-800">Group/team item per-participant surcharge (optional)</h4>
+                        <p class="text-xs text-slate-500">
+                            When set, a team item bills <strong>flat fee + (rate × actual participant count)</strong>
+                            instead of a single flat team fee — e.g. ₹250 flat + ₹100 × 7 members = ₹950.
+                            Leave both blank to keep billing team items at the flat team registration fee (Competition → head fees).
+                        </p>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" v-model="feeSettingsForm.charge_standbys">
+                            Count standby participants toward this surcharge
+                        </label>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <FormField label="Flat event fee (₹)">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="feeSettingsForm.group_item_flat_fee" type="number" min="0"
+                                           class="field" placeholder="₹0">
+                                </template>
+                            </FormField>
+                            <FormField label="Per-participant rate (₹)">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="feeSettingsForm.group_item_per_participant_rate" type="number" min="0"
+                                           class="field" placeholder="₹0">
+                                </template>
+                            </FormField>
+                        </div>
+                    </div>
                 </div>
 
                 <div v-else-if="feeSettingsForm.fee_model === 'cksc_tiered'" class="space-y-4 border-t border-slate-100 pt-4">
@@ -90,17 +117,23 @@
                             <span class="block text-xs text-slate-500 mt-0.5">Not the annual Sahodaya membership fee — only enable if you charge an extra registration amount for this event.</span>
                         </span>
                     </label>
-                    <div v-if="feeSettingsForm.include_school_registration" class="grid gap-3 sm:grid-cols-2">
-                        <FormField label="Secondary school (₹)">
-                            <template #default="{ id }">
-                                <input :id="id" v-model.number="feeSettingsForm.school_registration.secondary" type="number" min="0" class="field">
-                            </template>
-                        </FormField>
-                        <FormField label="Senior secondary (₹)">
-                            <template #default="{ id }">
-                                <input :id="id" v-model.number="feeSettingsForm.school_registration.senior_secondary" type="number" min="0" class="field">
-                            </template>
-                        </FormField>
+                    <div v-if="feeSettingsForm.include_school_registration" class="space-y-2">
+                        <div v-for="tier in Object.keys(feeSettingsForm.school_registration)" :key="tier" class="flex items-end gap-2">
+                            <FormField :label="schoolRegistrationTierLabel(tier)" class-extra="flex-1 mb-0">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="feeSettingsForm.school_registration[tier]" type="number" min="0" class="field">
+                                </template>
+                            </FormField>
+                            <button type="button" class="text-xs text-red-400 hover:text-red-600 mb-2.5" @click="removeSchoolRegistrationTier(tier)">Remove</button>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <FormField label="Add tier" hint="e.g. secondary, senior_secondary, other" class-extra="flex-1 mb-0 max-w-xs">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model="newSchoolRegistrationTierKey" type="text" class="field" placeholder="tier key">
+                                </template>
+                            </FormField>
+                            <button type="button" class="btn-secondary text-xs mb-2.5" @click="addSchoolRegistrationTier">+ Add tier</button>
+                        </div>
                     </div>
                     <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
                         <template #default="{ id }">
@@ -141,6 +174,50 @@
                             <input :id="id" v-model.number="feeSettingsForm.per_student_amount" type="number" min="0" class="field max-w-xs">
                         </template>
                     </FormField>
+                    <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field max-w-xs">
+                        </template>
+                    </FormField>
+                </div>
+
+                <div v-else-if="feeSettingsForm.fee_model === 'student_count_slab'" class="space-y-3 border-t border-slate-100 pt-4">
+                    <p class="text-xs text-slate-600">
+                        Bills each school a single stepped amount based on its total registered student count for
+                        this event. Slabs are scoped to this event only — configure them below.
+                    </p>
+                    <div class="overflow-x-auto rounded-xl border border-slate-100">
+                        <table class="data-table">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-slate-600">Min students</th>
+                                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-slate-600">Max students</th>
+                                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-slate-600">Amount (₹)</th>
+                                    <th class="px-4 py-2.5"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                <tr v-for="(slab, index) in feeSettingsForm.student_count_slabs" :key="index">
+                                    <td class="px-4 py-2">
+                                        <input v-model.number="slab.min_count" type="number" min="0" class="field w-24">
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <input v-model.number="slab.max_count" type="number" min="0" class="field w-24" placeholder="∞">
+                                    </td>
+                                    <td class="px-4 py-2 text-right">
+                                        <input v-model.number="slab.amount" type="number" min="0" class="field w-32 ml-auto text-right">
+                                    </td>
+                                    <td class="px-4 py-2 text-right">
+                                        <button type="button" class="text-xs text-red-400 hover:text-red-600" @click="removeStudentCountSlab(index)">Remove</button>
+                                    </td>
+                                </tr>
+                                <tr v-if="!feeSettingsForm.student_count_slabs.length">
+                                    <td colspan="4" class="px-4 py-3 text-sm text-slate-500">No slabs yet — add one below.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn-secondary text-sm" @click="addStudentCountSlab">+ Add slab</button>
                     <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field max-w-xs">
@@ -555,23 +632,53 @@
                     </template>
                 </FormField>
 
+                <div class="border-t border-slate-100 pt-4 space-y-2">
+                    <h4 class="text-sm font-semibold text-slate-800">Group/team item per-participant surcharge (optional)</h4>
+                    <p class="text-xs text-slate-500">
+                        When set, a group/team item bills <strong>flat fee + (rate × actual participant count)</strong>
+                        instead of a single flat team fee — e.g. ₹250 flat + ₹100 × 7 members = ₹950.
+                        Leave both blank to keep billing group/team items at the flat category rate above.
+                        "Charge standby participants" above also decides whether standbys count toward this participant total.
+                    </p>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <FormField label="Flat event fee (₹)">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="feeSettingsForm.group_item_flat_fee" type="number" min="0"
+                                       class="field" placeholder="₹0">
+                            </template>
+                        </FormField>
+                        <FormField label="Per-participant rate (₹)">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="feeSettingsForm.group_item_per_participant_rate" type="number" min="0"
+                                       class="field" placeholder="₹0">
+                            </template>
+                        </FormField>
+                    </div>
+                </div>
+
                 <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
                     <template #default="{ id }">
                         <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field max-w-xs">
                     </template>
                 </FormField>
 
-                <div v-if="feeSettingsForm.include_school_registration" class="grid gap-3 sm:grid-cols-2">
-                    <FormField label="Secondary registration (₹)">
-                        <template #default="{ id }">
-                            <input :id="id" v-model.number="feeSettingsForm.school_registration.secondary" type="number" min="0" class="field">
-                        </template>
-                    </FormField>
-                    <FormField label="Senior secondary (₹)">
-                        <template #default="{ id }">
-                            <input :id="id" v-model.number="feeSettingsForm.school_registration.senior_secondary" type="number" min="0" class="field">
-                        </template>
-                    </FormField>
+                <div v-if="feeSettingsForm.include_school_registration" class="space-y-2">
+                    <div v-for="tier in Object.keys(feeSettingsForm.school_registration)" :key="tier" class="flex items-end gap-2">
+                        <FormField :label="schoolRegistrationTierLabel(tier)" class-extra="flex-1 mb-0">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="feeSettingsForm.school_registration[tier]" type="number" min="0" class="field">
+                            </template>
+                        </FormField>
+                        <button type="button" class="text-xs text-red-400 hover:text-red-600 mb-2.5" @click="removeSchoolRegistrationTier(tier)">Remove</button>
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <FormField label="Add tier" hint="e.g. secondary, senior_secondary, other" class-extra="flex-1 mb-0 max-w-xs">
+                            <template #default="{ id }">
+                                <input :id="id" v-model="newSchoolRegistrationTierKey" type="text" class="field" placeholder="tier key">
+                            </template>
+                        </FormField>
+                        <button type="button" class="btn-secondary text-xs mb-2.5" @click="addSchoolRegistrationTier">+ Add tier</button>
+                    </div>
                 </div>
 
                 <div v-if="event.event_type === 'sports'">
@@ -665,6 +772,8 @@
                                     <th>Item</th>
                                     <th class="w-36">Category rate</th>
                                     <th class="w-40 text-right">Override (₹)</th>
+                                    <th class="w-40 text-right">Group/team flat fee (₹)</th>
+                                    <th class="w-40 text-right">Per-participant rate (₹)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -683,6 +792,18 @@
                                         <input v-model.number="row.fee_amount" type="number" min="0"
                                                class="field w-full max-w-[8rem] ml-auto text-right"
                                                :placeholder="formatAmount(categoryRateForRow(row), true)">
+                                    </td>
+                                    <td class="text-right">
+                                        <input v-if="row.participant_type === 'group' || row.participant_type === 'team'"
+                                               v-model.number="row.group_item_flat_fee" type="number" min="0"
+                                               class="field w-full max-w-[8rem] ml-auto text-right" placeholder="₹0">
+                                        <span v-else class="text-xs text-slate-300">—</span>
+                                    </td>
+                                    <td class="text-right">
+                                        <input v-if="row.participant_type === 'group' || row.participant_type === 'team'"
+                                               v-model.number="row.group_item_per_participant_rate" type="number" min="0"
+                                               class="field w-full max-w-[8rem] ml-auto text-right" placeholder="₹0">
+                                        <span v-else class="text-xs text-slate-300">—</span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -722,6 +843,7 @@
 <script setup>
 import { computed, inject, ref } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
 
 const {
     feeSettingsForm, feeModels, event, classGroupLabels,
@@ -733,6 +855,8 @@ const {
     editingSchemeGroupId, schemeGroupEditForm,
     startEditSchemeGroup, cancelEditSchemeGroup, saveSchemeGroupEdit,
 } = inject('eventSettings');
+
+const { confirm } = useConfirm();
 
 if (event.event_type === 'sports') {
     feeSettingsForm.fee_model = 'sports_composite';
@@ -759,7 +883,7 @@ const selectedScheme = computed(() => (
 // what's affected (events_count/event_titles come from the backend) before either delete
 // actually fires, matching this codebase's existing confirm()-before-destructive-action
 // pattern (see AcademicYears/Index.vue, SportsAgeGroups/Index.vue, etc.).
-function confirmDeleteScheme(scheme) {
+async function confirmDeleteScheme(scheme) {
     const count = scheme.events_count ?? 0;
     const message = count > 0
         ? `Delete "${scheme.name}"? ${count} event${count === 1 ? ' is' : 's are'} currently using it`
@@ -767,15 +891,15 @@ function confirmDeleteScheme(scheme) {
             + ` — you'll need to reassign ${count === 1 ? 'that event' : 'those events'} to a different scheme afterward. This cannot be undone.`
         : `Delete "${scheme.name}"? This cannot be undone.`;
 
-    if (!confirm(message)) return;
+    if (!(await confirm({ message, destructive: true }))) return;
     removeClassCategoryScheme(scheme.id);
 }
 
-function confirmDeleteSchemeGroup(scheme, group) {
+async function confirmDeleteSchemeGroup(scheme, group) {
     const message = `Remove category "${group.label}" from "${scheme.name}"? Any students or items already placed `
         + `in this category will need to be reassigned to a different category afterward. This cannot be undone.`;
 
-    if (!confirm(message)) return;
+    if (!(await confirm({ message, destructive: true }))) return;
     removeClassCategorySchemeGroup(scheme.id, group.id);
 }
 
@@ -791,6 +915,40 @@ function billingModelLabel(key, label) {
         return 'Composite (school + student + included items)';
     }
     return label;
+}
+
+// N-tier school registration map (Phase I) — feeSettingsForm.school_registration is now
+// an arbitrary-keyed object (see SchoolClassCategoryResolver on the backend) instead of
+// a fixed { secondary, senior_secondary } pair, so the form renders one row per key
+// present and lets the admin add/remove tier rows freely.
+const newSchoolRegistrationTierKey = ref('');
+
+function schoolRegistrationTierLabel(key) {
+    return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function addSchoolRegistrationTier() {
+    const key = newSchoolRegistrationTierKey.value.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!key || key in feeSettingsForm.school_registration) {
+        return;
+    }
+    feeSettingsForm.school_registration[key] = '';
+    newSchoolRegistrationTierKey.value = '';
+}
+
+function removeSchoolRegistrationTier(key) {
+    delete feeSettingsForm.school_registration[key];
+}
+
+// student_count_slab fee model's slab table (Phase J) — feeSettingsForm.student_count_slabs
+// is a plain client-side array edited here and submitted whole with the rest of the fee
+// settings form, same as feeSettingsForm.item_fees / head_fees above.
+function addStudentCountSlab() {
+    feeSettingsForm.student_count_slabs.push({ min_count: 0, max_count: '', amount: '' });
+}
+
+function removeStudentCountSlab(index) {
+    feeSettingsForm.student_count_slabs.splice(index, 1);
 }
 
 const ledgerForm = useForm({ name: ledgerAccount?.name ?? '' });

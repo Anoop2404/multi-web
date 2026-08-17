@@ -4,7 +4,7 @@
             <h1 class="text-xl font-semibold">State championship events</h1>
             <ul class="space-y-2">
                 <li v-for="e in events.data" :key="e.id">
-                    <Link :href="`/admin/state-workspace/fest/${e.id}`" class="link-brand">{{ e.name }}</Link>
+                    <Link :href="e.show_url" class="link-brand">{{ e.name }}</Link>
                     <span class="text-xs text-slate-400 ml-2">{{ e.status }}</span>
                 </li>
             </ul>

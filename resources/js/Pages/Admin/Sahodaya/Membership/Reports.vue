@@ -266,6 +266,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { reactive, computed, defineComponent, h, ref, watch } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String,
@@ -278,6 +279,8 @@ const props = defineProps({
     paymentDue: Object,
     paymentsPending: Object, paymentsDone: Object,
 });
+
+const { confirm, prompt } = useConfirm();
 
 const searchForm = reactive({
     search: props.search ?? '',
@@ -367,15 +370,15 @@ function exportUrl() {
     return `/sahodaya-admin/${props.sahodaya.id}/membership/reports/export/${type}${qs ? `?${qs}` : ''}`;
 }
 
-function askCancelReason(label) {
-    const reason = window.prompt(`Reason for cancelling membership${label ? ` — ${label}` : ''}?`);
+async function askCancelReason(label) {
+    const reason = await prompt({ message: `Reason for cancelling membership${label ? ` — ${label}` : ''}?`, inputMultiline: true, inputRequired: false });
     return reason?.trim() || null;
 }
 
-function cancelOne(school) {
-    const reason = askCancelReason(school.name);
+async function cancelOne(school) {
+    const reason = await askCancelReason(school.name);
     if (!reason) return;
-    if (!confirm(`Cancel membership for "${school.name}"? They will be removed from approved member schools.`)) return;
+    if (!(await confirm({ message: `Cancel membership for "${school.name}"? They will be removed from approved member schools.` }))) return;
 
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${school.id}/cancel-membership`, { reason }, {
         preserveScroll: true,
@@ -404,11 +407,11 @@ function toggleSelectAllUnpaid(checked) {
     }
 }
 
-function bulkCancelSelected() {
+async function bulkCancelSelected() {
     if (!selectedUnpaidIds.value.length) return;
-    const reason = askCancelReason(`${selectedUnpaidIds.value.length} schools`);
+    const reason = await askCancelReason(`${selectedUnpaidIds.value.length} schools`);
     if (!reason) return;
-    if (!confirm(`Cancel membership for ${selectedUnpaidIds.value.length} school(s)?`)) return;
+    if (!(await confirm({ message: `Cancel membership for ${selectedUnpaidIds.value.length} school(s)?` }))) return;
 
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/bulk-cancel-membership`, {
         school_ids: selectedUnpaidIds.value,

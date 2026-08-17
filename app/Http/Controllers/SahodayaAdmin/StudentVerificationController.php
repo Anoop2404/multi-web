@@ -21,9 +21,9 @@ class StudentVerificationController extends SahodayaAdminController
             'search'            => 'nullable|string|max:100',
         ]);
 
-        $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)
-            ->where('type', 'school')
-            ->pluck('id');
+        $schoolIds = $this->membershipRegionScopedSchoolIds(
+            Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id')->all()
+        );
 
         $base = Student::query()
             ->whereIn('tenant_id', $schoolIds)
@@ -139,6 +139,7 @@ class StudentVerificationController extends SahodayaAdminController
     {
         $this->assertStaffCan('membership.manage');
         abort_if($student->tenant?->parent_id !== $this->sahodaya->id, 403);
+        abort_if($this->membershipRegionScopedSchoolIds([$student->tenant_id]) === [], 403);
 
         if ($student->verified_at) {
             return back()->with('success', 'Student is already verified.');
@@ -170,6 +171,7 @@ class StudentVerificationController extends SahodayaAdminController
     {
         $this->assertStaffCan('membership.manage');
         abort_if($student->tenant?->parent_id !== $this->sahodaya->id, 403);
+        abort_if($this->membershipRegionScopedSchoolIds([$student->tenant_id]) === [], 403);
 
         $data = $request->validate(['reason' => 'required|string|max:500']);
 
@@ -206,7 +208,9 @@ class StudentVerificationController extends SahodayaAdminController
             'school_id'             => 'nullable|string',
         ]);
 
-        $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id');
+        $schoolIds = $this->membershipRegionScopedSchoolIds(
+            Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id')->all()
+        );
 
         if (! empty($data['student_ids'])) {
             $query = Student::whereIn('tenant_id', $schoolIds)
@@ -255,7 +259,9 @@ class StudentVerificationController extends SahodayaAdminController
         $defaultReason = $data['reason'] ?? 'Verification rejected by Sahodaya.';
         $reasonsMap = $data['reasons'] ?? [];
 
-        $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id');
+        $schoolIds = $this->membershipRegionScopedSchoolIds(
+            Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id')->all()
+        );
 
         $students = Student::whereIn('tenant_id', $schoolIds)
             ->where('status', 'active')
