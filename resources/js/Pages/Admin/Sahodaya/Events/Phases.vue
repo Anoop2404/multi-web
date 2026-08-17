@@ -4,11 +4,21 @@
         <PageHeader :title="`${event.title} — Phases`" eyebrow="Rounds & levels"
                     description="Split items into named phases (e.g. Digi Fest day, Off-stage day, On-stage day). Optional — leave every item unassigned to run the event as a single phase." />
 
-        <EventSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="levels" />
+        <EventSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="phases" />
 
         <div class="mb-4">
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/levels`" class="link-brand text-sm">&larr; Back to Rounds & Levels</Link>
         </div>
+
+        <div v-if="conductSystemLocked === 'partitioned'" class="mb-4 max-w-5xl rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            This event currently uses region partitioning (Rounds &amp; Levels). Phases and items here stay usable, but creating a payment batch will be blocked while those partitions already have registrations.
+        </div>
+
+        <div v-if="needsBatchBeforeRoutingWorks" class="mb-4 max-w-5xl rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Phases are set up, but no payment batch exists yet — item-phase assignment has no effect on registration routing until you add at least one payment batch below.
+        </div>
+
+        <FestPhaseWorkflowNav class="max-w-5xl" :batches="registrationBatches" :phases="phases" />
 
         <section class="card mb-6 max-w-5xl space-y-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -200,10 +210,19 @@
                             </div>
                         </div>
                         <div v-if="regionEditId === phase.id" class="mt-2 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 space-y-2">
-                            <p class="text-xs font-semibold text-slate-600">Allowed regions for {{ phase.name }}</p>
-                            <select v-model="regionEditIds" multiple class="field text-sm min-h-24">
-                                <option v-for="region in regions" :key="region.id" :value="region.id">{{ region.name }}</option>
-                            </select>
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-semibold text-slate-600">Allowed regions for {{ phase.name }}</p>
+                                <p class="text-[11px] text-slate-500">{{ regionEditIds.length }} selected</p>
+                            </div>
+                            <div v-if="regions.length" class="grid sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto rounded-lg border border-indigo-100 bg-white p-2">
+                                <label v-for="region in regions" :key="region.id"
+                                       class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs cursor-pointer hover:bg-indigo-50 transition"
+                                       :class="regionEditIds.includes(region.id) ? 'bg-indigo-50 text-indigo-900 font-semibold' : 'text-slate-700'">
+                                    <input type="checkbox" :value="region.id" v-model="regionEditIds" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-400">
+                                    <span>{{ region.name }}</span>
+                                </label>
+                            </div>
+                            <p v-else class="text-xs text-slate-400">No active regions configured for this Sahodaya yet.</p>
                             <div class="flex gap-2">
                                 <button type="button" class="btn-primary text-xs" :disabled="regionEditForm.processing" @click="saveRegionEdit(phase)">Save regions</button>
                                 <button type="button" class="btn-ghost text-xs" @click="regionEditId = null">Cancel</button>
@@ -219,6 +238,8 @@
 
                 <div v-if="items.length === 0" class="text-sm text-slate-400">No items on this event yet.</div>
                 <template v-else>
+                    <input v-model="itemSearch" type="search" class="field text-sm" placeholder="Search items by title, code, or category…">
+
                     <div class="flex items-center gap-2">
                         <select v-model="assignPhaseId" class="field text-sm flex-1">
                             <option :value="null">— No phase (unassign) —</option>
@@ -228,6 +249,8 @@
                             Assign ({{ selectedItemIds.length }})
                         </button>
                     </div>
+
+                    <p class="text-xs text-slate-400">{{ filteredItems.length }} of {{ items.length }} item(s)</p>
 
                     <div class="max-h-96 overflow-y-auto rounded-xl border border-slate-200">
                         <table class="w-full text-sm">
@@ -239,13 +262,23 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
-                                <tr v-for="item in items" :key="item.id" class="bg-white">
-                                    <td class="p-2"><input type="checkbox" :value="item.id" v-model="selectedItemIds"></td>
+                                <tr v-for="item in filteredItems" :key="item.id" class="bg-white">
+                                    <td class="p-2 align-top"><input type="checkbox" :value="item.id" v-model="selectedItemIds"></td>
                                     <td class="p-2">
-                                        {{ item.title }}
-                                        <span v-if="item.item_code" class="ml-1 text-xs font-mono text-slate-400">{{ item.item_code }}</span>
+                                        <div>
+                                            {{ item.title }}
+                                            <span v-if="item.item_code" class="ml-1 text-xs font-mono text-slate-400">{{ item.item_code }}</span>
+                                        </div>
+                                        <div class="mt-1 flex flex-wrap gap-1">
+                                            <span v-if="item.stage_type" class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-100">{{ formatLabel(item.stage_type) }}</span>
+                                            <span v-if="item.gender" class="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 border border-violet-100">{{ formatLabel(item.gender) }}</span>
+                                            <span v-if="item.participant_type" class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">{{ formatLabel(item.participant_type) }}</span>
+                                        </div>
                                     </td>
-                                    <td class="p-2 text-slate-600">{{ item.phase_name || '—' }}</td>
+                                    <td class="p-2 text-slate-600 align-top">{{ item.phase_name || '—' }}</td>
+                                </tr>
+                                <tr v-if="filteredItems.length === 0">
+                                    <td colspan="3" class="p-4 text-center text-sm text-slate-400">No items match "{{ itemSearch }}".</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -263,6 +296,7 @@ import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
+import FestPhaseWorkflowNav from '@/Components/sahodaya/FestPhaseWorkflowNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -276,7 +310,14 @@ const props = defineProps({
     registrationBatches: { type: Array, default: () => [] },
     regions: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
+    conductSystemLocked: { type: String, default: null },
 });
+
+// Phase assignment has no effect on registration routing until a payment batch exists
+// (that's what flips workflow_mode). Condition-driven, not just a one-time flash, so it
+// still catches an admin who comes back later having forgotten — see
+// FestEventPhaseController::assignItems()'s matching backend warning.
+const needsBatchBeforeRoutingWorks = computed(() => props.phases.length > 0 && props.registrationBatches.length === 0);
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const { confirm } = useConfirm();
@@ -285,6 +326,23 @@ const showAdd = ref(false);
 const editId = ref(null);
 const selectedItemIds = ref([]);
 const assignPhaseId = ref(null);
+const itemSearch = ref('');
+
+const filteredItems = computed(() => {
+    const q = itemSearch.value.trim().toLowerCase();
+    if (!q) return props.items;
+
+    return props.items.filter((item) =>
+        item.title?.toLowerCase().includes(q)
+        || item.item_code?.toLowerCase().includes(q)
+        || item.category?.toLowerCase().includes(q)
+    );
+});
+
+function formatLabel(value) {
+    if (!value) return '';
+    return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const addForm = useForm({
     name: '', code: '', sort_order: null, is_default: false,
@@ -314,7 +372,7 @@ const regionEditForm = useForm({ region_ids: [] });
 
 const topologyForm = useForm({});
 
-const allSelected = computed(() => props.items.length > 0 && selectedItemIds.value.length === props.items.length);
+const allSelected = computed(() => filteredItems.value.length > 0 && filteredItems.value.every((item) => selectedItemIds.value.includes(item.id)));
 
 function itemCountForPhase(phaseId) {
     return props.items.filter((i) => i.phase_id === phaseId).length;
@@ -348,7 +406,14 @@ const feeShareWarning = computed(() => {
 });
 
 function toggleSelectAll() {
-    selectedItemIds.value = allSelected.value ? [] : props.items.map((i) => i.id);
+    const filteredIds = filteredItems.value.map((item) => item.id);
+
+    if (allSelected.value) {
+        const excluded = new Set(filteredIds);
+        selectedItemIds.value = selectedItemIds.value.filter((id) => !excluded.has(id));
+    } else {
+        selectedItemIds.value = Array.from(new Set([...selectedItemIds.value, ...filteredIds]));
+    }
 }
 
 function createPhase() {

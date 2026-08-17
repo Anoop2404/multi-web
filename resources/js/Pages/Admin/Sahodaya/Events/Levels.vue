@@ -18,8 +18,53 @@
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="levels" />
 
         <div class="space-y-6 max-w-6xl">
-            <!-- Hero Topology Overview Card -->
-            <div class="card bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white !p-6 shadow-xl rounded-2xl border border-indigo-900/50">
+            <!-- Conduct Choice Cards — shown only before a generic event has committed to
+                 either system (see showConductChoice/conductSystemLocked above). Equal
+                 visual weight on purpose: the old hero gave Region Split a full-width bold
+                 CTA and Phases two small text links, which is how a Sahodaya ended up with
+                 both systems half-configured on the same event in the first place. -->
+            <div v-if="showConductChoice && conductSystemLocked === null" class="grid sm:grid-cols-2 gap-4">
+                <div class="card space-y-3 border-2 border-slate-200 hover:border-indigo-300 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl shrink-0">🗺️</div>
+                        <h3 class="text-base font-bold text-slate-900">Region Split</h3>
+                    </div>
+                    <p class="text-sm text-slate-600">One region choice for the whole event — splits it into one child event per active Sahodaya region.</p>
+                    <button type="button" class="btn-primary text-xs w-full justify-center !py-2.5" :disabled="topologyForm.processing" @click="toggleQuickMode">
+                        Choose Region Split
+                    </button>
+                </div>
+                <div class="card space-y-3 border-2 border-slate-200 hover:border-indigo-300 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-xl shrink-0">⚡</div>
+                        <h3 class="text-base font-bold text-slate-900">Phases &amp; Payment Levels</h3>
+                    </div>
+                    <p class="text-sm text-slate-600">Multiple named conduct phases (e.g. Digi Fest, Off Stage, Sargadhara), each with its own independent regions and payment level.</p>
+                    <Link :href="`${base}/phases`" class="btn-primary text-xs w-full justify-center !py-2.5 block text-center">
+                        Set Up Phases &amp; Levels
+                    </Link>
+                </div>
+            </div>
+
+            <!-- Compact summary once locked to Phases & Payment Levels — the old sync
+                 button/custom-partition form below stay hidden (showPartitionUi is
+                 conductMode-driven and this event's conduct_mode is 'partitioned' too by
+                 now, so gate on conductSystemLocked specifically to avoid showing both). -->
+            <div v-else-if="showConductChoice && conductSystemLocked === 'phased'" class="card !p-5 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-slate-50 to-indigo-50/40 border border-indigo-100">
+                <div class="flex items-center gap-3.5">
+                    <div class="h-11 w-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xl shrink-0 shadow">⚡</div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Using Phases &amp; Payment Levels</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">{{ phaseCount }} phase{{ phaseCount === 1 ? '' : 's' }} · {{ batchCount }} payment batch{{ batchCount === 1 ? '' : 'es' }}</p>
+                    </div>
+                </div>
+                <Link :href="`${base}/phases`" class="btn-primary text-xs shrink-0">Manage on Phases page →</Link>
+            </div>
+
+            <!-- Hero Topology Overview Card — unchanged content, now shown for: kids_fest/
+                 sports/child-events (always, via showConductChoice), and any generic event
+                 already locked to region partitioning. -->
+            <div v-else class="card bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white !p-6 shadow-xl rounded-2xl border border-indigo-900/50">
                 <div class="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
                     <div class="flex items-center gap-3.5">
                         <div class="h-12 w-12 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center text-2xl shadow-inner border border-white/20">
@@ -83,10 +128,16 @@
 
             <!-- Two-Column Operations Layout -->
             <div class="grid lg:grid-cols-12 gap-6">
-                
-                <!-- Left Column: Regional Partitions & Child Events (Span 7) -->
-                <div class="lg:col-span-7 space-y-6">
-                    
+
+                <!-- Left Column: Regional Partitions & Child Events (Span 7) — this whole
+                     card is the OLD region-partition system's management UI (list/create
+                     region-split children). Once a generic event has committed to Phases &
+                     Payment Levels it has no purpose: its own children are phase leaves, not
+                     legacy partitions, so activePartitions/partitions here are always empty,
+                     and the "Add Custom Region Partition" form would just be rejected by
+                     FestPartitionService::assertLegacyPartitioningAllowed() if submitted. -->
+                <div v-if="showLegacyPartitionCard" class="lg:col-span-7 space-y-6">
+
                     <!-- Region Partitions & Sync Card -->
                     <div class="card space-y-4">
                         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -190,8 +241,9 @@
                     </div>
                 </div>
 
-                <!-- Right Column: Competition Rounds & Promotions (Span 5) -->
-                <div class="lg:col-span-5 space-y-6">
+                <!-- Right Column: Competition Rounds & Promotions — full width when the
+                     left column above is hidden. -->
+                <div :class="showLegacyPartitionCard ? 'lg:col-span-5' : 'lg:col-span-12'" class="space-y-6">
                     
                     <!-- School Rounds & Promotions -->
                     <div class="card space-y-4">
@@ -252,8 +304,9 @@
                         </div>
                     </div>
 
-                    <!-- Event Phases Link Card -->
-                    <div class="card p-4 flex items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-indigo-50/30 border border-indigo-100">
+                    <!-- Event Phases Link Card — redundant with the compact summary card
+                         above once conductSystemLocked === 'phased', so hidden then. -->
+                    <div v-if="conductSystemLocked !== 'phased'" class="card p-4 flex items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-indigo-50/30 border border-indigo-100">
                         <div>
                             <h5 class="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
                                 <span>⚡</span> Event Phases
@@ -328,11 +381,28 @@ const props = defineProps({
     memberSchools: { type: Array, default: () => [] },
     schoolPartitions: { type: Object, default: () => ({}) },
     regionDrillDown: { type: Array, default: () => [] },
+    conductSystemLocked: { type: String, default: null },
+    phaseCount: { type: Number, default: 0 },
+    batchCount: { type: Number, default: 0 },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const { confirm } = useConfirm();
-const showPartitionUi = computed(() => props.conductMode === 'partitioned' || props.event.event_type === 'kalolsavam');
+// kids_fest/sports have their own bespoke cluster/season flows (spawnCluster(),
+// SportsSetupSubNav) that predate and don't map onto the generic "Region Split vs Phases
+// & Payment Levels" choice below -- leave their experience exactly as it was. Child
+// events (region/phase leaves) never show conduct-topology controls of their own either.
+const showConductChoice = computed(() => !['kids_fest', 'sports'].includes(props.event.event_type) && !props.event.parent_event_id);
+// No longer force-shown for every kalolsavam event regardless of its actual conduct
+// choice -- that bias would silently defeat the decision cards below for exactly the
+// event type this whole redesign is about. Purely conductMode-driven now.
+const showPartitionUi = computed(() => props.conductMode === 'partitioned');
+// The old region-partition management card (list/create region-split children) has no
+// purpose once a generic event is locked to Phases & Payment Levels -- see the template
+// comment above where this gates the whole left column. Always shown for kids_fest/
+// sports/child-events (their own bespoke flows, showConductChoice false) or for a generic
+// event not yet locked to phased.
+const showLegacyPartitionCard = computed(() => !showConductChoice.value || props.conductSystemLocked !== 'phased');
 const showCustomForm = ref(false);
 
 const activePartitions = computed(() => props.partitions?.length ? props.partitions : (props.event.child_events || []));

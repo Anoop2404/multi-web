@@ -7,6 +7,7 @@ use App\Models\FestEventPhase;
 use App\Models\FestRegistrationBatch;
 use App\Models\Region;
 use App\Services\Events\FestEventPhaseService;
+use App\Services\Events\FestPartitionService;
 use App\Support\FestPageActivity;
 
 use App\Services\Audit\PlatformAuditLogger;
@@ -14,16 +15,20 @@ use Illuminate\Http\Request;
 
 class FestEventPhaseController extends SahodayaAdminController
 {
-    public function index(Request $request, string $tenantId, FestEvent $event, FestEventPhaseService $service)
+    public function index(Request $request, string $tenantId, FestEvent $event, FestEventPhaseService $service, FestPartitionService $partitions)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $phases = $service->getPhases($event)->load(['registrationBatch', 'allowedRegions.region']);
+        $registrationBatches = FestRegistrationBatch::where('event_id', $event->id)->orderBy('sort_order')->get();
         $items = $event->items()->with('phase')->get()->map(fn ($item) => [
             'id' => $item->id,
             'title' => $item->title,
             'item_code' => $item->item_code,
             'category' => $item->category,
+            'stage_type' => $item->stage_type,
+            'gender' => $item->gender,
+            'participant_type' => $item->participant_type,
             'phase_id' => $item->phase_id,
             'phase_name' => $item->phase?->name,
         ]);
@@ -32,8 +37,19 @@ class FestEventPhaseController extends SahodayaAdminController
             'event' => $event,
             'phases' => $phases,
             'items' => $items,
-            'registrationBatches' => FestRegistrationBatch::where('event_id', $event->id)->orderBy('sort_order')->get(),
+            'registrationBatches' => $registrationBatches,
             'regions' => Region::forTenant($event->tenant_id)->active()->orderBy('sort_order')->get(),
+            // Informational only on this page -- only batch creation actually flips
+            // routing (FestRegistrationBatchController::store()), so phase/item setup
+            // stays usable while old-system partitions exist without registrations; that
+            // pivot point is already covered by FestPartitionService::
+            // assertSafeToActivatePhasedWorkflow(). Never used to lock phases/items here.
+            // Same threshold as FestEventController::levels()'s conductSystemLocked --
+            // matches FestPartitionService::assertLegacyPartitioningAllowed() exactly
+            // (phases/batches existing, not just workflow_mode already flipped).
+            'conductSystemLocked' => ($event->usesPhasedRegionalBilling() || $phases->isNotEmpty() || $registrationBatches->isNotEmpty())
+                ? 'phased'
+                : ($partitions->hasLegacyPartitions($event) ? 'partitioned' : null),
         ]));
     }
 
@@ -175,6 +191,14 @@ class FestEventPhaseController extends SahodayaAdminController
             'phase_id' => $data['phase_id'] ?? null,
             'count' => $count,
         ]);
+
+        // Phase assignment has no effect on registration routing until a payment batch
+        // exists (that's what flips workflow_mode -- see FestRegistrationBatchController::
+        // store()); without this, an admin who sets up phases before batches gets a
+        // silent "success" that doesn't actually do anything yet.
+        if ($event->phases()->exists() && $event->registrationBatches()->doesntExist()) {
+            return back()->with('warning', "Assigned {$count} item(s) to phase, but phase-based routing isn't active yet — create a payment batch first, or these items keep routing through the event's current topology.");
+        }
 
         return back()->with('success', "Assigned {$count} item(s) to phase.");
     }

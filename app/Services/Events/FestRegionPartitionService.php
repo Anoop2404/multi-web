@@ -157,12 +157,12 @@ class FestRegionPartitionService
         }
 
         try {
-            if ($this->partitions->conductMode($hub) !== 'partitioned') {
-                // Auto-enable partitioned mode for region-applicable events
-                $hub->update(['conduct_mode' => 'partitioned']);
-                $hub->refresh();
-            }
-
+            // syncPartitionsFromRegions() below does its own conduct_mode flip (and, via
+            // FestPartitionService::assertLegacyPartitioningAllowed(), its own guard against
+            // an event that already uses Phases & Payment Levels) -- no need to pre-flip
+            // conduct_mode here too. This try/catch already does the right thing once the
+            // guard sits at that method's own top: a locked event just no-ops the auto-sync,
+            // matching this method's "never block the creating/publishing action" contract.
             $this->syncPartitionsFromRegions($hub);
         } catch (\Throwable) {
             // Never block the creating/publishing action
@@ -265,6 +265,7 @@ class FestRegionPartitionService
     {
         abort_if($hub->parent_event_id, 422, 'Sync regions on the hub event, not a partition.');
         abort_if($hub->event_type === 'sports', 422, 'Sports regions must be synced below each sport discipline.');
+        $this->partitions->assertLegacyPartitioningAllowed($hub);
 
         $regions = Region::forTenant($hub->tenant_id)->active()->orderBy('sort_order')->orderBy('name')->get();
         abort_if($regions->isEmpty(), 422, 'No active regions configured for this Sahodaya.');
@@ -370,6 +371,10 @@ class FestRegionPartitionService
      */
     public function syncPartitionsFromRegionsForPhase(FestEvent $hub, FestEventPhase $phase): array
     {
+        // Deliberately NOT guarded by FestPartitionService::assertLegacyPartitioningAllowed()
+        // -- unlike syncPartitionsFromRegions() above, this is the phased system's OWN
+        // per-regional-phase sync primitive (operates on a real FestEventPhase, keyed by
+        // region_partition_group), not a competing write path. See that guard's docblock.
         abort_if($hub->parent_event_id, 422, 'Sync regions on the hub event, not a partition.');
         abort_if($hub->event_type === 'sports', 422, 'Sports regions must be synced below each sport discipline.');
         abort_if((int) $phase->event_id !== (int) $hub->id, 422, 'Phase does not belong to this hub event.');

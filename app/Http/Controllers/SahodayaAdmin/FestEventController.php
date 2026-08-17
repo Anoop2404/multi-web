@@ -502,13 +502,36 @@ class FestEventController extends SahodayaAdminController
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $isPartitionedHub = $partitionService->isPartitionedHub($event);
+        // Old-system partitions only, excluding phased-system leaf children (which also
+        // carry partition_key/cluster_key for unrelated reasons) -- see
+        // FestPartitionService::legacyPartitions() docblock. isPartitionedHub/partitions/
+        // regionDrillDown below drive this page's OWN region-partition management UI, so
+        // they must reflect only what THIS page's actions actually own; a phased-only
+        // event must not show up here as if it had legacy partitions to manage.
+        $hasLegacyPartitions = $partitionService->hasLegacyPartitions($event);
+        $phaseCount = \App\Models\FestEventPhase::where('event_id', $event->id)->count();
+        $batchCount = \App\Models\FestRegistrationBatch::where('event_id', $event->id)->count();
+
+        // Which conduct system (if either) this event has already committed to, driven by
+        // the EXACT same predicate FestPartitionService::assertLegacyPartitioningAllowed()
+        // blocks on ($phaseCount/$batchCount, not just workflow_mode) -- otherwise this page
+        // could still offer "Choose Region Split" on an event the backend would already
+        // reject that action for, since phases/batches can exist before the first batch
+        // ever flips workflow_mode.
+        $conductSystemLocked = match (true) {
+            $event->usesPhasedRegionalBilling() || $phaseCount > 0 || $batchCount > 0 => 'phased',
+            $hasLegacyPartitions => 'partitioned',
+            default => null,
+        };
 
         return $this->inertia('Sahodaya/Events/Levels', $ctx + [
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::LEVELS),
             'conductMode' => $partitionService->conductMode($event),
-            'isPartitionedHub' => $isPartitionedHub,
-            'partitions' => $partitionService->partitions($event)->map(fn ($p) => [
+            'isPartitionedHub' => $hasLegacyPartitions,
+            'conductSystemLocked' => $conductSystemLocked,
+            'phaseCount' => $phaseCount,
+            'batchCount' => $batchCount,
+            'partitions' => $partitionService->legacyPartitions($event)->map(fn ($p) => [
                 'id' => $p->id,
                 'title' => $p->title,
                 'partition_key' => $p->partition_key ?? $p->cluster_key,
@@ -522,7 +545,7 @@ class FestEventController extends SahodayaAdminController
             // docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md. Only meaningful (and
             // only computed) when this event is actually a partitioned hub with
             // region children; empty array otherwise so the panel stays hidden.
-            'regionDrillDown' => $isPartitionedHub ? $partitionService->regionDrillDownSummary($event) : [],
+            'regionDrillDown' => $hasLegacyPartitions ? $partitionService->regionDrillDownSummary($event) : [],
         ]);
     }
 
@@ -812,6 +835,13 @@ class FestEventController extends SahodayaAdminController
             'conduct_mode'              => 'required|string|in:standard,partitioned',
             'combine_regions_at_finale' => 'nullable|boolean',
         ]);
+
+        // Switching TO standard is always safe; only switching to partitioned needs the
+        // guard, and it must run before the update below, not after -- a blocked switch
+        // must not leave conduct_mode persisted with zero children to back it up.
+        if ($data['conduct_mode'] === 'partitioned') {
+            app(\App\Services\Events\FestPartitionService::class)->assertLegacyPartitioningAllowed($event);
+        }
 
         $event->update([
             'conduct_mode'              => $data['conduct_mode'],

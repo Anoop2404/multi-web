@@ -4,9 +4,11 @@ namespace App\Services\Events;
 
 use App\Models\FestCateringOrder;
 use App\Models\FestEvent;
+use App\Models\FestEventPhase;
 use App\Models\FestFoodBill;
 use App\Models\FestFoodCoupon;
 use App\Models\FestRegistration;
+use App\Models\FestRegistrationBatch;
 use App\Models\Tenant;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -47,6 +49,62 @@ class FestPartitionService
         }
 
         return $this->partitions($event)->isNotEmpty();
+    }
+
+    /**
+     * Guard for every write path that creates or re-syncs old-system region/finale/
+     * cluster children (spawnPartition(), spawnFromPreset(), spawnCluster(),
+     * FestRegionPartitionService::syncPartitionsFromRegions()). The two conduct systems
+     * are alternatives, never layerable — FestRegistrationRouterService::
+     * resolveTargetEvent() checks workflow_mode before conduct_mode, so a hub using the
+     * phased/batch system would have its old-system children silently ignored for
+     * registration routing. Blocks as soon as the phased system has ANY configuration —
+     * phases, payment batches, or an already-flipped workflow_mode — not only once it
+     * has registrations, because the harm here is creating the conflicting structure
+     * itself, and a Sahodaya that has already named phases or created a batch has made a
+     * deliberate choice worth protecting even before anyone has registered.
+     *
+     * Deliberately NOT called from syncPartitionsFromRegionsForPhase() — that's the
+     * phased system's own per-regional-phase sync primitive, not a competing path.
+     */
+    public function assertLegacyPartitioningAllowed(FestEvent $hub): void
+    {
+        if ($hub->usesPhasedRegionalBilling()) {
+            abort(422, 'This event already uses Phases & Payment Levels. Region partitioning and phased billing cannot both run on the same event — manage regions per-phase from the Phases page instead.');
+        }
+
+        $phaseCount = FestEventPhase::where('event_id', $hub->id)->count();
+        $batchCount = FestRegistrationBatch::where('event_id', $hub->id)->count();
+
+        abort_if($phaseCount > 0 || $batchCount > 0, 422,
+            "This event already has {$phaseCount} phase(s) and {$batchCount} payment batch(es) configured on the Phases page. Finish that setup (or remove them) before switching to region partitioning."
+        );
+    }
+
+    /**
+     * Guard for FestRegistrationBatchController::store() — creating the event's first
+     * payment batch flips workflow_mode, which FestRegistrationRouterService checks
+     * before conduct_mode. Lower threshold than assertLegacyPartitioningAllowed()
+     * above by design: creating a batch doesn't create conflicting structure, it only
+     * changes future routing, so it's only actually dangerous once an old-system child
+     * already has real registrations that would go dark.
+     */
+    public function assertSafeToActivatePhasedWorkflow(FestEvent $hub): void
+    {
+        $legacyChildIds = FestEvent::where('parent_event_id', $hub->id)
+            ->whereNull('source_phase_id')
+            ->whereNotNull('partition_role')
+            ->pluck('id');
+
+        if ($legacyChildIds->isEmpty()) {
+            return;
+        }
+
+        $registrationCount = FestRegistration::whereIn('event_id', $legacyChildIds)->count();
+
+        abort_if($registrationCount > 0, 422,
+            "This event has {$registrationCount} registration(s) under its existing region/finale partitions. Creating a payment batch switches registration routing to the Phases system and would stop routing to those partitions. Resolve or migrate those registrations first."
+        );
     }
 
     public function shouldCombineAtFinale(FestEvent $event): bool
@@ -94,6 +152,26 @@ class FestPartitionService
             ->orderBy('cluster_label')
             ->orderBy('event_start')
             ->get();
+    }
+
+    /**
+     * Old-system region/finale/cluster partitions only — excludes phased-system leaf
+     * events. FestPhaseTopologyService::syncLeaf() also stamps partition_key/cluster_key
+     * on every leaf it creates (for its own, unrelated reasons: workflow_leaf_key
+     * derivation), so plain partitions() can't tell the two systems' children apart on
+     * its own. source_phase_id is only ever set on phased-system leaves, so it's the
+     * reliable discriminator.
+     *
+     * @return Collection<int, FestEvent>
+     */
+    public function legacyPartitions(FestEvent $hub): Collection
+    {
+        return $this->partitions($hub)->filter(fn (FestEvent $p) => $p->source_phase_id === null)->values();
+    }
+
+    public function hasLegacyPartitions(FestEvent $hub): bool
+    {
+        return $this->legacyPartitions($hub)->isNotEmpty();
     }
 
     /** @return list<string> */
@@ -269,6 +347,7 @@ class FestPartitionService
     public function spawnPartition(FestEvent $hub, array $data): FestEvent
     {
         abort_if($hub->parent_event_id, 422, 'Create partitions on the hub event, not a child partition.');
+        $this->assertLegacyPartitioningAllowed($hub);
 
         $allowedTypes = ['kids_fest', 'kalolsavam', 'kalotsav', 'english_fest', 'science_fest', 'teacher_fest', 'sports', 'custom'];
         abort_unless(
@@ -340,6 +419,7 @@ class FestPartitionService
     {
         $preset = config("fest_conduct_presets.{$presetKey}");
         abort_if(! $preset, 422, "Unknown conduct preset: {$presetKey}");
+        $this->assertLegacyPartitioningAllowed($hub);
 
         $hub->update([
             'conduct_mode'        => $preset['conduct_mode'] ?? 'partitioned',
@@ -376,6 +456,8 @@ class FestPartitionService
     /** Kids Fest backward compatibility. */
     public function spawnCluster(FestEvent $umbrella, array $data): FestEvent
     {
+        $this->assertLegacyPartitioningAllowed($umbrella);
+
         if ($umbrella->conduct_mode !== 'partitioned' && $umbrella->event_type === 'kids_fest') {
             $umbrella->update(['conduct_mode' => 'partitioned']);
         }

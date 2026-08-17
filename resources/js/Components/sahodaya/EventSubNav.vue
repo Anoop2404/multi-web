@@ -39,6 +39,7 @@ const tabs = computed(() => {
         { key: 'settings', label: 'Settings', icon: '⚙️', href: `${base.value}/settings/fees` },
         { key: 'items', label: 'Items', icon: '🏆', href: `${base.value}/items` },
         { key: 'levels', label: 'Rounds & Levels', icon: '🔀', href: `${base.value}/levels` },
+        { key: 'phases', label: 'Phases', icon: '🧭', href: `${base.value}/phases` },
         { key: 'registrations', label: 'Registrations', icon: '📝', href: `${base.value}/registrations` },
         { key: 'fees', label: 'Event Fees', icon: '💳', href: `${base.value}/fees` },
         { key: 'chest-numbers', label: 'Chest Numbers', icon: '🔢', href: `${base.value}/chest-numbers` },

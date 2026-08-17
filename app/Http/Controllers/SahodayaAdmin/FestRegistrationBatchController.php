@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Models\FestEvent;
 use App\Models\FestRegistrationBatch;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestPartitionService;
 use App\Services\Events\FestPhasedWorkflowService;
 use App\Support\FestPageActivity;
 use Illuminate\Http\Request;
@@ -22,10 +23,14 @@ use Illuminate\Validation\Rule;
  */
 class FestRegistrationBatchController extends SahodayaAdminController
 {
-    public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit, FestPartitionService $partitions)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($event->parent_event_id, 422, 'Payment batches belong on the root event.');
+
+        if ($event->workflow_mode !== FestPhasedWorkflowService::MODE) {
+            $partitions->assertSafeToActivatePhasedWorkflow($event);
+        }
 
         $data = $request->validate([
             'code' => [
@@ -69,6 +74,14 @@ class FestRegistrationBatchController extends SahodayaAdminController
             $event->update([
                 'workflow_mode' => FestPhasedWorkflowService::MODE,
                 'phase_mode_enabled' => true,
+                // Matches what fest:configure-phased-structure already sets for the CLI
+                // path. Behaviorally a no-op for FestPartitionService::conductMode()'s own
+                // derivation (it already infers 'partitioned' from phase-leaf children
+                // carrying partition_key/cluster_key) -- but without it here,
+                // FestAuditEventTopology::auditStandardWithChildren() reads the raw column
+                // directly and flags a false standard_event_with_children anomaly on every
+                // event configured purely through this web UI.
+                'conduct_mode' => 'partitioned',
             ]);
         }
 
