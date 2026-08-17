@@ -38,8 +38,12 @@ Route::domain(config('state.domain'))
 
         Route::prefix('qualifiers')->name('qualifiers.')->group(function () {
             Route::get('/', [StateQualifierReviewController::class, 'index'])->name('index');
+            Route::post('/intake', [StateQualifierReviewController::class, 'storeIntake'])->name('store-intake');
             Route::get('/{intake}', [StateQualifierReviewController::class, 'show'])->name('show');
             Route::post('/{intake}/approve', [StateQualifierReviewController::class, 'approve'])->name('approve');
+            Route::post('/{intake}/entries', [StateQualifierReviewController::class, 'storeEntry'])->name('entries.store');
+            Route::put('/{intake}/entries/{entry}', [StateQualifierReviewController::class, 'updateEntry'])->name('entries.update');
+            Route::delete('/{intake}/entries/{entry}', [StateQualifierReviewController::class, 'destroyEntry'])->name('entries.destroy');
             Route::post('/{intake}/entries/{entry}/review', [StateQualifierReviewController::class, 'reviewEntry'])->name('entries.review');
         });
 

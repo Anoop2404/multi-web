@@ -226,4 +226,58 @@ class StateAdminFlowHttpTest extends TestCase
         $this->assertSame('category_5', $item->class_group);
         $this->assertSame(2, $item->qualify_count);
     }
+
+    public function test_state_admin_can_add_qualifier_intake_and_edit_qualifier_entries(): void
+    {
+        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false]);
+        $admin->assignRole('state_admin');
+
+        $program = FestStateProgram::create([
+            'title' => 'State Qualifier Test Program',
+            'event_type' => 'kalotsavam',
+            'conduct_levels' => ['sahodaya', 'state'],
+            'status' => 'published',
+        ]);
+        $sahodaya = Tenant::create([
+            'id' => 'qualifier-test-sahodaya',
+            'name' => 'Qualifier Test Sahodaya',
+            'type' => 'sahodaya',
+        ]);
+
+        $response = $this->actingAs($admin)->post('/admin/state-workspace/qualifiers/intake', [
+            'state_program_id' => $program->id,
+            'source_tenant_id' => $sahodaya->id,
+            'entries' => [
+                [
+                    'student_name' => 'Initial Student',
+                    'school_name' => 'Silver Hills School',
+                    'item_code' => '101',
+                    'item_name' => 'Recitation Malayalam',
+                    'position' => 1,
+                    'grade' => 'A',
+                ],
+            ],
+        ]);
+        $response->assertRedirect()->assertSessionHas('success');
+
+        $intake = \App\Models\State\StateQualifierIntake::where('source_tenant_id', $sahodaya->id)->sole();
+        $entry = $intake->entries()->firstOrFail();
+
+        $updateResponse = $this->actingAs($admin)->put("/admin/state-workspace/qualifiers/{$intake->id}/entries/{$entry->id}", [
+            'student_name' => 'Updated Student Name',
+            'school_name' => 'Silver Hills Higher Secondary',
+            'item_code' => '101',
+            'item_name' => 'Recitation Malayalam',
+            'position' => 1,
+            'grade' => 'A+',
+            'status' => 'approved',
+        ]);
+        $updateResponse->assertRedirect()->assertSessionHas('success');
+
+        $entry->refresh();
+        $this->assertSame('Updated Student Name', $entry->student_name);
+        $this->assertSame('Silver Hills Higher Secondary', $entry->school_name);
+        $this->assertSame('A+', $entry->grade);
+        $this->assertSame('approved', $entry->status);
+    }
 }

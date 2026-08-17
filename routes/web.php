@@ -123,8 +123,12 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
 
         Route::prefix('state-workspace')->name('state.')->group(function () {
             Route::get('/qualifiers', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'index'])->name('qualifiers.index');
+            Route::post('/qualifiers/intake', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'storeIntake'])->name('qualifiers.store-intake');
             Route::get('/qualifiers/{intake}', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'show'])->name('qualifiers.show');
             Route::post('/qualifiers/{intake}/approve', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'approve'])->name('qualifiers.approve');
+            Route::post('/qualifiers/{intake}/entries', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'storeEntry'])->name('qualifiers.entries.store');
+            Route::put('/qualifiers/{intake}/entries/{entry}', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'updateEntry'])->name('qualifiers.entries.update');
+            Route::delete('/qualifiers/{intake}/entries/{entry}', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'destroyEntry'])->name('qualifiers.entries.destroy');
             Route::post('/qualifiers/{intake}/entries/{entry}/review', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'reviewEntry'])->name('qualifiers.entries.review');
             Route::get('/fest', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'index'])->name('fest.index');
             Route::post('/fest', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'store'])->name('fest.store');
