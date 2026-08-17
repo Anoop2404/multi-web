@@ -107,11 +107,12 @@ class StudentVerificationController extends SahodayaAdminController
                     fn ($c) => $c->where('class_category_id', $filters['class_category_id'])
                 ))
                 ->when(! empty($filters['search']), function ($q) use ($filters) {
-                    $term = '%'.$filters['search'].'%';
+                    $searchVal = trim((string) $filters['search']);
+                    $term = '%'.mb_strtolower($searchVal).'%';
                     $q->where(fn ($inner) => $inner
-                        ->where('name', 'like', $term)
-                        ->orWhere('reg_no', 'like', $term)
-                        ->orWhere('admission_number', 'like', $term));
+                        ->whereRaw('LOWER(name) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(reg_no) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(admission_number) LIKE ?', [$term]));
                 })
                 ->orderBy('name')
                 ->paginate(50)

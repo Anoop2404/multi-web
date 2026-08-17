@@ -101,12 +101,13 @@ class TeacherController extends SchoolAdminController
             ->when(($filters['verification'] ?? 'all') === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
             ->when(($filters['verification'] ?? 'all') === 'unverified', fn ($q) => $q->whereNull('verified_at'))
             ->when(! empty($filters['search']), function ($q) use ($filters) {
-                $term = '%'.$filters['search'].'%';
+                $searchVal = trim((string) $filters['search']);
+                $term = '%'.mb_strtolower($searchVal).'%';
                 $q->where(function ($inner) use ($term) {
-                    $inner->where('name', 'like', $term)
-                        ->orWhere('email', 'like', $term)
-                        ->orWhere('login_code', 'like', $term)
-                        ->orWhere('mobile', 'like', $term);
+                    $inner->whereRaw('LOWER(name) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(email) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(login_code) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(mobile) LIKE ?', [$term]);
                 });
             });
     }

@@ -45,13 +45,13 @@ class SchoolStudentsController extends SahodayaAdminController
             })
             ->when(! empty($filters['school_class_id']), fn ($q) => $q->where('school_class_id', $filters['school_class_id']))
             ->when(! empty($filters['search']), function ($q) use ($filters) {
-                $term = '%'.$filters['search'].'%';
                 $searchVal = trim((string) $filters['search']);
+                $term = '%'.mb_strtolower($searchVal).'%';
                 $q->where(function ($inner) use ($term, $searchVal) {
-                    $inner->where('name', 'like', $term)
-                        ->orWhere('admission_number', 'like', $term)
-                        ->orWhere('roll_number', 'like', $term)
-                        ->orWhere('reg_no', 'like', $term);
+                    $inner->whereRaw('LOWER(name) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(admission_number) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(roll_number) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(reg_no) LIKE ?', [$term]);
 
                     if (is_numeric($searchVal)) {
                         $inner->orWhere('id', (int) $searchVal);

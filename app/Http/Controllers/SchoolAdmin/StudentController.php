@@ -1151,16 +1151,16 @@ class StudentController extends SchoolAdminController
             ->when(($filters['verification'] ?? 'all') === 'verified', fn ($q) => $q->whereNotNull('students.verified_at'))
             ->when(($filters['verification'] ?? 'all') === 'unverified', fn ($q) => $q->whereNull('students.verified_at'))
             ->when(! empty($filters['search']), function ($q) use ($filters) {
-                $term = '%'.$filters['search'].'%';
                 $searchVal = trim((string) $filters['search']);
+                $term = '%'.mb_strtolower($searchVal).'%';
                 $q->where(function ($inner) use ($term, $searchVal) {
-                    $inner->where('students.name', 'like', $term)
-                        ->orWhere('students.parent_email', 'like', $term)
-                        ->orWhere('students.email', 'like', $term)
-                        ->orWhere('students.admission_number', 'like', $term)
-                        ->orWhere('students.reg_no', 'like', $term)
-                        ->orWhere('students.roll_number', 'like', $term)
-                        ->orWhere('students.parent_name', 'like', $term);
+                    $inner->whereRaw('LOWER(students.name) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(students.parent_email) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(students.email) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(students.admission_number) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(students.reg_no) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(students.roll_number) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(students.parent_name) LIKE ?', [$term]);
 
                     if (is_numeric($searchVal)) {
                         $inner->orWhere('students.id', (int) $searchVal);
