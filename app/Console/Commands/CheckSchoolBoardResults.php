@@ -61,7 +61,6 @@ class CheckSchoolBoardResults extends Command
         if ($sahodayaId) {
             $sahodaya = Tenant::find($sahodayaId);
             if (! $sahodaya) {
-                // Search parent in central database
                 config(['database.default' => 'central']);
                 $sahodaya = Tenant::find($sahodayaId);
             }
@@ -85,11 +84,11 @@ class CheckSchoolBoardResults extends Command
         $this->info("  Active Tenant DB: {$dbName}");
         $this->info("=================================================\n");
 
+        // Preload all BoardResults for quick lookup
+        $boardResultMap = BoardResult::where('tenant_id', $school->id)->get()->keyBy('id');
+
         // Query BoardResult records via Eloquent
-        $results = BoardResult::where('tenant_id', $school->id)
-            ->orderByDesc('academic_year')
-            ->orderByDesc('class')
-            ->get();
+        $results = $boardResultMap->values();
 
         $this->info("1. BOARD RESULTS SUMMARY (" . $results->count() . " saved rows):");
         if ($results->isEmpty()) {
@@ -109,26 +108,55 @@ class CheckSchoolBoardResults extends Command
             $this->table($headers, $rows);
         }
 
-        // Query Toppers records via Eloquent / DB
-        $toppers = Topper::where('tenant_id', $school->id)->get();
-        if ($toppers->isEmpty() && Schema::hasTable('board_result_toppers')) {
-            $toppers = BoardResultTopper::where('school_id', $school->id)->get();
+        // Query Overall & Stream Toppers
+        $overallToppers = Topper::where('tenant_id', $school->id)->where('entry_type', '!=', 'full_a1')->get();
+
+        $this->info("\n2. OVERALL & STREAM TOPPERS (" . $overallToppers->count() . " records):");
+        if ($overallToppers->isEmpty()) {
+            $this->warn("   No Overall Topper records found.");
+        } else {
+            $headers = ['ID', 'Name', 'Result ID', 'Year / Class', 'Entry Type', 'Stream', 'Marks', 'Percentage', 'Rank'];
+            $rows = $overallToppers->map(function ($t) use ($boardResultMap) {
+                $br = $boardResultMap->get($t->board_result_id);
+                $yearClass = $br ? "{$br->academic_year} (Class {$br->class})" : 'Unknown';
+                return [
+                    $t->id,
+                    $t->name ?? $t->student_name ?? 'N/A',
+                    $t->board_result_id ?? 'N/A',
+                    $yearClass,
+                    $t->entry_type ?? 'overall',
+                    $t->stream ?? 'N/A',
+                    ($t->marks_obtained ?? '-') . '/' . ($t->total_marks ?? '-'),
+                    ! empty($t->percentage) ? $t->percentage . '%' : '-',
+                    $t->rank ?? '-',
+                ];
+            })->all();
+            $this->table($headers, $rows);
         }
 
-        $this->info("\n2. TOPPERS LIST (" . $toppers->count() . " records):");
-        if ($toppers->isEmpty()) {
-            $this->warn("   No Topper records found.");
+        // Query Full A1 Achievers from toppers table (entry_type = 'full_a1')
+        $fullA1Toppers = Topper::where('tenant_id', $school->id)->where('entry_type', 'full_a1')->get();
+        if ($fullA1Toppers->isEmpty() && Schema::hasTable('board_result_full_a1_achievers')) {
+            $fullA1Toppers = BoardResultFullA1Achiever::where('school_id', $school->id)->get();
+        }
+
+        $this->info("\n3. FULL A1 ACHIEVERS (" . $fullA1Toppers->count() . " records):");
+        if ($fullA1Toppers->isEmpty()) {
+            $this->warn("   No Full A1 Achiever records found.");
         } else {
-            $headers = ['ID', 'Name', 'Entry Type', 'Stream', 'Marks', 'Percentage', 'Rank'];
-            $rows = $toppers->map(fn ($t) => [
-                $t->id,
-                $t->name ?? $t->student_name ?? 'N/A',
-                $t->entry_type ?? 'overall',
-                $t->stream ?? 'N/A',
-                ($t->marks_obtained ?? '-') . '/' . ($t->total_marks ?? '-'),
-                ! empty($t->percentage) ? $t->percentage . '%' : '-',
-                $t->rank ?? '-',
-            ])->all();
+            $headers = ['ID', 'Student Name', 'Result ID', 'Year / Class', 'Roll No', 'Stream'];
+            $rows = $fullA1Toppers->map(function ($t) use ($boardResultMap) {
+                $br = $boardResultMap->get($t->board_result_id);
+                $yearClass = $br ? "{$br->academic_year} (Class {$br->class})" : 'Unknown';
+                return [
+                    $t->id,
+                    $t->name ?? $t->student_name ?? 'N/A',
+                    $t->board_result_id ?? 'N/A',
+                    $yearClass,
+                    $t->roll_no ?? 'N/A',
+                    $t->stream ?? 'N/A',
+                ];
+            })->all();
             $this->table($headers, $rows);
         }
 
@@ -137,7 +165,7 @@ class CheckSchoolBoardResults extends Command
         if (Schema::hasTable('board_result_subject_toppers')) {
             $subjectToppers = BoardResultSubjectTopper::where('school_id', $school->id)->get();
         }
-        $this->info("\n3. SUBJECT TOPPERS (" . $subjectToppers->count() . " records):");
+        $this->info("\n4. SUBJECT TOPPERS (" . $subjectToppers->count() . " records):");
         if ($subjectToppers->isNotEmpty()) {
             $headers = ['ID', 'Student Name', 'Subject', 'Score', 'Year', 'Class'];
             $rows = $subjectToppers->map(fn ($st) => [
@@ -153,25 +181,6 @@ class CheckSchoolBoardResults extends Command
             $this->warn("   No Subject Topper records found.");
         }
 
-        // Query Full A1 Achievers
-        $fullA1 = collect();
-        if (Schema::hasTable('board_result_full_a1_achievers')) {
-            $fullA1 = BoardResultFullA1Achiever::where('school_id', $school->id)->get();
-        }
-        $this->info("\n4. FULL A1 ACHIEVERS (" . $fullA1->count() . " records):");
-        if ($fullA1->isNotEmpty()) {
-            $headers = ['ID', 'Student Name', 'Year', 'Class'];
-            $rows = $fullA1->map(fn ($fa1) => [
-                $fa1->id,
-                $fa1->student_name,
-                $fa1->academic_year,
-                "Class {$fa1->class}",
-            ])->all();
-            $this->table($headers, $rows);
-        } else {
-            $this->warn("   No Full A1 Achiever records found.");
-        }
-
         // Query Data Change Audit Logs
         $logs = DataChangeLog::where('school_id', $school->id)
             ->whereIn('log_name', ['board_result', 'topper', 'achievement'])
@@ -181,7 +190,7 @@ class CheckSchoolBoardResults extends Command
 
         $this->info("\n5. RECENT AUDIT LOGS (" . $logs->count() . " recent entries):");
         if ($logs->isNotEmpty()) {
-            $headers = ['ID', 'Date', 'Action', 'Description', 'Subject ID', 'User ID'];
+            $headers = ['ID', 'Date', 'Action', 'Description', 'Board Result / Topper ID', 'User ID'];
             $rows = $logs->map(fn ($l) => [
                 $l->id,
                 $l->created_at ? $l->created_at->format('Y-m-d H:i') : 'N/A',
