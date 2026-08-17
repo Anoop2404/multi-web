@@ -266,6 +266,10 @@ class FestRegistrationEligibilityService
         $canonicalStudentGroup = FestClassGroupScheme::canonicalKey($studentGroup);
         $canonicalItemGroup = FestClassGroupScheme::canonicalKey($itemGroup);
 
+        if ($canonicalItemGroup === 'open' || $canonicalItemGroup === null || $canonicalItemGroup === '') {
+            return null;
+        }
+
         if ($canonicalStudentGroup !== $canonicalItemGroup) {
             $labels = FestClassGroupScheme::labels(null, $event ?? $item->event);
             $expected = $labels[$canonicalItemGroup] ?? $labels[$itemGroup] ?? strtoupper($itemGroup);

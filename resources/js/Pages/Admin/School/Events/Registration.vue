@@ -1310,17 +1310,19 @@ const GROUP_ALIASES = {
     up: ['up', 'category2', 'categoryii', 'cat2', 'catii', 'category_2', 'cc2'],
     hs: ['hs', 'category3', 'categoryiii', 'cat3', 'catiii', 'category_3', 'cc3'],
     hss: ['hss', 'category4', 'categoryiv', 'cat4', 'cativ', 'category_4', 'cc4'],
-    open: ['open', 'category5', 'categoryv', 'cat5', 'catv', 'category_5', 'cc5'],
 };
+const OPEN_GROUP_VALS = new Set(['open', 'category5', 'categoryv', 'cat5', 'catv', 'cc5']);
 
 function normalizedClassGroup(value) {
     return String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
 function matchesClassGroup(studentGrpRaw, itemGrpRaw) {
-    if (!itemGrpRaw || itemGrpRaw === 'open') return true;
-    const studentGrp = normalizedClassGroup(studentGrpRaw);
+    if (!itemGrpRaw) return true;
     const itemGrp = normalizedClassGroup(itemGrpRaw);
+    if (OPEN_GROUP_VALS.has(itemGrp) || itemGrp === 'open') return true;
+
+    const studentGrp = normalizedClassGroup(studentGrpRaw);
     if (studentGrp === itemGrp) return true;
 
     for (const [, aliases] of Object.entries(GROUP_ALIASES)) {
