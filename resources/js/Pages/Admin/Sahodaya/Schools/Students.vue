@@ -114,6 +114,9 @@
                                           class="text-[#0f3d7a] hover:underline">
                                         {{ s.name }}
                                     </Link>
+                                    <div v-if="s.reg_no" class="text-[11px] font-mono text-gray-400 font-normal">
+                                        ID: {{ s.reg_no }}
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 text-gray-500 text-xs">{{ s.school_class?.class_category?.label || '—' }}</td>
                                 <td class="px-4 py-3 text-gray-600">{{ s.school_class?.name || '—' }}</td>

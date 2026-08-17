@@ -1152,7 +1152,8 @@ class StudentController extends SchoolAdminController
             ->when(($filters['verification'] ?? 'all') === 'unverified', fn ($q) => $q->whereNull('students.verified_at'))
             ->when(! empty($filters['search']), function ($q) use ($filters) {
                 $term = '%'.$filters['search'].'%';
-                $q->where(function ($inner) use ($term) {
+                $searchVal = trim((string) $filters['search']);
+                $q->where(function ($inner) use ($term, $searchVal) {
                     $inner->where('students.name', 'like', $term)
                         ->orWhere('students.parent_email', 'like', $term)
                         ->orWhere('students.email', 'like', $term)
@@ -1160,6 +1161,10 @@ class StudentController extends SchoolAdminController
                         ->orWhere('students.reg_no', 'like', $term)
                         ->orWhere('students.roll_number', 'like', $term)
                         ->orWhere('students.parent_name', 'like', $term);
+
+                    if (is_numeric($searchVal)) {
+                        $inner->orWhere('students.id', (int) $searchVal);
+                    }
                 });
             });
     }

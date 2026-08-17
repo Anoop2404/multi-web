@@ -46,11 +46,16 @@ class SchoolStudentsController extends SahodayaAdminController
             ->when(! empty($filters['school_class_id']), fn ($q) => $q->where('school_class_id', $filters['school_class_id']))
             ->when(! empty($filters['search']), function ($q) use ($filters) {
                 $term = '%'.$filters['search'].'%';
-                $q->where(function ($inner) use ($term) {
+                $searchVal = trim((string) $filters['search']);
+                $q->where(function ($inner) use ($term, $searchVal) {
                     $inner->where('name', 'like', $term)
                         ->orWhere('admission_number', 'like', $term)
                         ->orWhere('roll_number', 'like', $term)
                         ->orWhere('reg_no', 'like', $term);
+
+                    if (is_numeric($searchVal)) {
+                        $inner->orWhere('id', (int) $searchVal);
+                    }
                 });
             })
             ->when(($filters['verification'] ?? 'all') === 'verified', fn ($q) => $q->whereNotNull('verified_at'))

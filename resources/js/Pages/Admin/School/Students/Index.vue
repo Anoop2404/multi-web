@@ -212,6 +212,9 @@
                                 Pending
                             </span>
                         </div>
+                        <div v-if="student.reg_no" class="text-[11px] font-mono text-gray-500 mt-0.5">
+                            ID: {{ student.reg_no }}
+                        </div>
                     </td>
                     <td class="px-4 py-3 font-mono text-xs text-gray-500">
                         {{ student.admission_number || '—' }}
