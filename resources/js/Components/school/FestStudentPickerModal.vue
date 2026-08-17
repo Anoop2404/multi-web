@@ -151,6 +151,9 @@
 
 <script setup>
 import { computed, ref, watch, nextTick } from 'vue';
+import { useSweetAlert } from '@/composables/useSweetAlert.js';
+
+const { showWarning } = useSweetAlert();
 
 const props = defineProps({
     modelValue: { type: Boolean, default: false },
@@ -269,7 +272,10 @@ watch(() => props.modelValue, (open) => {
 
 function toggleId(id) {
     const entry = props.entries.find(e => e.id === id);
-    if (!entry?.eligible) return;
+    if (!entry?.eligible) {
+        showWarning(entry?.reason || 'This student is not eligible for this item.', 'Student Ineligible');
+        return;
+    }
     const idx = localSelected.value.indexOf(id);
     if (idx === -1) {
         if (props.maxSelected && localSelected.value.length >= props.maxSelected) {

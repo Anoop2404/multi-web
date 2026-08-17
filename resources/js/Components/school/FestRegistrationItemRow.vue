@@ -229,6 +229,9 @@
 import { computed, ref, watch } from 'vue';
 import FestStudentPickerModal from '@/Components/school/FestStudentPickerModal.vue';
 import { studentDisplayName } from '@/support/studentDisplay.js';
+import { useSweetAlert } from '@/composables/useSweetAlert.js';
+
+const { showError, showWarning } = useSweetAlert();
 
 const props = defineProps({
     item: { type: Object, required: true },
@@ -495,6 +498,10 @@ function formatMoney(value) {
 }
 
 function openPicker() {
+    if (props.blocked) {
+        showWarning(props.blockReason || 'This item is currently unavailable.', 'Item Unavailable');
+        return;
+    }
     if (!isEditing.value && (props.registrations?.length ?? 0) > 0 && props.registrations[0]) {
         emit('edit', props.registrations[0]);
     }
@@ -505,6 +512,10 @@ function openPicker() {
 }
 
 function openStandbyPicker() {
+    if (props.blocked) {
+        showWarning(props.blockReason || 'This item is currently unavailable.', 'Item Unavailable');
+        return;
+    }
     if (!isEditing.value && (props.registrations?.length ?? 0) > 0 && props.registrations[0]) {
         emit('edit', props.registrations[0]);
     }
@@ -518,6 +529,20 @@ function handleMainPickerConfirm() {
 }
 
 function submit() {
+    if (props.blocked) {
+        showWarning(props.blockReason || 'This item is currently unavailable for registration.', 'Item Unavailable');
+        return;
+    }
+    if (!canSubmit.value) {
+        if (submitHint.value) {
+            showWarning(submitHint.value, 'Registration Incomplete');
+        } else if (selectedCount.value === 0) {
+            showWarning(`Please pick ${props.performerLabel} before registering.`, 'Selection Required');
+        } else {
+            showWarning('Please review selection requirements for this item.', 'Registration Notice');
+        }
+        return;
+    }
     if (isEditing.value) {
         emit('update', props.editingRegistrationId);
     } else {

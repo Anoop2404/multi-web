@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import Swal from 'sweetalert2';
 
 const dialogRef = ref(null);
 
@@ -22,14 +23,26 @@ export function useConfirm() {
                 return dialog.ask(options);
             }
 
-            return Promise.resolve(window.confirm(options.message ?? 'Are you sure?'));
+            return Swal.fire({
+                title: options.title ?? 'Are you sure?',
+                text: options.message ?? '',
+                icon: options.destructive ? 'warning' : 'question',
+                showCancelButton: true,
+                confirmButtonText: options.confirmLabel ?? 'Yes, proceed',
+                cancelButtonText: options.cancelLabel ?? 'Cancel',
+                confirmButtonColor: options.destructive ? '#dc2626' : '#0f3d7a',
+                cancelButtonColor: '#94a3b8',
+                customClass: {
+                    popup: 'rounded-2xl font-sans shadow-xl border border-slate-100',
+                    title: 'text-lg font-bold text-slate-900',
+                    htmlContainer: 'text-sm text-slate-600',
+                    confirmButton: 'px-4 py-2 rounded-xl text-sm font-semibold shadow-sm',
+                    cancelButton: 'px-4 py-2 rounded-xl text-sm font-semibold shadow-sm',
+                },
+            }).then((res) => res.isConfirmed);
         },
 
         /**
-         * UI/UX audit 2026-08-14 Finding 19 fix (2026-08-15): replaces raw window.prompt().
-         * Resolves to the entered string, or null if the user cancels. inputRequired
-         * defaults to true (matching prompt()'s own default of returning null/empty rather
-         * than letting the caller submit blank) — pass inputRequired:false to allow empty.
          * @param {{ title?: string, message?: string, inputLabel?: string, inputPlaceholder?: string, inputValue?: string, inputMultiline?: boolean, inputRequired?: boolean, confirmLabel?: string, cancelLabel?: string, destructive?: boolean }} options
          * @returns {Promise<string|null>}
          */
@@ -45,7 +58,35 @@ export function useConfirm() {
                 });
             }
 
-            return Promise.resolve(window.prompt(options.message ?? '', options.inputValue ?? ''));
+            return Swal.fire({
+                title: options.title ?? 'Input Required',
+                text: options.message ?? '',
+                input: options.inputMultiline ? 'textarea' : 'text',
+                inputValue: options.inputValue ?? '',
+                inputPlaceholder: options.inputPlaceholder ?? '',
+                inputAttributes: {
+                    autocapitalize: 'off',
+                },
+                showCancelButton: true,
+                confirmButtonText: options.confirmLabel ?? 'OK',
+                cancelButtonText: options.cancelLabel ?? 'Cancel',
+                confirmButtonColor: '#0f3d7a',
+                cancelButtonColor: '#94a3b8',
+                inputValidator: (value) => {
+                    if ((options.inputRequired ?? true) && !value?.trim()) {
+                        return options.inputLabel ? `${options.inputLabel} is required` : 'This field is required';
+                    }
+                    return null;
+                },
+                customClass: {
+                    popup: 'rounded-2xl font-sans shadow-xl border border-slate-100',
+                    title: 'text-lg font-bold text-slate-900',
+                    htmlContainer: 'text-sm text-slate-600',
+                    input: 'field text-sm rounded-xl',
+                    confirmButton: 'px-4 py-2 rounded-xl text-sm font-semibold shadow-sm',
+                    cancelButton: 'px-4 py-2 rounded-xl text-sm font-semibold shadow-sm',
+                },
+            }).then((res) => (res.isConfirmed ? res.value : null));
         },
     };
 }

@@ -625,7 +625,9 @@ import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.j
 import { genderLabel } from '@/support/festItemEligibility.js';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 import { useConfirm } from '@/composables/useConfirm';
+import { useSweetAlert } from '@/composables/useSweetAlert.js';
 const { confirm, prompt } = useConfirm();
+const { showError, showWarning, showSuccess } = useSweetAlert();
 
 const alertMessage = ref('');
 
@@ -1660,7 +1662,9 @@ function updateItem(event, item) {
     delete itemErrors[key];
 
     if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
-        itemErrors[key] = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
+        const msg = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
+        itemErrors[key] = msg;
+        showWarning(msg, 'Limit Exceeded');
         scrollToItemRow(event.id, item.id);
         return;
     }
@@ -1680,12 +1684,15 @@ function updateItem(event, item) {
             delete itemErrors[key];
             delete editingRegistrationId[key];
             resetItemForm(event.id, item.id);
+            showSuccess(`Updated registration for ${item.title || item.clean_title}!`, 'Registration Updated');
         },
         onError: (errors) => {
-            itemErrors[key] = extractItemErrors(errors, item.id)
+            const err = extractItemErrors(errors, item.id)
                 || errors.registration
                 || page.props.flash?.error
                 || 'Could not update registration.';
+            itemErrors[key] = err;
+            showError(err, 'Update Failed');
             scrollToItemRow(event.id, item.id);
         },
     });
@@ -1921,13 +1928,17 @@ function submitItem(event, item) {
     delete itemErrors[key];
 
     if (isItemBlocked(event, item)) {
-        itemErrors[key] = itemBlockReason(event, item);
+        const reason = itemBlockReason(event, item);
+        itemErrors[key] = reason;
+        showWarning(reason, 'Item Registration Notice');
         scrollToItemRow(event.id, item.id);
         return;
     }
 
     if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
-        itemErrors[key] = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
+        const msg = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
+        itemErrors[key] = msg;
+        showWarning(msg, 'Limit Exceeded');
         scrollToItemRow(event.id, item.id);
         return;
     }
@@ -1955,12 +1966,15 @@ function submitItem(event, item) {
             form.coach_phone = '';
             form.manager_name = '';
             form.manager_phone = '';
+            showSuccess(`Registered successfully for ${item.title || item.clean_title}!`, 'Registration Successful');
         },
         onError: (errors) => {
-            itemErrors[key] = extractItemErrors(errors, item.id)
+            const err = extractItemErrors(errors, item.id)
                 || errors.registration
                 || page.props.flash?.error
                 || 'Could not register for this item.';
+            itemErrors[key] = err;
+            showError(err, 'Registration Failed');
             scrollToItemRow(event.id, item.id);
         },
     });
