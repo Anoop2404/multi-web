@@ -33,12 +33,12 @@ class RelinkOrphanToppers extends Command
         // Discover all parent tenants / Sahodayas
         $parentTenants = Tenant::whereNull('parent_id')->orWhere('type', 'sahodaya')->get();
         if ($parentTenants->isEmpty()) {
-            // Fallback for single DB or default tenant
             $parentTenants = collect([(object)['id' => null, 'name' => 'Central/Default']]);
         }
 
         $totalOrphansFound = 0;
         $totalRelinked = 0;
+        $totalDuplicatesRemoved = 0;
 
         foreach ($parentTenants as $parent) {
             if ($parent->id) {
@@ -108,22 +108,47 @@ class RelinkOrphanToppers extends Command
                         $targetResult = $activeResults->first();
                     }
 
-                    $actionStr = $dryRun ? '[DRY RUN] Would link to' : 'Linked to';
-
                     if ($targetResult) {
-                        $previewRows[] = [
-                            $topper->id,
-                            $topper->name ?? $topper->student_name ?? 'N/A',
-                            $topper->entry_type ?? 'overall',
-                            "ID #{$topper->board_result_id} (Deleted)",
-                            "{$actionStr} ID #{$targetResult->id} (Class {$targetResult->class}, {$targetResult->academic_year})",
-                        ];
+                        // Check if a topper with exact same roll_no & entry_type already exists on targetResult
+                        $existingOnTarget = false;
+                        if (filled($topper->roll_no)) {
+                            $existingOnTarget = Topper::where('board_result_id', $targetResult->id)
+                                ->where('roll_no', $topper->roll_no)
+                                ->where('entry_type', $topper->entry_type ?? 'overall')
+                                ->where('id', '!=', $topper->id)
+                                ->exists();
+                        }
 
-                        if (! $dryRun) {
-                            $topper->update([
-                                'board_result_id' => $targetResult->id,
-                            ]);
-                            $totalRelinked++;
+                        if ($existingOnTarget) {
+                            $actionStr = $dryRun ? '[DRY RUN] Remove duplicate' : 'Removed duplicate';
+                            $previewRows[] = [
+                                $topper->id,
+                                $topper->name ?? $topper->student_name ?? 'N/A',
+                                $topper->entry_type ?? 'overall',
+                                "ID #{$topper->board_result_id} (Deleted)",
+                                "{$actionStr} (Roll No {$topper->roll_no} already exists on Result #{$targetResult->id})",
+                            ];
+
+                            if (! $dryRun) {
+                                $topper->delete();
+                                $totalDuplicatesRemoved++;
+                            }
+                        } else {
+                            $actionStr = $dryRun ? '[DRY RUN] Link to' : 'Linked to';
+                            $previewRows[] = [
+                                $topper->id,
+                                $topper->name ?? $topper->student_name ?? 'N/A',
+                                $topper->entry_type ?? 'overall',
+                                "ID #{$topper->board_result_id} (Deleted)",
+                                "{$actionStr} ID #{$targetResult->id} (Class {$targetResult->class}, {$targetResult->academic_year})",
+                            ];
+
+                            if (! $dryRun) {
+                                $topper->update([
+                                    'board_result_id' => $targetResult->id,
+                                ]);
+                                $totalRelinked++;
+                            }
                         }
                     }
                 }
@@ -139,7 +164,7 @@ class RelinkOrphanToppers extends Command
             $this->info("To execute the re-linking and update the database, re-run without --dry-run:");
             $this->info("php artisan board-results:relink-orphans " . ($schoolInput ? $schoolInput : ''));
         } else {
-            $this->info("RE-LINKING COMPLETE: Successfully re-linked {$totalRelinked} of {$totalOrphansFound} orphaned topper record(s)!");
+            $this->info("RE-LINKING COMPLETE: Successfully re-linked {$totalRelinked} record(s) and cleaned up {$totalDuplicatesRemoved} duplicate(s)!");
         }
         $this->info("=================================================\n");
 
