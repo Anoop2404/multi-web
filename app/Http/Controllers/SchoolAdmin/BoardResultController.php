@@ -836,11 +836,21 @@ class BoardResultController extends SchoolAdminController
         $yearService = app(BoardResultAcademicYearService::class);
         $academicYearOptions = $yearService->activeOrPopulatedYearOptions((string) $this->school->parent_id);
         if ($academicYear === '') {
-            $configuredOpenYear = collect($academicYearOptions)
-                ->first(fn (array $year) => $year['entry_configured'] && $year['entry_status'] === 'open');
-            $openYear = $configuredOpenYear
-                ?? collect($academicYearOptions)->firstWhere('entry_status', 'open');
-            $academicYear = $openYear['label'] ?? ((date('Y') - 1).'-'.substr((string) date('Y'), 2));
+            $populatedResult = BoardResult::where('tenant_id', $this->school->id)
+                ->where('class', $class)
+                ->whereHas('toppers', fn ($q) => $q->where('entry_type', Topper::ENTRY_FULL_A1))
+                ->orderByDesc('academic_year')
+                ->first();
+
+            if ($populatedResult) {
+                $academicYear = $populatedResult->academic_year;
+            } else {
+                $configuredOpenYear = collect($academicYearOptions)
+                    ->first(fn (array $year) => ($year['entry_configured'] ?? false) && ($year['entry_status'] ?? '') === 'open');
+                $openYear = $configuredOpenYear
+                    ?? collect($academicYearOptions)->firstWhere('entry_status', 'open');
+                $academicYear = $openYear['label'] ?? ((date('Y') - 1).'-'.substr((string) date('Y'), 2));
+            }
         }
 
         $yearService->assertEditableYear($yearService->resolveId($academicYear), $academicYear);
