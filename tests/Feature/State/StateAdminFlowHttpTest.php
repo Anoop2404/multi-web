@@ -3,6 +3,7 @@
 namespace Tests\Feature\State;
 
 use App\Models\FestStateProgram;
+use App\Models\PlatformState;
 use App\Models\State\StateAttendance;
 use App\Models\State\StateFestEvent;
 use App\Models\State\StateFestMark;
@@ -28,12 +29,22 @@ class StateAdminFlowHttpTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
     }
 
-    public function test_state_admin_can_review_conduct_and_publish_a_complete_state_flow(): void
+    /** A state_admin with no state_id is now blocked from everything (fail-closed) — every test needs a real, assigned state. */
+    private function makeStateAdmin(): array
     {
-        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false]);
+        $state = PlatformState::create(['code' => 'TS', 'name' => 'Test State']);
+        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false, 'state_id' => $state->id]);
         $admin->assignRole('state_admin');
 
+        return [$admin, $state];
+    }
+
+    public function test_state_admin_can_review_conduct_and_publish_a_complete_state_flow(): void
+    {
+        [$admin, $state] = $this->makeStateAdmin();
+
         $program = FestStateProgram::create([
+            'state_id' => $state->id,
             'title' => 'State Route Flow 2026',
             'event_type' => 'kalotsavam',
             'conduct_levels' => ['sahodaya', 'state'],
@@ -131,10 +142,10 @@ class StateAdminFlowHttpTest extends TestCase
 
     public function test_state_admin_can_view_state_program_show_page_with_propagations(): void
     {
-        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false]);
-        $admin->assignRole('state_admin');
+        [$admin, $state] = $this->makeStateAdmin();
 
         $program = FestStateProgram::create([
+            'state_id' => $state->id,
             'title' => 'State Program Show Test',
             'event_type' => 'kalotsavam',
             'conduct_levels' => ['sahodaya', 'state'],
@@ -168,10 +179,10 @@ class StateAdminFlowHttpTest extends TestCase
 
     public function test_dedicated_state_domain_exposes_domain_local_action_urls(): void
     {
-        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false]);
-        $admin->assignRole('state_admin');
+        [$admin, $state] = $this->makeStateAdmin();
         $event = StateFestEvent::create([
             'state_program_id' => '019fea66-9b8d-7361-9828-1f6bbacaf36e',
+            'state_id' => $state->id,
             'name' => 'Dedicated State Domain',
             'status' => 'draft',
         ]);
@@ -181,7 +192,7 @@ class StateAdminFlowHttpTest extends TestCase
             ->get("http://state.localhost/fest/{$event->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('StateAdmin/Fest/Show')
+                ->component('StateAdmin/Fest/Show', false)
                 ->where('actionUrls.attendance', "/fest/{$event->id}/attendance")
                 ->where('actionUrls.marks', "/fest/{$event->id}/marks")
                 ->where('actionUrls.publishResults', "/fest/{$event->id}/publish-results"));
@@ -189,10 +200,10 @@ class StateAdminFlowHttpTest extends TestCase
 
     public function test_state_admin_can_update_state_program_item(): void
     {
-        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false]);
-        $admin->assignRole('state_admin');
+        [$admin, $state] = $this->makeStateAdmin();
 
         $program = FestStateProgram::create([
+            'state_id' => $state->id,
             'title' => 'State Item Update Program',
             'event_type' => 'kalotsavam',
             'conduct_levels' => ['sahodaya', 'state'],
@@ -229,10 +240,10 @@ class StateAdminFlowHttpTest extends TestCase
 
     public function test_state_admin_can_add_qualifier_intake_and_edit_qualifier_entries(): void
     {
-        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false]);
-        $admin->assignRole('state_admin');
+        [$admin, $state] = $this->makeStateAdmin();
 
         $program = FestStateProgram::create([
+            'state_id' => $state->id,
             'title' => 'State Qualifier Test Program',
             'event_type' => 'kalotsavam',
             'conduct_levels' => ['sahodaya', 'state'],

@@ -22,5 +22,7 @@ export function examPortalNavItems(sahodayaId, examId = null, options = {}) {
         items.push({ href: `${examBase}/marks`, label: 'Mark entry' });
     }
 
+    items.push({ href: `${examBase}/results`, label: 'Results' });
+
     return items;
 }

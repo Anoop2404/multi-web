@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\FestEvent;
+use App\Models\FestMark;
+use App\Models\FestQualification;
 use App\Models\FestStateProgram;
 use App\Models\FestStateProgramItem;
+use App\Models\FestStateProgramPropagation;
 use App\Models\StateDomain;
 use App\Services\Events\FestEventFeeResolver;
 use App\Services\Events\FestItemSyncService;
@@ -12,16 +16,27 @@ use App\Services\Events\FestStateProgramService;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestConductLevels;
 use App\Support\FestSportsAgeGroup;
+use App\Support\StateScope;
+use App\Support\TenantDomainSync;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StateFestProgramController extends Controller
 {
+    /**
+     * Event types that get a generic results/winners rollup here. Kalolsavam and sports
+     * have their own dedicated controllers (KalotsavStateController, SportsResultsController)
+     * with the same underlying data shape — this covers the remaining program types, which
+     * previously had setup/propagation tracking but no results view at all (Path_breaks.md 3.3).
+     */
+    private const RESULTS_EVENT_TYPES = ['kids_fest', 'teacher_fest', 'custom'];
+
     public function index()
     {
-        $programs = FestStateProgram::query()
+        $programs = StateScope::apply(FestStateProgram::query())
             ->withCount(['propagations', 'items'])
             ->orderByDesc('created_at')
             ->get();
@@ -39,6 +54,7 @@ class StateFestProgramController extends Controller
         $data = $this->attachStateDomainConfig($request, $data);
         $data['created_by_user_id'] = $request->user()->id;
         $data['status'] = 'draft';
+        $data['state_id'] = StateScope::shouldScope($request) ? StateScope::id($request) : null;
 
         $program = FestStateProgram::create($data);
 
@@ -48,6 +64,8 @@ class StateFestProgramController extends Controller
 
     public function show(FestStateProgram $stateProgram)
     {
+        StateScope::assertOwns($stateProgram->state_id);
+
         $stateProgram->load(['propagations.sahodaya:id,name', 'items', 'stateDomain']);
 
         $allSahodayas = \App\Models\Tenant::query()
@@ -107,8 +125,162 @@ class StateFestProgramController extends Controller
         ]);
     }
 
+    public function results(FestStateProgram $stateProgram)
+    {
+        StateScope::assertOwns($stateProgram->state_id);
+        abort_unless(in_array($stateProgram->event_type, self::RESULTS_EVENT_TYPES, true), 404);
+
+        $propagations = FestStateProgramPropagation::where('state_program_id', $stateProgram->id)
+            ->with('sahodaya')
+            ->get();
+
+        $clusterResults = $propagations->map(function (FestStateProgramPropagation $prop) {
+            if (! $prop->tenant_event_id || ! $prop->sahodaya) {
+                return [
+                    'sahodaya' => $prop->sahodaya?->name,
+                    'level'    => $prop->level_round,
+                    'status'   => 'not_propagated',
+                    'results'  => [],
+                ];
+            }
+
+            $eventData = \App\Support\TenancyDatabase::whenDatabaseReady($prop->sahodaya, function () use ($prop) {
+                $event = FestEvent::find($prop->tenant_event_id);
+                if (! $event) {
+                    return null;
+                }
+
+                return [
+                    'id'                  => $event->id,
+                    'title'               => $event->title,
+                    'results_published'   => (bool) $event->results_published,
+                    'registrations_count' => FestMark::where('event_id', $event->id)->count(),
+                ];
+            });
+
+            return [
+                'sahodaya'            => $prop->sahodaya?->name,
+                'level'               => $prop->level_round,
+                'event_id'            => $eventData['id'] ?? null,
+                'event_title'         => $eventData['title'] ?? null,
+                'results_published'   => $eventData['results_published'] ?? false,
+                'registrations_count' => $eventData['registrations_count'] ?? 0,
+            ];
+        });
+
+        return inertia('StatePrograms/Results', [
+            'program'        => $stateProgram->only('id', 'title', 'academic_year', 'status', 'event_type'),
+            'clusterResults' => $clusterResults,
+        ]);
+    }
+
+    public function winners(FestStateProgram $stateProgram)
+    {
+        StateScope::assertOwns($stateProgram->state_id);
+        abort_unless(in_array($stateProgram->event_type, self::RESULTS_EVENT_TYPES, true), 404);
+
+        return inertia('StatePrograms/Winners', [
+            'program' => $stateProgram->only('id', 'title', 'academic_year', 'event_type'),
+            'winners' => $this->collectWinnerRows($stateProgram),
+        ]);
+    }
+
+    public function exportWinners(FestStateProgram $stateProgram): StreamedResponse
+    {
+        StateScope::assertOwns($stateProgram->state_id);
+        abort_unless(in_array($stateProgram->event_type, self::RESULTS_EVENT_TYPES, true), 404);
+
+        $rows = $this->collectWinnerRows($stateProgram);
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Participant', 'Reg No', 'School', 'Item', 'Category', 'Grade', 'From Event', 'Next Level', 'Promoted At']);
+            foreach ($rows as $w) {
+                fputcsv($out, [
+                    $w['participant'], $w['reg_no'], $w['school'], $w['item'], $w['category'],
+                    $w['grade'], $w['from_event'], $w['next_level'], $w['promoted_at'],
+                ]);
+            }
+            fclose($out);
+        }, "state-program-winners-{$stateProgram->id}.csv");
+    }
+
+    /**
+     * Qualifications/marks live in each Sahodaya's own tenant database, so this has to loop
+     * per-Sahodaya via TenancyDatabase rather than running one whereIn('event_id', ...)
+     * across ids that span multiple databases. Mirrors KalotsavStateController's identical
+     * private method — duplicated rather than shared to avoid touching that already-verified
+     * controller for this fix.
+     *
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function collectWinnerRows(FestStateProgram $stateProgram): \Illuminate\Support\Collection
+    {
+        $propagations = FestStateProgramPropagation::where('state_program_id', $stateProgram->id)
+            ->whereNotNull('tenant_event_id')
+            ->with('sahodaya')
+            ->get();
+
+        $winners = collect();
+
+        foreach ($propagations as $propagation) {
+            if (! $propagation->sahodaya) {
+                continue;
+            }
+
+            $rows = \App\Support\TenancyDatabase::whenDatabaseReady($propagation->sahodaya, function () use ($propagation) {
+                $qualifications = FestQualification::where('event_id', $propagation->tenant_event_id)
+                    ->with([
+                        'participant.student',
+                        'participant.teacher',
+                        'participant.registration.school',
+                        'item',
+                        'event',
+                        'nextLevelEvent',
+                    ])
+                    ->orderByDesc('promoted_at')
+                    ->get();
+
+                $marks = FestMark::where('event_id', $propagation->tenant_event_id)
+                    ->whereIn('participant_id', $qualifications->pluck('participant_id'))
+                    ->get()
+                    ->keyBy(fn (FestMark $m) => "{$m->event_id}:{$m->item_id}:{$m->participant_id}");
+
+                $base = TenantDomainSync::publicUrl($propagation->sahodaya);
+
+                return $qualifications->map(function (FestQualification $q) use ($marks, $base) {
+                    $mark = $marks->get("{$q->event_id}:{$q->item_id}:{$q->participant_id}");
+                    $posterUrl = null;
+
+                    if ($mark && in_array((int) $mark->position, [1, 2, 3], true) && $base && $q->event && $q->item) {
+                        $posterUrl = rtrim($base, '/')."/fest/{$q->event_id}/items/{$q->item_id}/winners/{$mark->id}/poster.svg";
+                    }
+
+                    return [
+                        'participant' => $q->participant?->student?->name ?? $q->participant?->teacher?->name,
+                        'reg_no'      => $q->participant?->student?->reg_no,
+                        'school'      => $q->participant?->registration?->school?->name,
+                        'item'        => $q->item?->title,
+                        'category'    => $q->item?->category,
+                        'grade'       => $mark?->grade,
+                        'from_event'  => $q->event?->title,
+                        'next_level'  => $q->nextLevelEvent?->level_round,
+                        'promoted_at' => $q->promoted_at?->toDateString(),
+                        'poster_url'  => $posterUrl,
+                    ];
+                });
+            }, collect());
+
+            $winners = $winners->concat($rows);
+        }
+
+        return $winners->sortByDesc('promoted_at')->values();
+    }
+
     public function sahodayaItems(FestStateProgram $stateProgram, \App\Models\Tenant $sahodaya)
     {
+        StateScope::assertOwns($stateProgram->state_id);
+
         $items = \App\Support\TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($stateProgram, $sahodaya) {
             $event = \App\Models\FestEvent::where('tenant_id', $sahodaya->id)
                 ->where('state_program_id', $stateProgram->id)
@@ -129,8 +301,31 @@ class StateFestProgramController extends Controller
         ]);
     }
 
+    public function toggleSahodaya(Request $request, FestStateProgram $stateProgram, \App\Models\Tenant $sahodaya)
+    {
+        StateScope::assertOwns($stateProgram->state_id);
+        $enabled = $request->boolean('enabled');
+
+        // Not-yet-deployed Sahodayas have no propagation row yet; toggling one
+        // records the disabled/enabled intent up front so it takes effect on deploy.
+        $propagation = \App\Models\FestStateProgramPropagation::firstOrCreate(
+            [
+                'state_program_id' => $stateProgram->id,
+                'sahodaya_id' => $sahodaya->id,
+                'level_round' => 'sahodaya',
+            ],
+        );
+
+        $propagation->update(['is_enabled' => $enabled]);
+
+        $status = $enabled ? 'enabled' : 'disabled';
+
+        return back()->with('success', "{$sahodaya->name} {$status} for this state program.");
+    }
+
     public function toggleSahodayaItem(Request $request, FestStateProgram $stateProgram, \App\Models\Tenant $sahodaya, \App\Models\FestEventItem $item)
     {
+        StateScope::assertOwns($stateProgram->state_id);
         $enabled = $request->boolean('enabled');
 
         \App\Support\TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($item, $enabled) {
@@ -142,6 +337,7 @@ class StateFestProgramController extends Controller
 
     public function bulkToggleSahodayaItems(Request $request, FestStateProgram $stateProgram, \App\Models\Tenant $sahodaya)
     {
+        StateScope::assertOwns($stateProgram->state_id);
         $enabled = $request->boolean('enabled');
         $itemIds = $request->input('item_ids', []);
 
@@ -165,6 +361,7 @@ class StateFestProgramController extends Controller
 
     public function update(Request $request, FestStateProgram $stateProgram, FestStateProgramService $service)
     {
+        StateScope::assertOwns($stateProgram->state_id);
         $data = $this->validateProgram($request);
         $data = $this->attachStateDomainConfig($request, $data);
 
@@ -188,6 +385,7 @@ class StateFestProgramController extends Controller
 
     public function destroy(FestStateProgram $stateProgram)
     {
+        StateScope::assertOwns($stateProgram->state_id);
         abort_if($stateProgram->status === 'published', 422, 'Published programs cannot be deleted.');
 
         $stateProgram->delete();
@@ -198,6 +396,7 @@ class StateFestProgramController extends Controller
 
     public function publish(FestStateProgram $stateProgram, FestStateProgramService $service)
     {
+        StateScope::assertOwns($stateProgram->state_id);
         $result = $service->publish($stateProgram);
 
         app(\App\Services\Audit\PlatformAuditLogger::class)->log(
@@ -228,6 +427,7 @@ class StateFestProgramController extends Controller
 
     public function storeItem(Request $request, FestStateProgram $stateProgram, FestItemSyncService $syncService)
     {
+        StateScope::assertOwns($stateProgram->state_id);
         $data = $this->validateItem($request);
 
         $data['state_program_id'] = $stateProgram->id;
@@ -245,6 +445,7 @@ class StateFestProgramController extends Controller
 
     public function updateItem(Request $request, FestStateProgram $stateProgram, FestStateProgramItem $item, FestItemSyncService $syncService)
     {
+        StateScope::assertOwns($stateProgram->state_id);
         abort_if($item->state_program_id !== $stateProgram->id, 404);
 
         $data = $this->validateItem($request);
@@ -261,6 +462,7 @@ class StateFestProgramController extends Controller
 
     public function destroyItem(FestStateProgram $stateProgram, FestStateProgramItem $item, FestItemSyncService $syncService)
     {
+        StateScope::assertOwns($stateProgram->state_id);
         abort_if($item->state_program_id !== $stateProgram->id, 404);
 
         $itemId = $item->id;

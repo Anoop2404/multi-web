@@ -150,6 +150,21 @@ class FestItemHeadController extends SahodayaAdminController
 
         $head->update($data);
 
+        // A region/finale partition child editing its own head's fee columns directly
+        // must survive the hub's next propagateFeeSettingsToChildren() cascade — same
+        // reasoning as FestEventSettingsController::updateFeeSettings()/updateItemFee().
+        // Scoped to the actual fee fields that cascade overwrites, so a schedule-only
+        // edit here doesn't unnecessarily opt this child out of future hub fee pushes.
+        $headFeeFields = [
+            'default_item_fee', 'extra_item_fee', 'school_registration_fee',
+            'student_registration_fee', 'team_registration_fee',
+            'included_items_per_student', 'included_teams',
+            'verification_policy', 'approval_policy', 'max_participants', 'max_teams',
+        ];
+        if ($event->parent_event_id !== null && array_intersect_key($data, array_flip($headFeeFields)) !== []) {
+            $event->updateQuietly(['fee_customized_at' => now()]);
+        }
+
         // What we push down to items depends on the mode:
         //  - same_time      → the single date + time for every item (so they run together)
         //  - different_days → only the registration window; each item keeps its own day/time

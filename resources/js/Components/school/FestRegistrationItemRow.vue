@@ -35,8 +35,9 @@
                     <span class="text-emerald-600/70 shrink-0">{{ reg.status }}</span>
                     <button v-if="canEdit(reg)" type="button"
                             class="shrink-0 text-indigo-600 font-semibold hover:underline"
+                            :title="reg.status === 'rejected' ? reg.rejection_reason : null"
                             @click="$emit('edit', reg)">
-                        Edit
+                        {{ reg.status === 'rejected' ? 'Fix & resubmit' : 'Edit' }}
                     </button>
                     <button v-if="canWithdraw(reg)" type="button"
                             class="shrink-0 text-red-600 font-semibold hover:underline"
@@ -120,8 +121,9 @@
                     <span class="text-gray-400"> · {{ reg.status }}</span>
                     <button v-if="canEdit(reg)" type="button"
                             class="ml-1 text-indigo-600 font-semibold hover:underline"
+                            :title="reg.status === 'rejected' ? reg.rejection_reason : null"
                             @click="$emit('edit', reg)">
-                        Edit
+                        {{ reg.status === 'rejected' ? 'Fix & resubmit' : 'Edit' }}
                     </button>
                     <button v-if="canWithdraw(reg)" type="button"
                             class="ml-1 text-red-600 font-semibold hover:underline"

@@ -59,6 +59,7 @@
                 <template v-if="summary.fee_model === 'item_catalog'"> Billing model: <strong>Item catalog billing</strong> (age group / category / per-item rates).</template>
                 <template v-else-if="summary.fee_model === 'cksc_tiered'"> Billing model: <strong>Tiered per-item participation fees</strong>.</template>
                 <template v-else-if="summary.fee_model === 'sports_composite'"> Billing model: <strong>Sports composite billing</strong> (school reg + per-athlete + team fees).</template>
+                <template v-else-if="summary.fee_model === 'kalolsavam_composite'"> Billing model: <strong>Kalotsavam composite billing</strong> (school reg + per-student + included items).</template>
                 <template v-else-if="summary.fee_model === 'none'"> Billing model: <strong>No event fee configured</strong>.</template>
             </p>
         </div>

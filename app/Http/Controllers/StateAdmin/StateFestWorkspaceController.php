@@ -14,6 +14,7 @@ use App\Services\State\StateEventLifecycleGate;
 use App\Services\State\StateJudgeScoreService;
 use App\Services\State\StatePublicResultsProjectionService;
 use App\Services\State\StateResultPublicationService;
+use App\Support\StateScope;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -22,7 +23,7 @@ class StateFestWorkspaceController extends Controller
 {
     public function index()
     {
-        $events = StateFestEvent::orderByDesc('starts_on')->paginate(20);
+        $events = StateScope::apply(StateFestEvent::orderByDesc('starts_on'))->paginate(20);
         $routePrefix = request()->routeIs('state.portal.*') ? 'state.portal' : 'admin.state';
         $events->getCollection()->each(fn (StateFestEvent $event) => $event->setAttribute(
             'show_url',
@@ -43,7 +44,12 @@ class StateFestWorkspaceController extends Controller
             'ends_on'          => 'nullable|date',
         ]);
 
-        $event = StateFestEvent::create(array_merge($data, ['status' => 'draft']));
+        StateScope::assertOwns(\App\Models\FestStateProgram::find($data['state_program_id'])?->state_id);
+
+        $event = StateFestEvent::create(array_merge($data, [
+            'status' => 'draft',
+            'state_id' => StateScope::shouldScope() ? StateScope::id() : \App\Models\FestStateProgram::find($data['state_program_id'])?->state_id,
+        ]));
 
         return redirect()->route('admin.state.fest.show', $event)->with('success', 'State fest event created.');
     }
@@ -55,6 +61,7 @@ class StateFestWorkspaceController extends Controller
         StateResultPublicationService $resultPublication,
     )
     {
+        StateScope::assertOwns($event->state_id);
         $routePrefix = $request->routeIs('state.portal.*') ? 'state.portal' : 'admin.state';
         $approvedQualifiers = StateQualifierEntry::where('status', 'approved')
             ->whereHas('intake', fn ($q) => $q->where('state_program_id', $event->state_program_id))
@@ -97,6 +104,7 @@ class StateFestWorkspaceController extends Controller
      */
     public function assignJudge(Request $request, StateFestEvent $event)
     {
+        StateScope::assertOwns($event->state_id);
         $data = $request->validate([
             'item_id'    => [
                 'required',
@@ -124,6 +132,7 @@ class StateFestWorkspaceController extends Controller
 
     public function unassignJudge(StateFestEvent $event, StateJudgeAssignment $assignment)
     {
+        StateScope::assertOwns($event->state_id);
         abort_if($assignment->state_event_id !== $event->id, 403);
 
         $assignment->delete();
@@ -140,6 +149,7 @@ class StateFestWorkspaceController extends Controller
      */
     public function enterMark(Request $request, StateFestEvent $event)
     {
+        StateScope::assertOwns($event->state_id);
         StateEventLifecycleGate::allowMarkEntry($event);
 
         $data = $request->validate([
@@ -174,6 +184,7 @@ class StateFestWorkspaceController extends Controller
 
     public function publishResults(StateFestEvent $event, StateResultPublicationService $service)
     {
+        StateScope::assertOwns($event->state_id);
         $result = $service->publish($event);
 
         return back()->with('success', "Published {$result['marks']} State result(s) across {$result['items']} item(s).");
@@ -187,6 +198,7 @@ class StateFestWorkspaceController extends Controller
      */
     public function assignChestNumbers(StateFestEvent $event, StateConductService $service)
     {
+        StateScope::assertOwns($event->state_id);
         $count = $service->assignChestNumbers($event);
 
         return back()->with('success', $count > 0

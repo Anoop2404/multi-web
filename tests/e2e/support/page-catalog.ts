@@ -220,6 +220,9 @@ export const stateAdminPages: PageEntry[] = [
     { path: '/admin/sports', label: 'State sports results' },
     { path: '/admin/state-remittances', label: 'State remittances' },
     { path: '/admin/sahodayas', label: 'Sahodaya clusters' },
+    { path: '/admin/state-workspace/qualifiers', label: 'State qualifier intakes' },
+    { path: '/admin/state-workspace/fest', label: 'State finals workspace' },
+    { path: '/admin/board-results', label: 'State board results' },
 ];
 
 export const publicPages: PageEntry[] = [

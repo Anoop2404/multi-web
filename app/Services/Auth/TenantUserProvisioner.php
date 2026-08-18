@@ -48,7 +48,7 @@ class TenantUserProvisioner
         if ($password !== null) {
             $user->password = Hash::make($password);
         } elseif (! $user->exists) {
-            $plainPassword = $this->credentials->generateTemporaryPassword();
+            $plainPassword = $this->credentials->generateTemporaryPassword($roles[0] ?? null);
             $user->password = Hash::make($plainPassword);
             $user->must_change_password = true;
         }
@@ -103,7 +103,7 @@ class TenantUserProvisioner
             throw ValidationException::withMessages(['user' => 'User not found for this tenant.']);
         }
 
-        if ($user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal', 'sahodaya_admin'])) {
+        if ($user->hasAnyRole(TenantUserCatalog::primaryAdminRoles())) {
             throw ValidationException::withMessages(['user' => 'Primary admin accounts are managed from the superadmin panel.']);
         }
 

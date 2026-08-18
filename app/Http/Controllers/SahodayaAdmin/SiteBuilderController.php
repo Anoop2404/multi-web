@@ -11,7 +11,6 @@ use App\Support\SahodayaTenantBranding;
 use App\Support\TenantPublicSite;
 use App\Support\SahodayaWebsiteTemplateCatalog;
 use App\Services\Website\SahodayaContentReadiness;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SiteBuilderController extends SahodayaAdminController
@@ -88,14 +87,6 @@ class SiteBuilderController extends SahodayaAdminController
             'themePresets'           => SahodayaTenantBranding::themePresets(),
             'experiences'            => SahodayaWebsiteTemplateCatalog::summaries(),
             'readiness'              => app(SahodayaContentReadiness::class)->inspect($this->sahodaya, $site),
-        ]);
-    }
-
-    public function sectionTypes(): JsonResponse
-    {
-        return response()->json([
-            'types'    => SahodayaSiteBuilderCatalog::SECTION_TYPES,
-            'fieldDefs'=> SectionFieldRegistry::all(),
         ]);
     }
 }

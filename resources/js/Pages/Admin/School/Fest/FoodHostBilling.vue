@@ -3,7 +3,10 @@
         <PageHeader :title="`${event.title} — Food Billing`" eyebrow="Programs"
                     description="Your school is the designated payee for this event's food orders — manage every participating school's bill here." />
 
-        <div class="flex justify-end mb-3">
+        <EventHierarchyBadge :hierarchy="hierarchy" />
+
+        <div class="flex flex-wrap gap-2 items-center mb-3">
+            <Link :href="`/school-admin/${school.id}/fest/${event.id}/food-host-billing/report`" class="text-sm text-indigo-600 ml-auto">Day-wise report →</Link>
             <a :href="`/school-admin/${school.id}/fest/${event.id}/food-host-billing/export`"
                class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700">Export CSV</a>
         </div>
@@ -80,9 +83,11 @@
 import { computed, ref } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
 
 const props = defineProps({
     event: Object,
+    hierarchy: { type: Object, default: null },
     bills: { type: Array, default: () => [] },
     summary: { type: Object, default: () => ({ total: 0, paid: 0, balance: 0 }) },
 });

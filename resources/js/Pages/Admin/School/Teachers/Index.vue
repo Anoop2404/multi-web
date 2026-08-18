@@ -21,6 +21,7 @@
                 <a :href="exportUrl('xlsx')" class="btn-secondary ml-auto">↓ Export (.xlsx)</a>
                 <a :href="exportUrl('csv')" class="btn-secondary">↓ Export (.csv)</a>
                 <a :href="exportPdfUrl()" class="btn-secondary">↓ Print / PDF</a>
+                <button type="button" class="btn-secondary" @click="exportCredentials">↓ Export credentials (.xlsx)</button>
             </div>
 
             <!-- Bulk add -->
@@ -379,6 +380,12 @@ function exportUrl(format) {
 function exportPdfUrl() {
     const params = new URLSearchParams(f);
     return `/school-admin/${props.school.id}/teachers/export-pdf?${params.toString()}`;
+}
+
+async function exportCredentials() {
+    if (!(await confirm({ message: 'This file contains temporary passwords in plain text. Handle it carefully and delete it once shared.', destructive: false }))) return;
+    const params = new URLSearchParams(f);
+    window.location.href = `/school-admin/${props.school.id}/teachers/export-credentials?${params.toString()}`;
 }
 
 const editingTeacher = ref(null);

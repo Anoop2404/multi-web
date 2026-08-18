@@ -302,7 +302,7 @@ export function schoolAdminNav(schoolId, options = {}) {
         // User management links
         if (canNav('users')) {
             schoolItems.push({ label: 'Profile requests', href: `${schoolAdminHref(schoolId, 'users')}/profile-change-requests`, icon: 'user-check', badge: pendingChangeRequests });
-            schoolItems.push({ label: 'Portal users', href: schoolAdminHref(schoolId, 'users'), icon: 'shield', hidden: true });
+            schoolItems.push({ label: 'Portal users', href: schoolAdminHref(schoolId, 'users'), icon: 'shield' });
             schoolItems.push({ label: 'Event coordinators', href: `${schoolAdminHref(schoolId, 'users')}?coordinators=1`, icon: 'users' });
         }
         groups.push({ section: 'School', items: schoolItems });
@@ -390,18 +390,20 @@ export function schoolAdminNav(schoolId, options = {}) {
             section: 'Website',
             items: [
                 { label: 'School Website →', href: `${base}/site-builder`, icon: 'layers' },
-                // Hidden — all accessible from site-builder hub; searchable
-                { label: 'News', href: `${base}/news`, icon: 'file-text', hidden: true },
-                { label: 'Events', href: `${base}/events`, icon: 'calendar', hidden: true },
-                { label: 'Gallery', href: `${base}/gallery`, icon: 'image', hidden: true },
-                { label: 'Staff', href: `${base}/staff`, icon: 'users', hidden: true },
-                { label: 'Achievements', href: `${base}/achievements`, icon: 'star', hidden: true },
-                { label: 'Downloads', href: `${base}/downloads`, icon: 'folder', hidden: true },
-                { label: 'Job Vacancies', href: `${base}/job-vacancies`, icon: 'briefcase', hidden: true },
-                { label: 'Alumni', href: `${base}/alumni`, icon: 'award', hidden: true },
-                { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star', hidden: true },
-                { label: 'Contact Page', href: `${base}/contact`, icon: 'file-text', hidden: true },
-                { label: 'Enquiries', href: `${base}/enquiries`, icon: 'inbox', hidden: true },
+                // Previously hidden on the assumption the site-builder hub above cross-links
+                // to all of these — it doesn't (it's Page Sections/Navigation/Footer only,
+                // see SiteBuilder.vue's `tabs`), so they were only reachable via nav search.
+                { label: 'News', href: `${base}/news`, icon: 'file-text' },
+                { label: 'Events', href: `${base}/events`, icon: 'calendar' },
+                { label: 'Gallery', href: `${base}/gallery`, icon: 'image' },
+                { label: 'Staff', href: `${base}/staff`, icon: 'users' },
+                { label: 'Achievements', href: `${base}/achievements`, icon: 'star' },
+                { label: 'Downloads', href: `${base}/downloads`, icon: 'folder' },
+                { label: 'Job Vacancies', href: `${base}/job-vacancies`, icon: 'briefcase' },
+                { label: 'Alumni', href: `${base}/alumni`, icon: 'award' },
+                { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star' },
+                { label: 'Contact Page', href: `${base}/contact`, icon: 'file-text' },
+                { label: 'Enquiries', href: `${base}/enquiries`, icon: 'inbox' },
             ],
         });
     }

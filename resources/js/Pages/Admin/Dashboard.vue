@@ -26,6 +26,34 @@
                 </div>
             </div>
 
+            <div>
+                <div class="grid grid-cols-2 gap-4 lg:grid-cols-3">
+                    <div class="stat-tile">
+                        <p class="stat-tile-label">Students</p>
+                        <p class="stat-tile-value">{{ snapshot ? formatAmount(snapshot.total_students) : '—' }}</p>
+                    </div>
+                    <div class="stat-tile">
+                        <p class="stat-tile-label">Teachers</p>
+                        <p class="stat-tile-value">{{ snapshot ? formatAmount(snapshot.total_teachers) : '—' }}</p>
+                    </div>
+                    <div class="stat-tile">
+                        <p class="stat-tile-label">Revenue this month</p>
+                        <p class="stat-tile-value">₹{{ snapshot ? formatAmount(snapshot.revenue_this_month_inr) : '—' }}</p>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400 mt-2">
+                    <template v-if="snapshot">
+                        As of {{ formatDateTime(snapshot.computed_at) }} · {{ snapshot.sahodayas_included }}/{{ snapshot.sahodayas_total }} Sahodaya databases included
+                        <span v-if="snapshot.sahodayas_included < snapshot.sahodayas_total" class="text-amber-600">
+                            — some databases were unreachable at snapshot time
+                        </span>
+                    </template>
+                    <template v-else>
+                        No snapshot yet — updates nightly via the <code>platform:snapshot-dashboard</code> scheduled command.
+                    </template>
+                </p>
+            </div>
+
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Link href="/admin/sahodayas" class="track-card block">
                     <div class="text-2xl mb-2">🏛️</div>
@@ -84,10 +112,16 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 defineProps({
     stats: { type: Object, default: () => ({}) },
+    snapshot: { type: Object, default: null },
 });
 
 const websiteEnabled = computed(() => usePage().props.features?.website_enabled ?? false);
+
+function formatAmount(v) {
+    return Number(v ?? 0).toLocaleString('en-IN');
+}
 </script>

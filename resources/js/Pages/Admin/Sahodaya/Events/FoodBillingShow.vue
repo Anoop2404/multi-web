@@ -22,9 +22,10 @@
         </div>
 
         <div class="flex flex-wrap gap-2 items-center mb-6">
-            <span class="text-xs px-2 py-1 rounded" :class="bill.status === 'settled' ? 'bg-green-100 text-green-700' : 'bg-gray-100'">{{ bill.status }}</span>
+            <span class="text-xs px-2 py-1 rounded" :class="statusBadgeClass">{{ bill.status }}</span>
             <button v-if="bill.status === 'open'" @click="settle" class="btn-secondary text-xs">Mark settled</button>
-            <button v-else @click="reopen" class="text-xs text-indigo-600 font-semibold">Reopen bill</button>
+            <button v-if="bill.status === 'settled'" @click="reopen" class="text-xs text-indigo-600 font-semibold">Reopen bill</button>
+            <button v-if="bill.status === 'open'" @click="cancelBill" class="text-xs text-red-600 font-semibold">Cancel bill</button>
             <a :href="`${base}/pdf`" target="_blank" class="ml-auto px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700">Print PDF</a>
         </div>
 
@@ -92,6 +93,7 @@
                         <th class="p-3">Mode</th>
                         <th class="p-3">Received</th>
                         <th class="p-3">Notes</th>
+                        <th class="p-3 text-right"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -101,9 +103,12 @@
                         <td class="p-3 capitalize">{{ p.payment_mode.replace('_', ' ') }}</td>
                         <td class="p-3">{{ formatCalendarDate(p.received_at) }}</td>
                         <td class="p-3 text-gray-500">{{ p.notes }}</td>
+                        <td class="p-3 text-right">
+                            <button class="text-xs font-semibold text-red-500" @click="voidPayment(p)">Void</button>
+                        </td>
                     </tr>
                     <tr v-if="!payments.length">
-                        <td colspan="5" class="p-6 text-center text-gray-400">No payments recorded yet.</td>
+                        <td colspan="6" class="p-6 text-center text-gray-400">No payments recorded yet.</td>
                     </tr>
                 </tbody>
             </table>
@@ -161,6 +166,12 @@ const payeeNote = computed(() => (
         : 'Payable to the Sahodaya.'
 ));
 
+const statusBadgeClass = computed(() => ({
+    'bg-green-100 text-green-700': props.bill.status === 'settled',
+    'bg-red-100 text-red-700': props.bill.status === 'cancelled',
+    'bg-gray-100 text-gray-700': props.bill.status === 'open',
+}));
+
 const { confirm } = useConfirm();
 
 const itemForm = useForm({ menu_item_id: '', quantity: 1 });
@@ -191,7 +202,16 @@ async function settle() {
     if (!(await confirm({ message: 'Mark this bill as settled?', destructive: false }))) return;
     router.post(`${base}/settle`, {}, { preserveScroll: true });
 }
-function reopen() {
+async function reopen() {
+    if (!(await confirm({ message: 'Reopen this bill for editing?', destructive: false }))) return;
     router.post(`${base}/reopen`, {}, { preserveScroll: true });
+}
+async function cancelBill() {
+    if (!(await confirm({ message: 'Cancel this bill? This is a terminal action and only allowed while no payments are recorded.', destructive: true }))) return;
+    router.post(`${base}/cancel`, {}, { preserveScroll: true });
+}
+async function voidPayment(p) {
+    if (!(await confirm({ message: `Void payment ${p.receipt_number} (₹${Number(p.amount).toFixed(2)})? This cannot be undone.`, destructive: true }))) return;
+    router.delete(`${base}/payments/${p.id}`, { preserveScroll: true });
 }
 </script>

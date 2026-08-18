@@ -73,7 +73,7 @@ import PortalLayout from '@/Layouts/PortalLayout.vue';
 import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
 
 const props = defineProps({ sahodaya: Object, exam: Object, registrations: Object, isTrustedReviewer: { type: Boolean, default: false } });
@@ -105,5 +105,6 @@ function importCsv() {
     }, { forceFormData: true, preserveScroll: true });
 }
 
-const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id));
+const currentRole = computed(() => usePage().props.auth?.user?.roles?.includes('exam_staff') ? 'exam_staff' : null);
+const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id, { role: currentRole.value }));
 </script>

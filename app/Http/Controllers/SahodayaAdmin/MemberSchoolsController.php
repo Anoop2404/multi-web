@@ -623,6 +623,37 @@ class MemberSchoolsController extends SahodayaAdminController
             'membership',
         );
 
+        // The applicant's login is created here, on approval — not at application time
+        // (see SchoolApplicationController::store()) — so credentials are never emailed
+        // for a school nobody has reviewed yet. `school_email` is always present in
+        // application_payload (stored unconditionally by store()), but this is guarded
+        // in case an older, pre-fix application record predates that guarantee.
+        $email = strtolower(trim((string) ($school->application_payload['school_email'] ?? '')));
+
+        if ($email !== '' && ! User::where('email', $email)->exists()) {
+            $plainPassword = \Illuminate\Support\Str::password(12);
+
+            $user = User::create([
+                'tenant_id' => $school->id,
+                'name'      => $school->application_payload['school_name'] ?? $school->name,
+                'email'     => $email,
+                'password'  => \Illuminate\Support\Facades\Hash::make($plainPassword),
+            ]);
+            $user->assignRole('school_admin');
+
+            try {
+                \App\Services\Mail\SahodayaMailer::for($school->parent_id)->sendVerification($user);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            try {
+                $notifier->schoolCredentialsIssued($user, $plainPassword, $school);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         $notifier->schoolApproved($school);
 
         $audit->log(

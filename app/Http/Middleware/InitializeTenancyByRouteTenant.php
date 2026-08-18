@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Tenant;
 use App\Support\TenancyDatabase;
+use App\Support\TenantSubscriptionGate;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,6 +30,14 @@ class InitializeTenancyByRouteTenant
         if ($tenant) {
             if (! $tenant->is_active && ! $request->user()?->isSuperAdmin()) {
                 abort(403, 'This organization is inactive.');
+            }
+
+            $subscriptionBlock = TenantSubscriptionGate::check($tenant, $request);
+            if ($subscriptionBlock === 'suspended') {
+                abort(403, "This organization's subscription has been suspended. Contact the platform administrator.");
+            }
+            if ($subscriptionBlock === 'readonly') {
+                abort(403, "This organization's subscription is read-only. Contact the platform administrator to restore full access.");
             }
 
             TenancyDatabase::initializeForTenant($tenant);

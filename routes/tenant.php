@@ -32,6 +32,15 @@ Route::middleware([
     Route::get('/office-bearers/{bearer}/photo', [\App\Http\Controllers\Public\OfficeBearerPhotoController::class, 'show'])
         ->name('tenant.office-bearers.photo');
 
+    // Impersonation handoff (FRD-13 §12) — see ImpersonationService's docblock for why this
+    // has to be a cross-host redirect rather than a same-session guard swap.
+    Route::get('/impersonate/consume/{token}', [\App\Http\Controllers\Public\ImpersonationBridgeController::class, 'consume'])
+        ->middleware('throttle:10,1')
+        ->name('tenant.impersonate.consume');
+    Route::post('/impersonate/end', [\App\Http\Controllers\Public\ImpersonationBridgeController::class, 'end'])
+        ->middleware('auth')
+        ->name('tenant.impersonate.end');
+
     // School membership application (always available on Sahodaya tenants)
     Route::get('/school-register', [SchoolApplicationController::class, 'create'])->name('school-register.create');
     Route::post('/school-register', [SchoolApplicationController::class, 'store'])
@@ -90,6 +99,8 @@ Route::middleware([
     Route::middleware(['website.enabled', 'public.website.enabled'])->group(function () {
         Route::get('/news', [NewsArticleController::class, 'index'])->name('tenant.news.index');
         Route::get('/news/{slug}', [NewsArticleController::class, 'show'])->name('tenant.news.show');
+        Route::get('/circulars', [\App\Http\Controllers\Public\CircularController::class, 'index'])->name('tenant.circulars.index');
+        Route::get('/circulars/{circular}/download', [\App\Http\Controllers\Public\CircularController::class, 'download'])->name('tenant.circulars.download');
         Route::get('/events', [EventController::class, 'index'])->name('tenant.events.index');
         Route::get('/events/{slug}', [EventController::class, 'show'])->name('tenant.events.show');
 

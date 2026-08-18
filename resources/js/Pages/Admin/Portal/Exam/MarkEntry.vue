@@ -54,7 +54,7 @@ import PortalLayout from '@/Layouts/PortalLayout.vue';
 import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 
 const props = defineProps({ sahodaya: Object, exam: Object, registrations: Object, gradeBands: { type: Array, default: () => [] } });
 const gradeOptions = computed(() => props.gradeBands?.length ? props.gradeBands.map((b) => b.label) : ['A+', 'A', 'B', 'C', 'D', 'F']);
@@ -73,5 +73,8 @@ function save(r) {
     router.post(`/portal/exam/${props.sahodaya.id}/exams/${props.exam.id}/registrations/${r.id}/marks`, forms[r.id], { preserveScroll: true });
 }
 
-const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id));
+// Role passed through so exam_staff (view-only for marks) doesn't get shown the
+// "Mark entry" link only to hit a 403 on the server — see Documents/Path_breaks.md.
+const currentRole = computed(() => usePage().props.auth?.user?.roles?.includes('exam_staff') ? 'exam_staff' : null);
+const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id, { role: currentRole.value }));
 </script>

@@ -3,159 +3,62 @@
         <PageHeader
             title="Portal users"
             eyebrow="Administration"
-            description="Create judges, exam staff, mark-entry coordinators, event ops, and view-only Sahodaya staff. Assign permissions and event duties below."
-        />
+            description="Create judges, exam staff, mark-entry coordinators, event ops, and view-only Sahodaya staff."
+        >
+            <template #actions>
+                <button type="button" class="btn-secondary text-sm" @click="exportCredentials">
+                    ↓ Export credentials
+                </button>
+                <button type="button" class="btn-primary text-sm" @click="openCreate">
+                    + New user
+                </button>
+            </template>
+        </PageHeader>
 
         <div v-if="newCredentials" class="notice-banner notice-banner--success mb-4 text-sm">
             Account created. Username: <strong class="font-mono">{{ newCredentials.username }}</strong>
             · Temp password: <strong class="font-mono">{{ newCredentials.password }}</strong> (shown once — share this with the user, it won't be shown again)
         </div>
 
-        <form @submit.prevent="createUser" class="card mb-6 form-stack">
-            <div>
-                <h3 class="section-title">New user</h3>
-                <p class="section-desc">Password must be at least 8 characters.</p>
-            </div>
-            <div class="grid gap-4 sm:grid-cols-2">
-                <FormField label="Full name" :error="form.errors.name" required>
-                    <template #default="{ id }">
-                        <input :id="id" v-model="form.name" class="field" placeholder="Full name" required>
-                    </template>
-                </FormField>
-                <FormField label="Email (optional — leave blank to log in by username only)" :error="form.errors.email">
-                    <template #default="{ id }">
-                        <input :id="id" v-model="form.email" type="email" class="field" placeholder="Email (optional)">
-                    </template>
-                </FormField>
-                <FormField label="Username (leave blank to auto-generate from name)" :error="form.errors.username">
-                    <template #default="{ id }">
-                        <input :id="id" v-model="form.username" class="field" placeholder="e.g. anoop.john">
-                    </template>
-                </FormField>
-                <FormField label="Password" :error="form.errors.password" class-extra="sm:col-span-2" required>
-                    <template #default="{ id }">
-                        <input :id="id" v-model="form.password" type="password" class="field" placeholder="Password (min 8)" minlength="8" required>
-                    </template>
-                </FormField>
-            </div>
-            <div>
-                <ChoiceGroup label="Roles" :error="form.errors.roles">
-                    <div class="w-full space-y-4">
-                        <div v-for="group in groupedRoles" :key="group.name">
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">{{ group.name }}</p>
-                            <div class="flex flex-wrap gap-2">
-                                <label v-for="r in group.roles" :key="r.value"
-                                       class="choice-chip"
-                                       :class="{ 'choice-chip--checked': form.roles.includes(r.value) }"
-                                       :title="r.description || ''">
-                                    <input type="checkbox" class="choice-chip-input" :value="r.value" v-model="form.roles">
-                                    <span class="choice-chip-label">{{ r.label }}</span>
-                                </label>
-                            </div>
-                            <p v-if="group.name === 'Event roles'" class="mt-1.5 text-xs text-slate-500 space-y-0.5">
-                                <span class="block"><strong class="text-slate-600">Event coordinator</strong> — full control across every event.</span>
-                                <span class="block"><strong class="text-slate-600">Event operations</strong> — one duty (registration desk, stage, food…) on one event.</span>
-                                <span class="block"><strong class="text-slate-600">Event admin</strong> — full control, but only for the events you tick.</span>
-                            </p>
-                        </div>
-                    </div>
-                </ChoiceGroup>
-            </div>
-            <div v-if="form.roles.includes('fest_ops')" class="card card--accent space-y-3">
-                <p class="text-xs font-semibold text-violet-900">Event ops assignment</p>
-                <FormField label="Event">
-                    <template #default="{ id }">
-                        <select :id="id" v-model="form.fest_ops_event_id" class="field">
-                            <option value="">Select event (optional)</option>
-                            <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
-                        </select>
-                    </template>
-                </FormField>
-                <div>
-                    <p class="form-label mb-2">Duties</p>
-                    <div class="flex flex-wrap gap-2">
-                        <label v-for="d in dutyOptions" :key="d.value" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
-                            <input type="checkbox" :value="d.value" v-model="form.fest_ops_duties" :aria-label="d.label">
-                            {{ d.label }}
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <div v-if="form.roles.includes('event_admin')" class="card card--accent space-y-3">
-                <p class="text-xs font-semibold text-violet-900">Event admin — assigned events</p>
-                <p class="text-xs text-slate-500">This user gets full sahodaya-admin control (items, fees, registrations, results, settings) but only for the events checked below.</p>
-                <div class="flex flex-wrap gap-2">
-                    <label v-for="e in festEvents" :key="e.id" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
-                        <input type="checkbox" :value="e.id" v-model="form.event_admin_event_ids">
-                        {{ e.title }} ({{ e.status }})
-                    </label>
-                    <p v-if="!festEvents.length" class="text-xs text-slate-400 italic">No active events yet.</p>
-                </div>
-            </div>
-            <div v-if="hasExamRole(form.roles)" class="card card--muted space-y-3">
-                <p class="text-xs font-semibold text-sky-900">Exam assignment</p>
-                <FormField label="Talent Search exam">
-                    <template #default="{ id }">
-                        <select :id="id" v-model="form.exam_staff_exam_id" class="field">
-                            <option value="">Select exam (optional)</option>
-                            <option v-for="e in mcqExams" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
-                        </select>
-                    </template>
-                </FormField>
-                <FormField label="Exam role">
-                    <template #default="{ id }">
-                        <select :id="id" v-model="form.exam_staff_role" class="field">
-                            <option value="staff">Hall staff (attendance)</option>
-                            <option value="controller">Exam controller (attendance + marks)</option>
-                        </select>
-                    </template>
-                </FormField>
-            </div>
-            <div v-if="hasPermissionRole(form.roles)" class="card card--muted space-y-2">
-                <p class="form-label mb-1">Access permissions</p>
-                <p class="text-xs text-slate-500 mb-2">Role defaults are applied automatically; adjust individual permissions below.</p>
-                <div class="flex flex-wrap gap-2">
-                    <label v-for="p in permissions" :key="p" class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1 text-xs">
-                        <input type="checkbox" :value="p" v-model="form.permissions">
-                        {{ permissionLabels[p] || p }}
-                    </label>
-                </div>
-            </div>
-            <div v-if="regions.length" class="card card--muted space-y-2">
-                <p class="form-label mb-1">Restrict to region(s) <span class="text-slate-400 font-normal">(optional)</span></p>
-                <p class="text-xs text-slate-500 mb-2">Leave unchecked for unrestricted access. If any region is checked, this user only sees schools/students in those regions for Membership — this is separate from Fest event/region duties above.</p>
-                <div class="flex flex-wrap gap-2">
-                    <label v-for="r in regions" :key="r.id" class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1 text-xs">
-                        <input type="checkbox" :value="r.id" v-model="form.region_ids">
-                        {{ r.name }}
-                    </label>
-                </div>
-            </div>
-            <FormActions sticky>
-                <button type="submit" class="btn-primary" :disabled="form.processing">
-                    {{ form.processing ? 'Creating…' : 'Create user' }}
-                </button>
-            </FormActions>
-        </form>
+        <div class="card mb-4 flex flex-wrap items-center gap-3 py-3">
+            <label class="text-xs font-semibold text-slate-500" for="role-filter">Filter by role</label>
+            <select id="role-filter" v-model="roleFilter" class="field field--sm max-w-xs">
+                <option value="all">All roles ({{ users.length }})</option>
+                <optgroup v-for="group in groupedRoles" :key="group.name" :label="group.name">
+                    <option v-for="r in group.roles" :key="r.value" :value="r.value">
+                        {{ r.label }} ({{ countForRole(r.value) }})
+                    </option>
+                </optgroup>
+            </select>
+            <span class="text-xs text-slate-400">{{ filteredUsers.length }} of {{ users.length }} shown</span>
+        </div>
 
         <div class="card overflow-hidden p-0">
             <EmptyState
                 v-if="!users.length"
                 title="No operational users yet"
-                description="Create judges, coordinators, and staff accounts using the form above."
+                description="Create judges, coordinators, and staff accounts to get started."
                 icon="👥"
+            />
+            <EmptyState
+                v-else-if="!filteredUsers.length"
+                title="No users with this role"
+                description="Try a different filter."
+                icon="🔍"
             />
             <table v-else class="data-table">
                 <thead>
                     <tr>
                         <th>Name</th>
                         <th>Email / Username</th>
-                        <th>Roles & assignments</th>
+                        <th>Roles</th>
+                        <th>Assignments</th>
+                        <th>Status</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="u in users" :key="u.id">
+                    <tr v-for="u in filteredUsers" :key="u.id">
                         <td class="font-medium text-slate-900">{{ u.name }}</td>
                         <td class="text-slate-600">
                             {{ u.email || '—' }}
@@ -168,39 +71,175 @@
                                     {{ roleLabel(r) }}
                                 </span>
                             </div>
-                            <div v-if="u.permissions.length" class="flex flex-wrap gap-1 mt-1.5">
-                                <span v-for="p in u.permissions" :key="p"
-                                      class="inline-flex items-center rounded-full bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-[9px] text-slate-500">
-                                    {{ permissionLabels[p] || p }}
-                                </span>
-                            </div>
-                            <div v-if="u.fest_assignments?.length" class="flex flex-wrap gap-1 mt-1.5">
-                                <span v-for="(a, i) in u.fest_assignments" :key="i"
+                        </td>
+                        <td class="text-xs">
+                            <div v-if="u.fest_assignments?.length" class="flex flex-wrap gap-1">
+                                <span v-for="(a, i) in u.fest_assignments" :key="`f${i}`"
                                       class="inline-flex items-center rounded-full bg-violet-50 border border-violet-200 px-2 py-0.5 text-[10px] font-medium text-violet-700">
                                     {{ a.event_title }} · {{ dutyLabel(a.duty) }}
                                 </span>
                             </div>
-                            <div v-if="u.exam_assignments?.length" class="flex flex-wrap gap-1 mt-1.5">
-                                <span v-for="(a, i) in u.exam_assignments" :key="i"
+                            <div v-if="u.exam_assignments?.length" class="flex flex-wrap gap-1 mt-1">
+                                <span v-for="(a, i) in u.exam_assignments" :key="`e${i}`"
                                       class="inline-flex items-center rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-medium text-sky-700">
                                     {{ a.exam_title }} · {{ a.role === 'controller' ? 'Controller' : 'Hall staff' }}
                                 </span>
                             </div>
-                            <div v-if="u.region_ids?.length" class="flex flex-wrap gap-1 mt-1.5">
-                                <span v-for="rid in u.region_ids" :key="rid"
+                            <div v-if="u.region_ids?.length" class="flex flex-wrap gap-1 mt-1">
+                                <span v-for="rid in u.region_ids" :key="`r${rid}`"
                                       class="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                                     🗺️ {{ regionName(rid) }}
                                 </span>
                             </div>
+                            <span v-if="!u.fest_assignments?.length && !u.exam_assignments?.length && !u.region_ids?.length" class="text-slate-300">—</span>
+                        </td>
+                        <td>
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                  :class="u.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
+                                {{ u.is_active ? 'Active' : 'Inactive' }}
+                            </span>
                         </td>
                         <td class="text-right whitespace-nowrap">
                             <button type="button" @click="openEdit(u)" class="btn-ghost text-indigo-600">Edit</button>
                             <button type="button" @click="resetPw(u)" class="btn-ghost text-slate-600">Reset PW</button>
+                            <button type="button" @click="toggleActive(u)" class="btn-ghost" :class="u.is_active ? 'text-amber-600' : 'text-emerald-600'">
+                                {{ u.is_active ? 'Deactivate' : 'Activate' }}
+                            </button>
                             <button type="button" @click="remove(u)" class="btn-ghost text-red-600">Remove</button>
                         </td>
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <div v-if="creating" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="creating = false">
+            <form @submit.prevent="createUser" class="card w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl form-stack">
+                <div>
+                    <h3 class="section-title">New user</h3>
+                    <p class="section-desc">Password must be at least 8 characters.</p>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <FormField label="Full name" :error="form.errors.name" required>
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.name" class="field" placeholder="Full name" required>
+                        </template>
+                    </FormField>
+                    <FormField label="Email (optional — leave blank to log in by username only)" :error="form.errors.email">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.email" type="email" class="field" placeholder="Email (optional)">
+                        </template>
+                    </FormField>
+                    <FormField label="Username (leave blank to auto-generate from name)" :error="form.errors.username">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.username" class="field" placeholder="e.g. anoop.john">
+                        </template>
+                    </FormField>
+                    <FormField label="Password" :error="form.errors.password" class-extra="sm:col-span-2" required>
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.password" type="password" class="field" placeholder="Password (min 8)" minlength="8" required>
+                        </template>
+                    </FormField>
+                </div>
+                <div>
+                    <ChoiceGroup label="Roles" :error="form.errors.roles">
+                        <div class="w-full space-y-4">
+                            <div v-for="group in groupedRoles" :key="group.name">
+                                <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">{{ group.name }}</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <label v-for="r in group.roles" :key="r.value"
+                                           class="choice-chip"
+                                           :class="{ 'choice-chip--checked': form.roles.includes(r.value) }"
+                                           :title="r.description || ''">
+                                        <input type="checkbox" class="choice-chip-input" :value="r.value" v-model="form.roles">
+                                        <span class="choice-chip-label">{{ r.label }}</span>
+                                    </label>
+                                </div>
+                                <p v-if="group.name === 'Event roles'" class="mt-1.5 text-xs text-slate-500 space-y-0.5">
+                                    <span class="block"><strong class="text-slate-600">Event coordinator</strong> — full control across every event.</span>
+                                    <span class="block"><strong class="text-slate-600">Event operations</strong> — one duty (registration desk, stage, food…) on one event.</span>
+                                    <span class="block"><strong class="text-slate-600">Event admin</strong> — full control, but only for the events you tick.</span>
+                                </p>
+                            </div>
+                        </div>
+                    </ChoiceGroup>
+                </div>
+                <div v-if="form.roles.includes('fest_ops')" class="card card--accent space-y-3">
+                    <p class="text-xs font-semibold text-violet-900">Event ops assignment</p>
+                    <FormField label="Event">
+                        <template #default="{ id }">
+                            <select :id="id" v-model="form.fest_ops_event_id" class="field">
+                                <option value="">Select event (optional)</option>
+                                <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
+                            </select>
+                        </template>
+                    </FormField>
+                    <div>
+                        <p class="form-label mb-2">Duties</p>
+                        <div class="flex flex-wrap gap-2">
+                            <label v-for="d in dutyOptions" :key="d.value" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
+                                <input type="checkbox" :value="d.value" v-model="form.fest_ops_duties" :aria-label="d.label">
+                                {{ d.label }}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="form.roles.includes('event_admin')" class="card card--accent space-y-3">
+                    <p class="text-xs font-semibold text-violet-900">Event admin — assigned events</p>
+                    <p class="text-xs text-slate-500">This user gets full sahodaya-admin control (items, fees, registrations, results, settings) but only for the events checked below.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <label v-for="e in festEvents" :key="e.id" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
+                            <input type="checkbox" :value="e.id" v-model="form.event_admin_event_ids">
+                            {{ e.title }} ({{ e.status }})
+                        </label>
+                        <p v-if="!festEvents.length" class="text-xs text-slate-400 italic">No active events yet.</p>
+                    </div>
+                </div>
+                <div v-if="hasExamRole(form.roles)" class="card card--muted space-y-3">
+                    <p class="text-xs font-semibold text-sky-900">Exam assignment</p>
+                    <FormField label="Talent Search exam">
+                        <template #default="{ id }">
+                            <select :id="id" v-model="form.exam_staff_exam_id" class="field">
+                                <option value="">Select exam (optional)</option>
+                                <option v-for="e in mcqExams" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
+                            </select>
+                        </template>
+                    </FormField>
+                    <FormField label="Exam role">
+                        <template #default="{ id }">
+                            <select :id="id" v-model="form.exam_staff_role" class="field">
+                                <option value="staff">Hall staff (attendance)</option>
+                                <option value="controller">Exam controller (attendance + marks)</option>
+                            </select>
+                        </template>
+                    </FormField>
+                </div>
+                <div v-if="hasPermissionRole(form.roles)" class="card card--muted space-y-2">
+                    <p class="form-label mb-1">Access permissions</p>
+                    <p class="text-xs text-slate-500 mb-2">Role defaults are applied automatically; adjust individual permissions below.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <label v-for="p in permissions" :key="p" class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1 text-xs">
+                            <input type="checkbox" :value="p" v-model="form.permissions">
+                            {{ permissionLabels[p] || p }}
+                        </label>
+                    </div>
+                </div>
+                <div v-if="regions.length" class="card card--muted space-y-2">
+                    <p class="form-label mb-1">Restrict to region(s) <span class="text-slate-400 font-normal">(optional)</span></p>
+                    <p class="text-xs text-slate-500 mb-2">Leave unchecked for unrestricted access. If any region is checked, this user only sees schools/students in those regions for Membership — this is separate from Fest event/region duties above.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <label v-for="r in regions" :key="r.id" class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1 text-xs">
+                            <input type="checkbox" :value="r.id" v-model="form.region_ids">
+                            {{ r.name }}
+                        </label>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="creating = false" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary" :disabled="form.processing">
+                        {{ form.processing ? 'Creating…' : 'Create user' }}
+                    </button>
+                </div>
+            </form>
         </div>
 
         <div v-if="editing" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="editing = null">
@@ -336,6 +375,9 @@ const props = defineProps({
     regions: { type: Array, default: () => [] },
 });
 
+const creating = ref(false);
+const roleFilter = ref('all');
+
 const form = useForm({
     name: '', email: '', username: '', password: '', roles: [], permissions: [],
     fest_ops_event_id: '', fest_ops_duties: [],
@@ -352,6 +394,15 @@ const editForm = useForm({
     exam_staff_exam_id: '', exam_staff_role: 'staff',
     region_ids: [],
 });
+
+const filteredUsers = computed(() => {
+    if (roleFilter.value === 'all') return props.users;
+    return props.users.filter((u) => u.roles.includes(roleFilter.value));
+});
+
+function countForRole(role) {
+    return props.users.filter((u) => u.roles.includes(role)).length;
+}
 
 function regionName(id) {
     return props.regions.find((r) => r.id === id)?.name ?? `#${id}`;
@@ -417,10 +468,16 @@ watch(() => editForm.roles, (roles) => {
     }
 }, { deep: true });
 
+function openCreate() {
+    form.reset();
+    form.clearErrors();
+    creating.value = true;
+}
+
 function createUser() {
     form.post(`/sahodaya-admin/${props.sahodaya.id}/users`, {
         preserveScroll: true,
-        onSuccess: () => form.reset(),
+        onSuccess: () => { form.reset(); creating.value = false; },
     });
 }
 
@@ -465,5 +522,15 @@ async function remove(user) {
 async function resetPw(user) {
     if (!(await confirm({ message: `Reset password for ${user.name}?` }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/users/${user.id}/reset-password`, {}, { preserveScroll: true });
+}
+
+async function toggleActive(user) {
+    if (user.is_active && !(await confirm({ message: `Deactivate ${user.name}? They won't be able to log in until reactivated.` }))) return;
+    router.patch(`/sahodaya-admin/${props.sahodaya.id}/users/${user.id}/toggle-active`, {}, { preserveScroll: true });
+}
+
+async function exportCredentials() {
+    if (!(await confirm({ message: 'This file contains temporary passwords in plain text. Handle it carefully and delete it once shared.' }))) return;
+    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/users/export-credentials`;
 }
 </script>

@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Http\Middleware\Concerns\RedirectsUnauthenticated;
 use App\Http\Middleware\Concerns\ResolvesSahodayaAdminScope;
+use App\Support\TenantSubscriptionGate;
 use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -33,6 +34,22 @@ class EnsureSahodayaAdmin
         $tenantId = $request->route('tenantId');
         if ($tenantId && $user->tenant_id !== $tenantId) {
             abort(403);
+        }
+
+        if ($tenantId) {
+            $sahodaya = \App\Models\Tenant::find($tenantId);
+            if ($sahodaya && ! $sahodaya->is_active) {
+                abort(403, 'This organization is inactive.');
+            }
+            if ($sahodaya) {
+                $subscriptionBlock = TenantSubscriptionGate::check($sahodaya, $request);
+                if ($subscriptionBlock === 'suspended') {
+                    abort(403, "This organization's subscription has been suspended. Contact the platform administrator.");
+                }
+                if ($subscriptionBlock === 'readonly') {
+                    abort(403, "This organization's subscription is read-only. Contact the platform administrator to restore full access.");
+                }
+            }
         }
 
         if ($user->hasRole('training_admin') && ! $user->hasRole('sahodaya_admin')) {

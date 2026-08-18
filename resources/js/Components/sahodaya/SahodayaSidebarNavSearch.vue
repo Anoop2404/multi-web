@@ -25,7 +25,7 @@
 
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
-import SahodayaSvgIcon from './SahodayaSvgIcon.vue';
+import SahodayaSvgIcon from '@/Components/icons/SvgIcon.vue';
 
 const model = defineModel({ type: String, default: '' });
 

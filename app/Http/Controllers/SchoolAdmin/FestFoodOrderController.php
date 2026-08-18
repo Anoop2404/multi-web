@@ -35,10 +35,11 @@ class FestFoodOrderController extends SchoolAdminController
     {
         $this->assertAccess($event);
 
-        $menuItems = FestFoodMenuItem::forEvent($event->id)
-            ->where('is_available', true)
-            ->orderBy('menu_date')->orderBy('meal_type')->orderBy('sort_order')->orderBy('name')
-            ->get();
+        // Sorted in PHP, not via orderBy('meal_type') — see
+        // FestFoodMenuItem::sortForDisplay() for why a SQL sort would be wrong here.
+        $menuItems = FestFoodMenuItem::sortForDisplay(
+            FestFoodMenuItem::forEvent($event->id)->where('is_available', true)->get()
+        );
 
         $bill = FestFoodBill::where('event_id', $event->id)->where('school_id', $this->school->id)->first();
         $bill?->load(['orderItems', 'payments']);
@@ -49,7 +50,9 @@ class FestFoodOrderController extends SchoolAdminController
 
         return $this->inertia('School/Fest/FoodOrder', [
             'event' => $event->only('id', 'title', 'event_start', 'event_end'),
+            'hierarchy' => $event->hierarchyContext(),
             'menuItems' => $menuItems,
+            'mealTypes' => FestFoodMenuItem::MEAL_TYPES,
             'bill' => $bill ? [
                 ...$bill->only(['id', 'status', 'amount_total', 'amount_paid']),
                 'balance_due' => $bill->balanceDue(),
@@ -95,10 +98,8 @@ class FestFoodOrderController extends SchoolAdminController
 
         $bill = FestFoodBill::where('event_id', $event->id)->where('school_id', $this->school->id)->firstOrFail();
         abort_if($orderItem->bill_id !== $bill->id, 404);
-        abort_if($bill->status !== FestFoodBill::STATUS_OPEN, 422, 'Your food bill for this event is already settled.');
 
-        $orderItem->delete();
-        $bill->recalculate();
+        $bill->removeOrderItem($orderItem);
 
         return back()->with('success', 'Removed from your order.');
     }

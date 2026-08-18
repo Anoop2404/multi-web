@@ -446,7 +446,13 @@ class FestRegistrationCreateService
             // Sahodaya review rather than silently keeping the old approval. See
             // notifyIfRosterEditRevokedApproval() (LIFE-10) — the actual notification for
             // this fires after the transaction commits, not here.
-            if ($registration->status === 'submitted' || $registration->status === 'approved') {
+            //
+            // A 'rejected' registration goes through the same re-review logic — editing it
+            // is how a school resubmits after a fix, not a silent no-op that would otherwise
+            // leave the row permanently stuck on 'rejected' even after the roster changes.
+            // See Documents/Path_breaks.md.
+            if (in_array($registration->status, ['submitted', 'approved', 'rejected'], true)) {
+                $wasRejected = $registration->status === 'rejected';
                 $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
                 $feeService = app(FestSchoolEventFeeService::class);
                 $feeRequiredBeforeApproval = ($policy['require_fee_before_approval'] ?? false) && $feeService->feeRequired($event);
@@ -455,7 +461,10 @@ class FestRegistrationCreateService
                 $newStatus = ($item->head?->requiresManualApproval() || $event->requiresManualApproval() || $feeUnpaid)
                     ? 'submitted'
                     : 'approved';
-                $registration->update(['status' => $newStatus, 'submitted_at' => now()]);
+                $registration->update(array_merge(
+                    ['status' => $newStatus, 'submitted_at' => now()],
+                    $wasRejected ? ['rejection_reason' => null, 'rejected_at' => null, 'rejected_by_user_id' => null] : [],
+                ));
             }
 
             app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
@@ -547,6 +556,12 @@ class FestRegistrationCreateService
 
             if ($registration->status === 'approved') {
                 $registration->update(['status' => 'submitted', 'submitted_at' => now()]);
+            } elseif ($registration->status === 'rejected') {
+                // Same resubmit-on-edit handling as the student path above.
+                $registration->update([
+                    'status' => 'submitted', 'submitted_at' => now(),
+                    'rejection_reason' => null, 'rejected_at' => null, 'rejected_by_user_id' => null,
+                ]);
             }
 
             app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));

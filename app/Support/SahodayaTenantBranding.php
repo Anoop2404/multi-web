@@ -180,13 +180,14 @@ class SahodayaTenantBranding
         }
 
         $items[] = ['label' => 'Downloads', 'url' => '/downloads', 'external' => false, 'children' => []];
+        $items[] = ['label' => 'Circulars', 'url' => '/circulars', 'external' => false, 'children' => []];
         $items[] = [
-            'label' => 'Programmes', 'url' => '/#programmes', 'external' => false,
+            'label' => 'Programmes', 'url' => '/fest', 'external' => false,
             'children' => [
-                ['label' => 'Athletic Meet', 'url' => '/#programmes', 'external' => false],
-                ['label' => 'Kalotsav', 'url' => '/fest', 'external' => false],
-                ['label' => 'Kids Fest', 'url' => '/#programmes', 'external' => false],
-                ['label' => 'Teacher Fest', 'url' => '/#programmes', 'external' => false],
+                ['label' => 'Athletic Meet & Kalotsav', 'url' => '/fest', 'external' => false],
+                ['label' => 'Kids Fest', 'url' => '/fest', 'external' => false],
+                ['label' => 'Teacher Fest', 'url' => '/fest', 'external' => false],
+                ['label' => 'MCQ Talent Search Papers', 'url' => '/mcq/papers', 'external' => false],
                 ['label' => 'Membership Renewal', 'url' => '/school-register', 'external' => false],
             ],
         ];

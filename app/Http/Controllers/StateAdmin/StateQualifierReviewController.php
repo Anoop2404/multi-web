@@ -10,6 +10,7 @@ use App\Services\State\StateQualifierMaterializationService;
 use App\Services\State\StateRemittanceService;
 use App\Models\FestStateProgram;
 use App\Models\Tenant;
+use App\Support\StateScope;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -17,7 +18,7 @@ class StateQualifierReviewController extends Controller
 {
     public function index()
     {
-        $intakes = StateQualifierIntake::withCount('entries')
+        $intakes = StateScope::apply(StateQualifierIntake::withCount('entries'))
             ->where('status', '!=', 'draft')
             ->orderByDesc('created_at')
             ->paginate(20);
@@ -27,7 +28,7 @@ class StateQualifierReviewController extends Controller
             route("{$routePrefix}.qualifiers.show", $intake, false),
         ));
 
-        $statePrograms = FestStateProgram::orderByDesc('created_at')->get(['id', 'title', 'event_type']);
+        $statePrograms = StateScope::apply(FestStateProgram::orderByDesc('created_at'))->get(['id', 'title', 'event_type']);
         $sahodayas = Tenant::query()->where('type', 'sahodaya')->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('StateAdmin/Qualifiers/Index', [
@@ -55,6 +56,8 @@ class StateQualifierReviewController extends Controller
             'entries.*.grade'        => 'nullable|string|max:10',
         ]);
 
+        StateScope::assertOwns(FestStateProgram::find($data['state_program_id'])?->state_id);
+
         $key = $data['idempotency_key'] ?? 'manual-'.str()->uuid()->toString();
 
         $intake = $service->receive($key, [
@@ -79,6 +82,7 @@ class StateQualifierReviewController extends Controller
 
     public function show(StateQualifierIntake $intake)
     {
+        StateScope::assertOwns($intake->state_id);
         $intake->load(['entries' => fn ($q) => $q->orderBy('item_code')->orderBy('position')]);
         $routePrefix = request()->routeIs('state.portal.*') ? 'state.portal' : 'admin.state';
 
@@ -99,6 +103,7 @@ class StateQualifierReviewController extends Controller
 
     public function storeEntry(Request $request, StateQualifierIntake $intake)
     {
+        StateScope::assertOwns($intake->state_id);
         $data = $request->validate([
             'student_name' => 'required|string|max:255',
             'school_name'  => 'required|string|max:255',
@@ -126,6 +131,7 @@ class StateQualifierReviewController extends Controller
 
     public function updateEntry(Request $request, StateQualifierIntake $intake, StateQualifierEntry $entry)
     {
+        StateScope::assertOwns($intake->state_id);
         abort_if($entry->intake_id !== $intake->id, 404);
 
         $data = $request->validate([
@@ -145,6 +151,7 @@ class StateQualifierReviewController extends Controller
 
     public function destroyEntry(StateQualifierIntake $intake, StateQualifierEntry $entry)
     {
+        StateScope::assertOwns($intake->state_id);
         abort_if($entry->intake_id !== $intake->id, 404);
         $entry->delete();
 
@@ -158,6 +165,7 @@ class StateQualifierReviewController extends Controller
         StateQualifierMaterializationService $materializer,
         StateRemittanceService $remittances,
     ) {
+        StateScope::assertOwns($intake->state_id);
         $data = $request->validate(['notes' => 'nullable|string|max:2000']);
         $intake = $service->approve($intake, $request->user()?->id, $data['notes'] ?? null);
         if ($intake->status === 'rejected') {
@@ -184,6 +192,7 @@ class StateQualifierReviewController extends Controller
         StateQualifierEntry $entry,
         StateQualifierIntakeService $service,
     ) {
+        StateScope::assertOwns($intake->state_id);
         $data = $request->validate(['status' => 'required|in:approved,rejected']);
         $service->reviewEntry($intake, $entry, $data['status']);
 

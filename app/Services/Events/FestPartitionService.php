@@ -7,6 +7,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventPhase;
 use App\Models\FestFoodBill;
 use App\Models\FestFoodCoupon;
+use App\Models\FestFoodMenuItem;
 use App\Models\FestRegistration;
 use App\Models\FestRegistrationBatch;
 use App\Models\Tenant;
@@ -319,6 +320,50 @@ class FestPartitionService
             }
 
             return $summary;
+        })->values()->all();
+    }
+
+    /**
+     * Per-region food summary cards — same idea as regionDrillDownSummary() above, scoped
+     * to food data instead of registrations/results. Used on the hub's own Food Menu/
+     * Coupons/Billing/Catering pages so an admin sees where to actually go instead of an
+     * unexplained empty page (those tables are always empty on a hub by construction —
+     * food lives on each region's own child event, same reasoning as combinedFoodSummary()
+     * above, which this complements: that method gives hub-wide totals, this gives one
+     * card per region to drill into).
+     *
+     * @return list<array{
+     *     id: int, title: string, label: string, status: string, venue: ?string,
+     *     menu_items_count: int, bills_count: int, total: float, paid: float,
+     *     coupons_issued: int, catering_head_count: int,
+     * }>
+     */
+    public function foodRegionDrillDownSummary(FestEvent $hub): array
+    {
+        $regionPartitions = $this->partitions($hub)->filter(
+            fn (FestEvent $p) => $this->partitionRole($p) === 'region'
+        );
+
+        return $regionPartitions->map(function (FestEvent $partition) {
+            $bills = FestFoodBill::where('event_id', $partition->id)
+                ->where('status', '!=', FestFoodBill::STATUS_CANCELLED)
+                ->get(['amount_total', 'amount_paid']);
+
+            return [
+                'id' => $partition->id,
+                'title' => $partition->title,
+                'label' => $partition->cluster_label ?? $partition->title,
+                'status' => $partition->status,
+                'venue' => $partition->venue,
+                'menu_items_count' => FestFoodMenuItem::forEvent($partition->id)->count(),
+                'bills_count' => $bills->count(),
+                'total' => round((float) $bills->sum('amount_total'), 2),
+                'paid' => round((float) $bills->sum('amount_paid'), 2),
+                'coupons_issued' => FestFoodCoupon::where('event_id', $partition->id)->count(),
+                'catering_head_count' => (int) FestCateringOrder::where('event_id', $partition->id)
+                    ->where('status', 'confirmed')
+                    ->sum('head_count'),
+            ];
         })->values()->all();
     }
 

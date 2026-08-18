@@ -97,6 +97,8 @@
             </header>
 
             <main class="sa-main flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isStaffUser }" :inert="isStaffUser">
+                <ImpersonationBanner />
+                <AnnouncementBanner />
                 <StaffReadOnlyBanner v-if="isStaffUser" />
                 <FlashBanner />
                 <ValidationBanner />
@@ -110,11 +112,13 @@
 import { Head, usePage } from '@inertiajs/vue3';
 import SignOutButton from '@/Components/SignOutButton.vue';
 import StaffReadOnlyBanner from '@/Components/StaffReadOnlyBanner.vue';
+import ImpersonationBanner from '@/Components/ImpersonationBanner.vue';
+import AnnouncementBanner from '@/Components/AnnouncementBanner.vue';
 import FlashBanner from '@/Components/ui/FlashBanner.vue';
 import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import SahodayaNavItem from '@/Components/sahodaya/SahodayaNavItem.vue';
 import SahodayaSidebarNavSearch from '@/Components/sahodaya/SahodayaSidebarNavSearch.vue';
-import SahodayaSvgIcon from '@/Components/sahodaya/SahodayaSvgIcon.vue';
+import SahodayaSvgIcon from '@/Components/icons/SvgIcon.vue';
 import { filterNavGroups } from '@/support/filterNavGroups.js';
 import {
     detectSchoolFestContextFromUrl,
@@ -159,8 +163,11 @@ const showPublicSiteLink = computed(() => websiteEnabled.value && publicWebsiteE
 
 const STAFF_NAV = {
     students: ['fest.view', 'website.view', 'website.manage', 'membership.view'],
-    membership: ['membership.view', 'membership.manage'],
-    fest: ['fest.view', 'fest.manage'],
+    // finance.view added — school_finance_coordinator (finance.view, fest.finance) could
+    // previously write to Payments & Receipts via direct URL but had no nav item showing
+    // them the page existed. See Documents/Path_breaks.md.
+    membership: ['membership.view', 'membership.manage', 'finance.view'],
+    fest: ['fest.view', 'fest.manage', 'fest.finance'],
     mcq: ['mcq.view', 'mcq.manage'],
     training: ['training.view', 'training.manage', 'fest.view', 'fest.manage'],
     website: ['website.view', 'website.manage', 'website.news'],

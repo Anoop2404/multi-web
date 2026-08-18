@@ -104,6 +104,10 @@
                             </select>
                         </div>
                     </div>
+                    <label class="flex items-center gap-2 text-sm text-gray-600">
+                        <input v-model="subForm.auto_renew" type="checkbox" class="rounded">
+                        Auto-renew (informational — no payment gateway is wired up to actually charge yet)
+                    </label>
                     <div class="flex gap-2">
                         <button type="submit" class="btn-primary text-sm px-4 py-2">Save</button>
                         <button type="button" @click="showSubForm = false" class="btn-ghost text-sm px-4 py-2">Cancel</button>
@@ -165,6 +169,10 @@
                                 <option value="monthly">Monthly</option>
                             </select>
                         </div>
+                        <div>
+                            <label class="label-xs">Grace period (days)</label>
+                            <input v-model="planForm.grace_period_days" type="number" min="0" class="field" placeholder="14">
+                        </div>
                     </div>
                     <div class="flex gap-2">
                         <button type="submit" class="btn-primary text-sm px-4 py-2">Create Plan</button>
@@ -187,6 +195,9 @@
                               class="text-xs font-semibold px-2.5 py-0.5 rounded-full">
                             {{ p.is_active ? 'Active' : 'Inactive' }}
                         </span>
+                        <button type="button" @click="openFeatures(p)" class="link-brand text-xs font-semibold shrink-0">
+                            Manage features
+                        </button>
                     </div>
                 </div>
             </div>
@@ -194,19 +205,35 @@
         </div>
 
         <!-- Reject Modal -->
-        <div v-if="rejectModal.open" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-                <h3 class="font-semibold text-gray-900 mb-3">Reject Receipt</h3>
-                <textarea v-model="rejectModal.reason" rows="3" class="field w-full mb-4"
-                          placeholder="Reason for rejection…"></textarea>
-                <div class="flex gap-2 justify-end">
-                    <button @click="rejectModal.open = false" class="btn-ghost px-4 py-2 text-sm">Cancel</button>
-                    <button @click="confirmReject" class="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700">
-                        Reject
-                    </button>
+        <Modal :show="rejectModal.open" title="Reject Receipt" size="sm" @close="rejectModal.open = false">
+            <textarea v-model="rejectModal.reason" rows="3" class="field w-full"
+                      placeholder="Reason for rejection…"></textarea>
+            <template #footer>
+                <button @click="rejectModal.open = false" class="btn-ghost px-4 py-2 text-sm">Cancel</button>
+                <button @click="confirmReject" class="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700">
+                    Reject
+                </button>
+            </template>
+        </Modal>
+
+        <!-- Plan Features Modal -->
+        <Modal :show="featuresModal.open" :title="featuresModal.plan ? `Features — ${featuresModal.plan.name}` : ''" size="lg" @close="featuresModal.open = false">
+            <div class="space-y-2 max-h-96 overflow-y-auto">
+                <div v-for="(meta, key) in featureCatalog" :key="key"
+                     class="flex items-center justify-between gap-3 py-2 border-b border-gray-100 last:border-0">
+                    <label class="flex items-center gap-2 text-sm text-gray-700 flex-1">
+                        <input type="checkbox" v-model="featuresForm[key].enabled" class="rounded border-gray-300">
+                        {{ meta.label }}
+                    </label>
+                    <input v-if="meta.type === 'limit'" v-model="featuresForm[key].limit_value" type="number" min="0"
+                           class="field text-sm w-28" placeholder="No limit">
                 </div>
             </div>
-        </div>
+            <template #footer>
+                <button type="button" @click="featuresModal.open = false" class="btn-ghost px-4 py-2 text-sm">Cancel</button>
+                <button type="button" @click="saveFeatures" class="btn-primary text-sm px-4 py-2">Save features</button>
+            </template>
+        </Modal>
 
     </AdminLayout>
 </template>
@@ -243,6 +270,7 @@ const props = defineProps({
     stats:          Object,
     filters:        Object,
     tenantsForSelect: Array,
+    featureCatalog: { type: Object, default: () => ({}) },
 });
 
 const subSearch = ref(props.filters?.search ?? '');
@@ -271,17 +299,40 @@ const tenantsForSelectComputed = computed(() =>
 
 // ─── Plan form ─────────────────────────────────────────────────────────────
 const showPlanForm = ref(false);
-const planForm = reactive({ name: '', slug: '', price_inr: '', billing_period: 'annual' });
+const planForm = reactive({ name: '', slug: '', price_inr: '', billing_period: 'annual', grace_period_days: 14 });
 
 function savePlan() {
     router.post('/admin/billing/plans', planForm, {
-        onSuccess: () => { showPlanForm.value = false; Object.assign(planForm, { name: '', slug: '', price_inr: '', billing_period: 'annual' }); },
+        onSuccess: () => { showPlanForm.value = false; Object.assign(planForm, { name: '', slug: '', price_inr: '', billing_period: 'annual', grace_period_days: 14 }); },
+    });
+}
+
+// ─── Plan features ─────────────────────────────────────────────────────────
+const featuresModal = reactive({ open: false, plan: null });
+const featuresForm = reactive({});
+
+function openFeatures(plan) {
+    featuresModal.plan = plan;
+    const existing = Object.fromEntries((plan.plan_features ?? []).map(f => [f.feature_key, f]));
+    for (const key of Object.keys(props.featureCatalog)) {
+        featuresForm[key] = {
+            enabled: existing[key]?.enabled ?? false,
+            limit_value: existing[key]?.limit_value ?? null,
+        };
+    }
+    featuresModal.open = true;
+}
+
+function saveFeatures() {
+    router.put(`/admin/billing/plans/${featuresModal.plan.id}/features`, { features: { ...featuresForm } }, {
+        preserveScroll: true,
+        onSuccess: () => { featuresModal.open = false; },
     });
 }
 
 // ─── Subscription form ─────────────────────────────────────────────────────
 const showSubForm = ref(false);
-const subForm = reactive({ tenant_id: '', plan_id: '', period_start: '', period_end: '', status: 'active' });
+const subForm = reactive({ tenant_id: '', plan_id: '', period_start: '', period_end: '', status: 'active', auto_renew: false });
 
 function saveSubscription() {
     router.post('/admin/billing/subscriptions', subForm, {

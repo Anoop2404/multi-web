@@ -88,6 +88,24 @@ class TenantUserCatalog
         return ['school_principal', 'school_vice_principal', 'school_admin'];
     }
 
+    /** Primary admin roles across School + Sahodaya — protected from deletion/deactivation via the Portal users panels. */
+    /** @return list<string> */
+    public static function primaryAdminRoles(): array
+    {
+        return ['school_admin', 'school_principal', 'school_vice_principal', 'sahodaya_admin'];
+    }
+
+    /** Roles whose auto-generated temporary password gets the stronger "leadership" tier (see UserCredentialService). */
+    public static function passwordTierForRole(?string $role): string
+    {
+        $leadership = [
+            'school_principal', 'school_vice_principal', 'school_admin',
+            'sahodaya_admin', 'sahodaya_finance', 'event_admin', 'region_admin',
+        ];
+
+        return in_array($role, $leadership, true) ? 'leadership' : 'standard';
+    }
+
     /**
      * School roles subject to Spatie write-permission checks (non-leadership).
      *
@@ -566,7 +584,7 @@ class TenantUserCatalog
             'membership' => ['membership.view', 'membership.manage'],
             'fest'       => ['fest.view', 'fest.manage', 'fest.marks', 'fest.registrations', 'fest.results', 'fest.settings', 'fest.finance', 'fest.certificates', 'fest.catering', 'fest.schedule'],
             'mcq'        => ['mcq.view', 'mcq.manage', 'mcq.attendance', 'mcq.marks'],
-            'training'   => ['training.view', 'training.manage', 'fest.view', 'fest.manage'],
+            'training'   => ['training.view', 'training.manage'],
             'ledger'     => ['finance.view', 'membership.view', 'membership.manage', 'fest.finance'],
             'users'      => ['users.manage'],
         ];
@@ -579,10 +597,10 @@ class TenantUserCatalog
     {
         return [
             'students'   => ['fest.view', 'website.view', 'website.manage'],
-            'membership' => ['membership.view', 'membership.manage'],
-            'fest'       => ['fest.view', 'fest.manage'],
+            'membership' => ['membership.view', 'membership.manage', 'finance.view'],
+            'fest'       => ['fest.view', 'fest.manage', 'fest.finance'],
             'mcq'        => ['mcq.view', 'mcq.manage'],
-            'training'   => ['training.view', 'training.manage', 'fest.view', 'fest.manage'],
+            'training'   => ['training.view', 'training.manage'],
             'website'    => ['website.view', 'website.manage', 'website.news', 'website.edit', 'website.publish'],
             'users'      => ['users.manage'],
         ];

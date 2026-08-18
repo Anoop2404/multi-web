@@ -116,6 +116,14 @@
                     label="Results"
                     hint="Published scores and ranks"
                 />
+                <!-- Plain anchor, not HubCard/Inertia Link — this route streams a ZIP
+                     file, and Inertia's Link expects an Inertia-formatted response. -->
+                <a :href="`/school-admin/${school.id}/fest/${event.id}/certificates/download-all`"
+                   class="hub-card">
+                    <span class="hub-card-icon" aria-hidden="true">🎓</span>
+                    <span class="hub-card-label">Download all certificates</span>
+                    <span class="hub-card-hint">Bulk ZIP for every student</span>
+                </a>
             </div>
 
             <div v-if="appeals.length" class="card mb-6 bg-slate-50/50">

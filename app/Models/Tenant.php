@@ -74,6 +74,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
 
     public function parent()       { return $this->belongsTo(Tenant::class, 'parent_id'); }
     public function children()     { return $this->hasMany(Tenant::class, 'parent_id'); }
+    public function subscription() { return $this->hasOne(TenantSubscription::class, 'tenant_id'); }
     public function settings()     { return $this->hasMany(TenantSetting::class, 'tenant_id'); }
     public function sections()     { return $this->hasMany(SiteSection::class, 'tenant_id'); }
     public function news()         { return $this->hasMany(NewsArticle::class, 'tenant_id'); }

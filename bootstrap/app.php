@@ -75,6 +75,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'event.coordinator'     => \App\Http\Middleware\EventCoordinatorScope::class,
             'public.cache'    => \App\Http\Middleware\SetPublicCacheHeaders::class,
             'website.enabled' => \App\Http\Middleware\EnsureWebsiteEnabled::class,
+            'feature' => \App\Http\Middleware\EnsureTenantFeatureEnabled::class,
             'public.website.enabled' => \App\Http\Middleware\EnsureTenantPublicWebsiteEnabled::class,
             'public.website.admin.cms' => \App\Http\Middleware\EnsureTenantPublicWebsiteForAdminCms::class,
         ]);

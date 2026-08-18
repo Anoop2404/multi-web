@@ -7,6 +7,7 @@ use App\Models\State\StateAttendance;
 use App\Models\State\StateFestEvent;
 use App\Models\State\StateFestParticipant;
 use App\Services\State\StateEventLifecycleGate;
+use App\Support\StateScope;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Validation\Rule;
@@ -22,6 +23,7 @@ class StateAttendanceController extends Controller
 {
     public function index(StateFestEvent $event)
     {
+        StateScope::assertOwns($event->state_id);
         $routePrefix = request()->routeIs('state.portal.*') ? 'state.portal' : 'admin.state';
         $registrations = $event->registrations()
             ->whereNotIn('status', ['rejected', 'withdrawn'])
@@ -46,6 +48,7 @@ class StateAttendanceController extends Controller
 
     public function store(Request $request, StateFestEvent $event)
     {
+        StateScope::assertOwns($event->state_id);
         StateEventLifecycleGate::allowAttendanceEntry($event);
 
         if ($request->boolean('bulk')) {

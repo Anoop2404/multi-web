@@ -12,12 +12,13 @@ class TenantSubscription extends Model
 
     protected $fillable = [
         'tenant_id', 'plan_id', 'period_start', 'period_end',
-        'status', 'suspended_at', 'suspended_reason',
+        'status', 'auto_renew', 'suspended_at', 'suspended_reason',
     ];
 
     protected $casts = [
         'period_start'  => 'date',
         'period_end'    => 'date',
+        'auto_renew'    => 'boolean',
         'suspended_at'  => 'datetime',
     ];
 
@@ -44,5 +45,10 @@ class TenantSubscription extends Model
     public function isReadOnly(): bool
     {
         return $this->status === 'readonly';
+    }
+
+    public function isSuspended(): bool
+    {
+        return $this->status === 'suspended';
     }
 }

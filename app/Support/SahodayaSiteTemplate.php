@@ -38,14 +38,12 @@ class SahodayaSiteTemplate
                     [
                         'label' => 'Academic', 'url' => '/#academic', 'external' => false,
                         'children' => [
-                            ['label' => 'Kids Fest 2025-26', 'url' => '/#academic', 'external' => false],
-                            ['label' => 'Athletic Meet', 'url' => '/#academic', 'external' => false],
-                            ['label' => 'Kalotsav 2025', 'url' => '/#academic', 'external' => false],
-                            ['label' => 'MSAT / Aptitude', 'url' => '/#academic', 'external' => false],
-                            ['label' => 'Teacher Fest', 'url' => '/#academic', 'external' => false],
+                            ['label' => 'Fest Schedule & Results', 'url' => '/fest', 'external' => false],
+                            ['label' => 'MCQ Talent Search Papers', 'url' => '/mcq/papers', 'external' => false],
                             ['label' => 'Membership Renewal', 'url' => '/school-register', 'external' => false],
                         ],
                     ],
+                    ['label' => 'Circulars', 'url' => '/circulars', 'external' => false, 'children' => []],
                     ['label' => 'Useful Links', 'url' => '/#useful-links', 'external' => false, 'children' => []],
                     ['label' => 'Contact', 'url' => '/#contact', 'external' => false, 'children' => []],
                     ['label' => 'School Registration', 'url' => '/school-register', 'external' => false, 'children' => []],

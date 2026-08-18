@@ -14,6 +14,12 @@
                 <Link v-else :href="`/school-admin/${school.id}/users`" class="btn-secondary text-sm">
                     All portal users
                 </Link>
+                <button v-if="!coordinatorMode" type="button" class="btn-secondary text-sm" @click="exportCredentials">
+                    ↓ Export credentials
+                </button>
+                <button type="button" class="btn-primary text-sm" @click="openCreate">
+                    + New user
+                </button>
             </template>
         </PageHeader>
 
@@ -134,84 +140,16 @@
             </div>
         </section>
 
-        <form @submit.prevent="createUser" class="card mb-6 space-y-4">
-            <div>
-                <h3 class="section-title">New user</h3>
-                <p class="section-desc">Event coordinators only see the programs and events you assign below.</p>
-            </div>
-            <div class="grid gap-4 sm:grid-cols-2">
-                <FormField label="Full name" :error="form.errors.name" required>
-                    <template #default="{ id }">
-                        <input :id="id" v-model="form.name" class="field" placeholder="Full name" required>
-                    </template>
-                </FormField>
-                <FormField label="Email" :error="form.errors.email" required>
-                    <template #default="{ id }">
-                        <input :id="id" v-model="form.email" type="email" class="field" placeholder="Email" required>
-                    </template>
-                </FormField>
-                <FormField label="Username (leave blank to auto-generate from name)" :error="form.errors.username">
-                    <template #default="{ id }">
-                        <input :id="id" v-model="form.username" class="field" placeholder="e.g. anoop.john">
-                    </template>
-                </FormField>
-                <FormField label="Password" :error="form.errors.password" class-extra="sm:col-span-2"
-                           hint="Leave blank to auto-generate a temporary password">
-                    <template #default="{ id }">
-                        <input :id="id" v-model="form.password" type="password" class="field" placeholder="Optional — auto-generated if empty" minlength="8">
-                    </template>
-                </FormField>
-            </div>
-            <div v-if="!coordinatorMode">
-                <p class="form-label mb-2">Role</p>
-                <div class="flex flex-wrap gap-2">
-                    <label v-for="r in assignableRoles" :key="r.value"
-                           class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium cursor-pointer"
-                           :class="form.roles[0] === r.value ? 'border-indigo-400 bg-indigo-50' : ''">
-                        <input type="radio" :value="r.value" v-model="form.roles[0]" name="create-role">
-                        {{ r.label }}
-                    </label>
-                </div>
-            </div>
-            <p v-else class="text-xs text-slate-500">Role: Event coordinator (scoped to assignments below)</p>
-
-            <EventScopePicker
-                v-if="form.roles.includes('school_event_coordinator')"
-                v-model="form.event_scopes"
-                :scope-options="scopeOptions"
-                :error="form.errors.event_scopes"
-            />
-
-            <div v-if="form.roles.includes('school_staff')">
-                <p class="form-label mb-2">Staff permissions</p>
-                <div class="flex flex-wrap gap-2">
-                    <label v-for="p in permissions" :key="p" class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1 text-xs">
-                        <input type="checkbox" :value="p" v-model="form.permissions">
-                        {{ permissionLabels[p] || p }}
-                    </label>
-                </div>
-            </div>
-            <div v-if="form.roles.includes('group_admin')">
-                <p class="form-label mb-2">Assigned classes</p>
-                <div class="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
-                    <label v-for="cls in classes" :key="cls.id" class="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1 text-xs">
-                        <input type="checkbox" :value="cls.id" v-model="form.group_classes">
-                        {{ cls.name }}
-                    </label>
-                </div>
-            </div>
-            <FormField v-if="form.roles.includes('house_admin')" label="Assigned house" required>
-                <template #default="{ id }">
-                    <select :id="id" v-model="form.school_house_id" class="field max-w-xs" required>
-                        <option value="">Select house</option>
-                        <option v-for="h in houses" :key="h.id" :value="h.id">{{ h.name }}</option>
-                    </select>
-                </template>
-            </FormField>
-            <button type="submit" class="btn-primary" :disabled="form.processing">
-                {{ form.processing ? 'Creating…' : 'Create user' }}
-            </button>
-        </form>
+        <div v-if="!coordinatorMode" class="card mb-4 flex flex-wrap items-center gap-3 py-3">
+            <label class="text-xs font-semibold text-slate-500" for="role-filter">Filter by role</label>
+            <select id="role-filter" v-model="roleFilter" class="field field--sm max-w-xs">
+                <option value="all">All roles ({{ users.length }})</option>
+                <option v-for="r in assignableRoles" :key="r.value" :value="r.value">
+                    {{ r.label }} ({{ countForRole(r.value) }})
+                </option>
+            </select>
+            <span class="text-xs text-slate-400">{{ visibleUsers.length }} of {{ users.length }} shown</span>
+        </div>
 
         <div class="card overflow-hidden p-0">
             <EmptyState
@@ -219,7 +157,7 @@
                 :title="coordinatorMode ? 'No event coordinators yet' : 'No portal users yet'"
                 :description="coordinatorMode
                     ? 'Add a coordinator and assign the fest programs or specific events they should manage.'
-                    : 'Add coordinators, vice principals, or staff using the form above.'"
+                    : 'Add coordinators, vice principals, or staff using the New user button above.'"
                 icon="👥"
             />
             <div v-else class="overflow-x-auto">
@@ -229,6 +167,7 @@
                         <th>Name</th>
                         <th>Login</th>
                         <th>Roles / assignments</th>
+                        <th>Status</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -246,15 +185,108 @@
                             </p>
                             <p v-if="u.group_classes?.length" class="mt-1 text-slate-400">Classes: {{ u.group_classes.join(', ') }}</p>
                         </td>
+                        <td>
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                  :class="u.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
+                                {{ u.is_active ? 'Active' : 'Inactive' }}
+                            </span>
+                        </td>
                         <td class="text-right whitespace-nowrap">
                             <button type="button" @click="openEdit(u)" class="btn-ghost text-indigo-600">Edit</button>
                             <button v-if="!isProtected(u)" type="button" @click="resetPw(u)" class="btn-ghost text-slate-600">Reset PW</button>
+                            <button v-if="!isProtected(u)" type="button" @click="toggleActive(u)" class="btn-ghost" :class="u.is_active ? 'text-amber-600' : 'text-emerald-600'">
+                                {{ u.is_active ? 'Deactivate' : 'Activate' }}
+                            </button>
                             <button v-if="!isProtected(u)" type="button" @click="remove(u)" class="btn-ghost text-red-600">Remove</button>
                         </td>
                     </tr>
                 </tbody>
             </table>
             </div>
+        </div>
+
+        <div v-if="creating" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="creating = false">
+            <form @submit.prevent="createUser" class="card w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl space-y-4">
+                <div>
+                    <h3 class="section-title">New user</h3>
+                    <p class="section-desc">Event coordinators only see the programs and events you assign below.</p>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <FormField label="Full name" :error="form.errors.name" required>
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.name" class="field" placeholder="Full name" required>
+                        </template>
+                    </FormField>
+                    <FormField label="Email" :error="form.errors.email" required>
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.email" type="email" class="field" placeholder="Email" required>
+                        </template>
+                    </FormField>
+                    <FormField label="Username (leave blank to auto-generate from name)" :error="form.errors.username">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.username" class="field" placeholder="e.g. anoop.john">
+                        </template>
+                    </FormField>
+                    <FormField label="Password" :error="form.errors.password" class-extra="sm:col-span-2"
+                               hint="Leave blank to auto-generate a temporary password">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.password" type="password" class="field" placeholder="Optional — auto-generated if empty" minlength="8">
+                        </template>
+                    </FormField>
+                </div>
+                <div v-if="!coordinatorMode">
+                    <p class="form-label mb-2">Role</p>
+                    <div class="flex flex-wrap gap-2">
+                        <label v-for="r in assignableRoles" :key="r.value"
+                               class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium cursor-pointer"
+                               :class="form.roles[0] === r.value ? 'border-indigo-400 bg-indigo-50' : ''">
+                            <input type="radio" :value="r.value" v-model="form.roles[0]" name="create-role">
+                            {{ r.label }}
+                        </label>
+                    </div>
+                </div>
+                <p v-else class="text-xs text-slate-500">Role: Event coordinator (scoped to assignments below)</p>
+
+                <EventScopePicker
+                    v-if="form.roles.includes('school_event_coordinator')"
+                    v-model="form.event_scopes"
+                    :scope-options="scopeOptions"
+                    :error="form.errors.event_scopes"
+                />
+
+                <div v-if="form.roles.includes('school_staff')">
+                    <p class="form-label mb-2">Staff permissions</p>
+                    <div class="flex flex-wrap gap-2">
+                        <label v-for="p in permissions" :key="p" class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1 text-xs">
+                            <input type="checkbox" :value="p" v-model="form.permissions">
+                            {{ permissionLabels[p] || p }}
+                        </label>
+                    </div>
+                </div>
+                <div v-if="form.roles.includes('group_admin')">
+                    <p class="form-label mb-2">Assigned classes</p>
+                    <div class="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
+                        <label v-for="cls in classes" :key="cls.id" class="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                            <input type="checkbox" :value="cls.id" v-model="form.group_classes">
+                            {{ cls.name }}
+                        </label>
+                    </div>
+                </div>
+                <FormField v-if="form.roles.includes('house_admin')" label="Assigned house" required>
+                    <template #default="{ id }">
+                        <select :id="id" v-model="form.school_house_id" class="field max-w-xs" required>
+                            <option value="">Select house</option>
+                            <option v-for="h in houses" :key="h.id" :value="h.id">{{ h.name }}</option>
+                        </select>
+                    </template>
+                </FormField>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="creating = false" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary" :disabled="form.processing">
+                        {{ form.processing ? 'Creating…' : 'Create user' }}
+                    </button>
+                </div>
+            </form>
         </div>
 
         <div v-if="editing" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="editing = null">
@@ -357,12 +389,22 @@ const props = defineProps({
 
 const page = usePage();
 const coordinatorMode = computed(() => page.url.includes('coordinators=1'));
+const creating = ref(false);
+const roleFilter = ref('all');
 
-const visibleUsers = computed(() =>
-    coordinatorMode.value
+const visibleUsers = computed(() => {
+    const base = coordinatorMode.value
         ? (props.users ?? []).filter((u) => u.roles?.includes('school_event_coordinator'))
-        : (props.users ?? []),
-);
+        : (props.users ?? []);
+
+    if (coordinatorMode.value || roleFilter.value === 'all') return base;
+
+    return base.filter((u) => u.roles?.includes(roleFilter.value));
+});
+
+function countForRole(role) {
+    return (props.users ?? []).filter((u) => u.roles?.includes(role)).length;
+}
 
 const form = useForm({
     name: '', email: '', username: '', password: '', roles: ['school_event_coordinator'],
@@ -422,13 +464,22 @@ function isProtected(user) {
     return user.roles.some(r => ['school_admin', 'school_principal', 'school_vice_principal'].includes(r));
 }
 
+function openCreate() {
+    form.reset();
+    form.clearErrors();
+    if (coordinatorMode.value) {
+        form.roles[0] = 'school_event_coordinator';
+    }
+    creating.value = true;
+}
+
 function createUser() {
     form.transform(data => ({
         ...data,
         roles: [data.roles[0]].filter(Boolean),
     })).post(`/school-admin/${props.school.id}/users`, {
         preserveScroll: true,
-        onSuccess: () => form.reset('name', 'email', 'password', 'event_scopes'),
+        onSuccess: () => { form.reset('name', 'email', 'password', 'event_scopes'); creating.value = false; },
     });
 }
 
@@ -503,5 +554,15 @@ async function resetPw(user) {
 async function remove(user) {
     if (!(await confirm({ message: `Remove ${user.name}?`, destructive: true }))) return;
     router.delete(`/school-admin/${props.school.id}/users/${user.id}`, { preserveScroll: true });
+}
+
+async function toggleActive(user) {
+    if (user.is_active && !(await confirm({ message: `Deactivate ${user.name}? They won't be able to log in until reactivated.`, destructive: true }))) return;
+    router.patch(`/school-admin/${props.school.id}/users/${user.id}/toggle-active`, {}, { preserveScroll: true });
+}
+
+async function exportCredentials() {
+    if (!(await confirm({ message: 'This file contains temporary passwords in plain text. Handle it carefully and delete it once shared.', destructive: false }))) return;
+    window.location.href = `/school-admin/${props.school.id}/users/export-credentials`;
 }
 </script>

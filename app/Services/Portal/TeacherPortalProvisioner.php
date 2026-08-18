@@ -23,7 +23,7 @@ class TeacherPortalProvisioner
         $email = strtolower(trim($email));
         abort_unless(filled($email), 422, 'Teacher email is required for portal access.');
 
-        $plainPassword = $password ?? $this->credentials->generateTemporaryPassword();
+        $plainPassword = $password ?? $this->credentials->generateTemporaryPassword('teacher');
         $loginCode = $this->loginCodes->assignTeacher($teacher->fresh());
 
         if ($teacher->user_id) {

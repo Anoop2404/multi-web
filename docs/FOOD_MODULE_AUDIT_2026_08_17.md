@@ -6,6 +6,14 @@
 
 **Important context:** This module is under active, uncommitted development right now. `git status` shows `FestFoodOrderController.php`, `FestEventPhase.php`, `FestEventPhaseController.php`, `FestEventPhaseService.php`, `FestPhaseLifecycleService.php`, `FoodMenu.vue`, `FoodOrder.vue`, `FoodBillingShow.vue`, `FoodHostBillingShow.vue`, and a phase-lifecycle test file as modified-but-not-committed, alongside ~10 brand-new untracked files implementing a `phased_regional_billing` workflow. The findings below describe the code as it stands today, mid-change — some may already be in flight.
 
+**Implementation status (updated same day):** Findings 1, 2, 3, and 15 have been fixed (still uncommitted, same working tree) — `require_payment_for_coupons` now blocks the legacy catering issuance/submission paths, `removeOrderItem`/`settle`/`reopen`/`cancel` are centralized on `FestFoodBill` with row-locking and a balance guard, and void-payment/cancel-bill actions are now reachable from both the Sahodaya and School billing UIs (host billing also gained the audit-log writes it was missing, as part of Finding 11). A new regression test, `tests/Feature/SahodayaAdmin/FestFoodBillingSafetyTest.php`, covers all of the above and passes, alongside the existing suite. Findings 4–14 and 16–24, and the phase/cross-event architecture question in §2, are unchanged and still need a decision/fix.
+
+**Follow-up work beyond the original findings (same working tree, all tested):**
+- Menu-listing correctness: meal types now sort chronologically (breakfast → lunch → snacks → tea → dinner → other) instead of alphabetically, `menu_date` is bound to the event's own `event_start`/`event_end`, and region sync skips items outside a region's own date window. See `FestFoodMenuItem::sortForDisplay()`/`MEAL_TYPES`.
+- Event/region context: every food page now shows hierarchy breadcrumbs (hub/region/phase) and, on a partitioned hub, a region drill-down panel with per-region food stats — closing the "silently empty page on a hub" gap on Food Coupons and Catering specifically. See `FestEvent::hierarchyContext()`, `FestPartitionService::foodRegionDrillDownSummary()`, `EventHierarchyBadge.vue`, `FoodRegionDrillDown.vue`.
+- New day × meal-type × item report (quantity, revenue, schools ordering) with CSV export, on both the Sahodaya and School host Food Billing pages — previously there was no aggregated view across schools at all. See `FestFoodOrderItem::dayMealReport()`.
+- Food Menu rebuilt around a reusable item catalog: define a food item once (name, description, price), then bulk-assign it onto date+meal slots — mirroring the existing Items↔Phases assignment pattern on the Phases page — instead of re-entering the same item on every date/meal it's served. See `fest_food_catalog_items` migration, `FestFoodCatalogItem`, `FestFoodMenuController::catalogStore/catalogUpdate/catalogDestroy/assignCatalogItems()`, and the redesigned `FoodMenu.vue`.
+
 ---
 
 ## TL;DR

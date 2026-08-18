@@ -18,6 +18,7 @@ class AuditLogCatalog
             'finance'    => 'Finance & ledger',
             'platform'   => 'Platform & tenants',
             'billing'    => 'Billing & subscriptions',
+            'impersonation' => 'Impersonation',
             'system'     => 'System',
         ];
     }
@@ -71,6 +72,10 @@ class AuditLogCatalog
 
         if (str_starts_with($action, 'subscription.')) {
             return 'billing';
+        }
+
+        if (str_starts_with($action, 'impersonation.')) {
+            return 'impersonation';
         }
 
         return 'system';

@@ -52,6 +52,12 @@ class FestEvent extends Model
         'strict_item_payment_gating',
         'food_payee_type', 'food_host_school_id', 'require_payment_for_coupons',
         'phase_mode_enabled', 'workflow_mode', 'source_phase_id', 'registration_batch_id', 'workflow_leaf_key',
+        // sahodaya_customized_at was stamped via updateQuietly() since 2026-08-13 but was
+        // never added here — mass-assignment silently dropped it every time, so the
+        // customization-indicator badge it drives never actually turned on. fee_customized_at
+        // is the same mechanism for the hub -> partition-child fee boundary; added here from
+        // the start so it doesn't repeat that mistake.
+        'sahodaya_customized_at', 'fee_customized_at',
     ];
 
     protected $attributes = [
@@ -110,6 +116,7 @@ class FestEvent extends Model
         'max_teams' => 'integer',
         'sort_order' => 'integer',
         'sahodaya_customized_at' => 'datetime',
+        'fee_customized_at' => 'datetime',
     ];
 
     /** Whether composite sports fee columns are configured (checklist readiness). */
@@ -270,6 +277,30 @@ class FestEvent extends Model
     public function region(): BelongsTo
     {
         return $this->belongsTo(Region::class, 'region_id');
+    }
+
+    /**
+     * Breadcrumb-style facts about this event's place in a hub/region/phase hierarchy —
+     * built for pages (food menu/billing/coupons/catering first) that previously gave no
+     * indication whether the admin or school was looking at a hub, a specific region, or a
+     * named competition phase. `is_hub` is only meaningful together with `has_children`:
+     * a hub with zero children is just a standard event that happens to have no parent.
+     */
+    public function hierarchyContext(): array
+    {
+        $parent = $this->parent_event_id ? $this->parentEvent()->first(['id', 'title']) : null;
+        $region = $this->region_id ? $this->region()->first(['id', 'name']) : null;
+        $phase = $this->source_phase_id ? $this->sourcePhase()->first(['id', 'name']) : null;
+
+        return [
+            'is_hub' => $this->parent_event_id === null,
+            'has_children' => $this->parent_event_id === null && $this->childEvents()->exists(),
+            'parent_event' => $parent ? ['id' => $parent->id, 'title' => $parent->title] : null,
+            'region' => $region ? ['id' => $region->id, 'name' => $region->name] : null,
+            'phase' => $phase ? ['id' => $phase->id, 'name' => $phase->name] : null,
+            'cluster_label' => $this->cluster_label,
+            'partition_role' => $this->partition_role,
+        ];
     }
 
     public function scopeForTenant($q, string $tenantId)
@@ -735,6 +766,17 @@ class FestEvent extends Model
     public function isCustomizedBySahodaya(): bool
     {
         return $this->sahodaya_customized_at !== null;
+    }
+
+    /**
+     * True when this partition child's own fee data (fee_settings, an item's fee_amount,
+     * or a head's fee columns) has been edited directly on the child itself, rather than
+     * inherited untouched from the hub. FestSchoolEventFeeService::propagateFeeSettingsToChildren()
+     * skips a child entirely once this is set, so a hub-level fee save no longer reverts it.
+     */
+    public function hasCustomizedFees(): bool
+    {
+        return $this->fee_customized_at !== null;
     }
 
     public function isEditableBySahodaya(): bool

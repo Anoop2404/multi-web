@@ -10,7 +10,7 @@ class SubscriptionPlan extends Model
 {
     use CentralConnection;
 
-    protected $fillable = ['name', 'slug', 'price_inr', 'billing_period', 'features', 'is_active'];
+    protected $fillable = ['name', 'slug', 'price_inr', 'billing_period', 'grace_period_days', 'features', 'is_active'];
 
     protected $casts = [
         'price_inr'  => 'decimal:2',
@@ -26,5 +26,10 @@ class SubscriptionPlan extends Model
     public function invoices(): HasMany
     {
         return $this->hasMany(SubscriptionInvoice::class, 'plan_id');
+    }
+
+    public function planFeatures(): HasMany
+    {
+        return $this->hasMany(PlanFeature::class, 'plan_id');
     }
 }

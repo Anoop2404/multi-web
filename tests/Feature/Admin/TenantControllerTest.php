@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\AuditLog;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -244,5 +245,130 @@ class TenantControllerTest extends TestCase
                 ->where('loginLookup.matches.0.email', 'existing@example.com')
                 ->where('loginLookup.matches.0.username', 'contact@example.com')
             );
+    }
+
+    public function test_creating_a_tenant_writes_an_audit_log_entry(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        config(['tenancy.database_per_sahodaya' => false]);
+
+        $superadmin = User::factory()->create([
+            'tenant_id' => null,
+            'email_verified_at' => now(),
+        ]);
+        $superadmin->assignRole('superadmin');
+
+        $this->actingAs($superadmin)
+            ->post('/admin/tenants', [
+                'type' => 'sahodaya',
+                'name' => 'Audited Sahodaya',
+                'database_name' => 'audited_sahodaya_db',
+            ])
+            ->assertRedirect();
+
+        $tenant = Tenant::where('name', 'Audited Sahodaya')->firstOrFail();
+
+        $log = AuditLog::where('action', 'tenant.created')->where('subject_id', $tenant->id)->first();
+        $this->assertNotNull($log, 'Expected a tenant.created audit log entry.');
+        $this->assertSame('platform', $log->category);
+        $this->assertSame($superadmin->id, $log->user_id);
+    }
+
+    public function test_updating_a_tenant_writes_an_audit_log_entry_with_changes(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        config(['tenancy.database_per_sahodaya' => false]);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Original Name',
+            'is_active' => true,
+        ]);
+
+        $superadmin = User::factory()->create([
+            'tenant_id' => null,
+            'email_verified_at' => now(),
+        ]);
+        $superadmin->assignRole('superadmin');
+
+        $this->actingAs($superadmin)
+            ->put("/admin/tenants/{$sahodaya->id}", [
+                'type' => 'sahodaya',
+                'name' => 'Renamed Sahodaya',
+            ])
+            ->assertRedirect();
+
+        $log = AuditLog::where('action', 'tenant.updated')->where('subject_id', $sahodaya->id)->first();
+        $this->assertNotNull($log, 'Expected a tenant.updated audit log entry.');
+        $this->assertArrayHasKey('name', $log->properties['changes'] ?? []);
+        $this->assertSame('Renamed Sahodaya', $log->properties['changes']['name']);
+    }
+
+    public function test_deleting_a_tenant_writes_an_audit_log_entry(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        config(['tenancy.database_per_sahodaya' => false]);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'To Be Deleted',
+            'is_active' => true,
+        ]);
+        $tenantId = $sahodaya->id;
+
+        $superadmin = User::factory()->create([
+            'tenant_id' => null,
+            'email_verified_at' => now(),
+        ]);
+        $superadmin->assignRole('superadmin');
+
+        $this->actingAs($superadmin)
+            ->delete("/admin/tenants/{$tenantId}")
+            ->assertRedirect();
+
+        $this->assertNull(Tenant::find($tenantId));
+
+        $log = AuditLog::where('action', 'tenant.deleted')->where('subject_id', $tenantId)->first();
+        $this->assertNotNull($log, 'Expected a tenant.deleted audit log entry.');
+    }
+
+    public function test_rejecting_school_membership_writes_an_audit_log_entry(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        config(['tenancy.database_per_sahodaya' => false]);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Parent Sahodaya',
+            'is_active' => true,
+        ]);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Applicant School',
+            'parent_id' => $sahodaya->id,
+            'membership_status' => 'pending',
+            'is_active' => true,
+        ]);
+
+        $superadmin = User::factory()->create([
+            'tenant_id' => null,
+            'email_verified_at' => now(),
+        ]);
+        $superadmin->assignRole('superadmin');
+
+        $this->actingAs($superadmin)
+            ->post("/admin/tenants/{$school->id}/reject-membership", [
+                'reason' => 'Incomplete documentation.',
+            ])
+            ->assertRedirect();
+
+        $log = AuditLog::where('action', 'tenant.membership_rejected')->where('subject_id', $school->id)->first();
+        $this->assertNotNull($log, 'Expected a tenant.membership_rejected audit log entry.');
+        $this->assertSame('Incomplete documentation.', $log->properties['reason']);
     }
 }

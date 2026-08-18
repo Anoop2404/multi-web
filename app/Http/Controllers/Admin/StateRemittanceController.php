@@ -7,6 +7,7 @@ use App\Models\StateRemittance;
 use App\Models\Tenant;
 use App\Services\Ledger\StateRemittanceLedgerService;
 use App\Services\Notifications\SahodayaAdminNotifier;
+use App\Support\StateScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -14,7 +15,7 @@ class StateRemittanceController extends Controller
 {
     public function index(Request $request)
     {
-        $remittances = StateRemittance::with('sahodaya')
+        $remittances = StateScope::apply(StateRemittance::with('sahodaya'))
             ->when($request->get('academic_year'), fn ($q, $y) => $q->where('academic_year', $y))
             ->when($request->get('status'), fn ($q, $s) => $q->where('status', $s))
             ->orderByDesc('created_at')
@@ -24,11 +25,11 @@ class StateRemittanceController extends Controller
         $sahodayas = Tenant::where('type', 'sahodaya')->orderBy('name')->get(['id', 'name']);
 
         $summary = [
-            'total'    => StateRemittance::count(),
-            'pending'  => StateRemittance::where('status', 'pending')->count(),
-            'submitted'=> StateRemittance::where('status', 'submitted')->count(),
-            'verified' => StateRemittance::where('status', 'verified')->count(),
-            'amount'   => StateRemittance::where('status', 'verified')->sum('amount'),
+            'total'    => StateScope::apply(StateRemittance::query())->count(),
+            'pending'  => StateScope::apply(StateRemittance::query())->where('status', 'pending')->count(),
+            'submitted'=> StateScope::apply(StateRemittance::query())->where('status', 'submitted')->count(),
+            'verified' => StateScope::apply(StateRemittance::query())->where('status', 'verified')->count(),
+            'amount'   => StateScope::apply(StateRemittance::query())->where('status', 'verified')->sum('amount'),
         ];
 
         return inertia('StateRemittances/Index', [
@@ -52,6 +53,7 @@ class StateRemittanceController extends Controller
 
         $data['created_by'] = $request->user()->id;
         $data['status']     = 'pending';
+        $data['state_id']   = StateScope::shouldScope($request) ? StateScope::id($request) : null;
 
         $remittance = StateRemittance::create($data);
 
@@ -70,6 +72,7 @@ class StateRemittanceController extends Controller
 
     public function verify(Request $request, StateRemittance $remittance, StateRemittanceLedgerService $ledger)
     {
+        StateScope::assertOwns($remittance->state_id);
         abort_unless($remittance->status === 'submitted', 422, 'Only submitted remittances can be verified.');
 
         $remittance->update([
@@ -95,6 +98,7 @@ class StateRemittanceController extends Controller
 
     public function reject(Request $request, StateRemittance $remittance)
     {
+        StateScope::assertOwns($remittance->state_id);
         abort_unless($remittance->status === 'submitted', 422, 'Only submitted remittances can be rejected.');
 
         $data = $request->validate([
@@ -123,6 +127,7 @@ class StateRemittanceController extends Controller
 
     public function proof(StateRemittance $remittance)
     {
+        StateScope::assertOwns($remittance->state_id);
         abort_unless($remittance->proof_path, 404);
 
         $disk = config('filesystems.upload_disk', 'shared');

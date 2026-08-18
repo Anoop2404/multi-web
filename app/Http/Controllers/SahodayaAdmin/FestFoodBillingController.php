@@ -42,9 +42,11 @@ class FestFoodBillingController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Events/FoodBilling', $this->withEventActivity($event, FestPageActivity::FOOD_BILLING, [
             'event' => $event->only('id', 'title', 'food_payee_type', 'food_host_school_id'),
+            'hierarchy' => $event->hierarchyContext(),
             'hostSchoolName' => $hostSchoolName,
             'isPartitionedHub' => $isPartitionedHub,
             'regionFoodSummary' => $regionFoodSummary,
+            'foodRegionSummary' => $isPartitionedHub ? $partitions->foodRegionDrillDownSummary($event) : [],
             'bills' => $bills->map(fn (FestFoodBill $b) => [
                 'id' => $b->id,
                 'school_id' => $b->school_id,
@@ -72,6 +74,63 @@ class FestFoodBillingController extends SahodayaAdminController
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]));
+    }
+
+    /**
+     * Day x meal-type x item breakdown across every school's bill on this event — what
+     * a kitchen/procurement view needs ("how many lunches on day 2") that the per-school
+     * bill list doesn't answer. See FestFoodOrderItem::dayMealReport().
+     */
+    public function report(string $tenantId, FestEvent $event, FestPartitionService $partitions)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $isPartitionedHub = $partitions->isPartitionedHub($event);
+
+        return $this->inertia('Sahodaya/Events/FoodBillingReport', $this->withEventActivity($event, FestPageActivity::FOOD_BILLING, [
+            'event' => $event->only('id', 'title'),
+            'hierarchy' => $event->hierarchyContext(),
+            'isPartitionedHub' => $isPartitionedHub,
+            'foodRegionSummary' => $isPartitionedHub ? $partitions->foodRegionDrillDownSummary($event) : [],
+            'report' => FestFoodOrderItem::dayMealReport($event->id),
+        ]));
+    }
+
+    public function reportExportCsv(string $tenantId, FestEvent $event, CsvExportDispatcher $exports)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $rows = [];
+        foreach (FestFoodOrderItem::dayMealReport($event->id) as $day) {
+            foreach ($day['meals'] as $meal) {
+                foreach ($meal['items'] as $item) {
+                    $rows[] = [
+                        'date' => $day['date'],
+                        'meal_type' => $meal['meal_type'],
+                        'item_name' => $item['item_name'],
+                        'quantity' => $item['quantity'],
+                        'revenue' => $item['revenue'],
+                        'schools_count' => $item['schools_count'],
+                    ];
+                }
+            }
+        }
+
+        return $exports->dispatch(
+            request()->user(),
+            'fest_food_billing_report',
+            'food-order-report-'.$event->id.'.csv',
+            $rows,
+            ['Date', 'Meal', 'Item', 'Quantity', 'Revenue', 'Schools ordering'],
+            fn (array $r) => [
+                $r['date'],
+                $r['meal_type'],
+                $r['item_name'],
+                $r['quantity'],
+                number_format($r['revenue'], 2, '.', ''),
+                $r['schools_count'],
+            ],
+        );
     }
 
     /** Open a bill for a school (e.g. before the school has ordered anything themselves, or for a walk-in). */
@@ -155,11 +214,9 @@ class FestFoodBillingController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($bill->event_id !== $event->id, 404);
         abort_if($orderItem->bill_id !== $bill->id, 404);
-        abort_if($bill->status !== FestFoodBill::STATUS_OPEN, 422, 'This bill is settled/cancelled and no longer editable.');
 
         $name = $orderItem->item_name;
-        $orderItem->delete();
-        $bill->recalculate();
+        $bill->removeOrderItem($orderItem);
 
         $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.item_removed', "'{$name}' removed from bill", [
             'bill_id' => $bill->id,
@@ -220,13 +277,8 @@ class FestFoodBillingController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($bill->event_id !== $event->id, 404);
-        abort_if($bill->balanceDue() > 0.0, 422, 'This bill has an outstanding balance of ₹'.number_format($bill->balanceDue(), 2).' — record the remaining payment before settling.');
 
-        $bill->update([
-            'status' => FestFoodBill::STATUS_SETTLED,
-            'settled_at' => now(),
-            'settled_by_user_id' => $request->user()->id,
-        ]);
+        $bill->settle($request->user()->id);
 
         $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.settled', 'Bill marked settled', [
             'bill_id' => $bill->id,
@@ -240,7 +292,7 @@ class FestFoodBillingController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($bill->event_id !== $event->id, 404);
 
-        $bill->update(['status' => FestFoodBill::STATUS_OPEN, 'settled_at' => null, 'settled_by_user_id' => null]);
+        $bill->reopen();
 
         $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.reopened', 'Bill reopened', [
             'bill_id' => $bill->id,
@@ -259,10 +311,8 @@ class FestFoodBillingController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($bill->event_id !== $event->id, 404);
-        abort_if($bill->status === FestFoodBill::STATUS_CANCELLED, 422, 'Bill is already cancelled.');
-        abort_if($bill->amount_paid > 0, 422, 'This bill has payments recorded — void the payment(s) first so the refund is explicit, then cancel.');
 
-        $bill->update(['status' => FestFoodBill::STATUS_CANCELLED]);
+        $bill->cancel();
 
         $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.cancelled', 'Bill cancelled', [
             'bill_id' => $bill->id,

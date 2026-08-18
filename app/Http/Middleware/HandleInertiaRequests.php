@@ -28,24 +28,14 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => fn () => $request->user() ? array_merge(
                     $request->user()->only('id', 'name', 'email', 'email_verified_at'),
-                    [
-                        'roles' => $request->user()->tenant_id === null
-                            ? \Illuminate\Support\Facades\DB::connection(config('tenancy.database.central_connection', 'central'))
-                                ->table('model_has_roles')
-                                ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-                                ->where('model_has_roles.model_id', $request->user()->id)
-                                ->whereIn('model_has_roles.model_type', [\App\Models\User::class, \App\Models\PlatformUser::class])
-                                ->pluck('roles.name')
-                                ->unique()
-                                ->values()
-                                ->all()
-                            : $request->user()->getRoleNames()->values()->all(),
-                    ]
+                    ['roles' => $this->roleNames($request)]
                 ) : null,
             ],
             'features' => [
                 'website_enabled' => \App\Support\FeatureFlags::websiteEnabled(),
             ],
+            'impersonating' => fn () => $this->impersonating($request),
+            'announcements' => fn () => $this->activeAnnouncements($request),
             'flash' => [
                 'success'      => fn () => $request->session()->get('success'),
                 'error'        => fn () => $request->session()->get('error'),
@@ -59,5 +49,50 @@ class HandleInertiaRequests extends Middleware
             ],
             'old' => fn () => $request->old(),
         ];
+    }
+
+    /** @return array{sessionId: int}|null */
+    private function impersonating(Request $request): ?array
+    {
+        $sessionId = $request->session()->get('impersonation_session_id');
+
+        return $sessionId ? ['sessionId' => $sessionId] : null;
+    }
+
+    /** @return list<string> */
+    private function roleNames(Request $request): array
+    {
+        $user = $request->user();
+
+        return $user->tenant_id === null
+            ? \Illuminate\Support\Facades\DB::connection(config('tenancy.database.central_connection', 'central'))
+                ->table('model_has_roles')
+                ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                ->where('model_has_roles.model_id', $user->id)
+                ->whereIn('model_has_roles.model_type', [\App\Models\User::class, \App\Models\PlatformUser::class])
+                ->pluck('roles.name')
+                ->unique()
+                ->values()
+                ->all()
+            : $user->getRoleNames()->values()->all();
+    }
+
+    /** @return list<array{id: int, title: string, body: string, type: string}> */
+    private function activeAnnouncements(Request $request): array
+    {
+        if (! $request->user()) {
+            return [];
+        }
+
+        $audiences = array_values(array_intersect(
+            $this->roleNames($request),
+            ['superadmin', 'state_admin', 'sahodaya_admin', 'school_admin']
+        ));
+
+        return \App\Models\PlatformAnnouncement::currentlyActive()
+            ->forAudience($audiences)
+            ->orderByDesc('id')
+            ->get(['id', 'title', 'body', 'type'])
+            ->all();
     }
 }

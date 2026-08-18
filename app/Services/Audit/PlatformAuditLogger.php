@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\FestAppeal;
 use App\Models\FestEvent;
 use App\Models\FestRegistration;
+use App\Models\ImpersonationSession;
 use App\Models\McqExam;
 use App\Models\McqRegistration;
 use App\Models\MembershipPayment;
@@ -121,6 +122,12 @@ class PlatformAuditLogger
     public function loginNoPortal(int $userId, ?string $email, array $context = []): ?AuditLog
     {
         return $this->dispatchAuthLog('login.no_portal', $userId, $email, $context);
+    }
+
+    /** @param  array<string, mixed>  $context */
+    public function loginInactive(int $userId, ?string $email, array $context = []): ?AuditLog
+    {
+        return $this->dispatchAuthLog('login.inactive', $userId, $email, $context);
     }
 
     /** @param  array<string, mixed>  $context */
@@ -549,6 +556,54 @@ class PlatformAuditLogger
             $receipt,
             ['tenant_id' => $receipt->invoice->tenant_id, 'invoice_id' => $receipt->invoice_id, 'reason' => $reason],
             category: 'billing',
+        );
+    }
+
+    public function impersonationStarted(ImpersonationSession $session): AuditLog
+    {
+        return $this->log(
+            'impersonation.started',
+            "Impersonation started for user #{$session->target_user_id} on tenant {$session->target_tenant_id}",
+            $session,
+            [
+                'tenant_id' => $session->target_tenant_id,
+                'actor_platform_user_id' => $session->actor_platform_user_id,
+                'target_user_id' => $session->target_user_id,
+                'reason' => $session->reason,
+            ],
+            userId: $session->actor_platform_user_id,
+            category: 'impersonation',
+        );
+    }
+
+    public function impersonationConsumed(ImpersonationSession $session): AuditLog
+    {
+        return $this->log(
+            'impersonation.consumed',
+            "Impersonation session #{$session->id} activated for user #{$session->target_user_id}",
+            $session,
+            [
+                'tenant_id' => $session->target_tenant_id,
+                'target_user_id' => $session->target_user_id,
+            ],
+            userId: $session->target_user_id,
+            category: 'impersonation',
+        );
+    }
+
+    public function impersonationEnded(ImpersonationSession $session): AuditLog
+    {
+        return $this->log(
+            'impersonation.ended',
+            "Impersonation session #{$session->id} ended for user #{$session->target_user_id}",
+            $session,
+            [
+                'tenant_id' => $session->target_tenant_id,
+                'target_user_id' => $session->target_user_id,
+                'duration_seconds' => $session->consumed_at ? now()->diffInSeconds($session->consumed_at) : null,
+            ],
+            userId: $session->target_user_id,
+            category: 'impersonation',
         );
     }
 }

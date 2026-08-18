@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Middleware\Concerns\RedirectsUnauthenticated;
+use App\Support\TenantSubscriptionGate;
 use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -48,6 +49,15 @@ class EnsureSchoolAdmin
             }
             if ($school?->membership_status === 'rejected') {
                 abort(403, 'Your school application was rejected.');
+            }
+            if ($school) {
+                $subscriptionBlock = TenantSubscriptionGate::check($school, $request);
+                if ($subscriptionBlock === 'suspended') {
+                    abort(403, "This school's subscription has been suspended. Contact the platform administrator.");
+                }
+                if ($subscriptionBlock === 'readonly') {
+                    abort(403, "This school's subscription is read-only. Contact the platform administrator to restore full access.");
+                }
             }
         }
 

@@ -18,49 +18,62 @@ class SportsResultsController extends Controller
 
         $sahodayas = Tenant::where('type', 'sahodaya')->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
-        $query = FestEvent::query()
-            ->where('event_type', 'sports')
-            ->where('results_published', true);
-
-        if ($clusterId) {
-            $query->where('tenant_id', $clusterId);
-        }
-
-        $events = $query->orderByDesc('event_start')->get(['id', 'title', 'tenant_id', 'event_start']);
-        $sahodayaNames = Tenant::whereIn('id', $events->pluck('tenant_id')->unique())->pluck('name', 'id');
+        // fest_events/fest_marks live in each Sahodaya cluster's own database
+        // (TENANCY_DATABASE_PER_SAHODAYA), not the central one — so this has to
+        // run the query once per cluster, inside that cluster's own connection,
+        // same pattern as the tenant-iterating console commands (e.g.
+        // AuditPaymentIntegrity::handle()) use.
+        $clustersToScan = $clusterId
+            ? $sahodayas->where('id', $clusterId)
+            : $sahodayas;
 
         $results = collect();
-        foreach ($events as $event) {
-            $clusterName = $sahodayaNames[$event->tenant_id] ?? '—';
-            $marks = FestMark::where('event_id', $event->id)
-                ->whereNotNull('position')
-                ->with(['participant.student', 'participant.registration.school', 'item'])
-                ->orderBy('item_id')
-                ->orderBy('position')
-                ->get()
-                ->filter(function (FestMark $m) use ($ageGroup, $gender) {
-                    if ($ageGroup && ($m->item?->age_group ?? '') !== $ageGroup) {
-                        return false;
-                    }
-                    if ($gender && ($m->item?->gender ?? '') !== $gender) {
-                        return false;
-                    }
+        foreach ($clustersToScan as $sahodaya) {
+            $clusterResults = $sahodaya->run(function () use ($sahodaya, $ageGroup, $gender) {
+                $events = FestEvent::query()
+                    ->where('event_type', 'sports')
+                    ->where('results_published', true)
+                    ->where('tenant_id', $sahodaya->id)
+                    ->orderByDesc('event_start')
+                    ->get(['id', 'title', 'tenant_id', 'event_start']);
 
-                    return true;
-                })
-                ->map(fn (FestMark $m) => [
-                    'event'       => $event->title,
-                    'cluster'     => $clusterName,
-                    'item'        => $m->item?->title,
-                    'age_group'   => $m->item?->age_group,
-                    'gender'      => $m->item?->gender,
-                    'position'    => $m->position,
-                    'measurement' => $m->measurement_value ? "{$m->measurement_value} {$m->measurement_unit}" : null,
-                    'participant' => $m->participant?->student?->name,
-                    'school'      => $m->participant?->registration?->school?->name,
-                ]);
+                $clusterMarks = collect();
+                foreach ($events as $event) {
+                    $marks = FestMark::where('event_id', $event->id)
+                        ->whereNotNull('position')
+                        ->with(['participant.student', 'participant.registration.school', 'item'])
+                        ->orderBy('item_id')
+                        ->orderBy('position')
+                        ->get()
+                        ->filter(function (FestMark $m) use ($ageGroup, $gender) {
+                            if ($ageGroup && ($m->item?->age_group ?? '') !== $ageGroup) {
+                                return false;
+                            }
+                            if ($gender && ($m->item?->gender ?? '') !== $gender) {
+                                return false;
+                            }
 
-            $results = $results->merge($marks);
+                            return true;
+                        })
+                        ->map(fn (FestMark $m) => [
+                            'event'       => $event->title,
+                            'cluster'     => $sahodaya->name,
+                            'item'        => $m->item?->title,
+                            'age_group'   => $m->item?->age_group,
+                            'gender'      => $m->item?->gender,
+                            'position'    => $m->position,
+                            'measurement' => $m->measurement_value ? "{$m->measurement_value} {$m->measurement_unit}" : null,
+                            'participant' => $m->participant?->student?->name,
+                            'school'      => $m->participant?->registration?->school?->name,
+                        ]);
+
+                    $clusterMarks = $clusterMarks->merge($marks);
+                }
+
+                return $clusterMarks;
+            });
+
+            $results = $results->merge($clusterResults);
         }
 
         return inertia('State/Sports/Results', [

@@ -3,6 +3,8 @@
         <PageHeader :title="`${event.title} — Food Order`" eyebrow="Programs"
             :description="`Preorder food for your contingent. ${payeeLabel}.`" />
 
+        <EventHierarchyBadge :hierarchy="hierarchy" />
+
         <div v-if="bill" class="grid grid-cols-3 gap-3 mb-6 max-w-lg">
             <div class="card text-center">
                 <p class="text-xl font-bold">₹{{ Number(bill.amount_total).toFixed(2) }}</p>
@@ -23,40 +25,43 @@
 
         <div v-for="group in groupedMenu" :key="group.date" class="card card--flush mb-4">
             <div class="p-3 border-b bg-gray-50 font-bold text-sm">{{ formatCalendarDate(group.date) }}</div>
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                    <tr>
-                        <th class="p-3">Meal</th>
-                        <th class="p-3">Item</th>
-                        <th class="p-3">Price</th>
-                        <th class="p-3">Ordered</th>
-                        <th class="p-3 text-right"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="item in group.items" :key="item.id" class="border-t">
-                        <td class="p-3 capitalize">{{ item.meal_type }}</td>
-                        <td class="p-3">
-                            {{ item.name }}
-                            <p v-if="item.description" class="text-xs text-gray-400">{{ item.description }}</p>
-                            <p v-if="item.max_per_school" class="text-xs" :class="remainingFor(item) <= 0 ? 'text-amber-600 font-semibold' : 'text-gray-400'">
-                                {{ orderedQty(item.id) }} / {{ item.max_per_school }} ordered
-                                <span v-if="remainingFor(item) <= 0">— limit reached</span>
-                            </p>
-                        </td>
-                        <td class="p-3">₹{{ Number(item.price).toFixed(2) }}</td>
-                        <td class="p-3">{{ orderedQty(item.id) }}</td>
-                        <td class="p-3 text-right" v-if="canOrder">
-                            <div v-if="!item.max_per_school || remainingFor(item) > 0" class="flex items-center gap-2 justify-end">
-                                <input type="number" min="1" :max="item.max_per_school ? remainingFor(item) : undefined"
-                                       v-model="qty[item.id]" class="field text-xs w-16">
-                                <button class="btn-secondary text-xs" :disabled="itemForm.processing" @click="addItem(item)">Add</button>
-                            </div>
-                            <span v-else class="text-xs text-gray-400">Limit reached</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div v-for="mealGroup in group.meals" :key="mealGroup.mealType" class="border-t first:border-t-0">
+                <div class="px-3 py-1.5 bg-gray-50/70 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {{ mealTypes[mealGroup.mealType] || mealGroup.mealType }}
+                </div>
+                <table class="w-full text-sm">
+                    <thead class="text-left text-xs uppercase text-gray-400">
+                        <tr>
+                            <th class="p-3">Item</th>
+                            <th class="p-3">Price</th>
+                            <th class="p-3">Ordered</th>
+                            <th class="p-3 text-right"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in mealGroup.items" :key="item.id" class="border-t">
+                            <td class="p-3">
+                                {{ item.name }}
+                                <p v-if="item.description" class="text-xs text-gray-400">{{ item.description }}</p>
+                                <p v-if="item.max_per_school" class="text-xs" :class="remainingFor(item) <= 0 ? 'text-amber-600 font-semibold' : 'text-gray-400'">
+                                    {{ orderedQty(item.id) }} / {{ item.max_per_school }} ordered
+                                    <span v-if="remainingFor(item) <= 0">— limit reached</span>
+                                </p>
+                            </td>
+                            <td class="p-3">₹{{ Number(item.price).toFixed(2) }}</td>
+                            <td class="p-3">{{ orderedQty(item.id) }}</td>
+                            <td class="p-3 text-right" v-if="canOrder">
+                                <div v-if="!item.max_per_school || remainingFor(item) > 0" class="flex items-center gap-2 justify-end">
+                                    <input type="number" min="1" :max="item.max_per_school ? remainingFor(item) : undefined"
+                                           v-model="qty[item.id]" class="field text-xs w-16">
+                                    <button class="btn-secondary text-xs" :disabled="itemForm.processing" @click="addItem(item)">Add</button>
+                                </div>
+                                <span v-else class="text-xs text-gray-400">Limit reached</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         <EmptyState v-if="!menuItems.length" title="No menu published yet" description="The Sahodaya hasn't added food items for this event yet." />
 
@@ -108,14 +113,17 @@
 <script setup>
 import { computed, reactive } from 'vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
-const { confirm, prompt } = useConfirm();
+const { confirm } = useConfirm();
 
 const props = defineProps({
     event: Object,
+    hierarchy: { type: Object, default: null },
     menuItems: { type: Array, default: () => [] },
+    mealTypes: { type: Object, default: () => ({}) },
     bill: { type: Object, default: null },
     orderItems: { type: Array, default: () => [] },
     payments: { type: Array, default: () => [] },
@@ -154,13 +162,23 @@ async function removeItem(oi) {
     router.delete(`${base}/items/${oi.id}`, { preserveScroll: true });
 }
 
+// Canonical meal order comes from the mealTypes prop (breakfast/lunch/snacks/tea/dinner/
+// other — see FestFoodMenuItem::MEAL_TYPES), not from however the items array arrives.
+const mealTypeOrder = computed(() => Object.keys(props.mealTypes));
+
 const groupedMenu = computed(() => {
     const byDate = {};
     for (const item of props.menuItems) {
         const d = item.menu_date;
-        if (!byDate[d]) byDate[d] = [];
-        byDate[d].push(item);
+        if (!byDate[d]) byDate[d] = {};
+        if (!byDate[d][item.meal_type]) byDate[d][item.meal_type] = [];
+        byDate[d][item.meal_type].push(item);
     }
-    return Object.keys(byDate).sort().map((date) => ({ date, items: byDate[date] }));
+    return Object.keys(byDate).sort().map((date) => ({
+        date,
+        meals: mealTypeOrder.value
+            .filter((mt) => byDate[date][mt]?.length)
+            .map((mt) => ({ mealType: mt, items: byDate[date][mt] })),
+    }));
 });
 </script>

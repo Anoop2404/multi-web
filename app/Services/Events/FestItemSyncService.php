@@ -15,29 +15,34 @@ use Illuminate\Support\Str;
 class FestItemSyncService
 {
     /**
-     * Push all state catalog items into a Sahodaya tenant event.
+     * Create any State catalog items that don't yet exist on this Sahodaya tenant event.
+     *
+     * Same create-or-touch-nothing rule as FestStateProgramService::syncTenantEvent()
+     * (STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN_2026_08_13.md, Set 1 items 1-2): an existing
+     * item belongs to the Sahodaya from creation onward. This used to updateOrCreate() on
+     * every sync, reapplying toTenantAttributes() to already-existing items — so a
+     * Sahodaya's own max_per_school/qualify_count/squad caps (set via
+     * FestEventController::bulkUpdateItemCaps()) were silently reverted to the State
+     * template every time State added a new item and the program re-synced. Only items
+     * State has added since the last sync get created; existing ones are never touched.
      */
     public function syncProgramToEvent(FestStateProgram $program, FestEvent $event): int
     {
         $count = 0;
 
         foreach ($program->items()->orderBy('display_order')->get() as $stateItem) {
-            $existing = FestEventItem::where('event_id', $event->id)
+            $exists = FestEventItem::where('event_id', $event->id)
                 ->where('state_program_item_id', $stateItem->id)
-                ->first();
+                ->exists();
 
-            $attrs = $stateItem->toTenantAttributes();
-            if ($existing) {
-                unset($attrs['is_enabled']);
+            if ($exists) {
+                continue;
             }
 
-            FestEventItem::updateOrCreate(
-                [
-                    'event_id'              => $event->id,
-                    'state_program_item_id' => $stateItem->id,
-                ],
-                $attrs
-            );
+            FestEventItem::create(array_merge(
+                ['event_id' => $event->id],
+                $stateItem->toTenantAttributes()
+            ));
             $count++;
         }
 
@@ -219,6 +224,19 @@ class FestItemSyncService
                 ->first();
         }
 
+        // Same create-or-touch-nothing rule as syncProgramToEvent(): once a partition
+        // child's item row exists, it's that region/finale's own copy from then on. This
+        // used to unconditionally $target->update($attributes) on every call — and
+        // FestRegistrationCreateService::createForSchool() calls this on every single
+        // registration routed to a partition child — so any Sahodaya customization on a
+        // region's own item (max_per_school, fee_amount, is_enabled, etc., editable from
+        // that region's own event page) was silently reverted to the hub's current values
+        // by the next student registering. Only a genuinely new child item gets seeded
+        // from the hub now; an existing one (and its phase_id/head_id) is never touched.
+        if ($target) {
+            return $target;
+        }
+
         $attributes = array_merge($this->attributesFromItem($item), [
             'owner_level'            => $item->owner_level,
             'state_program_item_id'  => $item->state_program_item_id,
@@ -227,12 +245,6 @@ class FestItemSyncService
             'phase_id'               => $this->resolvePhaseIdForTarget($item, $child),
             'head_id'                => $this->resolveHeadIdForTarget($item, $child),
         ]);
-
-        if ($target) {
-            $target->update($attributes);
-
-            return $target->refresh();
-        }
 
         return FestEventItem::create(array_merge(
             ['event_id' => $child->id],

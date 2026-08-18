@@ -13,9 +13,10 @@ class FestItemFeeResolver
 {
     public function amountForItem(?FestEventItem $item, array $schedule, ?FestEvent $event = null, bool $extraQuotaItem = false, ?FestRegistration $registration = null): float
     {
-        // Sports composite: items inherit the sport event's rates (Head = Event) —
-        // except an explicit per-item fee override, which always wins.
-        if (($schedule['fee_model'] ?? null) === 'sports_composite' || $event?->event_type === 'sports') {
+        // Sports composite (and its non-sports Kalotsavam counterpart, kalolsavam_composite):
+        // items inherit the event's rates (Head = Event) — except an explicit per-item fee
+        // override, which always wins.
+        if (in_array($schedule['fee_model'] ?? null, ['sports_composite', 'kalolsavam_composite'], true) || $event?->event_type === 'sports') {
             if ($item?->fee_amount !== null) {
                 return (float) $item->fee_amount;
             }

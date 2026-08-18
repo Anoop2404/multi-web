@@ -55,6 +55,7 @@ import PortalLayout from '@/Layouts/PortalLayout.vue';
 import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
     sahodaya: Object,
@@ -63,5 +64,6 @@ const props = defineProps({
     summary: Object,
 });
 
-const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id));
+const currentRole = computed(() => usePage().props.auth?.user?.roles?.includes('exam_staff') ? 'exam_staff' : null);
+const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id, { role: currentRole.value }));
 </script>

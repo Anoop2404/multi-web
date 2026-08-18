@@ -15,7 +15,7 @@ class FestStateProgramPropagation extends Model
 
     protected $fillable = [
         'state_program_id', 'sahodaya_id', 'tenant_event_id', 'level_round',
-        'program_updated_at_when_synced',
+        'program_updated_at_when_synced', 'is_enabled',
     ];
 
     protected $casts = [

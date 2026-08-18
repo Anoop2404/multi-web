@@ -141,6 +141,97 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(5350.0, (float) $fee->total_due);
     }
 
+    public function test_kalolsavam_composite_tiers_school_fee_by_class_category(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();
+
+        $schoolTwo = Tenant::create([
+            'id'            => (string) Str::uuid(),
+            'type'          => 'school',
+            'name'          => 'Fee Test School Two',
+            'parent_id'     => $sahodaya->id,
+            'school_prefix' => 'FT2',
+            'is_active'     => true,
+        ]);
+
+        $event->update([
+            'fee_settings' => [
+                'fee_model' => 'kalolsavam_composite',
+                'school_registration_flat' => 7000,
+                'school_registration' => [
+                    'senior_secondary' => 8000,
+                    'secondary' => 7000,
+                    'other' => 7000,
+                ],
+                'per_student_amount' => 100,
+                'included_items_per_student' => 1,
+                'default_item_fee' => 100,
+            ],
+        ]);
+
+        // Real tier resolution via SchoolClassCategoryResolver, not the dead
+        // institution_level shortcut — see SahodayaMasterDataSeeder for these global codes.
+        $srSecCategoryId = \App\Models\ClassCategory::whereNull('sahodaya_id')->where('code', 'SrSEC')->value('id');
+        $secCategoryId = \App\Models\ClassCategory::whereNull('sahodaya_id')->where('code', 'SEC')->value('id');
+
+        $seniorClass = SchoolClass::create([
+            'tenant_id'         => $school->id,
+            'name'              => '12',
+            'class_category_id'=> $srSecCategoryId,
+            'is_active'         => true,
+        ]);
+        $seniorStudent = Student::create([
+            'tenant_id'       => $school->id,
+            'school_class_id' => $seniorClass->id,
+            'name'            => 'Senior Student',
+            'gender'          => 'male',
+            'dob'             => '2009-01-01',
+            'status'          => 'active',
+        ]);
+
+        $secondaryClass = SchoolClass::create([
+            'tenant_id'         => $schoolTwo->id,
+            'name'              => '10',
+            'class_category_id'=> $secCategoryId,
+            'is_active'         => true,
+        ]);
+        $secondaryStudent = Student::create([
+            'tenant_id'       => $schoolTwo->id,
+            'school_class_id' => $secondaryClass->id,
+            'name'            => 'Secondary Student',
+            'gender'          => 'male',
+            'dob'             => '2011-01-01',
+            'status'          => 'active',
+        ]);
+
+        $itemTwo = FestEventItem::create([
+            'event_id'         => $event->id,
+            'title'            => 'Elocution',
+            'participant_type' => 'individual',
+            'class_group'      => 'hs',
+            'is_enabled'       => true,
+        ]);
+
+        foreach ([[$school, $seniorStudent], [$schoolTwo, $secondaryStudent]] as [$s, $student]) {
+            // First item is within the 1-item quota (free); second is the ₹100 extra.
+            FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $s->id, 'status' => 'approved'])
+                ->participants()->create(['student_id' => $student->id, 'participant_role' => 'performer']);
+            FestRegistration::create(['event_id' => $event->id, 'item_id' => $itemTwo->id, 'school_id' => $s->id, 'status' => 'approved'])
+                ->participants()->create(['student_id' => $student->id, 'participant_role' => 'performer']);
+        }
+
+        $service = app(FestSchoolEventFeeService::class);
+
+        $seniorFee = $service->recalculate($event->fresh(), $school->id);
+        $this->assertSame(8000.0, (float) $seniorFee->school_registration_fee);
+        $this->assertSame(100.0, (float) $seniorFee->student_registration_fee);
+        $this->assertSame(8200.0, (float) $seniorFee->total_due);
+
+        $secondaryFee = $service->recalculate($event->fresh(), $schoolTwo->id);
+        $this->assertSame(7000.0, (float) $secondaryFee->school_registration_fee);
+        $this->assertSame(7200.0, (float) $secondaryFee->total_due);
+    }
+
     public function test_cksc_tiered_counts_registrations_only_by_default(): void
     {
         ['school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();
@@ -411,6 +502,45 @@ class FestSchoolEventFeeServiceTest extends TestCase
 
         $this->assertSame('per_student', $normalized['state']['fee_model']);
         $this->assertSame(650.0, $normalized['state']['individual_amount']);
+    }
+
+    public function test_normalize_event_fee_settings_keeps_school_registration_tier_map_for_kalolsavam_composite(): void
+    {
+        $normalized = app(FestEventFeeResolver::class)->normalizeEventFeeSettings([
+            'fee_model' => 'kalolsavam_composite',
+            'school_registration_flat' => 7000,
+            'school_registration' => ['senior_secondary' => 8000, 'secondary' => 7000, 'other' => 7000],
+            'per_student_amount' => 100,
+            'included_items_per_student' => 1,
+            'default_item_fee' => 100,
+        ]);
+
+        $this->assertSame('kalolsavam_composite', $normalized['fee_model']);
+        $this->assertSame(
+            ['senior_secondary' => 8000.0, 'secondary' => 7000.0, 'other' => 7000.0],
+            $normalized['school_registration']
+        );
+        $this->assertSame(100.0, $normalized['per_student_amount']);
+        $this->assertSame(1, $normalized['included_items_per_student']);
+    }
+
+    public function test_sports_event_type_still_resolves_to_literal_sports_composite(): void
+    {
+        ['sahodaya' => $sahodaya] = $this->festContext();
+
+        $sportsEvent = FestEvent::create([
+            'tenant_id'   => $sahodaya->id,
+            'title'       => 'Sports Meet',
+            'event_type'  => 'sports',
+            'level_round' => 'sahodaya',
+            'status'      => 'registration_open',
+        ]);
+
+        // event_type === 'sports' must keep forcing the literal 'sports_composite' key —
+        // never the new kalolsavam_composite one, which is only ever explicitly chosen.
+        $schedule = app(FestSchoolEventFeeService::class)->resolveSchedule($sportsEvent->fresh());
+
+        $this->assertSame('sports_composite', $schedule['fee_model']);
     }
 
     public function test_id_cards_require_item_for_students(): void
@@ -726,5 +856,84 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame('Quiz categories', $lines[0]['head_name']);
         $this->assertSame('GK QUIZ Category 2', $lines[0]['item_title']);
         $this->assertSame(400.0, (float) $lines[0]['amount']);
+    }
+
+    public function test_propagate_fee_settings_to_children_skips_a_child_that_customized_its_own_fees(): void
+    {
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'Fee Propagation Sahodaya',
+            'domain'    => 'fee-propagation-sahodaya.test',
+            'is_active' => true,
+        ]);
+
+        $hub = FestEvent::create([
+            'tenant_id'    => $sahodaya->id,
+            'title'        => 'Partitioned Hub',
+            'event_type'   => 'kalolsavam',
+            'conduct_mode' => 'partitioned',
+            'level_round'  => 'sahodaya',
+            'status'       => 'registration_open',
+            'fee_settings' => ['fee_model' => 'per_item', 'per_item_amount' => 100],
+        ]);
+
+        $hubItem = FestEventItem::create([
+            'event_id'   => $hub->id,
+            'title'      => 'Solo Song',
+            'item_code'  => 'SS01',
+            'fee_amount' => 50,
+        ]);
+
+        // Region admin already customized this region's own fees directly.
+        $customizedChild = FestEvent::create([
+            'tenant_id'        => $sahodaya->id,
+            'parent_event_id'  => $hub->id,
+            'partition_role'   => 'region',
+            'title'            => 'Tirur Region',
+            'event_type'       => 'kalolsavam',
+            'level_round'      => 'sahodaya',
+            'status'           => 'draft',
+            'fee_settings'     => ['fee_model' => 'per_item', 'per_item_amount' => 999],
+            'fee_customized_at' => now(),
+        ]);
+        $customizedChildItem = FestEventItem::create([
+            'event_id'               => $customizedChild->id,
+            'inherited_from_item_id' => $hubItem->id,
+            'title'                  => 'Solo Song',
+            'item_code'              => 'SS01',
+            'fee_amount'             => 200,
+        ]);
+
+        // A second region that never touched its own fees — should keep inheriting.
+        $plainChild = FestEvent::create([
+            'tenant_id'       => $sahodaya->id,
+            'parent_event_id' => $hub->id,
+            'partition_role'  => 'region',
+            'title'           => 'Ponnani Region',
+            'event_type'      => 'kalolsavam',
+            'level_round'     => 'sahodaya',
+            'status'          => 'draft',
+            'fee_settings'    => ['fee_model' => 'per_item', 'per_item_amount' => 100],
+        ]);
+        $plainChildItem = FestEventItem::create([
+            'event_id'               => $plainChild->id,
+            'inherited_from_item_id' => $hubItem->id,
+            'title'                  => 'Solo Song',
+            'item_code'              => 'SS01',
+            'fee_amount'             => 50,
+        ]);
+
+        // Hub raises its price and cascades.
+        $hub->update(['fee_settings' => ['fee_model' => 'per_item', 'per_item_amount' => 150]]);
+        $hubItem->update(['fee_amount' => 75]);
+
+        app(FestSchoolEventFeeService::class)->propagateFeeSettingsToChildren($hub->fresh());
+
+        $this->assertSame(999, $customizedChild->fresh()->fee_settings['per_item_amount']);
+        $this->assertSame(200.0, (float) $customizedChildItem->fresh()->fee_amount);
+
+        $this->assertSame(150, $plainChild->fresh()->fee_settings['per_item_amount']);
+        $this->assertSame(75.0, (float) $plainChildItem->fresh()->fee_amount);
     }
 }

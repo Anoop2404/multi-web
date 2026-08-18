@@ -112,6 +112,49 @@ class TeacherController extends SchoolAdminController
             });
     }
 
+    public function exportCredentials(Request $request, PlatformAuditLogger $audit)
+    {
+        $filters = $this->validatedTeacherListFilters($request);
+
+        $teachers = $this->teacherListQuery($filters)
+            ->with('user:id,username,plain_password,email')
+            ->orderBy('name')
+            ->get();
+
+        $header = ['Name', 'Login code', 'Temporary password', 'Email', 'Mobile', 'Portal URL', 'Status'];
+        $rows = [$header];
+        $portalUrl = url('/portal/login');
+
+        foreach ($teachers as $t) {
+            $rows[] = [
+                $t->name,
+                $t->login_code ?? $t->user?->username ?? '',
+                $t->user?->plain_password ?: 'Already changed',
+                $t->email ?? '',
+                $t->mobile ?? '',
+                $portalUrl,
+                ucfirst($t->status),
+            ];
+        }
+
+        $audit->log(
+            'teacher.credentials.exported',
+            "Exported portal credentials for {$teachers->count()} teacher(s)",
+            null,
+            ['tenant_id' => $this->school->id, 'count' => $teachers->count()],
+        );
+
+        $prefix = $this->school->school_prefix ?: 'school';
+        $filename = "{$prefix}-teacher-credentials-".now()->format('Y-m-d').'.xlsx';
+        $xlsx = SpreadsheetWriter::xlsx($rows);
+
+        return response()->streamDownload(
+            fn () => print $xlsx,
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
+    }
+
     public function export(Request $request)
     {
         $filters = $this->validatedTeacherListFilters($request);

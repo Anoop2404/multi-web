@@ -15,9 +15,48 @@ class EventCoordinatorScope
 {
     use RedirectsUnauthenticated;
 
+    /**
+     * Roles named after one specific fest program, but which share the same coarse-grained
+     * `fest.*` permissions as every other program (Kalotsav, Sports, Kids Fest, Teacher Fest,
+     * English Fest, Science Fest, Custom all use identical permission strings — there's no
+     * per-program permission namespace to gate on). Without this map, e.g. a
+     * school_sports_coordinator could view and write to Kalotsav/Kids Fest/etc too, despite
+     * their role name and permission-set implying "Sports Meet only". See
+     * Documents/Path_breaks.md.
+     *
+     * @var array<string, string>
+     */
+    private const SINGLE_PROGRAM_ROLES = [
+        'school_sports_coordinator'     => 'sports-meet',
+        'school_kalotsavam_coordinator' => 'kalotsav',
+    ];
+
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+
+        if ($user && ! $user->hasRole('school_event_coordinator')) {
+            foreach (self::SINGLE_PROGRAM_ROLES as $role => $allowedProgramSlug) {
+                if (! $user->hasRole($role)) {
+                    continue;
+                }
+
+                if ($user->isSuperAdmin() || $user->hasAnyRole(TenantUserCatalog::schoolManagementRoles()) || $user->hasRole('sahodaya_admin')) {
+                    return $next($request);
+                }
+
+                $programSlug = $this->inferProgramSlug($request->path());
+
+                // No program in the URL (e.g. the school dashboard) — nothing to check.
+                abort_if(
+                    $programSlug !== null && $programSlug !== $allowedProgramSlug,
+                    403,
+                    'Your account is scoped to one fest program only.',
+                );
+
+                return $next($request);
+            }
+        }
 
         if (! $user || ! $user->hasRole('school_event_coordinator')) {
             return $next($request);
@@ -40,6 +79,14 @@ class EventCoordinatorScope
         $scopes = SchoolUserEventScope::where('user_id', $user->id)
             ->when($tenantId, fn ($q) => $q->where('school_id', $tenantId))
             ->get();
+
+        // A zero-scope coordinator's own post-login landing URL IS this page (see
+        // AuthController::homeFor() -> SchoolUserScopeService::homeUrlFor()) — aborting
+        // here too meant they never saw the friendly "No Assigned Events" screen
+        // DashboardController::unassigned() renders, only a raw 403. See Documents/Path_breaks.md.
+        if ($scopes->isEmpty() && str_ends_with($path, '/unassigned')) {
+            return $next($request);
+        }
 
         if ($scopes->isEmpty()) {
             abort(403, 'No event scope assigned to this coordinator account.');

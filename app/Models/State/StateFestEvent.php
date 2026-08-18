@@ -9,7 +9,7 @@ class StateFestEvent extends StateModel
     protected $table = 'state_fest_events';
 
     protected $fillable = [
-        'state_program_id', 'name', 'slug', 'status',
+        'state_program_id', 'state_id', 'name', 'slug', 'status',
         'starts_on', 'ends_on', 'settings',
         'results_published', 'scoring_locked', 'scoring_preset',
     ];

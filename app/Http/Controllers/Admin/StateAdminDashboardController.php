@@ -8,6 +8,7 @@ use App\Models\StateRemittance;
 use App\Models\Tenant;
 use App\Services\Events\StateDashboardService;
 use App\Support\AcademicYear;
+use App\Support\StateScope;
 use Inertia\Response;
 
 class StateAdminDashboardController extends Controller
@@ -24,8 +25,8 @@ class StateAdminDashboardController extends Controller
         // rather than a full year-switcher.
         $academicYear = AcademicYear::forSahodaya(null);
 
-        $programs = FestStateProgram::query()->where('academic_year', $academicYear)->get();
-        $remittances = StateRemittance::query()->where('academic_year', $academicYear)->get();
+        $programs = StateScope::apply(FestStateProgram::query())->where('academic_year', $academicYear)->get();
+        $remittances = StateScope::apply(StateRemittance::query())->where('academic_year', $academicYear)->get();
 
         return inertia('State/Dashboard', [
             'activeAcademicYear' => $academicYear,

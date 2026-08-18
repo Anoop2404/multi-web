@@ -4,6 +4,7 @@ return [
     'fee_models' => [
         'none' => 'No fee',
         'sports_composite' => 'Sports composite (school + student + included items)',
+        'kalolsavam_composite' => 'Kalotsavam composite (school + student + included items)',
         'cksc_tiered' => 'CKSC tiered (school registration + per item)',
         'item_catalog' => 'Item catalog (class group / per-item rates)',
         'flat_school' => 'Flat per school',

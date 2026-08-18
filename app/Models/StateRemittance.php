@@ -13,6 +13,7 @@ class StateRemittance extends Model
 
     use CentralConnection;
     protected $fillable = [
+        'state_id',
         'sahodaya_id', 'title', 'description', 'amount', 'due_date', 'academic_year',
         'status', 'proof_path', 'transaction_ref', 'bank_name', 'payment_date',
         'rejection_reason', 'created_by', 'reviewed_by', 'reviewed_at', 'source_breakdown',
@@ -29,6 +30,11 @@ class StateRemittance extends Model
     public function sahodaya(): BelongsTo
     {
         return $this->belongsToCentralTenant('sahodaya_id');
+    }
+
+    public function state(): BelongsTo
+    {
+        return $this->belongsTo(PlatformState::class, 'state_id');
     }
 
     public function createdBy(): BelongsTo

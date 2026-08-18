@@ -120,6 +120,9 @@
                                     <span v-else-if="r.fee_receipt?.status === 'uploaded'" class="text-xs text-yellow-700">Fee pending approval</span>
                                     <span v-else-if="r.fee_receipt?.status === 'rejected'" class="text-xs text-red-600">Fee rejected — re-upload</span>
                                 </template>
+                                <button v-if="canCancel(r)" type="button"
+                                        @click="cancelRegistration(r)"
+                                        class="text-xs font-semibold text-red-600 hover:underline">Cancel</button>
                             </div>
                         </div>
                         <form v-if="program.fee_type === 'flat' && program.fee_amount && needsFeeUpload(r)"
@@ -218,6 +221,9 @@
 import { computed, reactive, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school: Object,
@@ -266,6 +272,25 @@ function selectAll(program) {
 
 function clearSelection(program) {
     selections[program.id] = [];
+}
+
+function canCancel(registration) {
+    return !['cancelled', 'rejected', 'completed'].includes(registration.status);
+}
+
+async function cancelRegistration(registration) {
+    const ok = await confirm({
+        title: 'Cancel registration?',
+        message: `Cancel ${registration.teacher?.name ?? 'this teacher'}'s training registration? This can't be undone from here — contact your Sahodaya office to re-register.`,
+        confirmLabel: 'Yes, cancel',
+        cancelLabel: 'Keep it',
+        destructive: true,
+    });
+    if (!ok) return;
+
+    router.post(`/school-admin/${props.school.id}/training/${registration.id}/cancel`, {}, {
+        preserveScroll: true,
+    });
 }
 
 function needsFeeUpload(registration) {

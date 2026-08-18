@@ -21,6 +21,16 @@
                 </div>
 
                 <div class="flex items-center gap-3">
+                    <template v-if="hasResultsRollup">
+                        <Link :href="`/admin/state-programs/${program.id}/results`"
+                              class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition border border-white/10 backdrop-blur">
+                            Results
+                        </Link>
+                        <Link :href="`/admin/state-programs/${program.id}/winners`"
+                              class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition border border-white/10 backdrop-blur">
+                            Winners
+                        </Link>
+                    </template>
                     <form v-if="program.status !== 'published'" @submit.prevent="publish">
                         <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition shadow-lg shadow-emerald-500/20">
                             🚀 Publish to all Sahodayas
@@ -699,6 +709,7 @@ const props = defineProps({
 });
 
 const activeTab = ref('general');
+const hasResultsRollup = computed(() => ['kids_fest', 'teacher_fest', 'custom'].includes(props.program.event_type));
 const sahodayaModalOpen = ref(false);
 const activeSahodaya = ref(null);
 const sahodayaItems = ref([]);

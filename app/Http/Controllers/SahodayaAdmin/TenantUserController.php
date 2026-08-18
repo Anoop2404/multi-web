@@ -12,6 +12,8 @@ use App\Models\StaffRegionAssignment;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Auth\TenantUserProvisioner;
 use App\Services\Auth\UserCredentialService;
+use App\Services\Spreadsheet\SpreadsheetWriter;
+use App\Support\TenantDomainSync;
 use App\Support\TenantUserCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -35,6 +37,7 @@ class TenantUserController extends SahodayaAdminController
                 'username'    => $u->username,
                 'roles'       => $u->getRoleNames()->values()->all(),
                 'permissions' => $u->getPermissionNames()->values()->all(),
+                'is_active'   => $u->is_active,
                 'fest_assignments' => FestEventStaff::where('user_id', $u->id)
                     ->with('event:id,title', 'stage:id,name')
                     ->get()
@@ -214,6 +217,61 @@ class TenantUserController extends SahodayaAdminController
         $provisioner->destroy($user, $this->sahodaya->id, TenantUserCatalog::sahodayaAssignableRoles());
 
         return back()->with('success', 'User removed.');
+    }
+
+    public function toggleActive(string $tenantId, User $user, PlatformAuditLogger $audit)
+    {
+        abort_if($user->tenant_id !== $this->sahodaya->id, 403);
+        abort_if(! $user->hasAnyRole(TenantUserCatalog::sahodayaAssignableRoles()), 404);
+        abort_if($user->hasAnyRole(TenantUserCatalog::primaryAdminRoles()), 422, 'Primary admin accounts are managed from the superadmin panel.');
+
+        $user->update(['is_active' => ! $user->is_active]);
+        $audit->userUpdated($user);
+
+        return back()->with('success', $user->is_active ? 'User activated.' : 'User deactivated.');
+    }
+
+    public function exportCredentials(PlatformAuditLogger $audit)
+    {
+        $roles = TenantUserCatalog::sahodayaAssignableRoles();
+
+        $users = User::query()
+            ->where('tenant_id', $this->sahodaya->id)
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', $roles))
+            ->orderBy('name')
+            ->get();
+
+        $publicUrl = TenantDomainSync::publicUrl($this->sahodaya);
+        $portalUrl = $publicUrl ? rtrim($publicUrl, '/').'/login' : url('/login');
+
+        $rows = [['Name', 'Username', 'Temporary password', 'Email', 'Portal URL', 'Roles', 'Status']];
+        foreach ($users as $u) {
+            $rows[] = [
+                $u->name,
+                $u->username ?? '',
+                $u->plain_password ?: 'Already changed',
+                $u->email ?? '',
+                $portalUrl,
+                $u->getRoleNames()->join(', '),
+                $u->is_active ? 'Active' : 'Inactive',
+            ];
+        }
+
+        $audit->log(
+            'sahodaya.user_credentials.exported',
+            "Exported portal credentials for {$users->count()} user(s)",
+            null,
+            ['tenant_id' => $this->sahodaya->id, 'count' => $users->count()],
+        );
+
+        $filename = 'sahodaya-user-credentials-'.now()->format('Y-m-d').'.xlsx';
+        $xlsx = SpreadsheetWriter::xlsx($rows);
+
+        return response()->streamDownload(
+            fn () => print $xlsx,
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
     }
 
     /** @param  array<string, mixed>  $data */

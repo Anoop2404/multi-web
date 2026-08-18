@@ -355,14 +355,6 @@ class SiteBuilderApiController extends SahodayaAdminController
         ]);
     }
 
-    public function getTheme(): JsonResponse
-    {
-        return response()->json([
-            'theme'   => SahodayaTenantBranding::theme($this->sahodaya),
-            'presets' => SahodayaTenantBranding::themePresets(),
-        ]);
-    }
-
     public function saveTheme(Request $request): JsonResponse
     {
         $data = $request->validate([

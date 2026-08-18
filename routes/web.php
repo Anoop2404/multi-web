@@ -98,6 +98,10 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::put('/{stateProgram}/items/{item}', [StateFestProgramController::class, 'updateItem'])->name('items.update');
             Route::delete('/{stateProgram}/items/{item}', [StateFestProgramController::class, 'destroyItem'])->name('items.destroy');
 
+            Route::get('/{stateProgram}/results', [StateFestProgramController::class, 'results'])->name('results');
+            Route::get('/{stateProgram}/winners', [StateFestProgramController::class, 'winners'])->name('winners');
+            Route::get('/{stateProgram}/winners/export', [StateFestProgramController::class, 'exportWinners'])->name('winners.export');
+
             Route::post('/{stateProgram}/sahodaya/{sahodaya}/toggle', [StateFestProgramController::class, 'toggleSahodaya'])->name('sahodaya.toggle');
             Route::get('/{stateProgram}/sahodaya/{sahodaya}/items', [StateFestProgramController::class, 'sahodayaItems'])->name('sahodaya.items');
             Route::post('/{stateProgram}/sahodaya/{sahodaya}/items/item/{item}/toggle', [StateFestProgramController::class, 'toggleSahodayaItem'])->name('sahodaya.items.toggle');
@@ -145,26 +149,55 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
         });
 
         Route::get('/sports', [\App\Http\Controllers\Admin\SportsResultsController::class, 'index'])->name('sports.index');
+        Route::get('/mcq-results', [\App\Http\Controllers\Admin\McqStateResultsController::class, 'index'])->name('mcq-results.index');
         Route::get('/board-results', [\App\Http\Controllers\StateAdmin\StateBoardResultsController::class, 'index'])->name('board-results.index');
 
         Route::get('/sahodayas', [TenantController::class, 'indexSahodayas'])->name('sahodayas.index');
+        Route::get('/sahodayas/export-admin-credentials', [TenantController::class, 'exportSahodayaAdminCredentials'])->name('sahodayas.export-admin-credentials');
+
+        Route::prefix('state-users')->name('state-users.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\StateUserController::class, 'index'])->name('index');
+            Route::get('/export-credentials', [\App\Http\Controllers\Admin\StateUserController::class, 'exportCredentials'])->name('export-credentials');
+            Route::post('/', [\App\Http\Controllers\Admin\StateUserController::class, 'store'])->name('store');
+            Route::put('/{user}', [\App\Http\Controllers\Admin\StateUserController::class, 'update'])->name('update');
+            Route::patch('/{user}/toggle-active', [\App\Http\Controllers\Admin\StateUserController::class, 'toggleActive'])->name('toggle-active');
+            Route::delete('/{user}', [\App\Http\Controllers\Admin\StateUserController::class, 'destroy'])->name('destroy');
+        });
     });
 
     // ── Superadmin-only platform routes ─────────────────────────────────────
     Route::middleware('super.admin')->group(function () {
 
-    Route::get('/dashboard', function () {
+    Route::prefix('states')->name('states.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\StateController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Admin\StateController::class, 'store'])->name('store');
+        Route::put('/{state}', [\App\Http\Controllers\Admin\StateController::class, 'update'])->name('update');
+        Route::delete('/{state}', [\App\Http\Controllers\Admin\StateController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('announcements')->name('announcements.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\PlatformAnnouncementController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Admin\PlatformAnnouncementController::class, 'store'])->name('store');
+        Route::put('/{announcement}', [\App\Http\Controllers\Admin\PlatformAnnouncementController::class, 'update'])->name('update');
+        Route::delete('/{announcement}', [\App\Http\Controllers\Admin\PlatformAnnouncementController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::get('/dashboard', function (\App\Services\Reports\PlatformDashboardSnapshotService $snapshots) {
         $stats = [
             'total_tenants'   => \App\Models\Tenant::count(),
             'school_tenants'  => \App\Models\Tenant::where('type', 'school')->count(),
             'sahodaya_tenants'=> \App\Models\Tenant::where('type', 'sahodaya')->count(),
             'active_tenants'  => \App\Models\Tenant::where('is_active', true)->count(),
         ];
-        return inertia('Dashboard', compact('stats'));
+        return inertia('Dashboard', [
+            'stats'    => $stats,
+            'snapshot' => $snapshots->latest(),
+        ]);
     })->name('dashboard');
 
     Route::get('/sahodayas/create', [TenantController::class, 'createSahodaya'])->name('sahodayas.create');
     Route::get('/schools', [TenantController::class, 'indexSchools'])->name('schools.index');
+    Route::get('/schools/export-admin-credentials', [TenantController::class, 'exportSchoolAdminCredentials'])->name('schools.export-admin-credentials');
     Route::get('/schools/create', [TenantController::class, 'createSchool'])->name('schools.create');
 
     Route::resource('tenants', TenantController::class)->only([
@@ -190,6 +223,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     Route::delete('tenants/{tenant}/erase-students', [TenantController::class, 'eraseStudents'])->name('tenants.erase-students');
     Route::post('tenants/{tenant}/erasure-batches/{batchId}/restore', [TenantController::class, 'restoreErasedStudents'])->name('tenants.erasure-batches.restore');
     Route::put('tenants/{tenant}/nav-visibility', [TenantController::class, 'updateNavVisibility'])->name('tenants.nav-visibility.update');
+    Route::post('tenants/{tenant}/impersonate/{user}', [\App\Http\Controllers\Admin\ImpersonationController::class, 'start'])->name('tenants.impersonate');
 
     Route::get('/storage-migration', [\App\Http\Controllers\Admin\StorageMigrationController::class, 'index'])->name('storage-migration');
     Route::get('/storage-migration/scan', [\App\Http\Controllers\Admin\StorageMigrationController::class, 'scan'])->name('storage-migration.scan');
@@ -293,6 +327,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     Route::prefix('billing')->name('billing.')->group(function () {
         Route::get('/',                                      [SubscriptionController::class, 'index'])->name('index');
         Route::post('/plans',                                [SubscriptionController::class, 'storePlan'])->name('plans.store');
+        Route::put('/plans/{plan}/features',                 [SubscriptionController::class, 'updatePlanFeatures'])->name('plans.features.update');
         Route::post('/subscriptions',                        [SubscriptionController::class, 'storeTenantSubscription'])->name('subscriptions.store');
         Route::post('/invoices',                             [SubscriptionController::class, 'storeInvoice'])->name('invoices.store');
         Route::post('/receipts/{receipt}/approve',           [SubscriptionController::class, 'approveReceipt'])->name('receipts.approve');
@@ -303,13 +338,6 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     Route::redirect('audit', 'audit-logs');
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
     Route::get('/audit-logs/export', [AuditLogController::class, 'export'])->name('audit-logs.export');
-
-    Route::prefix('state-users')->name('state-users.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\Admin\StateUserController::class, 'index'])->name('index');
-        Route::post('/', [\App\Http\Controllers\Admin\StateUserController::class, 'store'])->name('store');
-        Route::put('/{user}', [\App\Http\Controllers\Admin\StateUserController::class, 'update'])->name('update');
-        Route::delete('/{user}', [\App\Http\Controllers\Admin\StateUserController::class, 'destroy'])->name('destroy');
-    });
 
     Route::get('/dev-pass-token', [\App\Http\Controllers\Admin\DevPassTokenAdminController::class, 'show'])->name('dev-pass-token.show');
     Route::post('/dev-pass-token', [\App\Http\Controllers\Admin\DevPassTokenAdminController::class, 'update'])->name('dev-pass-token.update');
@@ -451,6 +479,8 @@ Route::prefix('school-admin/{tenantId}')
     Route::delete('/fest/{event}/food-order/items/{orderItem}', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'removeItem'])->name('food-order.items.destroy');
     Route::get('/fest/{event}/food-host-billing', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'index'])->name('food-host-billing.index');
     Route::get('/fest/{event}/food-host-billing/export', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'exportCsv'])->name('food-host-billing.export');
+    Route::get('/fest/{event}/food-host-billing/report', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'report'])->name('food-host-billing.report');
+    Route::get('/fest/{event}/food-host-billing/report/export', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'reportExportCsv'])->name('food-host-billing.report.export');
     Route::get('/fest/{event}/food-host-billing/{bill}', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'show'])->name('food-host-billing.show');
     Route::get('/fest/{event}/food-host-billing/{bill}/pdf', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'pdf'])->name('food-host-billing.pdf');
     Route::post('/fest/{event}/food-host-billing/{bill}/items', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'addItem'])->name('food-host-billing.items.store');
@@ -468,6 +498,7 @@ Route::prefix('school-admin/{tenantId}')
 
     Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');
     Route::get('/teachers/export', [TeacherController::class, 'export'])->name('teachers.export');
+    Route::get('/teachers/export-credentials', [TeacherController::class, 'exportCredentials'])->name('teachers.export-credentials');
     Route::get('/teachers/export-pdf', [TeacherController::class, 'exportPdf'])->name('teachers.export.pdf');
     Route::post('/teachers', [TeacherController::class, 'store'])->name('teachers.store');
     Route::post('/teachers/bulk', [TeacherController::class, 'storeBulk'])->name('teachers.store.bulk');
@@ -486,6 +517,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::delete('/teachers/{teacher}', [TeacherController::class, 'destroy'])->name('teachers.destroy');
 
     Route::get('/users', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'index'])->name('users.index');
+    Route::get('/users/export-credentials', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'exportCredentials'])->name('users.export-credentials');
     Route::put('/users/coordinator-contact', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'updateCoordinatorContact'])->name('users.coordinator-contact.update');
     Route::post('/users/coordinator-login', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'provisionCoordinatorFromContact'])->name('users.coordinator-login');
     Route::put('/users/leadership-contact/{roleKey}', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'updateLeadershipContact'])->name('users.leadership-contact.update');
@@ -493,6 +525,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/users', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'store'])->name('users.store');
     Route::put('/users/{user}', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'update'])->name('users.update');
     Route::post('/users/{user}/reset-password', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'resetPassword'])->name('users.reset-password');
+    Route::patch('/users/{user}/toggle-active', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'toggleActive'])->name('users.toggle-active');
     Route::delete('/users/{user}', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'destroy'])->name('users.destroy');
 
     Route::get('/circulars', [CircularAcknowledgementController::class, 'index'])->name('circulars.index');
@@ -634,6 +667,29 @@ Route::prefix('school-admin/{tenantId}')
         ]);
     })->name('contact.index');
     Route::post('/contact',                                  [SettingsController::class, 'update'])->name('contact.update');
+
+    // Site Builder — controllers existed but were never wired to a route (see
+    // Documents/Path_breaks.md), leaving every item below unreachable from the sidebar.
+    Route::get('/site-builder', [SiteBuilderController::class, 'index'])->name('site-builder');
+    Route::prefix('site-builder/api')->name('site-builder.api.')->group(function () {
+        Route::get('/sections', [SiteBuilderApiController::class, 'sections'])->name('sections.index');
+        Route::post('/sections', [SiteBuilderApiController::class, 'storeSection'])->name('sections.store');
+        Route::patch('/sections/{sectionId}', [SiteBuilderApiController::class, 'updateSection'])->name('sections.update');
+        Route::delete('/sections/{sectionId}', [SiteBuilderApiController::class, 'deleteSection'])->name('sections.delete');
+        Route::post('/sections/{sectionId}/toggle', [SiteBuilderApiController::class, 'toggleSection'])->name('sections.toggle');
+        Route::post('/sections/reorder', [SiteBuilderApiController::class, 'reorderSections'])->name('sections.reorder');
+        Route::post('/sections/{sectionId}/publish', [SiteBuilderApiController::class, 'publishSection'])->name('sections.publish');
+        Route::get('/sections/{sectionId}/versions', [SiteBuilderApiController::class, 'sectionVersions'])->name('sections.versions');
+        Route::post('/sections/{sectionId}/versions/{versionId}/restore', [SiteBuilderApiController::class, 'restoreSectionVersion'])->name('sections.versions.restore');
+        Route::get('/nav', [SiteBuilderApiController::class, 'getNav'])->name('nav.get');
+        Route::post('/nav', [SiteBuilderApiController::class, 'saveNav'])->name('nav.save');
+        Route::get('/footer', [SiteBuilderApiController::class, 'getFooter'])->name('footer.get');
+        Route::post('/footer', [SiteBuilderApiController::class, 'saveFooter'])->name('footer.save');
+        Route::post('/portal-links', [SiteBuilderApiController::class, 'ensurePortalLinks'])->name('portal-links.ensure');
+        Route::post('/default-nav', [SiteBuilderApiController::class, 'ensureDefaultNav'])->name('default-nav.ensure');
+        Route::get('/public-website', [SiteBuilderApiController::class, 'getPublicWebsite'])->name('public-website.get');
+        Route::post('/public-website', [SiteBuilderApiController::class, 'savePublicWebsite'])->name('public-website.save');
+    });
     }); // public.website.admin.cms
     }); // website.enabled
 });
@@ -651,9 +707,11 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/audit-logs/export', [SahodayaAuditLogController::class, 'export'])->name('audit-logs.export');
 
         Route::get('/users', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'index'])->name('users.index');
+        Route::get('/users/export-credentials', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'exportCredentials'])->name('users.export-credentials');
         Route::post('/users', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'store'])->name('users.store');
         Route::put('/users/{user}', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'update'])->name('users.update');
         Route::post('/users/{user}/reset-password', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'resetPassword'])->name('users.reset-password');
+        Route::patch('/users/{user}/toggle-active', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'toggleActive'])->name('users.toggle-active');
         Route::delete('/users/{user}', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'destroy'])->name('users.destroy');
 
         Route::get('/settings/nav-visibility', [\App\Http\Controllers\SahodayaAdmin\NavVisibilityController::class, 'edit'])->name('settings.nav-visibility');
@@ -721,7 +779,6 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::middleware('website.enabled')->group(function () {
         Route::middleware('public.website.admin.cms')->group(function () {
         Route::get('/site-builder', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderController::class, 'index'])->name('site-builder');
-        Route::get('/site-builder/section-types', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderController::class, 'sectionTypes'])->name('site-builder.section-types');
         Route::get('/website/domains', [\App\Http\Controllers\SahodayaAdmin\WebsiteDomainController::class, 'index'])->name('website.domains');
         Route::post('/website/domains', [\App\Http\Controllers\SahodayaAdmin\WebsiteDomainController::class, 'store'])->name('website.domains.store');
         Route::post('/website/domains/{domainId}/verify', [\App\Http\Controllers\SahodayaAdmin\WebsiteDomainController::class, 'verify'])->name('website.domains.verify');
@@ -764,7 +821,6 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/sections/{sectionId}/versions/{versionId}/restore', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'restoreSectionVersion'])->name('sections.versions.restore');
             Route::get('/public-website', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'getPublicWebsite'])->name('public-website.get');
             Route::post('/public-website', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'savePublicWebsite'])->name('public-website.save');
-            Route::get('/theme', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'getTheme'])->name('theme.get');
             Route::post('/theme', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'saveTheme'])->name('theme.save');
             Route::post('/media', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'uploadMedia'])->name('media.upload');
         });
@@ -1161,13 +1217,19 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/food-coupons/print', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'print'])->name('food-coupons.print');
             Route::get('/{event}/food-menu', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'index'])->name('food-menu.index');
             Route::post('/{event}/food-menu', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'store'])->name('food-menu.store');
+            Route::post('/{event}/food-menu/assign-catalog-items', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'assignCatalogItems'])->name('food-menu.assign-catalog-items');
             Route::put('/{event}/food-menu/{menuItem}', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'update'])->name('food-menu.update');
             Route::delete('/{event}/food-menu/{menuItem}', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'destroy'])->name('food-menu.destroy');
             Route::put('/{event}/food-menu-payee', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'updatePayee'])->name('food-menu.payee.update');
             Route::post('/{event}/food-menu/sync-to-regions', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'syncToRegions'])->name('food-menu.sync-to-regions');
+            Route::post('/{event}/food-catalog', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'catalogStore'])->name('food-catalog.store');
+            Route::put('/{event}/food-catalog/{catalogItem}', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'catalogUpdate'])->name('food-catalog.update');
+            Route::delete('/{event}/food-catalog/{catalogItem}', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'catalogDestroy'])->name('food-catalog.destroy');
             Route::get('/{event}/food-billing', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'index'])->name('food-billing.index');
             Route::post('/{event}/food-billing', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'store'])->name('food-billing.store');
             Route::get('/{event}/food-billing/export', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'exportCsv'])->name('food-billing.export');
+            Route::get('/{event}/food-billing/report', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'report'])->name('food-billing.report');
+            Route::get('/{event}/food-billing/report/export', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'reportExportCsv'])->name('food-billing.report.export');
             Route::get('/{event}/food-billing/{bill}', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'show'])->name('food-billing.show');
             Route::get('/{event}/food-billing/{bill}/pdf', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'pdf'])->name('food-billing.pdf');
             Route::post('/{event}/food-billing/{bill}/items', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'addItem'])->name('food-billing.items.store');
@@ -1675,6 +1737,7 @@ Route::prefix('portal/exam/{tenantId}')
         Route::get('/exams/{exam}/marks', [\App\Http\Controllers\Portal\ExamOpsController::class, 'marks'])->name('marks');
         Route::post('/exams/{exam}/registrations/{registration}/marks', [\App\Http\Controllers\Portal\ExamOpsController::class, 'storeMark'])->name('marks.store');
         Route::get('/exams/{exam}/supervision', [\App\Http\Controllers\Portal\ExamOpsController::class, 'supervision'])->name('supervision');
+        Route::get('/exams/{exam}/results', [\App\Http\Controllers\Portal\ExamOpsController::class, 'results'])->name('results');
     });
 
 Route::prefix('portal/house-admin/{tenantId}')

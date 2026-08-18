@@ -131,14 +131,18 @@ class TrainingRegistrationController extends SchoolAdminController
             return back()->with('success', 'Registration is already cancelled.');
         }
 
-        // Block if the school batch fee is approved — at that point the money has been
+        // Block if the fee has already been approved — at that point the money has been
         // accepted and only a Sahodaya admin cancel (with credit/refund) makes sense.
-        abort_if(
-            $program->usesSchoolBatchFee() && $registration->school_id,
-            fn () => \App\Models\TrainingSchoolFee::where('program_id', $program->id)
+        // Covers both the school batch fee and an individual teacher's own fee receipt.
+        $feeApproved = $program->usesSchoolBatchFee() && $registration->school_id
+            ? \App\Models\TrainingSchoolFee::where('program_id', $program->id)
                 ->where('school_id', $registration->school_id)
                 ->where('status', 'approved')
-                ->exists(),
+                ->exists()
+            : $registration->feeReceipt?->status === 'approved';
+
+        abort_if(
+            $feeApproved,
             422,
             'This registration\'s fee has been approved. Contact your Sahodaya office to cancel a paid registration.',
         );

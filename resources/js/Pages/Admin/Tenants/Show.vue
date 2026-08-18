@@ -55,6 +55,22 @@
                 </div>
             </div>
 
+            <!-- Setup checklist -->
+            <div v-if="setupChecklist && !setupChecklist.complete" class="bg-amber-50 rounded-xl border border-amber-200 p-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-amber-600">⚠️</span>
+                    <h3 class="font-bold text-amber-900">Setup incomplete — {{ setupChecklist.pending_count }} step(s) remaining</h3>
+                </div>
+                <ul class="space-y-1.5">
+                    <li v-for="(step, key) in setupChecklist.steps" :key="key" class="flex items-center gap-2 text-sm">
+                        <span :class="step.completed ? 'text-emerald-600' : 'text-amber-500'">
+                            {{ step.completed ? '✓' : '○' }}
+                        </span>
+                        <span :class="step.completed ? 'text-gray-500 line-through' : 'text-gray-800 font-medium'">{{ step.label }}</span>
+                    </li>
+                </ul>
+            </div>
+
             <!-- Sidebar menu manager (superadmin → Sahodaya) -->
             <div v-if="navManager" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <h3 class="font-bold text-gray-900 mb-1">Sidebar menu access</h3>
@@ -389,7 +405,11 @@
                                         {{ revealingId === admin.id ? 'Loading…' : 'Show password' }}
                                     </button>
                                 </td>
-                                <td class="px-4 py-3 text-right space-x-2">
+                                <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                                    <button type="button" @click="openImpersonate(admin)"
+                                            class="text-xs font-semibold text-amber-700 hover:text-amber-900">
+                                        Impersonate
+                                    </button>
                                     <button type="button" @click="editAdmin(admin)"
                                             class="link-brand text-xs">
                                         Edit
@@ -555,13 +575,30 @@
                 </div>
             </div>
         </div>
+
+        <Modal :show="impersonateModal.open" title="Impersonate admin" size="sm" @close="impersonateModal.open = false">
+            <p class="text-sm text-gray-600 mb-3">
+                You're about to view this account as <strong>{{ impersonateModal.admin?.name }}</strong>
+                ({{ impersonateModal.admin?.email }}). This is fully audited — give a reason before continuing.
+            </p>
+            <textarea v-model="impersonateForm.reason" rows="3" class="field w-full"
+                      placeholder="Why are you impersonating this account? (e.g. investigating a support ticket)"></textarea>
+            <p v-if="impersonateForm.errors.reason" class="text-xs text-red-600 mt-1">{{ impersonateForm.errors.reason }}</p>
+            <template #footer>
+                <button type="button" @click="impersonateModal.open = false" class="btn-ghost px-4 py-2 text-sm">Cancel</button>
+                <button type="button" @click="confirmImpersonate" :disabled="impersonateForm.processing"
+                        class="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-50">
+                    {{ impersonateForm.processing ? 'Starting…' : 'Start impersonation' }}
+                </button>
+            </template>
+        </Modal>
     </AdminLayout>
 </template>
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -590,6 +627,7 @@ const props = defineProps({
     loginLookup: { type: Object, default: () => ({ query: '', matches: [], searched: false, message: null }) },
     navManager: { type: Object, default: null },
     erasureBatches: { type: Array, default: () => [] },
+    setupChecklist: { type: Object, default: null },
 });
 
 const websiteEnabled = computed(() => usePage().props.features?.website_enabled ?? false);
@@ -786,6 +824,22 @@ async function revealPassword(admin) {
     } finally {
         revealingId.value = null;
     }
+}
+
+const impersonateModal = reactive({ open: false, admin: null });
+const impersonateForm = useForm({ reason: '' });
+
+function openImpersonate(admin) {
+    impersonateModal.admin = admin;
+    impersonateModal.open = true;
+    impersonateForm.reset();
+    impersonateForm.clearErrors();
+}
+
+function confirmImpersonate() {
+    impersonateForm.post(`/admin/tenants/${props.tenant.id}/impersonate/${impersonateModal.admin.id}`, {
+        onSuccess: () => { impersonateModal.open = false; },
+    });
 }
 
 async function removeAdmin(admin) {

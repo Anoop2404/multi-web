@@ -11,11 +11,16 @@
                         : 'Manage member schools, domains, and parent Sahodaya assignment.' }}
                 </p>
             </div>
-            <Link v-if="createUrl && !readOnly"
-                  :href="createUrl"
-                  class="btn-primary">
-                + {{ tenantType === 'sahodaya' ? 'Add Sahodaya' : 'Add School' }}
-            </Link>
+            <div class="flex items-center gap-2">
+                <button v-if="!readOnly" type="button" class="btn-secondary" @click="exportAdminCredentials">
+                    ↓ Export admin credentials
+                </button>
+                <Link v-if="createUrl && !readOnly"
+                      :href="createUrl"
+                      class="btn-primary">
+                    + {{ tenantType === 'sahodaya' ? 'Add Sahodaya' : 'Add School' }}
+                </Link>
+            </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-4 p-4">
@@ -60,7 +65,13 @@
                         </td>
                     </tr>
                     <tr v-for="tenant in tenants.data" :key="tenant.id" class="hover:bg-gray-50">
-                        <td class="px-4 py-3 font-medium text-gray-800">{{ tenant.name }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-800">
+                            {{ tenant.name }}
+                            <span v-if="tenant.setup_incomplete" title="Setup incomplete — open this tenant to see what's missing"
+                                  class="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+                                Setup incomplete
+                            </span>
+                        </td>
                         <td v-if="tenantType === 'school'" class="px-4 py-3 text-gray-500 text-xs">
                             {{ tenant.parent?.name || '—' }}
                         </td>
@@ -124,6 +135,9 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, reactive, watch } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     tenants: Object,
@@ -150,6 +164,14 @@ const hasFilters = computed(() => !!filterForm.search || filterForm.status !== '
 const listPath = computed(() =>
     props.tenantType === 'school' ? '/admin/schools' : '/admin/sahodayas',
 );
+
+async function exportAdminCredentials() {
+    if (!(await confirm({
+        message: 'This file contains every ' + (props.tenantType === 'school' ? 'school' : 'Sahodaya') + ' admin\'s temporary password in plain text. Handle it carefully and delete it once shared.',
+        destructive: false,
+    }))) return;
+    window.location.href = `${listPath.value}/export-admin-credentials`;
+}
 
 function tenantPublicUrl(tenant) {
     if (!tenant.domain) return null;

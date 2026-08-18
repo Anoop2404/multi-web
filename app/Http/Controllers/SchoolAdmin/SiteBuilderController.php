@@ -8,7 +8,6 @@ use App\Support\SchoolPortalNavLinks;
 use App\Support\SchoolSiteBuilderCatalog;
 use App\Support\SectionFieldRegistry;
 use App\Support\TenantPublicSite;
-use Illuminate\Http\JsonResponse;
 
 class SiteBuilderController extends SchoolAdminController
 {
@@ -36,14 +35,6 @@ class SiteBuilderController extends SchoolAdminController
             'defaultNavConfig'     => $defaults,
             'navLayoutOptions'     => NavConfigDefaults::layoutOptions('school'),
             'navNeedsSetup'          => empty($navConfig['items']),
-        ]);
-    }
-
-    public function sectionTypes(): JsonResponse
-    {
-        return response()->json([
-            'types'     => SchoolSiteBuilderCatalog::SECTION_TYPES,
-            'fieldDefs' => SectionFieldRegistry::all(),
         ]);
     }
 }

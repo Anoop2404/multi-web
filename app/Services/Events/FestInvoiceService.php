@@ -35,7 +35,7 @@ class FestInvoiceService
             return $this->issueForSchoolPerHead($event, $school, $feeService, $existing, $issuedBy);
         }
 
-        if (($schedule['fee_model'] ?? 'none') === 'sports_composite') {
+        if (in_array($schedule['fee_model'] ?? 'none', ['sports_composite', 'kalolsavam_composite'], true)) {
             return $this->issueForSchoolSportsComposite($event, $school, $feeService, $schedule, $existing, $issuedBy);
         }
 

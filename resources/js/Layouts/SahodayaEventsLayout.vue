@@ -150,7 +150,7 @@ import StaffReadOnlyBanner from '@/Components/StaffReadOnlyBanner.vue';
 import FlashBanner from '@/Components/ui/FlashBanner.vue';
 import SahodayaNavItem from '@/Components/sahodaya/SahodayaNavItem.vue';
 import SahodayaSidebarNavSearch from '@/Components/sahodaya/SahodayaSidebarNavSearch.vue';
-import SahodayaSvgIcon from '@/Components/sahodaya/SahodayaSvgIcon.vue';
+import SahodayaSvgIcon from '@/Components/icons/SvgIcon.vue';
 import EventHeadSidebarSection from '@/Components/fest/EventHeadSidebarSection.vue';
 import { eventsModuleNav, eventScopedNav, navItemActive, shouldShowSportsHeadSidebar } from '@/support/sahodayaEventNav.js';
 import { filterNavByPermissions, staffCanSeeNavItem } from '@/support/sahodayaEventNavPermissions.js';

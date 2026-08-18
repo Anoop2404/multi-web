@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ExternalSahodaya;
 use App\Models\ExternalSchool;
+use App\Models\FestStateProgram;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Auth\UserCredentialService;
+use App\Support\StateScope;
 
 /**
  * State-admin view of one ExternalSahodaya's schools and their portal login credentials.
@@ -17,6 +19,7 @@ class ExternalSchoolController extends Controller
 {
     public function index(ExternalSahodaya $externalSahodaya)
     {
+        StateScope::assertOwns(FestStateProgram::find($externalSahodaya->state_program_id)?->state_id);
         $schools = $externalSahodaya->schools()
             ->orderBy('name')
             ->get(['id', 'name', 'username', 'status', 'contact_name', 'contact_phone', 'created_at'])
@@ -31,7 +34,7 @@ class ExternalSchoolController extends Controller
                 'created_at'    => $school->created_at,
             ]);
 
-        return inertia('Admin/ExternalSchools/Index', [
+        return inertia('ExternalSchools/Index', [
             'sahodaya' => $externalSahodaya->only('id', 'name'),
             'schools'  => $schools,
         ]);
@@ -39,6 +42,9 @@ class ExternalSchoolController extends Controller
 
     public function resetPassword(ExternalSchool $externalSchool, UserCredentialService $credentials, PlatformAuditLogger $audit)
     {
+        $externalSchool->loadMissing('sahodaya');
+        StateScope::assertOwns(FestStateProgram::find($externalSchool->sahodaya?->state_program_id)?->state_id);
+
         $plainPassword = $credentials->generateTemporaryPassword();
 
         $externalSchool->forceFill([

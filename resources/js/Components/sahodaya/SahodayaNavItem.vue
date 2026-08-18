@@ -17,7 +17,7 @@
 
 <script setup>
 import { Link } from '@inertiajs/vue3';
-import SahodayaSvgIcon from './SahodayaSvgIcon.vue';
+import SahodayaSvgIcon from '@/Components/icons/SvgIcon.vue';
 
 defineProps({
     href: { type: String, required: true },

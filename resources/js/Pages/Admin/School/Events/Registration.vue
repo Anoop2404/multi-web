@@ -25,7 +25,7 @@
 
         <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
 
-        <div v-if="schoolRegion?.applies && !event?.uses_registration_batch_billing" class="mb-5 max-w-2xl">
+        <div v-if="schoolRegion?.applies && !focusEvent?.uses_registration_batch_billing" class="mb-5 max-w-2xl">
             <div v-if="schoolRegion.region && !showChangeRegion" class="notice-banner notice-banner--info text-sm flex flex-wrap items-center gap-3 justify-between">
                 <p>Your {{ programLabel }} region: <strong>{{ schoolRegion.region }}</strong>.</p>
                 <button type="button" class="link-brand font-semibold text-xs shrink-0" @click="showChangeRegion = true">Change region →</button>
@@ -50,16 +50,16 @@
             </div>
         </div>
 
-        <SchoolEventWorkflowStepper v-if="singleEventMode && event?.id"
+        <SchoolEventWorkflowStepper v-if="singleEventMode && focusEvent?.id"
                                     :school-id="school.id"
                                     :program-prefix="programPrefix"
-                                    :event-id="event.id"
+                                    :event-id="focusEvent.id"
                                     :is-sports="isSports"
-                                    :current-step="getTab(event.id) === 'athletes' ? 'event-reg' : (getTab(event.id) === 'items' ? 'item-reg' : 'payment')"
-                                    @select-step="step => setTab(event.id, step.tab)" />
+                                    :current-step="getTab(focusEvent.id) === 'athletes' ? 'event-reg' : (getTab(focusEvent.id) === 'items' ? 'item-reg' : 'payment')"
+                                    @select-step="step => setTab(focusEvent.id, step.tab)" />
 
-        <PhasedRegionBillingPanel v-if="event?.uses_registration_batch_billing"
-                                  :event="event"
+        <PhasedRegionBillingPanel v-if="focusEvent?.uses_registration_batch_billing"
+                                  :event="focusEvent"
                                   :school-id="school.id"
                                   :program-prefix="programPrefix" />
 
@@ -732,6 +732,14 @@ function isMinFeeApplied(event) {
 }
 const isSports = computed(() => props.eventType === 'sports' || programSlug.value === 'sports-meet');
 const isLocked = computed(() => !!props.studentEditLock?.locked);
+
+// props.event only carries a small whitelisted column set (see
+// BuildsSchoolFestEventContext::schoolFestEventNavProps()) — it never has the
+// fee/billing attributes hydrateEventForSchoolRegistration() adds (e.g.
+// uses_registration_batch_billing, phase_region_options). In single-event mode
+// props.events[0] is that fully-hydrated event, so prefer it for anything reading
+// those computed attributes.
+const focusEvent = computed(() => (props.singleEventMode ? (props.events?.[0] ?? props.event) : props.event));
 
 const displayEvents = computed(() => {
     if (!props.focusEventId) return props.events ?? [];
@@ -1600,11 +1608,14 @@ async function withdraw(id) {
 }
 
 function canEdit(reg) {
-    if (['withdrawn', 'rejected'].includes(reg.status)) return false;
+    // 'rejected' is editable — that's how a school fixes and resubmits (server resets
+    // status back to 'submitted' on save, see FestRegistrationCreateService::updateForSchool()).
+    // 'withdrawn' stays final — nothing to fix, it was the school's own choice to cancel.
+    if (reg.status === 'withdrawn') return false;
     const event = props.events.find(e => Number(e.id) === Number(reg.event_id) || Number(e.parent_event_id) === Number(reg.event_id)) ?? props.events[0];
-    if (!event) return reg.status === 'submitted';
+    if (!event) return ['submitted', 'rejected'].includes(reg.status);
     if (event.schedule_published || event.results_published || ['completed', 'cancelled'].includes(event.status)) return false;
-    return event.status === 'registration_open' || reg.status === 'submitted';
+    return event.status === 'registration_open' || ['submitted', 'rejected'].includes(reg.status);
 }
 
 function resetItemForm(eventId, itemId) {

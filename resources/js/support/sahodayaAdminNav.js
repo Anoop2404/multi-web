@@ -170,17 +170,20 @@ export function sahodayaMembershipScopedNav(sahodayaId, options = {}) {
 
 /** Sidebar on training programs hub. */
 export function sahodayaTrainingHubNav(sahodayaId, options = {}) {
-    const { canNav = () => true } = options;
+    const { canNav = () => true, isStaffUser = false } = options;
     if (!canNav('training')) {
         return [];
     }
 
     const base = `/sahodaya-admin/${sahodayaId}`;
+    // Scoped staff (e.g. training_admin) are blocked from the bare tenant root by
+    // EnsureSahodayaAdmin — send them back to their own hub instead of a 403.
+    const homeHref = isStaffUser ? `${base}/training` : base;
 
     return [
         {
             section: 'Sahodaya',
-            items: [{ label: 'Main dashboard', href: base, icon: 'grid', exact: true }],
+            items: [{ label: 'Main dashboard', href: homeHref, icon: 'grid', exact: true }],
         },
         {
             section: 'Teacher training',
@@ -194,18 +197,19 @@ export function sahodayaTrainingHubNav(sahodayaId, options = {}) {
 
 /** Sidebar when managing one training program. */
 export function sahodayaTrainingProgramScopedNav(sahodayaId, programId, options = {}) {
-    const { canNav = () => true } = options;
+    const { canNav = () => true, isStaffUser = false } = options;
     if (!canNav('training')) {
         return [];
     }
 
     const base = `/sahodaya-admin/${sahodayaId}`;
     const programBase = `${base}/training/${programId}`;
+    const homeHref = isStaffUser ? `${base}/training` : base;
 
     return [
         {
             section: 'Sahodaya',
-            items: [{ label: 'Main dashboard', href: base, icon: 'grid', exact: true }],
+            items: [{ label: 'Main dashboard', href: homeHref, icon: 'grid', exact: true }],
         },
         {
             section: 'Teacher training',
@@ -460,9 +464,9 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
     if (canNav('mcq') && menuOn('mcq')) {
         examItems.push({ label: 'Talent Search exams', href: `${base}/mcq`, icon: 'clipboard' });
         examItems.push({ label: 'Talent Search payments', href: `${base}/mcq/payments`, icon: 'credit-card' });
-        examItems.push({ label: 'Talent Search question banks', href: `${base}/mcq/question-banks`, icon: 'book-open', hidden: true });
-        examItems.push({ label: 'Talent Search series', href: `${base}/mcq-series`, icon: 'layers', hidden: true });
-        examItems.push({ label: 'All Talent Search exams', href: `${base}/mcq-exams`, icon: 'clipboard', hidden: true });
+        examItems.push({ label: 'Talent Search question banks', href: `${base}/mcq/question-banks`, icon: 'book-open' });
+        examItems.push({ label: 'Talent Search series', href: `${base}/mcq-series`, icon: 'layers' });
+        examItems.push({ label: 'All Talent Search exams', href: `${base}/mcq-exams`, icon: 'clipboard' });
     }
     if (canNav('training') && menuOn('training')) {
         examItems.push({ label: 'Training programs', href: `${base}/training`, icon: 'users' });

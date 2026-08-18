@@ -122,6 +122,18 @@ class NotificationService
                 'title' => 'MCQ Registration Confirmed',
                 'body_template' => 'Registration for {{student_name}} in {{exam_title}} is confirmed.',
             ],
+            'training.registration.cancelled_by_school' => [
+                'title' => 'Training Registration Cancelled',
+                'body_template' => '{{school_name}} cancelled a registration in {{program_title}}.',
+            ],
+            'subscription.entered_grace' => [
+                'title' => 'Subscription Renewal Due',
+                'body_template' => 'Your subscription ({{plan_name}}) expired on {{period_end}} and is now in its grace period. Renew soon to avoid restricted access.',
+            ],
+            'subscription.suspended' => [
+                'title' => 'Subscription Suspended',
+                'body_template' => 'Your subscription ({{plan_name}}) has been suspended after its grace period expired. Contact the platform administrator to restore access.',
+            ],
             default => null,
         };
     }

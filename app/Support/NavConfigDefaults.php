@@ -59,7 +59,7 @@ class NavConfigDefaults
                     'label' => 'Events & Results', 'url' => '/fest', 'external' => false,
                     'children' => [
                         ['label' => 'All Events & Schedule', 'url' => '/fest', 'external' => false],
-                        ['label' => 'Live Scoreboards', 'url' => '/scoreboard', 'external' => false],
+                        ['label' => 'Live Scoreboards', 'url' => '/fest', 'external' => false],
                         ['label' => 'MCQ Talent Search Papers', 'url' => '/mcq/papers', 'external' => false],
                     ],
                 ],

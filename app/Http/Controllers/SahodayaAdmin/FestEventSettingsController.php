@@ -403,7 +403,7 @@ class FestEventSettingsController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'fee_model' => 'required|in:none,sports_composite,cksc_tiered,item_catalog,flat_school,per_item,per_student,student_count_slab',
+            'fee_model' => 'required|in:none,sports_composite,kalolsavam_composite,cksc_tiered,item_catalog,flat_school,per_item,per_student,student_count_slab',
             'school_registration_flat' => 'nullable|numeric|min:0',
             'included_items_per_student' => 'nullable|integer|min:0|max:50',
             'first_item' => 'nullable|numeric|min:0',
@@ -515,6 +515,15 @@ class FestEventSettingsController extends SahodayaAdminController
         );
 
         $event->update(['fee_settings' => $feeSettings]);
+
+        // A region/finale partition child saving its own fee settings directly means
+        // this child's fees are no longer just an untouched copy of the hub's — protect
+        // it from FestSchoolEventFeeService::propagateFeeSettingsToChildren() reverting
+        // this save the next time the hub's own fee settings are saved. No-op (and never
+        // read) for a standalone event or the hub itself.
+        if ($event->parent_event_id !== null) {
+            $event->updateQuietly(['fee_customized_at' => now()]);
+        }
 
         // Sports Head = Event: store composite fees on the FestEvent itself.
         if ($event->event_type === 'sports') {
@@ -666,6 +675,12 @@ class FestEventSettingsController extends SahodayaAdminController
                 ? (float) $data['fee_amount']
                 : null,
         ]);
+
+        // See the matching comment in updateFeeSettings() above: a region/finale child
+        // editing one of its own item fees directly must survive the hub's next cascade.
+        if ($event->parent_event_id !== null) {
+            $event->updateQuietly(['fee_customized_at' => now()]);
+        }
 
         // This quick single-item edit previously bypassed the hub->children fee cascade
         // entirely — only the "Fee settings" tab's bulk save triggered

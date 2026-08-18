@@ -50,6 +50,18 @@ class FestFoodMenuSyncService
 
     private function copyMenuItemToPartition(FestFoodMenuItem $item, FestEvent $child): bool
     {
+        // Skip if this item's date falls outside the region's OWN event window — a region
+        // can run on different days than the hub, and copying a date it doesn't actually
+        // operate on would silently pollute its menu with an inapplicable item. Only
+        // applies once the region has its own dates set; if not set yet, keep copying
+        // (nothing to bound against, matches the pre-existing behavior for that case).
+        if ($child->event_start && $item->menu_date->lt($child->event_start)) {
+            return false;
+        }
+        if ($child->event_end && $item->menu_date->gt($child->event_end)) {
+            return false;
+        }
+
         $exists = FestFoodMenuItem::forEvent($child->id)
             ->where('menu_date', $item->menu_date)
             ->where('meal_type', $item->meal_type)

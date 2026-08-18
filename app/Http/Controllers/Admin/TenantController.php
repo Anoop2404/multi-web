@@ -22,7 +22,9 @@ use App\Support\TenantAuth;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Membership\MembershipNotifier;
+use App\Services\Spreadsheet\SpreadsheetWriter;
 use App\Services\Tenancy\SahodayaDatabaseProvisioner;
+use App\Services\Tenancy\TenantProvisioningChecklistService;
 use App\Support\SahodayaNavVisibility;
 use App\Support\SahodayaSiteTemplate;
 use App\Support\TenancyDatabase;
@@ -74,7 +76,7 @@ class TenantController extends Controller
         return $this->createForm('school', route('admin.schools.index'));
     }
 
-    public function store(Request $request, SahodayaDatabaseProvisioner $databaseProvisioner)
+    public function store(Request $request, SahodayaDatabaseProvisioner $databaseProvisioner, PlatformAuditLogger $audit, TenantProvisioningChecklistService $checklist)
     {
         $validated = $request->validate(array_merge($this->rules(), [
             'database_name' => $this->databaseNameRules($request->input('type') === 'sahodaya'),
@@ -108,10 +110,13 @@ class TenantController extends Controller
             $tenant->invalidateCache();
         }
 
+        $audit->tenantCreated($tenant);
+        $checklist->markComplete($tenant, 'tenant_created', $request->user()->id);
+
         return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Tenant created.');
     }
 
-    public function show(Tenant $tenant, SahodayaDatabaseProvisioner $databaseProvisioner)
+    public function show(Tenant $tenant, SahodayaDatabaseProvisioner $databaseProvisioner, TenantProvisioningChecklistService $checklist)
     {
         $tenant->load('children', 'domains');
 
@@ -174,11 +179,12 @@ class TenantController extends Controller
                     is_array($tenant->nav_overrides) ? $tenant->nav_overrides : null,
                 ),
             ] : null,
+            'setupChecklist'   => $checklist->statusFor($tenant),
         ]);
     }
 
     /** Super-admin hard cap on a Sahodaya's sidebar menus/programs (stored centrally). */
-    public function updateNavVisibility(Request $request, Tenant $tenant)
+    public function updateNavVisibility(Request $request, Tenant $tenant, PlatformAuditLogger $audit)
     {
         abort_unless($tenant->type === 'sahodaya', 422, 'Menu control is only available for Sahodayas.');
 
@@ -195,6 +201,8 @@ class TenantController extends Controller
                 'menus'    => $request->input('menus', []),
             ]),
         ]);
+
+        $audit->tenantNavVisibilityUpdated($tenant);
 
         return back()->with('success', 'Sidebar menu access updated.');
     }
@@ -213,16 +221,18 @@ class TenantController extends Controller
         ]);
     }
 
-    public function update(Request $request, Tenant $tenant)
+    public function update(Request $request, Tenant $tenant, PlatformAuditLogger $audit)
     {
         $validated = $request->validate($this->rules($tenant));
 
         $tenant->update($validated);
 
+        $audit->tenantUpdated($tenant, $tenant->getChanges());
+
         return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Tenant updated.');
     }
 
-    public function destroy(Tenant $tenant)
+    public function destroy(Tenant $tenant, PlatformAuditLogger $audit)
     {
         abort_if($tenant->type === 'sahodaya' && $tenant->children()->exists(), 422, 'Remove member schools before deleting this Sahodaya.');
 
@@ -249,6 +259,8 @@ class TenantController extends Controller
         });
 
         $tenant->delete();
+
+        $audit->tenantDeleted($tenant);
 
         $route = $type === 'sahodaya' ? 'admin.sahodayas.index' : 'admin.schools.index';
 
@@ -477,7 +489,7 @@ class TenantController extends Controller
         });
     }
 
-    public function rejectMembership(Request $request, Tenant $tenant, MembershipNotifier $notifier)
+    public function rejectMembership(Request $request, Tenant $tenant, MembershipNotifier $notifier, PlatformAuditLogger $audit)
     {
         abort_if($tenant->type !== 'school', 404);
 
@@ -495,12 +507,14 @@ class TenantController extends Controller
             ]),
         ]);
 
+        $audit->tenantMembershipRejected($tenant, $data['reason']);
+
         $notifier->schoolRejected($tenant, $data['reason']);
 
         return redirect()->route('admin.tenants.show', $tenant)->with('success', 'School marked as rejected.');
     }
 
-    public function uploadLogo(Request $request, Tenant $tenant)
+    public function uploadLogo(Request $request, Tenant $tenant, PlatformAuditLogger $audit, TenantProvisioningChecklistService $checklist)
     {
         $request->validate(['logo' => 'required|image|max:2048']);
 
@@ -510,10 +524,13 @@ class TenantController extends Controller
             return redirect()->route('admin.tenants.show', $tenant)->with('error', $e->getMessage());
         }
 
+        $audit->tenantLogoUpdated($tenant);
+        $checklist->markComplete($tenant, 'logo_uploaded', $request->user()->id);
+
         return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Logo updated.');
     }
 
-    public function saveDatabase(Request $request, Tenant $tenant, SahodayaDatabaseProvisioner $databaseProvisioner)
+    public function saveDatabase(Request $request, Tenant $tenant, SahodayaDatabaseProvisioner $databaseProvisioner, PlatformAuditLogger $audit, TenantProvisioningChecklistService $checklist)
     {
         abort_if($tenant->type !== 'sahodaya', 404);
 
@@ -541,12 +558,17 @@ class TenantController extends Controller
             'password' => $data['admin_password'] ?? null,
         ]));
 
+        $audit->tenantDatabaseSaved($tenant);
+        $checklist->markComplete($tenant, 'database_configured', $request->user()->id);
+
         return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Database connection saved.');
     }
 
-    public function migrateDatabase(Request $request, Tenant $tenant, SahodayaDatabaseProvisioner $databaseProvisioner)
+    public function migrateDatabase(Request $request, Tenant $tenant, SahodayaDatabaseProvisioner $databaseProvisioner, PlatformAuditLogger $audit, TenantProvisioningChecklistService $checklist)
     {
         abort_if($tenant->type !== 'sahodaya', 404);
+
+        $adminCreated = false;
 
         try {
             $databaseProvisioner->migrate($tenant, (bool) $request->boolean('seed'));
@@ -558,6 +580,7 @@ class TenantController extends Controller
                     'email'    => $pending['email'],
                     'password' => $pending['password'],
                 ]);
+                $adminCreated = true;
             } elseif ($request->filled('admin_email') && $request->filled('admin_password')) {
                 $data = $request->validate([
                     'admin_name'     => 'nullable|string|max:255',
@@ -569,9 +592,16 @@ class TenantController extends Controller
                     'email'    => $data['admin_email'],
                     'password' => $data['admin_password'],
                 ]);
+                $adminCreated = true;
             }
         } catch (\Throwable $e) {
             return redirect()->route('admin.tenants.show', $tenant)->with('error', $e->getMessage());
+        }
+
+        $audit->tenantDatabaseMigrated($tenant);
+        $checklist->markComplete($tenant, 'database_migrated', $request->user()->id);
+        if ($adminCreated) {
+            $checklist->markComplete($tenant, 'portal_admin_created', $request->user()->id);
         }
 
         return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Sahodaya database migrations completed.');
@@ -602,18 +632,18 @@ class TenantController extends Controller
         });
     }
 
-    public function saveSahodayaAdmin(Request $request, Tenant $tenant, PlatformAuditLogger $audit)
+    public function saveSahodayaAdmin(Request $request, Tenant $tenant, PlatformAuditLogger $audit, TenantProvisioningChecklistService $checklist)
     {
         abort_if($tenant->type !== 'sahodaya', 404);
 
-        return $this->savePortalAdmin($request, $tenant, 'sahodaya_admin', $audit);
+        return $this->savePortalAdmin($request, $tenant, 'sahodaya_admin', $audit, $checklist);
     }
 
-    public function saveSchoolAdmin(Request $request, Tenant $tenant, PlatformAuditLogger $audit)
+    public function saveSchoolAdmin(Request $request, Tenant $tenant, PlatformAuditLogger $audit, TenantProvisioningChecklistService $checklist)
     {
         abort_if($tenant->type !== 'school', 404);
 
-        return $this->savePortalAdmin($request, $tenant, 'school_admin', $audit);
+        return $this->savePortalAdmin($request, $tenant, 'school_admin', $audit, $checklist);
     }
 
     public function destroySahodayaAdmin(Tenant $tenant, int $user, PlatformAuditLogger $audit)
@@ -626,9 +656,9 @@ class TenantController extends Controller
         return $this->destroyPortalAdmin($tenant, $user, 'school', 'school_admin', $audit);
     }
 
-    private function savePortalAdmin(Request $request, Tenant $tenant, string $role, PlatformAuditLogger $audit): \Illuminate\Http\RedirectResponse
+    private function savePortalAdmin(Request $request, Tenant $tenant, string $role, PlatformAuditLogger $audit, TenantProvisioningChecklistService $checklist): \Illuminate\Http\RedirectResponse
     {
-        return TenantAuth::withTenantUsers($tenant, function () use ($request, $tenant, $role, $audit) {
+        return TenantAuth::withTenantUsers($tenant, function () use ($request, $tenant, $role, $audit, $checklist) {
             $existingId = $request->input('user_id');
             $label = $role === 'sahodaya_admin' ? 'Sahodaya admin' : 'School admin';
 
@@ -689,6 +719,9 @@ class TenantController extends Controller
             $user->syncRoles([$role]);
 
             $existingId ? $audit->userUpdated($user) : $audit->userCreated($user);
+            if (! $existingId) {
+                $checklist->markComplete($tenant, 'portal_admin_created', $request->user()->id);
+            }
 
             $message = $existingId ? "{$label} login updated." : "{$label} account created.";
 
@@ -756,8 +789,10 @@ class TenantController extends Controller
         ];
     }
 
-    private function tenantIndex(string $type, string $pageTitle, ?string $createUrl, Request $request, bool $readOnly = false)
+    private function tenantIndex(string $type, string $pageTitle, ?string $createUrl, Request $request, bool $readOnly = false, ?TenantProvisioningChecklistService $checklist = null)
     {
+        $checklist ??= app(TenantProvisioningChecklistService::class);
+
         $filters = $request->validate([
             'search' => 'nullable|string|max:100',
             'status' => 'nullable|in:active,inactive,all',
@@ -794,11 +829,12 @@ class TenantController extends Controller
         $role = $type === 'school' ? 'school_admin' : 'sahodaya_admin';
         $tenants = $query->paginate(20)->withQueryString();
         $tenants->setCollection(
-            $tenants->getCollection()->map(function (Tenant $tenant) use ($role) {
+            $tenants->getCollection()->map(function (Tenant $tenant) use ($role, $checklist) {
                 $admins = $this->portalAdmins($tenant, $role);
                 $primary = $admins[0] ?? null;
                 $tenant->setAttribute('login_username', $primary['username'] ?? null);
                 $tenant->setAttribute('portal_admins', $admins);
+                $tenant->setAttribute('setup_incomplete', ! $checklist->statusFor($tenant)['complete']);
 
                 return $tenant;
             })
@@ -915,15 +951,17 @@ class TenantController extends Controller
     }
 
     /**
-     * Deliberately does NOT include the plaintext password — see revealPortalAdminPassword()
-     * for the on-demand, audit-logged reveal instead of shipping it in every page payload.
+     * Deliberately does NOT include the plaintext password by default — see
+     * revealPortalAdminPassword() for the on-demand, audit-logged single-admin reveal
+     * instead of shipping it in every page payload. $includePassword is a narrow,
+     * explicit opt-in used only by adminCredentialsExport()'s bulk, audit-logged export.
      *
-     * @return list<array{id: int, name: string, email: string, username: string, has_password: bool, created_at: ?string}>
+     * @return list<array{id: int, name: string, email: string, username: string, has_password: bool, password: ?string, created_at: ?string}>
      */
-    private function portalAdmins(Tenant $tenant, string $role): array
+    private function portalAdmins(Tenant $tenant, string $role, bool $includePassword = false): array
     {
         try {
-            return TenantAuth::withTenantUsers($tenant, function () use ($tenant, $role) {
+            return TenantAuth::withTenantUsers($tenant, function () use ($tenant, $role, $includePassword) {
                 if (! \Illuminate\Support\Facades\Schema::hasTable('roles')
                     || ! \Illuminate\Support\Facades\Schema::hasTable('users')) {
                     return [];
@@ -945,6 +983,7 @@ class TenantController extends Controller
                         'email'        => $user->email,
                         'username'     => $user->username ?: ($user->email ?? ''),
                         'has_password' => $hasPlain && (bool) $user->plain_password,
+                        'password'     => $includePassword && $hasPlain ? $user->plain_password : null,
                         'created_at'   => $user->created_at?->toIso8601String(),
                     ])
                     ->all();
@@ -952,6 +991,68 @@ class TenantController extends Controller
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    public function exportSahodayaAdminCredentials(Request $request, PlatformAuditLogger $audit)
+    {
+        $this->assertSuperadmin($request);
+
+        return $this->adminCredentialsExport('sahodaya', $audit);
+    }
+
+    public function exportSchoolAdminCredentials(Request $request, PlatformAuditLogger $audit)
+    {
+        $this->assertSuperadmin($request);
+
+        return $this->adminCredentialsExport('school', $audit);
+    }
+
+    private function assertSuperadmin(Request $request): void
+    {
+        abort_if(
+            $request->user()?->hasAnyRole(['state_admin', 'state_staff']) && ! $request->user()?->hasRole('superadmin'),
+            403,
+            'Only superadmins can export platform-wide admin credentials.',
+        );
+    }
+
+    /** Platform-wide roster of every Sahodaya's or School's primary admin login, across every tenant database. */
+    private function adminCredentialsExport(string $type, PlatformAuditLogger $audit)
+    {
+        $role = $type === 'school' ? 'school_admin' : 'sahodaya_admin';
+        $rows = [['Tenant', 'Admin name', 'Username', 'Temporary password', 'Email', 'Portal URL', 'Status']];
+        $count = 0;
+
+        foreach (Tenant::query()->where('type', $type)->orderBy('name')->cursor() as $tenant) {
+            foreach ($this->portalAdmins($tenant, $role, includePassword: true) as $admin) {
+                $rows[] = [
+                    $tenant->name,
+                    $admin['name'],
+                    $admin['username'],
+                    $admin['password'] ?: 'Already changed',
+                    $admin['email'] ?? '',
+                    $this->portalLoginUrl($tenant) ?? '',
+                    $tenant->is_active ? 'Active' : 'Inactive',
+                ];
+                $count++;
+            }
+        }
+
+        $audit->log(
+            'platform.admin_credentials.exported',
+            "Superadmin exported {$count} {$type} admin credential(s)",
+            null,
+            ['type' => $type, 'count' => $count],
+        );
+
+        $filename = "{$type}-admin-credentials-".now()->format('Y-m-d').'.xlsx';
+        $xlsx = SpreadsheetWriter::xlsx($rows);
+
+        return response()->streamDownload(
+            fn () => print $xlsx,
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
     }
 
     /** On-demand, audit-logged reveal of one portal admin's stored plaintext password. */

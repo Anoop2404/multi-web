@@ -50,6 +50,7 @@ class FestEventPortalController extends SchoolAdminController
 
         return $this->inertia('School/Events/Catering', [
             'event'  => $event->only('id', 'title'),
+            'hierarchy' => $event->hierarchyContext(),
             'orders' => $orders,
         ]);
     }
@@ -58,6 +59,16 @@ class FestEventPortalController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
         app(FestRegistrationRouterService::class)->assertSchoolCanAccess($event, $this->school->id);
+
+        // This free-form headcount flow has no payment record, so on an event that requires
+        // payment for coupons it would be a dead end (the order could never be turned into a
+        // coupon — see FestFoodCouponController::issueFromCatering()). Block it here instead
+        // of letting a school submit into that dead end. Food Module audit 2026-08-17, Finding 1.
+        abort_if(
+            $event->require_payment_for_coupons,
+            422,
+            'This event requires payment for food. Use the Food Order menu instead of Meal Requests.'
+        );
 
         $data = $request->validate([
             'meal_date'  => 'required|date',

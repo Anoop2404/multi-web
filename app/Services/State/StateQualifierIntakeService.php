@@ -2,6 +2,7 @@
 
 namespace App\Services\State;
 
+use App\Models\FestStateProgram;
 use App\Models\State\StateQualifierEntry;
 use App\Models\State\StateQualifierIntake;
 use Illuminate\Support\Facades\DB;
@@ -26,8 +27,14 @@ class StateQualifierIntakeService
         }
 
         return DB::connection('state')->transaction(function () use ($idempotencyKey, $payload, $sourceTenantId, $payloadHash) {
+            // Derived from the state program, not passed by the caller, so every intake
+            // path (manual state-admin entry, automated API intake) is correctly tagged
+            // without each call site needing to know about state scoping.
+            $stateId = FestStateProgram::find($payload['state_program_id'])?->state_id;
+
             $intake = StateQualifierIntake::create([
                 'state_program_id' => $payload['state_program_id'],
+                'state_id'         => $stateId,
                 'source_tenant_id' => $sourceTenantId,
                 'source_event_id'  => $payload['source_event_id'] ?? 0,
                 'idempotency_key'  => $idempotencyKey,

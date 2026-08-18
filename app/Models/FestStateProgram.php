@@ -17,6 +17,7 @@ class FestStateProgram extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
+        'state_id',
         'title', 'event_type', 'conduct_levels', 'academic_year',
         'registration_open', 'registration_close', 'event_start', 'event_end',
         'venue', 'fee_type', 'fee_amount', 'level_fees', 'level_policies', 'level_event_settings', 'settings_version', 'status', 'description', 'created_by_user_id',
@@ -36,6 +37,11 @@ class FestStateProgram extends Model
         'event_end'            => 'date',
         'fee_amount'           => 'decimal:2',
     ];
+
+    public function state(): BelongsTo
+    {
+        return $this->belongsTo(PlatformState::class, 'state_id');
+    }
 
     public function propagations(): HasMany
     {

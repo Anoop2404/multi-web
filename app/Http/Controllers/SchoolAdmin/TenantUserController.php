@@ -10,6 +10,7 @@ use App\Services\Auth\TenantUserProvisioner;
 use App\Services\Auth\UserCredentialService;
 use App\Services\Notifications\NotificationService;
 use App\Services\School\SchoolUserScopeService;
+use App\Services\Spreadsheet\SpreadsheetWriter;
 use App\Support\TenantDomainSync;
 use App\Support\TenantUserCatalog;
 use Illuminate\Http\Request;
@@ -41,6 +42,7 @@ class TenantUserController extends SchoolAdminController
                 'last_login_at' => $u->last_login_at?->toIso8601String(),
                 'roles'         => $u->getRoleNames()->values()->all(),
                 'permissions'   => $u->getPermissionNames()->values()->all(),
+                'is_active'     => $u->is_active,
                 'group_classes' => $u->group_classes ?? [],
                 'school_house_id' => $u->school_house_id,
                 'event_scopes'  => $scopes->scopesForUser($u->id, $this->school->id),
@@ -364,6 +366,68 @@ class TenantUserController extends SchoolAdminController
         $provisioner->destroy($user, $this->school->id, TenantUserCatalog::schoolPanelRoles());
 
         return back()->with('success', 'User removed.');
+    }
+
+    public function toggleActive(string $tenantId, User $user, PlatformAuditLogger $audit)
+    {
+        abort_if($user->tenant_id !== $this->school->id, 403);
+        abort_if(! $user->hasAnyRole(TenantUserCatalog::schoolPanelRoles()), 404);
+        abort_if($user->hasAnyRole(TenantUserCatalog::schoolManagementRoles()) && ! request()->user()?->hasRole('school_principal'), 403, 'Only the school principal can manage other school-management accounts.');
+        abort_if($user->hasAnyRole(TenantUserCatalog::primaryAdminRoles()), 422, 'Primary admin accounts are managed from the superadmin panel.');
+
+        $user->update(['is_active' => ! $user->is_active]);
+        $audit->userUpdated($user);
+
+        return back()->with('success', $user->is_active ? 'User activated.' : 'User deactivated.');
+    }
+
+    public function exportCredentials(PlatformAuditLogger $audit)
+    {
+        $actor = request()->user();
+        $assignable = TenantUserCatalog::assignableRolesFor($actor);
+        abort_if($assignable === [], 403, 'No roles are available for you to assign.');
+
+        $visibleRoles = $actor->hasRole('school_principal')
+            ? TenantUserCatalog::schoolPanelRoles()
+            : array_merge($assignable, TenantUserCatalog::schoolManagementRoles());
+
+        $users = User::query()
+            ->where('tenant_id', $this->school->id)
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', $visibleRoles))
+            ->orderBy('name')
+            ->get();
+
+        $portalUrl = $this->schoolLoginUrl();
+        $rows = [['Name', 'Username', 'Temporary password', 'Email', 'Portal URL', 'Roles', 'Status']];
+
+        foreach ($users as $u) {
+            $rows[] = [
+                $u->name,
+                $u->username ?? '',
+                $u->plain_password ?: 'Already changed',
+                $u->email ?? '',
+                $portalUrl,
+                $u->getRoleNames()->join(', '),
+                $u->is_active ? 'Active' : 'Inactive',
+            ];
+        }
+
+        $audit->log(
+            'school.user_credentials.exported',
+            "Exported portal credentials for {$users->count()} user(s)",
+            null,
+            ['tenant_id' => $this->school->id, 'count' => $users->count()],
+        );
+
+        $prefix = $this->school->school_prefix ?: 'school';
+        $filename = "{$prefix}-user-credentials-".now()->format('Y-m-d').'.xlsx';
+        $xlsx = SpreadsheetWriter::xlsx($rows);
+
+        return response()->streamDownload(
+            fn () => print $xlsx,
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
     }
 
     /** @param  list<string>  $roles */

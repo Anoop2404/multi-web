@@ -259,7 +259,11 @@ class FestRegistrationService
      */
     public function canSchoolEditRoster(FestRegistration $registration, FestEvent $event): bool
     {
-        if (! in_array($registration->status, ['submitted', 'approved', 'pending_approval', 'waitlisted'], true)) {
+        // 'rejected' included so a school can fix and resubmit instead of the only other
+        // option being to abandon the row and start an unrelated new registration — see
+        // Documents/Path_breaks.md. updateForSchool() resets status back to 'submitted'
+        // and clears the rejection fields once a rejected registration is edited.
+        if (! in_array($registration->status, ['submitted', 'approved', 'pending_approval', 'waitlisted', 'rejected'], true)) {
             return false;
         }
 

@@ -158,6 +158,17 @@
                         Download PDF ↓
                     </a>
                 </div>
+
+                <div v-if="audience === 'head' || audience === 'participant'" class="card space-y-3">
+                    <h3 class="section-title text-sm">Bulk downloads</h3>
+                    <p class="text-xs text-slate-500">One PDF covering every item or every head at once — for large events, may take a minute to generate.</p>
+                    <a :href="`${base}/pdf-all-items?template=${cardTemplate}`" class="btn-secondary w-full text-sm text-center block">
+                        All items — one PDF ↓
+                    </a>
+                    <a :href="`${base}/pdf-all-heads?template=${cardTemplate}`" class="btn-secondary w-full text-sm text-center block">
+                        All heads — one PDF ↓
+                    </a>
+                </div>
             </aside>
         </div>
 

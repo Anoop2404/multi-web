@@ -3,6 +3,7 @@
         <PageHeader :title="`${event.title} — Meal Requests (Catering)`" eyebrow="Fest Catering"
             description="Order bulk meals and catering for your school's fest team and participants (different from individual student Food Coupons)." />
 
+        <EventHierarchyBadge :hierarchy="hierarchy" />
 
         <form @submit.prevent="submit" class="card mb-4 grid sm:grid-cols-2 gap-2">
             <input v-model="form.meal_date" type="date" class="field" required>
@@ -29,9 +30,10 @@
 <script setup>
 import { useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 
-const props = defineProps({ school: Object, event: Object, orders: Array });
+const props = defineProps({ school: Object, event: Object, hierarchy: { type: Object, default: null }, orders: Array });
 const form = useForm({ meal_date: '', meal_type: 'lunch', head_count: 10, notes: '' });
 
 function submit() {

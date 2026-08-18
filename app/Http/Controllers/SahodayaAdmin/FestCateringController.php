@@ -7,11 +7,12 @@ use App\Models\FestCateringOrder;
 use App\Models\FestEvent;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestPartitionService;
 use Illuminate\Http\Request;
 
 class FestCateringController extends SahodayaAdminController
 {
-    public function index(string $tenantId, FestEvent $event)
+    public function index(string $tenantId, FestEvent $event, FestPartitionService $partitions)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
@@ -29,8 +30,16 @@ class FestCateringController extends SahodayaAdminController
             'requested'   => $orders->where('status', 'requested')->count(),
         ];
 
+        // Same reasoning as FestFoodCouponController::index() — catering orders are
+        // always empty on a partitioned hub, since schools order against each region's
+        // own child event, not the hub directly.
+        $isPartitionedHub = $partitions->isPartitionedHub($event);
+
         return $this->inertia('Sahodaya/Events/Catering', $this->withEventActivity($event, FestPageActivity::CATERING, [
             'event'   => $event,
+            'hierarchy' => $event->hierarchyContext(),
+            'isPartitionedHub' => $isPartitionedHub,
+            'foodRegionSummary' => $isPartitionedHub ? $partitions->foodRegionDrillDownSummary($event) : [],
             'orders'  => $orders,
             'schools' => $schools,
             'summary' => $summary,

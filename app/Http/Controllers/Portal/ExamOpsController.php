@@ -173,6 +173,28 @@ class ExamOpsController extends Controller
         return back()->with('success', 'Marks saved.');
     }
 
+    // No results/rank-list view previously existed anywhere in this portal — exam
+    // controllers/staff could enter marks and track attendance but never see the
+    // outcome. Open to every role EnsureExamPortal already allows in (view-only,
+    // same as attendance() above) — unlike marks entry, there's no reason to
+    // restrict who can see published results. See Documents/Path_breaks.md.
+    public function results(Request $request, string $tenantId, McqExam $exam)
+    {
+        $this->authorizeExam($request, $tenantId, $exam);
+
+        $registrations = McqRegistration::where('exam_id', $exam->id)
+            ->with(['student', 'school', 'mark'])
+            ->orderBy('hall_ticket_no')
+            ->get();
+
+        return inertia('Portal/Exam/Results', [
+            'sahodaya'      => Tenant::findOrFail($tenantId)->only('id', 'name'),
+            'exam'          => $exam,
+            'registrations' => $registrations,
+            'gradeBands'    => app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam),
+        ]);
+    }
+
     public function supervision(Request $request, string $tenantId, McqExam $exam)
     {
         $this->authorizeExam($request, $tenantId, $exam);

@@ -231,6 +231,16 @@ class AuthController extends Controller
             return self::authErrorResponse($request, 'Account not found or inactive.');
         }
 
+        if (! $user->is_active) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            app(PlatformAuditLogger::class)->loginInactive($user->id, $user->email, context: $auditContext);
+
+            return self::authErrorResponse($request, 'Your account has been deactivated. Contact your administrator.');
+        }
+
         if ($message = self::portalMismatchMessage($user, $request)) {
             Auth::logout();
             $request->session()->invalidate();
@@ -417,6 +427,10 @@ class AuthController extends Controller
             return route('admin.state.dashboard');
         }
 
+        if ($user->hasRole('state_judge')) {
+            return route('portal.state-judge.dashboard');
+        }
+
         if ($user->hasRole('sahodaya_admin') && $user->tenant_id) {
             return "/sahodaya-admin/{$user->tenant_id}";
         }
@@ -440,6 +454,7 @@ class AuthController extends Controller
             'certificate_collector',
             'data_entry',
             'mark_entry_admin',
+            'region_admin',
         ]) && $user->tenant_id) {
             return "/sahodaya-admin/{$user->tenant_id}";
         }
@@ -535,6 +550,9 @@ class AuthController extends Controller
             }
             if ($user->hasAnyRole(['state_admin', 'state_staff']) || (method_exists($user, 'isStateUser') && $user->isStateUser())) {
                 return null; // state admins log in at the central domain
+            }
+            if ($user->hasRole('state_judge')) {
+                return null; // state judges log in at the central domain, same as state admins
             }
             if ($user->hasAnyRole(array_merge(
                 ['sahodaya_staff', 'school_staff', 'judge', 'exam_controller', 'exam_staff', 'mark_entry_admin', 'mark_entry_coordinator', 'group_admin', 'house_admin', 'fest_ops'],

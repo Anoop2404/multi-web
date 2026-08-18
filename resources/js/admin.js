@@ -18,6 +18,7 @@ import HubCard from '@/Components/ui/HubCard.vue';
 import InputError from '@/Components/ui/InputError.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import PageShell from '@/Components/ui/PageShell.vue';
+import Modal from '@/Components/ui/Modal.vue';
 
 router.on('httpException', (event) => {
     const status = event.detail.response?.status;
@@ -67,6 +68,7 @@ createInertiaApp({
         app.component('PageShell', PageShell);
         app.component('FlashBanner', FlashBanner);
         app.component('HubCard', HubCard);
+        app.component('Modal', Modal);
 
         app.use(plugin);
         app.use(pinia);

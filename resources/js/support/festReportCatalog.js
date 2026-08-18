@@ -145,8 +145,8 @@ export const SCHOOL_EVENT_REPORTS = [
     { id: 'games-entry-form', label: 'Entry Form', category: 'ops', phase: 'before', hasPreview: true, hasExport: true, pdfExportSuffix: 'games-entry-form?download=1', icon: '📝', hint: 'Official A4 Games Entry Form by sports item with photos', featured: true, program: 'sports-meet' },
     // Print & ops
     { id: 'id-cards', label: 'ID cards', category: 'ops', phase: 'before', hasPreview: true, hasExport: true, pdfExportSuffix: 'id-cards/pdf', icon: '🪪', hint: 'Print student ID cards by head or item', featured: true },
-    { id: 'admit-cards', label: 'Admit cards (bulk PDF)', category: 'ops', phase: 'before', hasPreview: false, hasExport: false, icon: '🎫', hint: 'Bulk admit cards PDF' },
-    { id: 'group-roster', label: 'Group / squad roster', category: 'ops', phase: 'before', hasPreview: false, hasExport: false, icon: '👥', hint: 'Team squad sheets' },
+    { id: 'admit-cards', label: 'Admit cards (bulk PDF)', category: 'ops', phase: 'before', hasPreview: true, hasExport: false, icon: '🎫', hint: 'Bulk admit cards PDF' },
+    { id: 'group-roster', label: 'Group / squad roster', category: 'ops', phase: 'before', hasPreview: true, hasExport: false, icon: '👥', hint: 'Team squad sheets' },
     { id: 'certificate-counts-export', label: 'Certificate counts', category: 'ops', phase: 'after', hasPreview: false, hasExport: false, icon: '🎖️', hint: 'Certificates due by item' },
 ];
 

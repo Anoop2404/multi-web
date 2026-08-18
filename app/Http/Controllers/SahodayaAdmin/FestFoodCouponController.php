@@ -9,13 +9,14 @@ use App\Models\FestFoodBill;
 use App\Models\FestFoodCoupon;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestPartitionService;
 use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
 class FestFoodCouponController extends SahodayaAdminController
 {
-    public function index(string $tenantId, FestEvent $event)
+    public function index(string $tenantId, FestEvent $event, FestPartitionService $partitions)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
@@ -27,8 +28,16 @@ class FestFoodCouponController extends SahodayaAdminController
         $schools = Tenant::whereIn('id', $coupons->pluck('school_id')->unique())
             ->pluck('name', 'id');
 
+        // Coupons are always empty on a partitioned hub by construction — they're issued
+        // per region, against each region's own catering orders/bills. Without hub
+        // awareness here this page silently showed an empty list with no explanation why.
+        $isPartitionedHub = $partitions->isPartitionedHub($event);
+
         return $this->inertia('Sahodaya/Events/FoodCoupons', $this->withEventActivity($event, FestPageActivity::FOOD_COUPONS, [
             'event'   => $event,
+            'hierarchy' => $event->hierarchyContext(),
+            'isPartitionedHub' => $isPartitionedHub,
+            'foodRegionSummary' => $isPartitionedHub ? $partitions->foodRegionDrillDownSummary($event) : [],
             'coupons' => $coupons->map(fn (FestFoodCoupon $c) => [
                 ...$c->toArray(),
                 'school_name' => $schools[$c->school_id] ?? $c->school_id,
@@ -41,15 +50,24 @@ class FestFoodCouponController extends SahodayaAdminController
     }
 
     /**
-     * Older headcount/coupon flow. This flow has no fee or payment concept at all
-     * (FestCateringOrder is free-form headcount, not billed) — require_payment_for_coupons
-     * intentionally does not gate this method, since there is nothing to check payment
-     * against. The flag applies to issueFromBill() below, the priced-menu equivalent.
+     * Older headcount/coupon flow. FestCateringOrder is free-form headcount with no price
+     * or payment record at all, so once an event requires payment for coupons, this flow
+     * has nothing to check payment against and is blocked outright rather than silently
+     * issuing free coupons on a "payment required" event — see Food Module audit
+     * 2026-08-17, Finding 1: this was previously a complete, unguarded bypass of
+     * require_payment_for_coupons via the legacy flow. Events that don't require payment
+     * are unaffected. The flag's "real" enforcement is issueFromBill() below, the
+     * priced-menu equivalent, which actually has a balance to check.
      * See docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.6/§2.7.
      */
     public function issueFromCatering(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if(
+            $event->require_payment_for_coupons,
+            422,
+            'This event requires payment for food coupons. The free catering flow has no payment record to check, so it cannot be used to issue coupons here — use Food Billing (priced menu) instead.'
+        );
 
         $orders = FestCateringOrder::where('event_id', $event->id)
             ->where('status', 'confirmed')

@@ -9,7 +9,6 @@ use App\Support\SchoolApplicationForm;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
-use App\Notifications\PortalVerifyEmail;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -17,7 +16,7 @@ class SchoolApplicationSubmitTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_school_application_creates_user_with_gmail_and_prefix(): void
+    public function test_school_application_creates_pending_school_with_gmail_and_prefix(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
         Notification::fake();
@@ -50,13 +49,11 @@ class SchoolApplicationSubmitTest extends TestCase
         $this->assertSame('DEM', $school->school_prefix);
         $this->assertSame('pending', $school->membership_status);
         $this->assertTrue($school->is_active);
+        $this->assertSame('demo.school@gmail.com', $school->application_payload['school_email']);
 
-        $user = User::where('email', 'demo.school@gmail.com')->first();
-        $this->assertNotNull($user);
-        $this->assertNull($user->email_verified_at);
-        $this->assertTrue($user->hasRole('school_admin'));
-
-        Notification::assertSentTo($user, PortalVerifyEmail::class);
+        // No login (and no credentials email) is created at submission time — only once
+        // a Sahodaya admin approves the application (MemberSchoolsController::approveSchool()).
+        $this->assertNull(User::where('email', 'demo.school@gmail.com')->first());
     }
 
     public function test_valid_email_accepted(): void

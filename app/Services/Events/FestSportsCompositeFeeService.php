@@ -7,6 +7,7 @@ use App\Models\FestItemHead;
 use App\Models\FestLevelRegistration;
 use App\Models\FestRegistration;
 use App\Models\Tenant;
+use App\Support\SchoolClassCategoryResolver;
 
 class FestSportsCompositeFeeService
 {
@@ -550,9 +551,12 @@ class FestSportsCompositeFeeService
      */
     public function calculate(FestEvent $event, string $schoolId, array $schedule): array
     {
-        $schoolReg = (float) ($schedule['school_registration_flat']
-            ?? $schedule['flat_amount']
-            ?? 2000);
+        // Routed through schoolRegistrationAmount() so this and the standalone helper
+        // never drift apart — see that method for the tiered-vs-flat resolution.
+        $school = Tenant::find($schoolId);
+        $schoolReg = $school
+            ? $this->schoolRegistrationAmount($school, $schedule)
+            : (float) ($schedule['school_registration_flat'] ?? $schedule['flat_amount'] ?? 2000);
 
         $perStudent = (float) ($schedule['per_student_amount'] ?? 300);
         $includedQuota = max(0, (int) ($schedule['included_items_per_student'] ?? 2));
@@ -691,6 +695,17 @@ class FestSportsCompositeFeeService
 
     public function schoolRegistrationAmount(Tenant $school, array $schedule): float
     {
+        // Tiered-by-category takes over when a school_registration map is configured
+        // (kalolsavam_composite; sports_composite events that never set one keep the flat
+        // amount below unchanged) — same tier derivation and 'secondary' fallback as
+        // FestSchoolEventFeeService::schoolRegistrationAmount() uses for cksc_tiered/item_catalog.
+        $amounts = $schedule['school_registration'] ?? [];
+        if (is_array($amounts) && $amounts !== []) {
+            $tier = SchoolClassCategoryResolver::feeTierFor($school);
+
+            return (float) ($amounts[$tier] ?? $amounts['secondary'] ?? 0);
+        }
+
         return (float) ($schedule['school_registration_flat'] ?? $schedule['flat_amount'] ?? 2000);
     }
 }

@@ -225,13 +225,14 @@
                     </FormField>
                 </div>
 
-                <!-- This branch only ever renders for a NON-sports event whose billing model was manually set to
-                     "Sports composite" from the dropdown above — a real sports event (event_type === 'sports')
-                     never reaches this far down the chain; it resolves at the very first v-if on line 43.
-                     For that non-sports case, these fields (not "Sport event billing" below, which is sports-only —
-                     see the gate added there) are what updateFeeSettings() actually persists via
-                     normalizeEventFeeSettings(), so this block must stay intact. -->
-                <div v-else-if="feeSettingsForm.fee_model === 'sports_composite'" class="space-y-4 border-t border-slate-100 pt-4">
+                <!-- Shared by two billing models with identical fields: "Sports composite" (event_type ===
+                     'sports' only reaches this far when it has no head fees yet — see the very first v-if
+                     on line 43 for the sports-with-heads case) and "Kalotsavam composite" (its non-sports
+                     counterpart, same underlying calculation, different label so a cultural fest admin never
+                     has to pick something called "sports"). These fields (not "Sport event billing" below,
+                     which is sports-only — see the gate added there) are what updateFeeSettings() actually
+                     persists via normalizeEventFeeSettings() for either model, so this block must stay intact. -->
+                <div v-else-if="feeSettingsForm.fee_model === 'sports_composite' || feeSettingsForm.fee_model === 'kalolsavam_composite'" class="space-y-4 border-t border-slate-100 pt-4">
                     <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700 space-y-2">
                         <p class="font-semibold text-slate-900">How billing works</p>
                         <ol class="list-decimal pl-4 space-y-1">
@@ -727,7 +728,7 @@
                 </div>
             </section>
 
-            <section v-if="(feeSettingsForm.fee_model === 'item_catalog' || feeSettingsForm.fee_model === 'sports_composite') && feeSettingsForm.item_fees.length" class="card space-y-4">
+            <section v-if="['item_catalog', 'sports_composite', 'kalolsavam_composite'].includes(feeSettingsForm.fee_model) && feeSettingsForm.item_fees.length" class="card space-y-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h3 class="section-title">Per-item overrides</h3>
@@ -903,13 +904,11 @@ async function confirmDeleteSchemeGroup(scheme, group) {
     removeClassCategorySchemeGroup(scheme.id, group.id);
 }
 
-// Display-only relabel — the stored fee_model value stays 'sports_composite' either way
-// (that's what FestEventFeeResolver, FestSchoolEventFeeService, FestInvoiceService, etc.
-// actually key off of; introducing a genuinely separate fee_model value would mean
-// touching every one of those calculators too, and any missed spot silently bills ₹0).
-// A non-sports fest (English/Science/Kids/Teacher Fest, Kalolsavam, ...) picking this
-// billing model gets the same school+student+item math under a name that doesn't call
-// it "sports composite".
+// Historical note: this relabel predates the separate 'kalolsavam_composite' fee_model
+// (added later so a Kalotsavam admin picks that option directly from the dropdown instead
+// of "Sports composite" + a relabel). Kept as a fallback for any event saved before that
+// existed, whose fee_settings.fee_model is still the literal 'sports_composite' string —
+// those keep showing the friendlier label rather than "Sports composite" on a non-sports event.
 function billingModelLabel(key, label) {
     if (key === 'sports_composite' && event.event_type !== 'sports') {
         return 'Composite (school + student + included items)';

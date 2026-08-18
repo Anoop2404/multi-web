@@ -251,6 +251,15 @@ class FestSchoolEventFeeService
      * one-directional (hub → children): editing fee settings on a CHILD event already takes
      * effect for that child directly (it owns its own FestEventItem/FestItemHead rows), so
      * there is nothing to redirect the other way.
+     *
+     * Skips any child with hasCustomizedFees() set — once a Sahodaya admin has edited that
+     * child's own fee_settings, an item fee, or a head's fee columns directly (stamped by
+     * FestEventSettingsController::updateFeeSettings()/updateItemFee() and
+     * FestItemHeadController::updateWindows()), this cascade used to silently revert that
+     * edit back to the hub's values the next time hub fees were saved — including on every
+     * ordinary school registration routed through FestRegistrationCreateService, which
+     * refreshes a child's items via FestItemSyncService::copyItemToPartition(). A child that
+     * hasn't customized anything keeps inheriting hub changes exactly as before.
      */
     public function propagateFeeSettingsToChildren(FestEvent $hub): void
     {
@@ -258,7 +267,8 @@ class FestSchoolEventFeeService
             return;
         }
 
-        $children = FestEvent::where('parent_event_id', $hub->id)->get();
+        $children = FestEvent::where('parent_event_id', $hub->id)->get()
+            ->reject(fn (FestEvent $child) => $child->hasCustomizedFees());
         if ($children->isEmpty()) {
             return;
         }
@@ -989,7 +999,7 @@ class FestSchoolEventFeeService
         $hasAnyRegistration = $hasEventRegistration || $itemCount > 0 || $studentCount > 0;
 
         $schoolRegFee = match ($feeModel) {
-            'sports_composite' => $this->sportsCompositeFeeService->schoolRegistrationAmount($school, $schedule),
+            'sports_composite', 'kalolsavam_composite' => $this->sportsCompositeFeeService->schoolRegistrationAmount($school, $schedule),
             'cksc_tiered', 'item_catalog' => $hasAnyRegistration ? $this->schoolRegistrationAmount($school, $schedule) : 0.0,
             default => 0,
         };
@@ -997,7 +1007,7 @@ class FestSchoolEventFeeService
         $studentRegFee = 0.0;
         $extraItemFee = 0.0;
         $compositeLines = [];
-        $useComposite = $feeModel === 'sports_composite' && $this->supportsSportsCompositeSchema();
+        $useComposite = in_array($feeModel, ['sports_composite', 'kalolsavam_composite'], true) && $this->supportsSportsCompositeSchema();
 
         if ($useComposite) {
             $composite = $this->sportsCompositeFeeService->calculate($event, $schoolId, $schedule);
@@ -1008,7 +1018,7 @@ class FestSchoolEventFeeService
             $participationCount = $composite['student_count'];
             $compositeLines = $composite['lines'];
         } else {
-            if ($feeModel === 'sports_composite') {
+            if (in_array($feeModel, ['sports_composite', 'kalolsavam_composite'], true)) {
                 $feeModel = 'item_catalog';
                 $schoolRegFee = $hasAnyRegistration ? $this->schoolRegistrationAmount($school, $schedule) : 0.0;
             }
@@ -1231,7 +1241,7 @@ class FestSchoolEventFeeService
             ];
         }
 
-        if ($feeModel === 'sports_composite') {
+        if (in_array($feeModel, ['sports_composite', 'kalolsavam_composite'], true)) {
             if ($this->supportsFeeLines()) {
                 foreach ($fee->lines as $line) {
                     $items[] = [

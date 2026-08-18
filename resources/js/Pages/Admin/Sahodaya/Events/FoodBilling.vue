@@ -4,10 +4,13 @@
         <PageHeader :title="`${event.title} — Food Billing`" eyebrow="Operations"
                     description="Per-school food bills." />
 
+        <EventHierarchyBadge :hierarchy="hierarchy" :hub-href="hubHref" />
+
         <div class="flex flex-wrap gap-2 items-center mb-4">
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-menu`" class="text-sm text-indigo-600">← Food Menu</Link>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-billing/report`" class="text-sm text-indigo-600 ml-auto">Day-wise report →</Link>
             <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-billing/export`"
-               class="ml-auto px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700">Export CSV</a>
+               class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700">Export CSV</a>
         </div>
 
         <div v-if="event.food_payee_type === 'host_school'" class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-800 mb-4">
@@ -63,6 +66,9 @@
             </table>
             <p class="text-xs text-gray-400 mt-3">To manage an individual region's bills, open that region's own event page.</p>
         </div>
+
+        <FoodRegionDrillDown v-if="isPartitionedHub" :sahodaya-id="sahodaya.id" :regions="foodRegionSummary"
+                              target-path="food-billing" class="mb-6" />
 
         <div v-else class="grid grid-cols-3 gap-3 mb-4 max-w-lg">
             <div class="card text-center">
@@ -154,19 +160,26 @@ import { computed, ref } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
+import FoodRegionDrillDown from '@/Components/sahodaya/FoodRegionDrillDown.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, hostSchoolName: { type: String, default: null },
+    hierarchy: { type: Object, default: null },
     bills: { type: Array, default: () => [] },
     summary: { type: Object, default: () => ({ total: 0, paid: 0, balance: 0 }) },
     schoolOptions: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
     isPartitionedHub: { type: Boolean, default: false },
     regionFoodSummary: { type: Object, default: null },
+    foodRegionSummary: { type: Array, default: () => [] },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+const hubHref = computed(() => (
+    props.hierarchy?.parent_event ? `/sahodaya-admin/${props.sahodaya.id}/events/${props.hierarchy.parent_event.id}/food-billing` : null
+));
 
 const payeeNote = computed(() => (
     props.event.food_payee_type === 'host_school'

@@ -13,7 +13,7 @@ class BoardExamSubjectsCutoverTest extends TestCase
             'English Core' => 98,
             'Physics' => '',
             'Chemistry' => 95,
-            'Bad' => 101,
+            'Bad' => -1,
         ]);
 
         $this->assertSame(['English Core' => 98, 'Chemistry' => 95], $marks);

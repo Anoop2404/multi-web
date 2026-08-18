@@ -156,7 +156,7 @@ class FestEventFeeResolver
             return 'Stepped fee by total registered students ('.count($slabs).' slab'.(count($slabs) === 1 ? '' : 's').' configured)';
         }
 
-        if ($model === 'sports_composite') {
+        if (in_array($model, ['sports_composite', 'kalolsavam_composite'], true)) {
             $school = (float) ($schedule['school_registration_flat'] ?? 2000);
             $student = (float) ($schedule['per_student_amount'] ?? 300);
             $quota = (int) ($schedule['included_items_per_student'] ?? 2);
@@ -384,11 +384,15 @@ class FestEventFeeResolver
             return $this->applySchoolFeeCap($normalized, $input);
         }
 
-        if ($feeModel === 'sports_composite') {
+        if (in_array($feeModel, ['sports_composite', 'kalolsavam_composite'], true)) {
             return $this->applySchoolFeeCap([
-                'fee_model' => 'sports_composite',
+                'fee_model' => $feeModel,
                 'school_registration_flat' => isset($input['school_registration_flat']) && $input['school_registration_flat'] !== ''
                     ? (float) $input['school_registration_flat'] : 2000,
+                // N-tier school registration map — same shape/fallback as cksc_tiered/item_catalog
+                // above (see normalizeSchoolRegistration()); absent/empty means "use the flat
+                // amount above", so an event that never configures this keeps today's behavior.
+                'school_registration' => $this->normalizeSchoolRegistration($input['school_registration'] ?? []),
                 'per_student_amount' => isset($input['per_student_amount']) && $input['per_student_amount'] !== ''
                     ? (float) $input['per_student_amount'] : 300,
                 'included_items_per_student' => isset($input['included_items_per_student']) && $input['included_items_per_student'] !== ''

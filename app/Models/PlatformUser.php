@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Notifications\PortalVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -24,11 +25,13 @@ class PlatformUser extends Authenticatable implements MustVerifyEmail
 
     protected $fillable = [
         'tenant_id',
+        'state_id',
         'name',
         'email',
         'username',
         'password',
         'must_change_password',
+        'is_active',
         'portal_welcome_seen',
         'last_login_at',
         'created_by_user_id',
@@ -45,6 +48,7 @@ class PlatformUser extends Authenticatable implements MustVerifyEmail
             'email_verified_at'    => 'datetime',
             'password'             => 'hashed',
             'must_change_password' => 'boolean',
+            'is_active'            => 'boolean',
             'portal_welcome_seen'  => 'boolean',
             'last_login_at'        => 'datetime',
         ];
@@ -115,6 +119,11 @@ class PlatformUser extends Authenticatable implements MustVerifyEmail
             ->where('model_has_roles.model_id', $this->id)
             ->whereIn('model_has_roles.model_type', [self::class, User::class])
             ->exists();
+    }
+
+    public function state(): BelongsTo
+    {
+        return $this->belongsTo(PlatformState::class, 'state_id');
     }
 
     public function getRoleClass(): string

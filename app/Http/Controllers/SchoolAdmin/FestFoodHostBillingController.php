@@ -8,7 +8,9 @@ use App\Models\FestFoodMenuItem;
 use App\Models\FestFoodOrderItem;
 use App\Models\FestFoodPayment;
 use App\Models\Tenant;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Exports\CsvExportDispatcher;
+use App\Support\FestPageActivity;
 use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -81,6 +83,7 @@ class FestFoodHostBillingController extends SchoolAdminController
 
         return $this->inertia('School/Fest/FoodHostBilling', [
             'event' => $event->only('id', 'title'),
+            'hierarchy' => $event->hierarchyContext(),
             'bills' => $bills->map(fn (FestFoodBill $b) => [
                 'id' => $b->id,
                 'school_name' => $schools[$b->school_id] ?? $b->school_id,
@@ -96,6 +99,59 @@ class FestFoodHostBillingController extends SchoolAdminController
                 'balance' => (float) $bills->sum(fn (FestFoodBill $b) => $b->balanceDue()),
             ],
         ]);
+    }
+
+    /**
+     * Day x meal-type x item breakdown across every school's bill payable to this host —
+     * same report as the Sahodaya side, scoped to bills snapshotted to this school as
+     * payee. See FestFoodOrderItem::dayMealReport().
+     */
+    public function report(string $tenantId, FestEvent $event)
+    {
+        $this->assertIsHost($event);
+
+        return $this->inertia('School/Fest/FoodHostBillingReport', [
+            'event' => $event->only('id', 'title'),
+            'hierarchy' => $event->hierarchyContext(),
+            'report' => FestFoodOrderItem::dayMealReport($event->id, $this->school->id),
+        ]);
+    }
+
+    public function reportExportCsv(string $tenantId, FestEvent $event, CsvExportDispatcher $exports)
+    {
+        $this->assertIsHost($event);
+
+        $rows = [];
+        foreach (FestFoodOrderItem::dayMealReport($event->id, $this->school->id) as $day) {
+            foreach ($day['meals'] as $meal) {
+                foreach ($meal['items'] as $item) {
+                    $rows[] = [
+                        'date' => $day['date'],
+                        'meal_type' => $meal['meal_type'],
+                        'item_name' => $item['item_name'],
+                        'quantity' => $item['quantity'],
+                        'revenue' => $item['revenue'],
+                        'schools_count' => $item['schools_count'],
+                    ];
+                }
+            }
+        }
+
+        return $exports->dispatch(
+            request()->user(),
+            'fest_food_billing_report',
+            'food-order-report-'.$event->id.'.csv',
+            $rows,
+            ['Date', 'Meal', 'Item', 'Quantity', 'Revenue', 'Schools ordering'],
+            fn (array $r) => [
+                $r['date'],
+                $r['meal_type'],
+                $r['item_name'],
+                $r['quantity'],
+                number_format($r['revenue'], 2, '.', ''),
+                $r['schools_count'],
+            ],
+        );
     }
 
     public function show(string $tenantId, FestEvent $event, FestFoodBill $bill)
@@ -114,6 +170,7 @@ class FestFoodHostBillingController extends SchoolAdminController
 
         return $this->inertia('School/Fest/FoodHostBillingShow', [
             'event' => $event->only('id', 'title'),
+            'hierarchy' => $event->hierarchyContext(),
             'bill' => [
                 ...$bill->only(['id', 'status', 'amount_total', 'amount_paid', 'notes']),
                 'balance_due' => $bill->balanceDue(),
@@ -125,7 +182,7 @@ class FestFoodHostBillingController extends SchoolAdminController
         ]);
     }
 
-    public function addItem(Request $request, string $tenantId, FestEvent $event, FestFoodBill $bill)
+    public function addItem(Request $request, string $tenantId, FestEvent $event, FestFoodBill $bill, PlatformAuditLogger $audit)
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
@@ -147,24 +204,31 @@ class FestFoodHostBillingController extends SchoolAdminController
         $bill->orderItems()->create(FestFoodOrderItem::fromMenuItem($menuItem, $data['quantity'], $request->user()->id));
         $bill->recalculate();
 
+        $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.item_added', "{$data['quantity']} x {$menuItem->name} added to bill", [
+            'bill_id' => $bill->id,
+        ]);
+
         return back()->with('success', 'Item added.');
     }
 
-    public function removeItem(string $tenantId, FestEvent $event, FestFoodBill $bill, FestFoodOrderItem $orderItem)
+    public function removeItem(string $tenantId, FestEvent $event, FestFoodBill $bill, FestFoodOrderItem $orderItem, PlatformAuditLogger $audit)
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
         $this->assertBillBelongsToHost($bill);
         abort_if($orderItem->bill_id !== $bill->id, 404);
-        abort_if($bill->status !== FestFoodBill::STATUS_OPEN, 422, 'This bill is settled/cancelled and no longer editable.');
 
-        $orderItem->delete();
-        $bill->recalculate();
+        $name = $orderItem->item_name;
+        $bill->removeOrderItem($orderItem);
+
+        $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.item_removed', "'{$name}' removed from bill", [
+            'bill_id' => $bill->id,
+        ]);
 
         return back()->with('success', 'Item removed.');
     }
 
-    public function recordPayment(Request $request, string $tenantId, FestEvent $event, FestFoodBill $bill)
+    public function recordPayment(Request $request, string $tenantId, FestEvent $event, FestFoodBill $bill, PlatformAuditLogger $audit)
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
@@ -187,26 +251,30 @@ class FestFoodHostBillingController extends SchoolAdminController
             $request->user()->id,
         );
 
+        $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.payment_recorded', "Payment of ₹{$data['amount']} recorded ({$payment->receipt_number})", [
+            'bill_id' => $bill->id,
+            'payment_id' => $payment->id,
+        ]);
+
         return back()->with('success', "Payment recorded ({$payment->receipt_number}).");
     }
 
-    public function settle(string $tenantId, FestEvent $event, FestFoodBill $bill)
+    public function settle(Request $request, string $tenantId, FestEvent $event, FestFoodBill $bill, PlatformAuditLogger $audit)
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
         $this->assertBillBelongsToHost($bill);
-        abort_if($bill->balanceDue() > 0.0, 422, 'This bill has an outstanding balance of ₹'.number_format($bill->balanceDue(), 2).' — record the remaining payment before settling.');
 
-        $bill->update([
-            'status' => FestFoodBill::STATUS_SETTLED,
-            'settled_at' => now(),
-            'settled_by_user_id' => request()->user()->id,
+        $bill->settle($request->user()->id);
+
+        $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.settled', 'Bill marked settled', [
+            'bill_id' => $bill->id,
         ]);
 
         return back()->with('success', 'Bill settled.');
     }
 
-    public function voidPayment(string $tenantId, FestEvent $event, FestFoodBill $bill, FestFoodPayment $payment)
+    public function voidPayment(string $tenantId, FestEvent $event, FestFoodBill $bill, FestFoodPayment $payment, PlatformAuditLogger $audit)
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
@@ -214,18 +282,27 @@ class FestFoodHostBillingController extends SchoolAdminController
         abort_if($payment->bill_id !== $bill->id, 404);
 
         $receiptNumber = $payment->receipt_number;
+        $amount = (float) $payment->amount;
         $payment->voidPayment();
+
+        $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.payment_voided', "Payment of ₹{$amount} voided ({$receiptNumber})", [
+            'bill_id' => $bill->id,
+        ]);
 
         return back()->with('success', "Payment {$receiptNumber} voided.");
     }
 
-    public function reopen(string $tenantId, FestEvent $event, FestFoodBill $bill)
+    public function reopen(string $tenantId, FestEvent $event, FestFoodBill $bill, PlatformAuditLogger $audit)
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
         $this->assertBillBelongsToHost($bill);
 
-        $bill->update(['status' => FestFoodBill::STATUS_OPEN, 'settled_at' => null, 'settled_by_user_id' => null]);
+        $bill->reopen();
+
+        $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.reopened', 'Bill reopened', [
+            'bill_id' => $bill->id,
+        ]);
 
         return back()->with('success', 'Bill reopened.');
     }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ExternalSahodaya;
 use App\Models\FestStateProgram;
 use App\Services\State\ExternalIntakeService;
+use App\Support\StateScope;
 use Illuminate\Http\Request;
 
 /**
@@ -17,6 +18,7 @@ class ExternalSahodayaController extends Controller
 {
     public function index(FestStateProgram $stateProgram)
     {
+        StateScope::assertOwns($stateProgram->state_id);
         $sahodayas = ExternalSahodaya::where('state_program_id', $stateProgram->id)
             ->withCount('schools')
             ->orderBy('name')
@@ -31,6 +33,7 @@ class ExternalSahodayaController extends Controller
 
     public function store(Request $request, FestStateProgram $stateProgram, ExternalIntakeService $service)
     {
+        StateScope::assertOwns($stateProgram->state_id);
         $data = $request->validate([
             'name'          => 'required|string|max:255',
             'contact_name'  => 'nullable|string|max:255',
@@ -48,6 +51,7 @@ class ExternalSahodayaController extends Controller
 
     public function toggleStatus(ExternalSahodaya $externalSahodaya)
     {
+        StateScope::assertOwns(FestStateProgram::find($externalSahodaya->state_program_id)?->state_id);
         $externalSahodaya->update([
             'status' => $externalSahodaya->status === 'active' ? 'disabled' : 'active',
         ]);

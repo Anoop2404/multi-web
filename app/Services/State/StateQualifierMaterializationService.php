@@ -96,6 +96,7 @@ class StateQualifierMaterializationService
         return StateFestEvent::firstOrCreate(
             ['state_program_id' => $intake->state_program_id],
             [
+                'state_id' => $intake->state_id ?? $program?->state_id,
                 'name' => $program?->title ? "{$program->title} - State Finals" : "State Finals {$intake->state_program_id}",
                 'status' => 'draft',
                 'starts_on' => $program?->event_start,

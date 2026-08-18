@@ -39,6 +39,12 @@ class EnsureStateAdmin
             abort(403, 'View-only access. Contact your state administrator.');
         }
 
+        // Data-isolation fix (FRD-13 gap analysis, Finding A): controllers read this
+        // to scope their queries. A state user with no state assigned yet gets null,
+        // which every scoped query below treats as "see nothing" — fail closed, not
+        // open, until an admin assigns them via State Users.
+        $request->attributes->set('stateId', $user->state_id);
+
         return $next($request);
     }
 }

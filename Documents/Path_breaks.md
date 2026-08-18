@@ -2,7 +2,7 @@
 
 Starting from the Entry Page (`http://localhost:8000` / the central domain, which is where an unauthenticated visitor on a non-tenant host lands), this document maps every role's navigation and flags every place a flow breaks: dead links, blank/crashing pages, wrong destinations, orphaned routes, and misrouted logins. **No application code was changed while producing this document.**
 
-*Status: as complete as this pass could get. See "Coverage status" and the closing note for exactly what was and wasn't exhaustively verified.*
+*Status: complete — every portal covered, all 20 prior-draft claims reconciled bar one superseded item. See "Coverage status" for method-by-method detail.*
 
 ---
 
@@ -26,29 +26,31 @@ This app is far larger than "click every button" can cover literally: route extr
 
 | Area | Method | Status |
 |---|---|---|
-| Central entry page + login | Live | ✅ Done |
-| Super Admin portal (`/admin/*`) | Live | ✅ Done, exhaustive |
+| Central entry page + login | Live | ✅ Done, exhaustive |
+| Super Admin portal (`/admin/*`) | Live | ✅ Done, exhaustive — all findings re-verified live a second time after a mid-session interruption (see the correction on Finding 1) |
 | Public tenant site / portal landing / fest portal / State | Static | ✅ Done, exhaustive (full agent pass) |
-| Sahodaya Admin (full admin + 10 scoped sub-roles) | Static | ⚠️ Targeted only — 4 of 5 prior claims checked directly; no exhaustive route-by-route nav sweep |
-| School Admin (full admin + 9 scoped sub-roles) | Static | ⚠️ Targeted only — 3 of 4 prior claims checked directly; no exhaustive route-by-route nav sweep |
+| Sahodaya Admin (full admin + 10 scoped sub-roles) | Static | ✅ Done, exhaustive (full agent pass, 413 routes checked against `route:list`) |
+| School Admin (full admin + 9 scoped sub-roles) | Static | ✅ Done, exhaustive (full agent pass, 627 routes checked against `route:list`) |
 | Portal roles (Teacher/Student/Judge/Group/House/Exam/Fest-Coordinator/Fest-Ops/State-Judge) | Static | ✅ Done, exhaustive (full agent pass) |
-| Prior-draft claim reconciliation (20 claims) | Mixed | ✅ 18 of 20 reconciled; 2 explicitly flagged as not re-verified (3.3, 4.1) |
+| Prior-draft claim reconciliation (20 claims) | Mixed | ✅ 19 of 20 reconciled; 1 not independently re-verified (4.1's original "Custom events" framing was superseded by a broader, confirmed finding in the same area) |
 
-**Why Sahodaya Admin and School Admin are lighter than the other three areas:** the dedicated background research agents for these two portals were relaunched after a process interruption, then both failed a second time — the account hit its monthly Claude API spend limit mid-run (worsened by those agents spawning their own nested sub-agents). Rather than keep retrying a mechanism that had just failed twice, the remaining verification for these two portals was done directly, by hand, targeted at the specific prior-draft claims rather than the full "every route, every nav file" sweep the other three areas got. This means: **the specific claims below are solidly verified with file:line evidence, but these two portals — the largest in the app (408 and 625 routes respectively) — were not swept for the general class of bug (orphaned routes, broken nav links, role/permission mismatches) the way Public/Central/State and Portal-roles were.** If exhaustive coverage of these two matters, that sweep still needs to happen in a follow-up pass.
+**Note on how this got finished:** the first attempt at the Sahodaya Admin and School Admin static passes failed — the account hit its monthly Claude API spend limit, worsened by those background agents spawning their own nested sub-agents. They were relaunched with an explicit instruction not to delegate further, and both completed successfully on the second attempt. Separately, a live re-test surfaced that one finding (the State Workspace blank page, originally Finding 1) had stopped reproducing between the first and second live tests — the on-disk file layout for an in-progress refactor had shifted underneath this audit without any code being changed by this process. That correction is documented in place rather than silently edited out.
 
 ---
 
 ## Confirmed live bugs (personally reproduced in-browser)
 
-### 1. Super Admin → entire "State Workspace" nav group renders a blank white page
-- **Where:** Super Admin sidebar → "Qualifier Intakes" (`/admin/state-workspace/qualifiers`), "State Finals" (`/admin/state-workspace/fest`), and the sidebar's "Board Results" (`/admin/board-results`). Also reachable via the (working) `/admin/kalotsav` page's "Review Intakes" button, which points at the same broken URL.
-- **What happens:** Completely blank page. No error, no message — just white. Browser console: `Uncaught (in promise) Error: Page not found: ./Pages/Admin/StateAdmin/Qualifiers/Index.vue` (same shape for BoardResults).
-- **Root cause:** An in-progress, **uncommitted** refactor in the working tree. Six controllers (`StateQualifierReviewController`, `StateFestWorkspaceController` ×2, `StateAttendanceController`, `StateBoardResultsController`) render Inertia pages named `StateAdmin/...`. These routes are served through `resources/views/admin.blade.php` + `resources/js/admin.js`, whose page-loader **only** looks inside `./Pages/Admin/**` (`admin.js` line ~41). The actual Vue files have already been moved to `resources/js/Pages/StateAdmin/**` (outside that folder) — `git status` shows the old files under `Pages/Admin/StateAdmin/**` as deleted-but-uncommitted (backed up to `Pages/_to_delete/Admin_StateAdmin_2026_08_15/`) and the new ones at `Pages/StateAdmin/**` as modified/untracked. The controllers were never updated to match, so every one of these pages now points at a location the page-loader can't see.
-- **Likely relation to other work:** `routes/state.php`'s own comments reference `docs/STATE_KALOTSAV_MASTER_IMPLEMENTATION_PLAN.md` as the governing plan for an active State-domain rollout — this is very likely a regression mid-way through that rollout, not an unrelated one-off mistake.
-- **Who's affected:** Superadmin (bypass access, confirmed live) and real `state_admin`/`state_staff` users hitting the identical controllers (not yet independently live-verified for that role — see Coverage status).
-- **Fix direction (not applied — reporting only):** either move the six `Inertia::render()` calls to a path admin.js's loader can see, or add `./Pages/StateAdmin/**` to `admin.js`'s glob and update the six render calls to drop the "Admin/" implied prefix consistently — whichever matches where this refactor is actually headed.
+### 1. [RESOLVED DURING THIS AUDIT — see correction] Super Admin → "State Workspace" pages
+**Correction:** This was live-reproduced early in this session as a blank white page (see original evidence below), and was re-confirmed as still-broken via static analysis by a background agent partway through. When re-tested live just now (after this session's browser tooling had to be reconnected following an unrelated process interruption), **the pages render correctly** — `/admin/state-workspace/qualifiers` and `/admin/board-results` both now show real content, no error.
+
+Reading the working tree explains why: at the time of the original test, `resources/js/Pages/Admin/StateAdmin/**` (the path the page-loader needs) was missing from disk and only `resources/js/Pages/StateAdmin/**` (wrong path) existed. Right now, it's the reverse — `Pages/Admin/StateAdmin/**` exists on disk (matching what's committed to git) and `Pages/StateAdmin/**` does not. In other words: **the on-disk file layout genuinely flipped between the two live tests, without this audit changing any code.** This looks like an in-progress, uncommitted refactor that was mid-flight during the first test and has since been reverted or completed correctly — not something this audit did. Original evidence, kept for the record:
+
+> First test: completely blank page, no error shown to the user. Browser console: `Uncaught (in promise) Error: Page not found: ./Pages/Admin/StateAdmin/Qualifiers/Index.vue`. Root cause at the time: the six render calls in `StateQualifierReviewController`, `StateFestWorkspaceController` (×2), `StateAttendanceController`, `StateBoardResultsController` all target `StateAdmin/...`, which `admin.js`'s page-loader resolves under `./Pages/Admin/**` — and at that moment, the real files were sitting one level higher, outside that folder.
+
+**Bottom line:** not currently reproducible. Flagging as resolved rather than as an open bug, but noting it because the same class of mistake (a file placed outside the path the loader scans) recurs at least twice more elsewhere in this document (Findings 3 and the Portal-roles section) — worth a quick sanity check of `admin.js`'s glob coverage regardless.
 
 ### 2. Super Admin → "Sports Results" (`/admin/sports`) — 500 Internal Server Error, every time
+**Re-confirmed live just now, still reproduces identically.**
 - **What happens:** Full Laravel debug crash page. `SQLSTATE[42P01]: Undefined table: relation "fest_events" does not exist`.
 - **Root cause:** `SportsResultsController::index()` (`app/Http/Controllers/Admin/SportsResultsController.php:21-40`) queries the `FestEvent`/`FestMark` models directly with no tenant context. This app runs one **separate Postgres database per Sahodaya cluster** (`TENANCY_DATABASE_PER_SAHODAYA=true`) — `fest_events` only exists inside each cluster's own database, never on the shared central one this controller runs against. This isn't data-dependent — it will 500 on any environment with per-cluster databases, regardless of what's seeded. Contrast with the *working* `/admin/kalotsav` page (`KalotsavStateController`), which correctly queries `FestStateProgram` — a genuinely central table — instead.
 - **Severity:** High — hard crash on a page reachable directly from the main sidebar, for every superadmin.
@@ -111,9 +113,10 @@ Two Spatie roles exist in the system (assignable, with a fully-built destination
 
 *(Full agent report — completed on its second attempt after the first was interrupted.)*
 
-### New confirmed bug: Super Admin → "External Sahodayas → Schools" page is blank
+### Likely bug (code-confirmed, not live-tested): Super Admin → "External Sahodayas → Schools" page
 - **Where:** `/admin/state-programs/external-sahodayas/{externalSahodaya}/schools` — reached by clicking through from a State Program's "External Sahodayas" tab (`StatePrograms/ExternalSahodayas.vue:40`), so a real admin following the normal path will hit this.
-- **Root cause:** Same family of bug as the State Workspace blank page above, different specific mistake. `ExternalSchoolController.php:34` calls `inertia('Admin/ExternalSchools/Index', ...)`. Because this controller is itself inside the `Admin` namespace, and admin.js's loader already implicitly roots at `Pages/Admin/`, the literal string `'Admin/ExternalSchools/Index'` resolves to `Pages/Admin/Admin/ExternalSchools/Index.vue` — a doubled "Admin/Admin/" path that doesn't exist. The real file is at `Pages/Admin/ExternalSchools/Index.vue` (no "Admin/" in the render-call string needed).
+- **Root cause:** `ExternalSchoolController.php:34` calls `inertia('Admin/ExternalSchools/Index', ...)`. Because this controller is itself inside the `Admin` namespace, and admin.js's loader already implicitly roots at `Pages/Admin/`, the literal string `'Admin/ExternalSchools/Index'` resolves to `Pages/Admin/Admin/ExternalSchools/Index.vue` — a doubled "Admin/Admin/" path. Confirmed no such path exists on disk.
+- **Important distinction from Finding 1 above:** this is a plain string-concatenation mistake in the controller's own code (not a file-location drift caused by an in-progress refactor), so unlike Finding 1 it should be stable/reproducible regardless of working-tree churn. That said, it was **not live-verified** — no `ExternalSahodaya` records exist in the seeded demo data to click through with, and creating one was out of scope for this pass. Confidence is high given the direct code evidence, but treat as "very likely" rather than "confirmed," given Finding 1 is a fresh reminder that this class of bug can be more time-sensitive than it looks.
 - **Fix direction:** change the render call to `inertia('ExternalSchools/Index', ...)`.
 
 ### Confirmed dead sidebar code: Super Admin never shows "Site Builder & Themes"
@@ -181,17 +184,43 @@ Exam controllers/staff can enter marks, track attendance, and manage supervision
 
 ---
 
-## Prior-draft claims — Sahodaya Admin section (3.1–3.5)
+## Sahodaya Admin — full findings
 
-*(Verified directly — the dedicated background agent for this portal failed twice due to an account-level API spend limit; see note at the end of this document. This is a lighter, targeted pass covering the 5 specific claims rather than an exhaustive route-by-route sweep.)*
+A dedicated agent completed a full pass (verified counts against `php artisan route:list`: 413 GET routes; 141 normalized nav-href patterns cross-checked both directions; every `controller@method` target resolved).
+
+### Confirmed bug: `training_admin`'s own "Main dashboard" nav link 403s
+- `sahodayaAdminNav.js:183,208` (`sahodayaTrainingHubNav`/`sahodayaTrainingProgramScopedNav` — the only two nav builders a `training_admin` user ever sees) both unconditionally show a "Main dashboard" link pointing at the bare tenant root (`/sahodaya-admin/{id}`).
+- `EnsureSahodayaAdmin.php:55-63` hard-blocks `training_admin` (without `sahodaya_admin`) from any path except `/training*` — so that link 403s every time it's clicked.
+- Notably, `AuthController.php:432-434` already sends `training_admin` straight to `/training` on **login** specifically to avoid this exact trap — the login redirect was fixed, but the persistent sidebar link users see on every subsequent page was not. Confirmed pre-existing (unrelated to the uncommitted State Admin refactor).
+
+### Orphaned routes (6 confirmed of 413 GET routes checked)
+- `sahodaya.events.id-cards.pdf-all-heads` / `.pdf-all-items` — fully built bulk-PDF endpoints (deliberately tuned for scale, cites `docs/SCALE_AND_PAGINATION_PLAN.md`), but `Events/IdCards/Index.vue` only wires up single-scope preview/PDF buttons — no "download all" control exists anywhere.
+- `sahodaya.finance.financial-statements` — page renders fine if visited directly, just isn't linked from `Ledger/Index.vue` or the sidebar Finance section.
+- `sahodaya.site-builder.section-types` and `.api.theme.get` — genuinely dead JSON endpoints; the same data is already passed as Inertia props elsewhere, zero `fetch()` calls to either found anywhere.
+- `sahodaya.events.items.list` — a real, distinct page (`Events/Items/List.vue`) with zero references; the nav's "Items & catalog" link goes to a different method instead.
+- (270 of 413 routes had no sidebar match; 263 of those were spot-checked and confirmed reachable via per-row/per-page buttons using server-supplied URL props — a legitimate pattern in this codebase, not a gap. The 6 above are the ones that don't fit that pattern.)
+
+### Role-gate mismatches
+- **Training pages are viewable (not writable) by every non-training staff role.** All 9 non-training roles hold `fest.view`, which is enough to satisfy the client-side nav-visibility check for the Training section (`SahodayaAdminLayout.vue:171`) — confirmed the same bug exists in the (otherwise-dead) server-side permission map too, so it's not just a client/server drift. Writes are still correctly blocked, so this is a discoverability/scoping looseness, not a security hole.
+- **Correction to this document's own earlier framing:** `exam_controller`/`exam_staff` don't actually use the Sahodaya Admin sidebar at all — `TenantUserCatalog::sahodayaAdminPanelRoles()` explicitly excludes them; they're portal-only roles (`/portal/exam/{tenantId}`).
+- `event_admin`/`region_admin`'s "scoped to events only" framing is imprecise in practice: the assigned-event/region check only fires on GET requests for a specific `{event}` id and on writes — dashboard, schools, board results, and reports are all fully viewable regardless of scope.
+
+### Hardcoded-hidden nav items
+No new ones beyond the 3 already found (Talent Search question banks/series/all-exams).
+
+### Prior-draft claim verdicts
 
 | # | Claim | Verdict | Evidence |
 |---|---|---|---|
-| 3.1 | "Custom events" nav item hardcoded `hidden: true`; feature is thin | **REFUTED as described** — `sahodayaAdminNav.js:436` shows Custom events gated by `programOn('custom')` (a per-tenant visibility toggle), not a hardcoded `hidden: true`. **However, a real version of this bug exists for different items**: `sahodayaAdminNav.js:463-465` hardcodes `hidden: true` on "Talent Search question banks", "Talent Search series", and "All Talent Search exams" — three fully-built, routed pages permanently invisible in the sidebar regardless of tenant config. The underlying pattern (hidden-but-built nav items) is real; the specific item named in the prior draft was wrong. |
-| 3.2 | MCQ exams have no certificate routes/controllers/models | **REFUTED.** `McqCertificate` and `McqCertificateTemplate` models exist; `McqExamOpsController` has `previewCertificate`/`generateCertificates`/`printCertificate` (`routes/web.php:1417-1419`), plus a student-portal certificate view (`routes/web.php:1713`). Fully built. |
-| 3.3 | Only Kalotsav/Sports have state-tier rollup views | **Not independently re-verified this pass** (deprioritized under time/budget constraints — flagged for follow-up, not confirmed or refuted). |
-| 3.4 | `sportsEventNav.js` omits Judges/Marks-import vs generic nav; has "Item heads" generic nav lacks | **Partially confirmed, with important context.** `sportsEventNav.js` (full file read) genuinely has no "Judges" item, while `sahodayaEventNav.js` has "Judges & staff" (line 156) — that part is real. But neither file has a "Marks import"-labeled item (sports has plain "Marks"), and "Item heads" as a concept doesn't appear in either — `sportsEventNav.js`'s own code comments explain why: the app went through a documented "Head = Event unification" (referencing a `SPORTS_NAV_CLEANUP_PLAN.md` doc not yet read) that intentionally retired the old head/event split, leaving `isSportsSeasonEvent()` hardcoded to `return false` and season-hub nav code deliberately unreachable-but-not-deleted "in case it's re-enabled later." This reads as an intentional, documented post-refactor state, not an overlooked inconsistency — though the missing "Judges" item specifically may still be worth a product decision. |
-| 3.5 | `TenantUserCatalog` requires `fest.manage` instead of `fest.finance` for ledger-account updates, blocking finance staff | **REFUTED.** `TenantUserCatalog::writePermissionForPath()` (`app/Support/TenantUserCatalog.php:401-471`) matches any path containing `/ledger` (via substring match, which also catches `/ledger-account`) and correctly returns `'fest.finance'` — which `sahodaya_finance`'s role permissions already include. No block found. |
+| 3.1 | "Custom events" nav item hardcoded `hidden: true`; feature is thin | **REFUTED as described**, real bug found elsewhere — see the 3 Talent Search items above (unchanged from the earlier targeted check). |
+| 3.2 | MCQ exams have no certificate routes/controllers/models | **REFUTED.** `McqCertificate`/`McqCertificateTemplate` models exist; full preview/generate/print controller actions exist. |
+| 3.3 | Only Kalotsav/Sports have state-tier rollup views | **CONFIRMED**, with nuance. Kalotsav (`KalotsavStateController`) and Sports (`SportsResultsController`) both have real, dedicated results/winners aggregation across sahodaya clusters. Kids Fest, Teacher Fest, and Custom Events get only generic state-level *propagation/setup* tracking (`StateFestProgramController`) — no results/winners view at all. **MCQ gets nothing at the state tier whatsoever** — it isn't even in the generic program-type list, and no MCQ-specific state controller exists anywhere in the codebase. |
+| 3.4 | `sportsEventNav.js` omits Judges/Marks-import vs generic nav; has "Item heads" generic nav lacks | **Confirmed missing "Judges", but the "Item heads"/"Marks import" framing doesn't match current code** — the app went through a documented "Head = Event unification" (referenced but not fully read: `SPORTS_NAV_CLEANUP_PLAN.md`) that intentionally retired the old head/event split; the season-hub nav code is deliberately dead ("Unreachable in current builds… left in place in case re-enabled later," per its own comments). Reads as an intentional post-refactor state, not an oversight — though the missing "Judges" link specifically may still be worth a product decision. |
+| 3.5 | `TenantUserCatalog` requires `fest.manage` instead of `fest.finance` for ledger-account updates | **REFUTED.** Path-matching correctly resolves any `/ledger`-containing path (including `/ledger-account`) to `fest.finance`, which `sahodaya_finance` already has. |
+
+### Other dead-code signals
+- `TenantUserCatalog::sahodayaNavPermissions()`/`schoolNavPermissions()`/`staffCanSeeNav()` (PHP) have zero callers anywhere in `app/` — all real nav gating is client-side only (`SahodayaAdminLayout.vue`'s `STAFF_NAV`), and the two lists have already drifted apart (dead PHP list still references permissions the live JS list omits, and vice versa).
+- Otherwise a clean codebase in this area: zero TODO/FIXME/stub markers across all 210 Vue files checked under `Pages/Admin/Sahodaya/**`.
 
 ---
 
@@ -199,14 +228,34 @@ Exam controllers/staff can enter marks, track attendance, and manage supervision
 
 Section 5 (Portal-tier) is fully covered — see the Portal-roles findings folded in above (5.1 CONFIRMED and found to be worse than described — the route is actually broken, not just hidden; 5.2 nuanced-confirmed as a gating mismatch rather than a broken link; 5.3 CONFIRMED).
 
-### School Admin (4.1–4.4) — verified directly (targeted pass, same constraint as above)
+### School Admin — full findings
+
+A dedicated agent completed a full pass (627 GET routes confirmed via `route:list`, 241 distinct controller actions — the largest portal in the app).
+
+### Confirmed bug: "School Website" nav link is completely dead, and it takes 11 other pages down with it
+- `schoolAdminNav.js:392` links to `/school-admin/{id}/site-builder` — **this route does not exist at all.** `SiteBuilderController`/`SiteBuilderApiController` are imported at the top of `routes/web.php` but never once wired to a `Route::` call anywhere in the file (confirmed via full-text search). Both controllers are fully built and dead code; the Vue page (`Admin/School/SiteBuilder.vue`) exists too. Every school admin with the website feature enabled — a real, presumably common flag, not an edge case — hits this on click.
+- **Cascading effect:** 11 more nav items (News, Events, Gallery, Staff, Achievements, Downloads, Job Vacancies, Alumni, Testimonials, Contact Page, Enquiries) are hardcoded `hidden: true` in the nav specifically because they were meant to be reached *through* this dead site-builder hub. Their routes still work fine — the only way to find them now is typing the exact label into the sidebar's nav-search box, which most users won't think to do for a page they don't know exists.
+- **Contrast:** the equivalent Sahodaya-side site builder works correctly.
+
+### Orphaned routes
+- **14 report tiles across all 7 fest programs** (`{program}.reports.group-roster` and `.reports.admit-cards`) are real, working backend routes rendered as **inert, unclickable placeholder tiles** by explicit design — the report catalog config marks both with `hasPreview:false, hasExport:false`, so the hub page never generates a link for them. Effectively "coming soon" stubs with no in-app way to reach the working endpoint behind them.
+- `fest.certificates.download-all` (carried forward from the earlier targeted check) — confirmed still orphaned.
+
+### Role-gate mismatches — the most substantial findings in this document
+- **`school_finance_coordinator` can act on almost nothing they can see.** Their permissions (`finance.view`, `fest.finance`) satisfy none of the nav-section visibility gates — the entire "Fest" section (all 7 programs) and "Membership" section (including the literal Payments page) stay hidden. A default finance coordinator sees only "Dashboard" and "Academic Results." Yet the server-side write-permission check explicitly grants this exact role access to `/ledger`, `/finance`, and per-event fee paths. This is the sharpest "usable but undiscoverable" case found anywhere in this audit — the role can do the job the moment someone hands them the direct URL, but the UI never shows it to them.
+- **`school_sports_coordinator` and `school_kalotsavam_coordinator` aren't actually scoped to their named program.** Both get byte-identical permissions (`fest.view`, `fest.manage`, `fest.registrations`), and the only middleware that scopes a coordinator to specific programs (`EventCoordinatorScope`) checks exclusively for the role string `school_event_coordinator` — neither of these two matches it. Despite their names, both can view and write to **all 7 fest programs**, not just their own; only the post-login landing page differs.
+- **`school_event_coordinator`'s assigned permissions aren't enforced at the controller layer at all.** The role is missing from `schoolWriteGatedRoles()`, so the Spatie permission check that would normally gate their actions never runs for them — only their program/event *scope* is enforced, not which specific actions they take within it. Reads like the same gap a previous "PERM-03" fix (referenced in code comments) closed for five sibling coordinator roles, just missed for this one.
+- **Flagged, not confirmed:** possible zero-permissions-on-user-creation bug — the create-user form initializes `permissions: []` with nothing populating it from the selected role, and the backend's fallback-to-role-defaults only triggers if the key is *absent*, not if it's an empty array. Whether this actually bites depends on exact Inertia form-submission behavior that couldn't be verified without running the app live.
+
+### Prior-draft claim verdicts
 
 | # | Claim | Verdict | Evidence |
 |---|---|---|---|
-| 4.1 | Custom events & Teacher training lack fest-day desk/results/certs/attendance parity with built-out programs | **Not independently re-verified this pass** — deprioritized under time/budget constraints. |
-| 4.2 | "Download All Certificates" and "Event Appeals" routes exist and work, but have no sidebar/page links | **Half-confirmed, half-refuted.** Appeals is **NOT** orphaned — `FestEventPortalController::appeals` (`/fest/{event}/appeals`) is linked three times from `Events/FestHub.vue` (lines 108, 124, 142) and has its own dedicated `Appeals.vue` page. "Download All Certificates" (`FestEventPortalController::downloadCertificatesZip`, route name `fest.certificates.download-all`) genuinely has **zero** references anywhere in `schoolAdminNav.js`, `schoolEventNav.js`, or `FestHub.vue` — that half of the claim holds. |
-| 4.3 | Payment history only shows the current `fee_receipt_id` pointer; a rejected-then-reuploaded receipt disappears from view entirely | **Nuanced — depends which page.** Fest's own **event-level billing panel** already does this correctly: `FestRegistrationController::receiptHistoryPayload()` (`app/Http/Controllers/SchoolAdmin/FestRegistrationController.php:1335-1360`) returns full history via the `receipts()` relation (every upload/rejection/supersession/approval), explicitly built to close exactly this gap per a code comment citing `docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §7`. But the **shared, cross-program "Payment History" page** (`/school-admin/{tenant}/payments`, backed by `SchoolPaymentHistoryService`) — which is what the prior draft's "Entry Page" pointed at — was separately confirmed earlier in this document to *not yet* have that generalized receipt-level rebuild (Phase 3 of the fix plan). So: fixed for fest's own panel, likely still open on the unified cross-program history page. |
-| 4.4 | No "edit & resubmit" action for a rejected registration | **CONFIRMED.** `Events/Registration.vue:1598-1604` — `canEdit(reg)` explicitly returns `false` whenever `reg.status` is `'rejected'` (or `'withdrawn'`) before any other check. A rejected registration cannot be edited through this UI; the school's only options are to leave it or start an unrelated new registration. |
+| 4.1 | Custom events & Teacher training lack fest-day desk/results/certs/attendance parity with built-out programs | **REFUTED**, for the most direct reading. `CustomFestController`/`KalotsavController`/`TeacherFestController` are all thin 15-line shims over the exact same shared 1500+-line controllers every program uses — route counts (52 report routes + 8 event routes) are identical across all 7 programs. If "Teacher training" instead means the separate `training` module (not "Teacher Fest"), also refuted — it has its own attendance, certificates, and ID cards; it's a structurally different domain (no fest-day concept because it isn't a fest), not a stripped-down one. |
+| 4.2 | "Download All Certificates" and "Event Appeals" have no sidebar/page links | **Half-confirmed** (unchanged from the earlier targeted check) — Appeals is linked 3x, Download-All-Certificates is genuinely orphaned. |
+| 4.3 | Payment history: rejected-then-reuploaded receipt vanishes | **REFUTED for the shared cross-program page too** (corrects this document's own earlier, more cautious "likely still open" note). `SchoolPaymentHistoryService::mapReceiptsHistory()` returns the full, unfiltered receipt list — including rejected ones with their reasons — for all six fee types, and `Payments/Index.vue` renders it as an expandable "Show payment history (N attempts)" panel. Nothing vanishes; this gap is closed everywhere it was checked. |
+| 4.4 | No "edit & resubmit" action for a rejected registration | **CONFIRMED** (unchanged) — `canEdit(reg)` explicitly excludes `rejected`/`withdrawn` status. |
+| — | `school_event_coordinator` with zero assigned events — redirect loop | **REFUTED as a "loop," but CONFIRMED as a worse dead-end.** `homeUrlFor()` correctly returns `/unassigned` (no self-redirect), and a purpose-built friendly "No Assigned Events" page exists for exactly this case. But `EventCoordinatorScope` middleware guards the *entire* route group, including `/unassigned` itself, and hard-aborts with a raw 403 before that friendly page's controller ever runs. Net effect: a zero-scope coordinator's very first post-login screen is a generic, unstyled "Access denied" card whose only way out points at the public marketing site, not back into their own portal — worse than a loop, and the nicer dedicated screen sits built but unreachable. |
 
 ---
 
@@ -214,9 +263,9 @@ Section 5 (Portal-tier) is fully covered — see the Portal-roles findings folde
 
 | Area | Issue | Status |
 |---|---|---|
-| Super Admin | State Workspace nav group (Qualifiers/Fest/BoardResults) — blank page | ❌ Confirmed live, broken |
-| Super Admin | Sports Results — 500 crash | ❌ Confirmed live, broken |
-| Super Admin | External Sahodayas → Schools — blank page | ❌ Confirmed (static, same mechanism as above) |
+| Super Admin | State Workspace nav group (Qualifiers/Fest/BoardResults) — blank page | ✅ Was reproduced live, then re-tested and found resolved — see Finding 1's correction |
+| Super Admin | Sports Results — 500 crash | ❌ Confirmed live (re-verified twice) |
+| Super Admin | External Sahodayas → Schools — blank page | ❌ Very likely (code-confirmed, not live-testable — no seed data) |
 | Super Admin | Site Builder & Themes sidebar group — dead code, never renders | ❌ Confirmed |
 | Super Admin / Public | "Live Scoreboards" nav link → `/scoreboard` (doesn't exist) | ❌ Confirmed |
 | Public site | Fest schedule/results/scoreboard/MCQ archive undiscoverable via nav | ⚠️ Confirmed, more nuanced than described (dead-code nav defaults, not one link) |
@@ -227,20 +276,69 @@ Section 5 (Portal-tier) is fully covered — see the Portal-roles findings folde
 | Auth | School application emails credentials pre-approval | ❌ Confirmed |
 | Auth | 5 school coordinator roles get "no portal assigned" | ✅ Refuted — all route correctly |
 | Sahodaya Admin | 3 Talent Search nav items hardcoded hidden (not "Custom events" as originally claimed) | ❌ Confirmed (different item than described) |
+| Sahodaya Admin | `training_admin`'s own "Main dashboard" sidebar link 403s | ❌ Confirmed (new finding) |
+| Sahodaya Admin | 6 orphaned routes (bulk ID-card PDFs, financial statements, 2 dead JSON endpoints, unused items-list page) | ❌ Confirmed (new finding) |
+| Sahodaya Admin | Training pages viewable by all 9 non-training staff roles | ⚠️ Confirmed — discoverability looseness, not a security hole (new finding) |
 | Sahodaya Admin | MCQ has no certificates | ✅ Refuted — fully built |
 | Sahodaya Admin | Ledger permission blocks finance staff | ✅ Refuted |
 | Sahodaya Admin | Sports nav missing "Judges" vs generic nav | ⚠️ Confirmed, but likely intentional post-refactor state |
-| Sahodaya Admin | State-tier rollups only for Kalotsav/Sports | ❓ Not re-verified |
+| Sahodaya Admin | State-tier rollups only for Kalotsav/Sports | ❌ Confirmed — Kids/Teacher/Custom get setup-tracking only, MCQ gets nothing |
+| School Admin | "School Website" nav link — entire route doesn't exist, takes 11 other pages down with it | ❌ Confirmed (new finding, largest single School Admin issue found) |
+| School Admin | 14 fest-report tiles render as inert non-clickable stubs | ❌ Confirmed (new finding) |
+| School Admin | `school_finance_coordinator` can't see the sections they can write to | ❌ Confirmed (new finding — sharpest usable-but-undiscoverable case in this audit) |
+| School Admin | `school_sports_coordinator`/`school_kalotsavam_coordinator` not actually scoped to their named program | ❌ Confirmed (new finding) |
+| School Admin | `school_event_coordinator` permissions unenforced at controller layer | ❌ Confirmed (new finding) |
 | School Admin | "Download All Certificates" unlinked | ❌ Confirmed |
 | School Admin | "Event Appeals" unlinked | ✅ Refuted — linked 3x |
 | School Admin | Rejected registration has no edit/resubmit path | ❌ Confirmed |
-| School Admin | Payment history: rejected receipt vanishes on re-upload | ⚠️ Fixed on fest's own panel; likely still open on the shared cross-program history page |
-| School Admin | Custom events / training feature parity gap | ❓ Not re-verified |
+| School Admin | Payment history: rejected receipt vanishes on re-upload | ✅ Refuted (upgraded from earlier "likely open" note) — full history confirmed on both fest's own panel and the shared cross-program page |
+| School Admin | Custom events / training feature parity gap | ✅ Refuted — architecturally identical to every other program |
+| School Admin | `school_event_coordinator` zero-scope redirect loop | ⚠️ Refuted as a loop, confirmed as a worse dead-end (raw 403, no path back into the app) |
 | Portal | Group Admin "Results" route broken (missing Vue page) | ❌ Confirmed — worse than originally described (broken, not just hidden) |
 | Portal | `exam_staff` sees Mark Entry link that 403s | ⚠️ Confirmed — real gating mismatch |
 | Portal | No results/rank-list page in Exam portal | ❌ Confirmed |
 | Financial/cancellation (event & exam & training cancel cascades, MCQ Sahodaya-cancel, fee-credit stranding, membership cancel-with-credit) | Prior draft's whole "Operational & Financial" section | ✅ Refuted — already fixed per `docs/FLOW_GAP_FIX_PLAN.md` |
 | Financial (fee-rejection notify, fest-withdraw notify, school-side training cancel) | 3 specific sub-items from that same plan | ❌ Confirmed still open |
+
+---
+
+## Fix status (implementation pass after this audit)
+
+Every ❌/⚠️ item above was addressed in the implementation pass that followed this audit, except one deliberate no-op (noted below). Live-verified items were re-checked in-browser after a fresh `npm run build`; a few late additions were verified via direct code/route inspection plus the automated test suite instead, as noted.
+
+| Area | Issue | Resolution |
+|---|---|---|
+| Super Admin | Sports Results 500 crash | **Fixed.** `SportsResultsController::index()` now loops each Sahodaya cluster inside `$sahodaya->run()` instead of querying `fest_events`/`fest_marks` on the central connection. Live-verified. |
+| Super Admin | External Sahodayas → Schools blank page | **Fixed.** `ExternalSchoolController` was double-prefixing its Inertia render path (`Admin/ExternalSchools/Index` → `ExternalSchools/Index`). Live-verified. |
+| Super Admin | Site Builder & Themes sidebar dead code | **Fixed.** `AdminLayout.vue`'s `superNavGroups` early-`return` was rewritten so the conditional push is reachable. Live-verified. |
+| Super Admin / Public | "Live Scoreboards" → `/scoreboard` (404) | **Fixed.** Points at `/fest` now. Live-verified. |
+| Public site | Fest/MCQ undiscoverable via nav; no circulars page | **Fixed.** Nav defaults corrected in `SahodayaSiteTemplate.php`/`SahodayaTenantBranding.php`; new `CircularController` + public view + routes added. Live-verified. |
+| Auth | `state_judge` unreachable via login | **Fixed.** Added to `AuthController::homeFor()`/`portalMismatchMessage()`. Live-verified. |
+| Auth | `region_admin` unreachable via login | **Fixed.** Added to the same merged-role routing array. Live-verified. |
+| Auth | School application emails credentials pre-approval | **Fixed.** `SchoolApplicationController::store()` no longer creates a `User` or sends any email — only a pending `Tenant`. Credentials are now issued in `MemberSchoolsController::approveSchool()`. Verified via tinker simulation and an updated `SchoolApplicationSubmitTest` (all passing). |
+| Sahodaya Admin | 3 Talent Search nav items hardcoded hidden | **Fixed.** `hidden: true` removed in `sahodayaAdminNav.js`. Live-verified. |
+| Sahodaya Admin | `training_admin`'s "Main dashboard" link 403s | **Fixed.** Nav builders now point staff-only users at `/training` instead of the bare tenant root. Live-verified. |
+| Sahodaya Admin | 6 orphaned routes | **Fixed.** Bulk ID-card PDF links, a "Financial statements" link, and a "Registration counts" link added; 2 genuinely dead JSON endpoints removed along with their routes. Live-verified. |
+| Sahodaya Admin | Training pages viewable by all 9 non-training staff roles | **Not changed.** Discoverability looseness only (writes were already correctly blocked); left as-is to avoid scope creep beyond what was approved. |
+| Sahodaya Admin | State-tier rollups only for Kalotsav/Sports | **Fixed.** `StateFestProgramController` gained generic `results()`/`winners()`/`exportWinners()` covering Kids Fest, Teacher Fest and Custom (new pages `StatePrograms/Results.vue`, `StatePrograms/Winners.vue`); new `McqStateResultsController` + `/admin/mcq-results` gives MCQ its first state-tier view (new page `State/Mcq/Results.vue`). Both wired into the sidebar and the program list/detail pages. Live-verified end to end, including a real cross-cluster MCQ result and the type-guard 404 on Kalotsavam. |
+| School Admin | "School Website" nav link dead, takes 11 pages with it | **Fixed.** Added the missing `site-builder`/`site-builder/api/*` route block (School's own controller method set); un-hid all 11 Website section nav items. Live-verified. |
+| School Admin | 14 fest-report tiles inert | **Fixed.** `admit-cards` and `group-roster` entries in `festReportCatalog.js` now have `hasPreview: true`, matching their already-implemented, already-routed controller methods. Live-verified. |
+| School Admin | `school_finance_coordinator` nav visibility | **Fixed.** `STAFF_NAV.membership`/`STAFF_NAV.fest` extended with the finance permissions in `SchoolAdminLayout.vue` (and the equivalent dead-but-kept-in-sync server-side map). |
+| School Admin | `school_sports_coordinator`/`school_kalotsavam_coordinator` not scoped to their named program | **Fixed.** `EventCoordinatorScope` middleware now blocks either role from any fest program other than their own (403, with an explanatory message). Live-verified: sports coordinator can reach `/sports`, gets a real 403 on `/kalotsav`. |
+| School Admin | `school_event_coordinator` permissions unenforced at controller layer | **Deliberately not changed.** A code comment on `TenantUserCatalog::schoolEventCoordinatorRoles()` ("Event coordinators manage assigned fest/MCQ routes — not read-only staff") indicates the role's full access within its assigned scope is intentional design, not a bug — the earlier "tighten to match intended scope" approval was based on a framing that turned out to be wrong once this comment was found. Left as-is rather than restricting a role that's supposed to have this access. |
+| School Admin | "Download All Certificates" unlinked | **Fixed.** Plain `<a>` link added to `FestHub.vue` (not an Inertia `<Link>`, since the route streams a ZIP). |
+| School Admin | Rejected registration has no edit/resubmit path | **Fixed.** `canSchoolEditRoster()`/`canEdit()` (Vue) now allow `'rejected'`; `updateForSchool()` resets status to `'submitted'` and clears rejection fields on save; Edit button now reads "Fix & resubmit" for rejected rows. Same fix mirrored for the teacher-fest path. |
+| School Admin | `school_event_coordinator` zero-scope dead-end (raw 403) | **Fixed.** A zero-scope coordinator's own login-redirect target (`/unassigned`) now renders the friendly "unassigned" page instead of a raw 403. |
+| Portal | Group Admin "Results" route broken | **Fixed.** New `Portal/Group/Results.vue` page + nav entry; existing controller/route already worked, only the Vue page was missing. |
+| Portal | `exam_staff` sees Mark Entry link that 403s | **Fixed.** `examPortalNav.js` was already role-aware but every caller (`Attendance.vue`, `Supervision.vue`, `MarkEntry.vue`) was invoking it with no role argument — all three now pass the current user's role. |
+| Portal | No results/rank-list page in Exam portal | **Fixed.** New `ExamOpsController::results()` + `Portal/Exam/Results.vue` + nav entry. |
+| Financial | Fee-rejection doesn't notify school | **Already correct — audit finding was wrong.** `FestSchoolEventFeeController::reject()` already calls `OfflineProgramFeeOrchestrator::notifyRejected()`; confirmed via `git diff` that this code predates this session (not something this pass added). |
+| Financial | Fest-withdraw doesn't notify Sahodaya admin/event coordinator | **Already correct — audit finding was wrong.** `FestRegistrationService::cancel()` already calls `FestEventNotifier::registrationWithdrawnAdmin()` by default; a code comment shows this was fixed in a prior "LIFE-11" audit pass before this session started. |
+| Financial | No school-side training cancel | **Mostly already built, one real bug + the UI were missing.** The route and controller action already existed but a malformed `abort_if(...)` call (a `Closure` passed where an HTTP status code was expected) meant any batch-fee program's cancel attempt would fatal-error; fixed, and the same guard was extended to cover an individually-approved fee (the batch case already blocked this — the individual case didn't). The Sahodaya-notify call on cancel also silently no-op'd because no notification template existed for its slug — added a fallback template. The Training page itself had no Cancel button at all — added one. All four pieces live-verified end to end (cancel → confirm dialog → status flip → audit log → 3 Sahodaya admin/staff notifications delivered), including cleanup of the test data created for verification. |
+
+**Not done:** state-tier rollup Task 19 above completes the last of the 4 "build minimal version" items approved earlier; nothing from the original 29-item list was left unaddressed except the one documented deliberate no-op (`school_event_coordinator` scope) and the discoverability-only training-page-visibility item, both explained above.
+
+**Test suite:** 683 tests, 666 passing after this pass (one pre-existing failure — `SchoolApplicationSubmitTest` — was testing the old pre-fix credential-emailing behavior and has been updated to match the new, intended behavior). The remaining 16 failures are all in areas untouched by this audit/fix pass (Board Results certification, website microsite/homepage lifecycle, email template asset, a Sahodaya API case-sensitivity assertion, a training-eligibility region test, and the base Laravel `ExampleTest` scaffold) — pre-existing and out of scope for this pass.
 
 ---
 

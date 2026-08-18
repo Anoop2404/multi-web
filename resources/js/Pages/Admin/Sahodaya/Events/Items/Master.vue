@@ -7,6 +7,9 @@
                     description="Search, filter, edit configurations, toggle availability, and add event items.">
             <template #actions>
                 <div class="flex items-center gap-2">
+                    <Link :href="`${base}/items/list`" class="btn-secondary text-xs flex items-center gap-1.5">
+                        <span>📋 Registration counts</span>
+                    </Link>
                     <Link :href="`${base}/items/caps`" class="btn-secondary text-xs flex items-center gap-1.5 !bg-indigo-50 !text-indigo-700 font-bold border-indigo-200 hover:!bg-indigo-100">
                         <span>⚡ Bulk Limit Caps</span>
                     </Link>
