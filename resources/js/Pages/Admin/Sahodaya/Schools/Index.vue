@@ -49,6 +49,30 @@
                 <button type="button" class="text-sm text-slate-500 ml-auto" @click="clearSelection">Clear</button>
             </div>
 
+            <!-- Quick Payment Status Filter Pills -->
+            <div class="flex flex-wrap gap-2">
+                <button type="button" @click="setPaymentStatusFilter('all')"
+                        :class="['px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer',
+                                 (filterForm.payment_status || 'all') === 'all' ? 'bg-[#0f3d7a] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200']">
+                    All Member Schools ({{ verifiedCount }})
+                </button>
+                <button type="button" @click="setPaymentStatusFilter('no_proof')"
+                        :class="['px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5',
+                                 filterForm.payment_status === 'no_proof' || filterForm.payment_status === 'payment_not_done' ? 'bg-rose-700 text-white shadow-xs' : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100']">
+                    <span>⚠️ Approved — No Payment Proof / Fee Due</span>
+                </button>
+                <button type="button" @click="setPaymentStatusFilter('payment_pending')"
+                        :class="['px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5',
+                                 filterForm.payment_status === 'payment_pending' ? 'bg-amber-600 text-white shadow-xs' : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100']">
+                    <span>⏳ Payment Uploaded (Pending Review)</span>
+                </button>
+                <button type="button" @click="setPaymentStatusFilter('payment_verified')"
+                        :class="['px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5',
+                                 filterForm.payment_status === 'payment_verified' ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100']">
+                    <span>✓ Fee Verified</span>
+                </button>
+            </div>
+
             <!-- Filters -->
             <div class="filter-bar">
                 <div class="flex flex-wrap items-end gap-3">
@@ -56,6 +80,15 @@
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search</label>
                         <input v-model="filterForm.search" type="search" placeholder="Name or code…"
                                class="field">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Payment status</label>
+                        <select v-model="filterForm.payment_status" class="field">
+                            <option value="all">All payment statuses</option>
+                            <option value="no_proof">⚠️ Approved — No Payment Proof / Fee Due</option>
+                            <option value="payment_pending">⏳ Payment Uploaded (Pending Review)</option>
+                            <option value="payment_verified">✓ Fee Verified</option>
+                        </select>
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">From</label>
@@ -242,9 +275,10 @@ async function bulkSendCredentials() {
 }
 
 const filterForm = reactive({
-    search:    props.filters?.search ?? '',
-    date_from: props.filters?.date_from ?? '',
-    date_to:   props.filters?.date_to ?? '',
+    search:         props.filters?.search ?? '',
+    date_from:      props.filters?.date_from ?? '',
+    date_to:        props.filters?.date_to ?? '',
+    payment_status: props.filters?.payment_status ?? 'all',
 });
 
 const sortSelection = computed({
@@ -260,25 +294,32 @@ function applySort(e) {
 }
 
 const hasActiveFilters = computed(() =>
-    filterForm.search || filterForm.date_from || filterForm.date_to
+    filterForm.search || filterForm.date_from || filterForm.date_to || (filterForm.payment_status && filterForm.payment_status !== 'all')
 );
 
 function listParams(overrides = {}) {
     return {
-        search:    props.filters?.search ?? '',
-        date_from: props.filters?.date_from ?? '',
-        date_to:   props.filters?.date_to ?? '',
-        sort:      props.filters?.sort ?? 'name',
-        dir:       props.filters?.dir ?? 'asc',
+        search:         props.filters?.search ?? '',
+        date_from:      props.filters?.date_from ?? '',
+        date_to:        props.filters?.date_to ?? '',
+        payment_status: props.filters?.payment_status ?? 'all',
+        sort:           props.filters?.sort ?? 'name',
+        dir:            props.filters?.dir ?? 'asc',
         ...overrides,
     };
 }
 
+function setPaymentStatusFilter(status) {
+    filterForm.payment_status = status;
+    applyFilters();
+}
+
 function applyFilters() {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/schools`, listParams({
-        search: filterForm.search,
-        date_from: filterForm.date_from,
-        date_to: filterForm.date_to,
+        search:         filterForm.search,
+        date_from:      filterForm.date_from,
+        date_to:        filterForm.date_to,
+        payment_status: filterForm.payment_status,
     }), { preserveState: true, replace: true });
 }
 
@@ -288,8 +329,9 @@ function clearFilters() {
     filterForm.search = '';
     filterForm.date_from = '';
     filterForm.date_to = '';
+    filterForm.payment_status = 'all';
     router.get(`/sahodaya-admin/${props.sahodaya.id}/schools`, listParams({
-        search: '', date_from: '', date_to: '',
+        search: '', date_from: '', date_to: '', payment_status: 'all',
     }), { preserveState: true, replace: true });
 }
 

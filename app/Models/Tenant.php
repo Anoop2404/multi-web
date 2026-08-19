@@ -141,6 +141,11 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function scopeSchools($q)   { return $q->where('type', 'school'); }
     public function scopeSahodayas($q) { return $q->where('type', 'sahodaya'); }
 
+    public function payments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(MembershipPayment::class, 'school_id');
+    }
+
     /**
      * Tenant-scoped models (settings, sections, students, …) live in the Sahodaya
      * database when database_per_sahodaya is enabled. Without this override, Eloquent

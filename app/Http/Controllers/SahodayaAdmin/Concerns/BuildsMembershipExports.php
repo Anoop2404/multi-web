@@ -17,14 +17,15 @@ trait BuildsMembershipExports
     /** @return array{search: string, date_from: ?string, date_to: ?string, sort: string, dir: string} */
     protected function schoolListFilters(Request $request): array
     {
+        $status = $request->query('payment_status', 'all');
+
         return [
-            // Cast to string: query('search') can return an array (?search[]=x), which would
-            // fatally TypeError trim().
-            'search'    => trim((string) $request->query('search', '')),
-            'date_from' => $request->query('date_from'),
-            'date_to'   => $request->query('date_to'),
-            'sort'      => $request->query('sort', 'name'),
-            'dir'       => $request->query('dir', 'asc') === 'desc' ? 'desc' : 'asc',
+            'search'         => trim((string) $request->query('search', '')),
+            'date_from'      => $request->query('date_from'),
+            'date_to'        => $request->query('date_to'),
+            'sort'           => $request->query('sort', 'name'),
+            'dir'            => $request->query('dir', 'asc') === 'desc' ? 'desc' : 'asc',
+            'payment_status' => in_array($status, ['all', 'payment_verified', 'payment_pending', 'payment_not_done', 'no_proof'], true) ? $status : 'all',
         ];
     }
 
@@ -55,6 +56,7 @@ trait BuildsMembershipExports
 
         $this->applySchoolSearchAndDates($query, $filters);
         $this->applyMembershipRegionScope($query);
+        $this->applyPaymentStatusFilter($query, $sahodayaId, $filters);
 
         return $query;
     }
@@ -211,6 +213,34 @@ trait BuildsMembershipExports
 
         if ($filters['date_to']) {
             $query->whereDate('created_at', '<=', $filters['date_to']);
+        }
+    }
+
+    private function applyPaymentStatusFilter(Builder $query, string $sahodayaId, array $filters): void
+    {
+        $status = $filters['payment_status'] ?? 'all';
+        if ($status === 'all') {
+            return;
+        }
+
+        $academicYear = \App\Support\AcademicYear::forSahodaya($sahodayaId);
+
+        if ($status === 'no_proof' || $status === 'payment_not_done') {
+            // Schools with NO submitted or verified membership payment for this academic year
+            $query->whereDoesntHave('payments', function ($q) use ($academicYear) {
+                $q->where('academic_year', $academicYear)
+                  ->whereIn('status', ['submitted', 'verified']);
+            });
+        } elseif ($status === 'payment_pending') {
+            $query->whereHas('payments', function ($q) use ($academicYear) {
+                $q->where('academic_year', $academicYear)
+                  ->where('status', 'submitted');
+            });
+        } elseif ($status === 'payment_verified') {
+            $query->whereHas('payments', function ($q) use ($academicYear) {
+                $q->where('academic_year', $academicYear)
+                  ->where('status', 'verified');
+            });
         }
     }
 }
