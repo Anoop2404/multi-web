@@ -19,7 +19,10 @@
                     <button v-if="isPartitionedHub" type="button" class="btn-secondary text-xs flex items-center gap-1.5 !bg-amber-50 !text-amber-800 font-bold border-amber-300 hover:!bg-amber-100" @click="resyncPartitions" :disabled="resyncing">
                         <span>🔄 Resync to region child events</span>
                     </button>
-                    <button v-if="trashedItems.length" type="button" class="btn-secondary text-xs flex items-center gap-1.5" @click="showTrashed = !showTrashed">
+                    <button v-if="trashedItems.length" type="button"
+                            class="btn-secondary text-xs flex items-center gap-1.5 transition-all"
+                            :class="showTrashed ? '!bg-amber-100 !text-amber-900 border-amber-400 font-bold shadow-sm' : ''"
+                            @click="toggleTrashed">
                         <span>🗑️ Deleted ({{ trashedItems.length }})</span>
                     </button>
                     <button type="button" class="btn-primary text-xs flex items-center gap-1.5 shadow-sm" @click="showAddModal = true">
@@ -45,7 +48,7 @@
             </Link>
         </div>
 
-        <div v-if="showTrashed" class="card !p-4 space-y-2 mb-5 border-amber-200 bg-amber-50/40">
+        <div v-if="showTrashed" id="trashed-items-section" class="card !p-4 space-y-2 mb-5 border-amber-300 bg-amber-50/70 shadow-md transition-all">
             <div class="flex items-center justify-between">
                 <p class="text-xs font-bold uppercase tracking-wider text-amber-800">Deleted items — restore if needed</p>
                 <button type="button" class="text-slate-400 hover:text-slate-600 text-lg leading-none" @click="showTrashed = false">×</button>
@@ -529,8 +532,18 @@ const props = defineProps({
     trashedItems: { type: Array, default: () => [] },
 });
 
+const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const showTrashed = ref(false);
 const resyncing = ref(false);
+
+function toggleTrashed() {
+    showTrashed.value = !showTrashed.value;
+    if (showTrashed.value) {
+        setTimeout(() => {
+            document.getElementById('trashed-items-section')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 50);
+    }
+}
 
 function restoreItem(item) {
     router.post(`${base}/items/${item.id}/restore`, {}, { preserveScroll: true });
@@ -552,7 +565,6 @@ async function resyncPartitions() {
     });
 }
 
-const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const isArts = computed(() => ['kalolsavam', 'kids_fest'].includes(props.event.event_type));
 const isSports = computed(() => props.event.event_type === 'sports');
 
