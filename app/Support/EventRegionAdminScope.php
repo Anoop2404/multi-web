@@ -189,6 +189,43 @@ class EventRegionAdminScope
     }
 
     /**
+     * For a hub/singleton program event (Kalotsav, English Fest, ...) that an event/region/
+     * phase-scoped admin cannot directly open, finds the specific child event their scope
+     * DOES cover — so "open my program" (the sidebar program link, which always resolves to
+     * the hub — see FestEventController::programIndex()) lands a region-only admin on their
+     * own region's event instead of redirecting them into the hub and 403ing.
+     *
+     * Returns null when the admin can already reach the hub directly (matchesRegionScope()/
+     * matchesPhaseScope() already handle "assigned on the hub reaches every matching child" —
+     * this only covers the reverse: assigned on a child only, landing on the hub), or when no
+     * child of this hub matches any of their scopes.
+     *
+     * @param  list<int>  $allowedEventIds
+     * @param  list<array{event_id: int, region_id: ?int, source_phase_id: ?int}>  $regionScopes
+     * @param  list<array{event_id: int, source_phase_id: int}>  $phaseScopes
+     */
+    public static function resolveScopedLandingEvent(FestEvent $hub, array $allowedEventIds, array $regionScopes, array $phaseScopes): ?FestEvent
+    {
+        if (in_array($hub->id, $allowedEventIds, true)
+            || self::matchesRegionScope($hub->id, $regionScopes)
+            || self::matchesPhaseScope($hub->id, $phaseScopes)) {
+            return null;
+        }
+
+        $children = FestEvent::where('parent_event_id', $hub->id)->get();
+
+        foreach ($children as $child) {
+            if (in_array($child->id, $allowedEventIds, true)
+                || self::matchesRegionScope($child->id, $regionScopes)
+                || self::matchesPhaseScope($child->id, $phaseScopes)) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Phase-admin counterpart to matchesRegionScope(): true when the requested event is
      * either (a) directly assigned (a FestEventStaff row on this exact event), or (b)
      * reached via a scope granted on its parent hub whose source_phase_id matches this

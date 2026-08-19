@@ -108,6 +108,24 @@ class FestEventController extends SahodayaAdminController
             $event = app(\App\Services\Events\FestPrimaryEventResolver::class)
                 ->resolve($this->sahodaya->id, $eventType);
             if ($event && $eventType !== 'sports') {
+                // An event/region/phase-scoped admin (region_admin etc.) reaches this branch
+                // (isStaff=true skips the branch above) — the hub redirect below is
+                // unconditional, so a region-only admin landed on a hub they can't open and
+                // got bounced back to the Dashboard with "You are not assigned to this event."
+                // (bootstrap/app.php's Inertia 403->flash handler). Redirect to their own
+                // scoped child event instead when the hub itself isn't reachable.
+                if ($request->attributes->has('eventAdminEventIds')) {
+                    $landing = \App\Support\EventRegionAdminScope::resolveScopedLandingEvent(
+                        $event,
+                        $request->attributes->get('eventAdminEventIds', []),
+                        $request->attributes->get('regionAdminScopes', []),
+                        $request->attributes->get('phaseAdminScopes', []),
+                    );
+                    if ($landing) {
+                        $event = $landing;
+                    }
+                }
+
                 return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}");
             }
         }
