@@ -143,7 +143,10 @@ class ExternalSchoolPortalAuthTest extends TestCase
         $school = $this->makeSchool();
         $oldPassword = $school->plain_password;
 
-        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false]);
+        $state = \App\Models\PlatformState::create(['code' => 'KL', 'name' => 'Kerala']);
+        FestStateProgram::where('id', $school->sahodaya->state_program_id)->update(['state_id' => $state->id]);
+
+        $admin = User::factory()->create(['tenant_id' => null, 'must_change_password' => false, 'state_id' => $state->id]);
         $admin->assignRole('state_admin');
 
         $this->actingAs($admin)

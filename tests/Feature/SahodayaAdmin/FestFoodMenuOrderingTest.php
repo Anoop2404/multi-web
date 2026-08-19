@@ -158,6 +158,28 @@ class FestFoodMenuOrderingTest extends TestCase
                 ->where('menuItems.1.name', 'Dinner'));
     }
 
+    /**
+     * Regression test: `menu_date` was cast as a plain `date` (no format), so Eloquent's
+     * default JSON serialization converted the app-timezone (Asia/Kolkata, UTC+5:30)
+     * midnight instant to UTC before appending "Z" — turning "2026-09-01" into
+     * "2026-08-31T18:30:00.000000Z" on the wire. The frontend's date-prefix parser then
+     * displayed the wrong (previous) day everywhere: the menu page, order items, and
+     * printed food coupons. Casting as `date:Y-m-d` makes Eloquent serialize the plain
+     * calendar date with no timezone conversion at all.
+     */
+    public function test_menu_date_is_not_shifted_a_day_earlier_in_the_inertia_response(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeSahodayaAndEvent('2026-09-01', '2026-09-02');
+
+        FestFoodMenuItem::create(['tenant_id' => $sahodaya->id, 'event_id' => $event->id, 'menu_date' => '2026-09-01', 'meal_type' => 'lunch', 'name' => 'Meals', 'price' => 10, 'is_available' => true, 'sort_order' => 0]);
+
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/food-menu")
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Sahodaya/Events/FoodMenu', false)
+                ->where('menuItems.0.menu_date', '2026-09-01'));
+    }
+
     public function test_region_sync_skips_items_outside_the_regions_own_date_range(): void
     {
         ['sahodaya' => $sahodaya, 'event' => $hub] = $this->makeSahodayaAndEvent('2026-09-01', '2026-09-05');

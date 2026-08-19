@@ -25,9 +25,25 @@ use App\Models\Tenant;
 class SchoolClassCategoryResolver
 {
     /** Highest active-class fee tier for this school, e.g. 'secondary', 'senior_secondary', 'other'. */
-    public static function feeTierFor(Tenant $school): string
+    public static function feeTierFor(Tenant $school, array $schedule = []): string
     {
-        return self::feeTierLabel(self::highestClassGroupKeyFor($school));
+        $classTier = self::feeTierLabel(self::highestClassGroupKeyFor($school));
+
+        $secMinStudents = isset($schedule['secondary_min_students']) && $schedule['secondary_min_students'] !== '' && $schedule['secondary_min_students'] !== null
+            ? (int) $schedule['secondary_min_students']
+            : null;
+
+        if ($classTier === 'secondary' && $secMinStudents !== null) {
+            $studentCount = \App\Models\Student::where('tenant_id', $school->id)
+                ->where('status', 'active')
+                ->count();
+
+            if ($studentCount <= $secMinStudents) {
+                return 'other';
+            }
+        }
+
+        return $classTier;
     }
 
     /**

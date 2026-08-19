@@ -96,33 +96,31 @@
         </div>
 
         <!-- Payout Modal -->
-        <div v-if="selectedCredit" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" @click="closePayoutModal"></div>
-            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-                <h3 class="text-base font-bold text-slate-900">Record Out-of-Platform Bank Payout</h3>
-                <p class="text-xs text-slate-500 mt-1">
-                    Record a bank transfer refund of <strong class="text-slate-900">₹{{ fmt(selectedCredit.amount) }}</strong> to {{ selectedCredit.school_name }}. This closes out the credit row.
-                </p>
+        <Modal :show="!!selectedCredit" title="Record Out-of-Platform Bank Payout" @close="closePayoutModal">
+            <p class="text-xs text-slate-500">
+                Record a bank transfer refund of <strong class="text-slate-900">₹{{ fmt(selectedCredit?.amount) }}</strong> to {{ selectedCredit?.school_name }}. This closes out the credit row.
+            </p>
 
-                <form class="mt-4 space-y-3" @submit.prevent="submitPayout">
-                    <div>
-                        <label class="form-label text-xs font-semibold text-slate-700">Bank Reference / UTR #</label>
-                        <input v-model="payoutForm.bank_ref" type="text" class="form-input text-sm w-full mt-1" placeholder="e.g. UTR123456789" required />
-                    </div>
-                    <div>
-                        <label class="form-label text-xs font-semibold text-slate-700">Notes / Remarks</label>
-                        <textarea v-model="payoutForm.notes" rows="2" class="form-input text-sm w-full mt-1" placeholder="Optional notes for office record…"></textarea>
-                    </div>
+            <form id="payout-form" class="mt-4 space-y-3" @submit.prevent="submitPayout">
+                <div>
+                    <label class="form-label text-xs font-semibold text-slate-700">Bank Reference / UTR #</label>
+                    <input v-model="payoutForm.bank_ref" type="text" class="form-input text-sm w-full mt-1" placeholder="e.g. UTR123456789" required />
+                </div>
+                <div>
+                    <label class="form-label text-xs font-semibold text-slate-700">Notes / Remarks</label>
+                    <textarea v-model="payoutForm.notes" rows="2" class="form-input text-sm w-full mt-1" placeholder="Optional notes for office record…"></textarea>
+                </div>
+            </form>
 
-                    <div class="flex items-center justify-end gap-2 pt-2">
-                        <button type="button" class="btn-ghost text-xs" @click="closePayoutModal">Cancel</button>
-                        <button type="submit" class="btn-primary text-xs" :disabled="submitting">
-                            {{ submitting ? 'Saving…' : 'Confirm & Close Credit' }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+            <template #footer>
+                <div class="flex items-center justify-end gap-2">
+                    <button type="button" class="btn-ghost text-xs" @click="closePayoutModal">Cancel</button>
+                    <button type="submit" form="payout-form" class="btn-primary text-xs" :disabled="submitting">
+                        {{ submitting ? 'Saving…' : 'Confirm & Close Credit' }}
+                    </button>
+                </div>
+            </template>
+        </Modal>
     </SahodayaAdminLayout>
 </template>
 

@@ -181,6 +181,42 @@
                 </div>
             </div>
 
+            <!-- ── Template ───────────────────────────────────────────────── -->
+            <div v-if="activeTab === 'template'" class="space-y-5">
+                <div v-if="experienceDraft" class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white bg-gradient-to-r from-[#041525] to-sky-900">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-wider text-sky-200">Unpublished template draft</p>
+                        <h2 class="font-bold mt-1">{{ experienceName(experienceDraft.template_key) }}</h2>
+                        <p class="text-sm text-white/75 mt-1">The live website is unchanged until you publish this draft.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <a v-if="publicUrl" :href="publicUrl" target="_blank" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Preview site ↗</a>
+                        <button @click="cancelExperienceDraft" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Cancel draft</button>
+                        <button @click="publishExperienceDraft" :disabled="experienceSaving"
+                                class="px-4 py-2 text-sm font-bold rounded-xl bg-amber-400 text-[#041525] disabled:opacity-50">
+                            {{ experienceSaving ? 'Publishing…' : 'Publish template' }}
+                        </button>
+                    </div>
+                </div>
+
+                <ExperiencePicker :experiences="experiences" :selected-key="selectedExperienceKey"
+                                  :current-key="currentSiteData.template_key"
+                                  @select="selectedExperienceKey = $event" @apply="applyExperienceDraft" />
+
+                <div v-if="siteVersions.length" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                    <h3 class="font-bold text-gray-950 mb-4">Restore points</h3>
+                    <div class="divide-y divide-gray-100">
+                        <div v-for="version in siteVersions" :key="version.id" class="py-3 flex items-center justify-between gap-4">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-800">{{ experienceName(version.template_key) || 'Previous website' }}</p>
+                                <p class="text-xs text-gray-400">{{ (version.action || '').replace(/_/g, ' ') }} · {{ formatDate(version.created_at) }}</p>
+                            </div>
+                            <button @click="restoreSiteVersion(version)" class="text-xs font-bold text-sky-700">Restore</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ── Page Sections ──────────────────────────────────────────── -->
             <template v-if="activeTab === 'sections'">
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3.5 flex items-center justify-between gap-3">
@@ -339,17 +375,9 @@
         </div>
 
         <!-- Add section modal -->
-        <Teleport to="body">
-            <div v-if="addModal.open" class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
-                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <div class="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between z-10">
-                        <h3 class="font-bold text-gray-900 text-lg">Add Section</h3>
-                        <button @click="addModal.open = false"
-                                class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition text-gray-400 text-xl">×</button>
-                    </div>
-
+        <Modal :show="addModal.open" title="Add Section" size="lg" @close="addModal.open = false">
                     <!-- Section type grid -->
-                    <div class="p-6 space-y-5">
+                    <div class="space-y-5">
                         <div v-if="!addModal.selectedType">
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Choose a section type</p>
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -401,15 +429,14 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </Teleport>
+        </Modal>
     </SchoolAdminLayout>
 </template>
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import { ref, reactive, computed, defineComponent, h } from 'vue';
+import ExperiencePicker from '@/Components/sahodaya/website/ExperiencePicker.vue';
+import { ref, reactive, computed, defineComponent, h, onMounted } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -418,6 +445,8 @@ const props = defineProps({
     school:                  Object,
     publicUrl:               { type: String, default: null },
     sections:                { type: Array,  default: () => [] },
+    currentSite:             { type: Object, default: () => ({}) },
+    experiences:             { type: Array,  default: () => [] },
     sectionTypes:            { type: Object, default: () => ({}) },
     fieldDefs:               { type: Object, default: () => ({}) },
     navConfig:               { type: Object, default: () => ({}) },
@@ -430,6 +459,7 @@ const props = defineProps({
 });
 
 const tabs = [
+    { id: 'template', label: 'Template' },
     { id: 'sections', label: 'Page Sections' },
     { id: 'navigation', label: 'Navigation & Admissions' },
     { id: 'footer', label: 'Footer Links' },
@@ -469,6 +499,67 @@ const defaultNavSaving = ref(false);
 
 const addModal = reactive({
     open: false, selectedType: null, selectedVariant: null, saving: false,
+});
+
+// ── Template (whole-site experience) ────────────────────────────────────────
+
+const currentSiteData = reactive({ ...(props.currentSite ?? {}) });
+const experiences = props.experiences ?? [];
+const selectedExperienceKey = ref(currentSiteData.draft_template_json?.template_key ?? currentSiteData.template_key ?? experiences[0]?.key ?? null);
+const experienceDraft = ref(currentSiteData.draft_template_json ?? null);
+const experienceSaving = ref(false);
+const siteVersions = ref([]);
+
+function experienceName(key) {
+    return experiences.find(item => item.key === key)?.name ?? (key ? key.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '');
+}
+
+async function applyExperienceDraft(key, mode = 'full') {
+    if (!(await confirm({ message: `${mode === 'style' ? 'Apply the design character from' : 'Create a complete draft using'} "${experienceName(key)}"? The published website will not change until you publish.`, destructive: false }))) return;
+    experienceSaving.value = true;
+    try {
+        const response = await apiPost('/experience/draft', { site_id: currentSiteData.id, template_key: key, mode });
+        experienceDraft.value = response.draft;
+        selectedExperienceKey.value = key;
+    } finally {
+        experienceSaving.value = false;
+    }
+}
+
+async function cancelExperienceDraft() {
+    if (!(await confirm({ message: 'Cancel this template draft? The published website will remain unchanged.' }))) return;
+    await apiPost('/experience/cancel', { site_id: currentSiteData.id });
+    experienceDraft.value = null;
+}
+
+async function publishExperienceDraft() {
+    if (!(await confirm({ message: 'Publish this template now? A restore point will be created automatically, and your current sections will be replaced.', destructive: false }))) return;
+    experienceSaving.value = true;
+    try {
+        const response = await apiPost('/experience/publish', { site_id: currentSiteData.id });
+        experienceDraft.value = null;
+        currentSiteData.template_key = response.site?.template_key ?? currentSiteData.template_key;
+        currentSiteData.experience_version = response.site?.experience_version ?? currentSiteData.experience_version;
+        if (response.sections) sections.value = response.sections;
+        loadVersions();
+    } finally {
+        experienceSaving.value = false;
+    }
+}
+
+async function loadVersions() {
+    siteVersions.value = await apiGet(`/experience/versions?site_id=${currentSiteData.id}`);
+}
+
+async function restoreSiteVersion(version) {
+    if (!(await confirm({ message: `Restore the website to "${experienceName(version.template_key) || 'this'}" version from ${formatDate(version.created_at)}? This replaces the current sections.`, destructive: true }))) return;
+    const response = await apiPost(`/experience/versions/${version.id}/restore`, { site_id: currentSiteData.id });
+    if (response.sections) sections.value = response.sections;
+    loadVersions();
+}
+
+onMounted(() => {
+    if (currentSiteData.id) loadVersions();
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -524,6 +615,10 @@ async function apiPost(path, body) {
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
         body: JSON.stringify(body),
     });
+    return r.json();
+}
+async function apiGet(path) {
+    const r = await fetch(`${baseUrl.value}${path}`, { headers: { 'Accept': 'application/json' } });
     return r.json();
 }
 async function apiDelete(path) {

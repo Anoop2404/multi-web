@@ -12,7 +12,7 @@ class FestCateringOrder extends Model
         'head_count', 'notes', 'status', 'submitted_by_user_id',
     ];
 
-    protected $casts = ['meal_date' => 'date'];
+    protected $casts = ['meal_date' => 'date:Y-m-d'];
 
     public function event(): BelongsTo
     {

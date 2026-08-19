@@ -546,8 +546,20 @@ class FestSportsCompositeFeeService
      *   student_count: int,
      *   extra_item: float,
      *   included_quota: int,
-     *   lines: list<array{line_type: string, label: string, quantity: int, unit_amount: float, amount: float, meta?: array}>
+     *   lines: list<array{line_type: string, label: string, quantity: int, unit_amount: float, amount: float, meta?: array}>,
+     *   phase_attribution: array{
+     *     per_student_rate: float,
+     *     student_reg: array{by_phase: array<int, array{amount: float, student_count: int}>, no_phase: array{amount: float, student_count: int}, unattributed: array{amount: float, student_count: int}},
+     *     extra_item: array{by_phase: array<int, float>, no_phase: float}
+     *   }
      * }
+     *
+     * The whole method stays event-wide and unfiltered — quota/position is computed once
+     * across every registration for the event, never reset per phase. phase_attribution is
+     * additive, derived from that same walk: it's what FestSchoolEventFeeService::
+     * recalculateForPhase() reads to split this single, correctly-quota'd calculation across
+     * each FestEventPhase's own invoice, per the "quota applies once across the whole event"
+     * decision — see that method's compositeAttributionForPhase() helper.
      */
     public function calculate(FestEvent $event, string $schoolId, array $schedule): array
     {
@@ -592,11 +604,15 @@ class FestSportsCompositeFeeService
         $extraLines = [];
         $extraTotal = 0.0;
 
+        // Ordered by id so item "position" (for the quota walk below) and each student's
+        // "first item's phase" (for the once-per-event phase attribution below) agree on
+        // one deterministic sequence — see FestSchoolEventFeeService::recalculateForPhase().
         $registrations = FestRegistration::whereIn('event_id', $eventIds)
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
             ->with(['item', 'participants'])
+            ->orderBy('id')
             ->get();
 
         $itemCountByStudent = [];
@@ -609,6 +625,15 @@ class FestSportsCompositeFeeService
             }
         }
 
+        // Once-per-event phase attribution (see FestSchoolEventFeeService::
+        // recalculateForPhase()): a student's flat per-student fee is attributed to
+        // whichever phase their EARLIEST item registration belongs to (position === 1
+        // below); each item-level charge is attributed to that item's own phase.
+        // Populated for free as the same position walk that drives the quota runs.
+        $firstItemPhaseByStudent = [];
+        $extraByPhase = [];
+        $extraNoPhase = 0.0;
+
         $chargedRegistrations = [];
         foreach ($registrations as $registration) {
             foreach ($registration->participants as $participant) {
@@ -618,6 +643,11 @@ class FestSportsCompositeFeeService
                 $studentId = $participant->student_id;
                 $position = ($chargedRegistrations[$studentId] ?? 0) + 1;
                 $chargedRegistrations[$studentId] = $position;
+                $itemPhaseId = $registration->item?->phase_id;
+
+                if ($position === 1) {
+                    $firstItemPhaseByStudent[$studentId] = $itemPhaseId;
+                }
 
                 // Items within quota are covered by the student registration fee.
                 if ($includedQuota > 0 && $position <= $includedQuota) {
@@ -648,11 +678,55 @@ class FestSportsCompositeFeeService
                         'registration_id' => $registration->id,
                         'item_position' => $position,
                         'included_quota' => $includedQuota,
+                        'phase_id' => $itemPhaseId,
                     ],
                 ];
                 $extraTotal += $amount;
+
+                if ($itemPhaseId !== null) {
+                    $extraByPhase[$itemPhaseId] = ($extraByPhase[$itemPhaseId] ?? 0.0) + $amount;
+                } else {
+                    $extraNoPhase += $amount;
+                }
             }
         }
+
+        // Fold each billed student's flat fee into the phase bucket of their first item.
+        // A student counted in $studentIds but never seen in the walk above (their only
+        // registration's item was later disabled, excluding it from $registrations but not
+        // from $studentIds — a narrow, pre-existing inconsistency independent of phases) has
+        // no attributable phase at all, tracked separately rather than dropped or guessed.
+        $studentRegByPhase = [];
+        $studentRegNoPhase = ['amount' => 0.0, 'student_count' => 0];
+        $studentRegUnattributed = ['amount' => 0.0, 'student_count' => 0];
+
+        foreach ($studentIds as $studentId) {
+            if (! array_key_exists($studentId, $firstItemPhaseByStudent)) {
+                $studentRegUnattributed['amount'] += $perStudent;
+                $studentRegUnattributed['student_count']++;
+
+                continue;
+            }
+
+            $phaseId = $firstItemPhaseByStudent[$studentId];
+            if ($phaseId === null) {
+                $studentRegNoPhase['amount'] += $perStudent;
+                $studentRegNoPhase['student_count']++;
+
+                continue;
+            }
+
+            $studentRegByPhase[$phaseId] ??= ['amount' => 0.0, 'student_count' => 0];
+            $studentRegByPhase[$phaseId]['amount'] += $perStudent;
+            $studentRegByPhase[$phaseId]['student_count']++;
+        }
+
+        foreach ($studentRegByPhase as &$bucket) {
+            $bucket['amount'] = round($bucket['amount'], 2);
+        }
+        unset($bucket);
+        $studentRegNoPhase['amount'] = round($studentRegNoPhase['amount'], 2);
+        $studentRegUnattributed['amount'] = round($studentRegUnattributed['amount'], 2);
 
         // No school registration fee if the school hasn't registered anything at all
         // for this event — neither an event-level registration nor any item.
@@ -690,6 +764,18 @@ class FestSportsCompositeFeeService
             'extra_item' => round($extraTotal, 2),
             'included_quota' => $includedQuota,
             'lines' => $lines,
+            'phase_attribution' => [
+                'per_student_rate' => $perStudent,
+                'student_reg' => [
+                    'by_phase' => $studentRegByPhase,
+                    'no_phase' => $studentRegNoPhase,
+                    'unattributed' => $studentRegUnattributed,
+                ],
+                'extra_item' => [
+                    'by_phase' => array_map(fn ($amount) => round($amount, 2), $extraByPhase),
+                    'no_phase' => round($extraNoPhase, 2),
+                ],
+            ],
         ];
     }
 

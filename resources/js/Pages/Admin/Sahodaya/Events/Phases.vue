@@ -6,8 +6,11 @@
 
         <EventSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="phases" />
 
-        <div class="mb-4">
+        <div class="mb-4 flex items-center gap-4 flex-wrap">
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/levels`" class="link-brand text-sm">&larr; Back to Rounds & Levels</Link>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/phase-plan-wizard`" class="btn-secondary text-xs">
+                ⚡ Set up in bulk with the Phase Plan Wizard
+            </Link>
         </div>
 
         <div v-if="conductSystemLocked === 'partitioned'" class="mb-4 max-w-5xl rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">

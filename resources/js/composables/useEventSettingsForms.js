@@ -143,7 +143,7 @@ export function useEventSettingsForms(props) {
     const venueForm = useForm({ name: '', location: '', capacity: null, region_id: '' });
     const stageForm = useForm({ name: '', venue_id: '' });
     const comboForm = useForm({ school_id: '', class_group: '', max_arts_events: null, max_sports_events: null, max_on_stage: null, max_off_stage: null });
-    const gradeForm = useForm({ item_id: '', grade: 'A', min_score: null, max_score: null });
+    const gradeForm = useForm({ item_id: '', grade: 'A', min_score: null, max_score: null, min_percent: null, max_percent: null });
     const pointForm = useForm({ grade: '', position: null, points: null, is_group: false });
     const rankRows = ref(initRankRows(props.rankPoints));
     const groupRankRows = ref(initRankRows(props.groupRankPoints, 0));
@@ -514,8 +514,41 @@ export function useEventSettingsForms(props) {
         router.delete(`${base}/combo-rules/${id}`, { preserveScroll: true });
     }
 
+    const editingGradeConfigId = ref(null);
+
     function addGradeConfig() {
         gradeForm.post(`${base}/grade-configs`, { preserveScroll: true, onSuccess: () => gradeForm.reset({ grade: 'A' }) });
+    }
+
+    function startEditGradeConfig(config) {
+        editingGradeConfigId.value = config.id;
+        gradeForm.clearErrors();
+        gradeForm.item_id = config.item_id ?? '';
+        gradeForm.grade = config.grade;
+        gradeForm.min_score = config.min_score;
+        gradeForm.max_score = config.max_score;
+        gradeForm.min_percent = config.min_percent;
+        gradeForm.max_percent = config.max_percent;
+    }
+
+    function cancelEditGradeConfig() {
+        editingGradeConfigId.value = null;
+        gradeForm.reset({ grade: 'A' });
+    }
+
+    function saveGradeConfig() {
+        if (! editingGradeConfigId.value) {
+            addGradeConfig();
+            return;
+        }
+
+        gradeForm.put(`${base}/grade-configs/${editingGradeConfigId.value}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                editingGradeConfigId.value = null;
+                gradeForm.reset({ grade: 'A' });
+            },
+        });
     }
 
     function removeGradeConfig(id) {
@@ -650,6 +683,10 @@ export function useEventSettingsForms(props) {
         removeComboRule,
         addGradeConfig,
         removeGradeConfig,
+        editingGradeConfigId,
+        startEditGradeConfig,
+        cancelEditGradeConfig,
+        saveGradeConfig,
         addPointRule,
         removePointRule,
         rankRows,

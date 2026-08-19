@@ -2,10 +2,10 @@
     <AdminLayout :title="program.title">
         <div class="space-y-6 max-w-6xl mx-auto">
             <!-- Header Banner -->
-            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 rounded-2xl text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="bg-gradient-to-r from-[#041525] via-[#0a2744] to-[#0f3d7a] p-6 rounded-2xl text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <div class="flex items-center gap-3 mb-2">
-                        <Link href="/admin/state-programs" class="text-xs font-semibold text-indigo-300 hover:text-white transition">
+                        <Link href="/admin/state-programs" class="text-xs font-semibold text-slate-300 hover:text-white transition">
                             ← Back to State Programs
                         </Link>
                         <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold capitalize"
@@ -33,12 +33,12 @@
                     </template>
                     <form v-if="program.status !== 'published'" @submit.prevent="publish">
                         <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition shadow-lg shadow-emerald-500/20">
-                            🚀 Publish to all Sahodayas
+                            Publish to all Sahodayas
                         </button>
                     </form>
                     <form v-else @submit.prevent="publish">
                         <button type="submit" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition border border-white/10 backdrop-blur">
-                            🔄 Re-sync Clusters
+                            Re-sync Clusters
                         </button>
                     </form>
                 </div>
@@ -53,13 +53,13 @@
                     @click="activeTab = tab.id"
                     class="px-4 py-2.5 text-sm font-bold border-b-2 transition whitespace-nowrap flex items-center gap-2"
                     :class="activeTab === tab.id
-                        ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-xl'
+                        ? 'border-[color:var(--brand-blue)] text-[color:var(--brand-blue)] bg-[color:var(--brand-blue)]/10 rounded-t-xl'
                         : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300'"
                 >
                     <span>{{ tab.icon }}</span>
                     <span>{{ tab.label }}</span>
                     <span v-if="tab.badge !== undefined" class="px-2 py-0.5 rounded-full text-xs"
-                          :class="activeTab === tab.id ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'">
+                          :class="activeTab === tab.id ? 'bg-[color:var(--brand-blue)]/10 text-[color:var(--brand-blue)]' : 'bg-slate-100 text-slate-600'">
                         {{ tab.badge }}
                     </span>
                 </button>
@@ -73,11 +73,11 @@
                     <div class="grid sm:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Program Title *</label>
-                            <input v-model="form.title" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm font-medium" required>
+                            <input v-model="form.title" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-[color:var(--brand-blue)] text-sm font-medium" required>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Program Status *</label>
-                            <select v-model="form.status" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm font-medium">
+                            <select v-model="form.status" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-[color:var(--brand-blue)] text-sm font-medium">
                                 <option value="published">🟢 Published / Active</option>
                                 <option value="draft">🟡 Draft (Setup mode)</option>
                                 <option value="inactive">🔴 Inactive (Disabled)</option>
@@ -85,7 +85,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Event Type *</label>
-                            <select v-model="form.event_type" :disabled="program.status === 'published'" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm font-medium">
+                            <select v-model="form.event_type" :disabled="program.status === 'published'" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-[color:var(--brand-blue)] text-sm font-medium">
                                 <option v-for="(label, key) in eventTypes" :key="key" :value="key">{{ label }}</option>
                             </select>
                         </div>
@@ -95,7 +95,7 @@
                         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Conduct Levels</label>
                         <div class="flex flex-wrap gap-4">
                             <label v-for="(label, key) in selectableLevelLabels" :key="key" class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200/80 cursor-pointer hover:bg-slate-100">
-                                <input type="checkbox" :value="key" v-model="form.conduct_levels" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <input type="checkbox" :value="key" v-model="form.conduct_levels" class="rounded text-[color:var(--brand-blue)] focus:ring-[color:var(--brand-blue)]">
                                 {{ label }}
                             </label>
                         </div>
@@ -104,7 +104,7 @@
                     <!-- State Handoff Configuration -->
                     <div v-if="form.conduct_levels.includes('state')" class="p-5 rounded-2xl bg-slate-900 text-white space-y-4">
                         <div>
-                            <p class="text-sm font-bold text-amber-400">🔌 State Intake API & Qualifier Policy</p>
+                            <p class="text-sm font-bold text-amber-400">State Intake API & Qualifier Policy</p>
                             <p class="text-xs text-slate-300 mt-0.5">Configures signed API endpoint credentials and position qualifier boundaries from Sahodayas.</p>
                         </div>
 
@@ -163,7 +163,7 @@
                     </div>
 
                     <div class="flex justify-end pt-3">
-                        <button type="submit" class="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition">
+                        <button type="submit" class="btn-primary">
                             Save Changes
                         </button>
                     </div>
@@ -178,7 +178,7 @@
                             <h2 class="text-base font-bold text-slate-900">Master Item Catalog</h2>
                             <p class="text-xs text-slate-500 mt-0.5">Define state catalog items. Sahodaya complexes inherit these items when published.</p>
                         </div>
-                        <span class="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold self-start">
+                        <span class="px-3 py-1 rounded-full bg-[color:var(--brand-blue)]/10 text-[color:var(--brand-blue)] text-xs font-bold self-start">
                             {{ program.items?.length || 0 }} item(s) configured
                         </span>
                     </div>
@@ -219,7 +219,7 @@
                             <input v-model.number="itemForm.qualify_count" type="number" min="1" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="State Qualifiers (default 2)">
                         </div>
                         <div class="flex justify-end">
-                            <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition">
+                            <button type="submit" class="px-5 py-2 rounded-xl bg-[color:var(--brand-navy)] hover:bg-[color:var(--brand-navy-hover)] text-white font-bold text-xs transition">
                                 + Add State Item
                             </button>
                         </div>
@@ -229,36 +229,36 @@
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/80">
                         <!-- Quick Filter Pills -->
                         <div class="flex items-center gap-1.5 flex-wrap">
-                            <button type="button" 
-                                    @click="catalogFilter = 'all'" 
-                                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                                    :class="catalogFilter === 'all' ? 'bg-slate-900 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'">
+                            <button type="button"
+                                    @click="catalogFilter = 'all'"
+                                    class="gap-1.5 transition cursor-pointer"
+                                    :class="catalogFilter === 'all' ? 'catalog-pill catalog-pill--active' : 'catalog-pill'">
                                 All Items
-                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'all' ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-500'">{{ catalogCounts.all }}</span>
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'all' ? 'bg-[color:var(--brand-blue)]/20 text-[color:var(--brand-blue)]' : 'bg-slate-100 text-slate-500'">{{ catalogCounts.all }}</span>
                             </button>
 
-                            <button type="button" 
-                                    @click="catalogFilter = 'onstage_ind'" 
-                                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                                    :class="catalogFilter === 'onstage_ind' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-indigo-50 border border-slate-200/80'">
+                            <button type="button"
+                                    @click="catalogFilter = 'onstage_ind'"
+                                    class="gap-1.5 transition cursor-pointer"
+                                    :class="catalogFilter === 'onstage_ind' ? 'inline-flex items-center rounded-full border border-indigo-600 bg-indigo-600/10 px-3 py-1.5 text-xs font-semibold text-indigo-700' : 'catalog-pill'">
                                 🎭 On-Stage (Ind)
-                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'onstage_ind' ? 'bg-indigo-700 text-indigo-100' : 'bg-indigo-50 text-indigo-600'">{{ catalogCounts.onstage_ind }}</span>
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'onstage_ind' ? 'bg-indigo-600/20 text-indigo-700' : 'bg-slate-100 text-slate-500'">{{ catalogCounts.onstage_ind }}</span>
                             </button>
 
-                            <button type="button" 
-                                    @click="catalogFilter = 'group'" 
-                                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                                    :class="catalogFilter === 'group' ? 'bg-purple-600 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-purple-50 border border-slate-200/80'">
+                            <button type="button"
+                                    @click="catalogFilter = 'group'"
+                                    class="gap-1.5 transition cursor-pointer"
+                                    :class="catalogFilter === 'group' ? 'inline-flex items-center rounded-full border border-purple-600 bg-purple-600/10 px-3 py-1.5 text-xs font-semibold text-purple-700' : 'catalog-pill'">
                                 👥 Group Items
-                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'group' ? 'bg-purple-700 text-purple-100' : 'bg-purple-50 text-purple-600'">{{ catalogCounts.group }}</span>
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'group' ? 'bg-purple-600/20 text-purple-700' : 'bg-slate-100 text-slate-500'">{{ catalogCounts.group }}</span>
                             </button>
 
-                            <button type="button" 
-                                    @click="catalogFilter = 'offstage'" 
-                                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                                    :class="catalogFilter === 'offstage' ? 'bg-amber-600 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-amber-50 border border-slate-200/80'">
+                            <button type="button"
+                                    @click="catalogFilter = 'offstage'"
+                                    class="gap-1.5 transition cursor-pointer"
+                                    :class="catalogFilter === 'offstage' ? 'inline-flex items-center rounded-full border border-amber-600 bg-amber-600/10 px-3 py-1.5 text-xs font-semibold text-amber-700' : 'catalog-pill'">
                                 🎨 Off-Stage
-                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'offstage' ? 'bg-amber-700 text-amber-100' : 'bg-amber-50 text-amber-600'">{{ catalogCounts.offstage }}</span>
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="catalogFilter === 'offstage' ? 'bg-amber-600/20 text-amber-700' : 'bg-slate-100 text-slate-500'">{{ catalogCounts.offstage }}</span>
                             </button>
                         </div>
 
@@ -268,7 +268,7 @@
                                 <input v-model="catalogSearch" 
                                        type="text" 
                                        placeholder="Search item or code..." 
-                                       class="w-full pl-8 pr-7 py-1.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                                       class="w-full pl-8 pr-7 py-1.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-[color:var(--brand-blue)] focus:border-[color:var(--brand-blue)] bg-white">
                                 <span class="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
                                 <button v-if="catalogSearch" type="button" @click="catalogSearch = ''" class="absolute right-2.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
                             </div>
@@ -329,8 +329,8 @@
                                     </td>
                                     <td class="py-3 px-4 text-right">
                                         <div class="flex items-center justify-end gap-2">
-                                            <button type="button" @click="openEditItemModal(item)" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200/60">
-                                                ✏️ Edit
+                                            <button type="button" @click="openEditItemModal(item)" class="px-2.5 py-1 rounded-lg bg-[color:var(--brand-blue)]/10 hover:bg-[color:var(--brand-blue)]/20 text-[color:var(--brand-blue)] font-bold text-xs transition border border-[color:var(--brand-blue)]/20">
+                                                Edit
                                             </button>
                                             <button type="button" @click="removeItem(item.id)" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs transition border border-red-200/60">
                                                 Remove
@@ -344,7 +344,7 @@
                                         <button v-if="catalogSearch || catalogFilter !== 'all' || catalogCategoryFilter" 
                                                 type="button" 
                                                 @click="catalogSearch = ''; catalogFilter = 'all'; catalogCategoryFilter = ''" 
-                                                class="mt-2 text-xs font-bold text-indigo-600 hover:underline">
+                                                class="mt-2 text-xs link-brand">
                                             Reset Filters
                                         </button>
                                     </td>
@@ -460,7 +460,7 @@
                                 <button type="button" @click="closeEditItemModal" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
                                     Cancel
                                 </button>
-                                <button type="submit" :disabled="editItemForm.processing" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow-md">
+                                <button type="submit" :disabled="editItemForm.processing" class="px-5 py-2 rounded-xl bg-[color:var(--brand-navy)] hover:bg-[color:var(--brand-navy-hover)] text-white font-bold text-xs transition shadow-md">
                                     Save Item Changes
                                 </button>
                             </div>
@@ -497,14 +497,14 @@
                         </div>
                     </div>
 
-                    <div v-if="form.conduct_levels.includes('state')" class="p-5 rounded-2xl bg-indigo-50 border border-indigo-200 space-y-3">
+                    <div v-if="form.conduct_levels.includes('state')" class="p-5 rounded-2xl bg-[color:var(--brand-blue)]/10 border border-[color:var(--brand-blue)]/20 space-y-3">
                         <div>
-                            <h3 class="text-sm font-bold text-indigo-950 uppercase tracking-wider">State remittance rate</h3>
-                            <p class="text-xs text-indigo-700">Charged to each Sahodaya for every qualifier accepted into the State event.</p>
+                            <h3 class="text-sm font-bold text-[color:var(--brand-navy)] uppercase tracking-wider">State remittance rate</h3>
+                            <p class="text-xs text-[color:var(--brand-blue)]">Charged to each Sahodaya for every qualifier accepted into the State event.</p>
                         </div>
                         <div class="max-w-sm">
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Fee per accepted nominee/team (₹)</label>
-                            <input v-model.number="form.level_fees.state.individual_amount" type="number" min="0" class="w-full px-3.5 py-2 rounded-xl border border-indigo-200 text-sm font-medium">
+                            <input v-model.number="form.level_fees.state.individual_amount" type="number" min="0" class="w-full px-3.5 py-2 rounded-xl border border-[color:var(--brand-blue)]/30 text-sm font-medium">
                         </div>
                     </div>
 
@@ -539,7 +539,7 @@
                     </div>
 
                     <div class="flex justify-end">
-                        <button type="submit" class="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition">
+                        <button type="submit" class="btn-primary">
                             Save Fee & Policy Rules
                         </button>
                     </div>
@@ -585,10 +585,10 @@
                                     </td>
                                     <td class="py-3.5 px-4">
                                         <button v-if="cluster.is_enabled" type="button" @click="toggleSahodaya(cluster, false)" class="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition">
-                                            🟢 Active — Click to Disable
+                                            Active — Click to Disable
                                         </button>
                                         <button v-else type="button" @click="toggleSahodaya(cluster, true)" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition">
-                                            🔴 Disabled — Click to Enable
+                                            Disabled — Click to Enable
                                         </button>
                                     </td>
                                     <!-- STATE_SAHODAYA_RULE_BOUNDARY_FIX_PLAN — Set 1, Item 3 -->
@@ -596,14 +596,14 @@
                                         <span v-if="cluster.sahodaya_customized_at"
                                               class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200"
                                               :title="`This Sahodaya has locally customised their event settings (title, dates, venue, fee, or description). Re-publishing this program will NOT overwrite their changes. Customised since: ${new Date(cluster.sahodaya_customized_at).toLocaleDateString()}.`">
-                                            🔧 Customised · {{ new Date(cluster.sahodaya_customized_at).toLocaleDateString() }}
+                                            Customised · {{ new Date(cluster.sahodaya_customized_at).toLocaleDateString() }}
                                         </span>
                                         <span v-else-if="cluster.deployed" class="text-xs text-slate-400 font-medium">✓ Synced to State</span>
                                         <span v-else class="text-xs text-slate-300">—</span>
                                     </td>
                                     <td class="py-3.5 px-4 text-right">
-                                        <button v-if="cluster.deployed" type="button" @click="openSahodayaItemModal(cluster)" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition">
-                                            🎯 Manage Sahodaya Items →
+                                        <button v-if="cluster.deployed" type="button" @click="openSahodayaItemModal(cluster)" class="px-3 py-1.5 rounded-lg bg-[color:var(--brand-blue)]/10 hover:bg-[color:var(--brand-blue)]/20 text-[color:var(--brand-blue)] text-xs font-bold border border-[color:var(--brand-blue)]/20 transition">
+                                            Manage Sahodaya Items →
                                         </button>
                                         <span v-else class="text-xs text-slate-400 font-medium">Publish program first</span>
                                     </td>
@@ -624,7 +624,7 @@
                             <p class="text-xs text-slate-500 mt-0.5">Manage code-gated access credentials for Sahodaya complexes that are not platform tenants.</p>
                         </div>
                         <Link :href="`/admin/state-programs/${program.id}/external-sahodayas`"
-                              class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition">
+                              class="px-4 py-2 rounded-xl bg-[color:var(--brand-navy)] hover:bg-[color:var(--brand-navy-hover)] text-white font-bold text-xs transition">
                             Manage Credentials & Codes →
                         </Link>
                     </div>
@@ -636,7 +636,7 @@
                 <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
                     <div class="p-5 bg-slate-900 text-white flex items-center justify-between">
                         <div>
-                            <h3 class="font-bold text-base">🎯 {{ activeSahodaya?.name }} — Item Visibility Matrix</h3>
+                            <h3 class="font-bold text-base">{{ activeSahodaya?.name }} — Item Visibility Matrix</h3>
                             <p class="text-xs text-slate-300">Enable or hide specific state items for this Sahodaya complex.</p>
                         </div>
                         <button type="button" @click="sahodayaModalOpen = false" class="text-slate-400 hover:text-white text-xl font-bold px-2">✕</button>
@@ -656,7 +656,7 @@
 
                     <div class="flex-1 overflow-y-auto p-5">
                         <div v-if="loadingItems" class="text-center py-12 text-slate-500 text-sm font-medium">
-                            ⏳ Loading Sahodaya items...
+                            Loading Sahodaya items...
                         </div>
                         <div v-else-if="!filteredSahodayaItems.length" class="text-center py-12 text-slate-400 text-sm">
                             No matching items found.

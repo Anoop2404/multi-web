@@ -34,27 +34,24 @@
             </div>
         </div>
 
-        <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showModal = false"></div>
-            <div class="relative bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-                <h3 class="font-bold text-lg">New password</h3>
-                <p class="text-sm text-slate-600">{{ credentials?.school_name }}</p>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 text-sm">
-                    <div class="flex justify-between gap-3">
-                        <span class="text-slate-500">Username</span>
-                        <span class="font-mono font-semibold text-slate-900">{{ credentials?.username || '—' }}</span>
-                    </div>
-                    <div class="flex justify-between gap-3">
-                        <span class="text-slate-500">Password</span>
-                        <span class="font-mono font-semibold text-emerald-800">{{ credentials?.password || '—' }}</span>
-                    </div>
+        <Modal :show="showModal" title="New password" :subtitle="credentials?.school_name" @close="showModal = false">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 text-sm">
+                <div class="flex justify-between gap-3">
+                    <span class="text-slate-500">Username</span>
+                    <span class="font-mono font-semibold text-slate-900">{{ credentials?.username || '—' }}</span>
                 </div>
-                <p class="text-xs text-slate-500">This is shown once. Relay it to the school's coordinator yourself — no email is sent automatically.</p>
+                <div class="flex justify-between gap-3">
+                    <span class="text-slate-500">Password</span>
+                    <span class="font-mono font-semibold text-emerald-800">{{ credentials?.password || '—' }}</span>
+                </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-3">This is shown once. Relay it to the school's coordinator yourself — no email is sent automatically.</p>
+            <template #footer>
                 <div class="flex justify-end">
                     <button type="button" class="btn-primary text-sm" @click="showModal = false">Close</button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </Modal>
     </AdminLayout>
 </template>
 

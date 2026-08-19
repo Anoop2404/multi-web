@@ -348,9 +348,51 @@ class BuilderApiController extends Controller
         ]);
 
         $tenant = Tenant::findOrFail($tenantId);
-        $tenant->setSetting('theme', $data);
+        // Merge rather than overwrite — a raw overwrite drops keys this request
+        // doesn't touch, including the `customized` flag the Sahodaya self-service
+        // theme path (SahodayaTenantBranding::saveTheme()) relies on to know a theme
+        // was deliberately chosen rather than left at its subdomain default.
+        $existing = $tenant->getSetting('theme', []) ?? [];
+        $tenant->setSetting('theme', array_merge($existing, $data, ['customized' => true]));
 
         return response()->json(['saved' => true]);
+    }
+
+    // ── V2 experience design tokens (any tenant's WebsiteSite.design_json) ─────
+
+    public function getDesign(string $tenantId): JsonResponse
+    {
+        $site = WebsiteSite::where('tenant_id', $tenantId)->where('is_primary', true)->first();
+
+        return response()->json([
+            'experience_version' => $site?->experience_version ?? 'v1',
+            'design' => $site?->design_json ?? [],
+        ]);
+    }
+
+    public function saveDesign(Request $request, string $tenantId): JsonResponse
+    {
+        $site = WebsiteSite::where('tenant_id', $tenantId)->where('is_primary', true)->firstOrFail();
+
+        $data = $request->validate([
+            'primary' => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'secondary' => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'accent_color' => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'display_font' => 'required|in:Inter,Manrope,Merriweather,Roboto',
+            'body_font' => 'required|in:Inter,Manrope,Roboto',
+            'type_scale' => 'required|in:compact,balanced,editorial',
+            'density' => 'required|in:compact,comfortable,spacious',
+            'surface' => 'required|in:flat,bordered,soft,elevated',
+            'corners' => 'required|in:square,soft,rounded',
+            'buttons' => 'required|in:solid,bordered,understated',
+            'images' => 'required|in:documentary,vibrant,formal,monochrome',
+            'motion' => 'required|in:none,restrained,expressive',
+        ]);
+
+        $site->update(['design_json' => $data]);
+        $this->bustCache($tenantId);
+
+        return response()->json(['saved' => true, 'design' => $data]);
     }
 
     // ── Widgets config ────────────────────────────────────────────────────────

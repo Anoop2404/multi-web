@@ -63,6 +63,31 @@
                     </button>
                     <span v-if="saved" class="ml-3 text-sm text-green-600 font-medium">✓ Saved!</span>
                 </div>
+
+                <!-- V2 experience design tokens — only shown for tenants on the richer design system -->
+                <div v-if="isV2" class="card">
+                    <h3 class="font-bold text-gray-900 mb-1">Advanced Design (V2 Experience)</h3>
+                    <p class="text-xs text-gray-400 mb-4">This site uses the newer template/experience system — it reads these tokens instead of the flat theme above.</p>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div v-for="field in v2Fields" :key="field.key">
+                            <label class="form-label mb-1.5">{{ field.label }}</label>
+                            <div v-if="field.type === 'color'" class="flex items-center gap-2">
+                                <input type="color" v-model="v2Design[field.key]"
+                                       class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5">
+                                <input type="text" v-model="v2Design[field.key]"
+                                       class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2">
+                            </div>
+                            <select v-else v-model="v2Design[field.key]" class="field">
+                                <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button @click="saveV2Design" :disabled="!selectedTenantId"
+                            class="mt-6 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition disabled:opacity-50">
+                        Save Advanced Design
+                    </button>
+                    <span v-if="v2Saved" class="ml-3 text-sm text-green-600 font-medium">✓ Saved!</span>
+                </div>
             </div>
 
             <!-- Live preview -->
@@ -121,7 +146,7 @@ const saved = ref(false);
 const theme = reactive({
     primary: '#4f46e5',
     secondary: '#f59e0b',
-    accent: '#10b981',
+    accent_color: '#10b981',
     font_heading: 'Poppins, sans-serif',
     font_body: 'Inter, sans-serif',
     border_radius: 'md',
@@ -132,7 +157,7 @@ const theme = reactive({
 const themeFields = [
     { key: 'primary',      label: 'Primary Color',   type: 'color' },
     { key: 'secondary',    label: 'Secondary Color',  type: 'color' },
-    { key: 'accent',       label: 'Accent Color',     type: 'color' },
+    { key: 'accent_color', label: 'Accent Color',     type: 'color' },
     { key: 'font_heading', label: 'Heading Font',     type: 'text' },
     { key: 'font_body',    label: 'Body Font',        type: 'text' },
     { key: 'border_radius',label: 'Border Radius',    type: 'select', options: [
@@ -158,6 +183,29 @@ const themeFields = [
     ]},
 ];
 
+const isV2 = ref(false);
+const v2Saved = ref(false);
+const v2Design = reactive({
+    primary: '#4f46e5', secondary: '#7c3aed', accent_color: '#f59e0b',
+    display_font: 'Inter', body_font: 'Inter', type_scale: 'balanced',
+    density: 'comfortable', surface: 'elevated', corners: 'soft',
+    buttons: 'solid', images: 'documentary', motion: 'restrained',
+});
+const v2Fields = [
+    { key: 'primary', label: 'Primary Color', type: 'color' },
+    { key: 'secondary', label: 'Secondary Color', type: 'color' },
+    { key: 'accent_color', label: 'Accent Color', type: 'color' },
+    { key: 'display_font', label: 'Display Font', type: 'select', options: ['Inter', 'Manrope', 'Merriweather', 'Roboto'] },
+    { key: 'body_font', label: 'Body Font', type: 'select', options: ['Inter', 'Manrope', 'Roboto'] },
+    { key: 'type_scale', label: 'Type Scale', type: 'select', options: ['compact', 'balanced', 'editorial'] },
+    { key: 'density', label: 'Density', type: 'select', options: ['compact', 'comfortable', 'spacious'] },
+    { key: 'surface', label: 'Surface', type: 'select', options: ['flat', 'bordered', 'soft', 'elevated'] },
+    { key: 'corners', label: 'Corners', type: 'select', options: ['square', 'soft', 'rounded'] },
+    { key: 'buttons', label: 'Buttons', type: 'select', options: ['solid', 'bordered', 'understated'] },
+    { key: 'images', label: 'Image Treatment', type: 'select', options: ['documentary', 'vibrant', 'formal', 'monochrome'] },
+    { key: 'motion', label: 'Motion', type: 'select', options: ['none', 'restrained', 'expressive'] },
+];
+
     async function loadTheme() {
         if (!selectedTenantId.value) return;
         const res = await fetch(`/admin/api/tenants/${selectedTenantId.value}/theme`, {
@@ -166,6 +214,31 @@ const themeFields = [
         const data = await res.json();
         Object.assign(theme, data ?? {});
         activePreset.value = data.preset_slug ?? '';
+
+        const designRes = await fetch(`/admin/api/tenants/${selectedTenantId.value}/design`, {
+            headers: { 'Accept': 'application/json' },
+        });
+        const designData = await designRes.json();
+        isV2.value = designData.experience_version === 'v2';
+        if (designData.design && Object.keys(designData.design).length) {
+            Object.assign(v2Design, designData.design);
+        }
+    }
+
+    async function saveV2Design() {
+        if (!selectedTenantId.value) return;
+        v2Saved.value = false;
+        await fetch(`/admin/api/tenants/${selectedTenantId.value}/design`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content ?? '',
+            },
+            body: JSON.stringify(v2Design),
+        });
+        v2Saved.value = true;
+        setTimeout(() => { v2Saved.value = false; }, 3000);
     }
 
     function applyPreset(preset) {

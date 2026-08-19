@@ -182,6 +182,11 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
         Route::delete('/{announcement}', [\App\Http\Controllers\Admin\PlatformAnnouncementController::class, 'destroy'])->name('destroy');
     });
 
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\PlatformReportsController::class, 'index'])->name('index');
+        Route::get('/snapshots/export', [\App\Http\Controllers\Admin\PlatformReportsController::class, 'exportSnapshots'])->name('snapshots.export');
+    });
+
     Route::get('/dashboard', function (\App\Services\Reports\PlatformDashboardSnapshotService $snapshots) {
         $stats = [
             'total_tenants'   => \App\Models\Tenant::count(),
@@ -291,6 +296,10 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
         // Theme
         Route::get('/theme',           [BuilderApiController::class, 'getTheme'])->name('theme.get');
         Route::post('/theme',          [BuilderApiController::class, 'saveTheme'])->name('theme.save');
+
+        // V2 experience design tokens
+        Route::get('/design',          [BuilderApiController::class, 'getDesign'])->name('design.get');
+        Route::post('/design',         [BuilderApiController::class, 'saveDesign'])->name('design.save');
 
         // Widgets
         Route::get('/widgets',         [BuilderApiController::class, 'getWidgets'])->name('widgets.get');
@@ -689,6 +698,13 @@ Route::prefix('school-admin/{tenantId}')
         Route::post('/default-nav', [SiteBuilderApiController::class, 'ensureDefaultNav'])->name('default-nav.ensure');
         Route::get('/public-website', [SiteBuilderApiController::class, 'getPublicWebsite'])->name('public-website.get');
         Route::post('/public-website', [SiteBuilderApiController::class, 'savePublicWebsite'])->name('public-website.save');
+        Route::get('/experiences', [SiteBuilderApiController::class, 'experiences'])->name('experiences.index');
+        Route::post('/experience/draft', [SiteBuilderApiController::class, 'applyExperienceDraft'])->name('experience.draft');
+        Route::post('/experience/cancel', [SiteBuilderApiController::class, 'cancelExperienceDraft'])->name('experience.cancel');
+        Route::post('/experience/publish', [SiteBuilderApiController::class, 'publishExperienceDraft'])->name('experience.publish');
+        Route::get('/experience/versions', [SiteBuilderApiController::class, 'experienceVersions'])->name('experience.versions');
+        Route::post('/experience/versions/{versionId}/restore', [SiteBuilderApiController::class, 'restoreExperienceVersion'])->name('experience.versions.restore');
+        Route::post('/design', [SiteBuilderApiController::class, 'saveDesign'])->name('design.save');
     });
     }); // public.website.admin.cms
     }); // website.enabled
@@ -766,6 +782,16 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{taxonomyMaster}', [\App\Http\Controllers\SahodayaAdmin\FestTaxonomyMasterController::class, 'destroy'])->name('destroy');
         });
 
+        Route::prefix('scoring-rubric-templates')->name('scoring-rubric-templates.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\SahodayaAdmin\FestScoringRubricTemplateController::class, 'index'])->name('index');
+            Route::post('/', [\App\Http\Controllers\SahodayaAdmin\FestScoringRubricTemplateController::class, 'store'])->name('store');
+            Route::put('/{scoringRubricTemplate}', [\App\Http\Controllers\SahodayaAdmin\FestScoringRubricTemplateController::class, 'update'])->name('update');
+            Route::delete('/{scoringRubricTemplate}', [\App\Http\Controllers\SahodayaAdmin\FestScoringRubricTemplateController::class, 'destroy'])->name('destroy');
+            Route::post('/{scoringRubricTemplate}/criteria', [\App\Http\Controllers\SahodayaAdmin\FestScoringRubricTemplateController::class, 'storeCriterion'])->name('criteria.store');
+            Route::put('/{scoringRubricTemplate}/criteria/{criterion}', [\App\Http\Controllers\SahodayaAdmin\FestScoringRubricTemplateController::class, 'updateCriterion'])->name('criteria.update');
+            Route::delete('/{scoringRubricTemplate}/criteria/{criterion}', [\App\Http\Controllers\SahodayaAdmin\FestScoringRubricTemplateController::class, 'destroyCriterion'])->name('criteria.destroy');
+        });
+
         // Notification templates — communications config, not part of the public
         // website/CMS module, so it must stay reachable even when the website
         // feature is disabled (WEBSITE_ENABLED=false). Previously nested under
@@ -821,6 +847,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/sections/{sectionId}/versions/{versionId}/restore', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'restoreSectionVersion'])->name('sections.versions.restore');
             Route::get('/public-website', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'getPublicWebsite'])->name('public-website.get');
             Route::post('/public-website', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'savePublicWebsite'])->name('public-website.save');
+            Route::post('/experience-version', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'setExperienceVersion'])->name('experience.version.set');
             Route::post('/theme', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'saveTheme'])->name('theme.save');
             Route::post('/media', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'uploadMedia'])->name('media.upload');
         });
@@ -1123,6 +1150,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/phased-workflow/sync-topology', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'syncTopology'])->name('phased-workflow.sync-topology');
             Route::post('/{event}/phases/{phase}/regions', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'syncPhaseRegions'])->name('phases.regions.sync');
             Route::post('/{event}/phases/{phase}/schools/{schoolId}/region', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'overrideSchoolRegion'])->name('phases.schools.region.override');
+            Route::get('/{event}/phase-plan-wizard', [\App\Http\Controllers\SahodayaAdmin\FestPhasePlanWizardController::class, 'index'])->name('phase-plan-wizard.index');
+            Route::post('/{event}/phase-plan-wizard/preview', [\App\Http\Controllers\SahodayaAdmin\FestPhasePlanWizardController::class, 'preview'])->name('phase-plan-wizard.preview');
+            Route::post('/{event}/phase-plan-wizard/commit', [\App\Http\Controllers\SahodayaAdmin\FestPhasePlanWizardController::class, 'commit'])->name('phase-plan-wizard.commit');
             Route::post('/{event}/submit-state-qualifiers', [\App\Http\Controllers\SahodayaAdmin\StateQualifierSubmissionController::class, 'store'])->name('submit-state-qualifiers');
             // WP-04 manual State nomination workspace (master plan §27) — additive; a
             // Sahodaya only sees these if its event has a state_program_id at all, and
@@ -1185,6 +1215,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/marks', [FestMarkEntryController::class, 'index'])->name('marks.index');
             Route::post('/{event}/marks', [FestMarkEntryController::class, 'store'])->name('marks.store');
             Route::post('/{event}/items/{item}/mark-criteria', [FestMarkEntryController::class, 'saveCriteria'])->name('items.mark-criteria.save');
+            Route::post('/{event}/items/{item}/mark-criteria/copy', [FestMarkEntryController::class, 'copyCriteria'])->name('items.mark-criteria.copy');
+            Route::post('/{event}/items/{item}/mark-criteria/apply-template', [FestMarkEntryController::class, 'applyTemplate'])->name('items.mark-criteria.apply-template');
             Route::get('/{event}/reports/mark-entry-sheet', [FestMarkEntryController::class, 'markEntrySheet'])->name('reports.mark-entry-sheet');
             Route::get('/{event}/reports/mark-criteria-sheet', [FestMarkEntryController::class, 'cumulativeSheet'])->name('reports.mark-criteria-sheet');
             Route::post('/{event}/items/{item}/mark-sheet-uploads', [FestMarkEntryController::class, 'uploadSheet'])->name('items.mark-sheet-uploads.store');
@@ -1318,6 +1350,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/combo-rules', [FestEventSettingsController::class, 'storeComboRule'])->name('combo-rules.store');
             Route::delete('/{event}/combo-rules/{comboRule}', [FestEventSettingsController::class, 'destroyComboRule'])->name('combo-rules.destroy');
             Route::post('/{event}/grade-configs', [FestEventSettingsController::class, 'storeGradeConfig'])->name('grade-configs.store');
+            Route::put('/{event}/grade-configs/{gradeConfig}', [FestEventSettingsController::class, 'updateGradeConfig'])->name('grade-configs.update');
             Route::delete('/{event}/grade-configs/{gradeConfig}', [FestEventSettingsController::class, 'destroyGradeConfig'])->name('grade-configs.destroy');
             Route::post('/{event}/point-rules', [FestEventSettingsController::class, 'storePointRule'])->name('point-rules.store');
             Route::delete('/{event}/point-rules/{pointRule}', [FestEventSettingsController::class, 'destroyPointRule'])->name('point-rules.destroy');

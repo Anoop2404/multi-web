@@ -47,18 +47,12 @@
         <!-- Main Card Section -->
         <div class="card !p-4 space-y-4">
             
-            <!-- Item Filter Chips -->
-            <div class="space-y-2 border-b border-slate-100 pb-3">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Competition Item</p>
-                <div class="flex flex-wrap gap-1.5 text-xs">
-                    <button v-for="item in event.items" :key="item.id" type="button" @click="itemFilter = item.id"
-                            :class="itemFilter === item.id
-                                ? 'bg-slate-900 text-white font-bold shadow-sm'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-semibold'"
-                            class="px-3.5 py-1.5 rounded-full transition whitespace-nowrap">
-                        {{ item.title }}
-                    </button>
-                </div>
+            <!-- Item Filter -->
+            <div class="border-b border-slate-100 pb-3">
+                <ReportItemSearchSelect :items="event.items" :model-value="itemFilter"
+                                        label="Competition Item" all-items-label="Select an item"
+                                        search-placeholder="Search by item name or code…"
+                                        @select="(id) => { itemFilter = id; }" />
             </div>
 
             <!-- Toolbar: Bulk Actions & Search -->
@@ -213,6 +207,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,

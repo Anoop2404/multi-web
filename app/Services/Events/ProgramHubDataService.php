@@ -113,7 +113,157 @@ class ProgramHubDataService
                 'registrations_count' => $e->registrations_count,
                 'results_published'   => $e->results_published,
             ])->values()->all(),
+            'regionOptions' => $this->resolveRegionOptionsForSchool($school, $meta['eventType']),
         ], $extra);
+    }
+
+    /** @return array<string, mixed> */
+    public function resolveRegionOptionsForSchool(Tenant $school, string $eventType): array
+    {
+        $sahodayaId = $school->parent_id;
+        if (! $sahodayaId) {
+            return ['has_regions' => false, 'regions' => [], 'assignments' => []];
+        }
+
+        $regionService = app(FestRegionPartitionService::class);
+        if (! $regionService->regionsApply($sahodayaId)) {
+            return ['has_regions' => false, 'regions' => [], 'assignments' => []];
+        }
+
+        $hasRegionalEvent = FestEvent::where('tenant_id', $sahodayaId)
+            ->ofType($eventType)
+            ->where(function ($q) {
+                $q->whereNotNull('region_id')
+                  ->orWhere('conduct_mode', 'partitioned')
+                  ->orWhereHas('phases', fn ($pq) => $pq->where('is_regional', true));
+            })
+            ->exists();
+
+        if (! $hasRegionalEvent) {
+            return ['has_regions' => false, 'regions' => [], 'assignments' => []];
+        }
+
+        $activeRegions = \App\Models\Region::forTenant($sahodayaId)
+            ->active()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'description']);
+
+        if ($activeRegions->isEmpty()) {
+            return ['has_regions' => false, 'regions' => [], 'assignments' => []];
+        }
+
+        $venues = \App\Models\FestVenue::where('tenant_id', $sahodayaId)
+            ->where('is_active', true)
+            ->get()
+            ->groupBy('region_id');
+
+        $childEvents = FestEvent::where('tenant_id', $sahodayaId)
+            ->whereNotNull('region_id')
+            ->with('conductingSchool:id,name')
+            ->get()
+            ->groupBy('region_id');
+
+        $regionList = $activeRegions->map(function (\App\Models\Region $r) use ($venues, $childEvents) {
+            $venue = $venues->get($r->id)?->first();
+            $eventWithVenue = $childEvents->get($r->id)?->first();
+
+            $venueName = $venue?->name
+                ?: $eventWithVenue?->conductingSchool?->name
+                ?: $eventWithVenue?->location_name
+                ?: null;
+
+            $location = $venue?->location
+                ?: ($eventWithVenue?->conductingSchool?->name && $eventWithVenue?->location_name ? $eventWithVenue->location_name : null)
+                ?: null;
+
+            return [
+                'id'          => $r->id,
+                'name'        => $r->name,
+                'code'        => $r->code,
+                'description' => $r->description,
+                'venue_name'  => $venueName ?: 'Venue to be announced',
+                'location'    => $location,
+            ];
+        })->values()->all();
+
+        $year = \App\Support\AcademicYear::forSahodaya($sahodayaId);
+        $hasGroupCol = \Illuminate\Support\Facades\Schema::hasColumn('school_region_assignments', 'partition_group');
+
+        $assignments = \App\Models\SchoolRegionAssignment::forTenant($sahodayaId)
+            ->forYear($year)
+            ->where('school_id', $school->id)
+            ->get($hasGroupCol ? ['partition_group', 'region_id'] : ['region_id'])
+            ->mapWithKeys(fn ($a) => [(($hasGroupCol ? $a->partition_group : null) ?? 'default') => $a->region_id])
+            ->all();
+
+        $regionalGroups = \App\Models\FestEventPhase::query()
+            ->whereNotNull('region_partition_group')
+            ->whereHas('event', fn ($q) => $q->where('tenant_id', $sahodayaId)->ofType($eventType)->whereNull('parent_event_id'))
+            ->orderBy('sort_order')
+            ->get(['region_partition_group', 'name'])
+            ->unique('region_partition_group')
+            ->map(fn (\App\Models\FestEventPhase $phase) => [
+                'key'   => $phase->region_partition_group,
+                'label' => $phase->name,
+            ])
+            ->values()
+            ->all();
+
+        $phasedEvents = FestEvent::where('tenant_id', $sahodayaId)
+            ->ofType($eventType)
+            ->whereNull('parent_event_id')
+            ->whereIn('status', ['published', 'registration_open', 'ongoing'])
+            ->where('workflow_mode', \App\Services\Events\FestPhasedWorkflowService::MODE)
+            ->get();
+
+        $phaseRegionOptions = [];
+        foreach ($phasedEvents as $phasedHub) {
+            $selections = \App\Models\FestSchoolPhaseRegionSelection::where('event_id', $phasedHub->id)
+                ->where('school_id', $school->id)
+                ->get()
+                ->keyBy('phase_id');
+
+            $options = $phasedHub->phases()
+                ->where('is_regional', true)
+                ->with('allowedRegions.region')
+                ->get()
+                ->map(fn (\App\Models\FestEventPhase $phase) => [
+                    'event_id'    => $phasedHub->id,
+                    'event_title' => $phasedHub->title,
+                    'phase_id'    => $phase->id,
+                    'phase_name'  => $phase->name,
+                    'selection'   => ($selection = $selections->get($phase->id)) ? [
+                        'region_id' => $selection->region_id,
+                        'locked'    => $selection->locked_at !== null,
+                    ] : null,
+                    'regions'     => $phase->allowedRegions->where('enabled', true)->map(fn ($allowed) => [
+                        'id'               => $allowed->region_id,
+                        'name'             => $allowed->region?->name,
+                        'code'             => $allowed->region?->code,
+                        'venue'            => $allowed->venue,
+                        'conduct_start_at' => $allowed->conduct_start_at?->toIso8601String(),
+                    ])->values()->all(),
+                ])->values()->all();
+
+            $phaseRegionOptions = array_merge($phaseRegionOptions, $options);
+        }
+
+        $hasRegions = ! empty($phaseRegionOptions)
+            || ! empty($regionalGroups)
+            || FestEvent::where('tenant_id', $sahodayaId)
+                ->ofType($eventType)
+                ->where(fn ($q) => $q->whereNotNull('region_id')->orWhere('conduct_mode', 'partitioned'))
+                ->whereHas('phases', fn ($pq) => $pq->where('is_regional', true))
+                ->exists();
+
+        return [
+            'has_regions'          => $hasRegions,
+            'regions'              => $hasRegions ? $regionList : [],
+            'assignments'          => $assignments,
+            'regional_groups'      => $regionalGroups,
+            'phase_region_options' => $phaseRegionOptions,
+        ];
     }
 
     /** @return array<string, mixed> */

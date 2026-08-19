@@ -15,6 +15,6 @@ class TenantAuth
             return $callback();
         }
 
-        return TenancyDatabase::withTenantDatabase(TenancyDatabase::owner($tenant), $callback);
+        return TenancyDatabase::withTenantDatabase($tenant, $callback);
     }
 }

@@ -17,6 +17,37 @@
             </p>
         </div>
 
+        <div v-if="event.event_type !== 'sports'" class="card space-y-3 bg-gradient-to-r from-amber-50/70 to-orange-50/70 border-amber-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                        <span>⚡</span> Load Standard Fee Presets
+                    </h3>
+                    <p class="text-xs text-slate-600 mt-0.5">
+                        Click any preset below to auto-fill fee model settings. All amounts remain <strong>100% editable</strong> before saving!
+                    </p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2 pt-1">
+                <button type="button" @click="applyFeePreset('kochi_metro')"
+                        class="btn-secondary text-xs font-semibold !py-1.5 !px-3 hover:bg-amber-100 hover:text-amber-900 border-amber-300 transition shadow-xs">
+                    🏷️ Fee Type 1 (₹8k/₹7k + ₹100 Student + 1 Free Item)
+                </button>
+                <button type="button" @click="applyFeePreset('wayanad')"
+                        class="btn-secondary text-xs font-semibold !py-1.5 !px-3 hover:bg-amber-100 hover:text-amber-900 border-amber-300 transition shadow-xs">
+                    🏷️ Fee Type 2 (₹30k/₹25k + ₹250/Phase)
+                </button>
+                <button type="button" @click="applyFeePreset('malabar')"
+                        class="btn-secondary text-xs font-semibold !py-1.5 !px-3 hover:bg-amber-100 hover:text-amber-900 border-amber-300 transition shadow-xs">
+                    🏷️ Fee Type 3 (Student Count Slabs + ₹450)
+                </button>
+                <button type="button" @click="applyFeePreset('kannur_dist')"
+                        class="btn-secondary text-xs font-semibold !py-1.5 !px-3 hover:bg-amber-100 hover:text-amber-900 border-amber-300 transition shadow-xs">
+                    🏷️ Fee Type 4 (₹250 Indiv / ₹250+100 Group)
+                </button>
+            </div>
+        </div>
+
         <form @submit.prevent="saveFeeSettings" class="space-y-6">
             <section class="card space-y-4">
                 <div>
@@ -161,6 +192,31 @@
                             <input :id="id" v-model.number="feeSettingsForm.per_item_amount" type="number" min="0" class="field max-w-xs">
                         </template>
                     </FormField>
+                    <label class="flex items-start gap-2 text-sm pt-2">
+                        <input type="checkbox" v-model="feeSettingsForm.include_school_registration" class="mt-0.5">
+                        <span>
+                            Add optional one-time school registration line on the event invoice
+                            <span class="block text-xs text-slate-500 mt-0.5">Not the annual Sahodaya membership fee — only enable if you charge an extra school registration fee for this event.</span>
+                        </span>
+                    </label>
+                    <div v-if="feeSettingsForm.include_school_registration" class="space-y-2 border-t border-slate-100 pt-2">
+                        <div v-for="tier in Object.keys(feeSettingsForm.school_registration)" :key="tier" class="flex items-end gap-2">
+                            <FormField :label="schoolRegistrationTierLabel(tier)" class-extra="flex-1 mb-0 max-w-sm">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="feeSettingsForm.school_registration[tier]" type="number" min="0" class="field" placeholder="₹">
+                                </template>
+                            </FormField>
+                            <button type="button" class="text-xs text-red-400 hover:text-red-600 mb-2.5" @click="removeSchoolRegistrationTier(tier)">Remove tier</button>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <FormField label="Add custom tier" hint="e.g. senior_secondary, secondary, other" class-extra="flex-1 mb-0 max-w-xs">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model="newSchoolRegistrationTierKey" type="text" class="field" placeholder="tier key">
+                                </template>
+                            </FormField>
+                            <button type="button" class="btn-secondary text-xs mb-2.5" @click="addSchoolRegistrationTier">+ Add tier</button>
+                        </div>
+                    </div>
                     <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field max-w-xs">
@@ -174,6 +230,31 @@
                             <input :id="id" v-model.number="feeSettingsForm.per_student_amount" type="number" min="0" class="field max-w-xs">
                         </template>
                     </FormField>
+                    <label class="flex items-start gap-2 text-sm pt-2">
+                        <input type="checkbox" v-model="feeSettingsForm.include_school_registration" class="mt-0.5">
+                        <span>
+                            Add optional one-time school registration line on the event invoice (e.g. Wayanad Sahodaya ₹30k/₹25k/₹20k)
+                            <span class="block text-xs text-slate-500 mt-0.5">Not the annual Sahodaya membership fee — only enable if you charge an extra school registration fee for this event.</span>
+                        </span>
+                    </label>
+                    <div v-if="feeSettingsForm.include_school_registration" class="space-y-2 border-t border-slate-100 pt-2">
+                        <div v-for="tier in Object.keys(feeSettingsForm.school_registration)" :key="tier" class="flex items-end gap-2">
+                            <FormField :label="schoolRegistrationTierLabel(tier)" class-extra="flex-1 mb-0 max-w-sm">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="feeSettingsForm.school_registration[tier]" type="number" min="0" class="field" placeholder="₹">
+                                </template>
+                            </FormField>
+                            <button type="button" class="text-xs text-red-400 hover:text-red-600 mb-2.5" @click="removeSchoolRegistrationTier(tier)">Remove tier</button>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <FormField label="Add custom tier" hint="e.g. senior_secondary, secondary, other" class-extra="flex-1 mb-0 max-w-xs">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model="newSchoolRegistrationTierKey" type="text" class="field" placeholder="tier key">
+                                </template>
+                            </FormField>
+                            <button type="button" class="btn-secondary text-xs mb-2.5" @click="addSchoolRegistrationTier">+ Add tier</button>
+                        </div>
+                    </div>
                     <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field max-w-xs">
@@ -186,6 +267,36 @@
                         Bills each school a single stepped amount based on its total registered student count for
                         this event. Slabs are scoped to this event only — configure them below.
                     </p>
+                    <FormField label="Amount per participating student (₹) (optional)" hint="Charged per unique student in addition to the slab fee (e.g. ₹450 per student for Malabar Sahodaya)">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="feeSettingsForm.per_student_amount" type="number" min="0" class="field max-w-xs" placeholder="e.g. 450">
+                        </template>
+                    </FormField>
+                    <label class="flex items-start gap-2 text-sm pt-2">
+                        <input type="checkbox" v-model="feeSettingsForm.include_school_registration" class="mt-0.5">
+                        <span>
+                            Add optional one-time school registration line on the event invoice
+                            <span class="block text-xs text-slate-500 mt-0.5">Only enable if you charge an extra school registration fee for this event.</span>
+                        </span>
+                    </label>
+                    <div v-if="feeSettingsForm.include_school_registration" class="space-y-2 border-t border-slate-100 pt-2">
+                        <div v-for="tier in Object.keys(feeSettingsForm.school_registration)" :key="tier" class="flex items-end gap-2">
+                            <FormField :label="schoolRegistrationTierLabel(tier)" class-extra="flex-1 mb-0 max-w-sm">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="feeSettingsForm.school_registration[tier]" type="number" min="0" class="field" placeholder="₹">
+                                </template>
+                            </FormField>
+                            <button type="button" class="text-xs text-red-400 hover:text-red-600 mb-2.5" @click="removeSchoolRegistrationTier(tier)">Remove tier</button>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <FormField label="Add custom tier" hint="e.g. senior_secondary, secondary, other" class-extra="flex-1 mb-0 max-w-xs">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model="newSchoolRegistrationTierKey" type="text" class="field" placeholder="tier key">
+                                </template>
+                            </FormField>
+                            <button type="button" class="btn-secondary text-xs mb-2.5" @click="addSchoolRegistrationTier">+ Add tier</button>
+                        </div>
+                    </div>
                     <div class="overflow-x-auto rounded-xl border border-slate-100">
                         <table class="data-table">
                             <thead class="bg-slate-50">
@@ -225,25 +336,19 @@
                     </FormField>
                 </div>
 
-                <!-- Shared by two billing models with identical fields: "Sports composite" (event_type ===
-                     'sports' only reaches this far when it has no head fees yet — see the very first v-if
-                     on line 43 for the sports-with-heads case) and "Kalotsavam composite" (its non-sports
-                     counterpart, same underlying calculation, different label so a cultural fest admin never
-                     has to pick something called "sports"). These fields (not "Sport event billing" below,
-                     which is sports-only — see the gate added there) are what updateFeeSettings() actually
-                     persists via normalizeEventFeeSettings() for either model, so this block must stay intact. -->
+                <!-- Shared by two billing models with identical fields: "Sports composite" and "Kalotsavam composite" -->
                 <div v-else-if="feeSettingsForm.fee_model === 'sports_composite' || feeSettingsForm.fee_model === 'kalolsavam_composite'" class="space-y-4 border-t border-slate-100 pt-4">
                     <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700 space-y-2">
                         <p class="font-semibold text-slate-900">How billing works</p>
                         <ol class="list-decimal pl-4 space-y-1">
-                            <li><strong>School registration</strong> — once per school</li>
+                            <li><strong>School registration</strong> — once per school (flat or category-tiered)</li>
                             <li><strong>Student registration</strong> — per student registered for the event</li>
                             <li><strong>Free quota</strong> — how many item entries each student gets within the student fee (set <strong>0</strong> to charge every item)</li>
                             <li><strong>Extra item fee</strong> — per item beyond the free quota (or every item when quota is 0)</li>
                         </ol>
                     </div>
                     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <FormField label="School registration (₹)" hint="Once per school">
+                        <FormField label="School registration (flat ₹)" hint="Fallback flat fee per school">
                             <template #default="{ id }">
                                 <input :id="id" v-model.number="feeSettingsForm.school_registration_flat" type="number" min="0" class="field" placeholder="2000">
                             </template>
@@ -264,6 +369,38 @@
                             </template>
                         </FormField>
                     </div>
+
+                    <div class="border-t border-slate-100 pt-3 space-y-3">
+                        <h4 class="text-xs font-semibold text-slate-800 uppercase tracking-wide">Category-Tiered School Registration Fees (Optional)</h4>
+                        <p class="text-xs text-slate-500">
+                            Configure school registration fees by school category (e.g. Senior Secondary ₹8,000, Secondary ₹7,000, Other ₹7,000 for Kochi Metro).
+                            Overrides flat school fee above when configured.
+                        </p>
+                        <div class="space-y-2">
+                            <div v-for="tier in Object.keys(feeSettingsForm.school_registration)" :key="tier" class="flex items-end gap-2">
+                                <FormField :label="schoolRegistrationTierLabel(tier)" class-extra="flex-1 mb-0 max-w-sm">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="feeSettingsForm.school_registration[tier]" type="number" min="0" class="field" placeholder="₹">
+                                    </template>
+                                </FormField>
+                                <button type="button" class="text-xs text-red-400 hover:text-red-600 mb-2.5" @click="removeSchoolRegistrationTier(tier)">Remove tier</button>
+                            </div>
+                            <div class="flex items-end gap-2">
+                                <FormField label="Add custom tier" hint="e.g. senior_secondary, secondary, other" class-extra="flex-1 mb-0 max-w-xs">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model="newSchoolRegistrationTierKey" type="text" class="field" placeholder="tier key">
+                                    </template>
+                                </FormField>
+                                <button type="button" class="btn-secondary text-xs mb-2.5" @click="addSchoolRegistrationTier">+ Add tier</button>
+                            </div>
+                            <FormField label="Secondary Tier Min Student Strength Threshold (optional)" hint="Secondary schools with student count ≤ this limit fall back to 'other' fee tier (e.g. Wayanad Sahodaya: Secondary > 300 students = ₹25,000, else Other Schools = ₹20,000)." class-extra="pt-2">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="feeSettingsForm.secondary_min_students" type="number" min="0" class="field max-w-xs" placeholder="e.g. 300">
+                                </template>
+                            </FormField>
+                        </div>
+                    </div>
+
                     <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field max-w-xs">
@@ -847,7 +984,7 @@ import { Link, useForm } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
 
 const {
-    feeSettingsForm, feeModels, event, classGroupLabels,
+    feeSettingsForm, feeModels, feePresets, event, classGroupLabels,
     ageGroupLabels, defaultAgeGroupFees, defaultClassGroupFees, effectiveClassGroupLabels, saveFeeSettings,
     sahodaya, ledgerAccount, classCategorySchemes,
     classCategorySchemeForm, schemeGroupForm,
@@ -861,6 +998,42 @@ const { confirm } = useConfirm();
 
 if (event.event_type === 'sports') {
     feeSettingsForm.fee_model = 'sports_composite';
+}
+
+function applyFeePreset(presetKey) {
+    const rawPresets = feePresets?.value ?? feePresets ?? {};
+    const preset = rawPresets[presetKey];
+    if (!preset) return;
+
+    feeSettingsForm.fee_model = preset.fee_model;
+    if (preset.include_school_registration !== undefined) {
+        feeSettingsForm.include_school_registration = preset.include_school_registration;
+    }
+    if (preset.school_registration) {
+        feeSettingsForm.school_registration = { ...preset.school_registration };
+    }
+    if (preset.per_student_amount !== undefined) {
+        feeSettingsForm.per_student_amount = preset.per_student_amount;
+    }
+    if (preset.included_items_per_student !== undefined) {
+        feeSettingsForm.included_items_per_student = preset.included_items_per_student;
+    }
+    if (preset.extra_item_fee !== undefined) {
+        feeSettingsForm.extra_item_fee = preset.extra_item_fee;
+        feeSettingsForm.default_item_fee = preset.extra_item_fee;
+    }
+    if (preset.default_item_fee !== undefined) {
+        feeSettingsForm.default_item_fee = preset.default_item_fee;
+    }
+    if (preset.group_item_flat_fee !== undefined) {
+        feeSettingsForm.group_item_flat_fee = preset.group_item_flat_fee;
+    }
+    if (preset.group_item_per_participant_rate !== undefined) {
+        feeSettingsForm.group_item_per_participant_rate = preset.group_item_per_participant_rate;
+    }
+    if (preset.student_count_slabs) {
+        feeSettingsForm.student_count_slabs = JSON.parse(JSON.stringify(preset.student_count_slabs));
+    }
 }
 
 // The scheme currently selected in the dropdown (by id) — drives both the "Manage

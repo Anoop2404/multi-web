@@ -400,8 +400,6 @@ class FestReportService
             'day-wise' => $this->dayWisePdf($request),
             'attendance-sheet' => $this->attendanceSheetPdf($request),
             'attendance-sheet-school' => $this->attendanceSheetSchoolPdf($request),
-            'judge-sheet' => $this->judgeSheetPdf($request),
-            'mark-entry-sheet' => $this->markEntrySheetPdf($request),
             'mark-entered-summary' => $this->markEntryStatusCsv(),
             'mark-entry-status' => $this->markEntryStatusCsv(),
             'item-order-public' => $this->itemOrderPublicPdf($request),
@@ -1037,53 +1035,6 @@ class FestReportService
             'showClass'    => $showClass,
             ...$this->brandingData(),
         ], $this->slug()."-attendance-{$school->id}.pdf", true);
-    }
-
-    private function judgeSheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
-    {
-        $itemId = $request->integer('item_id') ?: $this->items()->first()?->id;
-        $item = FestEventItem::findOrFail($itemId);
-        $audience = $this->reportAudience($request);
-        $criteria = collect($item->criteria_json ?? [])->map(fn ($c, $i) => (object) [
-            'name'      => is_array($c) ? ($c['name'] ?? "Criterion {$i}") : (string) $c,
-            'max_marks' => is_array($c) ? ($c['max'] ?? 10) : 10,
-        ]);
-
-        $schedule = FestSchedule::whereIn('event_id', $this->eventIds())
-            ->whereIn('item_id', $this->itemIdsFor($itemId))
-            ->orderBy('scheduled_at')
-            ->first();
-
-        $participants = $this->participantsFlat($itemId, null, null, null, null, false);
-
-        return $this->renderPdf('fest.reports.judge-sheet', [
-            'event'    => $this->event,
-            'item'     => $item,
-            'criteria' => $criteria,
-            'schedule' => $schedule,
-            'rows'     => $this->participantReportRows($participants, $audience),
-            'audience' => $audience,
-            ...$this->brandingData(),
-        ], $this->slug()."-judge-{$itemId}.pdf");
-    }
-
-    private function markEntrySheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
-    {
-        $itemId = $request->integer('item_id') ?: $this->items()->first()?->id;
-        $item = FestEventItem::find($itemId);
-        $audience = $this->reportAudience($request);
-        $participants = $this->participantsFlat($itemId, null, null, null, null, false);
-
-        $sahodaya = Tenant::find($this->event->tenant_id);
-
-        return $this->renderPdf('fest.reports.mark-entry-sheet', [
-            'event'    => $this->event,
-            'item'     => $item,
-            'rows'     => $this->participantReportRows($participants, $audience),
-            'audience' => $audience,
-            'sahodaya' => $sahodaya,
-            'logoSrc'  => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
-        ], $this->slug()."-mark-entry-{$itemId}.pdf");
     }
 
     private function itemOrderPublicPdf(Request $request): \Symfony\Component\HttpFoundation\Response

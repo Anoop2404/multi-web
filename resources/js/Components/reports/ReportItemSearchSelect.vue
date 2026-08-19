@@ -51,6 +51,7 @@ const props = defineProps({
     allItemsLabel: { type: String, default: 'All items in this section' },
     showViewButton: { type: Boolean, default: false },
     viewEnabledFor: { type: Function, default: null },
+    statusFor: { type: Function, default: null },
 });
 
 const emit = defineEmits(['update:modelValue', 'select', 'view']);
@@ -84,7 +85,10 @@ const viewEnabled = computed(() => {
 });
 
 function itemLabel(item) {
-    const parts = [item.title];
+    const parts = [];
+    const status = typeof props.statusFor === 'function' ? props.statusFor(item) : null;
+    if (status) parts.push(status);
+    parts.push(item.title);
     if (item.participant_count) parts.push(`(${item.participant_count} reg.)`);
     return parts.join(' ');
 }

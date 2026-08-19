@@ -609,7 +609,7 @@ class FestReportController extends SahodayaAdminController
 
         $scope = $this->resolveRegistrationRegisterScope($request, $event, $register);
 
-        $data = $register->build($event, $scope['schoolId'], null, 50, null, null, $scope['schoolIds']);
+        $data = $register->build($event, $scope['schoolId'], null, 50, null, null, $scope['schoolIds'], $scope['eventIds']);
 
         $audit->festEvent($event, FestPageActivity::REPORTS, 'fest.report.scope_resolved', 'Registration register viewed', [
             'report'    => 'registration-register',
@@ -641,7 +641,7 @@ class FestReportController extends SahodayaAdminController
             'school_id' => $scope['schoolId'],
         ]);
 
-        return $register->exportCsv($event, $scope['schoolId'], $scope['schoolIds'], $scope['regionId']);
+        return $register->exportCsv($event, $scope['schoolId'], $scope['schoolIds'], $scope['regionId'], $scope['eventIds']);
     }
 
     /**
@@ -651,7 +651,18 @@ class FestReportController extends SahodayaAdminController
      * was supplied, using active-year SchoolRegionAssignment data (gap G5). Tampered
      * region_id/school_id values outside the admin's assigned region(s) are rejected.
      *
-     * @return array{schoolId: ?string, schoolIds: ?list<string>, regionId: ?int}
+     * The default (non-region-locked-admin) branch below delegates to
+     * FestReportScopeResolver rather than querying SchoolRegionAssignment directly —
+     * that resolver already knows a phased-regional-billing event's school-per-region
+     * choice lives in FestSchoolPhaseRegionSelection (phase+region scoped), not the
+     * legacy single-region-per-year SchoolRegionAssignment table, and also narrows
+     * eventIds to just the requested phase+region leaf so a scoped register doesn't
+     * pull in a school's registrations from every other leaf under the root. The
+     * regionAdminScopes-restricted branch above is left untouched — it is
+     * permission-scoping for the acting admin, not report-data scoping, and already
+     * has its own (correct, tested) region-only resolution.
+     *
+     * @return array{schoolId: ?string, schoolIds: ?list<string>, regionId: ?int, eventIds: ?list<int>}
      */
     private function resolveRegistrationRegisterScope(Request $request, FestEvent $event, FestRegistrationRegisterService $register): array
     {
@@ -670,7 +681,7 @@ class FestReportController extends SahodayaAdminController
             if ($schoolId) {
                 abort_unless(in_array($schoolId, $this->regionScopedSchoolIds([$schoolId], $eventYear), true), 403, "You are not assigned to that school's region.");
 
-                return ['schoolId' => $schoolId, 'schoolIds' => null, 'regionId' => $regionId ?? $allowedRegionIds[0]];
+                return ['schoolId' => $schoolId, 'schoolIds' => null, 'regionId' => $regionId ?? $allowedRegionIds[0], 'eventIds' => null];
             }
 
             // Lock to the admin's single region automatically; with more than one assigned
@@ -696,20 +707,19 @@ class FestReportController extends SahodayaAdminController
                 'schoolId'  => null,
                 'schoolIds' => $this->regionScopedSchoolIds($candidateSchoolIds, $eventYear),
                 'regionId'  => $regionId,
+                'eventIds'  => null,
             ];
         }
 
         $schoolIds = null;
+        $eventIds = null;
         if ($regionId && ! $schoolId) {
-            // REG-06 fix — see the comment on the equivalent branch above.
-            $schoolIds = \App\Models\SchoolRegionAssignment::forTenant($this->sahodaya->id)
-                ->forYear($event->academicYear?->label ?? \App\Support\AcademicYear::forSahodaya($this->sahodaya->id))
-                ->where('region_id', $regionId)
-                ->pluck('school_id')
-                ->all();
+            $scope = $this->reportScope($request, $event);
+            $schoolIds = $scope->schoolIds;
+            $eventIds = $scope->eventIds;
         }
 
-        return ['schoolId' => $schoolId, 'schoolIds' => $schoolIds, 'regionId' => $regionId];
+        return ['schoolId' => $schoolId, 'schoolIds' => $schoolIds, 'regionId' => $regionId, 'eventIds' => $eventIds];
     }
 
     public function assignmentCompleteness(Request $request, string $tenantId, FestEvent $event)

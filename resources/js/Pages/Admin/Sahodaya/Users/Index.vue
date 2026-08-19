@@ -76,7 +76,7 @@
                             <div v-if="u.fest_assignments?.length" class="flex flex-wrap gap-1">
                                 <span v-for="(a, i) in u.fest_assignments" :key="`f${i}`"
                                       class="inline-flex items-center rounded-full bg-violet-50 border border-violet-200 px-2 py-0.5 text-[10px] font-medium text-violet-700">
-                                    {{ a.event_title }} · {{ dutyLabel(a.duty) }}
+                                    {{ a.event_title }} · {{ dutyLabel(a.duty) }}{{ a.region_name ? ` — ${a.region_name}` : '' }}
                                 </span>
                             </div>
                             <div v-if="u.exam_assignments?.length" class="flex flex-wrap gap-1 mt-1">
@@ -213,6 +213,28 @@
                         </template>
                     </FormField>
                 </div>
+                <div v-if="form.roles.includes('region_admin')" class="card card--accent space-y-3">
+                    <p class="text-xs font-semibold text-violet-900">Region admin — event &amp; region</p>
+                    <p class="text-xs text-slate-500">Locked to this one event and this one region only — not all events, not all regions.</p>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <FormField label="Event" :error="form.errors.region_admin_event_id" required>
+                            <template #default="{ id }">
+                                <select :id="id" v-model="form.region_admin_event_id" class="field" @change="onRegionAdminEventChange(form)">
+                                    <option value="">Select event</option>
+                                    <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
+                                </select>
+                            </template>
+                        </FormField>
+                        <FormField label="Region" :error="form.errors.region_admin_region_id" required>
+                            <template #default="{ id }">
+                                <select :id="id" v-model="form.region_admin_region_id" class="field">
+                                    <option value="">Select region</option>
+                                    <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
+                                </select>
+                            </template>
+                        </FormField>
+                    </div>
+                </div>
                 <div v-if="hasPermissionRole(form.roles)" class="card card--muted space-y-2">
                     <p class="form-label mb-1">Access permissions</p>
                     <p class="text-xs text-slate-500 mb-2">Role defaults are applied automatically; adjust individual permissions below.</p>
@@ -323,6 +345,28 @@
                         </template>
                     </FormField>
                 </div>
+                <div v-if="editForm.roles.includes('region_admin')" class="card card--accent space-y-3">
+                    <p class="text-xs font-semibold text-violet-900">Region admin — event &amp; region</p>
+                    <p class="text-xs text-slate-500">Locked to this one event and this one region only — not all events, not all regions.</p>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <FormField label="Event" :error="editForm.errors.region_admin_event_id" required>
+                            <template #default="{ id }">
+                                <select :id="id" v-model="editForm.region_admin_event_id" class="field" @change="onRegionAdminEventChange(editForm)">
+                                    <option value="">Select event</option>
+                                    <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
+                                </select>
+                            </template>
+                        </FormField>
+                        <FormField label="Region" :error="editForm.errors.region_admin_region_id" required>
+                            <template #default="{ id }">
+                                <select :id="id" v-model="editForm.region_admin_region_id" class="field">
+                                    <option value="">Select region</option>
+                                    <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
+                                </select>
+                            </template>
+                        </FormField>
+                    </div>
+                </div>
                 <div v-if="hasPermissionRole(editForm.roles)" class="card card--muted space-y-2">
                     <p class="form-label mb-1">Access permissions</p>
                     <p class="text-xs text-slate-500 mb-2">Role defaults are applied when roles change; adjust individual permissions below.</p>
@@ -383,6 +427,7 @@ const form = useForm({
     fest_ops_event_id: '', fest_ops_duties: [],
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
+    region_admin_event_id: '', region_admin_region_id: '',
     region_ids: [],
 });
 const editing = ref(null);
@@ -392,6 +437,7 @@ const editForm = useForm({
     fest_ops_event_id: '', fest_ops_duties: [],
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
+    region_admin_event_id: '', region_admin_region_id: '',
     region_ids: [],
 });
 
@@ -437,6 +483,16 @@ function hasExamRole(roles) {
 
 function hasPermissionRole(roles) {
     return roles.some((r) => props.permissionRoles.includes(r));
+}
+
+/** Per-region child events (spawned as "{hub} — {region}") already belong to one region —
+ * prefill it as a starting point, but leave the dropdown editable for the hub-covers-every-
+ * child-region case. */
+function onRegionAdminEventChange(targetForm) {
+    const event = props.festEvents.find((e) => e.id === targetForm.region_admin_event_id);
+    if (event?.region_id) {
+        targetForm.region_admin_region_id = event.region_id;
+    }
 }
 
 function mergedRoleDefaults(roles) {
@@ -499,6 +555,10 @@ function openEdit(user) {
     editForm.event_admin_event_ids = (user.fest_assignments || [])
         .filter(a => a.duty === 'event_admin')
         .map(a => a.event_id);
+
+    const regionAdminAssignment = (user.fest_assignments || []).find(a => a.duty === 'region_admin');
+    editForm.region_admin_event_id = regionAdminAssignment?.event_id ?? '';
+    editForm.region_admin_region_id = regionAdminAssignment?.region_id ?? '';
 
     const exam = user.exam_assignments?.[0];
     editForm.exam_staff_exam_id = exam?.exam_id ?? '';

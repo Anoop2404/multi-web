@@ -141,6 +141,10 @@ class TenantController extends Controller
                 $databaseReady = true;
                 $tenantOverview = $this->tenantOverview($tenant);
             }
+        } elseif (TenancyDatabase::isStandalone($tenant)) {
+            // No Sahodaya parent — this school's data lives on the central connection directly.
+            $databaseReady = true;
+            $tenantOverview = $this->tenantOverview($tenant);
         } elseif (! config('tenancy.database_per_sahodaya', true)) {
             $databaseReady = true;
         }
@@ -780,10 +784,9 @@ class TenantController extends Controller
                     }
                 },
             ],
-            'parent_id' => [
-                Rule::requiredIf(fn () => ! $tenant && request('type') === 'school'),
-                'nullable', 'exists:tenants,id',
-            ],
+            // A school with no parent_id is a standalone tenant (App\Support\TenancyDatabase::isStandalone) —
+            // its data lives on the central connection instead of a Sahodaya's dedicated database.
+            'parent_id' => ['nullable', 'exists:tenants,id'],
             'plan'      => 'nullable|string',
             'is_active' => $tenant ? 'boolean' : 'sometimes',
         ];

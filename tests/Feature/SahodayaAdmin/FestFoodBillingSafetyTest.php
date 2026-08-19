@@ -284,4 +284,45 @@ class FestFoodBillingSafetyTest extends TestCase
         $response->assertStatus(422);
         $this->assertSame(0, FestCateringOrder::where('event_id', $event->id)->count());
     }
+
+    /**
+     * Regression test: opening a bill for a school validated `school_id` against the
+     * `tenants` table with no explicit connection. Since this runs inside tenant-DB
+     * context (the default connection is the tenant's own DB, where `tenants` doesn't
+     * exist), the exists check threw a QueryException instead of validating — this
+     * action was completely broken for every event, in every conduct mode.
+     */
+    public function test_opening_a_bill_for_a_school_succeeds(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'sahodayaAdmin' => $admin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeEvent($sahodaya->id);
+
+        $response = $this->actingAs($admin)->post(route('sahodaya.events.food-billing.store', [
+            'tenantId' => $sahodaya->id,
+            'event' => $event->id,
+        ]), [
+            'school_id' => $school->id,
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame(1, FestFoodBill::where('event_id', $event->id)->where('school_id', $school->id)->count());
+    }
+
+    /** Regression test: same `tenants`-table validation bug as store(), on the payee update. */
+    public function test_setting_a_host_school_as_food_payee_succeeds(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'sahodayaAdmin' => $admin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeEvent($sahodaya->id);
+
+        $response = $this->actingAs($admin)->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $sahodaya->id,
+            'event' => $event->id,
+        ]), [
+            'food_payee_type' => 'host_school',
+            'food_host_school_id' => $school->id,
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame($school->id, $event->fresh()->food_host_school_id);
+    }
 }

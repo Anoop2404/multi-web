@@ -7,6 +7,8 @@ use App\Models\FestEventItem;
 use App\Models\FestMarkCriterion;
 use App\Models\FestMarkCriterionScore;
 use App\Models\FestMarkJudgeScore;
+use App\Models\FestScoringRubricTemplate;
+use App\Models\FestScoringRubricTemplateCriterion;
 use Illuminate\Support\Collection;
 
 /**
@@ -126,6 +128,41 @@ class FestMarkCriteriaService
             ->delete();
 
         return $this->criteriaForItem($item);
+    }
+
+    /**
+     * Replace an item's scoring criteria and judge count with a copy of another
+     * item's — for items in the same event that share an identical rubric, so an
+     * admin doesn't have to re-type the same columns for every one of them.
+     */
+    public function copyCriteriaFromItem(FestEvent $event, FestEventItem $sourceItem, FestEventItem $targetItem): Collection
+    {
+        $rows = $this->criteriaForItem($sourceItem)
+            ->map(fn (FestMarkCriterion $c) => ['label' => $c->label, 'max_score' => $c->max_score])
+            ->values()
+            ->all();
+
+        $criteria = $this->saveCriteria($event, $targetItem, $rows);
+        $this->setJudgeCount($targetItem, $this->judgeCountForItem($sourceItem));
+
+        return $criteria;
+    }
+
+    /**
+     * Replace an item's scoring criteria with a copy of a named, reusable
+     * FestScoringRubricTemplate's criteria — same replace-and-recreate shape as
+     * copyCriteriaFromItem(), just sourcing rows from a template instead of another item.
+     * Deliberately does not touch judge count — a template is a set of scoring columns,
+     * not a judge-panel-size preset.
+     */
+    public function applyTemplateToItem(FestEvent $event, FestScoringRubricTemplate $template, FestEventItem $targetItem): Collection
+    {
+        $rows = $template->criteria
+            ->map(fn (FestScoringRubricTemplateCriterion $c) => ['label' => $c->label, 'max_score' => $c->max_score])
+            ->values()
+            ->all();
+
+        return $this->saveCriteria($event, $targetItem, $rows);
     }
 
     /**

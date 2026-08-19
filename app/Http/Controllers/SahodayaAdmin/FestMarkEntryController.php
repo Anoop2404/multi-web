@@ -7,11 +7,14 @@ use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
+use App\Models\FestMarkCriterion;
 use App\Models\FestMarkSheetUpload;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\FestScoringRubricTemplate;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\EventLifecycleGate;
+use App\Services\Events\FestHeadItemNavigationService;
 use App\Services\Events\FestMarkCriteriaService;
 use App\Services\Events\FestMarkSaveService;
 use App\Services\Events\FestNumberingService;
@@ -33,6 +36,11 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $event = $this->regionAwareTargetEvent($request, $event);
         $event->load('items');
+
+        // Head/item tabs for the picker — reuses the same navigation data ChestNumbers,
+        // ItemHeadOps, and the Reports hub already build item pickers from, instead of
+        // shipping the flat item list to a hand-rolled widget on this page.
+        $nav = app(FestHeadItemNavigationService::class)->navigationForEvent($event);
 
         $headId = $this->resolveHeadQueryParam($request->query('head_id') ?? $request->query('head'));
         $itemId = $request->integer('item_id') ?: null;
@@ -82,10 +90,31 @@ class FestMarkEntryController extends SahodayaAdminController
         $selectedHeadId = match (true) {
             $headId === 0 => 'other',
             $headId !== null => $headId,
+            // No head_id given and this event has no real FestItemHead rows at all — the
+            // whole catalog sits in one synthetic "Other items" group (see
+            // FestHeadItemNavigationService::navigationForEvent()). Default straight into
+            // it so the item search/dropdown is visible immediately, matching the old
+            // pill list's behavior of showing every item with no extra click. Events that
+            // do have real heads keep requiring a head to be picked first, unchanged.
+            ! $nav['hasItemHeads'] => 'other',
             default => null,
         };
 
         $childEvents = $event->sportEventDropdownOptions();
+
+        // Which items already have at least one scoring column configured, so the
+        // item picker can show progress across 140+ items without opening each one.
+        $configuredItemIds = FestMarkCriterion::whereIn('item_id', $event->items->pluck('id'))
+            ->distinct()
+            ->pluck('item_id')
+            ->all();
+
+        $rubricTemplates = FestScoringRubricTemplate::forTenant($this->sahodaya->id)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $gradeOptions = app(\App\Services\Events\FestGradePointService::class)->validGradesForEvent($event);
 
         $criteria = [];
         $judgeCount = 1;
@@ -121,6 +150,10 @@ class FestMarkEntryController extends SahodayaAdminController
             'attendance'     => $attendance,
             'selectedHeadId' => $selectedHeadId,
             'selectedItemId' => $itemId,
+            'headItemGroups' => $nav['headItemGroups'],
+            'configuredItemIds' => $configuredItemIds,
+            'rubricTemplates' => $rubricTemplates,
+            'gradeOptions' => $gradeOptions,
             'competitionUrl' => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/competition",
             'rankPoints'     => $event->event_type === 'sports'
                 ? app(FestRankPointService::class)->listForEvent($event)
@@ -143,7 +176,7 @@ class FestMarkEntryController extends SahodayaAdminController
         $data = $request->validate([
             'participant_id'    => 'required|exists:fest_participants,id',
             'item_id'           => 'required|exists:fest_event_items,id',
-            'grade'             => 'nullable|in:A,A+,B,C',
+            'grade'             => ['nullable', app(\App\Services\Events\FestGradePointService::class)->gradeValidationRule($event)],
             'position'          => 'nullable|integer|min:1|max:255',
             'score'             => 'nullable|numeric|min:0',
             'measurement_value' => 'nullable|string|max:50',
@@ -206,6 +239,52 @@ class FestMarkEntryController extends SahodayaAdminController
         ]);
 
         return back()->with('success', 'Marking criteria saved.');
+    }
+
+    public function copyCriteria(Request $request, string $tenantId, FestEvent $event, FestEventItem $item, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($item->event_id !== $event->id, 404);
+
+        $data = $request->validate([
+            'source_item_id' => 'required|integer|exists:fest_event_items,id',
+        ]);
+
+        $sourceItem = FestEventItem::findOrFail($data['source_item_id']);
+        abort_if($sourceItem->event_id !== $event->id, 404);
+
+        $criteria = $criteriaService->copyCriteriaFromItem($event, $sourceItem, $item);
+
+        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.criteria.copied', "Mark criteria copied from item #{$sourceItem->id} to item #{$item->id}", [
+            'source_item_id' => $sourceItem->id,
+            'item_id'        => $item->id,
+            'criteria_count' => $criteria->count(),
+        ]);
+
+        return back()->with('success', "Marking criteria copied from \"{$sourceItem->title}\".");
+    }
+
+    public function applyTemplate(Request $request, string $tenantId, FestEvent $event, FestEventItem $item, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($item->event_id !== $event->id, 404);
+
+        $data = $request->validate([
+            'template_id' => 'required|integer|exists:fest_scoring_rubric_templates,id',
+        ]);
+
+        $template = FestScoringRubricTemplate::findOrFail($data['template_id']);
+        abort_if($template->tenant_id !== $this->sahodaya->id, 404);
+
+        $criteria = $criteriaService->applyTemplateToItem($event, $template, $item);
+
+        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.criteria.template_applied', "Rubric template \"{$template->name}\" applied to item #{$item->id}", [
+            'template_id' => $template->id,
+            'item_id'     => $item->id,
+            'criteria_count' => $criteria->count(),
+        ]);
+
+        return back()->with('success', "Rubric template \"{$template->name}\" applied.");
     }
 
     /**

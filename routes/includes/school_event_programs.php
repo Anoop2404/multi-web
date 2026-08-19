@@ -51,6 +51,9 @@ foreach ($festPrograms as $cfg) {
         Route::post('/events/{event}/phase-region', [\App\Http\Controllers\SchoolAdmin\FestPhaseRegionSelectionController::class, 'store'])
             ->defaults('program', $slug)
             ->name('event.phase-region');
+        Route::post('/select-region', [FestRegistrationController::class, 'selectSchoolRegion'])
+            ->defaults('program', $slug)
+            ->name('select-region');
         if ($prefix === 'sports') {
             Route::get('/item-registration', [FestRegistrationController::class, 'itemRegistrationEntry'])
                 ->defaults('program', $slug)

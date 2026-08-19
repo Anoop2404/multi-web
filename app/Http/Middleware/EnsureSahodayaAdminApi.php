@@ -66,6 +66,7 @@ class EnsureSahodayaAdminApi
 
             $request->attributes->set('eventAdminEventIds', $scope['allowedEventIds']);
             $request->attributes->set('regionAdminScopes', $scope['allowedRegionScopes']);
+            $request->attributes->set('phaseAdminScopes', $scope['allowedPhaseScopes']);
         }
 
         return $next($request);

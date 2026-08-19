@@ -136,14 +136,12 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function feeCollectionRows(): array
     {
-        $schoolIds = FestSchoolEventFee::where('event_id', $this->event->id)
-            ->forAmountAggregation()
+        $schoolIds = $this->feeCollectionQuery()
             ->pluck('school_id')
             ->unique();
         $schools = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
 
-        return FestSchoolEventFee::where('event_id', $this->event->id)
-            ->forAmountAggregation()
+        return $this->feeCollectionQuery()
             ->with(['feeReceipt', 'registrationBatch'])
             ->orderBy('school_id')
             ->get()
@@ -160,6 +158,38 @@ class FestEventReportAnalyticsService
                 'available_credit' => $fee->outstandingCredit(),
             ])
             ->all();
+    }
+
+    /**
+     * FestSchoolEventFee rows for phased-regional-billing (batch) billing are always
+     * written against the root event's id, keyed by registration_batch_id, never
+     * against the region/phase leaf a 'region' scope resolves $this->event to (see
+     * FestRegistrationBatchFeeService::recalculateAll()) — so filtering by
+     * $this->event->id here returned nothing for a region-scoped phased event even
+     * though the school's fee record genuinely exists. Reads through $this->scope
+     * (already correctly resolved by FestReportScopeResolver, including the
+     * FestSchoolPhaseRegionSelection-based school list) instead of re-deriving it.
+     */
+    private function feeCollectionQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        if ($this->scope && $this->scope->mode === 'region' && $this->event->usesPhasedRegionalBilling()) {
+            $query = FestSchoolEventFee::where('event_id', $this->scope->rootEvent->id)->forAmountAggregation();
+
+            if ($this->scope->schoolIds !== []) {
+                $query->whereIn('school_id', $this->scope->schoolIds);
+            }
+
+            $batchId = $this->scope->registrationBatchId
+                ?? ($this->scope->competitionPhaseId ? \App\Models\FestEventPhase::find($this->scope->competitionPhaseId)?->registration_batch_id : null);
+
+            if ($batchId) {
+                $query->where('registration_batch_id', $batchId);
+            }
+
+            return $query;
+        }
+
+        return FestSchoolEventFee::where('event_id', $this->event->id)->forAmountAggregation();
     }
 
     /** @return list<array<string, mixed>> */

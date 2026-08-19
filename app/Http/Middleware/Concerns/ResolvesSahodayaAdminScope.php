@@ -28,7 +28,8 @@ trait ResolvesSahodayaAdminScope
      * @return array{
      *     applies: bool,
      *     allowedEventIds: list<int>,
-     *     allowedRegionScopes: list<array{event_id: int, region_id: ?int}>,
+     *     allowedRegionScopes: list<array{event_id: int, region_id: ?int, source_phase_id: ?int}>,
+     *     allowedPhaseScopes: list<array{event_id: int, source_phase_id: int}>,
      *     denialReason: ?string,
      * }
      */
@@ -36,19 +37,22 @@ trait ResolvesSahodayaAdminScope
     {
         $hasEventAdmin = $user->hasRole('event_admin') && ! $user->hasRole('sahodaya_admin');
         $hasRegionAdmin = $user->hasRole('region_admin') && ! $user->hasRole('sahodaya_admin');
+        $hasPhaseAdmin = $user->hasRole('phase_admin') && ! $user->hasRole('sahodaya_admin');
 
-        if (! $hasEventAdmin && ! $hasRegionAdmin) {
+        if (! $hasEventAdmin && ! $hasRegionAdmin && ! $hasPhaseAdmin) {
             return [
                 'applies'             => false,
                 'allowedEventIds'     => [],
                 'allowedRegionScopes' => [],
+                'allowedPhaseScopes'  => [],
                 'denialReason'        => null,
             ];
         }
 
-        $scopes = EventRegionAdminScope::resolve($user, $hasEventAdmin, $hasRegionAdmin);
+        $scopes = EventRegionAdminScope::resolve($user, $hasEventAdmin, $hasRegionAdmin, $hasPhaseAdmin);
         $allowedEventIds = $scopes['eventIds'];
         $allowedRegionScopes = $scopes['regionScopes'];
+        $allowedPhaseScopes = $scopes['phaseScopes'];
 
         $requestedEventId = EventRegionAdminScope::resolveRouteEventId($request);
 
@@ -59,6 +63,10 @@ trait ResolvesSahodayaAdminScope
 
             if (! $allowed && $allowedRegionScopes !== []) {
                 $allowed = EventRegionAdminScope::matchesRegionScope($requestedEventId, $allowedRegionScopes);
+            }
+
+            if (! $allowed && $allowedPhaseScopes !== []) {
+                $allowed = EventRegionAdminScope::matchesPhaseScope($requestedEventId, $allowedPhaseScopes);
             }
 
             if (! $allowed) {
@@ -72,6 +80,7 @@ trait ResolvesSahodayaAdminScope
             'applies'             => true,
             'allowedEventIds'     => $allowedEventIds,
             'allowedRegionScopes' => $allowedRegionScopes,
+            'allowedPhaseScopes'  => $allowedPhaseScopes,
             'denialReason'        => $denialReason,
         ];
     }

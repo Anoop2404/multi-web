@@ -291,10 +291,8 @@ const displayTitle = computed(() => {
 const isGroup = computed(() => ['group', 'team'].includes(props.item.participant_type));
 
 const competitionTypeBadge = computed(() => {
-    const sm = String(props.item.stage_mode || '').toLowerCase();
-    const title = String(props.item.title || props.item.name || '').toLowerCase();
     const isGrp = ['group', 'team'].includes(props.item.participant_type);
-    const isOff = sm.includes('off') || props.item.is_onstage === false || title.includes('offstage') || title.includes('off stage') || title.includes('painting') || title.includes('drawing') || title.includes('essay') || title.includes('story') || title.includes('versification') || title.includes('quiz') || title.includes('carrom') || title.includes('chess');
+    const isOff = props.item.stage_type === 'off_stage';
 
     if (isOff) {
         return { label: '🎨 Off-stage', class: 'bg-amber-50 text-amber-800 border-amber-200' };

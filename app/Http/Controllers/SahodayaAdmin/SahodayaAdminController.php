@@ -50,10 +50,11 @@ abstract class SahodayaAdminController extends Controller
     /**
      * Narrow a school-id list down to the current user's region(s), for controllers that
      * aren't reached through an /events/{event} route (so EnsureSahodayaAdmin's per-event
-     * region_admin gate never runs) but still show school-level financial/operational data.
-     * A no-op (returns $schoolIds unchanged) for sahodaya_admin and any non-region-scoped
-     * staff — 'regionAdminScopes' is only ever set on the request when the current user
-     * actually holds the region_admin role without a broader admin role.
+     * region_admin/phase_admin gate never runs) but still show school-level financial/
+     * operational data. A no-op (returns $schoolIds unchanged) for sahodaya_admin and any
+     * non-region-scoped, non-phase-scoped staff — 'regionAdminScopes'/'phaseAdminScopes'
+     * are only ever set on the request when the current user actually holds the
+     * region_admin/phase_admin role without a broader admin role.
      *
      * See docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.4, Phase 3.
      *
@@ -70,19 +71,42 @@ abstract class SahodayaAdminController extends Controller
      * preserved for callers that are genuinely about "right now" operational
      * queues rather than a specific historical record.
      *
+     * Phase admin fix (standalone phase_admin role): a phase_admin has no region_id at
+     * all (their scope spans every region under their phase), so without this, a
+     * phase_admin reaching one of these non-{event}-route pages would hit the `empty()`
+     * check below and fall through to "unrestricted" — the opposite of what fest.finance/
+     * fest.catering are supposed to grant them. Resolved to a region-id list via each
+     * assigned phase's own FestPhaseRegion rows, then merged into the same
+     * SchoolRegionAssignment lookup region_admin already uses — a phase_admin's schools
+     * are just the union of every region actually enabled for their phase(s).
+     *
      * @param  list<string>  $schoolIds
      * @return list<string>
      */
     protected function regionScopedSchoolIds(array $schoolIds, ?string $year = null): array
     {
         $scopes = request()->attributes->get('regionAdminScopes');
-        if (empty($scopes)) {
+        $phaseScopes = request()->attributes->get('phaseAdminScopes');
+
+        if (empty($scopes) && empty($phaseScopes)) {
             return $schoolIds;
         }
 
         $regionIds = collect($scopes)->pluck('region_id')->filter()->unique()->values()->all();
+
+        if (! empty($phaseScopes)) {
+            $phaseIds = collect($phaseScopes)->pluck('source_phase_id')->filter()->unique()->values()->all();
+            $phaseRegionIds = \App\Models\FestPhaseRegion::whereIn('phase_id', $phaseIds)
+                ->where('enabled', true)
+                ->pluck('region_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $regionIds = array_values(array_unique(array_merge($regionIds, $phaseRegionIds)));
+        }
+
         if ($regionIds === []) {
-            // Assigned the region_admin duty but no region picked yet — fail closed, not open.
+            // Assigned a region/phase-scoped duty but nothing resolves to a real region —
+            // fail closed, not open.
             return [];
         }
 

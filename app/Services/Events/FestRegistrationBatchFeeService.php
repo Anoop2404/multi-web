@@ -86,7 +86,11 @@ class FestRegistrationBatchFeeService
                 default => round((float) $itemLines->sum('amount'), 2),
             };
 
-            $baseFee = $registrations->isNotEmpty() ? (float) $batch->school_base_fee : 0.0;
+            $school = \App\Models\Tenant::find($schoolId);
+            $categoryBaseFee = $school ? $this->fees->schoolRegistrationAmount($school, $schedule) : 0.0;
+            $baseFee = $registrations->isNotEmpty()
+                ? ($categoryBaseFee > 0 ? $categoryBaseFee : (float) $batch->school_base_fee)
+                : 0.0;
             $total = round($baseFee + $participationFee, 2);
 
             $record = FestSchoolEventFee::where('event_id', $root->id)

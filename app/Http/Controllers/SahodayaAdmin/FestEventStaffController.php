@@ -143,9 +143,9 @@ class FestEventStaffController extends SahodayaAdminController
             $data['stage_id'] = null;
         }
 
-        if ($data['duty'] !== 'region_admin') {
+        if (! in_array($data['duty'], ['region_admin', 'phase_admin'], true)) {
             $data['source_phase_id'] = null;
-        } elseif (! empty($data['source_phase_id'])) {
+        } elseif ($data['duty'] === 'region_admin' && ! empty($data['source_phase_id'])) {
             $phase = $event->rootEvent()->phases()->findOrFail($data['source_phase_id']);
             if (! $phase->isRegional()) {
                 return back()->withErrors(['source_phase_id' => 'Only a regional phase can be assigned with region scope.']);
@@ -155,6 +155,21 @@ class FestEventStaffController extends SahodayaAdminController
                 ->where('enabled', true)
                 ->exists()) {
                 return back()->withErrors(['region_id' => 'That region is not enabled for the selected phase.']);
+            }
+        }
+
+        if ($data['duty'] === 'phase_admin') {
+            // Phase admin always spans every region within the phase — a region_id would
+            // contradict that, so it's force-cleared regardless of what was submitted.
+            $data['region_id'] = null;
+
+            if (empty($data['source_phase_id'])) {
+                return back()->withErrors(['source_phase_id' => 'Select a phase for this admin.']);
+            }
+
+            $phase = $event->rootEvent()->phases()->findOrFail($data['source_phase_id']);
+            if (! $phase->isRegional()) {
+                return back()->withErrors(['source_phase_id' => 'Only a regional phase can be assigned phase-wide access.']);
             }
         }
 
@@ -187,6 +202,8 @@ class FestEventStaffController extends SahodayaAdminController
         } elseif ($data['duty'] === 'region_admin') {
             $match['region_id'] = $data['region_id'] ?? null;
             $match['source_phase_id'] = $data['source_phase_id'] ?? null;
+        } elseif ($data['duty'] === 'phase_admin') {
+            $match['source_phase_id'] = $data['source_phase_id'] ?? null;
         }
 
         FestEventStaff::firstOrCreate($match, [
@@ -213,6 +230,15 @@ class FestEventStaffController extends SahodayaAdminController
                 // the periodic `permissions:sync-staff` command — mark entry, ID cards, registrations,
                 // finance, food billing (see TenantUserCatalog::defaultPermissionsForRole()).
                 $user->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('region_admin'));
+            } elseif ($data['duty'] === 'phase_admin') {
+                // Same reasoning as region_admin above: phase coordinators must not receive the
+                // unscoped 'fest_ops' role. Access is enforced via EnsureSahodayaAdmin's phase_admin
+                // branch, keyed off FestEventStaff.source_phase_id for this (event, phase) pair —
+                // reaching every region's leaf event under that phase, but nothing outside it.
+                if (! $user->hasRole('phase_admin')) {
+                    $user->assignRole('phase_admin');
+                }
+                $user->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('phase_admin'));
             } elseif ($data['duty'] !== 'marks' && ! $user->hasRole('fest_ops')) {
                 $user->assignRole('fest_ops');
             }

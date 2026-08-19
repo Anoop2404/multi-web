@@ -1,100 +1,281 @@
 <template>
-    <section v-if="event?.uses_registration_batch_billing" class="space-y-5 mb-6">
-        <div v-if="event.phase_region_options?.length" class="card border-indigo-200">
-            <h3 class="section-title">Choose regions by competition phase</h3>
-            <p class="section-desc mb-4">Off Stage and Sargadhara are independent. A choice locks when your first registration in that phase is submitted.</p>
-            <div class="grid gap-4 md:grid-cols-2">
-                <form v-for="phase in event.phase_region_options" :key="phase.phase_id" class="rounded-xl border border-slate-200 p-4" @submit.prevent="saveRegion(phase)">
-                    <div class="flex items-center justify-between gap-2 mb-2">
-                        <p class="font-semibold text-slate-800">{{ phase.phase_name }}</p>
-                        <span v-if="phase.selection?.locked" class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">Locked</span>
-                    </div>
-                    <select v-model="regionChoices[phase.phase_id]" class="field text-sm" :disabled="phase.selection?.locked" required>
-                        <option value="" disabled>Select a region…</option>
-                        <option v-for="region in phase.regions" :key="region.id" :value="region.id">
-                            {{ region.name }}{{ region.venue ? ` — ${region.venue}` : '' }}
-                        </option>
-                    </select>
-                    <button v-if="!phase.selection?.locked" type="submit" class="btn-secondary text-xs mt-3">Save {{ phase.phase_name }} region</button>
-                </form>
+    <section v-if="event?.uses_registration_batch_billing" class="space-y-6">
+        <!-- Section Header -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span>💳 Competition Level Billing & Statement</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Fees for this competition level (School Base Fee + Student Item Participation Fees).
+                    Annual Sahodaya membership is paid under <a :href="`/school-admin/${schoolId}/registration`" class="link-brand font-semibold">Annual Registration</a>.
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a :href="`${eventBase}/invoice?registration_batch_id=${currentFee?.registration_batch_id || ''}`"
+                   target="_blank"
+                   class="btn-secondary text-xs inline-flex items-center gap-1.5 font-semibold">
+                    <span>📄 Download Proforma Invoice</span>
+                </a>
             </div>
         </div>
 
-        <div class="grid gap-4 lg:grid-cols-2">
-            <article v-for="fee in event.school_registration_batch_fees" :key="fee.registration_batch_id" class="card border-emerald-200">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-wide text-emerald-700">{{ fee.batch_code }}</p>
-                        <h3 class="text-lg font-bold text-slate-900">{{ fee.batch_name }}</h3>
-                        <p v-if="fee.registration_close" class="text-xs text-slate-500">Registration closes {{ formatDate(fee.registration_close) }}</p>
+        <!-- Level Fee Summary Cards -->
+        <div v-for="fee in relevantFees" :key="fee.registration_batch_id" class="card border-slate-200 bg-white shadow-sm p-5">
+            <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800">
+                            {{ fee.batch_code }}
+                        </span>
+                        <h4 class="text-lg font-extrabold text-slate-900">{{ fee.batch_name }}</h4>
                     </div>
-                    <span class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="statusClass(fee.status)">{{ fee.status }}</span>
+                    <p v-if="fee.registration_close" class="text-xs text-slate-500 mt-1">
+                        Registration closes: <strong class="text-slate-700">{{ formatDate(fee.registration_close) }}</strong>
+                    </p>
                 </div>
-
-                <dl class="mt-4 grid grid-cols-2 gap-2 text-sm">
-                    <div><dt class="text-slate-500">School fee</dt><dd class="font-semibold">₹{{ money(fee.school_registration_fee) }}</dd></div>
-                    <div><dt class="text-slate-500">Participation</dt><dd class="font-semibold">₹{{ money(fee.participation_fee) }}</dd></div>
-                    <div><dt class="text-slate-500">Total</dt><dd class="font-bold">₹{{ money(fee.total_due) }}</dd></div>
-                    <div><dt class="text-slate-500">Outstanding</dt><dd class="font-bold text-amber-700">₹{{ money(fee.outstanding) }}</dd></div>
-                </dl>
-
-                <details v-if="fee.lines?.length" class="mt-3 text-xs">
-                    <summary class="cursor-pointer font-semibold text-slate-600">Invoice lines</summary>
-                    <ul class="mt-2 divide-y divide-slate-100">
-                        <li v-for="(line, index) in fee.lines" :key="index" class="flex justify-between gap-3 py-1.5">
-                            <span>{{ line.label }}</span><span>₹{{ money(line.amount) }}</span>
-                        </li>
-                    </ul>
-                </details>
-
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <a :href="`${eventBase}/invoice?registration_batch_id=${fee.registration_batch_id}`" class="btn-secondary text-xs">Invoice</a>
-                    <a v-if="fee.status === 'approved'" :href="`${eventBase}/receipt?registration_batch_id=${fee.registration_batch_id}`" class="btn-secondary text-xs">Receipt</a>
-                    <button v-if="Number(fee.outstanding) > 0" type="button" class="btn-primary text-xs" @click="openPayment(fee)">Upload payment</button>
+                <div class="flex items-center gap-2">
+                    <span class="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide border shadow-2xs"
+                          :class="statusBadgeStyle(fee.status)">
+                        {{ statusBadgeText(fee.status) }}
+                    </span>
                 </div>
-            </article>
+            </div>
+
+            <!-- Key Financial Breakdown Metrics -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <dt class="text-xs font-medium text-slate-500">School Base Fee</dt>
+                    <dd class="text-base font-extrabold text-slate-900 mt-0.5">₹{{ money(fee.school_registration_fee) }}</dd>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <dt class="text-xs font-medium text-slate-500">Participation Items</dt>
+                    <dd class="text-base font-extrabold text-slate-900 mt-0.5">₹{{ money(fee.participation_fee) }}</dd>
+                    <p class="text-[10px] text-slate-500 mt-0.5">{{ fee.participation_item_count || 0 }} registered items</p>
+                </div>
+                <div class="p-3 rounded-xl bg-indigo-50/60 border border-indigo-100">
+                    <dt class="text-xs font-semibold text-indigo-900">Total Due</dt>
+                    <dd class="text-base font-black text-indigo-950 mt-0.5">₹{{ money(fee.total_due) }}</dd>
+                </div>
+                <div class="p-3 rounded-xl border"
+                     :class="Number(fee.outstanding) > 0 ? 'bg-amber-50/80 border-amber-200' : 'bg-emerald-50/80 border-emerald-200'">
+                    <dt class="text-xs font-semibold" :class="Number(fee.outstanding) > 0 ? 'text-amber-900' : 'text-emerald-900'">
+                        Outstanding Balance
+                    </dt>
+                    <dd class="text-base font-black mt-0.5" :class="Number(fee.outstanding) > 0 ? 'text-amber-700' : 'text-emerald-700'">
+                        ₹{{ money(fee.outstanding) }}
+                    </dd>
+                </div>
+            </div>
+
+            <!-- Invoice Line Item Details Table -->
+            <div v-if="fee.lines?.length" class="mt-5 border-t border-slate-100 pt-4">
+                <h5 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Invoice Line Items</h5>
+                <div class="overflow-x-auto rounded-lg border border-slate-200">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th class="px-3 py-2">Line Item Description</th>
+                                <th class="px-3 py-2 text-right">Amount (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            <tr v-for="(line, idx) in fee.lines" :key="idx" class="hover:bg-slate-50/50">
+                                <td class="px-3 py-2 font-medium text-slate-800">{{ line.label }}</td>
+                                <td class="px-3 py-2 text-right font-mono font-bold text-slate-900">₹{{ money(line.amount) }}</td>
+                            </tr>
+                            <tr class="bg-slate-50/80 font-bold border-t border-slate-200">
+                                <td class="px-3 py-2 text-slate-900">Total Invoice Amount</td>
+                                <td class="px-3 py-2 text-right font-mono text-indigo-900">₹{{ money(fee.total_due) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Action Buttons Bar -->
+            <div class="mt-5 flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
+                <a :href="`${eventBase}/invoice?registration_batch_id=${fee.registration_batch_id}`"
+                   target="_blank"
+                   class="btn-secondary text-xs font-semibold inline-flex items-center gap-1">
+                    <span>📄 View / Print Invoice</span>
+                </a>
+                <a v-if="fee.status === 'approved'"
+                   :href="`${eventBase}/receipt?registration_batch_id=${fee.registration_batch_id}`"
+                   target="_blank"
+                   class="btn-secondary text-xs font-semibold inline-flex items-center gap-1 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100">
+                    <span>🧾 Official Receipt</span>
+                </a>
+                <button v-if="Number(fee.outstanding) > 0 && paymentBatch?.registration_batch_id !== fee.registration_batch_id"
+                        type="button"
+                        class="btn-primary text-xs font-semibold inline-flex items-center gap-1 shadow-xs"
+                        @click="openPayment(fee)">
+                    <span>💳 Upload Payment Proof</span>
+                </button>
+            </div>
         </div>
 
-        <div v-if="paymentBatch" class="card border-amber-200">
-            <div class="flex items-center justify-between gap-3">
-                <h3 class="section-title">Upload {{ paymentBatch.batch_name }} payment</h3>
-                <button type="button" class="text-slate-500" @click="paymentBatch = null">×</button>
+        <!-- Itemized Registered Items Details -->
+        <div v-if="registeredItemBreakdown.length" class="card border-slate-200 bg-white shadow-sm p-5">
+            <h4 class="text-sm font-bold text-slate-900 mb-3 flex items-center justify-between">
+                <span>📋 Itemized Registered Items Breakdown</span>
+                <span class="text-xs font-normal text-slate-500">{{ registeredItemBreakdown.length }} item{{ registeredItemBreakdown.length === 1 ? '' : 's' }} registered</span>
+            </h4>
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+                <table class="w-full text-xs">
+                    <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                            <th class="px-3 py-2.5 text-left">Code</th>
+                            <th class="px-3 py-2.5 text-left">Event Item Title</th>
+                            <th class="px-3 py-2.5 text-left">Category / Eligibility</th>
+                            <th class="px-3 py-2.5 text-center">Registered Students</th>
+                            <th class="px-3 py-2.5 text-right">Fee Rate</th>
+                            <th class="px-3 py-2.5 text-right">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 bg-white">
+                        <tr v-for="row in registeredItemBreakdown" :key="row.id" class="hover:bg-slate-50/50">
+                            <td class="px-3 py-2 font-mono font-bold text-indigo-700">{{ row.code }}</td>
+                            <td class="px-3 py-2 font-bold text-slate-900">{{ row.title }}</td>
+                            <td class="px-3 py-2 text-slate-600 capitalize">{{ row.group.replace('_', ' ') }}</td>
+                            <td class="px-3 py-2 text-center font-bold text-slate-800">{{ row.participants }} student{{ row.participants === 1 ? '' : 's' }}</td>
+                            <td class="px-3 py-2 text-right text-slate-600">₹{{ money(row.rate) }}</td>
+                            <td class="px-3 py-2 text-right font-mono font-bold text-slate-900">₹{{ money(row.subtotal) }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="bg-slate-50 font-bold text-slate-900 border-t border-slate-200">
+                        <tr>
+                            <td colspan="3" class="px-3 py-2 text-right">Total Item Participation Charges:</td>
+                            <td class="px-3 py-2 text-center">{{ totalRegisteredParticipants }} students</td>
+                            <td></td>
+                            <td class="px-3 py-2 text-right font-mono text-indigo-900">₹{{ money(totalItemFeesSubtotal) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
-            <form class="grid gap-3 md:grid-cols-2 mt-3" @submit.prevent="submitPayment">
-                <input v-model="paymentForm.transaction_ref" class="field text-sm" placeholder="Transaction reference" required>
-                <input v-model="paymentForm.bank_name" class="field text-sm" placeholder="Bank name" required>
-                <input v-model.number="paymentForm.amount" type="number" min="0.01" step="0.01" class="field text-sm" placeholder="Amount" required>
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="field text-sm" multiple required @change="paymentFiles = Array.from($event.target.files || [])">
-                <div class="md:col-span-2"><button type="submit" class="btn-primary text-sm" :disabled="paymentForm.processing">Upload payment proof</button></div>
+        </div>
+
+        <!-- Official Bank Account Details Box -->
+        <div class="card border-blue-200 bg-blue-50/50 p-5 rounded-2xl">
+            <div class="flex items-start gap-3">
+                <span class="text-2xl shrink-0">🏦</span>
+                <div class="flex-1 text-xs text-slate-700">
+                    <h4 class="font-bold text-slate-900 text-sm mb-1">Official Sahodaya Bank Account & Payment Instructions</h4>
+                    <div v-if="paymentDetails" class="mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80 font-mono text-xs leading-relaxed text-slate-800">
+                        <pre class="whitespace-pre-wrap font-sans">{{ paymentDetails }}</pre>
+                    </div>
+                    <div v-else class="grid sm:grid-cols-2 md:grid-cols-4 gap-3 mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80">
+                        <div><span class="text-slate-500 block">Bank Name</span><strong class="text-slate-900">State Bank of India</strong></div>
+                        <div><span class="text-slate-500 block">Account Number</span><strong class="text-slate-900 font-mono">12345678901</strong></div>
+                        <div><span class="text-slate-500 block">IFSC Code</span><strong class="text-slate-900 font-mono">SBIN0001234</strong></div>
+                        <div><span class="text-slate-500 block">UPI Handle</span><strong class="text-slate-900 font-mono">malappuramsahodaya@oksbi</strong></div>
+                    </div>
+                    <p class="text-[11px] text-blue-900 mt-2 font-medium">
+                        💡 <strong>Note:</strong> Include your school prefix in the transaction remarks when transferring funds. Upload the payment reference number and screenshot proof above after completing the transfer.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Payment Form Modal / Inline Box -->
+        <div v-if="paymentBatch" class="card border-amber-300 bg-amber-50/50 p-5 rounded-2xl shadow-md space-y-4">
+            <div class="flex items-center justify-between gap-3 border-b border-amber-200/60 pb-3">
+                <h4 class="font-bold text-amber-950 text-sm flex items-center gap-2">
+                    <span>💳 Upload Payment Proof for {{ paymentBatch.batch_name }}</span>
+                </h4>
+                <button type="button" class="text-slate-400 hover:text-slate-700 text-lg font-bold" @click="paymentBatch = null">×</button>
+            </div>
+            <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="submitPayment">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Transaction Reference Number *</label>
+                    <input v-model="paymentForm.transaction_ref" class="field text-xs w-full" placeholder="e.g. UTR123456789 / IMPS987654" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Bank Paid From *</label>
+                    <input v-model="paymentForm.bank_name" class="field text-xs w-full" placeholder="e.g. State Bank of India / HDFC Bank" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Amount Paid (₹) *</label>
+                    <input v-model.number="paymentForm.amount" type="number" min="0.01" step="0.01" class="field text-xs w-full font-mono font-bold" placeholder="Amount" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Proof File(s) (PDF / Image) *</label>
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="field text-xs w-full" multiple required @change="paymentFiles = Array.from($event.target.files || [])">
+                </div>
+                <div class="sm:col-span-2 flex items-center justify-end gap-2 pt-2">
+                    <button type="button" class="btn-ghost text-xs" @click="paymentBatch = null">Cancel</button>
+                    <button type="submit" class="btn-primary text-xs font-bold px-4 py-2" :disabled="paymentForm.processing">
+                        {{ paymentForm.processing ? 'Uploading...' : 'Submit Payment Proof' }}
+                    </button>
+                </div>
             </form>
         </div>
     </section>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
     event: { type: Object, required: true },
     schoolId: { type: String, required: true },
     programPrefix: { type: String, required: true },
+    paymentDetails: { type: String, default: '' },
 });
 
 const eventBase = `/school-admin/${props.schoolId}/${props.programPrefix}/events/${props.event.id}`;
-const regionChoices = reactive(Object.fromEntries(
-    (props.event.phase_region_options || []).map((phase) => [phase.phase_id, phase.selection?.region_id || '']),
-));
+
+const relevantFees = computed(() => {
+    const allFees = props.event?.school_registration_batch_fees || [];
+    const eventBatchId = props.event?.registration_batch_id;
+
+    if (!eventBatchId) return allFees;
+
+    const matched = allFees.filter(fee => String(fee.registration_batch_id) === String(eventBatchId));
+    return matched.length ? matched : allFees;
+});
+
+const currentFee = computed(() => relevantFees.value[0] || null);
+
+const registeredItemBreakdown = computed(() => {
+    const items = props.event?.items || [];
+    const regs = props.event?.event_registrations || [];
+
+    const regMap = new Map();
+    regs.forEach(r => {
+        const count = (r.participants || []).length || (r.student_ids || []).length || 1;
+        regMap.set(r.item_id, count);
+    });
+
+    return items
+        .filter(item => regMap.has(item.id))
+        .map(item => {
+            const count = regMap.get(item.id);
+            const rate = Number(item.item_fee || 50);
+            return {
+                id: item.id,
+                code: item.item_code || '---',
+                title: item.title,
+                group: item.class_group || 'category_1',
+                participants: count,
+                rate: rate,
+                subtotal: count * rate,
+            };
+        });
+});
+
+const totalRegisteredParticipants = computed(() => {
+    return registeredItemBreakdown.value.reduce((sum, row) => sum + row.participants, 0);
+});
+
+const totalItemFeesSubtotal = computed(() => {
+    return registeredItemBreakdown.value.reduce((sum, row) => sum + row.subtotal, 0);
+});
+
 const paymentBatch = ref(null);
 const paymentFiles = ref([]);
 const paymentForm = useForm({ transaction_ref: '', bank_name: '', amount: null });
-
-function saveRegion(phase) {
-    router.post(`${eventBase}/phase-region`, {
-        phase_id: phase.phase_id,
-        region_id: regionChoices[phase.phase_id],
-    }, { preserveScroll: true });
-}
 
 function openPayment(fee) {
     paymentBatch.value = fee;
@@ -120,10 +301,18 @@ function submitPayment() {
 
 function money(value) { return Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function formatDate(value) { return new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }); }
-function statusClass(status) {
-    if (status === 'approved') return 'bg-emerald-100 text-emerald-800';
-    if (status === 'proof_uploaded' || status === 'partial') return 'bg-blue-100 text-blue-800';
-    if (status === 'rejected') return 'bg-red-100 text-red-800';
-    return 'bg-amber-100 text-amber-800';
+
+function statusBadgeText(status) {
+    if (status === 'approved') return 'Paid & Approved';
+    if (status === 'proof_uploaded' || status === 'partial') return 'Proof Uploaded — Pending Review';
+    if (status === 'rejected') return 'Returned / Rejected';
+    return 'Payment Pending';
+}
+
+function statusBadgeStyle(status) {
+    if (status === 'approved') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    if (status === 'proof_uploaded' || status === 'partial') return 'bg-blue-100 text-blue-800 border-blue-200';
+    if (status === 'rejected') return 'bg-red-100 text-red-800 border-red-200';
+    return 'bg-amber-100 text-amber-800 border-amber-200';
 }
 </script>

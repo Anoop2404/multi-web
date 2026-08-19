@@ -211,16 +211,15 @@
         </div>
 
         <!-- Return report modal -->
-        <div v-if="returnTarget" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" @click.self="returnTarget = null">
-            <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
-                <h3 class="text-sm font-bold text-gray-900 mb-2">Return report for correction</h3>
-                <textarea v-model="returnReason" rows="3" class="field w-full text-xs" placeholder="Reason for returning this report..."></textarea>
-                <div class="flex justify-end gap-2 mt-3">
+        <Modal :show="!!returnTarget" title="Return report for correction" @close="returnTarget = null">
+            <textarea v-model="returnReason" rows="3" class="field w-full text-xs" placeholder="Reason for returning this report..."></textarea>
+            <template #footer>
+                <div class="flex justify-end gap-2">
                     <button type="button" class="btn-secondary text-xs" @click="returnTarget = null">Cancel</button>
                     <button type="button" class="btn-primary text-xs" :disabled="!returnReason.trim()" @click="confirmReturnReport">Return</button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </Modal>
     </SchoolAdminLayout>
 </template>
 

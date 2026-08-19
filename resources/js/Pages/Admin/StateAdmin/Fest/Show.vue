@@ -8,7 +8,7 @@
                 Results are published and scoring is locked. The public result page now reads these State-final marks.
             </div>
 
-            <Link :href="actionUrls.attendance" class="inline-block text-sm text-indigo-600">Mark attendance →</Link>
+            <Link :href="actionUrls.attendance" class="inline-block text-sm link-brand">Mark attendance →</Link>
 
             <div class="p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 flex items-center justify-between gap-3">
                 <p class="text-xs text-amber-900">

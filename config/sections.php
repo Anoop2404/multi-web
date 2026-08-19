@@ -210,6 +210,66 @@ return [
                 ['key' => 'anthem_url', 'type' => 'url',      'label' => 'Anthem Audio URL'],
             ],
         ],
+        'vision-mission' => [
+            'label' => 'Vision & Mission',
+            'description' => 'Vision and mission cards + core values grid',
+            'fields' => [
+                ['key' => 'heading',    'type' => 'text',   'label' => 'Heading'],
+                ['key' => 'background', 'type' => 'select', 'label' => 'Background', 'options' => [
+                    ['value' => 'light', 'label' => 'Light'],
+                    ['value' => 'dark',  'label' => 'Dark'],
+                ]],
+                ['key' => 'vision',  'type' => 'wysiwyg', 'label' => 'Vision'],
+                ['key' => 'mission', 'type' => 'wysiwyg', 'label' => 'Mission'],
+                ['key' => 'values',  'type' => 'repeater', 'label' => 'Core Values',
+                 'fields' => [
+                     ['key' => 'icon',  'type' => 'text', 'label' => 'Emoji Icon'],
+                     ['key' => 'label', 'type' => 'text', 'label' => 'Value'],
+                 ]],
+            ],
+        ],
+        'split-image' => [
+            'label' => 'Split Image',
+            'description' => 'Image one side, text + optional stats and CTA the other',
+            'fields' => [
+                ['key' => 'eyebrow',    'type' => 'text',   'label' => 'Eyebrow'],
+                ['key' => 'heading',    'type' => 'text',   'label' => 'Heading'],
+                ['key' => 'body',       'type' => 'wysiwyg', 'label' => 'Body'],
+                ['key' => 'image',      'type' => 'media',  'label' => 'Image'],
+                ['key' => 'image_side', 'type' => 'select', 'label' => 'Image Side', 'options' => [
+                    ['value' => 'left',  'label' => 'Left'],
+                    ['value' => 'right', 'label' => 'Right'],
+                ]],
+                ['key' => 'stats', 'type' => 'repeater', 'label' => 'Stats',
+                 'fields' => [
+                     ['key' => 'value', 'type' => 'text', 'label' => 'Value'],
+                     ['key' => 'label', 'type' => 'text', 'label' => 'Label'],
+                 ]],
+                ['key' => 'cta_label', 'type' => 'text', 'label' => 'Button Label'],
+                ['key' => 'cta_url',   'type' => 'url',  'label' => 'Button URL'],
+            ],
+        ],
+        'overlap-stats' => [
+            'label' => 'Overlapping Photos + Mini Stats',
+            'description' => 'Layered main+secondary photo with a floating stat badge, text and 3 mini-stat cards',
+            'fields' => [
+                ['key' => 'eyebrow',          'type' => 'text',    'label' => 'Eyebrow'],
+                ['key' => 'heading',          'type' => 'text',    'label' => 'Heading'],
+                ['key' => 'body',             'type' => 'wysiwyg', 'label' => 'Body'],
+                ['key' => 'image',            'type' => 'media',   'label' => 'Main Image'],
+                ['key' => 'image_secondary',  'type' => 'media',   'label' => 'Secondary (overlapping) Image'],
+                ['key' => 'stat_value',       'type' => 'text',    'label' => 'Floating Stat Value (e.g. "25+")'],
+                ['key' => 'stat_label_line1', 'type' => 'text',    'label' => 'Floating Stat Label Line 1'],
+                ['key' => 'stat_label_line2', 'type' => 'text',    'label' => 'Floating Stat Label Line 2'],
+                ['key' => 'mini_stats', 'type' => 'repeater', 'label' => 'Mini Stats (up to 3)',
+                 'fields' => [
+                     ['key' => 'value', 'type' => 'text', 'label' => 'Value'],
+                     ['key' => 'label', 'type' => 'text', 'label' => 'Label'],
+                 ]],
+                ['key' => 'cta_label', 'type' => 'text', 'label' => 'Button Label'],
+                ['key' => 'cta_url',   'type' => 'url',  'label' => 'Button URL'],
+            ],
+        ],
     ],
 
     'about_sahodaya' => [
@@ -290,6 +350,17 @@ return [
                 ['key' => 'photo',      'type' => 'media',  'label' => 'Photo'],
                 ['key' => 'message',    'type' => 'wysiwyg','label' => 'Message'],
                 ['key' => 'qualification', 'type' => 'text','label' => 'Qualification'],
+            ],
+        ],
+        'split-portrait' => [
+            'label' => 'Split Portrait',
+            'description' => 'Right-aligned text left, portrait right',
+            'fields' => [
+                ['key' => 'lead_in',     'type' => 'text',    'label' => 'Lead-in Line'],
+                ['key' => 'message',     'type' => 'wysiwyg', 'label' => 'Message'],
+                ['key' => 'name',        'type' => 'text',    'label' => 'Principal Name'],
+                ['key' => 'designation', 'type' => 'text',    'label' => 'Designation'],
+                ['key' => 'photo',       'type' => 'media',   'label' => 'Photo'],
             ],
         ],
         'full-width' => [
@@ -441,6 +512,29 @@ return [
                  ]],
             ],
         ],
+        'why-choose-cards' => [
+            'label' => 'Why Choose Us Cards',
+            'description' => 'Icon cards with per-item colors — "why choose us" style feature grid',
+            'fields' => [
+                ['key' => 'eyebrow',       'type' => 'text', 'label' => 'Eyebrow'],
+                ['key' => 'heading_line1', 'type' => 'text', 'label' => 'Heading Line 1'],
+                ['key' => 'heading_line2', 'type' => 'text', 'label' => 'Heading Line 2'],
+                ['key' => 'items', 'type' => 'repeater', 'label' => 'Items',
+                 'fields' => [
+                     ['key' => 'title',       'type' => 'text', 'label' => 'Title', 'required' => true],
+                     ['key' => 'description', 'type' => 'textarea', 'label' => 'Description'],
+                     ['key' => 'icon', 'type' => 'select', 'label' => 'Icon', 'options' => [
+                         ['value' => 'education', 'label' => 'Education (cap)'],
+                         ['value' => 'shield',    'label' => 'Safety (shield)'],
+                         ['value' => 'bulb',      'label' => 'Idea (bulb)'],
+                         ['value' => 'heart',     'label' => 'Care (heart)'],
+                         ['value' => 'smile',     'label' => 'Activities (smile)'],
+                     ]],
+                     ['key' => 'bg_color',     'type' => 'text', 'label' => 'Icon Background Color (hex)'],
+                     ['key' => 'stroke_color', 'type' => 'text', 'label' => 'Icon Stroke Color (hex)'],
+                 ]],
+            ],
+        ],
     ],
 
     'academic_programmes' => [
@@ -507,6 +601,15 @@ return [
                 ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
             ],
         ],
+        'card-grid' => [
+            'label' => 'Card Grid',
+            'description' => 'Bordered cards — photo, name, designation, department, qualification',
+            'fields' => [
+                ['key' => 'eyebrow', 'type' => 'text',   'label' => 'Eyebrow'],
+                ['key' => 'heading', 'type' => 'text',   'label' => 'Heading'],
+                ['key' => 'limit',   'type' => 'number', 'label' => 'Number to show', 'default' => 12],
+            ],
+        ],
     ],
 
     'news' => [
@@ -537,6 +640,13 @@ return [
         'featured-plus-list' => [
             'label' => 'Featured + List',
             'description' => '1 featured + sidebar list',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+            ],
+        ],
+        'featured-strip' => [
+            'label' => 'Featured Strip',
+            'description' => '1 large featured article + 4-up recent list',
             'fields' => [
                 ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
             ],
@@ -607,6 +717,17 @@ return [
                 ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
             ],
         ],
+        'preview-grid' => [
+            'label' => 'Preview Grid',
+            'description' => 'Simple square photo grid with a "view full gallery" link',
+            'fields' => [
+                ['key' => 'eyebrow',         'type' => 'text',   'label' => 'Eyebrow'],
+                ['key' => 'heading',         'type' => 'text',   'label' => 'Heading'],
+                ['key' => 'limit',           'type' => 'number', 'label' => 'Number of photos', 'default' => 8],
+                ['key' => 'view_more_label', 'type' => 'text',   'label' => 'View More Button Label'],
+                ['key' => 'view_more_url',   'type' => 'url',    'label' => 'View More URL'],
+            ],
+        ],
     ],
 
     'video_gallery' => [
@@ -614,11 +735,12 @@ return [
             'label' => 'YouTube Grid',
             'description' => 'YouTube embed cards',
             'fields' => [
+                ['key' => 'eyebrow', 'type' => 'text', 'label' => 'Eyebrow Label'],
                 ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
                 ['key' => 'videos',  'type' => 'repeater', 'label' => 'Videos',
                  'fields' => [
                      ['key' => 'title', 'type' => 'text', 'label' => 'Title'],
-                     ['key' => 'url',   'type' => 'url',  'label' => 'YouTube URL'],
+                     ['key' => 'url',   'type' => 'url',  'label' => 'YouTube URL', 'required' => true],
                  ]],
             ],
         ],
@@ -626,9 +748,11 @@ return [
             'label' => 'Featured Embed',
             'description' => 'Single featured video + list',
             'fields' => [
-                ['key' => 'heading',     'type' => 'text', 'label' => 'Heading'],
-                ['key' => 'featured_url','type' => 'url',  'label' => 'Featured Video URL'],
-                ['key' => 'videos',      'type' => 'repeater', 'label' => 'More Videos',
+                ['key' => 'eyebrow',       'type' => 'text', 'label' => 'Eyebrow Label'],
+                ['key' => 'heading',       'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'featured_url',  'type' => 'url',  'label' => 'Featured Video URL', 'required' => true],
+                ['key' => 'featured_title','type' => 'text', 'label' => 'Featured Video Title'],
+                ['key' => 'videos',        'type' => 'repeater', 'label' => 'More Videos',
                  'fields' => [
                      ['key' => 'title', 'type' => 'text', 'label' => 'Title'],
                      ['key' => 'url',   'type' => 'url',  'label' => 'YouTube URL'],
@@ -685,14 +809,54 @@ return [
                 ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
             ],
         ],
+        'horizontal-scroll' => [
+            'label' => 'Horizontal Scroll',
+            'description' => 'Horizontally-scrolling photo row',
+            'fields' => [
+                ['key' => 'eyebrow', 'type' => 'text',   'label' => 'Eyebrow'],
+                ['key' => 'heading', 'type' => 'text',   'label' => 'Heading'],
+                ['key' => 'limit',   'type' => 'number', 'label' => 'Number to show', 'default' => 8],
+            ],
+        ],
     ],
 
     'mandatory_disclosure' => [
         'structured' => [
             'label' => 'Structured (CBSE Format)',
-            'description' => 'CBSE-required format with all sections',
+            'description' => 'CBSE-required A-E category format',
             'fields' => [
-                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'school_name',        'type' => 'text',  'label' => 'Name of the School (defaults to tenant name)'],
+                ['key' => 'affiliation_no',     'type' => 'text',  'label' => 'Affiliation No.'],
+                ['key' => 'school_code',        'type' => 'text',  'label' => 'School Code'],
+                ['key' => 'address',            'type' => 'textarea', 'label' => 'Complete Address with Pin Code'],
+                ['key' => 'principal',          'type' => 'text',  'label' => 'Principal Name & Qualification'],
+                ['key' => 'email',              'type' => 'email', 'label' => 'School Email'],
+                ['key' => 'phone',              'type' => 'tel',   'label' => 'Contact Number'],
+                ['key' => 'doc_affiliation_letter',  'type' => 'url', 'label' => 'Affiliation/Upgradation Letter URL'],
+                ['key' => 'doc_trust_registration',  'type' => 'url', 'label' => 'Trust/Society Registration URL'],
+                ['key' => 'doc_noc',                 'type' => 'url', 'label' => 'No Objection Certificate URL'],
+                ['key' => 'doc_recognition',         'type' => 'url', 'label' => 'Recognition Certificate URL'],
+                ['key' => 'doc_building_safety',     'type' => 'url', 'label' => 'Building Safety Certificate URL'],
+                ['key' => 'doc_fire_safety',         'type' => 'url', 'label' => 'Fire Safety Certificate URL'],
+                ['key' => 'doc_deo_certificate',     'type' => 'url', 'label' => 'DEO Certificate URL'],
+                ['key' => 'doc_health_sanitation',   'type' => 'url', 'label' => 'Water/Health/Sanitation Certificates URL'],
+                ['key' => 'doc_fee_structure',       'type' => 'url', 'label' => 'Fee Structure URL'],
+                ['key' => 'doc_academic_calendar',   'type' => 'url', 'label' => 'Annual Academic Calendar URL'],
+                ['key' => 'doc_smc',                 'type' => 'url', 'label' => 'School Management Committee List URL'],
+                ['key' => 'doc_pta',                 'type' => 'url', 'label' => 'PTA Members List URL'],
+                ['key' => 'doc_board_results',       'type' => 'url', 'label' => 'Last 3-Year Board Results URL'],
+                ['key' => 'staff_principal',       'type' => 'text', 'label' => 'Principal (name)'],
+                ['key' => 'staff_total_teachers',  'type' => 'text', 'label' => 'Total Teachers'],
+                ['key' => 'staff_pgt',             'type' => 'text', 'label' => 'PGT Count'],
+                ['key' => 'staff_tgt',             'type' => 'text', 'label' => 'TGT Count'],
+                ['key' => 'staff_prt',             'type' => 'text', 'label' => 'PRT Count'],
+                ['key' => 'infra_campus_area',    'type' => 'text', 'label' => 'Total Campus Area (sq. mt.)'],
+                ['key' => 'infra_classrooms',     'type' => 'text', 'label' => 'No. and Size of Classrooms'],
+                ['key' => 'infra_labs',           'type' => 'text', 'label' => 'No. and Size of Labs'],
+                ['key' => 'infra_internet',       'type' => 'text', 'label' => 'Internet Facility'],
+                ['key' => 'infra_girls_toilets',  'type' => 'text', 'label' => "No. of Girls' Toilets"],
+                ['key' => 'infra_boys_toilets',   'type' => 'text', 'label' => "No. of Boys' Toilets"],
+                ['key' => 'infra_library',        'type' => 'text', 'label' => 'Library'],
             ],
         ],
         'accordion' => [
@@ -730,6 +894,20 @@ return [
             'description' => 'Info + embedded enquiry form',
             'fields' => [
                 ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+            ],
+        ],
+        'promo-block' => [
+            'label' => 'Promo Block',
+            'description' => 'Rounded promo panel — badge, heading, CTA, image',
+            'fields' => [
+                ['key' => 'badge',       'type' => 'text',     'label' => 'Badge Text'],
+                ['key' => 'heading',     'type' => 'text',     'label' => 'Heading'],
+                ['key' => 'subtitle',    'type' => 'text',     'label' => 'Subtitle'],
+                ['key' => 'content',     'type' => 'textarea', 'label' => 'Content'],
+                ['key' => 'image',       'type' => 'media',    'label' => 'Image'],
+                ['key' => 'cta_label',   'type' => 'text',     'label' => 'Button Label'],
+                ['key' => 'cta_url',     'type' => 'url',      'label' => 'Button URL (defaults to the admission enquiry form)'],
+                ['key' => 'notice_text', 'type' => 'text',     'label' => 'Optional Notice (e.g. admissions closed)'],
             ],
         ],
         'fee-structure' => [
@@ -947,6 +1125,77 @@ return [
         ],
     ],
 
+    'faq' => [
+        'accordion' => [
+            'label' => 'FAQ Accordion',
+            'description' => 'Expand/collapse question and answer list',
+            'fields' => [
+                ['key' => 'eyebrow',    'type' => 'text',     'label' => 'Eyebrow Label'],
+                ['key' => 'heading',    'type' => 'text',     'label' => 'Heading'],
+                ['key' => 'subheading', 'type' => 'textarea', 'label' => 'Introduction Text'],
+                ['key' => 'items',      'type' => 'repeater', 'label' => 'Questions',
+                 'fields' => [
+                     ['key' => 'question', 'type' => 'text',     'label' => 'Question', 'required' => true],
+                     ['key' => 'answer',   'type' => 'textarea', 'label' => 'Answer', 'required' => true],
+                 ]],
+            ],
+        ],
+    ],
+
+    'sponsors' => [
+        'logo-grid' => [
+            'label' => 'Sponsors & Partners',
+            'description' => 'Sponsor/partner logo grid, optionally grouped by tier',
+            'fields' => [
+                ['key' => 'eyebrow', 'type' => 'text', 'label' => 'Eyebrow Label'],
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'sponsors', 'type' => 'repeater', 'label' => 'Sponsors',
+                 'fields' => [
+                     ['key' => 'name',  'type' => 'text',  'label' => 'Sponsor Name', 'required' => true],
+                     ['key' => 'logo',  'type' => 'media', 'label' => 'Logo', 'required' => true],
+                     ['key' => 'tier',  'type' => 'text',  'label' => 'Tier (optional, e.g. Title, Gold, Silver)'],
+                     ['key' => 'url',   'type' => 'url',   'label' => 'Website URL (optional)'],
+                 ]],
+            ],
+        ],
+    ],
+
+    'awards' => [
+        'cards' => [
+            'label' => 'Awards & Recognition',
+            'description' => 'Card grid of the Sahodaya\'s own institutional awards and recognitions',
+            'fields' => [
+                ['key' => 'eyebrow', 'type' => 'text', 'label' => 'Eyebrow Label'],
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'awards', 'type' => 'repeater', 'label' => 'Awards',
+                 'fields' => [
+                     ['key' => 'title',       'type' => 'text',     'label' => 'Award Title', 'required' => true],
+                     ['key' => 'year',        'type' => 'text',     'label' => 'Year'],
+                     ['key' => 'description', 'type' => 'textarea', 'label' => 'Description'],
+                     ['key' => 'image',       'type' => 'media',    'label' => 'Image (optional)'],
+                 ]],
+            ],
+        ],
+    ],
+
+    'membership_cta' => [
+        'steps' => [
+            'label' => 'Membership / Join Us',
+            'description' => 'Why join, a short steps list, and a link to the school registration form',
+            'fields' => [
+                ['key' => 'eyebrow',     'type' => 'text',     'label' => 'Eyebrow Label'],
+                ['key' => 'heading',     'type' => 'text',     'label' => 'Heading'],
+                ['key' => 'subheading',  'type' => 'textarea', 'label' => 'Introduction Text'],
+                ['key' => 'cta_label',   'type' => 'text',     'label' => 'Button Label'],
+                ['key' => 'steps', 'type' => 'repeater', 'label' => 'Steps to Join',
+                 'fields' => [
+                     ['key' => 'title',       'type' => 'text',     'label' => 'Step Title', 'required' => true],
+                     ['key' => 'description', 'type' => 'textarea', 'label' => 'Description'],
+                 ]],
+            ],
+        ],
+    ],
+
     'contact' => [
         'side-by-side' => [
             'label' => 'Side by Side',
@@ -980,6 +1229,17 @@ return [
                 ['key' => 'email',         'type' => 'email','label' => 'Email'],
                 ['key' => 'whatsapp_number','type' => 'tel', 'label' => 'WhatsApp Number'],
                 ['key' => 'map_embed',     'type' => 'textarea', 'label' => 'Google Maps Embed HTML'],
+            ],
+        ],
+        'centered-card' => [
+            'label' => 'Centered Card Form',
+            'description' => 'Single centered card with a name/email/subject/message form',
+            'fields' => [
+                ['key' => 'badge',        'type' => 'text', 'label' => 'Badge Text'],
+                ['key' => 'heading',      'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'intro',        'type' => 'textarea', 'label' => 'Intro Text'],
+                ['key' => 'form_slug',    'type' => 'text', 'label' => 'Site Form Slug (must match a Form created in the admin)', 'default' => 'contact'],
+                ['key' => 'submit_label', 'type' => 'text', 'label' => 'Submit Button Label'],
             ],
         ],
     ],
@@ -1173,16 +1433,6 @@ return [
         ],
     ],
 
-    'testimonials_sahodaya' => [
-        'principal-quotes' => [
-            'label' => 'Principal Quotes',
-            'description' => 'Quotes from member school principals',
-            'fields' => [
-                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
-            ],
-        ],
-    ],
-
     'job_vacancies' => [
         'listing' => [
             'label' => 'Listing',
@@ -1330,16 +1580,17 @@ return [
 
     'testimonials_sahodaya' => [
         'principal-quotes' => [
-            'label'       => 'Principal Quotes',
-            'description' => 'Testimonials from member school principals',
+            'label'       => 'Testimonials',
+            'description' => 'Quotes from principals, parents, alumni, or other voices in the network',
             'fields'      => [
+                ['key' => 'eyebrow', 'type' => 'text', 'label' => 'Eyebrow Label'],
                 ['key' => 'heading', 'type' => 'text', 'label' => 'Section Heading'],
                 ['key' => 'quotes', 'type' => 'repeater', 'label' => 'Testimonials',
                  'fields' => [
-                     ['key' => 'quote',       'type' => 'textarea', 'label' => 'Quote'],
-                     ['key' => 'name',        'type' => 'text',     'label' => 'Name'],
-                     ['key' => 'designation', 'type' => 'text',     'label' => 'Designation'],
-                     ['key' => 'school',      'type' => 'text',     'label' => 'School Name'],
+                     ['key' => 'quote',       'type' => 'textarea', 'label' => 'Quote', 'required' => true],
+                     ['key' => 'name',        'type' => 'text',     'label' => 'Name', 'required' => true],
+                     ['key' => 'designation', 'type' => 'text',     'label' => 'Role (e.g. Principal, Parent, Alumnus)'],
+                     ['key' => 'school',      'type' => 'text',     'label' => 'School / Affiliation'],
                      ['key' => 'photo',       'type' => 'media',    'label' => 'Photo'],
                  ]],
             ],

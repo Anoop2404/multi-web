@@ -18,7 +18,7 @@ class FestFoodOrderItem extends Model
     ];
 
     protected $casts = [
-        'menu_date' => 'date',
+        'menu_date' => 'date:Y-m-d',
         'unit_price' => 'decimal:2',
         'line_total' => 'decimal:2',
     ];

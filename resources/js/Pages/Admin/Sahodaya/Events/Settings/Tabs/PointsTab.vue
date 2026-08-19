@@ -109,9 +109,9 @@
         <section v-if="event.event_type !== 'sports'" class="card !p-5 space-y-4 border border-slate-200">
             <div class="border-b border-slate-100 pb-3">
                 <h3 class="section-title !mb-0 flex items-center gap-2 text-base">
-                    <span>🏆</span> Championship Point Rules
+                    <span>🏆</span> Grade Points Master
                 </h3>
-                <p class="section-desc mt-0.5">Points awarded by grade and position for leaderboard calculations.</p>
+                <p class="section-desc mt-0.5">Points awarded by grade and position for leaderboard calculations — set separate rules for group/team items vs. individual items.</p>
             </div>
 
             <!-- Add Point Rule Form -->
@@ -122,9 +122,7 @@
                         <label class="form-label text-xs">Grade</label>
                         <select v-model="pointForm.grade" class="field text-xs">
                             <option value="">Any Grade</option>
-                            <option value="A">Grade A</option>
-                            <option value="B">Grade B</option>
-                            <option value="C">Grade C</option>
+                            <option v-for="g in gradeOptions" :key="g" :value="g">Grade {{ g }}</option>
                         </select>
                     </div>
                     <div>
@@ -141,6 +139,10 @@
                         <input v-model.number="pointForm.points" type="number" min="0" class="field text-xs" required placeholder="5">
                     </div>
                 </div>
+                <label class="flex items-center gap-2 text-xs font-medium text-slate-700">
+                    <input type="checkbox" v-model="pointForm.is_group">
+                    Group / team item (unchecked = individual item)
+                </label>
                 <div class="flex justify-end pt-1">
                     <button type="submit" class="btn-primary text-xs !py-1.5 !px-4">Add Point Rule</button>
                 </div>
@@ -153,6 +155,7 @@
                         <tr>
                             <th class="p-3.5">Grade Filter</th>
                             <th class="p-3.5">Position Filter</th>
+                            <th class="p-3.5">Type</th>
                             <th class="p-3.5">Points</th>
                             <th class="p-3.5 text-right">Actions</th>
                         </tr>
@@ -161,6 +164,7 @@
                         <tr v-for="rule in pointRules" :key="rule.id" class="hover:bg-slate-50/70 transition">
                             <td class="p-3.5 font-bold text-slate-800">{{ rule.grade || 'Any Grade' }}</td>
                             <td class="p-3.5 font-bold text-slate-800">{{ rule.position ? `${rule.position} Place` : 'Any Position' }}</td>
+                            <td class="p-3.5 text-slate-600">{{ rule.is_group ? 'Group / team' : 'Individual' }}</td>
                             <td class="p-3.5 font-black text-slate-900 tabular-nums">{{ rule.points }} pts</td>
                             <td class="p-3.5 text-right">
                                 <button type="button" @click="removePointRule(rule.id)" class="btn-secondary text-xs !text-rose-700 hover:!bg-rose-50 !py-1 !px-2.5">
@@ -181,7 +185,15 @@
 <script setup>
 import { inject, ref, computed, watch } from 'vue';
 
-const { event, pointRules, pointForm, rankPoints, groupRankPoints, addPointRule, removePointRule, saveRankPoints, seedAthletics, seeding, savingRanks, savingGroupRanks } = inject('eventSettings');
+const { event, pointRules, pointForm, rankPoints, groupRankPoints, gradeConfigs, addPointRule, removePointRule, saveRankPoints, seedAthletics, seeding, savingRanks, savingGroupRanks } = inject('eventSettings');
+
+// Same "this event's actual grade set" derivation as GradesTab.vue's datalist, just
+// rendered as a <select> here since point rules reference an existing grade rather than
+// defining a new one. Falls back to the legacy four when nothing's been customized.
+const gradeOptions = computed(() => {
+    const used = [...new Set((gradeConfigs ?? []).map((g) => String(g.grade || '').replace('_plus', '+')).filter(Boolean))];
+    return used.length ? used : ['A+', 'A', 'B', 'C'];
+});
 
 const rankRows = ref([]);
 const groupRankRows = ref([]);

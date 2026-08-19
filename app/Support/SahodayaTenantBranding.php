@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\OfficeBearers;
 use App\Models\SahodayaProfile;
+use App\Models\SkinPreset;
 use App\Models\Tenant;
 use App\Models\WebsiteSite;
 
@@ -68,19 +69,22 @@ class SahodayaTenantBranding
         ];
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * Reads from the SkinPreset table — the same preset source the superadmin
+     * Theme panel (Admin\BuilderApiController + resources/js/Pages/Admin/Builder/Theme.vue)
+     * uses, so there is one preset list instead of two hand-maintained, drifting arrays.
+     *
+     * @return list<array<string, mixed>>
+     */
     public static function themePresets(): array
     {
-        return [
-            ['id' => 'malappuram', 'label' => 'Malappuram Blue', 'primary' => '#1e40af', 'secondary' => '#7c3aed', 'accent_color' => '#f59e0b'],
-            ['id' => 'sahodaya', 'label' => 'Sahodaya Purple', 'primary' => '#5b21b6', 'secondary' => '#7c3aed', 'accent_color' => '#f59e0b'],
-            ['id' => 'teal', 'label' => 'Teal Green', 'primary' => '#0f766e', 'secondary' => '#14b8a6', 'accent_color' => '#f59e0b'],
-            ['id' => 'royal', 'label' => 'Royal Blue', 'primary' => '#1d4ed8', 'secondary' => '#3b82f6', 'accent_color' => '#eab308'],
-            ['id' => 'crimson', 'label' => 'Crimson Red', 'primary' => '#991b1b', 'secondary' => '#dc2626', 'accent_color' => '#f59e0b'],
-            ['id' => 'forest', 'label' => 'Forest Green', 'primary' => '#166534', 'secondary' => '#22c55e', 'accent_color' => '#fbbf24'],
-            ['id' => 'cksc', 'label' => 'Navy & Gold', 'primary' => '#15224D', 'secondary' => '#D9AF4B', 'accent_color' => '#D9AF4B'],
-            ['id' => 'slate', 'label' => 'Modern Slate', 'primary' => '#1e293b', 'secondary' => '#475569', 'accent_color' => '#38bdf8'],
-        ];
+        return SkinPreset::active()->get()->map(fn (SkinPreset $preset) => [
+            'id' => $preset->slug,
+            'label' => $preset->name,
+            'primary' => $preset->theme['primary'] ?? '#5b21b6',
+            'secondary' => $preset->theme['secondary'] ?? '#7c3aed',
+            'accent_color' => $preset->theme['accent_color'] ?? '#f59e0b',
+        ])->values()->all();
     }
 
     /** @return array<string, mixed> */

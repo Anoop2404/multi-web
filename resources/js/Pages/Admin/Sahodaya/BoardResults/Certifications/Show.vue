@@ -46,21 +46,19 @@
         </div>
 
         <!-- Return for Correction Modal -->
-        <div v-if="showReturnModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" @click.self="showReturnModal = false">
-            <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
-                <h3 class="text-sm font-bold text-gray-900 mb-2">Return for Correction</h3>
-                <p class="text-xs text-gray-500 mb-3">Provide a clear reason so the school knows what to fix.</p>
-                <textarea v-model="returnReason" rows="4" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300" placeholder="Reason for returning..."></textarea>
-                <div class="flex justify-end gap-2 mt-3">
+        <Modal :show="showReturnModal" title="Return for Correction" subtitle="Provide a clear reason so the school knows what to fix." @close="showReturnModal = false">
+            <textarea v-model="returnReason" rows="4" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300" placeholder="Reason for returning..."></textarea>
+            <template #footer>
+                <div class="flex justify-end gap-2">
                     <button type="button" class="btn-secondary text-xs" @click="showReturnModal = false">Cancel</button>
                     <form :action="`/sahodaya-admin/${sahodaya.id}/board-results/${pkg.board_result_id}/reject`" method="POST">
                         <input type="hidden" name="_token" :value="csrf">
                         <input type="hidden" name="rejection_reason" :value="returnReason">
-                        <button type="submit" class="btn-primary text-xs bg-rose-600 hover:bg-rose-700" :disabled="!returnReason.trim()">↩️ Return</button>
+                        <button type="submit" class="btn-primary text-xs bg-rose-600 hover:bg-rose-700" :disabled="!returnReason.trim()">Return</button>
                     </form>
                 </div>
-            </div>
-        </div>
+            </template>
+        </Modal>
 
         <div class="card !p-5 mb-4">
             <h3 class="text-sm font-bold text-slate-800 mb-3">Individual Reports</h3>

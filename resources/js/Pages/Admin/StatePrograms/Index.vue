@@ -51,7 +51,7 @@
                             <td class="p-3">{{ eventTypes[program.event_type] ?? program.event_type }}</td>
                             <td class="p-3">
                                 <span v-for="lvl in program.conduct_levels" :key="lvl"
-                                      class="inline-block mr-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 text-xs">
+                                      class="inline-block mr-1 px-2 py-0.5 rounded bg-[color:var(--brand-blue)]/10 text-[color:var(--brand-blue)] text-xs">
                                     {{ levelLabels[lvl] ?? lvl }}
                                 </span>
                             </td>
@@ -59,11 +59,11 @@
                             <td class="p-3">{{ program.propagations_count }}</td>
                             <td class="p-3 text-right space-x-3 whitespace-nowrap">
                                 <template v-if="['kids_fest', 'teacher_fest', 'custom'].includes(program.event_type)">
-                                    <Link :href="`/admin/state-programs/${program.id}/results`" class="text-indigo-600 font-medium">Results →</Link>
+                                    <Link :href="`/admin/state-programs/${program.id}/results`" class="link-brand">Results →</Link>
                                     <Link :href="`/admin/state-programs/${program.id}/winners`" class="text-emerald-600 font-medium">Winners →</Link>
                                 </template>
-                                <Link :href="`/admin/state-programs/${program.id}/external-sahodayas`" class="text-indigo-600 font-medium">🌐 Outside Sahodayas →</Link>
-                                <Link :href="`/admin/state-programs/${program.id}`" class="text-indigo-600 font-medium">Manage →</Link>
+                                <Link :href="`/admin/state-programs/${program.id}/external-sahodayas`" class="link-brand">Outside Sahodayas →</Link>
+                                <Link :href="`/admin/state-programs/${program.id}`" class="link-brand">Manage →</Link>
                             </td>
                         </tr>
                         <tr v-if="!programs.length">

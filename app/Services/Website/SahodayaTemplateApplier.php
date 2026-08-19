@@ -7,18 +7,26 @@ use App\Models\Tenant;
 use App\Models\WebsiteSite;
 use App\Models\WebsiteSiteVersion;
 use App\Support\HtmlSanitizer;
-use App\Support\SahodayaTenantBranding;
-use App\Support\SahodayaWebsiteTemplateCatalog;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Tier-agnostic — the caller resolves the template (from whichever tier's catalog:
+ * SahodayaWebsiteTemplateCatalog or SchoolWebsiteTemplateCatalog) and branding context
+ * before calling in, so this class has no knowledge of which tier it's serving. Mirrors
+ * the existing pattern where both SahodayaAdmin\SiteBuilderApiController and
+ * SchoolAdmin\SiteBuilderApiController already delegate plain section CRUD to one shared
+ * Admin\BuilderApiController.
+ */
 class SahodayaTemplateApplier
 {
-    /** @return array<string, mixed> */
-    public function applyDraft(Tenant $tenant, WebsiteSite $site, string $templateKey, string $mode = 'full'): array
+    /**
+     * @param  array<string, mixed>  $template  Resolved template definition (name/version/design/widgets/sections)
+     * @param  array<string, mixed>  $context  Placeholder context for {{name}}/{{short_name}}/{{region}} substitution
+     * @return array<string, mixed>
+     */
+    public function applyDraft(Tenant $tenant, WebsiteSite $site, string $templateKey, array $template, array $context, string $mode = 'full'): array
     {
-        $template = SahodayaWebsiteTemplateCatalog::get($templateKey);
-        $context = SahodayaTenantBranding::context($tenant);
         $sections = $mode === 'style'
             ? $this->snapshotSections($site, public: true)
             : $this->hydrate($template['sections'], $context);

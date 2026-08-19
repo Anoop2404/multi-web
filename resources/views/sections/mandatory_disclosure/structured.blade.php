@@ -1,5 +1,5 @@
 @php
-    $disc = $config['disclosure'] ?? [];
+    $disc = $config;
 @endphp
 <section class="py-16 px-4 bg-white">
     <div class="max-w-4xl mx-auto">
@@ -20,37 +20,37 @@
                 'Contact Number'                  => $disc['phone'] ?? '',
             ],
             'B. DOCUMENTS AND INFORMATION' => [
-                'Copies of Affiliation/Upgradation Letter'        => $disc['docs']['affiliation_letter'] ?? null,
-                'Copies of Societies/Trust/Company Registration'  => $disc['docs']['trust_registration'] ?? null,
-                'Copy of No Objection Certificate'                => $disc['docs']['noc'] ?? null,
-                'Copy of Recognition Certificate'                 => $disc['docs']['recognition'] ?? null,
-                'Copy of Valid Building Safety Certificate'       => $disc['docs']['building_safety'] ?? null,
-                'Copy of Valid Fire Safety Certificate'           => $disc['docs']['fire_safety'] ?? null,
-                'Copy of the DEO Certificate'                     => $disc['docs']['deo_certificate'] ?? null,
-                'Copies of Valid Water, Health & Sanitation Certificates' => $disc['docs']['health_sanitation'] ?? null,
+                'Copies of Affiliation/Upgradation Letter'        => $disc['doc_affiliation_letter'] ?? null,
+                'Copies of Societies/Trust/Company Registration'  => $disc['doc_trust_registration'] ?? null,
+                'Copy of No Objection Certificate'                => $disc['doc_noc'] ?? null,
+                'Copy of Recognition Certificate'                 => $disc['doc_recognition'] ?? null,
+                'Copy of Valid Building Safety Certificate'       => $disc['doc_building_safety'] ?? null,
+                'Copy of Valid Fire Safety Certificate'           => $disc['doc_fire_safety'] ?? null,
+                'Copy of the DEO Certificate'                     => $disc['doc_deo_certificate'] ?? null,
+                'Copies of Valid Water, Health & Sanitation Certificates' => $disc['doc_health_sanitation'] ?? null,
             ],
             'C. RESULT AND ACADEMICS' => [
-                'Fee Structure of the School'                     => $disc['docs']['fee_structure'] ?? null,
-                'Annual Academic Calendar'                        => $disc['docs']['academic_calendar'] ?? null,
-                'List of School Management Committee'             => $disc['docs']['smc'] ?? null,
-                'List of Parents-Teachers Association Members'    => $disc['docs']['pta'] ?? null,
-                'Last Three-Year Result of Board Examination'     => $disc['docs']['board_results'] ?? null,
+                'Fee Structure of the School'                     => $disc['doc_fee_structure'] ?? null,
+                'Annual Academic Calendar'                        => $disc['doc_academic_calendar'] ?? null,
+                'List of School Management Committee'             => $disc['doc_smc'] ?? null,
+                'List of Parents-Teachers Association Members'    => $disc['doc_pta'] ?? null,
+                'Last Three-Year Result of Board Examination'     => $disc['doc_board_results'] ?? null,
             ],
             'D. STAFF (TEACHING)' => [
-                'Principal'       => $disc['staff_info']['principal'] ?? '',
-                'Total Teachers'  => $disc['staff_info']['total_teachers'] ?? '',
-                'PGT'             => $disc['staff_info']['pgt'] ?? '',
-                'TGT'             => $disc['staff_info']['tgt'] ?? '',
-                'PRT'             => $disc['staff_info']['prt'] ?? '',
+                'Principal'       => $disc['staff_principal'] ?? '',
+                'Total Teachers'  => $disc['staff_total_teachers'] ?? '',
+                'PGT'             => $disc['staff_pgt'] ?? '',
+                'TGT'             => $disc['staff_tgt'] ?? '',
+                'PRT'             => $disc['staff_prt'] ?? '',
             ],
             'E. SCHOOL INFRASTRUCTURE' => [
-                'Total Campus Area (sq. mt.)'      => $disc['infrastructure']['campus_area'] ?? '',
-                'No. and size of the class rooms'  => $disc['infrastructure']['classrooms'] ?? '',
-                'No. and size of the labs'         => $disc['infrastructure']['labs'] ?? '',
-                'Internet Facility'                => $disc['infrastructure']['internet'] ?? '',
-                'No. of Girls\' Toilets'           => $disc['infrastructure']['girls_toilets'] ?? '',
-                'No. of Boys\' Toilets'            => $disc['infrastructure']['boys_toilets'] ?? '',
-                'Library'                          => $disc['infrastructure']['library'] ?? '',
+                'Total Campus Area (sq. mt.)'      => $disc['infra_campus_area'] ?? '',
+                'No. and size of the class rooms'  => $disc['infra_classrooms'] ?? '',
+                'No. and size of the labs'         => $disc['infra_labs'] ?? '',
+                'Internet Facility'                => $disc['infra_internet'] ?? '',
+                'No. of Girls\' Toilets'           => $disc['infra_girls_toilets'] ?? '',
+                'No. of Boys\' Toilets'            => $disc['infra_boys_toilets'] ?? '',
+                'Library'                          => $disc['infra_library'] ?? '',
             ],
         ];
         @endphp

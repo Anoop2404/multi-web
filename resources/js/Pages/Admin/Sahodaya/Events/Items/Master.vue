@@ -292,6 +292,10 @@
                         <input v-model.number="itemForm.duration_minutes" type="number" min="1" class="field" placeholder="e.g. 30">
                     </FormField>
 
+                    <FormField label="Total Marks" hint="Max score for this item — enables percentage-based grade bands">
+                        <input v-model.number="itemForm.total_marks" type="number" min="0" step="0.01" class="field" placeholder="e.g. 100">
+                    </FormField>
+
                     <FormField label="Result Method">
                         <select v-model="itemForm.result_method" class="field">
                             <option value="">Default</option>
@@ -426,6 +430,10 @@
 
                         <FormField label="Est. Duration (Mins)">
                             <input v-model.number="editForm.duration_minutes" type="number" min="1" class="field" placeholder="e.g. 30">
+                        </FormField>
+
+                        <FormField label="Total Marks" hint="Max score for this item — enables percentage-based grade bands">
+                            <input v-model.number="editForm.total_marks" type="number" min="0" step="0.01" class="field" placeholder="e.g. 100">
                         </FormField>
 
                         <FormField label="Result Method">
@@ -573,7 +581,7 @@ const itemForm = useForm({
     title: '', item_code: '', participant_type: 'individual', result_method: '', stage_type: '', venue_type: '',
     competition_format: '', sport_discipline: '', class_group: '', age_group: '', kids_band: '', gender: 'open',
     category: '', area_id: '', tiebreak_mode: 'none',
-    max_per_school: null, qualify_count: null, duration_minutes: null,
+    max_per_school: null, qualify_count: null, duration_minutes: null, total_marks: null,
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
     fee_amount: null, quota_eligible: false,
 });
@@ -593,7 +601,7 @@ const editForm = useForm({
     title: '', item_code: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
     stage_type: '', venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', result_method: '',
     category: '', area_id: '', tiebreak_mode: 'none',
-    max_per_school: null, qualify_count: null, duration_minutes: null,
+    max_per_school: null, qualify_count: null, duration_minutes: null, total_marks: null,
     min_group_size: null, max_group_size: null, standbys: null,
     fee_amount: null,
 });
@@ -616,6 +624,7 @@ function startEditItem(item) {
     editForm.standbys = item.standbys ?? null;
     editForm.qualify_count = item.qualify_count ?? null;
     editForm.duration_minutes = item.duration_minutes ?? null;
+    editForm.total_marks = item.total_marks ?? null;
     editForm.fee_amount = item.fee_amount ?? null;
 }
 

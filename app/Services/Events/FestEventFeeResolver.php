@@ -314,6 +314,10 @@ class FestEventFeeResolver
                 'additional_item' => isset($input['additional_item']) && $input['additional_item'] !== ''
                     ? (float) $input['additional_item'] : 100,
                 'charge_standbys' => (bool) ($input['charge_standbys'] ?? false),
+                'group_item_flat_fee' => isset($input['group_item_flat_fee']) && $input['group_item_flat_fee'] !== ''
+                    ? (float) $input['group_item_flat_fee'] : null,
+                'group_item_per_participant_rate' => isset($input['group_item_per_participant_rate']) && $input['group_item_per_participant_rate'] !== ''
+                    ? (float) $input['group_item_per_participant_rate'] : null,
             ], $input);
         }
 
@@ -335,9 +339,6 @@ class FestEventFeeResolver
                 'charge_standbys' => (bool) ($input['charge_standbys'] ?? false),
                 'team_standby_fee_amount' => isset($input['team_standby_fee_amount']) && $input['team_standby_fee_amount'] !== ''
                     ? (float) $input['team_standby_fee_amount'] : null,
-                // Phase L — event-wide default for the group/team per-participant surcharge
-                // (flat_fee + rate × actual FestGroup participant count); a per-item override
-                // on FestEventItem wins over this. See FestItemFeeResolver::groupItemSurchargeAmount().
                 'group_item_flat_fee' => isset($input['group_item_flat_fee']) && $input['group_item_flat_fee'] !== ''
                     ? (float) $input['group_item_flat_fee'] : null,
                 'group_item_per_participant_rate' => isset($input['group_item_per_participant_rate']) && $input['group_item_per_participant_rate'] !== ''
@@ -358,8 +359,15 @@ class FestEventFeeResolver
         if ($feeModel === 'per_item') {
             $normalized = [
                 'fee_model' => 'per_item',
+                'include_school_registration' => (bool) ($input['include_school_registration'] ?? false),
+                'school_registration' => $this->normalizeSchoolRegistration($input['school_registration'] ?? []),
                 'per_item_amount' => isset($input['per_item_amount']) && $input['per_item_amount'] !== ''
                     ? (float) $input['per_item_amount'] : 0,
+                'charge_standbys' => (bool) ($input['charge_standbys'] ?? false),
+                'group_item_flat_fee' => isset($input['group_item_flat_fee']) && $input['group_item_flat_fee'] !== ''
+                    ? (float) $input['group_item_flat_fee'] : null,
+                'group_item_per_participant_rate' => isset($input['group_item_per_participant_rate']) && $input['group_item_per_participant_rate'] !== ''
+                    ? (float) $input['group_item_per_participant_rate'] : null,
             ];
 
             return $this->applySchoolFeeCap($normalized, $input);
@@ -368,6 +376,8 @@ class FestEventFeeResolver
         if ($feeModel === 'per_student') {
             $normalized = [
                 'fee_model' => 'per_student',
+                'include_school_registration' => (bool) ($input['include_school_registration'] ?? false),
+                'school_registration' => $this->normalizeSchoolRegistration($input['school_registration'] ?? []),
                 'per_student_amount' => isset($input['per_student_amount']) && $input['per_student_amount'] !== ''
                     ? (float) $input['per_student_amount'] : 0,
             ];
@@ -378,6 +388,10 @@ class FestEventFeeResolver
         if ($feeModel === 'student_count_slab') {
             $normalized = [
                 'fee_model' => 'student_count_slab',
+                'include_school_registration' => (bool) ($input['include_school_registration'] ?? false),
+                'school_registration' => $this->normalizeSchoolRegistration($input['school_registration'] ?? []),
+                'per_student_amount' => isset($input['per_student_amount']) && $input['per_student_amount'] !== ''
+                    ? (float) $input['per_student_amount'] : null,
                 'student_count_slabs' => $this->normalizeStudentCountSlabs($input['student_count_slabs'] ?? []),
             ];
 
@@ -476,6 +490,10 @@ class FestEventFeeResolver
 
         if (isset($input['school_fee_min']) && $input['school_fee_min'] !== '') {
             $normalized['school_fee_min'] = (float) $input['school_fee_min'];
+        }
+
+        if (isset($input['secondary_min_students']) && $input['secondary_min_students'] !== '' && $input['secondary_min_students'] !== null) {
+            $normalized['secondary_min_students'] = (int) $input['secondary_min_students'];
         }
 
         return $normalized;

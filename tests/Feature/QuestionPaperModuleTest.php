@@ -180,6 +180,46 @@ class QuestionPaperModuleTest extends TestCase
         $this->assertDatabaseCount('question_papers', 0);
     }
 
+    /**
+     * A teacher with no subject/class assigned to their profile (common for freshly
+     * created or incompletely provisioned teacher records) must still be able to upload —
+     * they just get the school's full subject/class lists instead of a filtered-to-mine
+     * one, rather than being blocked outright. Mirrors the pre-existing (and unaffected by
+     * this) fallback that already applied to classes; this closes the same gap for subjects.
+     */
+    public function test_teacher_with_no_assignments_can_upload_for_any_subject_or_class(): void
+    {
+        $user = User::factory()->create([
+            'tenant_id' => $this->school->id,
+            'email' => 'unassigned.teacher@example.com',
+            'must_change_password' => false,
+        ]);
+        $user->assignRole('teacher');
+
+        Teacher::create([
+            'tenant_id' => $this->school->id,
+            'user_id' => $user->id,
+            'name' => 'Unassigned Teacher',
+            'email' => 'unassigned.teacher@example.com',
+            'subject_ids' => [],
+            'status' => 'active',
+        ]);
+
+        $anySubject = Subject::where('code', 'PHY')->firstOrFail();
+
+        $this->actingAs($user)
+            ->post(route('portal.teacher.question-papers.store', ['tenantId' => $this->school->id]), [
+                'title' => 'Physics Paper',
+                'school_class_id' => $this->schoolClass->id,
+                'subject_id' => $anySubject->id,
+                'academic_year' => '2026-27',
+                'file' => UploadedFile::fake()->create('physics.pdf', 50, 'application/pdf'),
+            ])
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseCount('question_papers', 1);
+    }
+
     public function test_non_leadership_school_staff_cannot_open_the_school_wide_library(): void
     {
         $staff = User::factory()->create([

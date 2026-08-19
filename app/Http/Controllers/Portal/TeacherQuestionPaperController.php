@@ -157,9 +157,10 @@ class TeacherQuestionPaperController extends Controller
             ? $assignedClasses
             : SchoolClass::where('tenant_id', $school->id)->active()->orderBy('display_order')->orderBy('name')->get(['id', 'name']);
 
-        $subjects = $resolver->subjects($school->parent_id);
+        $allSubjects = $resolver->subjects($school->parent_id);
         $subjectIds = array_map('intval', $teacher->subject_ids ?? []);
-        $subjects = $subjectIds === [] ? collect() : $subjects->whereIn('id', $subjectIds);
+        $assignedSubjects = $subjectIds === [] ? collect() : $allSubjects->whereIn('id', $subjectIds);
+        $subjects = $assignedSubjects->isNotEmpty() ? $assignedSubjects : $allSubjects;
 
         return [$classes, $subjects];
     }

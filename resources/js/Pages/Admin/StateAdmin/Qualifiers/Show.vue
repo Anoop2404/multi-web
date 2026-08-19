@@ -2,10 +2,10 @@
     <AdminLayout title="Qualifier Intake Scrutiny">
         <div class="max-w-6xl mx-auto space-y-6">
             <!-- Header Banner -->
-            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="bg-gradient-to-r from-[color:var(--brand-navy)] via-[color:var(--brand-navy-hover)] to-[color:var(--brand-navy)] rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div class="space-y-1">
                     <div class="flex items-center gap-2 flex-wrap">
-                        <Link href="/admin/state-workspace/qualifiers" class="text-xs font-bold text-indigo-300 hover:text-white transition">← All Intakes</Link>
+                        <Link href="/admin/state-workspace/qualifiers" class="text-xs font-bold text-slate-300 hover:text-white transition">← All Intakes</Link>
                         <span class="text-slate-600">/</span>
                         <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border"
                               :class="{
@@ -17,7 +17,7 @@
                         </span>
                     </div>
                     <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight">
-                        Intake: <span class="font-mono text-indigo-200">{{ intake.source_tenant_id }}</span>
+                        Intake: <span class="font-mono text-slate-300">{{ intake.source_tenant_id }}</span>
                     </h1>
                     <p class="text-slate-300 text-xs sm:text-sm">
                         Program: <span class="font-bold text-white">{{ stateProgram?.title || intake.state_program_id }}</span> · {{ intake.entries?.length || 0 }} total entries
@@ -25,11 +25,11 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button type="button" @click="openAddEntryModal" class="px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition">
+                    <button type="button" @click="openAddEntryModal" class="px-4 py-2.5 rounded-2xl bg-white hover:bg-slate-100 text-[color:var(--brand-navy)] font-bold text-xs shadow-md transition">
                         ➕ Add Entry
                     </button>
                     <button v-if="intake.status === 'received'" type="button" @click="approve" class="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition">
-                        ✓ Finalize & Approve Intake
+                        Finalize & Approve Intake
                     </button>
                 </div>
             </div>
@@ -67,7 +67,7 @@
                                     {{ e.school_name || e.school_id }}
                                 </td>
                                 <td class="py-3.5 px-4 text-center">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[color:var(--brand-blue)]/10 text-[color:var(--brand-blue)] border border-[color:var(--brand-blue)]/30">
                                         #{{ e.position }}
                                     </span>
                                 </td>
@@ -86,14 +86,14 @@
                                 </td>
                                 <td class="py-3.5 px-4 text-right">
                                     <div class="flex items-center justify-end gap-1.5">
-                                        <button type="button" @click="openEditEntryModal(e)" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200/60 transition">
+                                        <button type="button" @click="openEditEntryModal(e)" class="px-2.5 py-1 rounded-lg bg-[color:var(--brand-blue)]/10 hover:bg-[color:var(--brand-blue)]/15 text-[color:var(--brand-blue)] font-bold text-xs border border-[color:var(--brand-blue)]/30 transition">
                                             ✏️ Edit
                                         </button>
                                         <button v-if="e.status !== 'approved'" type="button" @click="review(e, 'approved')" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200/60 transition">
-                                            ✓ Approve
+                                            Approve
                                         </button>
                                         <button v-if="e.status !== 'rejected'" type="button" @click="review(e, 'rejected')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200/60 transition">
-                                            ✕ Reject
+                                            Reject
                                         </button>
                                         <button type="button" @click="deleteEntry(e)" class="px-2 py-1 rounded-lg text-slate-400 hover:text-red-600 font-bold text-xs transition">
                                             🗑
@@ -168,7 +168,7 @@
                             <button type="button" @click="closeEntryModal" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
                                 Cancel
                             </button>
-                            <button type="submit" :disabled="entryForm.processing" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow-md">
+                            <button type="submit" :disabled="entryForm.processing" class="btn-primary !min-h-0 text-xs font-bold">
                                 {{ isEditing ? 'Save Changes' : 'Add Entry' }}
                             </button>
                         </div>

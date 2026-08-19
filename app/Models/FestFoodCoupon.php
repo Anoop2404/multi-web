@@ -17,7 +17,7 @@ class FestFoodCoupon extends Model
     ];
 
     protected $casts = [
-        'valid_date'   => 'date',
+        'valid_date'   => 'date:Y-m-d',
         'issued_at'    => 'datetime',
         'redeemed_at'  => 'datetime',
     ];

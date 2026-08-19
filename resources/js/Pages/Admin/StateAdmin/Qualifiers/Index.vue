@@ -2,15 +2,15 @@
     <AdminLayout title="State Qualifier Intakes">
         <div class="max-w-6xl mx-auto space-y-6">
             <!-- Header Banner -->
-            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="bg-gradient-to-r from-[color:var(--brand-navy)] via-[color:var(--brand-navy-hover)] to-[color:var(--brand-navy)] rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div class="space-y-1">
-                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold border border-indigo-400/20">
-                        🏆 State Workspace · Scrutiny
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[color:var(--brand-gold)]/15 text-[color:var(--brand-gold)] text-xs font-semibold border border-[color:var(--brand-gold)]/30">
+                        State Workspace · Scrutiny
                     </div>
                     <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Qualifier Intakes</h1>
                     <p class="text-slate-300 text-xs sm:text-sm">Review, approve, and upload qualifier submissions from Sahodaya clusters and regional events.</p>
                 </div>
-                <button type="button" @click="showAddModal = true" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-indigo-600/30 transition">
+                <button type="button" @click="showAddModal = true" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white hover:bg-slate-100 text-[color:var(--brand-navy)] font-bold text-xs sm:text-sm shadow-lg transition">
                     ➕ Add Qualifier Data
                 </button>
             </div>
@@ -23,7 +23,7 @@
                 </div>
 
                 <div class="grid gap-3">
-                    <div v-for="intake in intakes.data" :key="intake.id" class="p-4 rounded-2xl border border-slate-200/80 hover:border-indigo-200 bg-slate-50/50 hover:bg-slate-50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div v-for="intake in intakes.data" :key="intake.id" class="p-4 rounded-2xl border border-slate-200/80 hover:border-[color:var(--brand-blue)]/30 bg-slate-50/50 hover:bg-slate-50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div class="space-y-1">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border"
@@ -43,7 +43,7 @@
                             </p>
                         </div>
 
-                        <Link :href="intake.review_url" class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs transition">
+                        <Link :href="intake.review_url" class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[color:var(--brand-navy)] hover:bg-[color:var(--brand-navy-hover)] text-white font-bold text-xs transition">
                             Review & Edit Entries →
                         </Link>
                     </div>
@@ -87,7 +87,7 @@
                         <div class="space-y-3 pt-2">
                             <div class="flex items-center justify-between">
                                 <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Qualifier Entries ({{ form.entries.length }})</h4>
-                                <button type="button" @click="addEntryRow" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">+ Add Row</button>
+                                <button type="button" @click="addEntryRow" class="text-xs font-bold link-brand">+ Add Row</button>
                             </div>
 
                             <div v-for="(e, idx) in form.entries" :key="idx" class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 relative">
@@ -110,7 +110,7 @@
                             <button type="button" @click="showAddModal = false" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
                                 Cancel
                             </button>
-                            <button type="submit" :disabled="form.processing" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow-md">
+                            <button type="submit" :disabled="form.processing" class="btn-primary !min-h-0 text-xs font-bold">
                                 Save Qualifier Data
                             </button>
                         </div>

@@ -12,7 +12,7 @@ class FestEventItem extends Model
 {
     protected $fillable = [
         'event_id', 'title', 'item_code', 'category', 'stage_type', 'venue_type',
-        'competition_format', 'sport_discipline', 'ranking_direction', 'result_method', 'duration_minutes', 'criteria_json',
+        'competition_format', 'sport_discipline', 'ranking_direction', 'result_method', 'duration_minutes', 'criteria_json', 'total_marks',
         'participant_type', 'gender', 'class_group', 'age_group', 'kids_band',
         'max_per_school', 'min_group_size', 'max_group_size', 'qualify_count',
         'owner_level', 'state_program_item_id', 'inherited_from_item_id', 'display_order',
@@ -25,6 +25,7 @@ class FestEventItem extends Model
     protected $casts = [
         'criteria_json' => 'array',
         'fee_amount' => 'decimal:2',
+        'total_marks' => 'decimal:2',
         'group_item_flat_fee' => 'decimal:2',
         'group_item_per_participant_rate' => 'decimal:2',
         'is_enabled' => 'boolean',

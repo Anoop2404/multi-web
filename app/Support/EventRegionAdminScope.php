@@ -20,12 +20,13 @@ use Illuminate\Http\Request;
 class EventRegionAdminScope
 {
     /**
-     * @return array{eventIds: list<int>, regionScopes: list<array{event_id: int, region_id: ?int}>}
+     * @return array{eventIds: list<int>, regionScopes: list<array{event_id: int, region_id: ?int, source_phase_id: ?int}>, phaseScopes: list<array{event_id: int, source_phase_id: int}>}
      */
-    public static function resolve(User $user, bool $hasEventAdmin, bool $hasRegionAdmin): array
+    public static function resolve(User $user, bool $hasEventAdmin, bool $hasRegionAdmin, bool $hasPhaseAdmin = false): array
     {
         $allowedEventIds = [];
         $allowedRegionScopes = [];
+        $allowedPhaseScopes = [];
 
         if ($hasEventAdmin) {
             $allowedEventIds = FestEventStaff::query()
@@ -41,16 +42,35 @@ class EventRegionAdminScope
             $allowedRegionScopes = FestEventStaff::query()
                 ->where('user_id', $user->id)
                 ->where('duty', 'region_admin')
-                ->get(['event_id', 'region_id'])
+                ->get(['event_id', 'region_id', 'source_phase_id'])
                 ->map(fn ($row) => [
-                    'event_id'  => (int) $row->event_id,
-                    'region_id' => $row->region_id !== null ? (int) $row->region_id : null,
+                    'event_id'        => (int) $row->event_id,
+                    'region_id'       => $row->region_id !== null ? (int) $row->region_id : null,
+                    'source_phase_id' => $row->source_phase_id !== null ? (int) $row->source_phase_id : null,
                 ])
                 ->values()
                 ->all();
         }
 
-        return ['eventIds' => $allowedEventIds, 'regionScopes' => $allowedRegionScopes];
+        if ($hasPhaseAdmin) {
+            // Unlike region_admin, a phase_admin scope with no source_phase_id is not
+            // "unscoped" — it's an incomplete assignment (FestEventStaffController::store()
+            // always requires one). Excluding it here means such a row grants no access at
+            // all, rather than being misread as "every phase."
+            $allowedPhaseScopes = FestEventStaff::query()
+                ->where('user_id', $user->id)
+                ->where('duty', 'phase_admin')
+                ->whereNotNull('source_phase_id')
+                ->get(['event_id', 'source_phase_id'])
+                ->map(fn ($row) => [
+                    'event_id'        => (int) $row->event_id,
+                    'source_phase_id' => (int) $row->source_phase_id,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return ['eventIds' => $allowedEventIds, 'regionScopes' => $allowedRegionScopes, 'phaseScopes' => $allowedPhaseScopes];
     }
 
     /**
@@ -113,12 +133,22 @@ class EventRegionAdminScope
      * reports then aggregate every child. A scope on a genuine leaf/child event has
      * nothing further under it to leak, so it's allowed on its own.
      *
-     * @param  list<array{event_id: int, region_id: ?int}>  $allowedRegionScopes
+     * Phase check (mirrors FestReportScopeResolver::actorRegionScopes()'s existing,
+     * already-enforced logic for reports): a scope's source_phase_id, when set, must
+     * match the requested event's own source_phase_id. Every scope assigned with "All
+     * phases in region" left selected (the default, and every scope that predates this
+     * field) has source_phase_id === null, so this is a no-op for them — it only
+     * narrows access for scopes an admin explicitly restricted to one phase. The
+     * requested event's own source_phase_id is also allowed to be null (e.g. the hub
+     * itself isn't "in" any one phase) so a phase-restricted scope doesn't lose
+     * hub-level access it already had.
+     *
+     * @param  list<array{event_id: int, region_id: ?int, source_phase_id: ?int}>  $allowedRegionScopes
      */
     public static function matchesRegionScope(int $requestedEventId, array $allowedRegionScopes): bool
     {
         $requestedEvent = FestEvent::query()
-            ->select(['id', 'parent_event_id', 'region_id'])
+            ->select(['id', 'parent_event_id', 'region_id', 'source_phase_id'])
             ->find($requestedEventId);
 
         if (! $requestedEvent) {
@@ -128,19 +158,73 @@ class EventRegionAdminScope
         $requestedIsHub = $requestedEvent->parent_event_id === null;
 
         foreach ($allowedRegionScopes as $scope) {
+            $scopePhaseId = $scope['source_phase_id'] ?? null;
+            $phaseMatches = $scopePhaseId === null
+                || $requestedEvent->source_phase_id === null
+                || $scopePhaseId === (int) $requestedEvent->source_phase_id;
+
             if ($scope['event_id'] === (int) $requestedEvent->id) {
                 if ($requestedIsHub && $scope['region_id'] === null) {
                     continue;
                 }
 
-                return true;
+                if ($phaseMatches) {
+                    return true;
+                }
+
+                continue;
             }
 
             if ($requestedEvent->parent_event_id
                 && $scope['event_id'] === (int) $requestedEvent->parent_event_id
                 && $scope['region_id'] !== null
                 && $requestedEvent->region_id !== null
-                && $scope['region_id'] === (int) $requestedEvent->region_id) {
+                && $scope['region_id'] === (int) $requestedEvent->region_id
+                && $phaseMatches) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Phase-admin counterpart to matchesRegionScope(): true when the requested event is
+     * either (a) directly assigned (a FestEventStaff row on this exact event), or (b)
+     * reached via a scope granted on its parent hub whose source_phase_id matches this
+     * event's own source_phase_id — i.e. a phase admin assigned on the hub can reach
+     * every region's leaf event under their phase without a separate row per region.
+     *
+     * There is no hub-level "all regions, no phase filter" case to guard against here the
+     * way matchesRegionScope() has to for gap G1: every phase_admin scope always carries a
+     * real source_phase_id (resolve() drops any row where it's null), so a bare hub
+     * assignment can never leak access to other phases.
+     *
+     * @param  list<array{event_id: int, source_phase_id: int}>  $allowedPhaseScopes
+     */
+    public static function matchesPhaseScope(int $requestedEventId, array $allowedPhaseScopes): bool
+    {
+        if ($allowedPhaseScopes === []) {
+            return false;
+        }
+
+        $requestedEvent = FestEvent::query()
+            ->select(['id', 'parent_event_id', 'source_phase_id'])
+            ->find($requestedEventId);
+
+        if (! $requestedEvent) {
+            return false;
+        }
+
+        foreach ($allowedPhaseScopes as $scope) {
+            if ($scope['event_id'] === (int) $requestedEvent->id) {
+                return true;
+            }
+
+            if ($requestedEvent->parent_event_id
+                && $scope['event_id'] === (int) $requestedEvent->parent_event_id
+                && $requestedEvent->source_phase_id !== null
+                && $scope['source_phase_id'] === (int) $requestedEvent->source_phase_id) {
                 return true;
             }
         }

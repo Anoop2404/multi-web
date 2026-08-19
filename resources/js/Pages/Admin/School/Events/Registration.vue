@@ -58,10 +58,60 @@
                                     :current-step="getTab(focusEvent.id) === 'athletes' ? 'event-reg' : (getTab(focusEvent.id) === 'items' ? 'item-reg' : 'payment')"
                                     @select-step="step => setTab(focusEvent.id, step.tab)" />
 
-        <PhasedRegionBillingPanel v-if="focusEvent?.uses_registration_batch_billing"
-                                  :event="focusEvent"
-                                  :school-id="school.id"
-                                  :program-prefix="programPrefix" />
+
+
+        <!-- Phase Region Selection Banner (shows ONLY on regional events when an error explicitly requires region selection) -->
+        <div v-if="$page.props.errors?.region_id && isFocusEventRegional"
+             class="card border-amber-300 bg-amber-50/90 mb-6 max-w-3xl p-4 shadow-sm">
+            <div class="flex items-start gap-3">
+                <span class="text-2xl shrink-0">📍</span>
+                <div class="flex-1">
+                    <h4 class="font-bold text-amber-950 text-sm flex items-center justify-between">
+                        <span>Region Selection Required for Competition Phases</span>
+                        <span class="text-xs font-normal text-amber-800 bg-amber-200/60 px-2 py-0.5 rounded-md">Action Needed</span>
+                    </h4>
+                    <p class="text-xs text-amber-900 mt-1">
+                        {{ $page.props.errors?.region_id || 'Please choose your school region for each active competition phase below to unlock item registration.' }}
+                    </p>
+
+                    <div v-if="focusEvent?.phase_region_options?.length" class="grid gap-3 sm:grid-cols-2 mt-3">
+                        <div v-for="phase in focusEvent.phase_region_options" :key="phase.phase_id"
+                             class="bg-white p-3 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between space-y-2">
+                            <div>
+                                <div class="flex items-center justify-between gap-2 mb-1">
+                                    <span class="font-bold text-xs text-slate-900">{{ phase.phase_name }}</span>
+                                    <span v-if="phase.selection?.locked" class="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Locked</span>
+                                </div>
+                                <select v-model="quickRegionChoices[phase.phase_id]"
+                                        class="field text-xs w-full py-1.5"
+                                        :disabled="phase.selection?.locked">
+                                    <option value="" disabled>Select region for {{ phase.phase_name }}…</option>
+                                    <option v-for="r in phase.regions" :key="r.id" :value="r.id">
+                                        {{ r.name }}{{ r.venue ? ` — ${r.venue}` : '' }}
+                                    </option>
+                                </select>
+
+                                <!-- Host Venue & Date Details Box -->
+                                <div v-if="getQuickSelectedRegionDetails(phase)" class="mt-2.5 p-2 rounded-lg bg-amber-50/80 border border-amber-200/80 text-[11px] space-y-0.5">
+                                    <p class="font-semibold text-slate-900 flex items-start gap-1">
+                                        <span>🏢 Venue:</span> <span class="text-amber-950 font-bold">{{ getQuickSelectedRegionDetails(phase).venue || 'Venue TBA' }}</span>
+                                    </p>
+                                    <p v-if="getQuickSelectedRegionDetails(phase).conduct_start_at" class="text-slate-700 flex items-center gap-1">
+                                        <span>📅 Date:</span> <span class="font-semibold text-slate-900">{{ formatDateStr(getQuickSelectedRegionDetails(phase).conduct_start_at) }}</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <button type="button"
+                                    @click="saveQuickPhaseRegion(phase)"
+                                    :disabled="!quickRegionChoices[phase.phase_id] || phase.selection?.locked"
+                                    class="btn-primary text-xs w-full py-1.5 font-semibold">
+                                {{ phase.selection?.region_id ? '✓ Change ' + phase.phase_name + ' Region' : 'Save ' + phase.phase_name + ' Region' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div v-if="showBulkImport && events.length" class="card mb-5 max-w-2xl text-sm border-indigo-100">
             <div class="flex items-center justify-between gap-2 mb-3">
@@ -559,6 +609,14 @@
                     </div>
                 </form>
 
+                <PhasedRegionBillingPanel
+                    v-if="event.uses_registration_batch_billing"
+                    v-show="getTab(event.id) === 'payment'"
+                    :event="event"
+                    :school-id="school.id"
+                    :program-prefix="programPrefix"
+                    :payment-details="paymentDetails" />
+
                 <EventBillingPanel
                     v-if="!event.uses_registration_batch_billing && event.fee_required && (event.uses_per_head_billing ? event.school_head_fees?.length : (event.uses_per_phase_billing ? event.school_phase_fees?.length : event.school_fee))"
                     v-show="getTab(event.id) === 'payment'"
@@ -611,7 +669,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted } from 'vue';
+import { computed, reactive, ref, onMounted, watch } from 'vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import QuickAddStudentModal from '@/Components/school/QuickAddStudentModal.vue';
@@ -740,6 +798,51 @@ const isLocked = computed(() => !!props.studentEditLock?.locked);
 // props.events[0] is that fully-hydrated event, so prefer it for anything reading
 // those computed attributes.
 const focusEvent = computed(() => (props.singleEventMode ? (props.events?.[0] ?? props.event) : props.event));
+
+const quickRegionChoices = reactive({});
+
+watch(() => focusEvent.value?.phase_region_options, (options) => {
+    if (options && Array.isArray(options)) {
+        for (const phase of options) {
+            if (phase.phase_id && quickRegionChoices[phase.phase_id] === undefined) {
+                quickRegionChoices[phase.phase_id] = phase.selection?.region_id || '';
+            }
+        }
+    }
+}, { immediate: true, deep: true });
+
+const hasUnselectedPhasedRegions = computed(() => {
+    const options = focusEvent.value?.phase_region_options;
+    if (!options || !Array.isArray(options) || !options.length) return false;
+    return options.some((phase) => !phase.selection?.region_id);
+});
+
+const isFocusEventRegional = computed(() => {
+    if (!focusEvent.value) return false;
+    return focusEvent.value.partition_role === 'region' || Boolean(focusEvent.value.region_id);
+});
+
+function saveQuickPhaseRegion(phase) {
+    const regionId = quickRegionChoices[phase.phase_id];
+    if (!regionId || !focusEvent.value?.id) return;
+    router.post(`${programBase.value}/events/${focusEvent.value.id}/phase-region`, {
+        phase_id: phase.phase_id,
+        region_id: regionId,
+    }, { preserveScroll: true });
+}
+
+function getQuickSelectedRegionDetails(phase) {
+    const selectedId = quickRegionChoices[phase.phase_id] || phase.selection?.region_id;
+    if (!selectedId) return null;
+    return phase.regions?.find(r => String(r.id) === String(selectedId)) || null;
+}
+
+function formatDateStr(val) {
+    if (!val) return '';
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return val;
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
 const displayEvents = computed(() => {
     if (!props.focusEventId) return props.events ?? [];
@@ -1115,14 +1218,9 @@ function clearItemFilters(eventId) {
 }
 
 function itemCompetitionType(item) {
-    const sm = String(item.stage_mode || item.stage_type || '').toLowerCase();
-    const title = String(item.title || item.name || '').toLowerCase();
     const isGrp = ['group', 'team'].includes(item.participant_type);
-    const isOff = sm.includes('off') || item.is_onstage === false || title.includes('offstage') || title.includes('off stage') || title.includes('painting') || title.includes('drawing') || title.includes('essay') || title.includes('story') || title.includes('versification') || title.includes('quiz') || title.includes('carrom') || title.includes('chess');
-
-    if (isOff) return 'off_stage';
-    if (isGrp) return 'on_stage_group';
-    return 'on_stage_single';
+    if (item.stage_type === 'off_stage') return 'off_stage';
+    return isGrp ? 'on_stage_group' : 'on_stage_single';
 }
 
 function itemCountsByCompetitionType(event) {
@@ -1179,12 +1277,9 @@ function filteredAllItems(event) {
             }
 
             if (stageFilter) {
-                const sm = String(item.stage_mode || item.stage_type || '').toLowerCase();
-                const title = String(item.title || item.name || '').toLowerCase();
-                const isOn = sm.includes('on') || item.is_onstage === true;
-                const isOff = sm.includes('off') || item.is_onstage === false || title.includes('offstage') || title.includes('off stage') || title.includes('painting') || title.includes('drawing') || title.includes('essay');
-                if (stageFilter === 'on_stage' && isOff && !isOn) return false;
-                if (stageFilter === 'off_stage' && isOn && !isOff) return false;
+                const isOff = item.stage_type === 'off_stage';
+                if (stageFilter === 'on_stage' && isOff) return false;
+                if (stageFilter === 'off_stage' && !isOff) return false;
             }
 
             if (groupFilter) {
@@ -1208,8 +1303,8 @@ function filteredAllItems(event) {
             });
         } else if (sortMode === 'stage') {
             items.sort((a, b) => {
-                const smA = String(a.stage_mode || a.stage_type || '').toLowerCase().includes('on') || a.is_onstage === true ? 1 : 2;
-                const smB = String(b.stage_mode || b.stage_type || '').toLowerCase().includes('on') || b.is_onstage === true ? 1 : 2;
+                const smA = a.stage_type === 'off_stage' ? 2 : 1;
+                const smB = b.stage_type === 'off_stage' ? 2 : 1;
                 return smA - smB;
             });
         } else if (sortMode === 'name') {

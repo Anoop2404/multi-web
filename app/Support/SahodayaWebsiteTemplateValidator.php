@@ -6,8 +6,12 @@ use Illuminate\Validation\ValidationException;
 
 class SahodayaWebsiteTemplateValidator
 {
-    /** @param array<string, mixed> $template */
-    public static function validate(string $key, array $template): void
+    /**
+     * @param  array<string, mixed>  $template
+     * @param  class-string  $catalog  Section-type/variant allow-list to validate against —
+     *                                  SahodayaSiteBuilderCatalog or SchoolSiteBuilderCatalog.
+     */
+    public static function validate(string $key, array $template, string $catalog = SahodayaSiteBuilderCatalog::class): void
     {
         $errors = [];
 
@@ -20,7 +24,7 @@ class SahodayaWebsiteTemplateValidator
         foreach ($template['sections'] ?? [] as $index => $section) {
             $type = $section['section_type'] ?? '';
             $variant = $section['variant'] ?? '';
-            if (! SahodayaSiteBuilderCatalog::allows($type, $variant)) {
+            if (! $catalog::allows($type, $variant)) {
                 $errors[] = "{$key} section ".($index + 1)." references unsupported {$type}/{$variant}.";
             }
         }

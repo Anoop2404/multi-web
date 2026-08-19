@@ -45,6 +45,7 @@
                                     :all-items-label="`All ${activeHead.item_count} items in ${activeHead.head_name}`"
                                     :show-view-button="showParticipantView"
                                     :view-enabled-for="hasParticipants"
+                                    :status-for="statusFor"
                                     search-placeholder="Search by item name or code…"
                                     @select="onItemSelect"
                                     @view="emitViewParticipants" />
@@ -70,6 +71,8 @@ const props = defineProps({
     preserveQuery: { type: Object, default: () => ({}) },
     participantCountsByItem: { type: Object, default: () => ({}) },
     isSports: { type: Boolean, default: false },
+    preserveState: { type: Boolean, default: true },
+    statusFor: { type: Function, default: null },
 });
 
 const emit = defineEmits(['view-participants']);
@@ -88,10 +91,10 @@ function emitViewParticipants(itemId) {
 function onItemSelect(itemId) {
     if (!activeHead.value) return;
     if (!itemId) {
-        router.get(headUrl(activeHead.value.head_id), {}, { preserveScroll: true, preserveState: true });
+        router.get(headUrl(activeHead.value.head_id), {}, { preserveScroll: true, preserveState: props.preserveState });
         return;
     }
-    router.get(itemUrl(activeHead.value.head_id, itemId), {}, { preserveScroll: true, preserveState: true });
+    router.get(itemUrl(activeHead.value.head_id, itemId), {}, { preserveScroll: true, preserveState: props.preserveState });
 }
 
 const activeHead = computed(() => {

@@ -11,9 +11,13 @@ class PublicContentController extends SahodayaAdminController
 {
     public function index()
     {
+        $primarySite = \App\Models\WebsiteSite::ensurePrimary($this->sahodaya->id);
+
         return $this->inertia('Sahodaya/PublicContent/Index', [
             'content'              => SahodayaHomepageContent::get($this->sahodaya),
             'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->sahodaya),
+            'experienceVersion'    => $primarySite->experience_version ?? 'v1',
+            'templateKey'          => $primarySite->template_key,
         ]);
     }
 
@@ -55,10 +59,21 @@ class PublicContentController extends SahodayaAdminController
             'links.*.url'        => 'nullable|string|max:500',
             'links.*.icon'       => 'nullable|string|max:10',
             'public_website_enabled' => 'nullable|boolean',
+            'experience_version'     => 'nullable|string|in:v1,v2',
         ]);
 
         if ($request->has('public_website_enabled')) {
             TenantPublicSite::setEnabled($this->sahodaya, $request->boolean('public_website_enabled'));
+        }
+
+        if ($request->filled('experience_version')) {
+            $site = \App\Models\WebsiteSite::ensurePrimary($this->sahodaya->id);
+            $newVer = $request->input('experience_version');
+            $site->update(['experience_version' => $newVer]);
+            if ($newVer === 'v2' && empty($site->template_key)) {
+                $site->update(['template_key' => 'events-results-live']);
+            }
+            $this->sahodaya->invalidateCache();
         }
 
         SahodayaHomepageContent::update($this->sahodaya, $data);

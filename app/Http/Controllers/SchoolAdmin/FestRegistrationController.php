@@ -596,6 +596,7 @@ class FestRegistrationController extends SchoolAdminController
             'inherited_from_item_id' => $item->inherited_from_item_id,
             'stage_type'             => $item->stage_type,
             'participant_type'  => $item->participant_type,
+            'category'          => $item->category,
             'gender'            => $item->gender,
             'age_group'         => $item->age_group,
             'class_group'       => $item->class_group,
@@ -1502,11 +1503,57 @@ class FestRegistrationController extends SchoolAdminController
             'other'     => $enabledItems->filter(fn ($i) => empty($i['stage_type']) && ! in_array($i['participant_type'] ?? null, ['group', 'team'], true))->values(),
         ];
 
-            return [$grouped, [
-            'on_stage'  => 'On stage',
-            'off_stage' => 'Off stage',
+        // "on_stage"/"off_stage" are real stage_type taxonomy entries, so their labels
+        // come from the tenant-editable registry; "group"/"other" are synthetic buckets
+        // (a combination of participant_type values, and a catch-all) with no single
+        // taxonomy entry of their own, so they keep static labels.
+        $stageLabels = app(\App\Services\Events\FestTaxonomyRegistry::class)
+            ->forTenant($event->tenant_id)
+            ->labels('stage_type');
+
+        return [$grouped, [
+            'on_stage'  => $stageLabels['on_stage'] ?? 'On stage',
+            'off_stage' => $stageLabels['off_stage'] ?? 'Off stage',
             'group'     => 'Group / team',
             'other'     => 'Other',
         ]];
+    }
+
+    public function selectSchoolRegion(Request $request)
+    {
+        $sahodayaId = $this->school->parent_id;
+        abort_if(! $sahodayaId, 403);
+
+        $data = $request->validate([
+            'region_id' => 'required|integer|exists:regions,id',
+            'group_key' => 'nullable|string',
+        ]);
+
+        $region = \App\Models\Region::forTenant($sahodayaId)->findOrFail($data['region_id']);
+        $year = \App\Support\AcademicYear::forSahodaya($sahodayaId);
+        $groupKey = filled($data['group_key'] ?? null) ? $data['group_key'] : null;
+
+        $hasGroupCol = \Illuminate\Support\Facades\Schema::hasColumn('school_region_assignments', 'partition_group');
+
+        $attributes = [
+            'school_id'     => $this->school->id,
+            'academic_year' => $year,
+        ];
+        if ($hasGroupCol) {
+            $attributes['partition_group'] = $groupKey;
+        }
+
+        $values = [
+            'tenant_id'           => $sahodayaId,
+            'region_id'           => $region->id,
+            'source'              => 'school',
+            'assigned_by_user_id' => $request->user()?->id,
+        ];
+
+        \App\Models\SchoolRegionAssignment::updateOrCreate($attributes, $values);
+
+        app(\App\Services\Events\FestRegionPartitionService::class)->syncSchoolAcrossHubs($sahodayaId, $this->school->id);
+
+        return back()->with('success', "Region assigned to {$region->name}. Venues and event items updated!");
     }
 }

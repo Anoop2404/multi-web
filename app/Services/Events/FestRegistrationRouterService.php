@@ -137,7 +137,7 @@ class FestRegistrationRouterService
         $target = app(FestSchoolPhaseRegionService::class)
             ->operationalEvent($hub, $sourcePhase, $schoolId);
 
-        if ($event->id !== $hub->id) {
+        if ($event->id !== $hub->id && $event->rootEvent()->id !== $hub->id) {
             abort_unless($event->id === $target->id, 403, 'This event belongs to a different phase or region.');
         }
 

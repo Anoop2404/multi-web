@@ -28,6 +28,37 @@
                  class="absolute -right-[8%] bottom-[-15%] w-[38rem] max-w-none h-auto opacity-[0.07] pointer-events-none select-none grayscale brightness-[3]">
             @endif
             <div class="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:26px_26px] pointer-events-none"></div>
+
+            {{-- Abstract "network of schools" motif — a real second visual anchor for the default slide, not just text-on-gradient --}}
+            <svg class="hidden lg:block absolute right-[4%] top-1/2 -translate-y-1/2 w-[34rem] h-[34rem] pointer-events-none" viewBox="0 0 520 520" fill="none" aria-hidden="true">
+                <g stroke="var(--color-accent)" stroke-width="1.25" opacity="0.35">
+                    <line x1="120" y1="140" x2="260" y2="90"/>
+                    <line x1="260" y1="90" x2="410" y2="150"/>
+                    <line x1="120" y1="140" x2="150" y2="290"/>
+                    <line x1="260" y1="90" x2="240" y2="270"/>
+                    <line x1="410" y1="150" x2="380" y2="300"/>
+                    <line x1="150" y1="290" x2="240" y2="270"/>
+                    <line x1="240" y1="270" x2="380" y2="300"/>
+                    <line x1="150" y1="290" x2="200" y2="410"/>
+                    <line x1="240" y1="270" x2="290" y2="420"/>
+                    <line x1="380" y1="300" x2="330" y2="430"/>
+                    <line x1="200" y1="410" x2="290" y2="420"/>
+                    <line x1="290" y1="420" x2="330" y2="430"/>
+                </g>
+                <g stroke="var(--color-secondary)" stroke-width="1" opacity="0.2">
+                    <line x1="120" y1="140" x2="410" y2="150"/>
+                    <line x1="150" y1="290" x2="380" y2="300"/>
+                </g>
+                <circle cx="260" cy="90" r="10" fill="var(--color-accent)" opacity="0.9"/>
+                <circle cx="120" cy="140" r="7" fill="white" opacity="0.6"/>
+                <circle cx="410" cy="150" r="8" fill="white" opacity="0.5"/>
+                <circle cx="150" cy="290" r="6" fill="white" opacity="0.5"/>
+                <circle cx="240" cy="270" r="12" fill="var(--color-accent)" opacity="0.7"/>
+                <circle cx="380" cy="300" r="7" fill="white" opacity="0.55"/>
+                <circle cx="200" cy="410" r="6" fill="white" opacity="0.45"/>
+                <circle cx="290" cy="420" r="9" fill="var(--color-secondary)" opacity="0.6"/>
+                <circle cx="330" cy="430" r="6" fill="white" opacity="0.4"/>
+            </svg>
         </div>
 
         @foreach($mediaSlides as $i => $slide)

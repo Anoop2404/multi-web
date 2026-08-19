@@ -160,6 +160,10 @@ class FestEventPhaseController extends SahodayaAdminController
         $name = $phase->name;
         $service->deletePhase($phase, $request->boolean('force'));
 
+        if ($event->usesPhasedRegionalBilling()) {
+            app(\App\Services\Events\FestPhaseTopologyService::class)->sync($event->fresh());
+        }
+
         $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.phase.deleted', "Deleted phase {$name}", [
             'phase_id' => $phase->id,
         ]);

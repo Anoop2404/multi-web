@@ -20,7 +20,7 @@ class FestFoodMenuItem extends Model
     ];
 
     protected $casts = [
-        'menu_date' => 'date',
+        'menu_date' => 'date:Y-m-d',
         'price' => 'decimal:2',
         'is_available' => 'boolean',
     ];

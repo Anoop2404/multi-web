@@ -1,7 +1,7 @@
 <template>
     <AdminLayout :title="`Outside Sahodayas — ${program.title}`">
         <div class="max-w-4xl space-y-4">
-            <Link :href="`/admin/state-programs/${program.id}`" class="text-sm text-indigo-600">← {{ program.title }}</Link>
+            <Link :href="`/admin/state-programs/${program.id}`" class="text-sm link-brand">← {{ program.title }}</Link>
 
             <div class="card">
                 <h3 class="font-semibold mb-1">Outside Sahodayas</h3>
@@ -32,12 +32,12 @@
                                 <span v-if="s.contact_name || s.contact_phone"> · {{ [s.contact_name, s.contact_phone].filter(Boolean).join(' · ') }}</span>
                             </p>
                             <p class="text-xs mt-1">
-                                <span class="font-mono font-semibold text-indigo-700">{{ s.access_code }}</span>
-                                <a :href="`${portalUrl}/${s.access_code}`" target="_blank" class="ml-2 text-indigo-600 hover:underline">Open portal ↗</a>
+                                <span class="font-mono font-semibold text-[color:var(--brand-blue)]">{{ s.access_code }}</span>
+                                <a :href="`${portalUrl}/${s.access_code}`" target="_blank" class="ml-2 link-brand">Open portal ↗</a>
                             </p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <Link :href="`/admin/state-programs/external-sahodayas/${s.id}/schools`" class="text-xs px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                            <Link :href="`/admin/state-programs/external-sahodayas/${s.id}/schools`" class="text-xs px-3 py-1.5 rounded-lg border border-[color:var(--brand-blue)]/30 text-[color:var(--brand-blue)] hover:bg-[color:var(--brand-blue)]/10">
                                 Manage schools →
                             </Link>
                             <button type="button" @click="toggleStatus(s)" class="text-xs px-3 py-1.5 rounded-lg border"

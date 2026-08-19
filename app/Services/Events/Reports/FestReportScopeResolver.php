@@ -55,6 +55,14 @@ class FestReportScopeResolver
             return $this->withBatch($scope, $batchId);
         }
 
+        $phaseScopes = $this->actorPhaseScopes($actor, $root);
+
+        if ($phaseScopes !== null) {
+            $scope = $this->resolveForPhaseRestrictedActor($requestedEvent, $root, $phaseScopes, $phaseId);
+
+            return $this->withBatch($scope, $batchId);
+        }
+
         $scope = match ($mode) {
             'region' => $this->regionScope($requestedEvent, $root, $regionId, $phaseId, false),
             'finale' => $this->roleScope($requestedEvent, $root, 'finale', $phaseId, false),
@@ -110,6 +118,56 @@ class FestReportScopeResolver
         }
 
         return $this->regionScope($requestedEvent, $root, $regionId, $phaseId, true);
+    }
+
+    /**
+     * Phase-admin counterpart to resolveForRestrictedActor(): unlike a region_admin scope
+     * (which resolves to one region's worth of events), a phase_admin scope always spans
+     * every region under its phase — exactly what combinedScope()'s phased_regional_billing
+     * branch already computes when given an explicit phaseId, so this reuses it rather than
+     * duplicating that event-id resolution.
+     *
+     * @param  list<array{event_id: int, source_phase_id: ?int}>  $phaseScopes
+     */
+    private function resolveForPhaseRestrictedActor(
+        FestEvent $requestedEvent,
+        FestEvent $root,
+        array $phaseScopes,
+        ?int $requestedPhaseId,
+    ): FestReportScope {
+        $allowedPhaseIds = collect($phaseScopes)->pluck('source_phase_id')->filter()->unique()->values()->all();
+
+        if ($requestedPhaseId !== null && ! in_array($requestedPhaseId, $allowedPhaseIds, true)) {
+            throw new HttpException(403, 'You are not assigned to that competition phase.');
+        }
+
+        if ($allowedPhaseIds === []) {
+            // Assigned duty=phase_admin but no real phase on any scope row — shouldn't
+            // happen (FestEventStaffController@store always requires one), but fail closed
+            // on bad data rather than fall through to an unfiltered read.
+            return $this->emptyScope($requestedEvent, $root, 'combined', null, null, true);
+        }
+
+        $phaseId = $requestedPhaseId ?? (count($allowedPhaseIds) === 1 ? (int) $allowedPhaseIds[0] : null);
+
+        if ($phaseId === null) {
+            // Multiple assigned phases and the caller didn't say which one — fail closed
+            // rather than silently union them, the same posture resolveForRestrictedActor()
+            // takes above for a region_admin with multiple assigned regions.
+            return $this->emptyScope($requestedEvent, $root, 'combined', null, null, true);
+        }
+
+        if (! $root->usesPhasedRegionalBilling()) {
+            // A phase_admin scope only has well-defined meaning within the
+            // phased_regional_billing topology combinedScope() understands (one leaf per
+            // region, each tagged with source_phase_id). FestEventStaffController@store
+            // already only allows this duty when the assigned phase isRegional(), but this
+            // fails closed too rather than assume every possible root shape is safe to
+            // aggregate under a phase filter.
+            return $this->emptyScope($requestedEvent, $root, 'combined', null, $phaseId, true);
+        }
+
+        return $this->combinedScope($requestedEvent, $root, $phaseId, true);
     }
 
     private function selfScope(FestEvent $requestedEvent, FestEvent $root, ?int $phaseId, bool $restricted): FestReportScope
@@ -451,6 +509,62 @@ class FestReportScopeResolver
             ->map(fn ($row) => [
                 'event_id' => (int) $row->event_id,
                 'region_id' => $row->region_id !== null ? (int) $row->region_id : null,
+                'source_phase_id' => $row->source_phase_id !== null ? (int) $row->source_phase_id : null,
+            ])
+            ->values()
+            ->all();
+
+        return $scopes === [] ? null : $scopes;
+    }
+
+    /**
+     * Phase-admin counterpart to actorRegionScopes(). Candidate event ids mirror that
+     * method's set (hub + region children + sports nesting) since a phase_admin row can in
+     * principle be assigned at any of those levels, even though the hub is the expected
+     * common case — same reasoning as EventRegionAdminScope::resolve()'s phase-scope
+     * resolution for Layer 1 route gating.
+     *
+     * Deliberately does NOT filter out null-source_phase_id rows here (unlike
+     * EventRegionAdminScope::resolve(), which can afford to since it only needs a flat
+     * allow-list) — null returned from this method means "not a phase-restricted actor at
+     * all," a different thing from "is phase_admin but this row has no real phase set."
+     * Collapsing those into one would make a malformed row (source_phase_id null) fall
+     * through resolve()'s `if ($phaseScopes !== null)` check entirely and get treated as an
+     * unrestricted actor. resolveForPhaseRestrictedActor() does the null-filtering and
+     * fails closed there instead, mirroring how resolveForRestrictedActor() handles a
+     * region_admin row with no region_id.
+     *
+     * @return null|list<array{event_id: int, source_phase_id: ?int}>
+     */
+    private function actorPhaseScopes(User $actor, FestEvent $root): ?array
+    {
+        if ($actor->isSuperAdmin() || $actor->hasRole('sahodaya_admin')) {
+            return null;
+        }
+
+        if (! $actor->hasRole('phase_admin')) {
+            return null;
+        }
+
+        $candidateEventIds = array_merge(
+            [(int) $root->id],
+            $root->childrenForRoles(['region'])->pluck('id')->map(fn ($id) => (int) $id)->all(),
+        );
+
+        foreach ($root->childrenForRoles(['sports_discipline']) as $sport) {
+            $candidateEventIds[] = (int) $sport->id;
+            foreach ($sport->childrenForRoles(['region']) as $regionLeaf) {
+                $candidateEventIds[] = (int) $regionLeaf->id;
+            }
+        }
+
+        $scopes = FestEventStaff::query()
+            ->where('user_id', $actor->id)
+            ->where('duty', 'phase_admin')
+            ->whereIn('event_id', array_values(array_unique($candidateEventIds)))
+            ->get(['event_id', 'source_phase_id'])
+            ->map(fn ($row) => [
+                'event_id' => (int) $row->event_id,
                 'source_phase_id' => $row->source_phase_id !== null ? (int) $row->source_phase_id : null,
             ])
             ->values()

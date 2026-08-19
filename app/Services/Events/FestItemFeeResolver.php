@@ -55,6 +55,10 @@ class FestItemFeeResolver
                 }
             }
 
+            if ($extraQuotaItem && isset($schedule['extra_item_fee']) && $schedule['extra_item_fee'] !== null && $schedule['extra_item_fee'] !== '') {
+                return (float) $schedule['extra_item_fee'];
+            }
+
             if (isset($schedule['default_item_fee']) && $schedule['default_item_fee'] !== '') {
                 return (float) $schedule['default_item_fee'];
             }

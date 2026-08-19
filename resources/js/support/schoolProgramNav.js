@@ -63,11 +63,13 @@ export function schoolProgramWorkflowItems(schoolId, programSlug) {
     const items = [
         { label: 'Overview', href: schoolProgramHref(schoolId, programSlug), icon: 'grid', exact: true },
         { label: 'Register students', href: schoolProgramHref(schoolId, programSlug, 'registration'), icon: 'clipboard' },
-        { label: 'My school events', href: schoolProgramHref(schoolId, programSlug, 'my-events'), icon: 'calendar' },
     ];
 
     if (programSlug === 'sports-meet') {
-        items.push({ label: 'Submit winners', href: schoolProgramHref(schoolId, programSlug, 'submit-winners'), icon: 'award' });
+        items.push(
+            { label: 'My school events', href: schoolProgramHref(schoolId, programSlug, 'my-events'), icon: 'calendar' },
+            { label: 'Submit winners', href: schoolProgramHref(schoolId, programSlug, 'submit-winners'), icon: 'award' }
+        );
     }
 
     items.push(

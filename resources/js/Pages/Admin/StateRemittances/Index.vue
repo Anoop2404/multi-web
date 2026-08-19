@@ -82,7 +82,7 @@
                                 <template v-if="r.status === 'submitted'">
                                     <div class="flex gap-2 justify-end">
                                         <a :href="`/admin/state-remittances/${r.id}/proof`" target="_blank" rel="noopener"
-                                           class="text-xs text-indigo-600 font-semibold">Proof ↗</a>
+                                           class="text-xs link-brand">Proof ↗</a>
                                         <button @click="verify(r)" class="text-xs text-green-600 font-semibold">Verify</button>
                                         <button @click="reject(r)" class="text-xs text-red-600 font-semibold">Reject</button>
                                     </div>
@@ -97,7 +97,7 @@
                 <div v-if="remittances.links?.length > 3" class="px-4 py-3 border-t flex flex-wrap gap-1">
                     <Link v-for="link in remittances.links" :key="link.label"
                           :href="link.url || '#'"
-                          :class="['px-3 py-1 rounded-lg text-xs', link.active ? 'bg-indigo-100 text-indigo-800 font-semibold' : 'text-gray-600 hover:bg-gray-100', !link.url && 'opacity-40 pointer-events-none']"
+                          :class="['px-3 py-1 rounded-lg text-xs', link.active ? 'bg-[color:var(--brand-blue)]/10 text-[color:var(--brand-blue)] font-semibold' : 'text-gray-600 hover:bg-gray-100', !link.url && 'opacity-40 pointer-events-none']"
                           v-html="link.label" />
                 </div>
             </div>

@@ -84,6 +84,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'feeSchedule'  => $schedule,
             'numberingSettings' => app(\App\Services\Events\FestNumberingService::class)->settings($event),
             'feeModels'    => config('fest_fees.fee_models'),
+            'feePresets'   => config('fest_fees.presets'),
             'classGroupScheme' => $classGroupScheme,
             // Named, Sahodaya-wide category schemes (replaces the old fixed
             // cbse/sahodaya/cluster/custom dropdown) — auto-seeded once per tenant from
@@ -1035,12 +1036,7 @@ class FestEventSettingsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $data = $request->validate([
-            'item_id'   => ['nullable', Rule::exists('fest_event_items', 'id')->where('event_id', $event->id)],
-            'grade'     => 'required|in:A_plus,A,B,C',
-            'min_score' => 'nullable|numeric|min:0',
-            'max_score' => 'nullable|numeric|min:0',
-        ]);
+        $data = $this->validatedGradeConfig($request, $event);
 
         FestGradeConfig::create(array_merge($data, ['event_id' => $event->id]));
 
@@ -1052,6 +1048,25 @@ class FestEventSettingsController extends SahodayaAdminController
         );
 
         return back()->with('success', 'Grade band saved.');
+    }
+
+    public function updateGradeConfig(Request $request, string $tenantId, FestEvent $event, FestGradeConfig $gradeConfig)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($gradeConfig->event_id !== $event->id, 404);
+
+        $data = $this->validatedGradeConfig($request, $event, $gradeConfig);
+
+        $gradeConfig->update($data);
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('grades'),
+            'fest.settings.grade_band_updated',
+            "Grade band updated: {$data['grade']}",
+        );
+
+        return back()->with('success', 'Grade band updated.');
     }
 
     public function destroyGradeConfig(string $tenantId, FestEvent $event, FestGradeConfig $gradeConfig)
@@ -1070,16 +1085,94 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', 'Grade band removed.');
     }
 
+    /**
+     * Shared by store/update so both reject an inverted range and a range that overlaps
+     * another band already covering the same event+item (in the same mode — percentage
+     * bands and raw-score bands on the same item are tracked as separate overlap groups,
+     * since resolveGradeFromScore() only ever matches one mode per item).
+     *
+     * @return array<string, mixed>
+     */
+    private function validatedGradeConfig(Request $request, FestEvent $event, ?FestGradeConfig $existing = null): array
+    {
+        $data = $request->validate([
+            'item_id'     => ['nullable', Rule::exists('fest_event_items', 'id')->where('event_id', $event->id)],
+            // Free-text since 2026-10 — was 'in:A_plus,A,B,C'. Deliberately not a closed
+            // list any more: this is what actually defines an event's grade vocabulary
+            // (see FestGradePointService::validGradesForEvent(), which reads whatever
+            // grade values exist on this event's FestGradeConfig rows). The regex just
+            // keeps the label sane — letters/numbers/spaces/+/-/_ in any script.
+            'grade'       => ['required', 'string', 'max:40', 'regex:/^[\pL\pN\s\+\-_]+$/u'],
+            'min_score'   => 'nullable|numeric|min:0',
+            'max_score'   => 'nullable|numeric|min:0',
+            'min_percent' => 'nullable|numeric|min:0|max:100',
+            'max_percent' => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        // Pre-existing bug fixed in passing: nullable fields absent from the request body
+        // entirely (not just sent as null) aren't guaranteed keys in validate()'s returned
+        // array, so the direct $data['min_percent'] access below could throw "Undefined
+        // array key" rather than the null it was presumably meant to read as.
+        $usePercentage = ($data['min_percent'] ?? null) !== null || ($data['max_percent'] ?? null) !== null;
+        $field = $usePercentage ? 'min_percent' : 'min_score';
+        $min = (float) ($usePercentage ? ($data['min_percent'] ?? 0) : ($data['min_score'] ?? 0));
+        $max = (float) ($usePercentage ? ($data['max_percent'] ?? 100) : ($data['max_score'] ?? 100));
+
+        if ($min > $max) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                $field => 'Minimum must not be greater than maximum.',
+            ]);
+        }
+
+        $itemId = $data['item_id'] ?? null;
+
+        $overlap = FestGradeConfig::where('event_id', $event->id)
+            ->when($itemId !== null, fn ($q) => $q->where('item_id', $itemId), fn ($q) => $q->whereNull('item_id'))
+            ->when($existing, fn ($q) => $q->where('id', '!=', $existing->id))
+            ->get()
+            ->first(function (FestGradeConfig $cfg) use ($usePercentage, $min, $max) {
+                if (($cfg->min_percent !== null) !== $usePercentage) {
+                    return false;
+                }
+                $cfgMin = (float) ($usePercentage ? ($cfg->min_percent ?? 0) : ($cfg->min_score ?? 0));
+                $cfgMax = (float) ($usePercentage ? ($cfg->max_percent ?? 100) : ($cfg->max_score ?? 100));
+
+                return $min <= $cfgMax && $max >= $cfgMin;
+            });
+
+        if ($overlap) {
+            $overlapRange = $usePercentage
+                ? "{$overlap->min_percent}%-{$overlap->max_percent}%"
+                : "{$overlap->min_score}-{$overlap->max_score}";
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                $field => "This range overlaps the existing {$overlap->grade} band ({$overlapRange}).",
+            ]);
+        }
+
+        return $data;
+    }
+
     public function storePointRule(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $gradePointService = app(\App\Services\Events\FestGradePointService::class);
+
         $data = $request->validate([
-            'grade'    => 'nullable|in:A_plus,A,B,C',
+            'grade'    => ['nullable', $gradePointService->gradeValidationRule($event)],
             'position' => 'nullable|integer|min:1|max:10',
             'points'   => 'required|integer|min:0',
             'is_group' => 'nullable|boolean',
         ]);
+
+        // gradeValidationRule() validates against display-form grades ("A+", matching what
+        // FestGradePointService::pointsForMark() looks marks up by after normalizeGrade())
+        // — convert to the same storage form FestPointRule.grade actually needs before
+        // saving, mirroring FestGradeConfig's own A_plus-suffix convention for the legacy
+        // four grades (custom labels pass through unchanged either way).
+        if (! empty($data['grade'])) {
+            $data['grade'] = $gradePointService->normalizeGrade($event, $data['grade']);
+        }
 
         FestPointRule::create(array_merge($data, [
             'event_id'  => $event->id,

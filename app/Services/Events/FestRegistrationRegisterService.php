@@ -28,6 +28,12 @@ class FestRegistrationRegisterService
      *                           paginated slice — filtering post-hoc client-side would
      *                           only see the current page).
      * @param  ?string  $itemId
+     * @param  ?list<int>  $eventIds  Overrides $event->reportableEventIds() — pass the
+     *                                phase+region-scoped leaf id(s) resolved by
+     *                                FestReportScopeResolver so a scoped register only
+     *                                reads that scope's own registrations/fees, not every
+     *                                leaf under the root (see FestReportController's
+     *                                registrationRegister()/exportRegistrationRegister()).
      * @return array{
      *     rows: list<array<string, mixed>>|\Illuminate\Pagination\LengthAwarePaginator,
      *     school_summaries: list<array<string, mixed>>,
@@ -42,17 +48,25 @@ class FestRegistrationRegisterService
         ?string $headId = null,
         ?string $itemId = null,
         ?array $schoolIds = null,
+        ?array $eventIds = null,
     ): array {
         $schedule = $this->feeService->resolveSchedule($event);
         $feeRequired = $this->feeService->feeRequired($event);
-        $eventIds = $event->reportableEventIds();
+        $eventIds ??= $event->reportableEventIds();
+        [$feeEventIds, $feeBatchIds] = $this->feeScopeFor($event, $eventIds);
 
         // A sports season hub has no fee record of its own — each child sport event
         // bills separately (event_id = child id, see sportsWiseSummary()), so a school's
         // real total is the sum across every sport it registered for under this hub.
         // Group+sum here rather than keyBy(), which would silently keep only one sport's
         // fee row per school once whereIn() starts returning more than one row per school.
-        $schoolFees = FestSchoolEventFee::whereIn('event_id', $eventIds)
+        // Phased-regional-billing is the same shape one level further: FestSchoolEventFee
+        // rows always live at the root event's id, keyed by registration_batch_id, never
+        // at a region/phase leaf's id (FestRegistrationBatchFeeService::recalculateAll()),
+        // so $feeEventIds/$feeBatchIds resolve to the root + the batch(es) behind the
+        // requested leaf(s) instead of $eventIds itself for that case.
+        $schoolFees = FestSchoolEventFee::whereIn('event_id', $feeEventIds)
+            ->when($feeBatchIds !== null, fn ($q) => $q->whereIn('registration_batch_id', $feeBatchIds))
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->when($schoolIds !== null, fn ($q) => $q->whereIn('school_id', $schoolIds))
             ->with('feeReceipt')
@@ -128,7 +142,7 @@ class FestRegistrationRegisterService
         // school-dropdown filter), so a region_id filter left the "Total schools"/fee
         // summary showing every school while the row list above was already scoped
         // correctly. Same bug shape as G3 (browser/export parity), just within one page.
-        $schoolSummaries = $this->schoolSummaries($event, $schoolFees, $feeRequired, $schoolId, $schoolIds);
+        $schoolSummaries = $this->schoolSummaries($event, $eventIds, $schoolFees, $feeRequired, $schoolId, $schoolIds);
 
         $totals = [
             'participants'   => count($rows),
@@ -187,9 +201,9 @@ class FestRegistrationRegisterService
      *                                    — kept in sync with the browser view so both read
      *                                    exactly the same rows (gap G3).
      */
-    public function exportCsv(FestEvent $event, ?string $schoolId = null, ?array $schoolIds = null, ?int $regionId = null): StreamedResponse
+    public function exportCsv(FestEvent $event, ?string $schoolId = null, ?array $schoolIds = null, ?int $regionId = null, ?array $eventIds = null): StreamedResponse
     {
-        $data = $this->build($event, $schoolId, null, 50, null, null, $schoolIds);
+        $data = $this->build($event, $schoolId, null, 50, null, null, $schoolIds, $eventIds);
         $slug = str($event->title)->slug('-');
 
         $regionSuffix = '';
@@ -229,6 +243,46 @@ class FestRegistrationRegisterService
     }
 
     /**
+     * FestSchoolEventFee's own scope for a given registration scope. For every billing
+     * mode except phased-regional-billing, fee rows live at the same event id(s) the
+     * registrations do, so this is just $eventIds unchanged. Phased-regional-billing
+     * (FestRegistrationBatchFeeService::recalculateAll()) always writes fee rows at the
+     * root event's id keyed by registration_batch_id — never at a region/phase leaf's
+     * id — so a $eventIds narrowed to one or more leaves (e.g. by
+     * FestReportScopeResolver's 'region' scope) needs translating: root id for the
+     * event filter, and the batch(es) behind those specific leaves' phases for the
+     * registration_batch_id filter, so scoping to "Off Stage — Nilambur" doesn't pull in
+     * a school's fee rows for every other phase too.
+     *
+     * @param  list<int>  $eventIds
+     * @return array{0: list<int>, 1: ?list<int>}
+     */
+    private function feeScopeFor(FestEvent $event, array $eventIds): array
+    {
+        if (! $event->usesPhasedRegionalBilling()) {
+            return [$eventIds, null];
+        }
+
+        $root = $event->rootEvent();
+        $phaseIds = FestEvent::whereIn('id', $eventIds)->whereNotNull('source_phase_id')->pluck('source_phase_id');
+
+        if ($phaseIds->isEmpty()) {
+            // Root itself in scope (no leaf narrowing) — every batch under it is in play.
+            return [[(int) $root->id], null];
+        }
+
+        $batchIds = \App\Models\FestEventPhase::where('event_id', $root->id)
+            ->whereIn('id', $phaseIds)
+            ->pluck('registration_batch_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return [[(int) $root->id], $batchIds];
+    }
+
+    /**
      * @param  \Illuminate\Support\Collection<string, array{total_due: float, status: string, receipt_no: ?string}>  $schoolFees
      * @param  ?list<string>  $scopedSchoolIds  Region scope from build()'s $schoolIds param —
      *                                          named distinctly here to avoid colliding with
@@ -236,10 +290,8 @@ class FestRegistrationRegisterService
      *                                          result, a different collection).
      * @return \Illuminate\Support\Collection<int, array<string, mixed>>
      */
-    private function schoolSummaries(FestEvent $event, $schoolFees, bool $feeRequired, ?string $schoolId, ?array $scopedSchoolIds = null)
+    private function schoolSummaries(FestEvent $event, array $eventIds, $schoolFees, bool $feeRequired, ?string $schoolId, ?array $scopedSchoolIds = null)
     {
-        $eventIds = $event->reportableEventIds();
-
         $schoolIds = FestRegistration::whereIn('event_id', $eventIds)
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->when($scopedSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $scopedSchoolIds))

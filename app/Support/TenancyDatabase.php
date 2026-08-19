@@ -72,7 +72,7 @@ class TenancyDatabase
      */
     public static function withTenantDatabase(Tenant $tenant, callable $callback): mixed
     {
-        if (! self::enabled()) {
+        if (! self::enabled() || self::isStandalone($tenant)) {
             return $callback();
         }
 
@@ -116,6 +116,10 @@ class TenancyDatabase
             return $tenant;
         }
 
+        if (self::isStandalone($tenant)) {
+            return $tenant;
+        }
+
         if ($tenant->type === 'school' && $tenant->parent_id) {
             $parent = Tenant::query()->find($tenant->parent_id);
 
@@ -125,6 +129,17 @@ class TenancyDatabase
         }
 
         throw new InvalidArgumentException('No Sahodaya database owner for tenant '.$tenant->id);
+    }
+
+    /**
+     * A standalone school has no Sahodaya parent. It has no dedicated database — its
+     * tenant-scoped data lives on the central connection, scoped by tenant_id, same as
+     * every other central table. Callers must check this before resolving a database
+     * owner, since a standalone school doesn't have one.
+     */
+    public static function isStandalone(Tenant $tenant): bool
+    {
+        return $tenant->type === 'school' && ! $tenant->parent_id;
     }
 
     public static function initializeForTenant(Tenant $tenant): void
@@ -138,6 +153,22 @@ class TenancyDatabase
         }
 
         if (tenancy()->initialized && tenant()?->id === $tenant->id) {
+            return;
+        }
+
+        if (self::isStandalone($tenant)) {
+            // database_per_sahodaya is on globally, so DatabaseTenancyBootstrapper is
+            // registered and will run for every initialize() call regardless — point this
+            // tenant's own db_name at the central database (same trick used below for a
+            // Sahodaya-affiliated school copying its parent's db_name) so the "switch"
+            // lands on the connection it's already on. No separate database to provision.
+            $central = (string) config('tenancy.database.central_connection', 'central');
+            $tenant->setInternal('db_name', config("database.connections.{$central}.database"));
+            $tenant->offsetUnset($tenant::internalPrefix().'db_username');
+            $tenant->offsetUnset($tenant::internalPrefix().'db_password');
+
+            tenancy()->initialize($tenant);
+
             return;
         }
 
@@ -188,7 +219,7 @@ MSG);
      */
     public static function whenDatabaseReady(Tenant $tenant, callable $callback, mixed $default = null): mixed
     {
-        if (! self::enabled()) {
+        if (! self::enabled() || self::isStandalone($tenant)) {
             return $callback();
         }
 
@@ -211,7 +242,7 @@ MSG);
      */
     public static function runWhenDatabaseReady(Tenant $tenant, callable $callback): mixed
     {
-        if (! self::enabled()) {
+        if (! self::enabled() || self::isStandalone($tenant)) {
             return $callback();
         }
 

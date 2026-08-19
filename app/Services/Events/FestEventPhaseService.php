@@ -152,6 +152,11 @@ class FestEventPhaseService
             "This phase has assigned items, region selections, or operational data. Migrate those records before deleting it."
         );
 
+        // Clean up operational child events spawned from this phase that have no registrations/results
+        \App\Models\FestEvent::where('source_phase_id', $phase->id)
+            ->whereDoesntHave('registrations')
+            ->delete();
+
         $phase->delete();
     }
 

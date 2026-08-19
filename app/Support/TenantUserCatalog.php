@@ -26,6 +26,7 @@ class TenantUserCatalog
             'school_principal',
             'event_admin',
             'region_admin',
+            'phase_admin',
         ];
     }
 
@@ -100,7 +101,7 @@ class TenantUserCatalog
     {
         $leadership = [
             'school_principal', 'school_vice_principal', 'school_admin',
-            'sahodaya_admin', 'sahodaya_finance', 'event_admin', 'region_admin',
+            'sahodaya_admin', 'sahodaya_finance', 'event_admin', 'region_admin', 'phase_admin',
         ];
 
         return in_array($role, $leadership, true) ? 'leadership' : 'standard';
@@ -156,7 +157,7 @@ class TenantUserCatalog
     /** @return list<string> */
     public static function festEventDuties(): array
     {
-        return ['coordinator', 'region_admin', 'stage', 'registration', 'attendance', 'food', 'appeals', 'certificates', 'marks', 'discipline', 'admit_cards'];
+        return ['coordinator', 'region_admin', 'phase_admin', 'stage', 'registration', 'attendance', 'food', 'appeals', 'certificates', 'marks', 'discipline', 'admit_cards'];
     }
 
     /** @return array<string, string> */
@@ -184,6 +185,7 @@ class TenantUserCatalog
             'house_admin'              => 'House admin (intra-school)',
             'event_admin'              => 'Event admin (full control, assigned events only)',
             'region_admin'             => 'Region admin (assigned event, one region only)',
+            'phase_admin'              => 'Phase admin (assigned event, one phase, every region)',
         ];
     }
 
@@ -213,6 +215,7 @@ class TenantUserCatalog
             'school_principal'         => 'Full school-admin access, can create/manage other school users.',
             'event_admin'              => 'Full sahodaya-admin control (items, fees, registrations, results, settings) but locked to only the events you tick below.',
             'region_admin'             => 'Mark entry, ID cards, registrations, finance, and food billing — locked to one region within one event. Assign via that event\'s Event Staff page, not here.',
+            'phase_admin'              => 'Mark entry, ID cards, registrations, finance, and food billing — locked to one phase, but across every region, within one event. Assign via that event\'s Event Staff page, not here.',
         ];
     }
 
@@ -227,7 +230,7 @@ class TenantUserCatalog
         return [
             'General'            => ['sahodaya_staff', 'school_principal'],
             'Registration & finance' => ['registration_coordinator', 'sahodaya_finance', 'certificate_collector', 'data_entry'],
-            'Event roles'        => ['event_coordinator', 'fest_ops', 'event_admin', 'region_admin', 'judge'],
+            'Event roles'        => ['event_coordinator', 'fest_ops', 'event_admin', 'region_admin', 'phase_admin', 'judge'],
             'Exams & training'   => ['training_admin', 'mark_entry_admin', 'mark_entry_coordinator', 'exam_controller', 'exam_staff'],
         ];
     }
@@ -253,6 +256,7 @@ class TenantUserCatalog
         return [
             'coordinator'  => 'Head of event (coordinator)',
             'region_admin' => 'Region coordinator / admin',
+            'phase_admin'  => 'Phase coordinator / admin',
             'stage'        => 'Stage manager',
             'registration' => 'Registration desk',
             'attendance'   => 'Attendance officer',
@@ -341,6 +345,7 @@ class TenantUserCatalog
             'mark_entry_admin',
             'event_admin',
             'region_admin',
+            'phase_admin',
             'training_admin',
         ];
     }
@@ -397,6 +402,14 @@ class TenantUserCatalog
             // 'fest.manage' is required because id-cards/food-menu/food-billing paths don't
             // have a dedicated permission and fall through to it in writePermissionForPath().
             'region_admin'             => [
+                'fest.view', 'fest.manage', 'fest.marks', 'fest.registrations',
+                'fest.finance', 'fest.catering',
+            ],
+            // Phase admin is region_admin's counterpart: same operational scope
+            // (mark entry, ID cards, registrations, finance, food billing), but
+            // spanning every region within one phase instead of being locked to
+            // a single region.
+            'phase_admin'              => [
                 'fest.view', 'fest.manage', 'fest.marks', 'fest.registrations',
                 'fest.finance', 'fest.catering',
             ],

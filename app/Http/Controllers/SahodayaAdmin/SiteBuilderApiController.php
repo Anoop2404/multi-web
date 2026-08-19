@@ -37,7 +37,9 @@ class SiteBuilderApiController extends SahodayaAdminController
             'mode' => 'nullable|in:full,style',
         ]);
         $site = WebsiteSite::resolveForTenant($this->sahodaya->id, (int) $data['site_id']);
-        $draft = $applier->applyDraft($this->sahodaya, $site, $data['template_key'], $data['mode'] ?? 'full');
+        $template = SahodayaWebsiteTemplateCatalog::get($data['template_key']);
+        $context = SahodayaTenantBranding::context($this->sahodaya);
+        $draft = $applier->applyDraft($this->sahodaya, $site, $data['template_key'], $template, $context, $data['mode'] ?? 'full');
         $this->sahodaya->invalidateCache();
 
         return response()->json([
@@ -352,6 +354,29 @@ class SiteBuilderApiController extends SahodayaAdminController
         return response()->json([
             'saved'   => true,
             'enabled' => $data['enabled'],
+        ]);
+    }
+
+    public function setExperienceVersion(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'site_id'            => 'required|integer',
+            'experience_version' => 'required|in:v1,v2',
+        ]);
+
+        $site = WebsiteSite::resolveForTenant($this->sahodaya->id, (int) $data['site_id']);
+        $site->update(['experience_version' => $data['experience_version']]);
+
+        if ($data['experience_version'] === 'v2' && empty($site->template_key)) {
+            $site->update(['template_key' => 'events-results-live']);
+        }
+
+        $this->sahodaya->invalidateCache();
+
+        return response()->json([
+            'saved'              => true,
+            'experience_version' => $site->experience_version,
+            'site'               => $this->sitePayload($site->fresh()),
         ]);
     }
 

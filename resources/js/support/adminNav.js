@@ -52,6 +52,7 @@ export function superadminNav(options = {}) {
                 { label: 'State Users', href: '/admin/state-users', icon: 'users' },
                 { label: 'Announcements', href: '/admin/announcements', icon: 'bell' },
                 { label: 'Audit Log', href: '/admin/audit-logs', icon: 'file-text' },
+                { label: 'Reports', href: '/admin/reports', icon: 'bar-chart' },
                 { label: 'S3 Migration', href: '/admin/storage-migration', icon: 'cloud' },
                 { label: 'Dev Pass Token', href: '/admin/dev-pass-token', icon: 'key' },
             ],

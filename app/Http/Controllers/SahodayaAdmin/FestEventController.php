@@ -976,6 +976,7 @@ class FestEventController extends SahodayaAdminController
             'title'                => 'required|string|max:255',
             'item_code'            => 'nullable|string|max:20',
             'duration_minutes'     => 'nullable|integer|min:1|max:480',
+            'total_marks'          => 'nullable|numeric|min:0',
             'max_per_school'       => 'nullable|integer|min:1',
             'min_group_size'       => 'nullable|integer|min:1',
             'max_group_size'       => 'nullable|integer|min:1',
@@ -1055,6 +1056,7 @@ class FestEventController extends SahodayaAdminController
             'qualify_count'  => 'nullable|integer|min:1',
             'max_per_school' => 'nullable|integer|min:1',
             'fee_amount'     => 'nullable|numeric|min:0',
+            'total_marks'    => 'nullable|numeric|min:0',
             'is_enabled'     => 'nullable|boolean',
             'head_id'        => 'nullable|exists:fest_item_heads,id',
             'area_id'        => [

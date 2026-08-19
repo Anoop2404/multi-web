@@ -22,12 +22,17 @@ class SahodayaSiteBuilderCatalog
         'testimonials_sahodaya' => ['principal-quotes'],
         'useful_links'          => ['icon-grid'],
         'gallery'               => ['grid', 'masonry-grid', 'carousel', 'album-based'],
+        'video_gallery'         => ['youtube-grid', 'featured-embed'],
         'contact'               => ['side-by-side', 'stacked', 'with-whatsapp'],
         'newsletter'            => ['subscribe-form'],
         'sahodaya_home'         => ['dashboard'],
         'sahodaya_action_hub'   => ['seasonal'],
         'resource_centre'       => ['search-grid'],
         'governance'            => ['structure'],
+        'faq'                   => ['accordion'],
+        'sponsors'              => ['logo-grid'],
+        'awards'                => ['cards'],
+        'membership_cta'        => ['steps'],
     ];
 
     public static function allows(string $sectionType, ?string $variant = null): bool

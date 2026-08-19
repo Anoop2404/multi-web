@@ -161,7 +161,7 @@ class FestMarkCoordinatorController extends Controller
         $data = $request->validate([
             'participant_id'    => 'required|exists:fest_participants,id',
             'item_id'           => 'required|exists:fest_event_items,id',
-            'grade'             => 'nullable|in:A,A+,B,C',
+            'grade'             => ['nullable', app(\App\Services\Events\FestGradePointService::class)->gradeValidationRule($event)],
             'position'          => 'nullable|integer|min:1|max:255',
             'score'             => 'nullable|numeric|min:0',
             'measurement_value' => 'nullable|string|max:50',

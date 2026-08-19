@@ -34,17 +34,17 @@
                     <option v-for="h in heads" :key="h.id" :value="h.id">{{ h.name }}</option>
                 </select>
             </div>
-            <div v-if="regionOptions && regionOptions.length" class="min-w-[180px]">
+            <div v-if="regionOptions && regionOptions.length && form.duty !== 'phase_admin'" class="min-w-[180px]">
                 <label class="text-xs text-gray-500">Region (optional scope)</label>
                 <select v-model="form.region_id" class="field w-full">
                     <option value="">All regions</option>
                     <option v-for="r in regionOptions" :key="r.id" :value="r.id">{{ r.name }}</option>
                 </select>
             </div>
-            <div v-if="form.duty === 'region_admin' && phaseOptions.length" class="min-w-[180px]">
-                <label class="text-xs text-gray-500">Phase (optional scope)</label>
-                <select v-model="form.source_phase_id" class="field w-full">
-                    <option value="">All phases in region</option>
+            <div v-if="(form.duty === 'region_admin' || form.duty === 'phase_admin') && phaseOptions.length" class="min-w-[180px]">
+                <label class="text-xs text-gray-500">{{ form.duty === 'phase_admin' ? 'Phase (required — every region)' : 'Phase (optional scope)' }}</label>
+                <select v-model="form.source_phase_id" class="field w-full" :required="form.duty === 'phase_admin'">
+                    <option value="">{{ form.duty === 'phase_admin' ? 'Select phase' : 'All phases in region' }}</option>
                     <option v-for="phase in phaseOptions" :key="phase.id" :value="phase.id">{{ phase.name }}</option>
                 </select>
             </div>
@@ -59,6 +59,9 @@
         </p>
         <p v-if="showHeadSelector && !heads.length" class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3 mb-4">
             Sync Event Heads under <strong>Setup hub → Event Heads</strong> before assigning coordinators.
+        </p>
+        <p v-if="form.duty === 'phase_admin' && !phaseOptions.length" class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3 mb-4">
+            This event has no regional phases configured yet — set one up under <strong>Phases</strong> before assigning a phase admin.
         </p>
         <p v-if="isSports" class="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-3 mb-4">
             Event Head coordinators enter marks and manage competition for their head (Athletics, Chess, …).

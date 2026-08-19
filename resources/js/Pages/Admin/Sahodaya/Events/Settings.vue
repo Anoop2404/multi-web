@@ -150,6 +150,7 @@ const props = defineProps({
     classGroups: Object,
     feeSchedule: Object,
     feeModels: Object,
+    feePresets: Object,
     classGroupLabels: Object,
     classGroupScheme: String,
     classGroupSchemeOptions: Object,
@@ -205,7 +206,7 @@ const activeCategory = computed(() => {
             { id: 'points', label: 'Rank Points Table', href: `${base.value}/settings/points` },
         ];
         if (isSports.value) sections.push({ id: 'eligibility', label: 'Age Cutoff Rules', href: `${base.value}/settings/eligibility` });
-        if (!isSports.value) sections.push({ id: 'grades', label: 'Grade Bands (A, B, C)', href: `${base.value}/settings/grades` });
+        if (!isSports.value) sections.push({ id: 'grades', label: 'Grade Master', href: `${base.value}/settings/grades` });
         if (!isSports.value) sections.push({ id: 'combo', label: 'Combo Rules', href: `${base.value}/settings/combo` });
         if (isSports.value) sections.push({ id: 'records', label: 'Meet Records', href: `${base.value}/settings/records` });
         return { title: '🏆 Scoring & Rules', sections };

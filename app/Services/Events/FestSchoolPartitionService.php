@@ -42,24 +42,61 @@ class FestSchoolPartitionService
                 return true;
             }
 
-            // For partition child events, only keep the child event assigned to this school's region
-            if ($event->parent_event_id && $this->partitions->partitionKey($event) !== null) {
-                $hubId = $event->parent_event_id;
+            // Reject any orphaned child events whose source phase was deleted
+            if ($event->source_phase_id && ! \App\Models\FestEventPhase::where('id', $event->source_phase_id)->exists()) {
+                return true;
+            }
 
-                if (! array_key_exists($hubId, $resolvedChildIdByHub)) {
-                    $hub = $event->parentEvent ?: FestEvent::find($hubId);
-                    $key = $hub ? $this->resolvePartitionKey($hub, $schoolId) : null;
-                    $child = ($hub && $key) ? $this->partitions->partitionByKey($hub, $key) : null;
-                    $resolvedChildIdByHub[$hubId] = $child?->id ?? false;
+            // For partition or phased regional child events, only keep the child event assigned to this school's region
+            if ($event->parent_event_id) {
+                $hub = $event->parentEvent ?: FestEvent::find($event->parent_event_id);
+
+                // Handle Phased Regional Billing workflow
+                if ($hub && $hub->usesPhasedRegionalBilling()) {
+                    $sourcePhase = $event->sourcePhase;
+                    if ($sourcePhase && $sourcePhase->isRegional()) {
+                        $selection = app(FestSchoolPhaseRegionService::class)->resolve($hub, $sourcePhase, $schoolId);
+                        if ($selection && $selection->region_id) {
+                            return (int) $event->region_id !== (int) $selection->region_id;
+                        }
+
+                        // If no region selected for this regional phase yet, keep 1 representative child event
+                        static $seenUnselectedPhases = [];
+                        $phaseGroupKey = $hub->id . ':phased_region:' . $sourcePhase->id;
+                        if (in_array($phaseGroupKey, $seenUnselectedPhases, true)) {
+                            return true;
+                        }
+                        $seenUnselectedPhases[] = $phaseGroupKey;
+
+                        return false;
+                    }
                 }
 
-                // If school belongs to a resolved region child, reject all sibling region children
-                if ($resolvedChildIdByHub[$hubId] !== false) {
-                    return $resolvedChildIdByHub[$hubId] !== $event->id;
-                }
+                if ($this->partitions->partitionKey($event) !== null) {
+                    $hubId = $event->parent_event_id;
 
-                // If no specific region key resolved for this school, keep partition child events so school can participate
-                return false;
+                    if (! array_key_exists($hubId, $resolvedChildIdByHub)) {
+                        $key = $hub ? $this->resolvePartitionKey($hub, $schoolId) : null;
+                        $child = ($hub && $key) ? $this->partitions->partitionByKey($hub, $key) : null;
+                        $resolvedChildIdByHub[$hubId] = $child?->id ?? false;
+                    }
+
+                    // If school belongs to a resolved region child, reject all sibling region children
+                    if ($resolvedChildIdByHub[$hubId] !== false) {
+                        return $resolvedChildIdByHub[$hubId] !== $event->id;
+                    }
+
+                    // If no specific region key resolved for this school yet, keep only 1 representative child event
+                    // per (parent_event_id, source_phase_id) to avoid flooding the table with duplicate region clones
+                    static $seenUnassignedGroups = [];
+                    $groupKey = $hubId . ':' . ($event->source_phase_id ?? 'default');
+                    if (in_array($groupKey, $seenUnassignedGroups, true)) {
+                        return true;
+                    }
+                    $seenUnassignedGroups[] = $groupKey;
+
+                    return false;
+                }
             }
 
             return false;

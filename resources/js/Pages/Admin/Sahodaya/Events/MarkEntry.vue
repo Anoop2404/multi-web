@@ -11,10 +11,10 @@
                         ← {{ isSports ? 'By Event Head' : 'By Item Head' }}
                     </Link>
                     <a :href="markEntrySheetUrl" target="_blank" class="btn-secondary text-xs !bg-indigo-50 !text-indigo-800 hover:!bg-indigo-100 font-bold border-indigo-200">
-                        🖨️ Mark Entry Sheet PDF
+                        🖨️ Print Blank Judge Sheets (Paper)
                     </a>
                     <a v-if="cumulativeSheetUrl" :href="cumulativeSheetUrl" target="_blank" class="btn-secondary text-xs">
-                        Digital Sum Sheet ↓
+                        📊 Digital Sum Sheet (Online Tabulation)
                     </a>
                     <Link :href="importUrl" class="btn-primary text-xs">
                         Import Marks
@@ -71,20 +71,16 @@
                 </select>
             </div>
 
-            <!-- Item Pill Chips -->
-            <div v-if="itemOptions.length > 1" class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex flex-wrap items-center gap-1.5 text-xs">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Item:</span>
-                    <button v-for="it in itemOptions" :key="it.id" type="button" @click="selectItem(it.id)"
-                            :class="selectedItemId == it.id
-                                ? 'bg-slate-900 text-white font-bold shadow-sm'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-semibold'"
-                            class="px-3.5 py-1.5 rounded-full transition whitespace-nowrap">
-                        {{ it.title }}
-                    </button>
-                </div>
+            <!-- Item Picker -->
+            <div v-if="itemOptions.length > 1" class="space-y-3">
+                <ReportHeadSubNav :head-item-groups="headItemGroups" :base-url="marksBaseUrl"
+                                  :selected-head-id="selectedHeadId" :selected-item-id="selectedItemId"
+                                  :show-item-links="true" :preserve-state="false" :status-for="itemConfiguredMark" />
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center justify-end gap-3">
+                    <span class="text-[11px] text-slate-400">
+                        ✓ {{ configuredCountInView }}/{{ itemOptions.length }} items configured
+                    </span>
                     <button v-if="props.selectedItemId" type="button" class="btn-secondary text-xs !py-1.5 !px-3"
                             @click="showColumnConfig = !showColumnConfig">
                         {{ showColumnConfig ? 'Close Columns ✕' : '⚙️ Configure Columns' }}
@@ -108,6 +104,38 @@
                         1 = single evaluator, entered directly online. 2+ = each judge gets their own printed sheet,
                         plus a Sum Sheet, and you type each judge's paper subtotal into the table below.
                     </p>
+                </div>
+
+                <div class="flex items-center gap-3 pb-3">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        Copy from item
+                    </label>
+                    <div class="flex-1 max-w-sm">
+                        <ReportItemSearchSelect :items="copySourceOptions" :model-value="copyFromItemId"
+                                                all-items-label="Select an item to copy from"
+                                                search-placeholder="Search by item name or code…"
+                                                @select="(id) => { copyFromItemId = id; }" />
+                    </div>
+                    <button type="button" class="btn-secondary text-xs !py-1.5 !px-3 self-end"
+                            :disabled="!copyFromItemId || copyingCriteria" @click="copyCriteriaFromItem">
+                        {{ copyingCriteria ? 'Copying…' : 'Copy' }}
+                    </button>
+                </div>
+
+                <div v-if="rubricTemplates.length" class="flex items-center gap-3 pb-4 border-b border-slate-100">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        Apply template
+                    </label>
+                    <select v-model="applyTemplateId" class="field text-xs !py-1.5 flex-1 max-w-sm">
+                        <option value="">Select a rubric template…</option>
+                        <option v-for="t in rubricTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                    </select>
+                    <button type="button" class="btn-secondary text-xs !py-1.5 !px-3"
+                            :disabled="!applyTemplateId || applyingTemplate" @click="applyRubricTemplate">
+                        {{ applyingTemplate ? 'Applying…' : 'Apply' }}
+                    </button>
+                    <a :href="`/sahodaya-admin/${sahodaya.id}/scoring-rubric-templates`" target="_blank"
+                       class="text-[11px] text-indigo-600 hover:underline whitespace-nowrap">Manage templates ↗</a>
                 </div>
 
                 <div class="space-y-2">
@@ -306,10 +334,7 @@
                                 <td v-if="showGradeColumn" class="p-3.5">
                                     <select v-model="markForms[participant.id].grade" class="field text-xs" :disabled="isAbsent(participant, item)">
                                         <option value="">—</option>
-                                        <option>A</option>
-                                        <option>A+</option>
-                                        <option>B</option>
-                                        <option>C</option>
+                                        <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
                                     </select>
                                 </td>
 
@@ -342,6 +367,8 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import { useFestMarkEntryDisplay } from '@/composables/useFestMarkEntryDisplay.js';
 
 const props = defineProps({
@@ -359,6 +386,10 @@ const props = defineProps({
     rankPoints: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
     itemHeads: { type: Array, default: () => [] },
+    headItemGroups: { type: Array, default: () => [] },
+    configuredItemIds: { type: Array, default: () => [] },
+    rubricTemplates: { type: Array, default: () => [] },
+    gradeOptions: { type: Array, default: () => ['A+', 'A', 'B', 'C'] },
     initialItemCriteria: { type: Array, default: () => [] },
     criteria: { type: Array, default: () => [] },
     judgeCount: { type: Number, default: 1 },
@@ -371,11 +402,13 @@ const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${
 const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
 const isSports = computed(() => props.event?.event_type === 'sports');
 
-const showGradeToggle = ref(false);
-const showGradeColumn = computed(() => {
-    if (showGradeToggle.value) return true;
-    return props.event?.event_type === 'kalolsavam' || props.event?.event_type === 'fest';
-});
+// Grade is auto-computed from score (and stored) for any non-sports event, regardless of
+// event_type — previously this only showed for 'kalolsavam' (plus a dead 'fest' check that
+// never matched a real event_type), hiding the grade admins could see/correct on every other
+// event type. Matches Judge/MarkEntry.vue's existing `!isSports` condition.
+const showGradeColumn = computed(() => ! isSports.value);
+
+const marksBaseUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`);
 
 const markEntrySheetUrl = computed(() => {
     let url = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/mark-entry-sheet`;
@@ -402,16 +435,54 @@ const itemOptions = computed(() => {
     return items.filter((it) => String(it.head_id) === String(props.selectedHeadId));
 });
 
-function selectItem(id) {
-    const params = { item_id: id };
-    if (props.selectedHeadId != null) {
-        params.head_id = props.selectedHeadId;
-    }
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, params, { preserveScroll: true });
-}
-
 function switchSportEvent(evt) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/marks`);
+}
+
+function itemConfiguredMark(item) {
+    return (props.configuredItemIds ?? []).includes(item.id) ? '✓' : null;
+}
+
+const configuredCountInView = computed(() =>
+    itemOptions.value.filter((it) => (props.configuredItemIds ?? []).includes(it.id)).length
+);
+
+const copySourceOptions = computed(() => (props.event?.items ?? [])
+    .filter((it) => it.is_enabled !== false && String(it.id) !== String(props.selectedItemId)));
+const copyFromItemId = ref(null);
+const copyingCriteria = ref(false);
+
+function copyCriteriaFromItem() {
+    if (!copyFromItemId.value || !props.selectedItemId) return;
+    copyingCriteria.value = true;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria/copy`,
+        { source_item_id: copyFromItemId.value },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                copyingCriteria.value = false;
+            },
+        }
+    );
+}
+
+const applyTemplateId = ref('');
+const applyingTemplate = ref(false);
+
+function applyRubricTemplate() {
+    if (!applyTemplateId.value || !props.selectedItemId) return;
+    applyingTemplate.value = true;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria/apply-template`,
+        { template_id: applyTemplateId.value },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                applyingTemplate.value = false;
+            },
+        }
+    );
 }
 
 const displayCtx = useFestMarkEntryDisplay(props, isSports);

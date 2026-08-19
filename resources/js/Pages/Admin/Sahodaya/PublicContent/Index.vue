@@ -23,6 +23,64 @@
                 </label>
             </div>
 
+            <!-- Website Version Experience Selector -->
+            <div v-if="websiteEnabled" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="font-bold text-gray-900 flex items-center gap-2">
+                            <span>🌐 Website Design Version</span>
+                        </h2>
+                        <p class="text-sm text-gray-500 mt-1">
+                            Choose which public layout version is active for your Sahodaya portal visitors.
+                        </p>
+                    </div>
+                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold shrink-0"
+                          :class="form.experience_version === 'v2' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-800'">
+                        Active: {{ form.experience_version === 'v2' ? 'V2 Modern Layout' : 'V1 Classic Layout' }}
+                    </span>
+                </div>
+
+                <div class="grid sm:grid-cols-2 gap-4 pt-1">
+                    <!-- Option 1: Classic V1 -->
+                    <div @click="form.experience_version = 'v1'"
+                         :class="['p-4 rounded-xl border-2 transition cursor-pointer flex flex-col justify-between space-y-3',
+                                  form.experience_version === 'v1' ? 'border-indigo-600 bg-indigo-50/40 shadow-xs' : 'border-gray-200 bg-white hover:border-gray-300']">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                                    🏛️ Classic Website (V1)
+                                </span>
+                                <input type="radio" name="exp_ver" value="v1" :checked="form.experience_version === 'v1'" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <p class="text-xs text-slate-600">
+                                Standard traditional layout with basic hero header, about section, circulars list, and portal links.
+                            </p>
+                        </div>
+                        <span v-if="form.experience_version === 'v1'" class="text-[11px] font-bold text-indigo-700">✓ Currently Active</span>
+                        <span v-else class="text-[11px] font-semibold text-slate-400">Click to activate V1</span>
+                    </div>
+
+                    <!-- Option 2: Modern V2 -->
+                    <div @click="form.experience_version = 'v2'"
+                         :class="['p-4 rounded-xl border-2 transition cursor-pointer flex flex-col justify-between space-y-3',
+                                  form.experience_version === 'v2' ? 'border-indigo-600 bg-indigo-50/40 shadow-xs' : 'border-gray-200 bg-white hover:border-gray-300']">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                                    ✨ Modern Website (V2)
+                                </span>
+                                <input type="radio" name="exp_ver" value="v2" :checked="form.experience_version === 'v2'" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <p class="text-xs text-slate-600">
+                                Next-gen experience featuring seasonal action hubs, live event tickers, directory maps, and microsites.
+                            </p>
+                        </div>
+                        <span v-if="form.experience_version === 'v2'" class="text-[11px] font-bold text-indigo-700">✓ Currently Active</span>
+                        <span v-else class="text-[11px] font-semibold text-slate-400">Click to activate V2</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Save bar -->
             <div class="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3">
                 <div class="flex border-b-0 gap-1 flex-wrap">
@@ -229,6 +287,7 @@ const props = defineProps({
     pendingPaymentsCount:    { type: Number, default: 0 },
     content:                 Object,
     publicWebsiteEnabled:    { type: Boolean, default: true },
+    experienceVersion:       { type: String, default: 'v1' },
 });
 
 const publicSiteEnabled = ref(props.publicWebsiteEnabled ?? true);
@@ -250,6 +309,7 @@ const tabs = computed(() =>
 
 const form = useForm({
     ...props.content,
+    experience_version: props.experienceVersion ?? 'v1',
     announcements: props.content.announcements?.length ? [...props.content.announcements] : [],
     programmes:    [...(props.content.programmes ?? [])],
     years:         (props.content.years ?? []).map(y => ({ ...y, links: [...(y.links ?? [])] })),

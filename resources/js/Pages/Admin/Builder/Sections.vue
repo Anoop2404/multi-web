@@ -78,13 +78,8 @@
         </div>
 
         <!-- Edit / Add Modal -->
-        <div v-if="modal.open" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                <div class="p-6 border-b flex items-center justify-between">
-                    <h3 class="font-bold text-gray-900">{{ modal.editing ? 'Edit Section' : 'Add Section' }}</h3>
-                    <button @click="modal.open = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-                </div>
-                <form @submit.prevent="saveSection" class="p-6 space-y-4">
+        <Modal :show="modal.open" :title="modal.editing ? 'Edit Section' : 'Add Section'" size="lg" @close="modal.open = false">
+                <form id="section-form" @submit.prevent="saveSection" class="space-y-4">
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="form-label mb-1">Section Type</label>
@@ -128,20 +123,19 @@
                         <input type="checkbox" id="is_active" v-model="modal.form.is_active" class="rounded">
                         <label for="is_active" class="text-sm text-gray-600">Active (visible on site)</label>
                     </div>
-
-                    <div class="flex gap-3 pt-2">
-                        <button type="submit"
-                                class="btn-primary flex-1">
-                            {{ modal.editing ? 'Save Changes' : 'Add Section' }}
-                        </button>
-                        <button type="button" @click="modal.open = false"
-                                class="px-6 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
-                            Cancel
-                        </button>
-                    </div>
                 </form>
-            </div>
-        </div>
+            <template #footer>
+                <div class="flex gap-3">
+                    <button type="submit" form="section-form" class="btn-primary flex-1">
+                        {{ modal.editing ? 'Save Changes' : 'Add Section' }}
+                    </button>
+                    <button type="button" @click="modal.open = false"
+                            class="px-6 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                        Cancel
+                    </button>
+                </div>
+            </template>
+        </Modal>
     </AdminLayout>
 </template>
 

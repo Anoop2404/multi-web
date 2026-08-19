@@ -59,6 +59,64 @@
                 </label>
             </div>
 
+            <!-- Website Version Experience Selector Card -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="font-bold text-gray-900 flex items-center gap-2">
+                            <span>🌐 Website Design Version</span>
+                        </h2>
+                        <p class="text-sm text-gray-500 mt-1">
+                            Choose which public layout version is active for your Sahodaya portal visitors.
+                        </p>
+                    </div>
+                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold shrink-0"
+                          :class="activeExperienceVersion === 'v2' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-800'">
+                        Active: {{ activeExperienceVersion === 'v2' ? 'V2 Modern Layout' : 'V1 Classic Layout' }}
+                    </span>
+                </div>
+
+                <div class="grid sm:grid-cols-2 gap-4 pt-1">
+                    <!-- Option 1: Classic V1 -->
+                    <div @click="setExperienceVersion('v1')"
+                         :class="['p-4 rounded-xl border-2 transition cursor-pointer flex flex-col justify-between space-y-3',
+                                  activeExperienceVersion === 'v1' ? 'border-indigo-600 bg-indigo-50/40 shadow-xs' : 'border-gray-200 bg-white hover:border-gray-300']">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                                    🏛️ Classic Website (V1)
+                                </span>
+                                <input type="radio" name="sb_exp_ver" value="v1" :checked="activeExperienceVersion === 'v1'" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <p class="text-xs text-slate-600">
+                                Standard traditional layout with basic hero header, about section, circulars list, and portal links.
+                            </p>
+                        </div>
+                        <span v-if="activeExperienceVersion === 'v1'" class="text-[11px] font-bold text-indigo-700">✓ Currently Active</span>
+                        <span v-else class="text-[11px] font-semibold text-slate-400">Click to activate V1</span>
+                    </div>
+
+                    <!-- Option 2: Modern V2 -->
+                    <div @click="setExperienceVersion('v2')"
+                         :class="['p-4 rounded-xl border-2 transition cursor-pointer flex flex-col justify-between space-y-3',
+                                  activeExperienceVersion === 'v2' ? 'border-indigo-600 bg-indigo-50/40 shadow-xs' : 'border-gray-200 bg-white hover:border-gray-300']">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                                    ✨ Modern Website (V2)
+                                </span>
+                                <input type="radio" name="sb_exp_ver" value="v2" :checked="activeExperienceVersion === 'v2'" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <p class="text-xs text-slate-600">
+                                Next-gen experience featuring seasonal action hubs, live event tickers, directory maps, and microsites.
+                            </p>
+                        </div>
+                        <span v-if="activeExperienceVersion === 'v2'" class="text-[11px] font-bold text-indigo-700">✓ Currently Active</span>
+                        <span v-else class="text-[11px] font-semibold text-slate-400">Click to activate V2</span>
+                    </div>
+                </div>
+            </div>
+
             <div v-if="experienceDraft" class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white bg-gradient-to-r from-indigo-950 to-purple-800">
                 <div><p class="text-xs font-bold uppercase tracking-wider text-purple-200">Unpublished experience draft</p><h2 class="font-bold mt-1">{{ experienceName(experienceDraft.template_key) }}</h2><p class="text-sm text-white/75 mt-1">The live website is unchanged until you publish this draft.</p></div>
                 <div class="flex flex-wrap gap-2"><a :href="selectedPreviewUrl" target="_blank" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Preview draft ↗</a><button @click="cancelExperienceDraft" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Cancel draft</button><button @click="publishExperienceDraft" :disabled="experienceSaving || !readinessReport.ready" class="px-4 py-2 text-sm font-bold rounded-xl bg-amber-400 text-indigo-950 disabled:opacity-50">Publish experience</button></div>
@@ -348,6 +406,8 @@
                         <label class="text-xs font-bold text-gray-600">Motion<select v-model="designConfig.motion" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="none">None</option><option value="restrained">Restrained</option><option value="expressive">Expressive</option></select></label>
                         <label class="text-xs font-bold text-gray-600">Homepage mode<select v-model="designConfig.homepage_mode" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="evergreen">Evergreen</option><option value="registration_open">Registration open</option><option value="event_live">Event live</option><option value="results_published">Results published</option></select></label>
                         <label class="text-xs font-bold text-gray-600">Manual mode expires<input v-model="designConfig.homepage_mode_override_until" type="datetime-local" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><span class="block mt-1 font-normal text-gray-400">Leave blank to follow ERP event status.</span></label>
+                        <label class="text-xs font-bold text-gray-600">Navigation layout<select v-model="designConfig.navigation" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="directory">Directory (logo left)</option><option value="event">Event (dark)</option><option value="editorial">Editorial (centered)</option><option value="institutional">Institutional (pill)</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Footer layout<select v-model="designConfig.footer" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="directory">Directory (four column)</option><option value="event">Event (minimal row)</option><option value="editorial">Editorial (two column)</option><option value="institutional">Institutional (three column)</option></select></label>
                     </div>
 
                     <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
@@ -536,17 +596,9 @@
         </div>
 
         <!-- Add section modal -->
-        <Teleport to="body">
-            <div v-if="addModal.open" class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
-                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <div class="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between z-10">
-                        <h3 class="font-bold text-gray-900 text-lg">Add Section</h3>
-                        <button @click="addModal.open = false"
-                                class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition text-gray-400 text-xl">×</button>
-                    </div>
-
+        <Modal :show="addModal.open" title="Add Section" size="lg" @close="addModal.open = false">
                     <!-- Section type grid -->
-                    <div class="p-6 space-y-5">
+                    <div class="space-y-5">
                         <div v-if="!addModal.selectedType">
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Choose a section type</p>
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -598,9 +650,7 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </Teleport>
+        </Modal>
     </SahodayaAdminLayout>
 </template>
 
@@ -681,6 +731,29 @@ const footerSaved = ref(false);
 const portalSaving = ref(false);
 const publicWebsiteEnabled = ref(props.publicWebsiteEnabled ?? true);
 const publicWebsiteSaving = ref(false);
+const activeExperienceVersion = ref(props.currentSite?.experience_version ?? 'v1');
+const experienceVersionSaving = ref(false);
+
+async function setExperienceVersion(version) {
+    if (!props.currentSite?.id || experienceVersionSaving.value) return;
+    experienceVersionSaving.value = true;
+    try {
+        const res = await apiPost('/site-builder/api/experience-version', {
+            site_id: props.currentSite.id,
+            experience_version: version,
+        });
+        if (res.saved) {
+            activeExperienceVersion.value = version;
+            if (props.currentSite) {
+                props.currentSite.experience_version = version;
+            }
+        }
+    } catch (e) {
+        console.error('Failed to set experience version:', e);
+    } finally {
+        experienceVersionSaving.value = false;
+    }
+}
 const defaultNavSaving = ref(false);
 const ckscTemplateSaving = ref(false);
 const themeSaving = ref(false);
@@ -736,6 +809,7 @@ const iconMap = {
     statistics: '📊', programmes: '🎓', academic_quicklinks: '🔗', downloads_sahodaya: '📥',
     circulars: '📄', testimonials_sahodaya: '💬', useful_links: '🌐', gallery: '🖼',
     contact: '📞', newsletter: '📧', sahodaya_home: '🏠',
+    faq: '❓', sponsors: '🤝', awards: '🏵️', membership_cta: '📝', video_gallery: '🎬',
 };
 const colorMap = {
     hero: '#f3f0ff', about_sahodaya: '#f0fdf4', office_bearers: '#fdf4ff',
@@ -743,11 +817,16 @@ const colorMap = {
     kalotsav: '#fdf4ff', sports_meet: '#f0fdfa', statistics: '#eff6ff',
     programmes: '#faf5ff', circulars: '#fefce8', contact: '#f0fdf4',
     newsletter: '#fdf2f8', gallery: '#f5f3ff',
+    faq: '#eef2ff', sponsors: '#fff7ed', awards: '#fefce8', membership_cta: '#ecfdf5', video_gallery: '#fef2f2',
+};
+const labelOverrides = {
+    faq: 'FAQ', membership_cta: 'Membership / Join Us', video_gallery: 'Video Gallery',
 };
 
 function sectionIcon(type)  { return iconMap[type] ?? '⚡'; }
 function sectionColor(type) { return colorMap[type] ?? '#f9fafb'; }
 function sectionTypeLabel(type) {
+    if (labelOverrides[type]) return labelOverrides[type];
     return (type ?? '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 function variantsFor(type) { return props.sectionTypes[type] ?? []; }

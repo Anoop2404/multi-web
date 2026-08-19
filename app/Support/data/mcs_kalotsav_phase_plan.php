@@ -14,15 +14,17 @@ return [
     'tenant_id' => 'REPLACE_WITH_MCS_SAHODAYA_TENANT_ID',
 
     'batches' => [
-        ['code' => 'LEVEL_1', 'name' => 'Level 1 -- Digi Fest & Off Stage', 'school_base_fee' => 4000, 'sort_order' => 1],
-        ['code' => 'LEVEL_2', 'name' => 'Level 2 -- Sargadhara & District Kalotsav', 'school_base_fee' => 0, 'sort_order' => 2],
+        ['code' => 'DIGI', 'name' => 'Digi Fest', 'school_base_fee' => 4000, 'sort_order' => 1],
+        ['code' => 'OFF_STAGE', 'name' => 'Off Stage', 'school_base_fee' => 0, 'sort_order' => 2],
+        ['code' => 'SARGADHARA', 'name' => 'Sargadhara', 'school_base_fee' => 0, 'sort_order' => 3],
+        ['code' => 'DISTRICT', 'name' => 'District Kalotsav', 'school_base_fee' => 0, 'sort_order' => 4],
     ],
 
     'phases' => [
         [
             'code' => 'DIGI',
             'name' => 'Digi Fest',
-            'batch_code' => 'LEVEL_1',
+            'batch_code' => 'DIGI',
             'is_regional' => false,
             'region_codes' => [],
             'sort_order' => 1,
@@ -30,7 +32,7 @@ return [
         [
             'code' => 'OFF_STAGE',
             'name' => 'Off Stage',
-            'batch_code' => 'LEVEL_1',
+            'batch_code' => 'OFF_STAGE',
             'is_regional' => true,
             // e.g. ['NILAMBUR', 'TIRUR']
             'region_codes' => [],
@@ -39,7 +41,7 @@ return [
         [
             'code' => 'SARGADHARA',
             'name' => 'Sargadhara',
-            'batch_code' => 'LEVEL_2',
+            'batch_code' => 'SARGADHARA',
             'is_regional' => true,
             // Independent of OFF_STAGE's list -- may overlap, need not match. e.g. ['TIRUR', 'MANJERI']
             'region_codes' => [],
@@ -48,7 +50,7 @@ return [
         [
             'code' => 'DISTRICT',
             'name' => 'District Kalotsav',
-            'batch_code' => 'LEVEL_2',
+            'batch_code' => 'DISTRICT',
             'is_regional' => false,
             'region_codes' => [],
             'sort_order' => 4,

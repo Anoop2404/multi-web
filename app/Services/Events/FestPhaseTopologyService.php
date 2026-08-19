@@ -35,6 +35,14 @@ class FestPhaseTopologyService
                 }
             }
 
+            $validLeafIds = $leaves->pluck('id')->filter()->all();
+
+            // Prune obsolete child events under this root whose phase/region was deleted
+            FestEvent::where('parent_event_id', $root->id)
+                ->whereNotIn('id', $validLeafIds)
+                ->whereDoesntHave('registrations')
+                ->delete();
+
             return $leaves->values();
         });
     }

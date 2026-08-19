@@ -84,7 +84,7 @@ class FestFoodMenuController extends SahodayaAdminController
             'food_host_school_id' => [
                 Rule::requiredIf($request->input('food_payee_type') === 'host_school'),
                 'nullable',
-                Rule::exists('tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
+                Rule::exists(Tenant::class, 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
             ],
             'require_payment_for_coupons' => ['nullable', 'boolean'],
         ]);

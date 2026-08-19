@@ -141,7 +141,7 @@ class FestFoodBillingController extends SahodayaAdminController
         $data = $request->validate([
             'school_id' => [
                 'required',
-                Rule::exists('tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
+                Rule::exists(Tenant::class, 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
             ],
         ]);
 

@@ -782,6 +782,51 @@ class FestSchoolEventFeeService
     }
 
     /**
+     * Pulls one phase's share out of a whole-event composite calculation already computed
+     * once, unfiltered, by FestSportsCompositeFeeService::calculate() (see its
+     * phase_attribution return key) — the per-student fee and item-quota mechanic are
+     * computed ONCE across the whole event, never reset per phase, and only attributed to
+     * individual phases here, for display/invoicing.
+     *
+     * @return array{student_reg_amount: float, student_reg_count: int, extra_item_amount: float, lines: list<array>}
+     */
+    private function compositeAttributionForPhase(array $composite, FestEventPhase $phase): array
+    {
+        $attribution = $composite['phase_attribution'] ?? [];
+        $perStudentRate = (float) ($attribution['per_student_rate'] ?? 0.0);
+        $studentBucket = $attribution['student_reg']['by_phase'][$phase->id] ?? ['amount' => 0.0, 'student_count' => 0];
+        $studentRegAmount = round((float) ($studentBucket['amount'] ?? 0), 2);
+        $studentRegCount = (int) ($studentBucket['student_count'] ?? 0);
+        $extraItemAmount = round((float) ($attribution['extra_item']['by_phase'][$phase->id] ?? 0.0), 2);
+
+        $lines = [];
+        if ($studentRegAmount > 0) {
+            $lines[] = [
+                'line_type' => 'student_reg',
+                'label' => "Student registration ({$phase->name}) — {$studentRegCount} × ₹".number_format($perStudentRate, 0),
+                'quantity' => $studentRegCount,
+                'unit_amount' => $perStudentRate,
+                'amount' => $studentRegAmount,
+                'meta' => ['event_id' => $phase->event_id, 'phase_id' => $phase->id],
+            ];
+        }
+
+        foreach ($composite['lines'] ?? [] as $line) {
+            if (in_array($line['line_type'] ?? null, ['item_fee', 'extra_item'], true)
+                && ($line['meta']['phase_id'] ?? null) === $phase->id) {
+                $lines[] = $line;
+            }
+        }
+
+        return [
+            'student_reg_amount' => $studentRegAmount,
+            'student_reg_count' => $studentRegCount,
+            'extra_item_amount' => $extraItemAmount,
+            'lines' => $lines,
+        ];
+    }
+
+    /**
      * Recalculate (and persist) the fee record for one specific named Phase for one school.
      * Independently payable via attachPaymentForPhase() — no gating between phases (confirmed
      * 2026-08-15, see plan doc §3 item 7): a school can register/pay a later phase without
@@ -807,20 +852,51 @@ class FestSchoolEventFeeService
         // a flat fee on one phase (e.g. MCS: full amount on "Level 1", 0 on "Level 2") and a
         // split across phases (e.g. half on each), purely by how shares are configured. Only
         // charged once this phase actually has registered activity, same guard the event-wide
-        // recalculate() already applies for its own school registration fee.
+        // recalculate() already applies for its own school registration fee. Unchanged for
+        // kalolsavam_composite/sports_composite too — that model's own school-fee component is
+        // deliberately not used here; the phase share is the single source of truth for the
+        // school-level amount regardless of fee model.
         $schoolRegFee = $hasActivity ? (float) ($phase->school_registration_fee_share ?? 0) : 0.0;
 
-        $participationFee = match ($feeModel) {
-            'item_catalog' => $this->itemFeeResolver->participationTotal($event, $schoolId, $schedule, $phase->id),
-            'cksc_tiered' => $this->participationFee($itemCount, $schedule),
-            'per_item' => $itemCount * (float) ($schedule['per_item_amount'] ?? 0),
-            'per_student' => $studentCount * (float) ($schedule['per_student_amount'] ?? 0),
-            'student_count_slab' => $this->studentCountSlabFee($studentCount, $schedule),
-            // flat_school and sports_composite aren't part of per-phase billing today — a
-            // flat-school event has nothing to split by phase (see plan doc's "Explicitly not
-            // changing" note), and sports never reaches usesPerPhaseBilling() at all.
-            default => 0.0,
-        };
+        $useComposite = in_array($feeModel, ['sports_composite', 'kalolsavam_composite'], true)
+            && $this->supportsSportsCompositeSchema();
+
+        $studentRegFee = 0.0;
+        $extraItemFee = 0.0;
+        $compositeLines = [];
+        $participationCount = $itemCount;
+
+        if ($useComposite) {
+            // Computed once, unfiltered, across the WHOLE event — never reset per phase — so
+            // the included-item quota and per-student fee apply once per student for the
+            // event, not once per phase. compositeAttributionForPhase() above pulls this
+            // phase's share back out.
+            $composite = $this->sportsCompositeFeeService->calculate($event, $schoolId, $schedule);
+            $attribution = $this->compositeAttributionForPhase($composite, $phase);
+
+            $studentRegFee = $attribution['student_reg_amount'];
+            $extraItemFee = $attribution['extra_item_amount'];
+            $participationFee = round($studentRegFee + $extraItemFee, 2);
+            $participationCount = $attribution['student_reg_count'];
+            $compositeLines = $attribution['lines'];
+        } else {
+            $participationFee = match ($feeModel) {
+                'item_catalog' => $this->itemFeeResolver->participationTotal($event, $schoolId, $schedule, $phase->id),
+                'cksc_tiered' => $this->participationFee($itemCount, $schedule),
+                'per_item' => $itemCount * (float) ($schedule['per_item_amount'] ?? 0),
+                'per_student' => $studentCount * (float) ($schedule['per_student_amount'] ?? 0),
+                'student_count_slab' => $this->studentCountSlabFee($studentCount, $schedule)
+                    + ($studentCount * (float) ($schedule['per_student_amount'] ?? 0)),
+                // flat_school isn't part of per-phase billing today — a flat-school event has
+                // nothing to split by phase (see plan doc's "Explicitly not changing" note).
+                default => 0.0,
+            };
+
+            $participationCount = match ($feeModel) {
+                'per_student', 'student_count_slab' => $studentCount,
+                default => $itemCount,
+            };
+        }
 
         $total = round($schoolRegFee + $participationFee, 2);
 
@@ -830,16 +906,24 @@ class FestSchoolEventFeeService
             'phase_id' => $phase->id,
         ]);
 
-        $record->fill([
+        $record->fill(array_filter([
             'school_registration_fee' => $schoolRegFee,
-            'participation_item_count' => $itemCount,
+            'student_registration_fee' => $this->supportsSportsCompositeSchema() ? $studentRegFee : null,
+            'participation_item_count' => $participationCount,
             'participation_fee' => $participationFee,
+            'extra_item_fee' => $this->supportsSportsCompositeSchema() ? $extraItemFee : null,
             'total_due' => $total,
-        ]);
+        ], fn ($value) => $value !== null));
         $record->save();
 
         $record->refreshPaidState();
         $this->applyAvailableCredit($record, $event);
+
+        if ($useComposite && $this->supportsFeeLines()) {
+            $this->syncFeeLines($record, $compositeLines);
+        } elseif ($this->supportsFeeLines()) {
+            $record->lines()->delete();
+        }
 
         return $record;
     }
@@ -1000,7 +1084,7 @@ class FestSchoolEventFeeService
 
         $schoolRegFee = match ($feeModel) {
             'sports_composite', 'kalolsavam_composite' => $this->sportsCompositeFeeService->schoolRegistrationAmount($school, $schedule),
-            'cksc_tiered', 'item_catalog' => $hasAnyRegistration ? $this->schoolRegistrationAmount($school, $schedule) : 0.0,
+            'cksc_tiered', 'item_catalog', 'per_student', 'per_item', 'student_count_slab' => $hasAnyRegistration ? $this->schoolRegistrationAmount($school, $schedule) : 0.0,
             default => 0,
         };
 
@@ -1029,7 +1113,7 @@ class FestSchoolEventFeeService
                 'per_item' => $itemCount * (float) ($schedule['per_item_amount'] ?? 0),
                 'flat_school' => (float) ($schedule['flat_amount'] ?? $schedule['fee_amount'] ?? 0),
                 'per_student' => $studentCount * (float) ($schedule['per_student_amount'] ?? 0),
-                'student_count_slab' => $this->studentCountSlabFee($studentCount, $schedule),
+                'student_count_slab' => $this->studentCountSlabFee($studentCount, $schedule) + ($studentCount * (float) ($schedule['per_student_amount'] ?? 0)),
                 default => 0,
             };
 

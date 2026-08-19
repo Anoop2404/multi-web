@@ -20,7 +20,7 @@
             </div>
 
             <div v-if="!classes.length || !subjects.length" class="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-xs font-medium text-amber-900 leading-relaxed">
-                ⚠️ Your teacher profile needs at least one subject and class assigned before uploading papers. Contact your school administrator to update your profile.
+                ⚠️ Your school hasn't set up any {{ !classes.length ? 'classes' : 'subjects' }} yet, so there's nothing to select. Contact your school administrator.
             </div>
 
             <form @submit.prevent="uploadPaper" class="grid sm:grid-cols-2 gap-4" enctype="multipart/form-data">

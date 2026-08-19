@@ -107,7 +107,14 @@ class FestSchoolPhaseRegionService
 
     public function lockForRegistration(FestEvent $event, FestEventPhase $phase, string $schoolId): void
     {
-        $selection = $this->requireSelection($event, $phase, $schoolId);
+        $sourcePhaseId = $phase->source_phase_id ?: $phase->id;
+        $sourcePhase = $phase->source_phase_id ? FestEventPhase::find($sourcePhaseId) : $phase;
+
+        if (! $sourcePhase || ! $sourcePhase->isRegional()) {
+            return;
+        }
+
+        $selection = $this->requireSelection($event, $sourcePhase, $schoolId);
         if (! $selection->locked_at) {
             $selection->update(['locked_at' => now()]);
         }
