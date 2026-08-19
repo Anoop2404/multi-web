@@ -275,7 +275,7 @@
                     </div>
                     <div class="flex justify-end gap-2 pt-2">
                         <button type="button" class="btn-secondary text-xs" @click="showCreateForm = false">Cancel</button>
-                        <button type="submit" class="btn-primary text-xs" :disabled="form.processing || breakdownExceedsTotal">
+                        <button type="submit" class="btn-primary text-xs" :disabled="form.processing">
                             {{ form.processing ? 'Creating...' : `Create ${program.label} Event` }}
                         </button>
                     </div>
@@ -496,12 +496,6 @@ const breakdownSum = computed(() => (
     (Number(form.max_onstage_per_student) || 0)
     + (Number(form.max_offstage_per_student) || 0)
     + (Number(form.max_group_per_student) || 0)
-));
-
-const breakdownExceedsTotal = computed(() => (
-    form.max_total_per_student !== null
-    && form.max_total_per_student !== ''
-    && breakdownSum.value > Number(form.max_total_per_student)
 ));
 
 const selectableLevelLabels = computed(() => {

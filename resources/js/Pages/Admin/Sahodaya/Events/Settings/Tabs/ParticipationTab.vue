@@ -21,8 +21,8 @@
                         <input v-model.number="policyForm.max_group_per_student" type="number" min="0" class="field" placeholder="0">
                     </FormField>
                 </FormGrid>
-                <p v-if="breakdownExceedsTotal" class="text-xs text-rose-600">
-                    On-stage + off-stage individual items ({{ breakdownSum }}) exceeds the total per-student limit ({{ policyForm.max_total_per_student }}).
+                <p class="text-xs text-slate-500 mt-1">
+                    Each limit is enforced independently during student registration. Leave a field blank or 0 for no limit.
                 </p>
             </FormSection>
 
@@ -53,26 +53,15 @@
                     </FormField>
                 </FormGrid>
                 <FormActions>
-                    <button type="button" @click="savePolicy" class="btn-primary" :disabled="policyForm.processing || breakdownExceedsTotal">Save policy</button>
+                    <button type="button" @click="savePolicy" class="btn-primary" :disabled="policyForm.processing">Save policy</button>
                 </FormActions>
             </FormSection>
     </div>
 </template>
 
 <script setup>
-import { computed, inject } from 'vue';
+import { inject } from 'vue';
 
 const { policyForm, participationPresets, savePolicy } = inject('eventSettings');
-
-const breakdownSum = computed(() => (
-    (Number(policyForm.max_onstage_per_student) || 0)
-    + (Number(policyForm.max_offstage_per_student) || 0)
-));
-
-const breakdownExceedsTotal = computed(() => (
-    policyForm.max_total_per_student !== null
-    && policyForm.max_total_per_student !== ''
-    && breakdownSum.value > Number(policyForm.max_total_per_student)
-));
 </script>
 
