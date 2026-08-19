@@ -466,7 +466,7 @@ export function schoolCoordinatorScopeHref(schoolId, scope) {
 
     const prefix = SLUG_TO_PREFIX[slug] ?? slug;
     if (scope.scope_type === 'fest_event' && scope.event_id) {
-        return `${schoolAdminHref(schoolId, prefix)}/events/${scope.event_id}/overview`;
+        return `${schoolAdminHref(schoolId, prefix)}/events/${scope.event_id}/registration`;
     }
 
     return `${schoolAdminHref(schoolId, prefix)}/registration`;

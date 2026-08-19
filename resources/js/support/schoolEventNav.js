@@ -94,9 +94,7 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
         ? [{ label: '← My assignments', href: `/school-admin/${schoolId}`, icon: 'grid', exact: true }]
         : [{ label: 'Dashboard', href: `/school-admin/${schoolId}`, icon: 'grid', exact: true }];
 
-    const workflowItems = [
-        { label: 'Event overview', href: `${eventBase}/overview`, icon: 'grid', exact: true },
-    ];
+    const workflowItems = [];
 
     // Every fest type gets the same 3-step flow now — Event Registration (issues the
     // student's event-level Fest ID, feeds the per-student billing line) → Item
@@ -163,7 +161,7 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
                 .slice(0, 5)
                 .map((ev) => ({
                     label: ev.title,
-                    href: `${schoolEventBase(schoolId, prefix, ev.id)}/overview`,
+                    href: `${schoolEventBase(schoolId, prefix, ev.id)}/registration`,
                     icon: 'layers',
                 })),
         });

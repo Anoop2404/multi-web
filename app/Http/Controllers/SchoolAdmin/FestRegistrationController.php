@@ -322,16 +322,14 @@ class FestRegistrationController extends SchoolAdminController
         $meta = SchoolFestProgram::meta($program);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        if ($redirect = $this->redirectHubToSchoolPartition($request, $event, $tenantId, $meta['slug'], 'overview')) {
+        if ($redirect = $this->redirectHubToSchoolPartition($request, $event, $tenantId, $meta['slug'], 'registration')) {
             return $redirect;
         }
 
         $event = $this->resolveSchoolFestEvent($request, $event, $meta['slug']);
+        $prefix = $meta['prefix'] ?? 'kalotsav';
 
-        return $this->inertia('School/Events/EventOverview', array_merge(
-            $this->schoolFestEventNavProps($event, $meta['slug']),
-            ['stats' => $this->schoolFestEventOverviewStats($event)],
-        ));
+        return redirect("/school-admin/{$tenantId}/{$prefix}/events/{$event->id}/registration");
     }
 
     public function eventRegistration(Request $request, string $tenantId, FestEvent $event, string $program = 'kalotsav')

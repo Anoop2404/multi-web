@@ -512,6 +512,8 @@ class FestEventController extends SahodayaAdminController
 
         $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.items.bulk_caps_updated', "Bulk updated limit caps for {$updatedCount} item(s)");
 
+        $this->syncItemToExistingPartitions($event);
+
         return back()->with('success', "Updated limit caps for {$updatedCount} item(s).");
     }
 

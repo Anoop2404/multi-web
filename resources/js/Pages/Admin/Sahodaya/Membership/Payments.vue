@@ -72,7 +72,9 @@
                    class="ml-auto inline-flex items-center px-4 py-2.5 rounded-xl bg-[#eff6ff] hover:bg-[#dbeafe] text-[#0f3d7a] border border-[#bfdbfe] text-sm font-semibold transition">
                     Download Excel ↓
                 </a>
-                      <!-- Payments list -->
+            </div>
+
+            <!-- Payments list -->
             <div v-if="(activeStatus === 'payment-due' || activeStatus === 'no-proof' || activeStatus === 'partial') && paymentDue?.data?.length" class="space-y-4">
                 <div v-for="r in paymentDue.data" :key="r.id ?? r.school_id"
                      class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -161,7 +163,6 @@
                         </div>
                     </div>
                 </div>
-            </div>                </div>
             </div>
 
             <div v-else-if="payments.data?.length" class="space-y-4">

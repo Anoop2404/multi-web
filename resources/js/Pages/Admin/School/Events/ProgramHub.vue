@@ -185,7 +185,7 @@
                         <td class="text-xs">{{ ev.level_label }}</td>
                         <td>{{ ev.registrations_count }}</td>
                         <td class="text-right">
-                            <Link :href="`${programBase}/events/${ev.id}/overview`" class="link-brand text-xs">Open event →</Link>
+                            <Link :href="`${programBase}/events/${ev.id}/registration`" class="link-brand text-xs">Open event →</Link>
                         </td>
                     </tr>
                 </tbody>

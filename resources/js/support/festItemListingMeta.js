@@ -66,18 +66,21 @@ export function festItemListingDetails(item, { taxonomy = {}, eventType = 'custo
         value: item.fee_amount != null && item.fee_amount !== '' ? `₹${item.fee_amount}` : 'Default',
     });
 
-    const squadParts = [];
-    if (criteria.min_playing != null) squadParts.push(`min on field ${criteria.min_playing}`);
-    if (criteria.max_subs != null) squadParts.push(`max subs ${criteria.max_subs}`);
-    if (criteria.max_squad != null) squadParts.push(`max squad ${criteria.max_squad}`);
-    if (criteria.min_squad != null) squadParts.push(`min squad ${criteria.min_squad}`);
-    if (criteria.standbys != null) squadParts.push(`standbys ${criteria.standbys}`);
-    if (item.min_group_size != null) squadParts.push(`min members ${item.min_group_size}`);
-    if (item.max_group_size != null) squadParts.push(`max members ${item.max_group_size}`);
-    if (item.squad_summary) {
-        fields.push({ label: 'Squad rules', value: item.squad_summary });
-    } else if (squadParts.length) {
-        fields.push({ label: 'Squad rules', value: squadParts.join(', ') });
+    const isMultiPerson = ['team', 'group', 'pair', 'trio'].includes(item.participant_type);
+    if (isMultiPerson) {
+        const squadParts = [];
+        if (criteria.min_playing != null) squadParts.push(`min on field ${criteria.min_playing}`);
+        if (criteria.max_subs != null) squadParts.push(`max subs ${criteria.max_subs}`);
+        if (criteria.max_squad != null) squadParts.push(`max squad ${criteria.max_squad}`);
+        if (criteria.min_squad != null) squadParts.push(`min squad ${criteria.min_squad}`);
+        if (criteria.standbys != null) squadParts.push(`standbys ${criteria.standbys}`);
+        if (item.min_group_size != null) squadParts.push(`min members ${item.min_group_size}`);
+        if (item.max_group_size != null) squadParts.push(`max members ${item.max_group_size}`);
+        if (item.squad_summary) {
+            fields.push({ label: 'Squad rules', value: item.squad_summary });
+        } else if (squadParts.length) {
+            fields.push({ label: 'Squad rules', value: squadParts.join(', ') });
+        }
     }
 
     if (item.item_code) {

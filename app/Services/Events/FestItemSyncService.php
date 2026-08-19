@@ -265,6 +265,7 @@ class FestItemSyncService
                 'kids_band'          => $item->kids_band,
                 'min_group_size'     => $item->min_group_size,
                 'max_group_size'     => $item->max_group_size,
+                'max_per_school'     => $this->maxPerSchoolForPartition($item, $partitionRole),
                 'qualify_count'      => $item->qualify_count,
                 'is_mandatory'       => $item->is_mandatory,
                 'quota_eligible'     => $item->quota_eligible,

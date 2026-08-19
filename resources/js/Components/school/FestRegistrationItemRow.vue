@@ -4,6 +4,10 @@
         <td class="px-3 py-2.5 align-middle">
             <div class="flex flex-wrap items-center gap-1.5">
                 <p class="font-medium text-slate-900 text-sm leading-snug">{{ displayTitle }}</p>
+                <span v-if="item.item_code"
+                      class="inline-flex shrink-0 text-[10px] font-mono font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                    CODE: {{ item.item_code }}
+                </span>
                 <span v-if="statusLabel"
                       class="inline-flex shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border"
                       :class="statusClass">
@@ -95,6 +99,10 @@
         <td class="px-3 py-2">
             <div class="flex flex-wrap items-center gap-1.5">
                 <p class="font-medium text-gray-900 text-sm">{{ displayTitle }}</p>
+                <span v-if="item.item_code"
+                      class="inline-flex shrink-0 text-[10px] font-mono font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                    CODE: {{ item.item_code }}
+                </span>
                 <span class="inline-flex shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border"
                       :class="competitionTypeBadge.class">
                     {{ competitionTypeBadge.label }}
