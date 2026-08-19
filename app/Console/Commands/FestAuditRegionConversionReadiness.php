@@ -178,6 +178,13 @@ class FestAuditRegionConversionReadiness extends Command
                     'item_code' => $item->item_code,
                     'title' => $item->title,
                     'category' => $item->category,
+                    // class_group (Category 1/2/3…, i.e. the age/class band) and gender are
+                    // real eligibility dimensions, not display noise — the same item title
+                    // legitimately repeats once per class_group and/or once per gender, so
+                    // without these two a same-titled row looks like a duplicate when it may
+                    // not be one at all.
+                    'class_group' => $item->class_group,
+                    'gender' => $item->gender,
                     'stage_type' => $item->stage_type,
                     'registrations' => $registrationIds->count(),
                     'participants' => FestParticipant::whereIn('registration_id', $registrationIds)->count(),
@@ -186,7 +193,10 @@ class FestAuditRegionConversionReadiness extends Command
             }
         }
 
-        return $rows->sortBy('item_code')->values()->all();
+        // Grouped by title first (then code/region) so every row sharing a title sits
+        // together — the fastest way to eyeball "different class_group/gender, so a real
+        // separate item" versus "everything matches, so an actual duplicate."
+        return $rows->sortBy([['title', 'asc'], ['item_code', 'asc'], ['region', 'asc']])->values()->all();
     }
 
     private function output(array $report, string $format): void
@@ -223,9 +233,9 @@ class FestAuditRegionConversionReadiness extends Command
             $this->newLine();
             $this->info(count($report['items']).' item row(s) across legacy region children — use item_code + these counts to build item_phase_map:');
             $this->table(
-                ['Item code', 'Title', 'Category', 'Stage', 'Region event', 'Regs', 'Participants', 'Chest #s issued'],
+                ['Item code', 'Title', 'Genre', 'Class group', 'Gender', 'Stage', 'Region event', 'Regs', 'Participants', 'Chest #s issued'],
                 collect($report['items'])->map(fn ($i) => [
-                    $i['item_code'], $i['title'], $i['category'] ?? '—', $i['stage_type'] ?? '—',
+                    $i['item_code'], $i['title'], $i['category'] ?? '—', $i['class_group'] ?? '—', $i['gender'] ?? '—', $i['stage_type'] ?? '—',
                     $i['child_event_id'], $i['registrations'], $i['participants'], $i['chest_numbers_issued'],
                 ])->all()
             );
