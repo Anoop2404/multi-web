@@ -7,9 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FestEventItem extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'event_id', 'title', 'item_code', 'category', 'stage_type', 'venue_type',
         'competition_format', 'sport_discipline', 'ranking_direction', 'result_method', 'duration_minutes', 'criteria_json', 'total_marks',

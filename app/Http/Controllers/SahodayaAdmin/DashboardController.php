@@ -49,6 +49,14 @@ class DashboardController extends SahodayaAdminController
         $activeStatuses = ['published', 'registration_open', 'ongoing'];
         $festEventIds = FestEvent::where('tenant_id', $this->sahodaya->id)->pluck('id');
 
+        // Event/region/phase-scoped admins (region_admin etc.) only get counts for their own
+        // event(s) here — otherwise every fest widget below (active fests, registrations,
+        // appeals, fee proofs) showed Sahodaya-wide numbers regardless of what they're
+        // actually scoped to.
+        if (($scopedEventIds = $this->scopedFestEventIds()) !== null) {
+            $festEventIds = $festEventIds->intersect($scopedEventIds)->values();
+        }
+
         $actionQueue = array_filter([
             'pending_school_applications' => Tenant::query()
                 ->where('parent_id', $this->sahodaya->id)
@@ -121,7 +129,7 @@ class DashboardController extends SahodayaAdminController
             'office_bearers'     => OfficeBearers::where('tenant_id', $this->sahodaya->id)->count(),
             'circulars'          => Circular::where('tenant_id', $this->sahodaya->id)->count(),
             'fest_events'        => $festEventIds->count(),
-            'active_fest_events' => FestEvent::where('tenant_id', $this->sahodaya->id)
+            'active_fest_events' => FestEvent::whereIn('id', $festEventIds)
                 ->whereIn('status', $activeStatuses)
                 ->count(),
             'fest_registrations' => $festEventIds->isEmpty()
@@ -139,7 +147,7 @@ class DashboardController extends SahodayaAdminController
             ->limit(5)
             ->get(['id', 'title', 'category', 'issued_date']);
 
-        $activeEvents = FestEvent::where('tenant_id', $this->sahodaya->id)
+        $activeEvents = FestEvent::whereIn('id', $festEventIds)
             ->whereIn('status', $activeStatuses)
             ->with(['parentEvent:id,title', 'parent:id,title'])
             ->withCount(['registrations' => fn ($q) => $q->whereIn('status', FestRegistration::ACTIVE_STATUSES)])

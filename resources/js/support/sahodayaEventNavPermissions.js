@@ -5,9 +5,14 @@
 
 export const FEST_VIEW = ['fest.view', 'fest.manage', 'fest.marks', 'fest.registrations', 'fest.results', 'fest.finance', 'fest.settings', 'fest.schedule', 'fest.certificates', 'fest.catering'];
 export const FEST_MANAGE = ['fest.manage', 'fest.settings'];
-export const FEST_SETTINGS = ['fest.settings', 'fest.manage'];
+// Deliberately does NOT fall back to 'fest.manage' — region_admin/phase_admin are granted
+// fest.manage for unrelated reasons (id-cards/food-menu/food-billing have no dedicated
+// permission and fall through to it — see TenantUserCatalog::defaultPermissionsForRole()),
+// but are explicitly documented as excluding settings/schedule access. Falling back to
+// fest.manage here previously showed them the Settings/Schedule tabs anyway.
+export const FEST_SETTINGS = ['fest.settings'];
 export const FEST_REGISTRATIONS = ['fest.registrations', 'fest.manage'];
-export const FEST_SCHEDULE = ['fest.schedule', 'fest.manage', 'fest.settings'];
+export const FEST_SCHEDULE = ['fest.schedule'];
 export const FEST_MARKS = ['fest.marks', 'fest.manage'];
 export const FEST_RESULTS = ['fest.results', 'fest.manage'];
 export const FEST_FINANCE = ['fest.finance'];

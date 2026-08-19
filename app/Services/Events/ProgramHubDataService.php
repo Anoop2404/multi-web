@@ -444,6 +444,7 @@ class ProgramHubDataService
 
             return [
                 'key'            => $p['key'],
+                'type'           => $p['type'],
                 'label'          => $p['label'],
                 'prefix'         => $p['prefix'],
                 'open_events'    => $events->whereIn('status', $activeStatuses)->count(),

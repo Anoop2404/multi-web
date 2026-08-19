@@ -26,11 +26,15 @@ function eventQuery(eventId) {
 }
 
 export function eventsModuleNav(sahodayaId, options = {}) {
-    const { navVisibility = null } = options;
+    const { navVisibility = null, scopedEventTypes = null } = options;
     const base = `/sahodaya-admin/${sahodayaId}`;
+    // Same event/region/phase scoping as sahodayaAdminNav.js's Fest & events section — see
+    // its own comment for why (every other program hub 403s, "All events" renders empty).
+    const isScoped = Array.isArray(scopedEventTypes);
 
     const programItems = PROGRAM_SLUGS
         .filter((slug) => isNavProgramVisible(navVisibility, slug))
+        .filter((slug) => !isScoped || scopedEventTypes.includes(SAHODAYA_PROGRAMS[slug].eventType))
         .map((slug) => {
             const p = SAHODAYA_PROGRAMS[slug];
             return { label: p.label, href: sahodayaProgramHref(sahodayaId, slug), icon: p.icon, permissions: FEST_VIEW };
@@ -41,12 +45,12 @@ export function eventsModuleNav(sahodayaId, options = {}) {
             section: 'Fest programs',
             items: programItems,
         }] : []),
-        {
+        ...(isScoped ? [] : [{
             section: 'Directory',
             items: [
                 { label: 'All events', href: `${base}/events`, icon: 'layers', exact: true, permissions: FEST_VIEW },
             ],
-        },
+        }]),
     ];
 }
 
@@ -94,11 +98,15 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         items: [
             { label: 'Overview', href: base, icon: 'grid', exact: true, permissions: FEST_VIEW },
             { label: 'Settings', href: `${base}/settings`, icon: 'settings', permissions: FEST_SETTINGS },
-            { label: 'Items & catalog', href: `${base}/items`, icon: 'file-text', permissions: FEST_MANAGE },
+            // Structural/config editing (not region_admin's operational scope — mark entry, ID
+            // cards, registrations, finance, catering) — gated on fest.settings specifically so
+            // fest.manage (which region_admin does hold, for id-cards/food-billing) doesn't
+            // unlock these too. See FEST_SETTINGS's own doc in sahodayaEventNavPermissions.js.
+            { label: 'Items & catalog', href: `${base}/items`, icon: 'file-text', permissions: FEST_SETTINGS },
             { label: 'Item windows', href: `${base}/settings/registration`, icon: 'calendar', permissions: FEST_SETTINGS },
-            { label: 'Competition areas', href: `${base}/areas`, icon: 'layers', permissions: FEST_MANAGE },
-            { label: 'Eligibility rules', href: `${base}/eligibility-rules`, icon: 'check-square', permissions: FEST_MANAGE },
-            { label: 'Rounds & levels', href: `${base}/levels`, icon: 'repeat', permissions: FEST_MANAGE },
+            { label: 'Competition areas', href: `${base}/areas`, icon: 'layers', permissions: FEST_SETTINGS },
+            { label: 'Eligibility rules', href: `${base}/eligibility-rules`, icon: 'check-square', permissions: FEST_SETTINGS },
+            { label: 'Rounds & levels', href: `${base}/levels`, icon: 'repeat', permissions: FEST_SETTINGS },
             { label: 'Activity log', href: `${base}/activity`, icon: 'clock', permissions: FEST_VIEW },
         ],
     });

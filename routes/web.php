@@ -1170,6 +1170,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::put('/{event}/items/{item}', [FestEventController::class, 'updateItem'])->name('items.update');
             Route::post('/{event}/items/import-catalog', [FestEventController::class, 'importCatalog'])->name('items.import-catalog');
             Route::delete('/{event}/items/{item}', [FestEventController::class, 'destroyItem'])->name('items.destroy');
+            Route::post('/{event}/items/{item}/restore', [FestEventController::class, 'restoreItem'])->name('items.restore')->withTrashed();
             Route::get('/{event}/registrations/import', [FestRegistrationReviewController::class, 'importForm'])->name('registrations.import-form');
             Route::get('/{event}/registrations', [FestRegistrationReviewController::class, 'index'])->name('registrations.index');
             Route::get('/{event}/registrations/approved-pdf', [FestRegistrationReviewController::class, 'printApproved'])->name('registrations.approved-pdf');

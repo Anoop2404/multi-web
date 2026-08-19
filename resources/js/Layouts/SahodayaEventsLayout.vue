@@ -234,7 +234,7 @@ watch(() => page.url, () => {
 
 const navGroups = computed(() => {
     const sid = props.sahodaya.id;
-    const navOptions = { navVisibility: page.props.navVisibility ?? null };
+    const navOptions = { navVisibility: page.props.navVisibility ?? null, scopedEventTypes: page.props.scopedEventTypes ?? null };
     let groups;
     if (eventContext.value?.id && !isProgramWorkspace.value) {
         groups = eventScopedNav(sid, eventContext.value.id, eventContext.value, programEventsList.value);

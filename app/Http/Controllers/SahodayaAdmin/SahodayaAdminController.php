@@ -136,6 +136,49 @@ abstract class SahodayaAdminController extends Controller
      *
      * @return list<string>|null
      */
+    /**
+     * The set of FestEvent ids an event/region/phase-scoped admin can actually reach —
+     * their directly-assigned event(s), plus (for a scope held on a hub) every child of that
+     * hub their scope covers, mirroring EventRegionAdminScope::matchesRegionScope()/
+     * matchesPhaseScope()'s own "hub reaches matching children" rule. Used to narrow
+     * Sahodaya-wide dashboard counts (active fests, registrations, appeals, fee proofs) down
+     * to just the admin's own event(s) instead of the whole Sahodaya's.
+     *
+     * Returns null for a full admin (not event/region/phase-scoped — unchanged, unfiltered).
+     *
+     * @return list<int>|null
+     */
+    protected function scopedFestEventIds(): ?array
+    {
+        $request = request();
+
+        if (! $request->attributes->has('eventAdminEventIds')) {
+            return null;
+        }
+
+        $regionScopes = $request->attributes->get('regionAdminScopes', []);
+        $phaseScopes = $request->attributes->get('phaseAdminScopes', []);
+
+        $eventIds = collect($request->attributes->get('eventAdminEventIds', []))
+            ->merge(collect($regionScopes)->pluck('event_id'))
+            ->merge(collect($phaseScopes)->pluck('event_id'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($eventIds->isEmpty()) {
+            return [];
+        }
+
+        $childIds = FestEvent::whereIn('parent_event_id', $eventIds->all())
+            ->get(['id', 'parent_event_id', 'region_id', 'source_phase_id'])
+            ->filter(fn (FestEvent $child) => \App\Support\EventRegionAdminScope::matchesRegionScope($child->id, $regionScopes)
+                || \App\Support\EventRegionAdminScope::matchesPhaseScope($child->id, $phaseScopes))
+            ->pluck('id');
+
+        return $eventIds->merge($childIds)->unique()->values()->all();
+    }
+
     protected function sidebarEventScope(): ?array
     {
         $request = request();

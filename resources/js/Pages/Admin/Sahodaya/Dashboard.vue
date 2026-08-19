@@ -13,13 +13,13 @@
                     Manage member schools, membership payments, fest programs, and circulars from one place.
                 </p>
                 <div class="dash-hero-badges">
-                    <span v-if="stats.approved_schools != null" class="dash-badge dash-badge--gold">
+                    <span v-if="canSee('membership') && stats.approved_schools != null" class="dash-badge dash-badge--gold">
                         {{ stats.approved_schools }} member schools
                     </span>
-                    <span v-if="(stats.pending_schools ?? pendingSchoolsCount) > 0" class="dash-badge">
+                    <span v-if="canSee('membership') && (stats.pending_schools ?? pendingSchoolsCount) > 0" class="dash-badge">
                         {{ stats.pending_schools ?? pendingSchoolsCount }} pending applications
                     </span>
-                    <span v-if="stats.active_fest_events" class="dash-badge dash-badge--success">
+                    <span v-if="canSee('fest') && stats.active_fest_events" class="dash-badge dash-badge--success">
                         {{ stats.active_fest_events }} active fest{{ stats.active_fest_events === 1 ? '' : 's' }}
                     </span>
                 </div>
@@ -126,13 +126,13 @@
             </div>
 
             <!-- Program status -->
-            <div v-if="dashboardExtras?.programStatus?.length" class="card">
+            <div v-if="scopedProgramStatus.length" class="card">
                 <div class="mb-4 flex items-center justify-between">
                     <h3 class="section-title text-base">Program status</h3>
-                    <Link :href="`/sahodaya-admin/${sahodaya.id}/events`" class="link-brand text-xs">All events →</Link>
+                    <Link v-if="!isScopedUser" :href="`/sahodaya-admin/${sahodaya.id}/events`" class="link-brand text-xs">All events →</Link>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <Link v-for="p in dashboardExtras.programStatus" :key="p.key" :href="p.hub_url" class="program-card group">
+                    <Link v-for="p in scopedProgramStatus" :key="p.key" :href="p.hub_url" class="program-card group">
                         <div class="flex items-center gap-3">
                             <span class="program-card-icon">{{ programIcon(p.key) }}</span>
                             <p class="font-semibold text-slate-900 group-hover:text-[#0f3d7a]">{{ p.label }}</p>
@@ -194,7 +194,7 @@
                 </div>
 
                 <!-- Board results -->
-                <div class="card">
+                <div v-if="canSee('membership')" class="card">
                     <div class="mb-4 flex items-center justify-between">
                         <h3 class="section-title text-base">Board results</h3>
                         <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification`" class="link-brand text-xs">
@@ -261,8 +261,9 @@
                 </div>
             </div>
 
-            <!-- Recent activity -->
-            <div v-if="recentActivity?.length" class="card">
+            <!-- Recent activity — org-wide audit log, not narrowed to any one event, so it's
+                 hidden for any staff/scoped admin rather than trying to filter it down. -->
+            <div v-if="recentActivity?.length && !isStaffUser" class="card">
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h3 class="section-title text-base">Recent activity</h3>
                     <Link :href="`/sahodaya-admin/${sahodaya.id}/audit-logs`" class="link-brand text-xs">Detailed log report →</Link>
@@ -302,7 +303,7 @@ const STAFF_SECTIONS = {
     membership: ['membership.view', 'membership.manage'],
     fest: ['fest.view', 'fest.manage', 'fest.marks', 'fest.registrations', 'fest.results', 'fest.settings', 'fest.finance', 'fest.certificates', 'fest.catering', 'fest.schedule'],
     mcq: ['mcq.view', 'mcq.manage', 'mcq.attendance', 'mcq.marks'],
-    training: ['training.view', 'training.manage', 'fest.view', 'fest.manage'],
+    training: ['training.view', 'training.manage'],
     ledger: ['finance.view', 'membership.view', 'membership.manage'],
 };
 
@@ -358,20 +359,20 @@ const actionQueueItems = computed(() => {
     const q = props.actionQueue ?? {};
     const base = adminBase.value;
     const map = {
-        membership_data_pending: { href: `${base}/membership/reports?tab=submissions`, label: 'membership data reviews pending', color: 'amber', icon: '📋' },
-        pending_school_applications: { href: `${base}/schools/applications`, label: 'school applications awaiting review', color: 'amber', icon: '🏫' },
-        membership_payments: { href: `${base}/membership/payments`, label: 'membership payments to verify', color: 'green', icon: '💳' },
-        fest_fee_proofs: { href: `${base}/fest/payments`, label: 'fest fee proofs awaiting approval', color: 'blue', icon: '🏆' },
-        mcq_fee_proofs: { href: `${base}/mcq/payments`, label: 'Talent Search batch fees awaiting approval', color: 'indigo', icon: '📝' },
-        fest_appeals: { href: `${base}/events`, label: 'open fest appeals', color: 'amber', icon: '⚖️' },
-        fest_registrations_review: { href: `${base}/events`, label: 'fest registrations to review', color: 'navy', icon: '📥' },
-        board_results_pending: { href: `${base}/board-results/verification`, label: 'board results awaiting verification', color: 'amber', icon: '📊' },
+        membership_data_pending: { href: `${base}/membership/reports?tab=submissions`, label: 'membership data reviews pending', color: 'amber', icon: '📋', category: 'membership' },
+        pending_school_applications: { href: `${base}/schools/applications`, label: 'school applications awaiting review', color: 'amber', icon: '🏫', category: 'membership' },
+        membership_payments: { href: `${base}/membership/payments`, label: 'membership payments to verify', color: 'green', icon: '💳', category: 'membership' },
+        fest_fee_proofs: { href: `${base}/fest/payments`, label: 'fest fee proofs awaiting approval', color: 'blue', icon: '🏆', category: 'fest' },
+        mcq_fee_proofs: { href: `${base}/mcq/payments`, label: 'Talent Search batch fees awaiting approval', color: 'indigo', icon: '📝', category: 'mcq' },
+        fest_appeals: { href: `${base}/events`, label: 'open fest appeals', color: 'amber', icon: '⚖️', category: 'fest' },
+        fest_registrations_review: { href: `${base}/events`, label: 'fest registrations to review', color: 'navy', icon: '📥', category: 'fest' },
+        board_results_pending: { href: `${base}/board-results/verification`, label: 'board results awaiting verification', color: 'amber', icon: '📊', category: 'membership' },
     };
     return Object.entries(q).map(([key, count]) => {
         const meta = map[key] ?? {};
         const href = props.actionQueueLinks?.[key] ?? meta.href;
         return { key, count, ...meta, href };
-    }).filter((i) => i.label);
+    }).filter((i) => i.label && canSee(i.category));
 });
 
 const primaryStats = computed(() => {
@@ -420,24 +421,38 @@ const primaryStats = computed(() => {
     return items;
 });
 
+// Event/region/phase-scoped admins (region_admin etc.) only ever reach their own assigned
+// event_type(s) — every other program hub redirects into a hub they're not scoped for, and
+// "Events" (all events) is empty for them server-side. Same scoping as the sidebar (see
+// sahodayaAdminNav.js) — null = unscoped (full tile set), array = only these event_types.
+const scopedEventTypes = computed(() => page.props.scopedEventTypes ?? null);
+const isScopedUser = computed(() => Array.isArray(scopedEventTypes.value));
+function programAllowed(eventType) {
+    return !isScopedUser.value || scopedEventTypes.value.includes(eventType);
+}
+
+const scopedProgramStatus = computed(() => (props.dashboardExtras?.programStatus ?? []).filter((p) => programAllowed(p.type)));
+
 const quickActions = computed(() => {
     const base = adminBase.value;
     const items = [];
-    if (canSee('membership')) {
+    if (canSee('membership') && !isScopedUser.value) {
         items.push({ label: 'Schools', description: 'Member directory', icon: '🏫', href: `${base}/schools` });
         items.push({ label: 'Payments', description: 'Verify fees', icon: '💳', href: `${base}/membership/payments` });
     }
     if (canSee('fest')) {
-        items.push({ label: 'Events', description: 'Fest management', icon: '🏆', href: `${base}/events` });
-        items.push({ label: 'Kalotsav', description: 'Program hub', icon: '🎭', href: `${base}/kalotsav` });
-        items.push({ label: 'Sports', description: 'Sports meet hub', icon: '⚽', href: `${base}/sports` });
-        items.push({ label: 'English Fest', description: 'Program hub', icon: '📚', href: `${base}/english-fest` });
-        items.push({ label: 'Science Fest', description: 'Program hub', icon: '🔬', href: `${base}/science-fest` });
+        if (!isScopedUser.value) {
+            items.push({ label: 'Events', description: 'Fest management', icon: '🏆', href: `${base}/events` });
+        }
+        if (programAllowed('kalolsavam')) items.push({ label: 'Kalotsav', description: 'Program hub', icon: '🎭', href: `${base}/kalotsav` });
+        if (programAllowed('sports')) items.push({ label: 'Sports', description: 'Sports meet hub', icon: '⚽', href: `${base}/sports` });
+        if (programAllowed('english_fest')) items.push({ label: 'English Fest', description: 'Program hub', icon: '📚', href: `${base}/english-fest` });
+        if (programAllowed('science_fest')) items.push({ label: 'Science Fest', description: 'Program hub', icon: '🔬', href: `${base}/science-fest` });
     }
-    if (canSee('website') && websiteEnabled.value && publicWebsiteEnabled.value) {
+    if (canSee('website') && websiteEnabled.value && publicWebsiteEnabled.value && !isScopedUser.value) {
         items.push({ label: 'Circulars', description: 'Publish notices', icon: '📄', href: `${base}/circulars` });
     }
-    if (canSee('mcq')) {
+    if (canSee('mcq') && !isScopedUser.value) {
         items.push({ label: 'Talent Search', description: 'Exam management', icon: '📝', href: `${base}/mcq` });
     }
     return items.slice(0, 4);

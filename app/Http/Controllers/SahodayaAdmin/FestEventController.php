@@ -386,11 +386,18 @@ class FestEventController extends SahodayaAdminController
             return $redirect;
         }
 
-        $event->load('items');
+        // registrations_count was previously never annotated here (unlike the sibling
+        // itemsList()/itemsCaps() actions), so the "N registered" badge and the delete
+        // guard below always read 0 regardless of the item's real registrations.
+        $event->load(['items' => function ($q) {
+            $q->withCount(['registrations' => fn ($r) => $r->whereIn('status', \App\Models\FestRegistration::ACTIVE_STATUSES)]);
+        }]);
         $ctx = $this->eventPageContext($event);
+        $trashedItems = FestEventItem::onlyTrashed()->where('event_id', $event->id)->orderBy('deleted_at', 'desc')->get(['id', 'title', 'item_code', 'owner_level', 'deleted_at']);
 
         return $this->inertia('Sahodaya/Events/Items/Master', $ctx + [
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::ITEMS),
+            'trashedItems' => $trashedItems,
         ]);
     }
 
@@ -1071,6 +1078,7 @@ class FestEventController extends SahodayaAdminController
 
         $data = $request->validate(array_merge([
             'title'          => 'required|string|max:255',
+            'item_code'      => 'nullable|string|max:20',
             'qualify_count'  => 'nullable|integer|min:1',
             'max_per_school' => 'nullable|integer|min:1',
             'fee_amount'     => 'nullable|numeric|min:0',
@@ -1157,23 +1165,45 @@ class FestEventController extends SahodayaAdminController
         return back()->with('success', 'Item updated.');
     }
 
+    /** Soft delete (FestEventItem uses SoftDeletes) — see restoreItem() for undoing this. */
     public function destroyItem(string $tenantId, FestEvent $event, FestEventItem $item, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($item->event_id !== $event->id, 403);
         abort_if($item->isStateCatalog(), 422, 'State catalog items cannot be removed here.');
+        abort_if($item->registrations()->exists(), 422, 'This item has registrations — withdraw or move them first, or disable the item instead of deleting it.');
         $title = $item->title;
         $itemId = $item->id;
         $item->delete();
 
         // Deleting a hub item previously left its already-copied region/finale/cluster
         // children in place with no way to reach them from here anymore — see
-        // FestItemSyncService::removeItemFromPartitions() (Phase 6 audit).
+        // FestItemSyncService::removeItemFromPartitions() (Phase 6 audit). Also soft
+        // deletes now (same trait), so a child disabled-not-deleted for having
+        // registrations is unaffected, and a child deleted here is restorable the same
+        // way as the hub item itself.
         app(\App\Services\Events\FestItemSyncService::class)->removeItemFromPartitions($itemId);
 
         $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.item.deleted', "Item removed: {$title}");
 
         return back()->with('success', 'Item removed.');
+    }
+
+    /** Undo destroyItem() — also restores any partition children that were deleted alongside it (mirrors removeItemFromPartitions()'s own cascade). */
+    public function restoreItem(string $tenantId, FestEvent $event, int $item, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $trashedItem = FestEventItem::withTrashed()->where('id', $item)->firstOrFail();
+        abort_if($trashedItem->event_id !== $event->id, 403);
+        abort_unless($trashedItem->trashed(), 422, 'This item is not deleted.');
+
+        $trashedItem->restore();
+        FestEventItem::onlyTrashed()->where('inherited_from_item_id', $trashedItem->id)->restore();
+
+        $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.item.restored', "Item restored: {$trashedItem->title}");
+
+        return back()->with('success', 'Item restored.');
     }
 
     public function importCatalog(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
