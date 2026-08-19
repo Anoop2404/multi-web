@@ -56,28 +56,32 @@ class SchoolClassCategoryResolver
         $highestKey = null;
         $highestRank = -1;
 
-        SchoolClass::query()
-            ->where('tenant_id', $school->id)
-            ->active()
-            ->with('classCategory')
-            ->get()
-            ->each(function (SchoolClass $schoolClass) use (&$highestKey, &$highestRank) {
-                $category = $schoolClass->classCategory;
-                if (! $category) {
-                    return;
-                }
+        try {
+            SchoolClass::query()
+                ->where('tenant_id', $school->id)
+                ->active()
+                ->with('classCategory')
+                ->get()
+                ->each(function (SchoolClass $schoolClass) use (&$highestKey, &$highestRank) {
+                    $category = $schoolClass->classCategory;
+                    if (! $category) {
+                        return;
+                    }
 
-                $key = self::classGroupKeyForCategory($category);
-                if ($key === null) {
-                    return;
-                }
+                    $key = self::classGroupKeyForCategory($category);
+                    if ($key === null) {
+                        return;
+                    }
 
-                $rank = array_search($key, FestClassGroupScheme::KEYS, true);
-                if ($rank !== false && $rank > $highestRank) {
-                    $highestRank = $rank;
-                    $highestKey = $key;
-                }
-            });
+                    $rank = array_search($key, FestClassGroupScheme::KEYS, true);
+                    if ($rank !== false && $rank > $highestRank) {
+                        $highestRank = $rank;
+                        $highestKey = $key;
+                    }
+                });
+        } catch (\Throwable) {
+            // school_classes table is tenant-scoped and may not exist on central DB connection
+        }
 
         $payload = $school->application_payload ?? [];
         $rawHighest = $payload['highest_class'] ?? $payload['highest_class_offered'] ?? $school->school_category ?? null;
