@@ -22,7 +22,7 @@ class PaymentDueResolver
             ->where('academic_year', $academicYear)
             ->whereIn('registration_status', ['payment_pending', 'payment_rejected'])
             ->whereDoesntHave('payments', fn ($q) => $q->where('status', 'submitted'))
-            ->with('school:id,name,school_prefix,membership_status,parent_id,created_at,application_payload,school_category')
+            ->with('school:id,name,school_prefix,membership_status,parent_id,created_at,application_payload')
             ->orderByDesc('updated_at')
             ->get();
 
@@ -146,7 +146,7 @@ class PaymentDueResolver
             ->where('amount_paid', '>', 0)
             ->whereIn('registration_status', ['payment_pending', 'payment_rejected', 'completed', 'approved'])
             ->with([
-                'school:id,name,school_prefix,membership_status,parent_id,created_at,application_payload,school_category',
+                'school:id,name,school_prefix,membership_status,parent_id,created_at,application_payload',
                 'payments' => fn ($q) => $q->where('status', '!=', 'superseded')->orderByDesc('created_at'),
             ])
             ->orderByDesc('updated_at')
