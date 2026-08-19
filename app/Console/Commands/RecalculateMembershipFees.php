@@ -25,72 +25,102 @@ class RecalculateMembershipFees extends Command
             $this->warn('--- DRY RUN MODE (No database changes will be saved) ---');
         }
 
-        $profiles = SahodayaProfile::query()
+        $sahodayas = Tenant::query()
+            ->where('type', 'sahodaya')
             ->when($sahodayaOption, function ($q) use ($sahodayaOption) {
-                $q->where('tenant_id', $sahodayaOption)
-                  ->orWhereHas('tenant', fn ($t) => $t->where('school_prefix', $sahodayaOption)->orWhere('name', 'like', "%{$sahodayaOption}%"));
+                $q->where(function ($sub) use ($sahodayaOption) {
+                    $sub->where('id', $sahodayaOption)
+                        ->orWhere('school_prefix', $sahodayaOption)
+                        ->orWhere('name', 'like', "%{$sahodayaOption}%");
+                });
             })
             ->get();
 
-        if ($profiles->isEmpty()) {
-            // Fallback if profiles table is empty or tenant database scoped
-            $tenants = Tenant::where('type', 'sahodaya')
-                ->when($sahodayaOption, fn ($q) => $q->where('id', $sahodayaOption))
-                ->get();
+        if ($sahodayas->isEmpty()) {
+            $sahodayas = Tenant::where('type', 'sahodaya')->get();
+        }
 
-            if ($tenants->isEmpty()) {
-                $tenants = Tenant::all();
-            }
-
-            foreach ($tenants as $t) {
-                $p = SahodayaProfile::where('tenant_id', $t->id)->first();
-                if ($p) {
-                    $profiles->push($p);
-                }
-            }
+        if ($sahodayas->isEmpty()) {
+            $sahodayas = Tenant::all();
         }
 
         $totalUpdated = 0;
 
-        foreach ($profiles as $profile) {
-            $sahodaya = Tenant::find($profile->tenant_id);
-            $this->info('Processing Sahodaya: '.($sahodaya->name ?? $profile->tenant_id));
+        foreach ($sahodayas as $sahodaya) {
+            $this->info('Processing Sahodaya: '.($sahodaya->name ?? $sahodaya->id));
 
-            $registrations = Registration::whereHas('school', fn ($q) => $q->where('parent_id', $profile->tenant_id))
-                ->with(['submission', 'school'])
-                ->get();
+            // Fetch member schools for this Sahodaya from Central connection
+            $schools = Tenant::where('type', 'school')
+                ->where('parent_id', $sahodaya->id)
+                ->get()
+                ->keyBy('id');
 
-            if ($registrations->isEmpty()) {
-                $schools = Tenant::where('type', 'school')->where('parent_id', $profile->tenant_id)->get();
-                foreach ($schools as $school) {
-                    $tier = \App\Support\SchoolClassCategoryResolver::feeTierFor($school);
-                    $fee = $feeCalculator->estimateFeeForSchool($school, '2026-27');
-                    $highest = $school->application_payload['highest_class'] ?? 'N/A';
-                    $this->line("  ✓ {$school->name} | Class: {$highest} | Tier: {$tier} | Estimated Fee: ₹".number_format($fee));
-                }
-
-                continue;
+            if ($schools->isEmpty()) {
+                $schools = Tenant::where('type', 'school')->get()->keyBy('id');
             }
 
-            foreach ($registrations as $registration) {
-                $school = $registration->school;
-                if (! $school) {
+            $initialized = false;
+            if (function_exists('tenancy')) {
+                try {
+                    tenancy()->initialize($sahodaya);
+                    $initialized = true;
+                } catch (\Throwable) {
+                }
+            }
+
+            try {
+                $profile = SahodayaProfile::where('tenant_id', $sahodaya->id)->first()
+                    ?? SahodayaProfile::first();
+
+                if (! $profile) {
+                    $this->warn("  - No fee profile configured for {$sahodaya->name}.");
                     continue;
                 }
 
-                $oldAmount = (float) ($registration->membership_fee_amount ?? 0);
-                $calculatedFee = $feeCalculator->estimateFeeForSchool($school, $registration->academic_year);
-                $tier = \App\Support\SchoolClassCategoryResolver::feeTierFor($school);
-                $paid = (float) ($registration->amount_paid ?? 0);
-                $due = max(0, $calculatedFee - $paid);
+                $registrations = Registration::whereIn('school_id', $schools->keys()->all())
+                    ->with('submission')
+                    ->get();
 
-                if (! $isDryRun && $calculatedFee > 0 && empty($registration->fee_override)) {
-                    $feeCalculator->calculateAndApply($registration, $profile, $registration->submission);
+                if ($registrations->isEmpty()) {
+                    $registrations = Registration::with('submission')->get();
                 }
 
-                $highest = $school->application_payload['highest_class'] ?? 'N/A';
-                $this->line("  ✓ {$school->name} | Class: {$highest} | Tier: {$tier} | Fee: ₹".number_format($calculatedFee)." | Paid: ₹".number_format($paid)." | Due: ₹".number_format($due));
-                $totalUpdated++;
+                if ($registrations->isEmpty()) {
+                    foreach ($schools as $school) {
+                        $tier = \App\Support\SchoolClassCategoryResolver::feeTierFor($school);
+                        $fee = $feeCalculator->estimateFeeForSchool($school, '2026-27');
+                        $highest = $school->application_payload['highest_class'] ?? $school->application_payload['highest_class_offered'] ?? 'N/A';
+                        $this->line("  ✓ {$school->name} | Class: {$highest} | Tier: {$tier} | Estimated Fee: ₹".number_format($fee));
+                    }
+                    continue;
+                }
+
+                foreach ($registrations as $registration) {
+                    $school = $schools->get($registration->school_id) ?? $registration->school;
+                    if (! $school) {
+                        continue;
+                    }
+
+                    $calculatedFee = $feeCalculator->estimateFeeForSchool($school, $registration->academic_year);
+                    $tier = \App\Support\SchoolClassCategoryResolver::feeTierFor($school);
+                    $paid = (float) ($registration->amount_paid ?? 0);
+                    $due = max(0, $calculatedFee - $paid);
+
+                    if (! $isDryRun && $calculatedFee > 0 && empty($registration->fee_override)) {
+                        $feeCalculator->calculateAndApply($registration, $profile, $registration->submission);
+                    }
+
+                    $highest = $school->application_payload['highest_class'] ?? $school->application_payload['highest_class_offered'] ?? 'N/A';
+                    $this->line("  ✓ {$school->name} | Class: {$highest} | Tier: {$tier} | Fee: ₹".number_format($calculatedFee).' | Paid: ₹'.number_format($paid).' | Due: ₹'.number_format($due));
+                    $totalUpdated++;
+                }
+            } finally {
+                if ($initialized && function_exists('tenancy')) {
+                    try {
+                        tenancy()->end();
+                    } catch (\Throwable) {
+                    }
+                }
             }
         }
 
