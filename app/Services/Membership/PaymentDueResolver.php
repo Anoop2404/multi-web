@@ -166,9 +166,20 @@ class PaymentDueResolver
 
     private function mapRegistration(Registration $registration, Tenant $school, string $academicYear): array
     {
-        $totalFee = $registration->membership_fee_amount !== null
-            ? (float) $registration->membership_fee_amount
-            : $this->feeCalculator->estimateFeeForSchool($school, $academicYear);
+        $calculatedFee = $this->feeCalculator->estimateFeeForSchool($school, $academicYear);
+
+        if ($registration->fee_override && isset($registration->fee_override['override_amount'])) {
+            $totalFee = (float) $registration->fee_override['override_amount'];
+        } elseif ($calculatedFee > 0) {
+            $totalFee = $calculatedFee;
+            if ((float) ($registration->membership_fee_amount ?? 0) !== $totalFee && empty($registration->fee_override)) {
+                $registration->update(['membership_fee_amount' => $totalFee]);
+            }
+        } else {
+            $totalFee = $registration->membership_fee_amount !== null
+                ? (float) $registration->membership_fee_amount
+                : $calculatedFee;
+        }
 
         $amountPaid = (float) ($registration->amount_paid ?? 0);
         $dueAmount = max(0.0, round($totalFee - $amountPaid, 2));
