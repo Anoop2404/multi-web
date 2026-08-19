@@ -313,8 +313,13 @@ class MembershipRegistrationTest extends TestCase
             ],
         ]);
 
+        $school->update(['application_payload' => ['highest_class' => 'Class 12']]);
         $calculator = app(\App\Services\Membership\MembershipFeeCalculator::class);
         $fee = $calculator->amountForSchool($profile, $school, AcademicYear::current());
-        $this->assertGreaterThan(0, $fee);
+        $this->assertEquals(6000.0, $fee);
+
+        $school->update(['application_payload' => ['highest_class' => 'Class 10']]);
+        $fee10 = $calculator->amountForSchool($profile, $school, AcademicYear::current());
+        $this->assertEquals(4500.0, $fee10);
     }
 }

@@ -70,6 +70,11 @@ class PublicContentController extends SahodayaAdminController
             TenantPublicSite::setEnabled($this->sahodaya, $request->boolean('public_website_enabled'));
         }
 
+        // Save content (heading, contact info, etc.) before acting on experience_version below —
+        // switching to V2 validates readiness (logo/contact present) against this same tenant, so
+        // contact details entered in the same submit must already be persisted when that check runs.
+        SahodayaHomepageContent::update($this->sahodaya, $data);
+
         if ($request->filled('experience_version')) {
             $site = \App\Models\WebsiteSite::ensurePrimary($this->sahodaya->id);
             $newVer = $request->input('experience_version');
@@ -102,8 +107,6 @@ class PublicContentController extends SahodayaAdminController
 
             $this->sahodaya->invalidateCache();
         }
-
-        SahodayaHomepageContent::update($this->sahodaya, $data);
 
         $label = FeatureFlags::websiteEnabled() ? 'Website content' : 'Portal content';
 
