@@ -25,7 +25,6 @@ class SchoolClassCategoryResolverTest extends TestCase
             'is_active' => true,
         ]);
 
-        // Scenario 1: SchoolClass with name "Class 12"
         SchoolClass::create([
             'tenant_id' => $school->id,
             'name' => 'Class 12',
@@ -83,5 +82,41 @@ class SchoolClassCategoryResolverTest extends TestCase
 
         $tier = SchoolClassCategoryResolver::feeTierFor($school);
         $this->assertEquals('senior_secondary', $tier);
+    }
+
+    public function test_fee_tier_for_secondary_high_school_returns_secondary(): void
+    {
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'High School Calicut',
+            'membership_status' => 'approved',
+            'application_payload' => ['highest_class' => 'Class X'],
+            'is_active' => true,
+        ]);
+
+        SchoolClass::create([
+            'tenant_id' => $school->id,
+            'name' => 'Class 10',
+            'is_active' => true,
+        ]);
+
+        $tier = SchoolClassCategoryResolver::feeTierFor($school);
+        $this->assertEquals('secondary', $tier);
+    }
+
+    public function test_fee_tier_for_primary_school_returns_other(): void
+    {
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Little Flower Primary School',
+            'membership_status' => 'approved',
+            'application_payload' => ['highest_class' => 'Class 5'],
+            'is_active' => true,
+        ]);
+
+        $tier = SchoolClassCategoryResolver::feeTierFor($school);
+        $this->assertEquals('other', $tier);
     }
 }

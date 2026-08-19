@@ -138,10 +138,10 @@ class SchoolClassCategoryResolver
 
         $str = mb_strtolower(trim((string) $text));
 
-        if (str_contains($str, '12')
+        // Senior Secondary / Higher Secondary (Class 11 & 12)
+        if (preg_match('/\b(12|11|xii|xi)\b/i', $str)
+            || str_contains($str, '12')
             || str_contains($str, '11')
-            || str_contains($str, 'xii')
-            || str_contains($str, 'xi')
             || str_contains($str, 'senior')
             || str_contains($str, 'higher')
             || str_contains($str, 'hss')
@@ -151,7 +151,9 @@ class SchoolClassCategoryResolver
             return 'hss';
         }
 
-        if (str_contains($str, '10')
+        // Secondary / High School (Class 9 & 10)
+        if (preg_match('/\b(10|9|x|ix)\b/i', $str)
+            || str_contains($str, '10')
             || str_contains($str, '9')
             || str_contains($str, 'high school')
             || str_contains($str, 'secondary')
@@ -159,7 +161,9 @@ class SchoolClassCategoryResolver
             return 'hs';
         }
 
-        if (str_contains($str, '8')
+        // Upper Primary (Class 6, 7 & 8)
+        if (preg_match('/\b(8|7|6|viii|vii|vi)\b/i', $str)
+            || str_contains($str, '8')
             || str_contains($str, '7')
             || str_contains($str, '6')
             || str_contains($str, 'upper primary')
@@ -167,13 +171,19 @@ class SchoolClassCategoryResolver
             return 'up';
         }
 
-        if (str_contains($str, '5')
+        // Lower Primary / Primary (Class 1 to 5, Pre-Primary)
+        if (preg_match('/\b(5|4|3|2|1|v|iv|iii|ii|i)\b/i', $str)
+            || str_contains($str, '5')
             || str_contains($str, '4')
             || str_contains($str, '3')
             || str_contains($str, '2')
             || str_contains($str, '1')
             || str_contains($str, 'primary')
-            || str_contains($str, 'lp')) {
+            || str_contains($str, 'lp')
+            || str_contains($str, 'lkg')
+            || str_contains($str, 'ukg')
+            || str_contains($str, 'kg')
+            || str_contains($str, 'nursery')) {
             return 'lp';
         }
 
