@@ -40,6 +40,7 @@ class FestEventPhaseService
             'registration_open' => $data['registration_open'] ?? null,
             'registration_close' => $data['registration_close'] ?? null,
             'school_registration_fee_share' => $data['school_registration_fee_share'] ?? null,
+            'student_registration_fee' => $data['student_registration_fee'] ?? null,
             'registration_batch_id' => $data['registration_batch_id'] ?? null,
             'is_regional' => (bool) ($data['is_regional'] ?? false),
             'result_publish_mode' => $data['result_publish_mode'] ?? 'all_regions',
@@ -77,7 +78,7 @@ class FestEventPhaseService
             // Not a lifecycle field in the LIFE-05 sense, but same "allow-list, only write if
             // explicitly present" shape fits it — see FestEventPhase::school_registration_fee_share
             // and docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3 item 4.
-            'school_registration_fee_share',
+            'school_registration_fee_share', 'student_registration_fee',
             'registration_batch_id', 'is_regional', 'result_publish_mode',
         ];
 

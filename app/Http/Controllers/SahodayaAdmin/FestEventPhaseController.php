@@ -68,6 +68,7 @@ class FestEventPhaseController extends SahodayaAdminController
             'registration_open' => 'nullable|date',
             'registration_close' => 'nullable|date|after_or_equal:registration_open',
             'school_registration_fee_share' => 'nullable|numeric|min:0',
+            'student_registration_fee' => 'nullable|numeric|min:0',
             'registration_batch_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('fest_registration_batches', 'id')->where('event_id', $event->id)],
             'is_regional' => 'nullable|boolean',
             'result_publish_mode' => 'nullable|in:all_regions,per_region',
@@ -113,6 +114,7 @@ class FestEventPhaseController extends SahodayaAdminController
             // FestEventPhaseService::updatePhase() and
             // docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3 item 4.
             'school_registration_fee_share' => 'nullable|numeric|min:0',
+            'student_registration_fee' => 'nullable|numeric|min:0',
             'registration_batch_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('fest_registration_batches', 'id')->where('event_id', $event->id)],
             'is_regional' => 'nullable|boolean',
             'result_publish_mode' => 'nullable|in:all_regions,per_region',

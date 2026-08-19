@@ -137,10 +137,16 @@
                             <input v-model="addForm.registration_close" type="datetime-local" class="field text-sm mt-0.5">
                         </label>
                     </div>
-                    <label class="text-xs text-slate-500 block">
-                        School registration fee collected by this phase (₹)
-                        <input v-model.number="addForm.school_registration_fee_share" type="number" min="0" step="0.01" class="field text-sm mt-0.5" placeholder="0.00 — leave blank if this phase charges none">
-                    </label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="text-xs text-slate-500 block">
+                            School reg. fee share (₹)
+                            <input v-model.number="addForm.school_registration_fee_share" type="number" min="0" step="0.01" class="field text-sm mt-0.5" placeholder="0.00 — optional">
+                        </label>
+                        <label class="text-xs text-slate-500 block">
+                            Student reg. fee (₹/student)
+                            <input v-model.number="addForm.student_registration_fee" type="number" min="0" step="0.01" class="field text-sm mt-0.5" placeholder="0.00 — optional">
+                        </label>
+                    </div>
                     <div class="grid grid-cols-2 gap-2">
                         <select v-model="addForm.registration_batch_id" class="field text-sm">
                             <option :value="null">No payment level</option>
@@ -180,10 +186,16 @@
                                         <input v-model="editForm.registration_close" type="datetime-local" class="field !py-1 !text-xs mt-0.5">
                                     </label>
                                 </div>
-                                <label class="text-[11px] text-slate-500 block">
-                                    School reg. fee share (₹)
-                                    <input v-model.number="editForm.school_registration_fee_share" type="number" min="0" step="0.01" class="field !py-1 !text-xs mt-0.5">
-                                </label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <label class="text-[11px] text-slate-500 block">
+                                        School reg. fee share (₹)
+                                        <input v-model.number="editForm.school_registration_fee_share" type="number" min="0" step="0.01" class="field !py-1 !text-xs mt-0.5">
+                                    </label>
+                                    <label class="text-[11px] text-slate-500 block">
+                                        Student reg. fee (₹/student)
+                                        <input v-model.number="editForm.student_registration_fee" type="number" min="0" step="0.01" class="field !py-1 !text-xs mt-0.5">
+                                    </label>
+                                </div>
                                 <div class="grid grid-cols-2 gap-2">
                                     <select v-model="editForm.registration_batch_id" class="field !py-1 !text-xs">
                                         <option :value="null">No payment level</option>
@@ -208,6 +220,9 @@
                                     </span>
                                     <span v-if="phase.school_registration_fee_share" class="ml-2">
                                         School fee: ₹{{ phase.school_registration_fee_share }}
+                                    </span>
+                                    <span v-if="phase.student_registration_fee" class="ml-2 text-emerald-600 font-medium">
+                                        Student fee: ₹{{ phase.student_registration_fee }}/student
                                     </span>
                                     <span v-if="phase.registration_batch" class="ml-2">{{ phase.registration_batch.name }}</span>
                                     <span v-if="phase.is_regional" class="ml-2 text-indigo-600">Regional: {{ phase.allowed_regions?.filter((r) => r.enabled).map((r) => r.region?.name).join(', ') || 'not configured' }}</span>
@@ -356,10 +371,10 @@ function formatLabel(value) {
 
 const addForm = useForm({
     name: '', code: '', sort_order: null, is_default: false,
-    registration_open: '', registration_close: '', school_registration_fee_share: null,
+    registration_open: '', registration_close: '', school_registration_fee_share: null, student_registration_fee: null,
     registration_batch_id: null, is_regional: false,
 });
-const editForm = reactive({ name: '', code: '', registration_open: '', registration_close: '', school_registration_fee_share: null, registration_batch_id: null, is_regional: false });
+const editForm = reactive({ name: '', code: '', registration_open: '', registration_close: '', school_registration_fee_share: null, student_registration_fee: null, registration_batch_id: null, is_regional: false });
 const assignForm = useForm({ phase_id: null, item_ids: [] });
 
 // Payment batches — a Sahodaya defines however many of these it needs (0, 1, 2, or more),
@@ -444,6 +459,7 @@ function startEdit(phase) {
         registration_open: toDatetimeLocal(phase.registration_open),
         registration_close: toDatetimeLocal(phase.registration_close),
         school_registration_fee_share: phase.school_registration_fee_share ?? null,
+        student_registration_fee: phase.student_registration_fee ?? null,
         registration_batch_id: phase.registration_batch_id ?? null,
         is_regional: Boolean(phase.is_regional),
     });
