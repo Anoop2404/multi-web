@@ -327,6 +327,7 @@ class FestIdCardService
                 'teacher.tenant',
                 'registration.item.head',
                 'registration.school',
+                'registration.event',
             ]);
 
         if (is_array($participantIds) && $participantIds !== []) {
@@ -436,7 +437,7 @@ class FestIdCardService
         })
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
-            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school']);
+            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event']);
 
         if (is_array($participantIds) && $participantIds !== []) {
             $query->whereIn('id', $participantIds);
@@ -508,7 +509,7 @@ class FestIdCardService
             }
         })
             ->where('participant_role', '!=', 'standby')
-            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school']);
+            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event']);
 
         if (is_array($participantIds) && $participantIds !== []) {
             $query->whereIn('id', $participantIds);
@@ -548,6 +549,7 @@ class FestIdCardService
             ))
             ->whereHas('item', fn ($q) => $q->whereIn('participant_type', ['group', 'team']))
             ->with([
+                'event',
                 'item:id,title,participant_type',
                 'school:id,name',
                 'groups',
@@ -596,6 +598,12 @@ class FestIdCardService
                 ];
             })->values()->all();
 
+            $rawDate = $event->event_start ?? $event->starts_at ?? $event->start_date;
+            $eventDate = $rawDate ? date('d M Y', strtotime((string) $rawDate)) : null;
+            if (! $eventDate && $event->event_end) {
+                $eventDate = date('d M Y', strtotime((string) $event->event_end));
+            }
+            $venue = $this->resolveVenue($event, null, $registration);
             $qrPayload = $this->qrPayload($event, 'registration', (string) $registration->id, $festId);
 
             return [
@@ -621,6 +629,10 @@ class FestIdCardService
                 'qr_src'          => $this->qrService->dataUri($qrPayload),
                 'footer'          => $scheduleLine ?: $event->title,
                 'entity_id'       => 'reg-'.$registration->id,
+                'event_name'      => $event->title,
+                'event_date'      => $eventDate,
+                'venue'           => $venue,
+                'sahodaya_name'   => $event->tenant?->name ?? 'Sahodaya',
             ];
         })->values()->all();
     }
@@ -682,7 +694,7 @@ class FestIdCardService
         if (! $eventDate && $event->event_end) {
             $eventDate = date('d M Y', strtotime((string) $event->event_end));
         }
-        $venue = $event->venue ?: ($event->venue_name ?: '—');
+        $venue = $this->resolveVenue($event, $p);
         $sahodayaName = $event->tenant?->name ?? 'Sahodaya';
         $category = $itemLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : '—'));
         $rawDob = $p->student?->dob;
@@ -723,6 +735,73 @@ class FestIdCardService
             'footer'          => null,
             'entity_id'       => (string) $p->id,
         ];
+    }
+
+    private function resolveVenue(FestEvent $event, ?FestParticipant $p = null, ?FestRegistration $registration = null): string
+    {
+        $regEvent = $p?->registration?->event ?? $registration?->event;
+        $targetRegionId = $event->region_id
+            ?? $regEvent?->region_id;
+
+        $rootEvent = $event->rootEvent();
+        $eventIds = array_values(array_unique(array_filter([
+            $event->id,
+            $event->parent_event_id,
+            $rootEvent->id,
+            $p?->registration?->event_id,
+            $registration?->event_id,
+            $regEvent?->parent_event_id,
+        ])));
+
+        // 1. Check FestVenue table for matching region_id if targetRegionId exists
+        if ($targetRegionId) {
+            $regionalVenue = \App\Models\FestVenue::whereIn('event_id', $eventIds)
+                ->where('region_id', $targetRegionId)
+                ->where('is_active', true)
+                ->first()
+                ?? \App\Models\FestVenue::where('tenant_id', $event->tenant_id)
+                    ->where('region_id', $targetRegionId)
+                    ->where('is_active', true)
+                    ->first();
+
+            if ($regionalVenue && !empty($regionalVenue->name)) {
+                return $regionalVenue->location
+                    ? "{$regionalVenue->name}, {$regionalVenue->location}"
+                    : $regionalVenue->name;
+            }
+        }
+
+        // 2. Check FestVenue table for any active venue under these event_ids
+        $eventVenue = \App\Models\FestVenue::whereIn('event_id', $eventIds)
+            ->where('is_active', true)
+            ->first();
+
+        if ($eventVenue && !empty($eventVenue->name)) {
+            return $eventVenue->location
+                ? "{$eventVenue->name}, {$eventVenue->location}"
+                : $eventVenue->name;
+        }
+
+        // 3. Fallback to event model columns (venue, venue_name, location_name, conductingSchool)
+        $eventsToCheck = array_filter([
+            $event,
+            $event->parent_event_id ? FestEvent::find($event->parent_event_id) : null,
+            $regEvent,
+        ]);
+
+        foreach ($eventsToCheck as $ev) {
+            if (!empty($ev->venue)) {
+                return $ev->venue;
+            }
+            if (!empty($ev->venue_name)) {
+                return $ev->venue_name;
+            }
+            if (!empty($ev->location_name)) {
+                return $ev->location_name;
+            }
+        }
+
+        return '—';
     }
 
     private function qrPayload(FestEvent $event, string $kind, string $entityId, string $festId): string
