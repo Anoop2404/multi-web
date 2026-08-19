@@ -72,10 +72,8 @@
                    class="ml-auto inline-flex items-center px-4 py-2.5 rounded-xl bg-[#eff6ff] hover:bg-[#dbeafe] text-[#0f3d7a] border border-[#bfdbfe] text-sm font-semibold transition">
                     Download Excel ↓
                 </a>
-            </div>
-
-            <!-- Payments list -->
-            <div v-if="(activeStatus === 'payment-due' || activeStatus === 'no-proof') && paymentDue?.data?.length" class="space-y-4">
+                      <!-- Payments list -->
+            <div v-if="(activeStatus === 'payment-due' || activeStatus === 'no-proof' || activeStatus === 'partial') && paymentDue?.data?.length" class="space-y-4">
                 <div v-for="r in paymentDue.data" :key="r.id ?? r.school_id"
                      class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                     <div class="px-6 py-4 flex items-start justify-between gap-4">
@@ -107,6 +105,32 @@
                             <StatusBadge :status="r.registration_status" />
                         </div>
                     </div>
+
+                    <div v-if="r.school_payments?.length" class="px-6 py-3 bg-slate-50 border-t border-slate-100 space-y-2 text-xs">
+                        <p class="font-bold text-slate-700 uppercase tracking-wide">Submitted Payment Proofs & History ({{ r.school_payments.length }})</p>
+                        <div class="space-y-1.5">
+                            <div v-for="sp in r.school_payments" :key="sp.id" class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white rounded-xl border border-slate-200">
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                    <span class="font-bold text-slate-900">₹{{ Number(sp.amount).toLocaleString('en-IN') }}</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-semibold capitalize" :class="paymentStatusBadgeClass(sp.status)">
+                                        {{ sp.status }}
+                                    </span>
+                                    <span v-if="sp.payment_method" class="text-slate-500">Method: <strong>{{ sp.payment_method }}</strong></span>
+                                    <span v-if="sp.transaction_ref" class="font-mono text-slate-600">Ref: <strong>{{ sp.transaction_ref }}</strong></span>
+                                    <span v-if="sp.created_at" class="text-slate-400">Date: {{ formatDate(sp.created_at) }}</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button v-if="sp.proof_url" type="button" @click="openProofPreview(sp)" class="inline-flex items-center gap-1 font-semibold text-[#0f3d7a] bg-blue-50 border border-blue-200/60 rounded-lg px-2.5 py-1 hover:bg-blue-100 transition">
+                                        📎 View Proof
+                                    </button>
+                                    <a v-if="sp.status === 'verified'" :href="`/sahodaya-admin/${sahodaya.id}/membership/payments/${sp.id}/receipt`" target="_blank" rel="noopener" class="inline-flex items-center gap-1 font-semibold text-indigo-800 bg-indigo-50 border border-indigo-200/60 rounded-lg px-2.5 py-1 hover:bg-indigo-100 transition">
+                                        🧾 Receipt ↗
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="px-6 py-3 bg-amber-50/60 border-t border-amber-100 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-800">
                         <div>
                             <template v-if="r.source === 'approved_without_proof'">
@@ -127,16 +151,17 @@
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             <button type="button" class="inline-flex items-center gap-1 font-semibold text-[#0f3d7a] bg-white border border-gray-200 rounded-lg px-2.5 py-1 hover:bg-gray-50"
-                                    @click="openNoteModal(r.school)">
+                                     @click="openNoteModal(r.school)">
                                 📝 {{ r.school?.admin_note ? 'Edit Note' : 'Add Note' }}
                             </button>
                             <button type="button" class="inline-flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 hover:bg-emerald-100"
-                                    @click="openProofModal(r.school, r.membership_fee_amount)">
+                                     @click="openProofModal(r.school, r.membership_fee_amount)">
                                 📤 Upload Proof
                             </button>
                         </div>
                     </div>
                 </div>
+            </div>                </div>
             </div>
 
             <div v-else-if="payments.data?.length" class="space-y-4">
@@ -400,6 +425,7 @@ function submitAdminProof() {
 const statusTabs = [
     { key: 'no-proof',    label: 'Approved — No Proof' },
     { key: 'payment-due', label: 'Payment Not Done' },
+    { key: 'partial',     label: 'Partial Payment' },
     { key: 'submitted',   label: 'Payment Pending' },
     { key: 'verified',    label: 'Verified' },
     { key: 'rejected',    label: 'Rejected' },
@@ -409,11 +435,21 @@ const statusTabs = [
 const emptyMessage = computed(() => ({
     'no-proof': 'No approved schools lacking payment proof. All approved schools have uploaded payment proof.',
     'payment-due': 'No schools awaiting payment. All registered schools have submitted payment or completed registration.',
-    submitted: 'No payments awaiting verification.',
-    verified:  'No verified payments yet.',
-    rejected:  'No rejected payments.',
-    all:       'No payments recorded.',
+    partial:     'No schools with partial payments. All schools have either paid in full or not paid yet.',
+    submitted:   'No payments awaiting verification.',
+    verified:    'No verified payments yet.',
+    rejected:    'No rejected payments.',
+    all:         'No payments recorded.',
 }[props.activeStatus] || 'No payments found.'));
+
+function paymentStatusBadgeClass(status) {
+    return {
+        verified: 'bg-green-100 text-green-700',
+        approved: 'bg-green-100 text-green-700',
+        submitted: 'bg-blue-100 text-blue-700',
+        rejected: 'bg-red-100 text-red-700',
+    }[status] || 'bg-slate-100 text-slate-600';
+}
 
 function listParams(overrides = {}) {
     return {

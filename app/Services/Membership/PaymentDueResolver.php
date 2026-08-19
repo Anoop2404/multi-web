@@ -135,6 +135,35 @@ class PaymentDueResolver
             ->exists();
     }
 
+    /** @return Collection<int, array<string, mixed>> */
+    public function partialItems(string $sahodayaId, array $schoolIds, string $academicYear, array $filters = []): Collection
+    {
+        $items = collect();
+
+        $registrations = Registration::query()
+            ->whereIn('school_id', $schoolIds)
+            ->where('academic_year', $academicYear)
+            ->where('amount_paid', '>', 0)
+            ->whereIn('registration_status', ['payment_pending', 'payment_rejected', 'completed', 'approved'])
+            ->with([
+                'school:id,name,school_prefix,membership_status,parent_id,created_at',
+                'payments' => fn ($q) => $q->where('status', '!=', 'superseded')->orderByDesc('created_at'),
+            ])
+            ->orderByDesc('updated_at')
+            ->get();
+
+        foreach ($registrations as $registration) {
+            $school = $registration->school;
+            if (! $school) {
+                continue;
+            }
+
+            $items->push($this->mapRegistration($registration, $school, $academicYear));
+        }
+
+        return $this->filterItems($items, $filters)->values();
+    }
+
     private function mapRegistration(Registration $registration, Tenant $school, string $academicYear): array
     {
         $totalFee = $registration->membership_fee_amount !== null
@@ -143,6 +172,25 @@ class PaymentDueResolver
 
         $amountPaid = (float) ($registration->amount_paid ?? 0);
         $dueAmount = max(0.0, round($totalFee - $amountPaid, 2));
+
+        $paymentsQuery = $registration->relationLoaded('payments')
+            ? $registration->payments
+            : MembershipPayment::where('school_id', $school->id)
+                ->where('academic_year', $academicYear)
+                ->where('status', '!=', 'superseded')
+                ->orderByDesc('created_at')
+                ->get();
+
+        $schoolPayments = $paymentsQuery->map(fn (MembershipPayment $p) => [
+            'id'              => $p->id,
+            'amount'          => (float) $p->amount,
+            'status'          => $p->status,
+            'payment_method'  => $p->payment_method,
+            'transaction_ref' => $p->transaction_ref,
+            'created_at'      => $p->created_at?->toIso8601String(),
+            'proof_url'       => $p->proof_url,
+            'rejection_reason'=> $p->rejection_reason,
+        ])->values()->all();
 
         return [
             'id'                    => $registration->id,
@@ -153,6 +201,7 @@ class PaymentDueResolver
             'membership_fee_amount' => $dueAmount,
             'total_fee_amount'      => $totalFee,
             'amount_paid'           => $amountPaid,
+            'school_payments'       => $schoolPayments,
             'source'                => 'registration',
             'updated_at'            => $registration->updated_at?->toIso8601String(),
             'school'                => [

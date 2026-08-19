@@ -38,8 +38,22 @@ trait BuildsMembershipExports
             'search'    => trim((string) $request->query('search', '')),
             'date_from' => $request->query('date_from'),
             'date_to'   => $request->query('date_to'),
-            'status'    => in_array($status, ['submitted', 'verified', 'rejected', 'all', 'payment-due'], true) ? $status : 'submitted',
+            'status'    => in_array($status, ['submitted', 'verified', 'rejected', 'all', 'payment-due', 'no-proof', 'partial'], true) ? $status : 'submitted',
         ];
+    }
+
+    protected function paginatedPartialPayments(string $sahodayaId, array $schoolIds, string $academicYear, array $filters, int $perPage = 15): LengthAwarePaginator
+    {
+        $items = $this->paymentDueResolver()->partialItems($sahodayaId, $schoolIds, $academicYear, $filters);
+        $page = max(1, (int) request()->query('page', 1));
+
+        return new LengthAwarePaginator(
+            $items->forPage($page, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()],
+        );
     }
 
     protected function verifiedSchoolsQuery(string $sahodayaId, array $filters): Builder

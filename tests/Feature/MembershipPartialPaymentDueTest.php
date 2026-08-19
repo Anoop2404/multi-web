@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\MembershipPayment;
 use App\Models\Registration;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
@@ -53,6 +54,17 @@ class MembershipPartialPaymentDueTest extends TestCase
             'registration_status' => 'payment_pending',
         ]);
 
+        $payment1 = MembershipPayment::create([
+            'school_id' => $school->id,
+            'academic_year' => $academicYear,
+            'registration_id' => $registration->id,
+            'amount' => 5000,
+            'payment_proof_path' => 'payments/proof1.pdf',
+            'status' => 'verified',
+            'payment_method' => 'NEFT',
+            'transaction_ref' => 'NEFT12345',
+        ]);
+
         $resolver = app(PaymentDueResolver::class);
         $items = $resolver->items($sahodaya->id, [$school->id], $academicYear);
 
@@ -64,5 +76,14 @@ class MembershipPartialPaymentDueTest extends TestCase
         $this->assertEquals(35000.0, $item['total_fee_amount']);
         $this->assertEquals(5000.0, $item['amount_paid']);
         $this->assertEquals(30000.0, $registration->outstandingBalance());
+
+        // Test partialItems resolver
+        $partialItems = $resolver->partialItems($sahodaya->id, [$school->id], $academicYear);
+        $this->assertCount(1, $partialItems);
+        $partialItem = $partialItems->first();
+        $this->assertEquals(30000.0, $partialItem['membership_fee_amount']);
+        $this->assertCount(1, $partialItem['school_payments']);
+        $this->assertEquals(5000.0, $partialItem['school_payments'][0]['amount']);
+        $this->assertEquals('verified', $partialItem['school_payments'][0]['status']);
     }
 }

@@ -30,6 +30,7 @@ class PaymentVerificationController extends SahodayaAdminController
         $statusCounts = [
             'payment-due' => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds, $year),
             'no-proof'    => $this->paymentDueResolver()->noProofItems($this->sahodaya->id, $schoolIds, $year)->count(),
+            'partial'     => $this->paymentDueResolver()->partialItems($this->sahodaya->id, $schoolIds, $year)->count(),
             'submitted'   => (clone $base)->where('status', 'submitted')->count(),
             'verified'    => (clone $base)->where('status', 'verified')->count(),
             'rejected'    => (clone $base)->where('status', 'rejected')->count(),
@@ -62,6 +63,24 @@ class PaymentVerificationController extends SahodayaAdminController
             return $this->inertia('Sahodaya/Membership/Payments', [
                 'payments'     => ['data' => []],
                 'paymentDue'   => $noProof,
+                'activeStatus' => $filters['status'],
+                'filters'      => [
+                    'search'    => $filters['search'],
+                    'date_from' => $filters['date_from'],
+                    'date_to'   => $filters['date_to'],
+                ],
+                'statusCounts' => $statusCounts,
+                'summary'      => $summary,
+            ]);
+        }
+
+        if ($filters['status'] === 'partial') {
+            $partial = $this->paginatedPartialPayments($this->sahodaya->id, $schoolIds, $year, $filters)
+                ->withQueryString();
+
+            return $this->inertia('Sahodaya/Membership/Payments', [
+                'payments'     => ['data' => []],
+                'paymentDue'   => $partial,
                 'activeStatus' => $filters['status'],
                 'filters'      => [
                     'search'    => $filters['search'],
@@ -113,6 +132,27 @@ class PaymentVerificationController extends SahodayaAdminController
 
             return ExcelExport::download('payment-due-'.$year, [
                 'School', 'Code', 'Year', 'Reg No', 'Status', 'Fee Due', 'Updated',
+            ], $rows);
+        }
+
+        if ($filters['status'] === 'partial') {
+            $year = AcademicYear::forSahodaya($this->sahodaya->id);
+            $items = $this->paymentDueResolver()->partialItems($this->sahodaya->id, $schoolIds, $year, $filters);
+
+            $rows = $items->map(fn (array $item) => [
+                $item['school']['name'] ?? '',
+                $item['school']['school_prefix'] ?? '',
+                $item['academic_year'],
+                $item['reg_no'] ?? '',
+                $item['registration_status'],
+                $item['total_fee_amount'] ?? '',
+                $item['amount_paid'] ?? '',
+                $item['membership_fee_amount'] ?? '',
+                isset($item['updated_at']) ? date('Y-m-d H:i', strtotime($item['updated_at'])) : '',
+            ]);
+
+            return ExcelExport::download('partial-payments-'.$year, [
+                'School', 'Code', 'Year', 'Reg No', 'Status', 'Total Fee', 'Amount Paid', 'Remaining Balance Due', 'Updated',
             ], $rows);
         }
 
