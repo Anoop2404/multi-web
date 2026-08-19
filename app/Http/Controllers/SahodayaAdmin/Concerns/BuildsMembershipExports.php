@@ -109,7 +109,7 @@ trait BuildsMembershipExports
 
         $query = MembershipPayment::whereIn('school_id', $schoolIds)
             ->where('status', '!=', 'superseded')
-            ->with('school:id,name,school_prefix,parent_id')
+            ->with('school:id,name,school_prefix,parent_id,application_payload,school_category')
             ->orderByDesc('created_at');
 
         if ($filters['status'] !== 'all') {
