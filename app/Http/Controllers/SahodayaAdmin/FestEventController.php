@@ -211,11 +211,10 @@ class FestEventController extends SahodayaAdminController
 
         if (isset($participationLimits['max_total_per_student'])) {
             $breakdown = ($participationLimits['max_onstage_per_student'] ?? 0)
-                + ($participationLimits['max_offstage_per_student'] ?? 0)
-                + ($participationLimits['max_group_per_student'] ?? 0);
+                + ($participationLimits['max_offstage_per_student'] ?? 0);
             if ($breakdown > $participationLimits['max_total_per_student']) {
                 return back()->withErrors([
-                    'max_total_per_student' => "On-stage + off-stage + team breakdown ({$breakdown}) exceeds the total per-student limit ({$participationLimits['max_total_per_student']}).",
+                    'max_total_per_student' => "On-stage + off-stage individual breakdown ({$breakdown}) exceeds the total per-student limit ({$participationLimits['max_total_per_student']}).",
                 ])->withInput();
             }
         }

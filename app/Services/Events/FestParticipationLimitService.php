@@ -558,8 +558,9 @@ class FestParticipationLimitService
     {
         return $regs->filter(function (FestRegistration $r) {
             $discipline = $r->item?->sport_discipline;
+            $dims = $this->itemDimensions($r->item);
 
-            return ! in_array($discipline, ['relay', 'march_past'], true);
+            return ! $dims['group'] && ! in_array($discipline, ['relay', 'march_past'], true);
         })->count();
     }
 }

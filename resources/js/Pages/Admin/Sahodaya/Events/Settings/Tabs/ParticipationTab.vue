@@ -22,7 +22,7 @@
                     </FormField>
                 </FormGrid>
                 <p v-if="breakdownExceedsTotal" class="text-xs text-rose-600">
-                    On-stage + off-stage + group ({{ breakdownSum }}) exceeds the total per-student limit ({{ policyForm.max_total_per_student }}).
+                    On-stage + off-stage individual items ({{ breakdownSum }}) exceeds the total per-student limit ({{ policyForm.max_total_per_student }}).
                 </p>
             </FormSection>
 
@@ -67,7 +67,6 @@ const { policyForm, participationPresets, savePolicy } = inject('eventSettings')
 const breakdownSum = computed(() => (
     (Number(policyForm.max_onstage_per_student) || 0)
     + (Number(policyForm.max_offstage_per_student) || 0)
-    + (Number(policyForm.max_group_per_student) || 0)
 ));
 
 const breakdownExceedsTotal = computed(() => (
