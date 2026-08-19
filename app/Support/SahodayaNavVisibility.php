@@ -40,6 +40,7 @@ class SahodayaNavVisibility
         return [
             'website'               => 'Website section',
             'membership'            => 'Membership section',
+            'documents'             => 'Compliance documents',
             'mcq'                   => 'Talent Search exams',
             'training'              => 'Training programs',
             'finance'               => 'Finance hub & ledger',
@@ -47,15 +48,19 @@ class SahodayaNavVisibility
             'fest_appeals'          => 'Appeals queue',
             'display_screens'       => 'Display screens',
             'certificate_templates' => 'Certificate templates',
+            'id_card_templates'     => 'ID card templates',
         ];
     }
 
     /** @return array{programs: array<string, bool>, menus: array<string, bool>} */
     public static function defaults(): array
     {
+        $menus = array_fill_keys(array_keys(self::menuLabels()), true);
+        $menus['documents'] = false;
+
         return [
             'programs' => array_fill_keys(self::programSlugs(), true),
-            'menus'    => array_fill_keys(array_keys(self::menuLabels()), true),
+            'menus'    => $menus,
         ];
     }
 

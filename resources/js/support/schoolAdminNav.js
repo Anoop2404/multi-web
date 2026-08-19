@@ -71,12 +71,28 @@ export function detectSchoolTrainingFromUrl(url) {
 
 /** Sidebar when managing annual membership / registration. */
 export function schoolMembershipScopedNav(schoolId, options = {}) {
-    const { canNav = () => true } = options;
+    const { canNav = () => true, navVisibility = null } = options;
     const base = schoolAdminHref(schoolId);
 
     if (!canNav('membership')) {
         return [];
     }
+
+    const membershipItems = [
+        { label: 'Annual registration', href: schoolAdminHref(schoolId, 'registration'), icon: 'clipboard', exact: true },
+        { label: 'Profile & account', href: schoolAdminHref(schoolId, 'registration', 'profile'), icon: 'user' },
+        { label: 'Student records', href: schoolAdminHref(schoolId, 'registration', 'students'), icon: 'users' },
+        { label: 'Student counts', href: schoolAdminHref(schoolId, 'registration', 'counts'), icon: 'layers' },
+        { label: 'Teacher records', href: schoolAdminHref(schoolId, 'registration', 'teachers'), icon: 'user-check' },
+        { label: 'Membership payment', href: schoolAdminHref(schoolId, 'registration', 'payment'), icon: 'credit-card' },
+        { label: 'Payments & receipts', href: schoolAdminHref(schoolId, 'payments'), icon: 'inbox' },
+    ];
+
+    if (isNavMenuVisible(navVisibility, 'documents')) {
+        membershipItems.push({ label: 'Compliance documents', href: schoolAdminHref(schoolId, 'documents'), icon: 'file-text' });
+    }
+
+    membershipItems.push({ label: 'Program calendar', href: schoolAdminHref(schoolId, 'calendar'), icon: 'calendar' });
 
     return [
         {
@@ -85,17 +101,7 @@ export function schoolMembershipScopedNav(schoolId, options = {}) {
         },
         {
             section: 'Membership',
-            items: [
-                { label: 'Annual registration', href: schoolAdminHref(schoolId, 'registration'), icon: 'clipboard', exact: true },
-                { label: 'Profile & account', href: schoolAdminHref(schoolId, 'registration', 'profile'), icon: 'user' },
-                { label: 'Student records', href: schoolAdminHref(schoolId, 'registration', 'students'), icon: 'users' },
-                { label: 'Student counts', href: schoolAdminHref(schoolId, 'registration', 'counts'), icon: 'layers' },
-                { label: 'Teacher records', href: schoolAdminHref(schoolId, 'registration', 'teachers'), icon: 'user-check' },
-                { label: 'Membership payment', href: schoolAdminHref(schoolId, 'registration', 'payment'), icon: 'credit-card' },
-                { label: 'Payments & receipts', href: schoolAdminHref(schoolId, 'payments'), icon: 'inbox' },
-                { label: 'Compliance documents', href: schoolAdminHref(schoolId, 'documents'), icon: 'file-text' },
-                { label: 'Program calendar', href: schoolAdminHref(schoolId, 'calendar'), icon: 'calendar' },
-            ],
+            items: membershipItems,
         },
     ];
 }
@@ -310,16 +316,24 @@ export function schoolAdminNav(schoolId, options = {}) {
 
     // ── Membership ────────────────────────────────────────────────────
     if (canNav('membership')) {
+        const membershipItems = [
+            { label: 'Annual Registration', href: schoolAdminHref(schoolId, 'registration'), icon: 'clipboard' },
+            { label: 'Payments & Receipts', href: schoolAdminHref(schoolId, 'payments'), icon: 'credit-card' },
+        ];
+
+        if (isNavMenuVisible(navVisibility, 'documents')) {
+            membershipItems.push({ label: 'Compliance documents', href: schoolAdminHref(schoolId, 'documents'), icon: 'file-text' });
+        }
+
+        membershipItems.push(
+            { label: 'Program calendar', href: schoolAdminHref(schoolId, 'calendar'), icon: 'calendar' },
+            // Hidden — tab on Annual Registration page
+            { label: 'Registration Details', href: schoolAdminHref(schoolId, 'registration', 'profile'), icon: 'user', hidden: true }
+        );
+
         groups.push({
             section: 'Membership',
-            items: [
-                { label: 'Annual Registration', href: schoolAdminHref(schoolId, 'registration'), icon: 'clipboard' },
-                { label: 'Payments & Receipts', href: schoolAdminHref(schoolId, 'payments'), icon: 'credit-card' },
-                { label: 'Compliance documents', href: schoolAdminHref(schoolId, 'documents'), icon: 'file-text' },
-                { label: 'Program calendar', href: schoolAdminHref(schoolId, 'calendar'), icon: 'calendar' },
-                // Hidden — tab on Annual Registration page
-                { label: 'Registration Details', href: schoolAdminHref(schoolId, 'registration', 'profile'), icon: 'user', hidden: true },
-            ],
+            items: membershipItems,
         });
     }
 

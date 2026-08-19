@@ -112,7 +112,9 @@ export function sahodayaMembershipScopedNav(sahodayaId, options = {}) {
             icon: 'settings',
             badge: setupIncompleteCount,
         });
-        settingsItems.push({ label: 'Document types', href: `${base}/documents/types`, icon: 'file-text' });
+        if (isNavMenuVisible(navVisibility, 'documents')) {
+            settingsItems.push({ label: 'Document types', href: `${base}/documents/types`, icon: 'file-text' });
+        }
         if (stateRemittancesEnabled) {
             settingsItems.push({ label: 'State remittances', href: `${base}/state-remittances`, icon: 'credit-card' });
         }
@@ -140,7 +142,7 @@ export function sahodayaMembershipScopedNav(sahodayaId, options = {}) {
                 { label: 'Student change requests', href: `${base}/student-change-requests`, icon: 'inbox', badge: pendingChangeRequests },
                 { label: 'Profile change requests', href: `${base}/users/profile-change-requests`, icon: 'inbox' },
                 { label: 'Student counts', href: `${base}/membership/submissions`, icon: 'inbox', badge: pendingSubmissionsCount },
-                { label: 'Document review', href: `${base}/documents/review`, icon: 'file-text' },
+                ...(isNavMenuVisible(navVisibility, 'documents') ? [{ label: 'Document review', href: `${base}/documents/review`, icon: 'file-text' }] : []),
             ],
         },
         {
@@ -403,7 +405,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
                 { label: 'Student change requests', href: `${base}/student-change-requests`, icon: 'inbox', badge: pendingChangeRequests, hidden: !pendingChangeRequests },
                 { label: 'Profile change requests', href: `${base}/users/profile-change-requests`, icon: 'inbox' },
                 { label: 'Student counts', href: `${base}/membership/submissions`, icon: 'inbox', badge: pendingSubmissionsCount, hidden: !pendingSubmissionsCount },
-                { label: 'Document review', href: `${base}/documents/review`, icon: 'file-text' },
+                ...(menuOn('documents') ? [{ label: 'Document review', href: `${base}/documents/review`, icon: 'file-text' }] : []),
             ],
         });
 
@@ -510,7 +512,9 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
                 icon: 'settings',
                 badge: setupIncompleteCount,
             });
-            settingsItems.push({ label: 'Document types', href: `${base}/documents/types`, icon: 'file-text' });
+            if (menuOn('documents')) {
+                settingsItems.push({ label: 'Document types', href: `${base}/documents/types`, icon: 'file-text' });
+            }
             settingsItems.push({ label: 'Migrate to S3', href: `${base}/settings/storage-migration`, icon: 'cloud' });
             settingsItems.push({ label: 'Setup wizard', href: `${base}/setup`, icon: 'layers', hidden: !setupIncompleteCount });
             if (stateRemittancesEnabled) {

@@ -335,8 +335,6 @@
 
         <!-- Students tab -->
         <div v-else-if="tab === 'students'" class="card card--flush overflow-hidden p-4 space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                <div>
             <div v-if="duplicateRegistrationsCount > 0" class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 flex flex-wrap items-center justify-between gap-3 mb-2 shadow-sm">
                 <div>
                     <p class="font-bold flex items-center gap-1.5 text-amber-950">

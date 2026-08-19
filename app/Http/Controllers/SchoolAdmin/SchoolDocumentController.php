@@ -14,6 +14,9 @@ class SchoolDocumentController extends SchoolAdminController
     public function index(SchoolDocumentTypeSeeder $seeder)
     {
         $sahodayaId = $this->school->parent_id;
+        $profile = $sahodayaId ? \App\Models\SahodayaProfile::where('tenant_id', $sahodayaId)->first() : null;
+        abort_unless(\App\Support\SahodayaNavVisibility::isMenuVisible($profile, 'documents'), 404);
+
         if ($sahodayaId) {
             $seeder->seedForSahodaya($sahodayaId);
         }
@@ -39,6 +42,9 @@ class SchoolDocumentController extends SchoolAdminController
     {
         $sahodayaId = $this->school->parent_id;
         abort_unless($sahodayaId, 403, 'Your school isn\'t linked to a Sahodaya yet. Contact your Sahodaya admin.');
+
+        $profile = \App\Models\SahodayaProfile::where('tenant_id', $sahodayaId)->first();
+        abort_unless(\App\Support\SahodayaNavVisibility::isMenuVisible($profile, 'documents'), 404);
 
         $request->validate([
             'document_type_id' => 'required|exists:school_document_types,id',

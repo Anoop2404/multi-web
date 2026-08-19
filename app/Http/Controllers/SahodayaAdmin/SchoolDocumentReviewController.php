@@ -15,6 +15,9 @@ class SchoolDocumentReviewController extends SahodayaAdminController
 {
     public function index(Request $request, SchoolDocumentTypeSeeder $seeder)
     {
+        $profile = \App\Models\SahodayaProfile::where('tenant_id', $this->sahodaya->id)->first();
+        abort_unless(\App\Support\SahodayaNavVisibility::isMenuVisible($profile, 'documents'), 404);
+
         $seeder->seedForSahodaya($this->sahodaya->id);
 
         $status = $request->string('status')->toString() ?: 'pending';

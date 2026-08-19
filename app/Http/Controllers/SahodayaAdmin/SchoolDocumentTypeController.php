@@ -10,6 +10,9 @@ class SchoolDocumentTypeController extends SahodayaAdminController
 {
     public function index()
     {
+        $profile = \App\Models\SahodayaProfile::where('tenant_id', $this->sahodaya->id)->first();
+        abort_unless(\App\Support\SahodayaNavVisibility::isMenuVisible($profile, 'documents'), 404);
+
         $types = SchoolDocumentType::where('sahodaya_id', $this->sahodaya->id)
             ->orderBy('sort_order')
             ->orderBy('name')

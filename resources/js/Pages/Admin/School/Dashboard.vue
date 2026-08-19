@@ -347,8 +347,9 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import DashboardStatCard from '@/Components/ui/DashboardStatCard.vue';
 import QuickActionCard from '@/Components/ui/QuickActionCard.vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { isNavMenuVisible } from '@/support/sahodayaAdminNav.js';
 import {
     windowClosingDays,
     windowClosingSoon,
@@ -406,11 +407,13 @@ const openProgramSummaries = computed(() =>
     (props.programSummaries ?? []).filter(p => (p.open_events ?? 0) > 0)
 );
 
+const page = usePage();
+
 const alertItems = computed(() => {
     const items = [];
     const docs = props.documentAlerts ?? {};
     const docTotal = (docs.expired ?? 0) + (docs.expiring_soon ?? 0) + (docs.rejected ?? 0) + (docs.pending ?? 0);
-    if (docTotal > 0) {
+    if (docTotal > 0 && isNavMenuVisible(page.props.navVisibility, 'documents')) {
         const parts = [];
         if (docs.pending) parts.push(`${docs.pending} pending upload`);
         if (docs.rejected) parts.push(`${docs.rejected} rejected`);
