@@ -10,13 +10,20 @@ use Illuminate\Console\Command;
 
 class RecalculateMembershipFees extends Command
 {
-    protected $signature = 'membership:recalculate-fees {--sahodaya= : Optional Sahodaya Tenant ID or prefix}';
+    protected $signature = 'membership:recalculate-fees 
+                            {--sahodaya= : Optional Sahodaya Tenant ID, UUID or name} 
+                            {--dry-run : Preview fee calculations without updating database}';
 
-    protected $description = 'Recalculates and updates membership fee amounts for all member school registrations based on current class levels and fee settings.';
+    protected $description = 'Recalculates membership fee amounts for member school registrations based on class levels and fee settings.';
 
     public function handle(MembershipFeeCalculator $feeCalculator): int
     {
         $sahodayaOption = $this->option('sahodaya');
+        $isDryRun = $this->option('dry-run');
+
+        if ($isDryRun) {
+            $this->warn('--- DRY RUN MODE (No database changes will be saved) ---');
+        }
 
         $profiles = SahodayaProfile::query()
             ->when($sahodayaOption, function ($q) use ($sahodayaOption) {
@@ -26,9 +33,21 @@ class RecalculateMembershipFees extends Command
             ->get();
 
         if ($profiles->isEmpty()) {
-            $this->warn('No Sahodaya profiles found matching your query.');
+            // Fallback if profiles table is empty or tenant database scoped
+            $tenants = Tenant::where('type', 'sahodaya')
+                ->when($sahodayaOption, fn ($q) => $q->where('id', $sahodayaOption))
+                ->get();
 
-            return self::SUCCESS;
+            if ($tenants->isEmpty()) {
+                $tenants = Tenant::all();
+            }
+
+            foreach ($tenants as $t) {
+                $p = SahodayaProfile::where('tenant_id', $t->id)->first();
+                if ($p) {
+                    $profiles->push($p);
+                }
+            }
         }
 
         $totalUpdated = 0;
@@ -41,20 +60,41 @@ class RecalculateMembershipFees extends Command
                 ->with(['submission', 'school'])
                 ->get();
 
-            foreach ($registrations as $registration) {
-                $oldAmount = $registration->membership_fee_amount;
-                $feeCalculator->calculateAndApply($registration, $profile, $registration->submission);
-                $newAmount = $registration->fresh()->membership_fee_amount;
-
-                if ((float) $oldAmount !== (float) $newAmount) {
-                    $schoolName = $registration->school->name ?? $registration->school_id;
-                    $this->line("  ✓ {$schoolName}: ₹".number_format((float) $oldAmount).' → ₹'.number_format((float) $newAmount));
-                    $totalUpdated++;
+            if ($registrations->isEmpty()) {
+                $schools = Tenant::where('type', 'school')->where('parent_id', $profile->tenant_id)->get();
+                foreach ($schools as $school) {
+                    $tier = \App\Support\SchoolClassCategoryResolver::feeTierFor($school);
+                    $fee = $feeCalculator->estimateFeeForSchool($school, '2026-27');
+                    $highest = $school->application_payload['highest_class'] ?? 'N/A';
+                    $this->line("  ✓ {$school->name} | Class: {$highest} | Tier: {$tier} | Estimated Fee: ₹".number_format($fee));
                 }
+
+                continue;
+            }
+
+            foreach ($registrations as $registration) {
+                $school = $registration->school;
+                if (! $school) {
+                    continue;
+                }
+
+                $oldAmount = (float) ($registration->membership_fee_amount ?? 0);
+                $calculatedFee = $feeCalculator->estimateFeeForSchool($school, $registration->academic_year);
+                $tier = \App\Support\SchoolClassCategoryResolver::feeTierFor($school);
+                $paid = (float) ($registration->amount_paid ?? 0);
+                $due = max(0, $calculatedFee - $paid);
+
+                if (! $isDryRun && $calculatedFee > 0 && empty($registration->fee_override)) {
+                    $feeCalculator->calculateAndApply($registration, $profile, $registration->submission);
+                }
+
+                $highest = $school->application_payload['highest_class'] ?? 'N/A';
+                $this->line("  ✓ {$school->name} | Class: {$highest} | Tier: {$tier} | Fee: ₹".number_format($calculatedFee)." | Paid: ₹".number_format($paid)." | Due: ₹".number_format($due));
+                $totalUpdated++;
             }
         }
 
-        $this->info("Recalculation completed! Total registrations updated: {$totalUpdated}");
+        $this->info("Completed! Total registrations processed: {$totalUpdated}");
 
         return self::SUCCESS;
     }
