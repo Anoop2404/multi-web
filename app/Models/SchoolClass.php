@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
+use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class SchoolClass extends Model
 {
     use BelongsToCentralTenant;
+    use CentralConnection;
 
     protected $table = 'school_classes';
 
