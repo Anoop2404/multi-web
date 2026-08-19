@@ -3,7 +3,7 @@
         <PageHeader
             :title="`Student-wise — ${event.title}`"
             :eyebrow="programLabel"
-            description="Per-student registrations, chest numbers, and scores for this event."
+            description="Per-student registrations and scores for this event."
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
@@ -64,7 +64,6 @@
                                 <th class="w-10 text-center">#</th>
                                 <th>Item Title</th>
                                 <th>Category / Head</th>
-                                <th class="text-center">Chest No</th>
                                 <th class="text-center">Status</th>
                                 <th class="text-center">Grade / Rank</th>
                                 <th class="text-right pr-4">Score</th>
@@ -75,7 +74,6 @@
                                 <td class="text-center text-slate-400 font-mono">{{ idx + 1 }}</td>
                                 <td class="font-semibold text-slate-900">{{ item.item_title }}</td>
                                 <td class="text-slate-600">{{ item.head_name || '—' }}</td>
-                                <td class="text-center font-mono font-bold text-slate-800">{{ item.chest_no || '—' }}</td>
                                 <td class="text-center">
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block"
                                           :class="item.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'">

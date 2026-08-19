@@ -145,9 +145,11 @@
             <thead>
                 <tr>
                     <th style="width: 5%;">#</th>
-                    <th style="width: 45%;">Item Name</th>
+                    <th style="width: {{ ($showChestNo ?? true) ? '45' : '55' }}%;">Item Name</th>
                     <th style="width: 25%;">Category / Head</th>
+                    @if($showChestNo ?? true)
                     <th style="width: 15%; text-align: center;">Chest No</th>
+                    @endif
                     <th style="width: 10%; text-align: center;">Status</th>
                 </tr>
             </thead>
@@ -157,7 +159,9 @@
                     <td style="color: #94a3b8; font-size: 10.5px;">{{ $itemIdx + 1 }}</td>
                     <td><strong>{{ $item['item_title'] }}</strong></td>
                     <td>{{ $item['head_name'] ?? '—' }}</td>
+                    @if($showChestNo ?? true)
                     <td style="text-align: center; font-family: monospace; font-weight: bold;">{{ $item['chest_no'] ?? '—' }}</td>
+                    @endif
                     <td style="text-align: center;">
                         <span class="badge {{ ($item['status'] ?? '') === 'approved' ? 'badge-approved' : 'badge-pending' }}">
                             {{ $item['status'] ?? '—' }}

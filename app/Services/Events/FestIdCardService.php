@@ -17,6 +17,18 @@ use App\Support\TenantStorage;
 
 class FestIdCardService
 {
+    /**
+     * Chest numbers are Sahodaya-admin-only information — schools don't see them on
+     * generated ID cards regardless of the event's chest_reveal_mode (that setting
+     * controls WHEN a chest number becomes visible at all — immediately vs. at stage
+     * entry — not WHO it's visible to; a school must not see it even once "revealed").
+     * FestSchoolReportController sets this true before calling any card-building
+     * method; Sahodaya-admin's FestIdCardController leaves the default, since it does
+     * need this field (and already respects chest_reveal_mode via
+     * FestChestNumberService::participantLabel()).
+     */
+    public bool $hideChestNo = false;
+
     public function __construct(
         private FestIdCardQrService $qrService,
         private FestChestNumberService $chestService,
@@ -584,7 +596,7 @@ class FestIdCardService
             // (on FestGroup, not per member) — show it on the team card
             // itself, not repeated per member.
             $chestNumber = ($group && $group->chest_no !== null) ? (string) $group->chest_no : null;
-            if ($chestNumber && $event->chest_reveal_mode === 'stage_entry' && ! $group->chest_revealed_at) {
+            if ($chestNumber && ($this->hideChestNo || ($event->chest_reveal_mode === 'stage_entry' && ! $group->chest_revealed_at))) {
                 $chestNumber = null;
             }
 
@@ -661,7 +673,7 @@ class FestIdCardService
         // which items they're eligible for — both worth surfacing on the
         // printed card face, not just buried in reports.
         $isSports = $event->event_type === 'sports';
-        $chestLabel = $this->chestService->participantLabel($p);
+        $chestLabel = $this->hideChestNo ? null : $this->chestService->participantLabel($p);
         $chestNumber = ($chestLabel && $chestLabel !== '—') ? $chestLabel : null;
         $ageGroupLabel = null;
 

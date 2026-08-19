@@ -41,27 +41,32 @@
             @endif
             <a href="{{ route('tenant.fest.search', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🔍 Search Participant</a>
         </div>
-        @if($items->isNotEmpty())
+        @if($itemGroups->isNotEmpty())
         <h2 class="text-lg font-semibold mt-10 mb-3">Item boards</h2>
-        <div class="grid sm:grid-cols-2 gap-2">
-            @foreach($items as $item)
-            @if($event->schedule_published)
-            <a href="{{ route('tenant.fest.item-schedule', [$event->id, $item->id]) }}"
-               class="p-3 bg-white border rounded-lg text-sm hover:border-amber-400 block">
-                {{ $item->title }}
-                @if($item->stage_type === 'off_stage')
-                <span class="text-xs text-gray-400"> · off-stage</span>
+        @foreach($itemGroups as $group)
+            @if($itemGroups->count() > 1)
+            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mt-6 mb-2">{{ $group['label'] ?? 'Items' }}</h3>
+            @endif
+            <div class="grid sm:grid-cols-2 gap-2">
+                @foreach($group['items'] as $item)
+                @if($scopeSchedulePublished)
+                <a href="{{ route('tenant.fest.item-schedule', [$event->id, $item->id]) }}"
+                   class="p-3 bg-white border rounded-lg text-sm hover:border-amber-400 block">
+                    {{ $item->title }}
+                    @if($item->stage_type === 'off_stage')
+                    <span class="text-xs text-gray-400"> · off-stage</span>
+                    @endif
+                </a>
                 @endif
-            </a>
-            @endif
-            @if($scopeResultsPublished)
-            <a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}"
-               class="p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm hover:border-amber-400 block">
-                {{ $item->title }} — results
-            </a>
-            @endif
-            @endforeach
-        </div>
+                @if($scopeResultsPublished)
+                <a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}"
+                   class="p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm hover:border-amber-400 block">
+                    {{ $item->title }} — results
+                </a>
+                @endif
+                @endforeach
+            </div>
+        @endforeach
         @endif
         @if($event->parent_event_id)
         <p class="text-xs text-gray-400 mt-6">Part of a multi-level festival series.</p>

@@ -15,7 +15,9 @@ h3{margin:0 0 6px;color:#1e3a8a;font-size:15px}
 <p class="meta">
 <strong>Item:</strong> {{ $p->registration?->item?->title }} ·
 <strong>School:</strong> {{ $p->registration?->school?->name }} ·
+@if($showChestNo ?? true)
 <strong>Chest:</strong> {{ $p->chest_no ?? 'TBA' }} ·
+@endif
 <strong>Class:</strong> {{ strtoupper($p->registration?->item?->class_group ?? '') }}
 </p>
 @if($event->venue)<p class="meta"><strong>Venue:</strong> {{ $event->venue }}</p>@endif

@@ -10,7 +10,7 @@ class FestRegistrationBatch extends Model
 {
     protected $fillable = [
         'event_id', 'code', 'name', 'sort_order', 'registration_open',
-        'registration_close', 'payment_due_at', 'school_base_fee',
+        'registration_close', 'payment_due_at', 'school_base_fee', 'student_registration_fee',
         'invoice_prefix', 'status', 'registration_locked',
     ];
 
@@ -20,6 +20,7 @@ class FestRegistrationBatch extends Model
         'registration_close' => 'datetime',
         'payment_due_at' => 'datetime',
         'school_base_fee' => 'decimal:2',
+        'student_registration_fee' => 'decimal:2',
         'registration_locked' => 'boolean',
     ];
 

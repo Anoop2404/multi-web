@@ -2,7 +2,7 @@
     <SchoolAdminLayout :title="`${programLabel} — Select Event for Reports`" :school="school" :show-header-title="false">
         <div class="reports-shell">
             <PageHeader :title="`${programLabel} — Select Event for Reports`" :eyebrow="`${programLabel} Reports`"
-                        description="Select an event below to open its full reports catalog (admit cards, chest numbers, score sheets, and exports)." />
+                        description="Select an event below to open its full reports catalog (admit cards, score sheets, and exports)." />
 
             <div v-if="events.length" class="space-y-4">
                 <article v-for="ev in events" :key="ev.id" class="reports-event-card">

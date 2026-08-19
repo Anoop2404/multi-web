@@ -57,6 +57,11 @@
                         <input v-model="addBatchForm.invoice_prefix" class="field text-sm mt-0.5" placeholder="e.g. MCS-L1">
                     </label>
                 </div>
+                <label class="text-xs text-slate-500 block">
+                    Student registration fee (₹ per student, optional)
+                    <input v-model.number="addBatchForm.student_registration_fee" type="number" min="0" step="0.01" class="field text-sm mt-0.5" placeholder="Leave blank to use the event's own per-student rate">
+                    <span class="text-[11px] text-slate-400">Charged once per student who registers under this batch — separate from, and on top of, the school base fee above. Leave blank unless this batch needs its own rate.</span>
+                </label>
                 <p v-if="addBatchForm.errors.code" class="text-xs text-red-600">{{ addBatchForm.errors.code }}</p>
                 <div class="flex gap-2">
                     <button type="submit" class="btn-primary text-sm" :disabled="addBatchForm.processing">Add batch</button>
@@ -84,6 +89,7 @@
                                 <input v-model="editBatchForm.registration_open" type="datetime-local" class="field !py-1 !text-xs">
                                 <input v-model="editBatchForm.registration_close" type="datetime-local" class="field !py-1 !text-xs">
                             </div>
+                            <input v-model.number="editBatchForm.student_registration_fee" type="number" min="0" step="0.01" class="field !py-1 !text-xs w-full" placeholder="Student registration fee (₹/student, blank = use event default)">
                         </div>
                         <div class="flex gap-2 shrink-0">
                             <button type="button" class="text-xs font-semibold text-[#0f3d7a]" @click="saveBatchEdit(batch)">Save</button>
@@ -96,6 +102,7 @@
                             <span class="ml-2 text-xs font-mono text-slate-400">{{ batch.code }}</span>
                             <div class="text-xs text-slate-400 mt-0.5">
                                 <span v-if="batch.school_base_fee">₹{{ batch.school_base_fee }} base fee</span>
+                                <span v-if="batch.student_registration_fee" class="ml-2">₹{{ batch.student_registration_fee }}/student</span>
                                 <span v-if="batch.registration_open || batch.registration_close" class="ml-2">
                                     Reg: {{ formatDate(batch.registration_open) }} &rarr; {{ formatDate(batch.registration_close) }}
                                 </span>
@@ -361,10 +368,10 @@ const assignForm = useForm({ phase_id: null, item_ids: [] });
 const showAddBatch = ref(false);
 const editBatchId = ref(null);
 const addBatchForm = useForm({
-    name: '', code: '', school_base_fee: 0, invoice_prefix: '',
+    name: '', code: '', school_base_fee: 0, student_registration_fee: null, invoice_prefix: '',
     registration_open: '', registration_close: '',
 });
-const editBatchForm = reactive({ name: '', code: '', school_base_fee: 0, invoice_prefix: '', registration_open: '', registration_close: '' });
+const editBatchForm = reactive({ name: '', code: '', school_base_fee: 0, student_registration_fee: null, invoice_prefix: '', registration_open: '', registration_close: '' });
 
 // Per-phase allowed-region editing — posts to the existing generic
 // phases/{phase}/regions endpoint (FestPhasedWorkflowController::syncPhaseRegions), which
@@ -462,6 +469,7 @@ function startBatchEdit(batch) {
         name: batch.name,
         code: batch.code,
         school_base_fee: Number(batch.school_base_fee ?? 0),
+        student_registration_fee: batch.student_registration_fee !== null && batch.student_registration_fee !== undefined ? Number(batch.student_registration_fee) : null,
         invoice_prefix: batch.invoice_prefix ?? '',
         registration_open: toDatetimeLocal(batch.registration_open),
         registration_close: toDatetimeLocal(batch.registration_close),

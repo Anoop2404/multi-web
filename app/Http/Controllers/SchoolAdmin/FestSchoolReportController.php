@@ -192,7 +192,7 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $analytics = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event]);
-        $rows = $analytics->studentWiseBrowserRows($this->school->id, $request->input('search'));
+        $rows = $this->stripChestNumbers($analytics->studentWiseBrowserRows($this->school->id, $request->input('search')));
 
         $base = $this->schoolReportsBase($program, $event);
 
@@ -390,6 +390,29 @@ class FestSchoolReportController extends SchoolAdminController
         return [$itemsByTeacher, $marksByTeacher];
     }
 
+    /**
+     * Chest numbers are Sahodaya-admin-only information — schools don't see them until
+     * assigned on fest day (see festDay() below, a separate, non-report page).
+     * studentWiseBrowserRows() is shared with Sahodaya-admin (which does need this
+     * field), so the strip happens here rather than in that shared service.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function stripChestNumbers(array $rows): array
+    {
+        return array_map(function (array $row) {
+            if (isset($row['items']) && is_array($row['items'])) {
+                $row['items'] = array_map(
+                    fn (array $item) => \Illuminate\Support\Arr::except($item, ['chest_no']),
+                    $row['items'],
+                );
+            }
+
+            return \Illuminate\Support\Arr::except($row, ['chest_no']);
+        }, $rows);
+    }
+
     /** @param array<int, array<string, mixed>> $rows */
     private function rowsWithAdmissionNumbers(array $rows): array
     {
@@ -421,13 +444,14 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $analytics = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event]);
-        $rows = $analytics->studentWiseBrowserRows($this->school->id, $request->input('search'));
+        $rows = $this->stripChestNumbers($analytics->studentWiseBrowserRows($this->school->id, $request->input('search')));
 
         $reportService = app(\App\Services\Events\FestReportService::class, ['event' => $event]);
 
         return $reportService->renderPdf('fest.reports.student-wise', [
-            'event'    => $event,
-            'students' => $rows,
+            'event'        => $event,
+            'students'     => $rows,
+            'showChestNo'  => false,
             ...$reportService->brandingData(),
         ], \Illuminate\Support\Str::slug($event->title).'-student-wise-report.pdf');
     }
@@ -619,6 +643,11 @@ class FestSchoolReportController extends SchoolAdminController
             $request->string('item_id')->toString() ?: null,
         );
 
+        // Chest numbers are Sahodaya-admin-only information — schools don't see them until
+        // assigned on fest day. build() is shared with Sahodaya-admin (which does need
+        // this field), so the strip happens here rather than in that shared service.
+        $rows = $data['rows']->through(fn (array $row) => \Illuminate\Support\Arr::except($row, ['chest_no']));
+
         return $this->inertia('School/Events/ReportRegistrationRegister', array_merge(
             $this->schoolItemHeadReportContext($event, $program),
             [
@@ -626,7 +655,7 @@ class FestSchoolReportController extends SchoolAdminController
                 'programMeta'     => $meta,
                 'school'          => $this->school->only('id', 'name'),
                 'event'           => $event->only('id', 'title', 'status', 'level_round'),
-                'rows'            => $data['rows'],
+                'rows'            => $rows,
                 'schoolSummary'   => $data['school_summaries'][0] ?? null,
                 'totals'          => $data['totals'],
                 'paymentsUrl'     => "/school-admin/{$this->school->id}/payments",
@@ -640,7 +669,7 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        return $register->exportCsv($event, $this->school->id);
+        return $register->exportCsv($event, $this->school->id, includeChestNo: false);
     }
 
     public function exportRegistrationRegisterPdf(
@@ -659,6 +688,7 @@ class FestSchoolReportController extends SchoolAdminController
     public function idCards(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        $service->hideChestNo = true;
 
         $meta = SchoolFestProgram::meta($program);
         $event->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')]);
@@ -692,6 +722,7 @@ class FestSchoolReportController extends SchoolAdminController
     public function idCardsJson(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        $service->hideChestNo = true;
 
         app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
             $event, $this->school, $request->integer('head_id') ?: null,
@@ -728,6 +759,7 @@ class FestSchoolReportController extends SchoolAdminController
         @set_time_limit(300);
 
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        $service->hideChestNo = true;
 
         app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
             $event, $this->school, $request->integer('head_id') ?: null,
@@ -758,6 +790,7 @@ class FestSchoolReportController extends SchoolAdminController
     public function idCardsPdf(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        $service->hideChestNo = true;
 
         app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
             $event, $this->school, $request->integer('head_id') ?: null,
@@ -799,6 +832,7 @@ class FestSchoolReportController extends SchoolAdminController
     public function idCardsPdfAllHeads(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        $service->hideChestNo = true;
 
         app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $this->school);
 
@@ -841,6 +875,7 @@ class FestSchoolReportController extends SchoolAdminController
     public function idCardsPdfAllItems(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        $service->hideChestNo = true;
 
         app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $this->school);
 
@@ -1150,11 +1185,13 @@ class FestSchoolReportController extends SchoolAdminController
         ]);
     }
 
-    public function exportNumberingRegister(Request $request, string $tenantId, FestEvent $event, string $program)
+    public function exportNumberingRegister(Request $request, string $tenantId, FestEvent $event, string $program, FestSchoolReportExportService $exports)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        return (new FestEventReportAnalyticsService($event))->exportNumberingRegister($this->school->id);
+        $rows = (new FestSchoolReportAnalyticsService($event, $this->school->id))->numberingRegisterRows();
+
+        return $exports->numberingRegisterExcel($event, $rows);
     }
 
     public function pendingApprovals(Request $request, string $tenantId, FestEvent $event, string $program)

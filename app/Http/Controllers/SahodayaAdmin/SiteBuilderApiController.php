@@ -357,7 +357,7 @@ class SiteBuilderApiController extends SahodayaAdminController
         ]);
     }
 
-    public function setExperienceVersion(Request $request): JsonResponse
+    public function setExperienceVersion(Request $request, SahodayaTemplateApplier $applier, SahodayaContentReadiness $readiness): JsonResponse
     {
         $data = $request->validate([
             'site_id'            => 'required|integer',
@@ -365,17 +365,37 @@ class SiteBuilderApiController extends SahodayaAdminController
         ]);
 
         $site = WebsiteSite::resolveForTenant($this->sahodaya->id, (int) $data['site_id']);
-        $site->update(['experience_version' => $data['experience_version']]);
 
-        if ($data['experience_version'] === 'v2' && empty($site->template_key)) {
-            $site->update(['template_key' => 'events-results-live']);
+        if ($data['experience_version'] === 'v2' && ! $site->sections()->exists()) {
+            // No section actually scoped to this site yet — apply a real template (same
+            // mechanism the Experience tab's "Apply" + "Publish" flow uses) instead of just
+            // flipping the flag and leaving visitors on the legacy fallback page.
+            $templateKey = $site->template_key && array_key_exists($site->template_key, SahodayaWebsiteTemplateCatalog::all())
+                ? $site->template_key
+                : 'network-directory';
+            $template = SahodayaWebsiteTemplateCatalog::get($templateKey);
+            $context = SahodayaTenantBranding::context($this->sahodaya);
+            $applier->applyDraft($this->sahodaya, $site, $templateKey, $template, $context);
+
+            $report = $readiness->inspect($this->sahodaya, $site->fresh());
+            if (! $report['ready']) {
+                $applier->cancelDraft($site);
+
+                return response()->json([
+                    'message' => 'Could not switch to the Modern (V2) website yet: '.implode(' ', $report['errors']),
+                ], 422);
+            }
+
+            $applier->publishDraft($site);
+        } else {
+            $site->update(['experience_version' => $data['experience_version']]);
         }
 
         $this->sahodaya->invalidateCache();
 
         return response()->json([
             'saved'              => true,
-            'experience_version' => $site->experience_version,
+            'experience_version' => $site->fresh()->experience_version,
             'site'               => $this->sitePayload($site->fresh()),
         ]);
     }

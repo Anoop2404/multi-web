@@ -24,6 +24,7 @@ use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class FestPortalController extends Controller
 {
@@ -84,14 +85,30 @@ class FestPortalController extends Controller
         );
         $scopes = $this->scoreboards->scopes($event);
 
-        $itemsEventId = $selectedScope['event_id'] ?: $event->id;
-        $items = FestEventItem::where('event_id', $itemsEventId)
+        // A single region/cluster/finale/phase-region scope maps to one real event.
+        // "Overall" has no registrations of its own once the hub has partition children —
+        // every child (region, cluster, finale, or phase-region leaf) carries its own
+        // synced item copies, so gather all of them rather than falling back to the hub.
+        $itemsEventIds = $selectedScope['event_id']
+            ? [(int) $selectedScope['event_id']]
+            : collect($scopes)->pluck('event_id')->filter()->map(fn ($id) => (int) $id)->all();
+        if ($itemsEventIds === []) {
+            $itemsEventIds = [$event->id];
+        }
+
+        $itemGroups = FestEventItem::whereIn('event_id', $itemsEventIds)
             ->orderBy('display_order')
-            ->get(['id', 'title', 'stage_type', 'category']);
+            ->get(['id', 'title', 'stage_type', 'category', 'event_id'])
+            ->groupBy('event_id')
+            ->map(fn ($groupItems, $groupEventId) => [
+                'label' => collect($scopes)->firstWhere('event_id', (int) $groupEventId)['label'] ?? null,
+                'items' => $groupItems->values(),
+            ])
+            ->values();
 
         return $this->renderPublic('public.fest.show', $tenant, [
             'event' => $event,
-            'items' => $items,
+            'itemGroups' => $itemGroups,
             'scopes' => $scopes,
             'selectedScope' => $selectedScope,
             'scopeResultsPublished' => (bool) $selectedScope['results_published'],
@@ -196,9 +213,24 @@ class FestPortalController extends Controller
             ->orderBy('position')
             ->get();
 
+        // Pair/group items register every performer as their own FestParticipant row
+        // sharing one registration_id (FestRegistrationCreateService) — only the row a
+        // judge happened to enter the mark against is on $mark->participant, so batch-
+        // fetch every co-performer up front rather than trusting the single mark row.
+        $rosterByRegistration = FestParticipant::whereIn(
+            'registration_id',
+            $marks->pluck('participant.registration_id')->filter()->unique()->values()
+        )
+            ->where('participant_role', 'performer')
+            ->with(['student', 'teacher'])
+            ->get()
+            ->groupBy('registration_id');
+
+        $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
+
         $itemResults = $marks
             ->groupBy('item_id')
-            ->map(function ($group) use ($event) {
+            ->map(function ($group) use ($event, $rosterByRegistration, $categoryColumn) {
                 /** @var FestMark $first */
                 $first = $group->first();
 
@@ -206,11 +238,32 @@ class FestPortalController extends Controller
                     'item_id' => $first->item_id,
                     'item' => $first->item?->title,
                     'head' => $first->item?->head?->name,
-                    'winners' => $group->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event))->values()->all(),
+                    'category' => $first->item?->{$categoryColumn},
+                    'winners' => $group->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $rosterByRegistration))->values()->all(),
                 ];
             })
-            ->values()
-            ->all();
+            ->values();
+
+        // Group item-wise results under the same category labels/order already used by
+        // the Category-wise tab above, so "region-wise, category-wise" results line up.
+        $itemResultsByCategory = collect($categories)
+            ->map(fn (string $key) => [
+                'key' => $key,
+                'label' => $this->scoreboards->categoryLabel($event, $key),
+                'items' => $itemResults->where('category', $key)->values()->all(),
+            ])
+            ->filter(fn (array $group) => count($group['items']) > 0)
+            ->values();
+
+        $uncategorized = $itemResults->whereNotIn('category', $categories)->values()->all();
+        if ($uncategorized !== []) {
+            $itemResultsByCategory->push([
+                'key' => null,
+                'label' => 'Other Items',
+                'items' => $uncategorized,
+            ]);
+        }
+        $itemResultsByCategory = $itemResultsByCategory->all();
 
         $individualResults = $marks
             ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event) + [
@@ -229,7 +282,7 @@ class FestPortalController extends Controller
             'phaseCumulativeBoard' => $phaseCumulativeBoard,
             'phaseBreakdown' => $phaseBreakdown,
             'categoryBoards' => $categoryBoards,
-            'itemResults' => $itemResults,
+            'itemResultsByCategory' => $itemResultsByCategory,
             'individualResults' => $individualResults,
             'championship' => $championship,
             'publishedAt' => $publishedAt,
@@ -540,17 +593,39 @@ class FestPortalController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function publicWinnerRow(FestMark $mark, FestEvent $event): array
+    private function publicWinnerRow(FestMark $mark, FestEvent $event, ?Collection $rosterByRegistration = null): array
     {
-        return [
+        $participant = $mark->participant;
+        $person = $participant?->student ?? $participant?->teacher;
+
+        $row = [
             'position' => $mark->position,
             'grade' => $mark->grade,
             'score' => $mark->score,
             'measurement' => trim(($mark->measurement_value ?? '').' '.($mark->measurement_unit ?? '')),
-            'participant' => $mark->participant?->student?->name ?? $mark->participant?->teacher?->name,
-            'reference' => $mark->participant ? $this->visibility->publicReference($event, $mark->participant) : null,
-            'school' => $mark->participant?->registration?->school?->name,
+            'participant' => $person?->name,
+            'photo' => $person?->photoDataUri(),
+            'reference' => $participant ? $this->visibility->publicReference($event, $participant) : null,
+            'school' => $participant?->registration?->school?->name,
         ];
+
+        // Pair/group items: every co-performer on the same registration, not just
+        // whichever one the mark happens to be attached to (see note where this is built).
+        if ($rosterByRegistration && $participant?->registration_id) {
+            $row['team'] = $rosterByRegistration->get($participant->registration_id, collect())
+                ->map(function (FestParticipant $member) {
+                    $memberPerson = $member->student ?? $member->teacher;
+
+                    return [
+                        'name' => $memberPerson?->name,
+                        'photo' => $memberPerson?->photoDataUri(),
+                    ];
+                })
+                ->values()
+                ->all();
+        }
+
+        return $row;
     }
 
     public function records(int $eventId)

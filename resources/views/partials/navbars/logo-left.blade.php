@@ -30,16 +30,18 @@
             </div>
         </a>
 
-        <div class="hidden lg:flex items-center gap-5">
-            @foreach($items as $item)
-                @php
-                    $isCurrent = request()->url() === url($item['url']);
-                @endphp
-                <a href="{{ $item['url'] }}"
-                   class="text-xs font-bold transition-colors py-1.5 border-b-2 {{ $isCurrent ? 'text-primary border-primary font-extrabold' : 'text-slate-600 border-transparent hover:text-primary hover:border-slate-300' }}">
-                    {{ $item['label'] }}
-                </a>
-            @endforeach
+        <div class="hidden lg:flex items-center gap-4 min-w-0">
+            <div class="flex items-center gap-4 nav-scroll">
+                @foreach($items as $item)
+                    @php
+                        $isCurrent = request()->url() === url($item['url']);
+                    @endphp
+                    <a href="{{ $item['url'] }}"
+                       class="text-xs font-bold transition-colors py-1.5 border-b-2 whitespace-nowrap {{ $isCurrent ? 'text-primary border-primary font-extrabold' : 'text-slate-600 border-transparent hover:text-primary hover:border-slate-300' }}">
+                        {{ $item['label'] }}
+                    </a>
+                @endforeach
+            </div>
             @include('partials.navbars.portal-cta', ['navConfig' => $navConfig ?? []])
         </div>
 

@@ -69,6 +69,11 @@
     .v2-chip-c { background: color-mix(in srgb, var(--color-chip-c) 15%, #fff); color: color-mix(in srgb, var(--color-chip-c) 90%, #000); }
     .v2-chip-d { background: color-mix(in srgb, var(--color-chip-d) 14%, #fff); color: color-mix(in srgb, var(--color-chip-d) 90%, #000); }
 
+    {{-- Horizontal nav-item rows: scrolls instead of wrapping when a tenant configures many menu items --}}
+    .nav-scroll { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+    .nav-scroll::-webkit-scrollbar { display: none; }
+    .nav-scroll > * { flex-shrink: 0; }
+
     {{-- Image character: applied via .v2-media on photographic <img> tags --}}
     .v2-media { filter: none; }
     @if(($theme['images'] ?? 'documentary') === 'vibrant')

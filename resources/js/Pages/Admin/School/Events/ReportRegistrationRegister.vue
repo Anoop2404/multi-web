@@ -3,7 +3,7 @@
         <PageHeader
             :title="`Registration & Fees — ${event.title}`"
             :eyebrow="programLabel"
-            description="Fest ID per student, item registrations, chest numbers, and your school's fee status."
+            description="Fest ID per student, item registrations, and your school's fee status."
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>

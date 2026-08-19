@@ -29,6 +29,14 @@ class FestReportService
 {
     private bool $preview = false;
 
+    /**
+     * Chest numbers are Sahodaya-admin-only information — schools don't see them until
+     * assigned on fest day. FestSchoolReportController::admitCards() sets this true
+     * before calling export('admit-cards', ...); Sahodaya-admin's export leaves the
+     * default, since it does need this field.
+     */
+    public bool $hideChestNo = false;
+
     public function __construct(public FestEvent $event, private ?FestReportScope $scope = null) {}
 
     /** @return list<int> */
@@ -67,9 +75,12 @@ class FestReportService
     /**
      * Sahodaya branding (org name + logo data URI) for PDF report headers.
      *
+     * Public for the same reason renderPdf() above is: FestSchoolReportController's
+     * exportStudentWisePdf() calls this on an externally-constructed instance.
+     *
      * @return array{orgName: string, logoSrc: ?string}
      */
-    private function brandingData(): array
+    public function brandingData(): array
     {
         $sahodaya = Tenant::find($this->event->tenant_id);
 
@@ -451,7 +462,15 @@ class FestReportService
         return str($this->event->title)->slug()->limit(40)->toString();
     }
 
-    private function renderPdf(
+    /**
+     * Public: FestSchoolReportController::exportStudentWisePdf() calls this on an
+     * externally-constructed FestReportService instance (every other call site is
+     * internal, $this->renderPdf(...)) — this was 'private' and that call would fatal
+     * with "Call to private method from scope FestSchoolReportController" for every
+     * school trying to download the student-wise PDF, pre-existing and unrelated to
+     * chest-number handling, found while adding test coverage for that fix.
+     */
+    public function renderPdf(
         string $view,
         array $data,
         string $filename,
@@ -1318,6 +1337,7 @@ class FestReportService
         return $this->renderPdf('fest.reports.admit-cards', [
             'event'        => $this->event,
             'participants' => $participants,
+            'showChestNo'  => ! $this->hideChestNo,
             ...$this->brandingData(),
         ], $this->slug().'-admit-cards.pdf');
     }

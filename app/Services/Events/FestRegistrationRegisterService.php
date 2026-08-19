@@ -201,7 +201,14 @@ class FestRegistrationRegisterService
      *                                    — kept in sync with the browser view so both read
      *                                    exactly the same rows (gap G3).
      */
-    public function exportCsv(FestEvent $event, ?string $schoolId = null, ?array $schoolIds = null, ?int $regionId = null, ?array $eventIds = null): StreamedResponse
+    /**
+     * @param  bool  $includeChestNo  Chest numbers are Sahodaya-admin-only information —
+     *                                schools don't see them until assigned on fest day.
+     *                                FestSchoolReportController's export passes false;
+     *                                Sahodaya-admin's export (which does need this column)
+     *                                leaves the default.
+     */
+    public function exportCsv(FestEvent $event, ?string $schoolId = null, ?array $schoolIds = null, ?int $regionId = null, ?array $eventIds = null, bool $includeChestNo = true): StreamedResponse
     {
         $data = $this->build($event, $schoolId, null, 50, null, null, $schoolIds, $eventIds);
         $slug = str($event->title)->slug('-');
@@ -216,14 +223,15 @@ class FestRegistrationRegisterService
             ? "{$slug}-registration-register-{$schoolId}.csv"
             : "{$slug}-registration-register{$regionSuffix}.csv";
 
-        return response()->streamDownload(function () use ($data) {
+        return response()->streamDownload(function () use ($data, $includeChestNo) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, [
-                'School', 'Student', 'School reg no', 'Fest ID', 'Item reg no', 'Item', 'Reg status', 'Role',
-                'Chest no', 'Item fee', 'School total due', 'Fee status',
-            ]);
+            $header = ['School', 'Student', 'School reg no', 'Fest ID', 'Item reg no', 'Item', 'Reg status', 'Role'];
+            if ($includeChestNo) {
+                $header[] = 'Chest no';
+            }
+            fputcsv($out, array_merge($header, ['Item fee', 'School total due', 'Fee status']));
             foreach ($data['rows'] as $row) {
-                fputcsv($out, [
+                $line = [
                     $row['school_name'],
                     $row['participant_name'],
                     $row['participant_reg_no'],
@@ -232,11 +240,11 @@ class FestRegistrationRegisterService
                     $row['item_title'],
                     $row['registration_status'],
                     $row['participant_role'],
-                    $row['chest_no'],
-                    $row['item_fee'],
-                    $row['school_total_due'],
-                    $row['school_fee_status'],
-                ]);
+                ];
+                if ($includeChestNo) {
+                    $line[] = $row['chest_no'];
+                }
+                fputcsv($out, array_merge($line, [$row['item_fee'], $row['school_total_due'], $row['school_fee_status']]));
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);

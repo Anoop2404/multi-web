@@ -115,6 +115,10 @@
                         <span v-else class="text-[11px] font-semibold text-slate-400">Click to activate V2</span>
                     </div>
                 </div>
+
+                <div v-if="experienceVersionError" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
+                    {{ experienceVersionError }}
+                </div>
             </div>
 
             <div v-if="experienceDraft" class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white bg-gradient-to-r from-indigo-950 to-purple-800">
@@ -733,10 +737,12 @@ const publicWebsiteEnabled = ref(props.publicWebsiteEnabled ?? true);
 const publicWebsiteSaving = ref(false);
 const activeExperienceVersion = ref(props.currentSite?.experience_version ?? 'v1');
 const experienceVersionSaving = ref(false);
+const experienceVersionError = ref('');
 
 async function setExperienceVersion(version) {
     if (!props.currentSite?.id || experienceVersionSaving.value) return;
     experienceVersionSaving.value = true;
+    experienceVersionError.value = '';
     try {
         const res = await apiPost('/site-builder/api/experience-version', {
             site_id: props.currentSite.id,
@@ -750,6 +756,7 @@ async function setExperienceVersion(version) {
         }
     } catch (e) {
         console.error('Failed to set experience version:', e);
+        experienceVersionError.value = e.message || 'Unable to switch website version.';
     } finally {
         experienceVersionSaving.value = false;
     }

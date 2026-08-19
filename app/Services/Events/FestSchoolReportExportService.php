@@ -43,10 +43,15 @@ class FestSchoolReportExportService
         $data = $register->build($event, $school->id);
         $slug = str($event->title)->slug()->limit(40);
 
+        // Chest numbers are Sahodaya-admin-only information — schools don't see them until
+        // assigned on fest day. build() is shared with Sahodaya-admin (which does need this
+        // field), so the strip happens here rather than in that shared service.
+        $rows = collect($data['rows'])->map(fn (array $row) => \Illuminate\Support\Arr::except($row, ['chest_no']));
+
         return $this->renderPdf('fest.reports.school-registration-register', [
             'event'   => $event,
             'school'  => $school,
-            'rows'    => $data['rows'],
+            'rows'    => $rows,
             'summary' => $data['school_summaries'][0] ?? null,
             ...$this->brandingData($event),
         ], "{$slug}-registration-register.pdf", true);
@@ -101,13 +106,39 @@ class FestSchoolReportExportService
             $r['class'] ?? '—',
             $r['fest_id'] ?? '—',
             $r['item_reg'] ?? '—',
-            $r['chest_no'] ?? '—',
             ucfirst((string) ($r['status'] ?? '—')),
         ]);
 
         return ExcelExport::download(
             str($event->title)->slug()->limit(30).'-'.str($title)->slug()->limit(24).'-participants',
-            ['Participant', 'Reg no', 'Class', 'Fest ID', 'Item reg', 'Chest', 'Status'],
+            ['Participant', 'Reg no', 'Class', 'Fest ID', 'Item reg', 'Status'],
+            $data,
+        );
+    }
+
+    /**
+     * School-only twin of FestEventReportAnalyticsService::exportNumberingRegister() —
+     * same column layout minus the Chest column, since chest numbers are Sahodaya-admin-
+     * only information (see FestSchoolReportAnalyticsService::numberingRegisterRows()).
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    public function numberingRegisterExcel(FestEvent $event, array $rows): StreamedResponse
+    {
+        $data = collect($rows)->map(fn (array $r) => [
+            $r['head_name'] ?? '—',
+            $r['item'] ?? '',
+            $r['name'] ?? '',
+            $r['reg_no'] ?? '',
+            $r['reg_status'] ?? '',
+            $r['role'] ?? '',
+            $r['fest_id'] ?? '',
+            $r['item_reg'] ?? '',
+        ]);
+
+        return ExcelExport::download(
+            str($event->title)->slug()->limit(40).'-numbering-register',
+            ['Head', 'Item', 'Participant', 'Reg no', 'Reg status', 'Role', 'Fest ID', 'Item reg'],
             $data,
         );
     }

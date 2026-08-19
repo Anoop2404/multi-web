@@ -33,17 +33,17 @@
             </button>
         </div>
 
-        <div class="hidden lg:flex items-center gap-1 pb-3 -mt-1">
+        <div class="hidden lg:flex items-center gap-0.5 pb-3 -mt-1 nav-scroll">
             @foreach($items as $item)
                 @if(!empty($item['children']))
-                <div class="relative" @mouseenter="academicOpen = true" @mouseleave="academicOpen = false">
+                <div class="relative shrink-0" @mouseenter="academicOpen = true" @mouseleave="academicOpen = false">
                     <button type="button"
-                            class="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition flex items-center gap-1">
+                            class="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition flex items-center gap-1 whitespace-nowrap">
                         {{ $item['label'] }}
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="academicOpen" x-cloak x-transition
-                         class="absolute left-0 top-full pt-1 w-56">
+                         class="absolute left-0 top-full pt-1 w-56 z-10">
                         <div class="bg-white rounded-xl shadow-xl border border-gray-100 py-2 overflow-hidden">
                             @foreach($item['children'] as $child)
                             <a href="{{ $child['url'] }}"
@@ -57,7 +57,7 @@
                 </div>
                 @else
                 <a href="{{ $item['url'] }}"
-                   class="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition"
+                   class="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition whitespace-nowrap shrink-0"
                    @if($item['external'] ?? false) target="_blank" rel="noopener" @endif>
                     {{ $item['label'] }}
                 </a>

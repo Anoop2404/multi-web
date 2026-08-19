@@ -2,7 +2,7 @@
     <SchoolAdminLayout :title="`${event.title} — Reports Catalog`" :school="school" :show-header-title="false">
         <div class="reports-shell">
             <PageHeader :title="`${event.title} — Reports Catalog`" :eyebrow="`${programLabel} Event Reports`"
-                        description="Browse and export every report for this event — admit cards, chest numbers, registration registers, score sheets, and certificates.">
+                        description="Browse and export every report for this event — admit cards, registration registers, score sheets, and certificates.">
                 <template #actions>
                     <Link :href="`${programBase}/reports`" class="btn-secondary text-sm">← All events</Link>
                 </template>

@@ -67,11 +67,20 @@ class FestSchoolReportAnalyticsService
             ->headWiseSummary($this->schoolId);
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * Chest numbers are Sahodaya-admin-only information (see numberingRegisterRows()'s
+     * docblock above) — headWiseParticipantRows() delegates to the shared
+     * FestEventReportAnalyticsService, so the strip happens here.
+     *
+     * @return list<array<string, mixed>>
+     */
     public function headWiseParticipantRows(?int $headId = null): array
     {
-        return app(FestEventReportAnalyticsService::class, ['event' => $this->event])
-            ->headWiseParticipantRows($headId, $this->schoolId);
+        return array_map(
+            fn (array $row) => \Illuminate\Support\Arr::except($row, ['chest_no']),
+            app(FestEventReportAnalyticsService::class, ['event' => $this->event])
+                ->headWiseParticipantRows($headId, $this->schoolId),
+        );
     }
 
     /** @return array{gold: int, silver: int, bronze: int, total_score: float, items: list<array<string, mixed>>} */
@@ -137,18 +146,31 @@ class FestSchoolReportAnalyticsService
             ->assignmentCompletenessTotals($rows);
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * Chest numbers are Sahodaya-admin-only information — schools don't see them until
+     * assigned on fest day (see FestRegistrationController::festDay(), a separate,
+     * non-report page). numberingRegisterRows()/numberingRegisterPaginated() delegate to
+     * the shared FestEventReportAnalyticsService (also used by Sahodaya-admin, which does
+     * need this field), so the strip happens here at the school-only wrapper rather than
+     * in that shared service.
+     *
+     * @return list<array<string, mixed>>
+     */
     public function numberingRegisterRows(): array
     {
-        return app(FestEventReportAnalyticsService::class, ['event' => $this->event])
-            ->numberingRegisterRows($this->schoolId);
+        return array_map(
+            fn (array $row) => \Illuminate\Support\Arr::except($row, ['chest_no']),
+            app(FestEventReportAnalyticsService::class, ['event' => $this->event])
+                ->numberingRegisterRows($this->schoolId),
+        );
     }
 
     /** On-screen paginated variant — see docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md §7 Phase 4. */
     public function numberingRegisterPaginated(int $page = 1, int $perPage = 50): \Illuminate\Pagination\LengthAwarePaginator
     {
         return app(FestEventReportAnalyticsService::class, ['event' => $this->event])
-            ->numberingRegisterPaginated($this->schoolId, $page, $perPage);
+            ->numberingRegisterPaginated($this->schoolId, $page, $perPage)
+            ->through(fn (array $row) => \Illuminate\Support\Arr::except($row, ['chest_no']));
     }
 
     /** @return list<array<string, mixed>> */
@@ -200,14 +222,10 @@ class FestSchoolReportAnalyticsService
                 'class'      => $p->student->schoolClass?->name,
                 'photo_url'  => $p->student->photoUrl(),
                 'fest_id'    => $p->level_registration_number,
-                'chest_no'   => $p->chest_no,
                 'items'      => [],
             ];
             if ($p->level_registration_number) {
                 $byStudent[$sid]['fest_id'] = $p->level_registration_number;
-            }
-            if ($p->chest_no) {
-                $byStudent[$sid]['chest_no'] = $p->chest_no;
             }
             $byStudent[$sid]['items'][] = [
                 'item_id'   => $p->registration?->item_id,
@@ -215,7 +233,6 @@ class FestSchoolReportAnalyticsService
                 'head_name' => $p->registration?->item?->head?->name,
                 'item'      => $p->registration?->item?->title,
                 'item_reg'  => $p->item_registration_number,
-                'chest_no'  => $p->chest_no,
             ];
         }
 
@@ -266,7 +283,6 @@ class FestSchoolReportAnalyticsService
             'class'       => $m->participant?->student?->schoolClass?->name,
             'photo_url'   => $m->participant?->student?->photoUrl(),
             'fest_id'     => $m->participant?->level_registration_number,
-            'chest_no'    => $m->participant?->chest_no,
             'position'    => $m->position,
             'grade'       => $m->grade,
             'score'       => $m->score,
@@ -364,7 +380,6 @@ class FestSchoolReportAnalyticsService
                 'photo_url'  => $p->student?->photoUrl(),
                 'fest_id'    => $p->level_registration_number,
                 'item_reg'   => $p->item_registration_number,
-                'chest_no'   => $p->chest_no,
                 'status'     => $p->registration?->status,
             ])
             ->values()

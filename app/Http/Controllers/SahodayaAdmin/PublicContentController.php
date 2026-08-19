@@ -84,9 +84,13 @@ class PublicContentController extends SahodayaAdminController
                 // earlier version of this toggle only flipped the flag without applying content) —
                 // apply a real template, same mechanism the Site Builder's "apply experience" uses,
                 // instead of leaving visitors on the legacy fallback page.
+                // 'network-directory' is the general-purpose experience (member directory, about,
+                // programmes) — the right default for a tenant with no experience picked yet.
+                // 'events-results-live' and the other templates are season/purpose-specific and
+                // should only apply when explicitly chosen via the Site Builder.
                 $templateKey = $site->template_key && array_key_exists($site->template_key, SahodayaWebsiteTemplateCatalog::all())
                     ? $site->template_key
-                    : 'events-results-live';
+                    : 'network-directory';
                 $template = SahodayaWebsiteTemplateCatalog::get($templateKey);
                 $context = SahodayaTenantBranding::context($this->sahodaya);
                 $applier->applyDraft($this->sahodaya, $site, $templateKey, $template, $context);

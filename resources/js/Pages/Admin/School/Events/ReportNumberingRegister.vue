@@ -1,7 +1,7 @@
 <template>
     <SchoolAdminLayout :title="`Numbering register — ${event.title}`" :school="school" :show-header-title="false">
         <PageHeader :title="`Numbering register — ${event.title}`" :eyebrow="programLabel"
-                    description="Fest ID, item reg and chest numbers assigned to your athletes.">
+                    description="Fest ID and item reg numbers assigned to your athletes.">
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
                 <a :href="xlsUrl" class="btn-secondary text-sm">Export Excel ↓</a>
@@ -11,7 +11,7 @@
         <div class="card overflow-hidden p-0">
             <table class="data-table text-sm">
                 <thead>
-                    <tr><th>Head</th><th>Item</th><th>Participant</th><th>Admission No</th><th>Status</th><th>Fest ID</th><th>Item reg</th><th>Chest</th></tr>
+                    <tr><th>Head</th><th>Item</th><th>Participant</th><th>Admission No</th><th>Status</th><th>Fest ID</th><th>Item reg</th></tr>
                 </thead>
                 <tbody>
                     <tr v-for="row in rows.data" :key="row.participant_id">
@@ -22,9 +22,8 @@
                         <td><span :class="row.reg_status === 'approved' ? 'text-emerald-700' : 'text-amber-700'">{{ row.reg_status }}</span></td>
                         <td class="font-mono text-xs">{{ row.fest_id ?? '—' }}</td>
                         <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
-                        <td class="font-mono font-bold">{{ row.chest_no ?? '—' }}</td>
                     </tr>
-                    <tr v-if="!rows.data.length"><td colspan="8" class="p-6 text-center text-slate-400">No registrations yet.</td></tr>
+                    <tr v-if="!rows.data.length"><td colspan="7" class="p-6 text-center text-slate-400">No registrations yet.</td></tr>
                 </tbody>
             </table>
             <div v-if="rows.last_page > 1" class="px-4 py-3 border-t border-gray-100 flex flex-wrap justify-center gap-1">
