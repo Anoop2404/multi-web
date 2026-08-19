@@ -20,6 +20,10 @@ class SchoolDocumentDownloadGateService
     /** Sahodaya annual membership fee verified for the current academic year. */
     public function membershipFeeCleared(Tenant $school): bool
     {
+        if ($school->membership_status === 'approved') {
+            return true;
+        }
+
         $year = AcademicYear::forSchool($school);
 
         $registration = Registration::where('school_id', $school->id)
