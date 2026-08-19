@@ -105,7 +105,7 @@ class FestHeadItemNavigationService
         return [
             'headItemGroups'  => $groups,
             'headsForFilter'    => $headsForFilter,
-            'hasItemHeads'      => $heads->isNotEmpty(),
+            'hasItemHeads'      => $heads->isNotEmpty() || $groups !== [],
         ];
     }
 
@@ -246,7 +246,7 @@ class FestHeadItemNavigationService
         return [
             'headItemGroups'   => $groups,
             'headsForFilter'   => $headsForFilter,
-            'hasItemHeads'     => $heads->isNotEmpty(),
+            'hasItemHeads'     => $heads->isNotEmpty() || $groups !== [],
             'unassignedItems'  => $unassigned,
         ];
     }

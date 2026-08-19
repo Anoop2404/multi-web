@@ -55,7 +55,7 @@ export function useReportHeadFilters(baseUrl, rowsSource, options = {}) {
 
     const headItemGroups = computed(() => page.props.headItemGroups ?? []);
     const headsForFilter = computed(() => page.props.headsForFilter ?? []);
-    const hasItemHeads = computed(() => page.props.hasItemHeads ?? false);
+    const hasItemHeads = computed(() => Boolean(page.props.hasItemHeads || headItemGroups.value.length > 0));
 
     const displayRows = computed(() => {
         const rows = typeof rowsSource === 'function'
