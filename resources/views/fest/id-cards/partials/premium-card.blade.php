@@ -74,7 +74,7 @@
                 <tr>
                     <td class="pcard__meta-label">Sahodaya</td>
                     <td class="pcard__meta-sep">:</td>
-                    <td class="pcard__meta-val">{{ $card['sahodaya_name'] ?? ($clusterName ?? 'Sahodaya') }}</td>
+                    <td class="pcard__meta-val">{{ (!empty($card['sahodaya_name']) && $card['sahodaya_name'] !== 'Sahodaya') ? $card['sahodaya_name'] : ($clusterName ?? 'Sahodaya') }}</td>
                 </tr>
                 <tr>
                     <td class="pcard__meta-label">Category</td>

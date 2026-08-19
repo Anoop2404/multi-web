@@ -80,7 +80,7 @@
                             <tr>
                                 <td class="pcard-pdf__meta-label">Sahodaya</td>
                                 <td class="pcard-pdf__meta-sep">:</td>
-                                <td class="pcard-pdf__meta-val">{{ $card['sahodaya_name'] ?? ($clusterName ?? 'Sahodaya') }}</td>
+                                <td class="pcard-pdf__meta-val">{{ (!empty($card['sahodaya_name']) && $card['sahodaya_name'] !== 'Sahodaya') ? $card['sahodaya_name'] : ($clusterName ?? 'Sahodaya') }}</td>
                             </tr>
                             <tr>
                                 <td class="pcard-pdf__meta-label">Category</td>

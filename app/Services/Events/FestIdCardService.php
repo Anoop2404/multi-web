@@ -637,7 +637,7 @@ class FestIdCardService
                 'event_name'      => $event->title,
                 'event_date'      => $eventDate,
                 'venue'           => $venue,
-                'sahodaya_name'   => $event->tenant?->name ?? 'Sahodaya',
+                'sahodaya_name'   => $event->tenant?->name ?? (\App\Models\Tenant::where('id', $event->tenant_id)->value('name') ?? 'Sahodaya'),
             ];
         })->values()->all();
     }
@@ -704,7 +704,9 @@ class FestIdCardService
             $eventDate = date('d M Y', strtotime((string) $event->event_end));
         }
         $venue = $this->resolveVenue($event, $p);
-        $sahodayaName = $event->tenant?->name ?? 'Sahodaya';
+        $sahodayaName = $event->tenant?->name
+            ?? \App\Models\Tenant::where('id', $event->tenant_id)->value('name')
+            ?? 'Sahodaya';
         $rawDob = $p->student?->dob;
         $dob = $rawDob ? date('d M Y', strtotime((string) $rawDob)) : null;
 
@@ -784,9 +786,7 @@ class FestIdCardService
                     ->first();
 
             if ($regionalVenue && !empty($regionalVenue->name)) {
-                return $regionalVenue->location
-                    ? "{$regionalVenue->name}, {$regionalVenue->location}"
-                    : $regionalVenue->name;
+                return $regionalVenue->name;
             }
 
             // Check FestPhaseRegion table if phase region venue is set
@@ -812,9 +812,7 @@ class FestIdCardService
             ->first();
 
         if ($eventVenue && !empty($eventVenue->name)) {
-            return $eventVenue->location
-                ? "{$eventVenue->name}, {$eventVenue->location}"
-                : $eventVenue->name;
+            return $eventVenue->name;
         }
 
         // 3. Fallback to event model columns (venue, venue_name, location_name, conductingSchool)
