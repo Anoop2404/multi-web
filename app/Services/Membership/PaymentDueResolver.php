@@ -137,9 +137,12 @@ class PaymentDueResolver
 
     private function mapRegistration(Registration $registration, Tenant $school, string $academicYear): array
     {
-        $amount = $registration->membership_fee_amount !== null
+        $totalFee = $registration->membership_fee_amount !== null
             ? (float) $registration->membership_fee_amount
             : $this->feeCalculator->estimateFeeForSchool($school, $academicYear);
+
+        $amountPaid = (float) ($registration->amount_paid ?? 0);
+        $dueAmount = max(0.0, round($totalFee - $amountPaid, 2));
 
         return [
             'id'                    => $registration->id,
@@ -147,7 +150,9 @@ class PaymentDueResolver
             'academic_year'         => $registration->academic_year,
             'reg_no'                => $registration->reg_no,
             'registration_status'   => $registration->registration_status,
-            'membership_fee_amount' => $amount,
+            'membership_fee_amount' => $dueAmount,
+            'total_fee_amount'      => $totalFee,
+            'amount_paid'           => $amountPaid,
             'source'                => 'registration',
             'updated_at'            => $registration->updated_at?->toIso8601String(),
             'school'                => [

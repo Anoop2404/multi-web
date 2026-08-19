@@ -101,6 +101,9 @@
                             <p v-if="r.membership_fee_amount" class="text-xl font-extrabold text-gray-900">
                                 ₹{{ Number(r.membership_fee_amount).toLocaleString('en-IN') }}
                             </p>
+                            <p v-if="Number(r.amount_paid) > 0" class="text-xs text-emerald-700 font-semibold mt-0.5">
+                                ₹{{ Number(r.amount_paid).toLocaleString('en-IN') }} verified paid
+                            </p>
                             <StatusBadge :status="r.registration_status" />
                         </div>
                     </div>
@@ -111,6 +114,9 @@
                             </template>
                             <template v-else-if="r.source === 'pending_membership'">
                                 New school application — membership fee not paid yet.
+                            </template>
+                            <template v-else-if="Number(r.amount_paid) > 0">
+                                Registered for {{ r.academic_year }} — partial payment of ₹{{ Number(r.amount_paid).toLocaleString('en-IN') }} verified. Remaining balance due: ₹{{ Number(r.membership_fee_amount).toLocaleString('en-IN') }}.
                             </template>
                             <template v-else>
                                 Registered for {{ r.academic_year }} — awaiting payment upload from school.

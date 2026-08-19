@@ -186,10 +186,20 @@
                 </div>
 
                 <div v-if="canPay" class="notice-banner notice-banner--warning space-y-5 !p-6">
+                    <div v-if="Number(registration.amount_paid ?? 0) > 0" class="rounded-xl bg-amber-100/80 border border-amber-200 px-4 py-3 text-sm text-amber-900">
+                        <p class="font-semibold">Partial Payment Verified</p>
+                        <p class="mt-0.5">
+                            Total membership fee: ₹{{ formatAmount(registration.membership_fee_amount) }} ·
+                            Already paid: ₹{{ formatAmount(registration.amount_paid) }} —
+                            only the remaining balance below is due.
+                        </p>
+                    </div>
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-wide opacity-80">Pending payment</p>
-                            <p class="text-3xl font-bold mt-1">₹{{ formatAmount(registration.membership_fee_amount) }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide opacity-80">
+                                {{ Number(registration.amount_paid ?? 0) > 0 ? 'Remaining payment due' : 'Pending payment' }}
+                            </p>
+                            <p class="text-3xl font-bold mt-1">₹{{ formatAmount(outstandingAmount) }}</p>
                             <p class="text-sm opacity-90 mt-1">Annual membership fee payable to Sahodaya</p>
                         </div>
                         <span v-if="registration.registration_status === 'payment_rejected'"
@@ -232,7 +242,7 @@
                 <div v-if="registration.registration_status === 'payment_submitted'" class="notice-banner notice-banner--info space-y-2">
                     <p class="font-semibold">Payment submitted — awaiting Sahodaya approval</p>
                     <p class="text-sm opacity-90">
-                        Your payment proof (₹{{ formatAmount(registration.membership_fee_amount) }}) has been sent to Sahodaya for verification.
+                        Your payment proof (₹{{ formatAmount(outstandingAmount) }}) has been sent to Sahodaya for verification.
                         You will be notified once approved.
                     </p>
                     <div v-if="payments?.length" class="text-sm opacity-80 pt-2 border-t border-blue-200/60 mt-3 space-y-1">
@@ -318,6 +328,13 @@ const paymentForm = useForm({
 const canPay = computed(() =>
     props.registration && ['payment_pending', 'payment_rejected'].includes(props.registration.registration_status)
 );
+
+const outstandingAmount = computed(() => {
+    if (! props.registration) return 0;
+    const fee = Number(props.registration.membership_fee_amount ?? 0);
+    const paid = Number(props.registration.amount_paid ?? 0);
+    return Math.max(0, fee - paid);
+});
 
 const needsDataSteps = computed(() =>
     props.registration && ['data_pending', 'data_rejected'].includes(props.registration.registration_status)
