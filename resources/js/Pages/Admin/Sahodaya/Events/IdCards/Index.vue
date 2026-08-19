@@ -60,7 +60,14 @@
                         </button>
                     </div>
 
-                    <div class="grid sm:grid-cols-2 gap-3">
+                    <div class="grid sm:grid-cols-3 gap-3">
+                        <FormField label="Card scope">
+                            <select v-model="filters.scope" class="field text-sm" @change="loadPreview">
+                                <option value="event">Event Pass (Event-wise)</option>
+                                <option value="item">Item Pass (Item-wise)</option>
+                                <option value="head">Discipline Pass (Head-wise)</option>
+                            </select>
+                        </FormField>
                         <FormField label="School filter">
                             <select v-model="filters.school_id" class="field text-sm" @change="loadPreview">
                                 <option value="">All schools</option>
@@ -197,7 +204,7 @@ function switchSportEvent(evt) {
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/id-cards`;
 const audience = ref('head');
 const cardTemplate = ref('premium');
-const filters = reactive({ school_id: '', item_id: '' });
+const filters = reactive({ scope: 'event', school_id: '', item_id: '' });
 const previewCards = ref([]);
 const loading = ref(false);
 
@@ -245,7 +252,7 @@ function apiAudience() {
 function queryString() {
     const p = new URLSearchParams({ template: cardTemplate.value, audience: apiAudience() });
     if (audience.value === 'head' || audience.value === 'participant') {
-        p.set('scope', 'event');
+        p.set('scope', filters.scope || 'event');
         if (filters.school_id) p.set('school_id', filters.school_id);
         if (filters.item_id) p.set('item_id', filters.item_id);
     }
@@ -265,7 +272,7 @@ async function loadPreview() {
     try {
         const params = new URLSearchParams({ audience: apiAudience() });
         if (audience.value === 'head' || audience.value === 'participant') {
-            params.set('scope', 'event');
+            params.set('scope', filters.scope || 'event');
             if (filters.school_id) params.set('school_id', filters.school_id);
             if (filters.item_id) params.set('item_id', filters.item_id);
         }
