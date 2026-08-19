@@ -29,8 +29,12 @@ const error = computed(() => page.props.flash?.error ?? '');
 const warning = computed(() => page.props.flash?.warning ?? '');
 const info = computed(() => page.props.flash?.info ?? '');
 
-watch([success, error, warning, info], () => {
-    if (success.value || error.value || warning.value || info.value) {
+// Only error/warning force a scroll to top — those need attention the user might
+// not be expecting. A routine success/info flash (e.g. "Item updated.") shouldn't
+// yank someone back to the top of a long list they were working through — see the
+// Sahodaya admin Items & catalog page, where every edit/delete used to do exactly that.
+watch([error, warning], () => {
+    if (error.value || warning.value) {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 });
