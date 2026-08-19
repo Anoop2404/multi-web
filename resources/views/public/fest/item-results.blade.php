@@ -11,7 +11,7 @@
                 <tr>
                     <th class="p-3 text-left">Position</th>
                     <th class="p-3 text-left">Ref</th>
-                    <th class="p-3 text-left">Name</th>
+                    <th class="p-3 text-left">Name / Team</th>
                     <th class="p-3 text-left">School</th>
                     <th class="p-3 text-left">Grade</th>
                     <th class="p-3 text-left">Result</th>
@@ -22,13 +22,14 @@
                 <tr class="border-t">
                 <td class="p-3 font-mono">#{{ $row['position'] ?? '—' }}</td>
                 <td class="p-3 font-mono text-xs">{{ $row['reference'] }}</td>
-                <td class="p-3">{{ $row['name'] ?? '—' }}</td>
+                <td class="p-3">{{ !empty($row['team']) ? implode(', ', $row['team']) : ($row['name'] ?? '—') }}</td>
                 <td class="p-3">{{ $row['school'] ?? '—' }}</td>
-                <td class="p-3">{{ $row['grade'] ?? '—' }}</td>
+                <td class="p-3 font-semibold text-amber-700">{{ !empty($row['grade']) ? 'Grade '.$row['grade'] : '—' }}</td>
                 <td class="p-3">
-                    {{ $row['result'] ?: ($row['score'] ?? '—') }}
                     @if(!empty($row['poster_url']))
-                    <a href="{{ $row['poster_url'] }}" class="block text-xs text-amber-700 mt-1" download>Winner poster ↓</a>
+                    <a href="{{ $row['poster_url'] }}" class="inline-flex items-center text-xs font-semibold text-amber-700 hover:underline" download>Winner poster ↓</a>
+                    @else
+                    <span class="text-gray-400 text-xs">—</span>
                     @endif
                 </td>
             </tr>

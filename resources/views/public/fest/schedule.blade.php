@@ -30,18 +30,11 @@
                     @else — @endif
                 </td>
                 <td class="p-3">
-                    @if($row['participant'] && $row['participant']['link_ref'])
-                    <a href="{{ route('tenant.fest.participant', [$event->id, $row['participant']['link_ref']]) }}" class="text-amber-700 hover:underline">
-                        @if(($row['participant']['reference'] ?? '—') !== '—')
-                        <span class="font-mono">#{{ $row['participant']['reference'] }}</span>
-                        @endif
-                        @if($row['participant']['show_name'] && $row['participant']['name'])
-                        {{ $row['participant']['name'] }}
-                        @elseif(!$row['participant']['show_name'])
-                        <span class="text-gray-400 text-xs">(anonymous until results)</span>
-                        @endif
-                    </a>
-                    @else — @endif
+                    @if($row['participant'] && $row['participant']['show_name'] && $row['participant']['name'])
+                        <span class="font-semibold">{{ $row['participant']['name'] }}</span>
+                    @else
+                        <span class="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">Scheduled Participant</span>
+                    @endif
                 </td>
                 <td class="p-3">{{ $row['stage'] ?? '—' }}</td>
             </tr>

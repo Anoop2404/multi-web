@@ -239,6 +239,7 @@ class FestPortalController extends Controller
                     'item' => $first->item?->title,
                     'head' => $first->item?->head?->name,
                     'category' => $first->item?->{$categoryColumn},
+                    'participant_type' => $first->item?->participant_type,
                     'winners' => $group->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $rosterByRegistration))->values()->all(),
                 ];
             })
@@ -274,10 +275,33 @@ class FestPortalController extends Controller
             ->values()
             ->all();
 
+        // Medal tally (gold/silver/bronze counts) per school, layered onto $schoolBoard's
+        // existing points-based rank rather than replacing it — points come from a grade
+        // scheme (FestGradePointService) that doesn't always track 1st/2nd/3rd counts
+        // 1:1, so the official rank stays points-driven and medals are informational.
+        // Built from the same top-3 $marks already fetched above for the item tab, scoped
+        // to whichever region/cluster/phase the page is currently showing.
+        $medalTally = $marks
+            ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
+            ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
+            ->map(fn ($group) => [
+                'gold' => $group->where('position', 1)->count(),
+                'silver' => $group->where('position', 2)->count(),
+                'bronze' => $group->where('position', 3)->count(),
+            ]);
+
+        $schoolBoard = collect($this->scoreboards->scoreboard($event, $selectedScope))
+            ->map(fn (array $row) => $row + [
+                'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
+                'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
+                'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
+            ])
+            ->all();
+
         return $this->renderPublic('public.fest.results', $tenant, [
             'event' => $event,
             'tab' => $tab,
-            'schoolBoard' => $this->scoreboards->scoreboard($event, $selectedScope),
+            'schoolBoard' => $schoolBoard,
             'usesPhases' => $usesPhases,
             'phaseCumulativeBoard' => $phaseCumulativeBoard,
             'phaseBreakdown' => $phaseBreakdown,
@@ -358,8 +382,25 @@ class FestPortalController extends Controller
             ->with(['participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('position')
             ->orderByDesc('score')
-            ->get()
-            ->map(fn (FestMark $m) => [
+            ->get();
+
+        // Pair/group/team/trio items: the mark is only ever attached to one performer
+        // on the registration (see the same note in results() above) — resolve the rest
+        // of the roster so this page doesn't show a single arbitrary member as if they
+        // competed solo. Skipped for individual items, which are the common case.
+        $rosterByRegistration = $item->isTeamItem()
+            ? FestParticipant::whereIn(
+                'registration_id',
+                $marks->pluck('participant.registration_id')->filter()->unique()->values()
+            )
+                ->where('participant_role', 'performer')
+                ->with(['student', 'teacher'])
+                ->get()
+                ->groupBy('registration_id')
+            : null;
+
+        $marks = $marks->map(function (FestMark $m) use ($event, $item, $rosterByRegistration) {
+            $row = [
                 'mark_id' => $m->id,
                 'reference' => $m->participant
                     ? $this->visibility->publicReference($event, $m->participant)
@@ -373,7 +414,18 @@ class FestPortalController extends Controller
                 'poster_url' => in_array((int) $m->position, [1, 2, 3], true)
                     ? route('tenant.fest.winner-poster', [$event->id, $item->id, $m->id])
                     : null,
-            ]);
+            ];
+
+            if ($rosterByRegistration && $m->participant?->registration_id) {
+                $row['team'] = $rosterByRegistration->get($m->participant->registration_id, collect())
+                    ->map(fn (FestParticipant $member) => $member->student?->name ?? $member->teacher?->name)
+                    ->filter()
+                    ->values()
+                    ->all();
+            }
+
+            return $row;
+        });
 
         return $this->renderPublic('public.fest.item-results', $tenant, compact('event', 'item', 'marks'));
     }

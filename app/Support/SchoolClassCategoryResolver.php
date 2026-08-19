@@ -79,32 +79,29 @@ class SchoolClassCategoryResolver
                 }
             });
 
-        if ($highestKey !== null) {
-            return $highestKey;
-        }
-
         $payload = $school->application_payload ?? [];
         $rawHighest = $payload['highest_class'] ?? $payload['highest_class_offered'] ?? $school->school_category ?? null;
 
-        if (! $rawHighest) {
-            return null;
+        if ($rawHighest) {
+            $str = strtolower((string) $rawHighest);
+            $profileKey = match (true) {
+                str_contains($str, '12') || str_contains($str, '11') || str_contains($str, 'senior') || str_contains($str, 'hss') => 'hss',
+                str_contains($str, '10') || str_contains($str, '9') || str_contains($str, 'high') || str_contains($str, 'secondary') || str_contains($str, 'hs') => 'hs',
+                str_contains($str, '8') || str_contains($str, '7') || str_contains($str, '6') || str_contains($str, 'upper') || str_contains($str, 'up') => 'up',
+                str_contains($str, '5') || str_contains($str, '4') || str_contains($str, '3') || str_contains($str, '2') || str_contains($str, '1') || str_contains($str, 'primary') || str_contains($str, 'lp') => 'lp',
+                default => null,
+            };
+
+            if ($profileKey !== null) {
+                $profileRank = array_search($profileKey, FestClassGroupScheme::KEYS, true);
+                if ($profileRank !== false && $profileRank > $highestRank) {
+                    $highestRank = $profileRank;
+                    $highestKey = $profileKey;
+                }
+            }
         }
 
-        $str = strtolower((string) $rawHighest);
-        if (str_contains($str, '12') || str_contains($str, '11') || str_contains($str, 'senior') || str_contains($str, 'hss')) {
-            return 'hss';
-        }
-        if (str_contains($str, '10') || str_contains($str, '9') || str_contains($str, 'high') || str_contains($str, 'secondary') || str_contains($str, 'hs')) {
-            return 'hs';
-        }
-        if (str_contains($str, '8') || str_contains($str, '7') || str_contains($str, '6') || str_contains($str, 'upper') || str_contains($str, 'up')) {
-            return 'up';
-        }
-        if (str_contains($str, '5') || str_contains($str, '4') || str_contains($str, '3') || str_contains($str, '2') || str_contains($str, '1') || str_contains($str, 'primary') || str_contains($str, 'lp')) {
-            return 'lp';
-        }
-
-        return null;
+        return $highestKey;
     }
 
     /**

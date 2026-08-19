@@ -104,6 +104,10 @@ class FestPublicVisibilityService
 
     public function publicReference(FestEvent $event, FestParticipant $participant): string
     {
+        if (! $event->results_published) {
+            return '—';
+        }
+
         if ($this->isOffStage($participant) && ! $this->isSportsEvent($event)) {
             return $participant->level_registration_number ?? '—';
         }
