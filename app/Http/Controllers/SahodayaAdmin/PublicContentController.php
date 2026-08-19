@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Services\Website\SahodayaContentReadiness;
+use App\Services\Website\SahodayaTemplateApplier;
 use App\Support\FeatureFlags;
 use App\Support\SahodayaHomepageContent;
+use App\Support\SahodayaTenantBranding;
+use App\Support\SahodayaWebsiteTemplateCatalog;
 use App\Support\TenantPublicSite;
 use Illuminate\Http\Request;
 
@@ -21,7 +25,7 @@ class PublicContentController extends SahodayaAdminController
         ]);
     }
 
-    public function update(Request $request)
+    public function update(Request $request, SahodayaTemplateApplier $applier, SahodayaContentReadiness $readiness)
     {
         $data = $request->validate([
             'heading'            => 'nullable|string|max:255',
@@ -69,10 +73,33 @@ class PublicContentController extends SahodayaAdminController
         if ($request->filled('experience_version')) {
             $site = \App\Models\WebsiteSite::ensurePrimary($this->sahodaya->id);
             $newVer = $request->input('experience_version');
-            $site->update(['experience_version' => $newVer]);
-            if ($newVer === 'v2' && empty($site->template_key)) {
-                $site->update(['template_key' => 'events-results-live']);
+
+            if ($newVer === 'v2' && ! $site->sections()->exists()) {
+                // No section actually scoped to this site yet (either never enabled before, or an
+                // earlier version of this toggle only flipped the flag without applying content) —
+                // apply a real template, same mechanism the Site Builder's "apply experience" uses,
+                // instead of leaving visitors on the legacy fallback page.
+                $templateKey = $site->template_key && array_key_exists($site->template_key, SahodayaWebsiteTemplateCatalog::all())
+                    ? $site->template_key
+                    : 'events-results-live';
+                $template = SahodayaWebsiteTemplateCatalog::get($templateKey);
+                $context = SahodayaTenantBranding::context($this->sahodaya);
+                $applier->applyDraft($this->sahodaya, $site, $templateKey, $template, $context);
+
+                $report = $readiness->inspect($this->sahodaya, $site->fresh());
+                if (! $report['ready']) {
+                    $applier->cancelDraft($site);
+
+                    return back()->withErrors([
+                        'experience_version' => 'Could not switch to the Modern (V2) website yet: '.implode(' ', $report['errors']),
+                    ]);
+                }
+
+                $applier->publishDraft($site);
+            } else {
+                $site->update(['experience_version' => $newVer]);
             }
+
             $this->sahodaya->invalidateCache();
         }
 

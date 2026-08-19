@@ -39,16 +39,21 @@ class WebsiteSite extends Model
 
     /**
      * Sections belonging to this site. The primary site also owns legacy rows
-     * whose site_id predates the multi-site migration and is therefore null.
+     * whose site_id predates the multi-site migration and is therefore null —
+     * but only as a fallback while the primary site has no sections of its own;
+     * once real site_id-scoped sections exist, the legacy rows are excluded so
+     * they don't get interleaved with (and duplicate) real content.
      */
     public function sectionQuery(): Builder
     {
+        $fallsBackToLegacy = $this->is_primary && ! $this->sections()->exists();
+
         return SiteSection::query()
             ->where('tenant_id', $this->tenant_id)
-            ->where(function (Builder $query) {
+            ->where(function (Builder $query) use ($fallsBackToLegacy) {
                 $query->where('site_id', $this->id);
 
-                if ($this->is_primary) {
+                if ($fallsBackToLegacy) {
                     $query->orWhereNull('site_id');
                 }
             });
