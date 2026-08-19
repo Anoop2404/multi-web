@@ -48,10 +48,23 @@ class SchoolClassCategoryResolver
 
     /**
      * The highest FestClassGroupScheme key (lp/up/hs/hss/open) reached by any of this
-     * school's active SchoolClass rows, SchoolYearStudentCount rows, or application payload attributes.
+     * school's application payload attributes, SchoolYearStudentCount rows, or active SchoolClass rows.
      */
     public static function highestClassGroupKeyFor(Tenant $school): ?string
     {
+        // Priority 1: Direct application payload / school profile (highest_class, highest_class_offered)
+        // This is the school's official registered level (e.g. "Class 10", "Class 12", "Class XII", "Class X")
+        $payload = $school->application_payload ?? [];
+        $explicitHighest = $payload['highest_class'] ?? $payload['highest_class_offered'] ?? null;
+
+        if ($explicitHighest) {
+            $key = self::classGroupKeyFromText((string) $explicitHighest);
+            if ($key !== null) {
+                return $key;
+            }
+        }
+
+        // Priority 2: Submitted student counts where total_count > 0 (actual enrolled classes)
         $highestKey = null;
         $highestRank = -1;
 
@@ -66,25 +79,6 @@ class SchoolClassCategoryResolver
             }
         };
 
-        // 1. Inspect SchoolClass rows for this school
-        try {
-            SchoolClass::query()
-                ->where('tenant_id', $school->id)
-                ->active()
-                ->with('classCategory')
-                ->get()
-                ->each(function (SchoolClass $schoolClass) use ($updateHighest) {
-                    if ($schoolClass->classCategory) {
-                        $updateHighest(self::classGroupKeyForCategory($schoolClass->classCategory));
-                        $updateHighest(self::classGroupKeyFromText($schoolClass->classCategory->name ?? $schoolClass->classCategory->label ?? null));
-                    }
-                    $updateHighest(self::classGroupKeyFromText($schoolClass->name));
-                });
-        } catch (\Throwable) {
-            // school_classes table is tenant-scoped and may not exist on central DB connection
-        }
-
-        // 2. Inspect SchoolYearStudentCount rows submitted for this school where total_count > 0
         try {
             \App\Models\SchoolYearStudentCount::query()
                 ->whereHas('submission', fn ($q) => $q->where('school_id', $school->id))
@@ -107,11 +101,12 @@ class SchoolClassCategoryResolver
         } catch (\Throwable) {
         }
 
-        // 3. Inspect application_payload and school attributes
-        $payload = $school->application_payload ?? [];
+        if ($highestKey !== null) {
+            return $highestKey;
+        }
+
+        // Priority 3: Other payload fallback fields (institution_type, affiliation_category, etc.)
         $candidates = [
-            $payload['highest_class'] ?? null,
-            $payload['highest_class_offered'] ?? null,
             $payload['school_category'] ?? null,
             $payload['institution_type'] ?? null,
             $payload['affiliation_category'] ?? null,
@@ -122,6 +117,27 @@ class SchoolClassCategoryResolver
             if ($raw) {
                 $updateHighest(self::classGroupKeyFromText((string) $raw));
             }
+        }
+
+        if ($highestKey !== null) {
+            return $highestKey;
+        }
+
+        // Priority 4: Active SchoolClass master rows
+        try {
+            SchoolClass::query()
+                ->where('tenant_id', $school->id)
+                ->active()
+                ->with('classCategory')
+                ->get()
+                ->each(function (SchoolClass $schoolClass) use ($updateHighest) {
+                    if ($schoolClass->classCategory) {
+                        $updateHighest(self::classGroupKeyForCategory($schoolClass->classCategory));
+                        $updateHighest(self::classGroupKeyFromText($schoolClass->classCategory->name ?? $schoolClass->classCategory->label ?? null));
+                    }
+                    $updateHighest(self::classGroupKeyFromText($schoolClass->name));
+                });
+        } catch (\Throwable) {
         }
 
         return $highestKey;
