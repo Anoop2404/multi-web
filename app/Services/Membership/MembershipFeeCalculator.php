@@ -61,8 +61,25 @@ class MembershipFeeCalculator
                     ? $this->totalStudents($profile, $submission)
                     : ($school ? $this->estimateStudentCount($school, $academicYear) : 0)
             ),
+            'variable_by_school_category' => $this->fromSchoolCategory($profile, $school),
             default => 0.0,
         };
+    }
+
+    private function fromSchoolCategory(SahodayaProfile $profile, ?Tenant $school): float
+    {
+        if (! $school) {
+            return (float) ($profile->fixed_membership_fee_amount ?? 0);
+        }
+
+        $tier = \App\Support\SchoolClassCategoryResolver::feeTierFor($school);
+        $amounts = $profile->school_category_fee_amounts ?? [];
+
+        if (array_key_exists($tier, $amounts) && $amounts[$tier] !== null && $amounts[$tier] !== '') {
+            return (float) $amounts[$tier];
+        }
+
+        return (float) ($amounts['senior_secondary'] ?? $amounts['secondary'] ?? $profile->fixed_membership_fee_amount ?? 0.0);
     }
 
     public function totalStudents(SahodayaProfile $profile, SchoolYearSubmission $submission): int

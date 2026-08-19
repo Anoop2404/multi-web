@@ -514,6 +514,7 @@
                             <select v-model="feeForm.membership_fee_type" class="field">
                                 <option value="fixed">Fixed fee (same for all schools)</option>
                                 <option value="variable_by_student_count">Variable by student count (slabs)</option>
+                                <option value="variable_by_school_category">Variable by school category (class range)</option>
                                 <option value="none">No membership fee (₹0)</option>
                             </select>
                             <p v-if="feeForm.membership_fee_type === 'none'" class="text-xs text-slate-600 mt-2">
@@ -531,6 +532,24 @@
                             </p>
                         </FormField>
                     </FormGrid>
+
+                    <div v-if="feeForm.membership_fee_type === 'variable_by_school_category'" class="mt-4 pt-4 border-t border-slate-100">
+                        <h4 class="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-3">Category Fee Slabs (Class Range)</h4>
+                        <div class="grid sm:grid-cols-3 gap-4">
+                            <FormField label="Senior Secondary (Classes 11 & 12)" required>
+                                <input v-model.number="feeForm.school_category_fee_amounts.senior_secondary" type="number" step="0.01" min="0" class="field" placeholder="e.g. 5000" required>
+                                <p class="text-[11px] text-slate-500 mt-1">Schools offering Class 11 or 12</p>
+                            </FormField>
+                            <FormField label="Secondary (Classes 9 & 10)" required>
+                                <input v-model.number="feeForm.school_category_fee_amounts.secondary" type="number" step="0.01" min="0" class="field" placeholder="e.g. 4000" required>
+                                <p class="text-[11px] text-slate-500 mt-1">Schools offering up to Class 10</p>
+                            </FormField>
+                            <FormField label="Others (Primary / Middle / up to Class 8)" required>
+                                <input v-model.number="feeForm.school_category_fee_amounts.other" type="number" step="0.01" min="0" class="field" placeholder="e.g. 3000" required>
+                                <p class="text-[11px] text-slate-500 mt-1">Schools offering up to Class 8 or lower</p>
+                            </FormField>
+                        </div>
+                    </div>
                 </FormSection>
 
                 <FormSection title="Non-affiliated schools (optional)"
@@ -1263,6 +1282,11 @@ const formFieldGroups = computed(() => {
 const feeForm = useForm({
     membership_fee_type: props.profile?.membership_fee_type ?? 'fixed',
     fixed_membership_fee_amount: props.profile?.fixed_membership_fee_amount ?? 0,
+    school_category_fee_amounts: props.profile?.school_category_fee_amounts ?? {
+        senior_secondary: 5000,
+        secondary: 4000,
+        other: 3000,
+    },
     allow_non_affiliated_schools: !!props.profile?.allow_non_affiliated_schools,
     non_affiliated_membership_fee_type: props.profile?.non_affiliated_membership_fee_type ?? 'fixed',
     non_affiliated_fixed_membership_fee_amount: props.profile?.non_affiliated_fixed_membership_fee_amount ?? 0,

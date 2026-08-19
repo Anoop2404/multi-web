@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('contact_email')->nullable();
             $table->string('contact_phone', 30)->nullable();
             $table->enum('student_data_mode', ['full_records', 'counts_only', 'not_required'])->default('not_required');
-            $table->enum('membership_fee_type', ['fixed', 'variable_by_student_count'])->default('fixed');
+            $table->string('membership_fee_type', 40)->default('fixed');
             $table->decimal('fixed_membership_fee_amount', 10, 2)->nullable();
             $table->boolean('teacher_registration_enabled')->default(false);
             $table->text('payment_instructions')->nullable();

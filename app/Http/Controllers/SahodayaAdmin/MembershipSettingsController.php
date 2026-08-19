@@ -177,7 +177,7 @@ class MembershipSettingsController extends SahodayaAdminController
         $profile = SahodayaProfile::firstOrCreate(['tenant_id' => $this->sahodaya->id]);
 
         $data = $request->validate([
-            'membership_fee_type'         => 'required|in:fixed,variable_by_student_count,none',
+            'membership_fee_type'         => 'required|in:fixed,variable_by_student_count,variable_by_school_category,none',
             'fixed_membership_fee_amount' => [
                 'nullable', 'numeric', 'min:0',
                 function ($attribute, $value, $fail) use ($request) {
@@ -192,31 +192,36 @@ class MembershipSettingsController extends SahodayaAdminController
                     }
                 },
             ],
-            'allow_non_affiliated_schools' => 'boolean',
-            'non_affiliated_membership_fee_type' => 'nullable|in:fixed,none',
-            'non_affiliated_fixed_membership_fee_amount' => [
-                'nullable', 'numeric', 'min:0',
+            'school_category_fee_amounts' => [
+                'nullable', 'array',
                 function ($attribute, $value, $fail) use ($request) {
-                    if (! $request->boolean('allow_non_affiliated_schools')) {
+                    if ($request->input('membership_fee_type') !== 'variable_by_school_category') {
                         return;
                     }
-                    if ($request->input('non_affiliated_membership_fee_type', 'fixed') !== 'fixed') {
-                        return;
-                    }
-                    if ($value === null || $value === '' || (float) $value < 0) {
-                        $fail('Enter the non-affiliated school membership fee (₹0 or more), or choose “No fee”.');
+                    if (! is_array($value) || empty($value)) {
+                        $fail('Configure the fee amounts for Senior Secondary, Secondary, and Other school categories.');
                     }
                 },
             ],
+            'school_category_fee_amounts.senior_secondary' => 'nullable|numeric|min:0',
+            'school_category_fee_amounts.secondary'        => 'nullable|numeric|min:0',
+            'school_category_fee_amounts.other'            => 'nullable|numeric|min:0',
+            'allow_non_affiliated_schools'                 => 'boolean',
+            'non_affiliated_membership_fee_type'           => 'nullable|in:fixed,none',
+            'non_affiliated_fixed_membership_fee_amount'  => 'nullable|numeric|min:0',
         ]);
 
         $data['allow_non_affiliated_schools'] = $request->boolean('allow_non_affiliated_schools');
 
         if ($data['membership_fee_type'] === 'none') {
             $data['fixed_membership_fee_amount'] = 0;
-        }
-
-        if ($data['membership_fee_type'] === 'variable_by_student_count') {
+            $data['school_category_fee_amounts'] = null;
+        } elseif ($data['membership_fee_type'] === 'fixed') {
+            $data['school_category_fee_amounts'] = null;
+        } elseif ($data['membership_fee_type'] === 'variable_by_student_count') {
+            $data['fixed_membership_fee_amount'] = null;
+            $data['school_category_fee_amounts'] = null;
+        } elseif ($data['membership_fee_type'] === 'variable_by_school_category') {
             $data['fixed_membership_fee_amount'] = null;
         }
 

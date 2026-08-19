@@ -14,7 +14,7 @@ class SahodayaProfile extends Model
     protected $fillable = [
         'tenant_id', 'slug', 'prefix', 'cbse_region', 'address',
         'contact_email', 'contact_phone',
-        'student_data_mode', 'membership_fee_type', 'fixed_membership_fee_amount',
+        'student_data_mode', 'membership_fee_type', 'fixed_membership_fee_amount', 'school_category_fee_amounts',
         'allow_non_affiliated_schools', 'non_affiliated_membership_fee_type', 'non_affiliated_fixed_membership_fee_amount',
         'teacher_registration_enabled', 'auto_approve_submissions', 'student_edit_lock_enabled', 'student_edit_lock_at',
         'require_student_verification', 'payment_instructions', 'prefixes_locked',
@@ -33,6 +33,7 @@ class SahodayaProfile extends Model
 
     protected $casts = [
         'fixed_membership_fee_amount'  => 'decimal:2',
+        'school_category_fee_amounts'  => 'array',
         'allow_non_affiliated_schools' => 'boolean',
         'non_affiliated_fixed_membership_fee_amount' => 'decimal:2',
         'teacher_registration_enabled' => 'boolean',
@@ -81,7 +82,7 @@ class SahodayaProfile extends Model
         return match ($this->membership_fee_type) {
             'none' => false,
             'fixed' => (float) ($this->fixed_membership_fee_amount ?? 0) > 0,
-            'variable_by_student_count' => true,
+            'variable_by_student_count', 'variable_by_school_category' => true,
             default => false,
         };
     }
@@ -109,6 +110,7 @@ class SahodayaProfile extends Model
                 ->where('sahodaya_id', $this->tenant_id)
                 ->where('academic_year', $academicYear ?? $this->resolvedAcademicYear())
                 ->exists(),
+            'variable_by_school_category' => ! empty($this->school_category_fee_amounts),
             default => false,
         };
     }

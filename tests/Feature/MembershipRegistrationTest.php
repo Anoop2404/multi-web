@@ -299,4 +299,22 @@ class MembershipRegistrationTest extends TestCase
             ->get("/school-admin/{$school->id}/students/{$student->id}/photo")
             ->assertOk();
     }
+
+    public function test_variable_by_school_category_fee_calculation(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school] = $this->cluster();
+        $profile = SahodayaProfile::where('tenant_id', $sahodaya->id)->first();
+        $profile->update([
+            'membership_fee_type' => 'variable_by_school_category',
+            'school_category_fee_amounts' => [
+                'senior_secondary' => 6000,
+                'secondary'        => 4500,
+                'other'            => 3000,
+            ],
+        ]);
+
+        $calculator = app(\App\Services\Membership\MembershipFeeCalculator::class);
+        $fee = $calculator->amountForSchool($profile, $school, AcademicYear::current());
+        $this->assertGreaterThan(0, $fee);
+    }
 }
