@@ -381,6 +381,9 @@ class FestIdCardService
                 $card = $this->participantCard($event, $lead, $schedule);
                 $entityKey = $lead->student_id ? 's'.$lead->student_id : 't'.$lead->teacher_id;
 
+                $cleanItems = array_map(fn ($i) => str_replace('_', ' ', $i), $items);
+                $itemsDisplay = implode(' · ', $cleanItems);
+
                 return array_merge($card, [
                     'card_type'       => 'head_participant',
                     'role_label'      => $card['role_label'],
@@ -388,8 +391,9 @@ class FestIdCardService
                     'head_id'         => (int) ($head?->id ?? $lead->registration?->item?->head_id ?? 0),
                     'detail'          => null,
                     'item_label'      => $headName,
-                    'items'           => $items,
-                    'item_count'      => count($items),
+                    'items'           => $cleanItems,
+                    'items_display'   => $itemsDisplay,
+                    'item_count'      => count($cleanItems),
                     'id_label'        => 'Fest ID',
                     'secondary_label' => null,
                     'secondary_value' => null,
@@ -477,6 +481,7 @@ class FestIdCardService
                     'role_class'      => 'student',
                     'detail'          => null,
                     'items'           => $items,
+                    'items_display'   => null,
                     'item_count'      => count($items),
                     'item_label'      => null,
                     'id_label'        => 'Fest ID',
@@ -679,6 +684,10 @@ class FestIdCardService
             $classCategory = $schemeLabels[$itemModel->class_group] ?? strtoupper($itemModel->class_group);
         }
 
+        $pureCategory = $ageGroupLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : null));
+        $itemTitleClean = ($item !== '—' && $item) ? str_replace('_', ' ', $item) : null;
+        $categoryDisplay = $pureCategory ? str_replace('_', ' ', $pureCategory) : ($itemTitleClean ?: '—');
+
         $rawGender = strtolower((string) ($p->student?->gender ?? $p->teacher?->gender ?? ''));
         $gender = match (true) {
             str_starts_with($rawGender, 'f') || $rawGender === 'girl' || $rawGender === 'female' => 'female',
@@ -696,7 +705,6 @@ class FestIdCardService
         }
         $venue = $this->resolveVenue($event, $p);
         $sahodayaName = $event->tenant?->name ?? 'Sahodaya';
-        $category = $itemLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : '—'));
         $rawDob = $p->student?->dob;
         $dob = $rawDob ? date('d M Y', strtotime((string) $rawDob)) : null;
 
@@ -720,10 +728,11 @@ class FestIdCardService
             'venue'           => $venue,
             'dob'             => $dob,
             'sahodaya_name'   => $sahodayaName,
-            'category'        => $category,
-            'detail'          => $item !== '—' ? $item : null,
+            'category'        => $categoryDisplay,
+            'items_display'   => $itemTitleClean,
+            'detail'          => $itemTitleClean,
             'head_label'      => $headName,
-            'item_label'      => $itemLabel ?: ($headName ?: null),
+            'item_label'      => $itemTitleClean ?: ($headName ?: null),
             'age_group_label' => $ageGroupLabel,
             'chest_number'    => $chestNumber,
             'schedule'        => $scheduleLine,
@@ -740,8 +749,18 @@ class FestIdCardService
     private function resolveVenue(FestEvent $event, ?FestParticipant $p = null, ?FestRegistration $registration = null): string
     {
         $regEvent = $p?->registration?->event ?? $registration?->event;
+        $schoolId = $p?->registration?->school_id ?? $registration?->school_id;
+
         $targetRegionId = $event->region_id
             ?? $regEvent?->region_id;
+
+        if (! $targetRegionId && $schoolId) {
+            $targetRegionId = \App\Models\SchoolRegionAssignment::forTenant($event->tenant_id)
+                ->where('school_id', $schoolId)
+                ->value('region_id')
+                ?? \App\Models\FestSchoolPhaseRegionSelection::where('school_id', $schoolId)
+                    ->value('region_id');
+        }
 
         $rootEvent = $event->rootEvent();
         $eventIds = array_values(array_unique(array_filter([
@@ -769,11 +788,27 @@ class FestIdCardService
                     ? "{$regionalVenue->name}, {$regionalVenue->location}"
                     : $regionalVenue->name;
             }
+
+            // Check FestPhaseRegion table if phase region venue is set
+            $phaseRegionVenue = \App\Models\FestPhaseRegion::where('region_id', $targetRegionId)
+                ->whereNotNull('venue')
+                ->where('venue', '!=', '')
+                ->value('venue');
+
+            if ($phaseRegionVenue) {
+                return $phaseRegionVenue;
+            }
         }
 
-        // 2. Check FestVenue table for any active venue under these event_ids
+        // 2. Check FestVenue table for any active venue WITH NO region restriction or matching targetRegionId if set
         $eventVenue = \App\Models\FestVenue::whereIn('event_id', $eventIds)
             ->where('is_active', true)
+            ->where(function ($q) use ($targetRegionId) {
+                $q->whereNull('region_id');
+                if ($targetRegionId) {
+                    $q->orWhere('region_id', $targetRegionId);
+                }
+            })
             ->first();
 
         if ($eventVenue && !empty($eventVenue->name)) {

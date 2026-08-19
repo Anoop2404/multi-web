@@ -79,8 +79,15 @@
                 <tr>
                     <td class="pcard__meta-label">Category</td>
                     <td class="pcard__meta-sep">:</td>
-                    <td class="pcard__meta-val">{{ $card['category'] ?? ($card['class_category'] ?? '—') }}</td>
+                    <td class="pcard__meta-val">{{ str_replace('_', ' ', $card['category'] ?? ($card['class_category'] ?? '—')) }}</td>
                 </tr>
+                @if(!$isEventPass && !empty($card['items_display']))
+                <tr>
+                    <td class="pcard__meta-label">Items</td>
+                    <td class="pcard__meta-sep">:</td>
+                    <td class="pcard__meta-val">{{ str_replace('_', ' ', $card['items_display']) }}</td>
+                </tr>
+                @endif
             </table>
         </div>
 

@@ -224,16 +224,35 @@ class FestItemSyncService
                 ->first();
         }
 
-        // Same create-or-touch-nothing rule as syncProgramToEvent(): once a partition
-        // child's item row exists, it's that region/finale's own copy from then on. This
-        // used to unconditionally $target->update($attributes) on every call — and
-        // FestRegistrationCreateService::createForSchool() calls this on every single
-        // registration routed to a partition child — so any Sahodaya customization on a
-        // region's own item (max_per_school, fee_amount, is_enabled, etc., editable from
-        // that region's own event page) was silently reverted to the hub's current values
-        // by the next student registering. Only a genuinely new child item gets seeded
-        // from the hub now; an existing one (and its phase_id/head_id) is never touched.
+        // When a partition child's item row exists, sync parent metadata edits (title, category,
+        // class_group, gender, criteria_json, squad rules, etc.) to keep child partition items
+        // up to date, while preserving any region-specific overrides (max_per_school, fee_amount, is_enabled).
         if ($target) {
+            $target->update([
+                'title'              => $item->title,
+                'item_code'          => $item->item_code,
+                'category'           => $item->category,
+                'stage_type'         => $item->stage_type,
+                'venue_type'         => $item->venue_type,
+                'competition_format' => $item->competition_format,
+                'sport_discipline'   => $item->sport_discipline,
+                'ranking_direction'  => $item->ranking_direction,
+                'result_method'      => $item->result_method,
+                'duration_minutes'   => $item->duration_minutes,
+                'criteria_json'      => $item->criteria_json,
+                'participant_type'   => $item->participant_type,
+                'gender'             => $item->gender,
+                'class_group'        => $item->class_group,
+                'age_group'          => $item->age_group,
+                'kids_band'          => $item->kids_band,
+                'min_group_size'     => $item->min_group_size,
+                'max_group_size'     => $item->max_group_size,
+                'qualify_count'      => $item->qualify_count,
+                'is_mandatory'       => $item->is_mandatory,
+                'quota_eligible'     => $item->quota_eligible,
+                'tiebreak_mode'      => $item->tiebreak_mode,
+            ]);
+
             return $target;
         }
 
