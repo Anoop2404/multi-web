@@ -1,6 +1,6 @@
 <template>
     <div class="page-header">
-        <div class="min-w-0 flex-1">
+        <div class="min-w-0 flex-1 sm:min-w-[280px]">
             <BreadcrumbTrail v-if="breadcrumbs?.length" :items="breadcrumbs" />
             <p v-if="eyebrow" class="page-header-eyebrow">{{ eyebrow }}</p>
             <h2 v-if="title" class="page-header-title">{{ title }}</h2>
