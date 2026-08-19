@@ -107,7 +107,8 @@ class MembershipFeeCalculator
 
     public function estimateFeeForSchool(Tenant $school, string $academicYear): float
     {
-        $profile = SahodayaProfile::where('tenant_id', $school->parent_id)->first();
+        $profile = SahodayaProfile::where('tenant_id', $school->parent_id)->first()
+            ?? SahodayaProfile::first();
 
         if (! $profile) {
             return 0.0;
