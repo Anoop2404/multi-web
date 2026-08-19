@@ -413,9 +413,11 @@ class FestEventController extends SahodayaAdminController
             $q->withCount(['registrations' => fn ($r) => $r->whereIn('status', \App\Models\FestRegistration::ACTIVE_STATUSES)]);
         }]);
         $ctx = $this->eventPageContext($event);
+        $trashedItems = FestEventItem::onlyTrashed()->where('event_id', $event->id)->orderBy('deleted_at', 'desc')->get(['id', 'title', 'item_code', 'owner_level', 'deleted_at']);
 
         return $this->inertia('Sahodaya/Events/Items/List', $ctx + [
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::ITEMS_LIST),
+            'trashedItems' => $trashedItems,
         ]);
     }
 

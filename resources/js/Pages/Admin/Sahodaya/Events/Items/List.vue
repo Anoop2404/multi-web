@@ -8,6 +8,9 @@
                     <Link :href="`${base}/items/caps`" class="btn-secondary text-xs flex items-center gap-1.5 !bg-indigo-50 !text-indigo-700 font-bold border-indigo-200 hover:!bg-indigo-100">
                         <span>⚡ Bulk Limit Caps</span>
                     </Link>
+                    <button v-if="trashedItems.length" type="button" class="btn-secondary text-xs flex items-center gap-1.5" @click="showTrashed = !showTrashed">
+                        <span>🗑️ Deleted ({{ trashedItems.length }})</span>
+                    </button>
                     <button type="button" class="btn-primary text-xs" @click="openAddItem()">+ Add item</button>
                 </div>
             </template>
@@ -27,6 +30,24 @@
                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200">
                 <span>⚡ Bulk Limit Caps & Squad Rules</span>
             </Link>
+        </div>
+
+        <div v-if="showTrashed" class="card !p-4 space-y-2 mb-5 border-amber-200 bg-amber-50/40">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-bold uppercase tracking-wider text-amber-800">Deleted items — restore if needed</p>
+                <button type="button" class="text-slate-400 hover:text-slate-600 text-lg leading-none" @click="showTrashed = false">×</button>
+            </div>
+            <ul class="divide-y divide-amber-100 rounded-xl border border-amber-200 bg-white overflow-hidden">
+                <li v-for="item in trashedItems" :key="item.id" class="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
+                    <div class="min-w-0">
+                        <p class="font-semibold text-slate-800 truncate">{{ item.title }}</p>
+                        <p class="text-[11px] text-slate-500">{{ item.item_code || 'no code' }} · deleted {{ item.deleted_at }}</p>
+                    </div>
+                    <button type="button" class="btn-secondary text-xs shrink-0" @click="restoreItem(item)">
+                        ↩ Restore
+                    </button>
+                </li>
+            </ul>
         </div>
 
         <section class="card !p-4 mb-5 space-y-3">
@@ -396,6 +417,7 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, itemsByLevel: Object, groupedItems: Object, taxonomy: Object,
     ownerLevelLabels: Object, activityLogs: { type: Array, default: () => [] },
+    trashedItems: { type: Array, default: () => [] },
     taxonomyMastersUrl: String,
     catalogUrl: String,
     sportsAgeGroupsUrl: String,
@@ -406,8 +428,13 @@ const isSports = computed(() => props.event.event_type === 'sports');
 const searchQuery = ref('');
 const ageFilter = ref('');
 const statusFilter = ref('');
+const showTrashed = ref(false);
 const addingItem = ref(false);
 const editingItem = ref(null);
+
+function restoreItem(item) {
+    router.post(`${base}/items/${item.id}/restore`, {}, { preserveScroll: true });
+}
 
 const catalogMasterUrl = computed(() => props.catalogUrl?.replace(/\/assign$/, '') ?? null);
 const dropdownMastersUrl = computed(() => `${props.taxonomyMastersUrl}?dimension=sport_discipline`);
