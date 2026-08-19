@@ -38,7 +38,7 @@ class AnnualRegistrationController extends SchoolAdminController
         $registration = Registration::where('school_id', $this->school->id)->where('academic_year', $academicYear)->first();
         if ($registration) {
             $registration = app(RegistrationStatusService::class)->ensureMembershipNumber($registration);
-            if ($registration->membership_fee_amount === null) {
+            if (! in_array($registration->registration_status, ['completed', 'approved'], true)) {
                 $registration = app(RegistrationStatusService::class)->ensureMembershipFee($registration);
             }
         }

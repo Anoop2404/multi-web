@@ -139,6 +139,16 @@ class RegistrationProfileController extends SchoolAdminController
 
         $this->school->update($updates);
 
+        $academicYear = AcademicYear::forSchool($this->school);
+        $registration = Registration::where('school_id', $this->school->id)
+            ->where('academic_year', $academicYear)
+            ->first();
+        if ($registration && ! in_array($registration->registration_status, ['completed', 'approved'], true)) {
+            if ($profile) {
+                app(\App\Services\Membership\MembershipFeeCalculator::class)->calculateAndApply($registration, $profile, $registration->submission);
+            }
+        }
+
         if ($section === 'principal' && array_key_exists('principal_email', $data)) {
             $principalSync->syncEmail($this->school, $data['principal_email'] ?? null);
         }

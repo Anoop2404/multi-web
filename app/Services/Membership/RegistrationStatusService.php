@@ -98,10 +98,6 @@ class RegistrationStatusService
     {
         $registration = $this->ensureMembershipNumber($registration);
 
-        if ($registration->membership_fee_amount !== null) {
-            return $registration;
-        }
-
         $school = $registration->school;
         $profile = SahodayaProfile::where('tenant_id', $school->parent_id)->firstOrFail();
         $submission = $registration->submission;
