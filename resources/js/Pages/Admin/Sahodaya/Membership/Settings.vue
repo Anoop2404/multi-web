@@ -533,21 +533,63 @@
                         </FormField>
                     </FormGrid>
 
-                    <div v-if="feeForm.membership_fee_type === 'variable_by_school_category'" class="mt-4 pt-4 border-t border-slate-100">
-                        <h4 class="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-3">Category Fee Slabs (Class Range)</h4>
+                    <div v-if="feeForm.membership_fee_type === 'variable_by_school_category'" class="mt-5 pt-5 border-t border-slate-200/80 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                    Category Fee Slabs (Class Range)
+                                </h4>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    Set the annual membership fee based on the highest class category running at each school.
+                                </p>
+                            </div>
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                                Dynamic Category Fee
+                            </span>
+                        </div>
+
                         <div class="grid sm:grid-cols-3 gap-4">
-                            <FormField label="Senior Secondary (Classes 11 & 12)" required>
-                                <input v-model.number="feeForm.school_category_fee_amounts.senior_secondary" type="number" step="0.01" min="0" class="field" placeholder="e.g. 5000" required>
-                                <p class="text-[11px] text-slate-500 mt-1">Schools offering Class 11 or 12</p>
-                            </FormField>
-                            <FormField label="Secondary (Classes 9 & 10)" required>
-                                <input v-model.number="feeForm.school_category_fee_amounts.secondary" type="number" step="0.01" min="0" class="field" placeholder="e.g. 4000" required>
-                                <p class="text-[11px] text-slate-500 mt-1">Schools offering up to Class 10</p>
-                            </FormField>
-                            <FormField label="Others (Primary / Middle / up to Class 8)" required>
-                                <input v-model.number="feeForm.school_category_fee_amounts.other" type="number" step="0.01" min="0" class="field" placeholder="e.g. 3000" required>
-                                <p class="text-[11px] text-slate-500 mt-1">Schools offering up to Class 8 or lower</p>
-                            </FormField>
+                            <!-- Senior Secondary -->
+                            <div class="bg-gradient-to-b from-indigo-50/50 to-white p-4 rounded-xl border border-indigo-100 shadow-sm space-y-2.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-900">Senior Secondary</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">Classes 11 & 12</span>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-snug">Schools offering Higher Secondary classes</p>
+                                <div class="relative mt-1">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 font-bold text-sm">₹</span>
+                                    <input v-model.number="feeForm.school_category_fee_amounts.senior_secondary" type="number" step="0.01" min="0"
+                                           class="field pl-7 font-bold text-slate-900 text-base" placeholder="0.00" required>
+                                </div>
+                            </div>
+
+                            <!-- Secondary -->
+                            <div class="bg-gradient-to-b from-teal-50/50 to-white p-4 rounded-xl border border-teal-100 shadow-sm space-y-2.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold uppercase tracking-wider text-teal-900">Secondary</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800">Classes 9 & 10</span>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-snug">Schools offering up to High School level</p>
+                                <div class="relative mt-1">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 font-bold text-sm">₹</span>
+                                    <input v-model.number="feeForm.school_category_fee_amounts.secondary" type="number" step="0.01" min="0"
+                                           class="field pl-7 font-bold text-slate-900 text-base" placeholder="0.00" required>
+                                </div>
+                            </div>
+
+                            <!-- Others -->
+                            <div class="bg-gradient-to-b from-slate-100/50 to-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-2.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold uppercase tracking-wider text-slate-800">Others</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200/70 text-slate-800">Class 8 & Below</span>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-snug">Primary, Middle, or Pre-Primary schools</p>
+                                <div class="relative mt-1">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 font-bold text-sm">₹</span>
+                                    <input v-model.number="feeForm.school_category_fee_amounts.other" type="number" step="0.01" min="0"
+                                           class="field pl-7 font-bold text-slate-900 text-base" placeholder="0.00" required>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </FormSection>
