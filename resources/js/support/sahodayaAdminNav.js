@@ -96,6 +96,7 @@ export function sahodayaMembershipScopedNav(sahodayaId, options = {}) {
         unverifiedStudentsCount = 0,
         setupIncompleteCount = 0,
         stateRemittancesEnabled = true,
+        navVisibility = null,
     } = options;
 
     if (!canNav('membership')) {
