@@ -48,64 +48,136 @@ class SchoolClassCategoryResolver
 
     /**
      * The highest FestClassGroupScheme key (lp/up/hs/hss/open) reached by any of this
-     * school's active SchoolClass rows, or null if it has none classifiable (no active
-     * classes, or only categories with no class range set, e.g. Pre-Primary).
+     * school's active SchoolClass rows, SchoolYearStudentCount rows, or application payload attributes.
      */
     public static function highestClassGroupKeyFor(Tenant $school): ?string
     {
         $highestKey = null;
         $highestRank = -1;
 
+        $updateHighest = function (?string $key) use (&$highestKey, &$highestRank) {
+            if (! $key) {
+                return;
+            }
+            $rank = array_search($key, FestClassGroupScheme::KEYS, true);
+            if ($rank !== false && $rank > $highestRank) {
+                $highestRank = $rank;
+                $highestKey = $key;
+            }
+        };
+
+        // 1. Inspect SchoolClass rows for this school
         try {
             SchoolClass::query()
                 ->where('tenant_id', $school->id)
                 ->active()
                 ->with('classCategory')
                 ->get()
-                ->each(function (SchoolClass $schoolClass) use (&$highestKey, &$highestRank) {
-                    $category = $schoolClass->classCategory;
-                    if (! $category) {
-                        return;
+                ->each(function (SchoolClass $schoolClass) use ($updateHighest) {
+                    if ($schoolClass->classCategory) {
+                        $updateHighest(self::classGroupKeyForCategory($schoolClass->classCategory));
+                        $updateHighest(self::classGroupKeyFromText($schoolClass->classCategory->name ?? $schoolClass->classCategory->label ?? null));
                     }
-
-                    $key = self::classGroupKeyForCategory($category);
-                    if ($key === null) {
-                        return;
-                    }
-
-                    $rank = array_search($key, FestClassGroupScheme::KEYS, true);
-                    if ($rank !== false && $rank > $highestRank) {
-                        $highestRank = $rank;
-                        $highestKey = $key;
-                    }
+                    $updateHighest(self::classGroupKeyFromText($schoolClass->name));
                 });
         } catch (\Throwable) {
             // school_classes table is tenant-scoped and may not exist on central DB connection
         }
 
+        // 2. Inspect SchoolYearStudentCount rows submitted for this school where total_count > 0
+        try {
+            \App\Models\SchoolYearStudentCount::query()
+                ->whereHas('submission', fn ($q) => $q->where('school_id', $school->id))
+                ->where('total_count', '>', 0)
+                ->with(['schoolClass.classCategory', 'classCategory'])
+                ->get()
+                ->each(function (\App\Models\SchoolYearStudentCount $count) use ($updateHighest) {
+                    if ($count->classCategory) {
+                        $updateHighest(self::classGroupKeyForCategory($count->classCategory));
+                        $updateHighest(self::classGroupKeyFromText($count->classCategory->name ?? $count->classCategory->label ?? null));
+                    }
+                    if ($count->schoolClass) {
+                        if ($count->schoolClass->classCategory) {
+                            $updateHighest(self::classGroupKeyForCategory($count->schoolClass->classCategory));
+                            $updateHighest(self::classGroupKeyFromText($count->schoolClass->classCategory->name ?? $count->schoolClass->classCategory->label ?? null));
+                        }
+                        $updateHighest(self::classGroupKeyFromText($count->schoolClass->name));
+                    }
+                });
+        } catch (\Throwable) {
+        }
+
+        // 3. Inspect application_payload and school attributes
         $payload = $school->application_payload ?? [];
-        $rawHighest = $payload['highest_class'] ?? $payload['highest_class_offered'] ?? $school->school_category ?? null;
+        $candidates = [
+            $payload['highest_class'] ?? null,
+            $payload['highest_class_offered'] ?? null,
+            $payload['school_category'] ?? null,
+            $payload['institution_type'] ?? null,
+            $payload['affiliation_category'] ?? null,
+            $school->school_category ?? null,
+        ];
 
-        if ($rawHighest) {
-            $str = strtolower((string) $rawHighest);
-            $profileKey = match (true) {
-                str_contains($str, '12') || str_contains($str, '11') || str_contains($str, 'senior') || str_contains($str, 'hss') => 'hss',
-                str_contains($str, '10') || str_contains($str, '9') || str_contains($str, 'high') || str_contains($str, 'secondary') || str_contains($str, 'hs') => 'hs',
-                str_contains($str, '8') || str_contains($str, '7') || str_contains($str, '6') || str_contains($str, 'upper') || str_contains($str, 'up') => 'up',
-                str_contains($str, '5') || str_contains($str, '4') || str_contains($str, '3') || str_contains($str, '2') || str_contains($str, '1') || str_contains($str, 'primary') || str_contains($str, 'lp') => 'lp',
-                default => null,
-            };
-
-            if ($profileKey !== null) {
-                $profileRank = array_search($profileKey, FestClassGroupScheme::KEYS, true);
-                if ($profileRank !== false && $profileRank > $highestRank) {
-                    $highestRank = $profileRank;
-                    $highestKey = $profileKey;
-                }
+        foreach ($candidates as $raw) {
+            if ($raw) {
+                $updateHighest(self::classGroupKeyFromText((string) $raw));
             }
         }
 
         return $highestKey;
+    }
+
+    /**
+     * Infer class group key (lp/up/hs/hss) directly from text representation of a class or category name.
+     */
+    public static function classGroupKeyFromText(?string $text): ?string
+    {
+        if (blank($text)) {
+            return null;
+        }
+
+        $str = mb_strtolower(trim((string) $text));
+
+        if (str_contains($str, '12')
+            || str_contains($str, '11')
+            || str_contains($str, 'xii')
+            || str_contains($str, 'xi')
+            || str_contains($str, 'senior')
+            || str_contains($str, 'higher')
+            || str_contains($str, 'hss')
+            || str_contains($str, '+2')
+            || str_contains($str, 'plus two')
+            || str_contains($str, 'plus 2')) {
+            return 'hss';
+        }
+
+        if (str_contains($str, '10')
+            || str_contains($str, '9')
+            || str_contains($str, 'high school')
+            || str_contains($str, 'secondary')
+            || str_contains($str, 'hs')) {
+            return 'hs';
+        }
+
+        if (str_contains($str, '8')
+            || str_contains($str, '7')
+            || str_contains($str, '6')
+            || str_contains($str, 'upper primary')
+            || str_contains($str, 'up')) {
+            return 'up';
+        }
+
+        if (str_contains($str, '5')
+            || str_contains($str, '4')
+            || str_contains($str, '3')
+            || str_contains($str, '2')
+            || str_contains($str, '1')
+            || str_contains($str, 'primary')
+            || str_contains($str, 'lp')) {
+            return 'lp';
+        }
+
+        return null;
     }
 
     /**
