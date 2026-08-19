@@ -272,9 +272,8 @@ class MembershipSettingsController extends SahodayaAdminController
         $registrations = \App\Models\Registration::whereIn('registration_status', [
                 'payment_pending', 'payment_rejected', 'completed', 'approved',
             ])
-            ->with('submission')
-            ->get()
-            ->filter(fn (\App\Models\Registration $registration) => $registration->submission !== null);
+            ->with(['submission', 'school'])
+            ->get();
 
         $reopened = 0;
         foreach ($registrations as $registration) {
