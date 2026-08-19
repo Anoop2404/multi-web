@@ -56,6 +56,51 @@ class PaymentDueResolver
         return $this->filterItems($items, $filters)->values();
     }
 
+    /** @return Collection<int, array<string, mixed>> */
+    public function noProofItems(string $sahodayaId, array $schoolIds, string $academicYear, array $filters = []): Collection
+    {
+        $approvedSchools = Tenant::query()
+            ->where('parent_id', $sahodayaId)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->whereIn('id', $schoolIds)
+            ->orderBy('name')
+            ->get();
+
+        $items = collect();
+
+        foreach ($approvedSchools as $school) {
+            $hasProof = MembershipPayment::query()
+                ->where('school_id', $school->id)
+                ->where('academic_year', $academicYear)
+                ->whereNotNull('payment_proof_path')
+                ->where('payment_proof_path', '!=', '')
+                ->exists();
+
+            if (! $hasProof) {
+                $items->push([
+                    'id'                    => null,
+                    'school_id'             => $school->id,
+                    'academic_year'         => $academicYear,
+                    'reg_no'                => null,
+                    'registration_status'   => 'approved_no_proof',
+                    'membership_fee_amount' => $this->feeCalculator->estimateFeeForSchool($school, $academicYear),
+                    'source'                => 'approved_without_proof',
+                    'updated_at'            => $school->created_at?->toIso8601String(),
+                    'school'                => [
+                        'id'                => $school->id,
+                        'name'              => $school->name,
+                        'school_prefix'     => $school->school_prefix,
+                        'membership_status' => $school->membership_status,
+                        'admin_note'        => $school->application_payload['admin_note'] ?? null,
+                    ],
+                ]);
+            }
+        }
+
+        return $this->filterItems($items, $filters)->values();
+    }
+
     public function count(string $sahodayaId, array $schoolIds, string $academicYear): int
     {
         return $this->items($sahodayaId, $schoolIds, $academicYear)->count();
@@ -110,6 +155,7 @@ class PaymentDueResolver
                 'name'              => $school->name,
                 'school_prefix'     => $school->school_prefix,
                 'membership_status' => $school->membership_status,
+                'admin_note'        => $school->application_payload['admin_note'] ?? null,
             ],
         ];
     }
@@ -130,6 +176,7 @@ class PaymentDueResolver
                 'name'              => $school->name,
                 'school_prefix'     => $school->school_prefix,
                 'membership_status' => $school->membership_status,
+                'admin_note'        => $school->application_payload['admin_note'] ?? null,
             ],
         ];
     }

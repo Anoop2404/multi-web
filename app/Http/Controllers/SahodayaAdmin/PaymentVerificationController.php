@@ -29,6 +29,7 @@ class PaymentVerificationController extends SahodayaAdminController
             ->where('status', '!=', 'superseded');
         $statusCounts = [
             'payment-due' => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds, $year),
+            'no-proof'    => $this->paymentDueResolver()->noProofItems($this->sahodaya->id, $schoolIds, $year)->count(),
             'submitted'   => (clone $base)->where('status', 'submitted')->count(),
             'verified'    => (clone $base)->where('status', 'verified')->count(),
             'rejected'    => (clone $base)->where('status', 'rejected')->count(),
@@ -43,6 +44,24 @@ class PaymentVerificationController extends SahodayaAdminController
             return $this->inertia('Sahodaya/Membership/Payments', [
                 'payments'     => ['data' => []],
                 'paymentDue'   => $paymentDue,
+                'activeStatus' => $filters['status'],
+                'filters'      => [
+                    'search'    => $filters['search'],
+                    'date_from' => $filters['date_from'],
+                    'date_to'   => $filters['date_to'],
+                ],
+                'statusCounts' => $statusCounts,
+                'summary'      => $summary,
+            ]);
+        }
+
+        if ($filters['status'] === 'no-proof') {
+            $noProof = $this->paginatedNoProof($this->sahodaya->id, $schoolIds, $year, $filters)
+                ->withQueryString();
+
+            return $this->inertia('Sahodaya/Membership/Payments', [
+                'payments'     => ['data' => []],
+                'paymentDue'   => $noProof,
                 'activeStatus' => $filters['status'],
                 'filters'      => [
                     'search'    => $filters['search'],

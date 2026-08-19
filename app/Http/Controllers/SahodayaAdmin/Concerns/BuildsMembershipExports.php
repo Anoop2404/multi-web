@@ -162,6 +162,20 @@ trait BuildsMembershipExports
         return $this->paymentDueResolver()->paginate($sahodayaId, $schoolIds, $academicYear, $filters, $perPage);
     }
 
+    protected function paginatedNoProof(string $sahodayaId, array $schoolIds, string $academicYear, array $filters, int $perPage = 15): LengthAwarePaginator
+    {
+        $items = $this->paymentDueResolver()->noProofItems($sahodayaId, $schoolIds, $academicYear, $filters);
+        $page = max(1, (int) request()->query('page', 1));
+
+        return new LengthAwarePaginator(
+            $items->forPage($page, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()],
+        );
+    }
+
     /** @return array{pending_amount: float, approved_amount: float, rejected_amount: float, payment_due_amount: float} */
     protected function paymentFeeSummary(string $sahodayaId, array $schoolIds, string $academicYear): array
     {

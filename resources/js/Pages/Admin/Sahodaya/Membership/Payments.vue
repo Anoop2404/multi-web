@@ -75,7 +75,7 @@
             </div>
 
             <!-- Payments list -->
-            <div v-if="activeStatus === 'payment-due' && paymentDue?.data?.length" class="space-y-4">
+            <div v-if="(activeStatus === 'payment-due' || activeStatus === 'no-proof') && paymentDue?.data?.length" class="space-y-4">
                 <div v-for="r in paymentDue.data" :key="r.id ?? r.school_id"
                      class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                     <div class="px-6 py-4 flex items-start justify-between gap-4">
@@ -84,7 +84,10 @@
                                 {{ r.school?.name?.charAt(0) }}
                             </div>
                             <div class="min-w-0">
-                                <p class="font-bold text-gray-900">{{ r.school?.name }}</p>
+                                <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/${r.school_id}`"
+                                      class="font-bold text-gray-900 hover:text-[#0f3d7a] hover:underline">
+                                    {{ r.school?.name }}
+                                </Link>
                                 <div class="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500">
                                     <span>{{ r.academic_year }}</span>
                                     <span v-if="r.reg_no" class="text-gray-300">·</span>
@@ -101,13 +104,31 @@
                             <StatusBadge :status="r.registration_status" />
                         </div>
                     </div>
-                    <div class="px-6 py-3 bg-amber-50/60 border-t border-amber-100 text-xs text-amber-800">
-                        <template v-if="r.source === 'pending_membership'">
-                            New school application — membership fee not paid yet.
-                        </template>
-                        <template v-else>
-                            Registered for {{ r.academic_year }} — awaiting payment upload from school.
-                        </template>
+                    <div class="px-6 py-3 bg-amber-50/60 border-t border-amber-100 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-800">
+                        <div>
+                            <template v-if="r.source === 'approved_without_proof'">
+                                ⚠️ Approved member school — no payment proof uploaded for {{ r.academic_year }}.
+                            </template>
+                            <template v-else-if="r.source === 'pending_membership'">
+                                New school application — membership fee not paid yet.
+                            </template>
+                            <template v-else>
+                                Registered for {{ r.academic_year }} — awaiting payment upload from school.
+                            </template>
+                            <p v-if="r.school?.admin_note" class="font-semibold text-amber-950 mt-1">
+                                📝 Admin Note: {{ r.school.admin_note }}
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button type="button" class="inline-flex items-center gap-1 font-semibold text-[#0f3d7a] bg-white border border-gray-200 rounded-lg px-2.5 py-1 hover:bg-gray-50"
+                                    @click="openNoteModal(r.school)">
+                                📝 {{ r.school?.admin_note ? 'Edit Note' : 'Add Note' }}
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 hover:bg-emerald-100"
+                                    @click="openProofModal(r.school, r.membership_fee_amount)">
+                                📤 Upload Proof
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -186,7 +207,7 @@
                       :class="link.active ? 'pagination-link--active' : 'pagination-link'"
                       v-html="link.label" />
             </div>
-            <div v-if="paymentDue?.links?.length > 3 && activeStatus === 'payment-due'" class="flex justify-center gap-1">
+            <div v-if="paymentDue?.links?.length > 3 && (activeStatus === 'payment-due' || activeStatus === 'no-proof')" class="flex justify-center gap-1">
                 <Link v-for="link in paymentDue.links" :key="link.label"
                       :href="link.url || '#'"
                       class="px-3 py-1 rounded-lg text-sm"
@@ -215,12 +236,79 @@
                         title="Payment proof preview"></iframe>
             </div>
         </div>
+
+        <!-- Admin Note Modal -->
+        <div v-if="editingNoteSchool" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl border border-gray-100">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <h3 class="font-bold text-gray-900 text-base">Admin Note — {{ editingNoteSchool.name }}</h3>
+                    <button type="button" class="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer" @click="editingNoteSchool = null">&times;</button>
+                </div>
+                <p class="text-xs text-gray-500">
+                    Add or update internal notes for Sahodaya Admins regarding this school's membership or payment terms.
+                </p>
+                <textarea v-model="adminNoteInput" rows="3"
+                          placeholder="e.g. Approved by Sahodaya President; payment proof to be submitted next week"
+                          class="w-full text-sm border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-purple-200 focus:outline-none"></textarea>
+                <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                    <button type="button" class="btn-ghost text-xs" @click="editingNoteSchool = null">Cancel</button>
+                    <button type="button" class="btn-primary text-xs" :disabled="savingNote" @click="saveSchoolNote">
+                        {{ savingNote ? 'Saving…' : 'Save Note' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Proof Modal -->
+        <div v-if="uploadProofSchool" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl border border-gray-100">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <h3 class="font-bold text-gray-900 text-base">Upload Payment Proof</h3>
+                    <button type="button" class="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer" @click="uploadProofSchool = null">&times;</button>
+                </div>
+                <p class="text-xs text-gray-500">
+                    Record payment proof or reference details for <strong>{{ uploadProofSchool.name }}</strong>.
+                </p>
+
+                <form @submit.prevent="submitAdminProof" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Amount (₹)</label>
+                        <input v-model="proofForm.amount" type="number" step="0.01" class="w-full text-sm border border-gray-200 rounded-xl p-2.5" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Reference / Receipt No / Note</label>
+                        <input v-model="proofForm.payment_reference" type="text" placeholder="e.g. Bank Ref # / SBI Receipt / Cash" class="w-full text-sm border border-gray-200 rounded-xl p-2.5">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Proof File (Optional PDF/Image)</label>
+                        <input type="file" @change="e => proofForm.proof = e.target.files[0]" accept=".pdf,.png,.jpg,.jpeg" class="w-full text-sm border border-gray-200 rounded-xl p-2.5">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Payment Status</label>
+                        <select v-model="proofForm.status" class="w-full text-sm border border-gray-200 rounded-xl p-2.5">
+                            <option value="verified">✓ Verified (Fee cleared immediately)</option>
+                            <option value="submitted">⏳ Submitted (Pending Review)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                        <button type="button" class="btn-ghost text-xs" @click="uploadProofSchool = null">Cancel</button>
+                        <button type="submit" class="btn-primary text-xs" :disabled="proofForm.processing">
+                            {{ proofForm.processing ? 'Uploading…' : 'Save & Verify Payment' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import { reactive, computed, defineComponent, h, ref } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
@@ -250,15 +338,70 @@ const filterForm = reactive({
 const proofPreview = ref(null);
 const proofPreviewUrl = computed(() => proofPreview.value?.proof_url ? withPreview(proofPreview.value.proof_url) : null);
 
+const editingNoteSchool = ref(null);
+const adminNoteInput = ref('');
+const savingNote = ref(false);
+
+const uploadProofSchool = ref(null);
+const proofForm = useForm({
+    amount: 4000,
+    payment_reference: '',
+    proof: null,
+    notes: '',
+    status: 'verified',
+});
+
+function openNoteModal(school) {
+    editingNoteSchool.value = school;
+    adminNoteInput.value = school?.admin_note || '';
+}
+
+function saveSchoolNote() {
+    if (!editingNoteSchool.value) return;
+    savingNote.value = true;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${editingNoteSchool.value.id}/note`, {
+        admin_note: adminNoteInput.value,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            savingNote.value = false;
+            editingNoteSchool.value = null;
+        },
+        onError: () => {
+            savingNote.value = false;
+        },
+    });
+}
+
+function openProofModal(school, feeAmount) {
+    uploadProofSchool.value = school;
+    proofForm.reset();
+    proofForm.amount = feeAmount ?? 4000;
+    proofForm.status = 'verified';
+}
+
+function submitAdminProof() {
+    if (!uploadProofSchool.value) return;
+    proofForm.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${uploadProofSchool.value.id}/payment-proof`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            uploadProofSchool.value = null;
+            proofForm.reset();
+        },
+    });
+}
+
 const statusTabs = [
+    { key: 'no-proof',    label: 'Approved — No Proof' },
     { key: 'payment-due', label: 'Payment Not Done' },
-    { key: 'submitted', label: 'Payment Pending' },
-    { key: 'verified',  label: 'Verified' },
-    { key: 'rejected',  label: 'Rejected' },
-    { key: 'all',       label: 'All' },
+    { key: 'submitted',   label: 'Payment Pending' },
+    { key: 'verified',    label: 'Verified' },
+    { key: 'rejected',    label: 'Rejected' },
+    { key: 'all',         label: 'All' },
 ];
 
 const emptyMessage = computed(() => ({
+    'no-proof': 'No approved schools lacking payment proof. All approved schools have uploaded payment proof.',
     'payment-due': 'No schools awaiting payment. All registered schools have submitted payment or completed registration.',
     submitted: 'No payments awaiting verification.',
     verified:  'No verified payments yet.',
