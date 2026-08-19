@@ -113,12 +113,14 @@ function statusClass(status) {
 }
 
 async function approve(req) {
-    const note = await prompt({ message: 'Optional note for the school:' }) ?? '';
-    router.post(`${base}/${req.id}/approve`, { resolution_note: note }, { preserveScroll: true });
+    const note = await prompt({ message: 'Optional note for the school:', inputRequired: false });
+    if (note === false || note === null) return;
+    router.post(`${base}/${req.id}/approve`, { resolution_note: typeof note === 'string' ? note : '' }, { preserveScroll: true });
 }
 
 async function reject(req) {
-    const note = await prompt({ message: 'Reason for rejection (optional):', inputMultiline: true }) ?? '';
-    router.post(`${base}/${req.id}/reject`, { resolution_note: note }, { preserveScroll: true });
+    const note = await prompt({ message: 'Reason for rejection (optional):', inputMultiline: true, inputRequired: false });
+    if (note === false || note === null) return;
+    router.post(`${base}/${req.id}/reject`, { resolution_note: typeof note === 'string' ? note : '' }, { preserveScroll: true });
 }
 </script>

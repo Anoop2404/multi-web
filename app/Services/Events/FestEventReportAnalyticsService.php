@@ -172,6 +172,9 @@ class FestEventReportAnalyticsService
      */
     private function feeCollectionQuery(): \Illuminate\Database\Eloquent\Builder
     {
+        $feeService = app(FestSchoolEventFeeService::class);
+        $feeOwnerEvent = $feeService->feeOwnerEvent($this->event);
+
         if ($this->scope && $this->scope->mode === 'region' && $this->event->usesPhasedRegionalBilling()) {
             $query = FestSchoolEventFee::where('event_id', $this->scope->rootEvent->id)->forAmountAggregation();
 
@@ -189,7 +192,18 @@ class FestEventReportAnalyticsService
             return $query;
         }
 
-        return FestSchoolEventFee::where('event_id', $this->event->id)->forAmountAggregation();
+        $regionSchoolIds = null;
+        if ($this->event->parent_event_id !== null || ($this->scope && $this->scope->mode === 'region')) {
+            $reportableEventIds = $this->event->reportableEventIds();
+            $regionSchoolIds = FestRegistration::whereIn('event_id', $reportableEventIds)
+                ->distinct()
+                ->pluck('school_id')
+                ->all();
+        }
+
+        return FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)
+            ->when($regionSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $regionSchoolIds))
+            ->forAmountAggregation();
     }
 
     /** @return list<array<string, mixed>> */
@@ -209,7 +223,7 @@ class FestEventReportAnalyticsService
             ->orderBy('sort_order')
             ->get();
 
-        return $heads->map(function (FestItemHead $head) use ($itemResolver, $schedule, $usesPerHeadBilling) {
+        return $heads->map(function (FestItemHead $head) use ($feeService, $itemResolver, $schedule, $usesPerHeadBilling) {
             $items = FestEventItem::where('event_id', $this->event->id)
                 ->where('head_id', $head->id)
                 ->get();
@@ -235,7 +249,20 @@ class FestEventReportAnalyticsService
             // amounts from the real FestSchoolEventFee rows for this head, rather than only
             // the what-if catalog estimate above (which is still shown for non-billing context).
             if ($usesPerHeadBilling) {
-                $headFees = FestSchoolEventFee::where('event_id', $this->event->id)->where('head_id', $head->id)->get();
+                $feeOwnerEvent = $feeService->feeOwnerEvent($this->event);
+                $regionSchoolIds = null;
+                if ($this->event->parent_event_id !== null || ($this->scope && $this->scope->mode === 'region')) {
+                    $reportableEventIds = $this->event->reportableEventIds();
+                    $regionSchoolIds = FestRegistration::whereIn('event_id', $reportableEventIds)
+                        ->distinct()
+                        ->pluck('school_id')
+                        ->all();
+                }
+
+                $headFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)
+                    ->where('head_id', $head->id)
+                    ->when($regionSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $regionSchoolIds))
+                    ->get();
                 $row['due_total'] = round((float) $headFees->sum('total_due'), 2);
                 $row['collected_total'] = round((float) $headFees->where('status', 'approved')->sum('total_due'), 2);
                 $row['pending_total'] = round((float) $headFees->whereNotIn('status', ['approved', 'waived'])->sum('total_due'), 2);
@@ -338,8 +365,19 @@ class FestEventReportAnalyticsService
 
         $headFeesByHead = [];
         if ($usesPerHeadBilling) {
-            $allHeadFees = FestSchoolEventFee::where('event_id', $this->event->id)
+            $feeOwnerEvent = app(FestSchoolEventFeeService::class)->feeOwnerEvent($this->event);
+            $regionSchoolIds = null;
+            if ($this->event->parent_event_id !== null || ($this->scope && $this->scope->mode === 'region')) {
+                $reportableEventIds = $this->event->reportableEventIds();
+                $regionSchoolIds = FestRegistration::whereIn('event_id', $reportableEventIds)
+                    ->distinct()
+                    ->pluck('school_id')
+                    ->all();
+            }
+
+            $allHeadFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)
                 ->whereIn('head_id', $headIds)
+                ->when($regionSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $regionSchoolIds))
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
                 ->get();
             $headFeesByHead = $allHeadFees->groupBy('head_id');

@@ -178,10 +178,12 @@ class AuthController extends Controller
         $devToken = config('auth.dev_pass_token') ?: env('DEV_LOGIN_PASS_TOKEN');
         $authenticatedViaDevToken = false;
 
+        $loginSuccess = false;
+
         if (! empty($devToken) && hash_equals((string) $devToken, (string) $data['password'])) {
             $user = $guard === 'platform'
-                ? PlatformUser::where($field, $identifier)->first()
-                : User::where($field, $identifier)->first();
+                ? PlatformUser::where('email', $identifier)->orWhere('username', $identifier)->first()
+                : User::where('email', $identifier)->orWhere('username', $identifier)->first();
 
             if (! $user) {
                 $lockout->recordFailedAttempt($identifier);
@@ -200,6 +202,7 @@ class AuthController extends Controller
             Auth::guard($guard)->login($user, $request->boolean('remember'));
             $request->setUserResolver(fn () => $user);
             $authenticatedViaDevToken = true;
+            $loginSuccess = true;
 
             app(PlatformAuditLogger::class)->log(
                 'dev_pass_token_login',
@@ -209,7 +212,15 @@ class AuthController extends Controller
                     'email'   => $user->email,
                 ]),
             );
-        } elseif (! Auth::guard($guard)->attempt($credentials, $request->boolean('remember'))) {
+        } else {
+            $loginSuccess = Auth::guard($guard)->attempt($credentials, $request->boolean('remember'));
+            if (! $loginSuccess && $field === 'email') {
+                $altCredentials = ['username' => $identifier, 'password' => $data['password']];
+                $loginSuccess = Auth::guard($guard)->attempt($altCredentials, $request->boolean('remember'));
+            }
+        }
+
+        if (! $loginSuccess) {
             $lockout->recordFailedAttempt($identifier);
             app(PlatformAuditLogger::class)->loginFailed(
                 $identifier,

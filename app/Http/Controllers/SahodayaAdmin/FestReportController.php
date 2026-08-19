@@ -814,6 +814,7 @@ class FestReportController extends SahodayaAdminController
                 'student_id' => $studentId,
             ],
             'schools' => $service->schools()->values(),
+            'pdfUrl'  => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/student-wise-pdf?'.http_build_query(array_filter(['school_id' => $schoolId, 'search' => $search])),
             'xlsUrl'  => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/student-wise-report?'.http_build_query(array_filter(['school_id' => $schoolId])),
             'childEvents' => $childEvents,
         ])));

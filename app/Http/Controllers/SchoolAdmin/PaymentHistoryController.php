@@ -11,6 +11,7 @@ use App\Services\Fees\CreditNoteService;
 use App\Services\Fees\ProgramFeeReceiptService;
 use App\Services\Fees\SchoolPaymentHistoryService;
 use App\Services\Membership\MembershipReceiptService;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class PaymentHistoryController extends SchoolAdminController
@@ -102,10 +103,7 @@ class PaymentHistoryController extends SchoolAdminController
         abort_if($receiptService->schoolIdForReceipt($feeReceipt) !== $this->school->id, 403);
         abort_if($feeReceipt->isSystemCredit() || ! $feeReceipt->file_path, 404, 'No payment proof uploaded.');
 
-        $disk = \Illuminate\Support\Facades\Storage::disk('local');
-        abort_unless($disk->exists($feeReceipt->file_path), 404, 'Payment proof file not found.');
-
-        return response()->file($disk->path($feeReceipt->file_path));
+        return TenantStorage::downloadResponse($this->school, $feeReceipt->file_path);
     }
 
     /**

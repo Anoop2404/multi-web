@@ -65,9 +65,10 @@ function approve(req) {
 }
 
 async function reject(req) {
-    const note = (await prompt({ message: 'Rejection note (optional)', inputMultiline: true, inputRequired: false })) ?? '';
+    const note = await prompt({ message: 'Rejection note (optional)', inputMultiline: true, inputRequired: false });
+    if (note === false || note === null) return;
     router.post(`/school-admin/${props.school.id}/students/pending-change-requests/${req.id}/reject`, {
-        resolution_note: note,
+        resolution_note: typeof note === 'string' ? note : '',
     });
 }
 </script>

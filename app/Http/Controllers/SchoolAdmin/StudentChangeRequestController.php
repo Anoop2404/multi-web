@@ -30,6 +30,10 @@ class StudentChangeRequestController extends SchoolAdminController
         abort_unless($this->canReview(), 403, 'You don\'t have permission to review change requests.');
         abort_if($changeRequest->school_id !== $this->school->id, 403);
 
+        if ($request->has('resolution_note') && ! is_string($request->input('resolution_note'))) {
+            $request->merge(['resolution_note' => null]);
+        }
+
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);
 
         $service->approveAtSchool($changeRequest, $request->user()?->id, $data['resolution_note'] ?? null);
@@ -45,6 +49,10 @@ class StudentChangeRequestController extends SchoolAdminController
     {
         abort_unless($this->canReview(), 403, 'You don\'t have permission to review change requests.');
         abort_if($changeRequest->school_id !== $this->school->id, 403);
+
+        if ($request->has('resolution_note') && ! is_string($request->input('resolution_note'))) {
+            $request->merge(['resolution_note' => null]);
+        }
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);
 

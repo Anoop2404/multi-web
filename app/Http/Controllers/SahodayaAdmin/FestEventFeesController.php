@@ -223,17 +223,42 @@ class FestEventFeesController extends SahodayaAdminController
         $event = FestEvent::findOrFail($event);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $selectedRegionId = $request->integer('region_id') ?: null;
+        if ($selectedRegionId !== null) {
+            $childEvent = $event->regionalChild($selectedRegionId) ?? FestEvent::find($selectedRegionId);
+            if ($childEvent) {
+                $event = $childEvent;
+            }
+        }
+
         $feeService = app(FestSchoolEventFeeService::class);
         $schedule = $feeService->resolveSchedule($event);
+        $feeOwnerEvent = $feeService->feeOwnerEvent($event);
+        $reportableEventIds = $event->reportableEventIds();
 
-        $schoolFees = FestSchoolEventFee::where('event_id', $event->id)
+        $schoolIdsWithFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)->pluck('school_id');
+        FestRegistration::whereIn('event_id', $reportableEventIds)
+            ->distinct()
+            ->pluck('school_id')
+            ->diff($schoolIdsWithFees)
+            ->each(fn (string $schoolId) => $feeService->recalculate($event, $schoolId));
+
+        $regionSchoolIds = null;
+        if ($event->parent_event_id !== null || $selectedRegionId !== null) {
+            $regionSchoolIds = FestRegistration::whereIn('event_id', $reportableEventIds)
+                ->distinct()
+                ->pluck('school_id')
+                ->all();
+        }
+
+        $schoolFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)
+            ->when($regionSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $regionSchoolIds))
             ->forAmountAggregation()
             ->with(['school', 'feeReceipt', 'receipts', 'head', 'registrationBatch', 'lines'])
             ->orderBy('school_id')
             ->get()
-            ->filter(fn ($fee) => (int) $fee->participation_item_count > 0 || (float) $fee->total_due > 0)
-            ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event) {
-                $regs = FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event, $reportableEventIds) {
+                $regs = FestRegistration::whereIn('event_id', $reportableEventIds)
                     ->where('school_id', $fee->school_id)
                     ->whereIn('status', ['submitted', 'approved'])
                     ->when($fee->registration_batch_id, function ($query) use ($fee) {
@@ -253,12 +278,27 @@ class FestEventFeesController extends SahodayaAdminController
                     'payment_date'    => $r->payment_date?->format('d M Y'),
                 ]);
 
+                $pendingReceipt = $fee->receipts->first(function ($r) {
+                    return !empty($r->file_path) && !in_array($r->status, ['approved', 'rejected', 'superseded', 'reversed'], true);
+                });
+                $primaryReceipt = $pendingReceipt ?? $fee->feeReceipt ?? $fee->receipts->sortByDesc('id')->first();
+
+                $hasPendingProof = $pendingReceipt !== null
+                    || ($primaryReceipt && !empty($primaryReceipt->file_path) && !in_array($primaryReceipt->status, ['approved', 'rejected', 'superseded', 'reversed'], true));
+
+                $effectiveStatus = $fee->status;
+                if ($effectiveStatus !== 'approved' && $hasPendingProof) {
+                    $effectiveStatus = 'proof_uploaded';
+                }
+
+                $items = $regs->map(fn ($r) => $r->item?->title)->filter()->unique()->values()->all();
+
                 return [
                     'school_id'               => $fee->school_id,
                     'school_name'             => $fee->school?->name ?? $fee->school_id,
                     'head_name'               => $fee->head?->name,
                     'registration_batch'      => $fee->registrationBatch?->name,
-                    'status'                  => $fee->status,
+                    'status'                  => $effectiveStatus,
                     'school_registration_fee' => (float) $fee->school_registration_fee,
                     'participation_fee'       => (float) $fee->participation_fee,
                     'total_due'               => (float) $fee->total_due,
@@ -269,14 +309,15 @@ class FestEventFeesController extends SahodayaAdminController
                     // balance_due rather than netted into it.
                     'available_credit'        => $fee->outstandingCredit(),
                     'item_count'              => (int) $fee->participation_item_count,
-                    'receipt_no'              => $fee->feeReceipt?->receipt_number,
-                    'payment_date'            => $fee->feeReceipt?->payment_date?->format('d M Y'),
-                    'txn_ref'                 => $fee->feeReceipt?->transaction_ref,
+                    'receipt_no'              => $primaryReceipt?->receipt_number,
+                    'payment_date'            => $primaryReceipt?->payment_date?->format('d M Y'),
+                    'txn_ref'                 => $primaryReceipt?->transaction_ref,
                     'breakdown'               => $feeService->breakdown($event, $fee, $schedule),
-                    'items'                   => $regs->map(fn ($r) => $r->item?->title)->filter()->unique()->values()->all(),
+                    'items'                   => $items,
                     'receipts'                => $receipts,
                 ];
-            });
+            })
+            ->filter(fn ($row) => ($row['item_count'] ?? 0) > 0 || count($row['items'] ?? []) > 0 || (float) ($row['total_due'] ?? 0) > 0);
 
         $statusRank = [
             'approved'       => 1,
@@ -327,11 +368,39 @@ class FestEventFeesController extends SahodayaAdminController
         return $pdf->stream($filename);
     }
 
-    public function exportPayments(string $tenantId, FestEvent $event): StreamedResponse
+    public function exportPayments(Request $request, string $tenantId, FestEvent $event): StreamedResponse
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $rows = FestSchoolEventFee::where('event_id', $event->id)
+        $selectedRegionId = $request->integer('region_id') ?: null;
+        if ($selectedRegionId !== null) {
+            $childEvent = $event->regionalChild($selectedRegionId) ?? FestEvent::find($selectedRegionId);
+            if ($childEvent) {
+                $event = $childEvent;
+            }
+        }
+
+        $feeService = app(FestSchoolEventFeeService::class);
+        $feeOwnerEvent = $feeService->feeOwnerEvent($event);
+        $reportableEventIds = $event->reportableEventIds();
+
+        $schoolIdsWithFees = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)->pluck('school_id');
+        FestRegistration::whereIn('event_id', $reportableEventIds)
+            ->distinct()
+            ->pluck('school_id')
+            ->diff($schoolIdsWithFees)
+            ->each(fn (string $schoolId) => $feeService->recalculate($event, $schoolId));
+
+        $regionSchoolIds = null;
+        if ($event->parent_event_id !== null || $selectedRegionId !== null) {
+            $regionSchoolIds = FestRegistration::whereIn('event_id', $reportableEventIds)
+                ->distinct()
+                ->pluck('school_id')
+                ->all();
+        }
+
+        $rows = FestSchoolEventFee::where('event_id', $feeOwnerEvent->id)
+            ->when($regionSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $regionSchoolIds))
             ->forAmountAggregation()
             ->with(['school', 'feeReceipt', 'head', 'registrationBatch'])
             ->orderBy('school_id')

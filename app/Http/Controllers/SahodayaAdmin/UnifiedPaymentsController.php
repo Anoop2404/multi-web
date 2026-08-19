@@ -20,6 +20,7 @@ use App\Services\Fees\SchoolPaymentHistoryService;
 use App\Services\Ledger\FeeReceiptReversalService;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\MembershipReceiptService;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class UnifiedPaymentsController extends SahodayaAdminController
@@ -344,10 +345,7 @@ class UnifiedPaymentsController extends SahodayaAdminController
     {
         abort_if($feeReceipt->isSystemCredit() || ! $feeReceipt->file_path, 404, 'No payment proof uploaded.');
 
-        $disk = \Illuminate\Support\Facades\Storage::disk('local');
-        abort_unless($disk->exists($feeReceipt->file_path), 404, 'Payment proof file not found.');
-
-        return response()->file($disk->path($feeReceipt->file_path));
+        return TenantStorage::downloadResponse($this->sahodaya, $feeReceipt->file_path);
     }
 
     public function recordCreditPayout(Request $request, \App\Services\Fees\CreditPayoutService $payoutService)

@@ -42,6 +42,10 @@ class StudentEditChangeRequestController extends SahodayaAdminController
     {
         abort_if($changeRequest->school?->parent_id !== $this->sahodaya->id, 403);
 
+        if ($request->has('resolution_note') && ! is_string($request->input('resolution_note'))) {
+            $request->merge(['resolution_note' => null]);
+        }
+
         $data = $request->validate([
             'resolution_note' => 'nullable|string|max:2000',
         ]);
@@ -54,6 +58,10 @@ class StudentEditChangeRequestController extends SahodayaAdminController
     public function reject(Request $request, string $tenantId, StudentEditChangeRequest $changeRequest, StudentEditChangeService $service)
     {
         abort_if($changeRequest->school?->parent_id !== $this->sahodaya->id, 403);
+
+        if ($request->has('resolution_note') && ! is_string($request->input('resolution_note'))) {
+            $request->merge(['resolution_note' => null]);
+        }
 
         $data = $request->validate([
             'resolution_note' => 'nullable|string|max:2000',

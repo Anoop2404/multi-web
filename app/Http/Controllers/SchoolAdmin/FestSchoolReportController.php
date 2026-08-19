@@ -191,25 +191,8 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'admission_number']);
-
-        [$itemsByStudent, $marksByStudent] = $this->studentWiseLookups($event);
-
-        $rows = $students->map(function ($student) use ($itemsByStudent, $marksByStudent) {
-            $marks = $marksByStudent->get($student->id) ?? collect();
-
-            return [
-                'student'       => $student->only(['id', 'name', 'admission_number']),
-                'registrations' => ($itemsByStudent->get($student->id) ?? collect())->values(),
-                'total_score'   => $marks->sum('score'),
-                'results'       => $marks->map(fn ($m) => [
-                    'item' => $m->item?->title,
-                    'position' => $m->position,
-                    'grade' => $m->grade,
-                    'score' => $m->score,
-                ])->values(),
-            ];
-        });
+        $analytics = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event]);
+        $rows = $analytics->studentWiseBrowserRows($this->school->id, $request->input('search'));
 
         $base = $this->schoolReportsBase($program, $event);
 
@@ -218,7 +201,8 @@ class FestSchoolReportController extends SchoolAdminController
             'school'   => $this->school->only('id', 'name'),
             'event'    => $event->only('id', 'title'),
             'rows'     => $rows,
-            'pdfUrl'   => "{$base}/export/school-wise",
+            'pdfUrl'   => "{$base}/student-wise/pdf",
+            'xlsUrl'   => "{$base}/student-wise/export",
             'csvUrl'   => "{$base}/student-wise/export",
         ]);
     }
@@ -432,21 +416,42 @@ class FestSchoolReportController extends SchoolAdminController
         }, $rows);
     }
 
+    public function exportStudentWisePdf(Request $request, string $tenantId, FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $analytics = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event]);
+        $rows = $analytics->studentWiseBrowserRows($this->school->id, $request->input('search'));
+
+        $reportService = app(\App\Services\Events\FestReportService::class, ['event' => $event]);
+
+        return $reportService->renderPdf('fest.reports.student-wise', [
+            'event'    => $event,
+            'students' => $rows,
+            ...$reportService->brandingData(),
+        ], \Illuminate\Support\Str::slug($event->title).'-student-wise-report.pdf');
+    }
+
     public function exportStudentWise(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        [$itemsByStudent, $marksByStudent] = $this->studentWiseLookups($event);
+        $analytics = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event]);
+        $rows = $analytics->studentWiseBrowserRows($this->school->id, $request->input('search'));
 
-        return response()->streamDownload(function () use ($event, $itemsByStudent, $marksByStudent) {
+        return response()->streamDownload(function () use ($event, $rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Admission No', 'Name', 'Items', 'Total Score', 'Results']);
-            $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'admission_number']);
-            foreach ($students as $student) {
-                $items = ($itemsByStudent->get($student->id) ?? collect())->filter()->implode('; ');
-                $marks = $marksByStudent->get($student->id) ?? collect();
-                $results = $marks->map(fn ($m) => ($m->item?->title ?? '').':'.($m->grade ?? $m->position ?? $m->score))->implode('; ');
-                fputcsv($out, [$student->admission_number, $student->name, $items, $marks->sum('score'), $results]);
+            fputcsv($out, ['Reg / Adm No', 'Name', 'Gender', 'Item Count', 'Registered Items', 'Total Score']);
+            foreach ($rows as $row) {
+                $itemTitles = collect($row['items'])->pluck('item_title')->filter()->implode('; ');
+                fputcsv($out, [
+                    $row['reg_no'] ?? '',
+                    $row['name'] ?? '',
+                    $row['gender'] ?? '',
+                    $row['item_count'] ?? 0,
+                    $itemTitles,
+                    $row['total_score'] ?? 0,
+                ]);
             }
             fclose($out);
         }, "{$event->id}-student-wise.csv", ['Content-Type' => 'text/csv']);

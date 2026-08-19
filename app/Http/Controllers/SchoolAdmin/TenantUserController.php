@@ -71,7 +71,7 @@ class TenantUserController extends SchoolAdminController
         $data = $request->validate([
             'name'            => 'required|string|max:255',
             'email'           => 'required|email|max:255|unique:users,email',
-            'username'        => 'nullable|string|max:255|regex:/^[a-zA-Z0-9_.-]+$/|unique:users,username',
+            'username'        => 'nullable|string|max:255|regex:/^[a-zA-Z0-9_.@-]+$/|unique:users,username',
             'password'        => 'nullable|string|min:8',
             'roles'           => 'required|array|min:1',
             'roles.*'         => ['string', Rule::in($assignable)],
@@ -280,7 +280,7 @@ class TenantUserController extends SchoolAdminController
         $data = $request->validate([
             'name'            => 'required|string|max:255',
             'email'           => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'username'        => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9_.-]+$/', Rule::unique('users', 'username')->ignore($user->id)],
+            'username'        => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9_.@-]+$/', Rule::unique('users', 'username')->ignore($user->id)],
             'password'        => 'nullable|string|min:8',
             'roles'           => 'required|array|min:1',
             'roles.*'         => ['string', Rule::in($assignable)],

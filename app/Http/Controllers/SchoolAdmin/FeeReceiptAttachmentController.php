@@ -4,15 +4,14 @@ namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\FeeReceiptAttachment;
 use App\Services\Fees\ProgramFeeReceiptService;
-use Illuminate\Support\Facades\Storage;
+use App\Support\TenantStorage;
 
 /**
  * Single shared endpoint for viewing any extra proof image attached to a FeeReceipt,
  * reused across every payment flow (Fest, Training, MCQ, Membership) instead of adding a
  * near-identical action to each program's own controller. Ownership is resolved generically
  * via ProgramFeeReceiptService::schoolIdForReceipt(), which already knows how to find the
- * owning school for all four feeable types. Mirrors PaymentHistoryController::
- * programProof()'s existing local-disk-response pattern for consistency.
+ * owning school for all four feeable types.
  */
 class FeeReceiptAttachmentController extends SchoolAdminController
 {
@@ -24,9 +23,6 @@ class FeeReceiptAttachmentController extends SchoolAdminController
 
         abort_if($receiptService->schoolIdForReceipt($receipt) !== $this->school->id, 403);
 
-        $disk = Storage::disk('local');
-        abort_unless($disk->exists($attachment->file_path), 404, 'Attachment file not found.');
-
-        return response()->file($disk->path($attachment->file_path));
+        return TenantStorage::downloadResponse($this->school, $attachment->file_path);
     }
 }

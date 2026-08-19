@@ -25,6 +25,33 @@ class FestParticipationLimitService
         return $this->policyService->resolveForEvent($this->event, $classGroup);
     }
 
+    /**
+     * A group/team item counts only toward the group quota — never on-stage/off-stage,
+     * regardless of its stage_type. Group participation is a different kind of
+     * commitment (whole-squad, not one more individual slot), so it's the exclusive
+     * bucket once participant_type is group/team; stage_type only matters for items
+     * that aren't. Single source of truth for this classification — every quota check
+     * below (school, student, combo-profile) and the usage badges all read through
+     * this instead of re-deriving the same three flags independently, which is what let
+     * on-stage-group items silently double-count against both buckets before.
+     *
+     * @return array{on_stage: bool, off_stage: bool, group: bool}
+     */
+    private function itemDimensions(?FestEventItem $item): array
+    {
+        if (! $item) {
+            return ['on_stage' => false, 'off_stage' => false, 'group' => false];
+        }
+
+        $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+
+        return [
+            'on_stage' => ! $isGroup && ($item->stage_type ?? '') === 'on_stage',
+            'off_stage' => ! $isGroup && ($item->stage_type ?? '') === 'off_stage',
+            'group' => $isGroup,
+        ];
+    }
+
     /** @return array{used: array<string, int>, limits: array<string, mixed>} */
     public function usageForSchool(string $schoolId, ?string $classGroup = null): array
     {
@@ -73,9 +100,10 @@ class FestParticipationLimitService
         $errors = array_merge($errors, $this->validateHeadCapacity($item, $policy, $schoolId, $excludeRegistrationId));
 
         $regs = $this->schoolRegistrations($schoolId, $policy, $excludeRegistrationId);
-        $isOnStage = ($item->stage_type ?? '') === 'on_stage';
-        $isOffStage = ($item->stage_type ?? '') === 'off_stage';
-        $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+        $dims = $this->itemDimensions($item);
+        $isOnStage = $dims['on_stage'];
+        $isOffStage = $dims['off_stage'];
+        $isGroup = $dims['group'];
 
         if ($isOnStage && ! empty($policy['max_onstage_per_school'])) {
             $count = $this->filterRegs($regs, 'on_stage')->count() + 1;
@@ -349,17 +377,15 @@ class FestParticipationLimitService
                 'group' => $this->filterRegs($studentRegs, 'group')->count(),
             ];
 
-            $isOnStage = ($item->stage_type ?? '') === 'on_stage';
-            $isOffStage = ($item->stage_type ?? '') === 'off_stage';
-            $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+            $dims = $this->itemDimensions($item);
 
-            if ($isOnStage) {
+            if ($dims['on_stage']) {
                 $counts['onstage']++;
             }
-            if ($isOffStage) {
+            if ($dims['off_stage']) {
                 $counts['offstage']++;
             }
-            if ($isGroup) {
+            if ($dims['group']) {
                 $counts['group']++;
             }
 
@@ -391,9 +417,10 @@ class FestParticipationLimitService
         $errors = [];
         $studentRegs = $this->studentRegistrations($studentId, $schoolId, $policy, $excludeRegistrationId);
 
-        $isOnStage = ($item->stage_type ?? '') === 'on_stage';
-        $isOffStage = ($item->stage_type ?? '') === 'off_stage';
-        $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+        $dims = $this->itemDimensions($item);
+        $isOnStage = $dims['on_stage'];
+        $isOffStage = $dims['off_stage'];
+        $isGroup = $dims['group'];
 
         if ($isOnStage && ! empty($policy['max_onstage_per_student'])) {
             $count = $this->filterRegs($studentRegs, 'on_stage')->count() + 1;
@@ -508,19 +535,7 @@ class FestParticipationLimitService
     /** @param Collection<int, FestRegistration> $regs */
     private function filterRegs($regs, string $dimension)
     {
-        return $regs->filter(function (FestRegistration $r) use ($dimension) {
-            $item = $r->item;
-            if (! $item) {
-                return false;
-            }
-
-            return match ($dimension) {
-                'on_stage' => ($item->stage_type ?? '') === 'on_stage',
-                'off_stage' => ($item->stage_type ?? '') === 'off_stage',
-                'group' => in_array($item->participant_type, ['group', 'team'], true),
-                default => false,
-            };
-        });
+        return $regs->filter(fn (FestRegistration $r) => $this->itemDimensions($r->item)[$dimension] ?? false);
     }
 
     /** @return list<string> */
