@@ -21,7 +21,7 @@ class MembershipPayment extends Model
         'verified_at' => 'datetime',
     ];
 
-    protected $appends = ['proof_url'];
+    protected $appends = ['proof_url', 'school_proof_url'];
 
     public function school()       { return $this->belongsToCentralTenant('school_id'); }
     public function registration() { return $this->belongsTo(Registration::class); }

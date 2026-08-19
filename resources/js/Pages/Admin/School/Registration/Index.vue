@@ -275,6 +275,53 @@
                         <Link :href="`/school-admin/${school.id}/registration/profile`" class="btn-secondary">Registration Details</Link>
                     </div>
                 </div>
+
+                <div v-if="payments?.length" class="card space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div>
+                            <h3 class="section-title text-base">Payment & Uploaded Proof History</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Recorded payments and proof uploads for {{ academicYear }}</p>
+                        </div>
+                        <span class="status-pill bg-slate-100 text-slate-700 text-xs font-semibold">
+                            {{ payments.length }} payment record{{ payments.length === 1 ? '' : 's' }}
+                        </span>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div v-for="p in payments" :key="p.id"
+                             class="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-2">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-lg font-bold text-slate-900">₹{{ formatAmount(p.amount) }}</span>
+                                        <span class="status-pill text-xs capitalize" :class="paymentStatusBadgeClass(p.status)">
+                                            {{ paymentStatusBadgeLabel(p.status) }}
+                                        </span>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 mt-1">
+                                        <span v-if="p.payment_method">Method: <strong>{{ p.payment_method }}</strong></span>
+                                        <span v-if="p.transaction_ref">Reference: <strong class="font-mono">{{ p.transaction_ref }}</strong></span>
+                                        <span v-if="p.created_at">Submitted: {{ formatDate(p.created_at) }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2">
+                                    <a v-if="p.school_proof_url || p.proof_url"
+                                       :href="p.school_proof_url || p.proof_url"
+                                       target="_blank"
+                                       class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-900 bg-white hover:bg-brand-50 border border-brand-200 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
+                                        📄 View Uploaded Proof
+                                    </a>
+                                </div>
+                            </div>
+
+                            <p v-if="p.status === 'rejected' && p.rejection_reason"
+                               class="text-xs text-red-700 bg-red-50 rounded-lg p-2.5 border border-red-200">
+                                <strong>Rejection Reason:</strong> {{ p.rejection_reason }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </template>
         </div>
     </SchoolAdminLayout>
@@ -351,6 +398,24 @@ const registrationClosingSoon = computed(() => windowClosingSoon(props.registrat
 function formatDate(value) {
     if (! value) return '';
     return new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function paymentStatusBadgeClass(status) {
+    return {
+        verified: 'bg-green-100 text-green-700',
+        approved: 'bg-green-100 text-green-700',
+        submitted: 'bg-blue-100 text-blue-700',
+        rejected: 'bg-red-100 text-red-700',
+    }[status] || 'bg-slate-100 text-slate-600';
+}
+
+function paymentStatusBadgeLabel(status) {
+    return {
+        verified: 'Verified & Approved',
+        approved: 'Verified & Approved',
+        submitted: 'Awaiting Sahodaya Review',
+        rejected: 'Rejected',
+    }[status] || status;
 }
 
 function begin() {
