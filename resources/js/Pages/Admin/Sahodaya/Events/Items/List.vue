@@ -8,6 +8,9 @@
                     <Link :href="`${base}/items/caps`" class="btn-secondary text-xs flex items-center gap-1.5 !bg-indigo-50 !text-indigo-700 font-bold border-indigo-200 hover:!bg-indigo-100">
                         <span>⚡ Bulk Limit Caps</span>
                     </Link>
+                    <button v-if="isPartitionedHub" type="button" class="btn-secondary text-xs flex items-center gap-1.5 !bg-amber-50 !text-amber-800 font-bold border-amber-300 hover:!bg-amber-100" @click="resyncPartitions" :disabled="resyncing">
+                        <span>🔄 Resync to child regions</span>
+                    </button>
                     <button v-if="trashedItems.length" type="button" class="btn-secondary text-xs flex items-center gap-1.5" @click="showTrashed = !showTrashed">
                         <span>🗑️ Deleted ({{ trashedItems.length }})</span>
                     </button>
@@ -406,6 +409,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import FestItemMetaIcons from '@/Components/sahodaya/FestItemMetaIcons.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { useConfirm } from '@/composables/useConfirm';
 import {
     festItemGenderLabel,
     festItemListingDetails,
@@ -413,9 +417,12 @@ import {
     festItemSearchHaystack,
 } from '@/support/festItemListingMeta.js';
 
+const { confirm } = useConfirm();
+
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, itemsByLevel: Object, groupedItems: Object, taxonomy: Object,
+    isPartitionedHub: Boolean,
     ownerLevelLabels: Object, activityLogs: { type: Array, default: () => [] },
     trashedItems: { type: Array, default: () => [] },
     taxonomyMastersUrl: String,
@@ -429,11 +436,28 @@ const searchQuery = ref('');
 const ageFilter = ref('');
 const statusFilter = ref('');
 const showTrashed = ref(false);
+const resyncing = ref(false);
 const addingItem = ref(false);
 const editingItem = ref(null);
 
 function restoreItem(item) {
     router.post(`${base}/items/${item.id}/restore`, {}, { preserveScroll: true });
+}
+
+async function resyncPartitions() {
+    if (!await confirm({
+        title: 'Resync items to region child events?',
+        message: 'This will update category, class group, gender, squad rules, and item metadata on all regional child events to match this parent event. Regional fee and limit overrides will be preserved.',
+        confirmButtonText: 'Yes, resync items now',
+    })) {
+        return;
+    }
+
+    resyncing.value = true;
+    router.post(`${base}/items/resync-partitions`, {}, {
+        preserveScroll: true,
+        onFinish: () => { resyncing.value = false; }
+    });
 }
 
 const catalogMasterUrl = computed(() => props.catalogUrl?.replace(/\/assign$/, '') ?? null);

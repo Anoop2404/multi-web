@@ -194,6 +194,24 @@ class FestItemSyncService
         return $count;
     }
 
+    public function resyncAllItemsToPartitions(FestEvent $hub): int
+    {
+        $partitions = app(FestPartitionService::class);
+        if (! $partitions->isPartitionedHub($hub)) {
+            return 0;
+        }
+
+        $hub->loadMissing('items');
+        $count = 0;
+
+        foreach ($partitions->partitions($hub) as $child) {
+            $role = $partitions->partitionRole($child) ?? 'region';
+            $count += $this->copyItemsToPartition($hub, $child, $role);
+        }
+
+        return $count;
+    }
+
     public function copyItemToPartition(
         FestEvent $hub,
         FestEventItem $item,

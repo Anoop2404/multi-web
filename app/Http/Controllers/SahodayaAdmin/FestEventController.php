@@ -1235,11 +1235,19 @@ class FestEventController extends SahodayaAdminController
         return back()->with('success', "{$count} standard item(s) imported.");
     }
 
+    public function resyncItemsToPartitions(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $count = app(\App\Services\Events\FestItemSyncService::class)->resyncAllItemsToPartitions($event);
+
+        $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.items.resynced_partitions', "Resynced item configurations to child regions/partitions", ['count' => $count]);
+
+        return back()->with('success', "Item configurations resynced across all regional child events.");
+    }
+
     /**
-     * Push item catalog changes into every region/cluster partition that already
-     * exists under this hub, so admins don't have to re-click "Sync Partitions"
-     * after every item add/edit/import. Never creates partitions — only keeps
-     * catalogs of existing partition children current.
+     * Keep item definitions, limits, and fees across the item catalogs of existing partition children current.
      */
     private function syncItemToExistingPartitions(FestEvent $event): void
     {
@@ -1296,6 +1304,7 @@ class FestEventController extends SahodayaAdminController
 
         return [
             'event'         => $event,
+            'isPartitionedHub' => app(\App\Services\Events\FestPartitionService::class)->isPartitionedHub($event),
             'groupedItems'  => $catalogService->groupForDisplay($event->items, $event->event_type),
             'taxonomy'      => $taxonomy,
             'itemHeads'     => $itemHeads,

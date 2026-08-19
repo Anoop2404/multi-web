@@ -16,6 +16,9 @@
                     <Link v-if="taxonomyMastersUrl" :href="taxonomyMastersUrl" class="btn-secondary text-xs flex items-center gap-1.5">
                         <span>🏷️ Category masters</span>
                     </Link>
+                    <button v-if="isPartitionedHub" type="button" class="btn-secondary text-xs flex items-center gap-1.5 !bg-amber-50 !text-amber-800 font-bold border-amber-300 hover:!bg-amber-100" @click="resyncPartitions" :disabled="resyncing">
+                        <span>🔄 Resync to region child events</span>
+                    </button>
                     <button v-if="trashedItems.length" type="button" class="btn-secondary text-xs flex items-center gap-1.5" @click="showTrashed = !showTrashed">
                         <span>🗑️ Deleted ({{ trashedItems.length }})</span>
                     </button>
@@ -517,6 +520,7 @@ const tiebreakModes = {
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, groupedItems: Object, taxonomy: Object,
+    isPartitionedHub: Boolean,
     competitionAreas: { type: Array, default: () => [] },
     taxonomyMastersUrl: String,
     catalogSummary: Object, catalogUrl: String,
@@ -526,9 +530,26 @@ const props = defineProps({
 });
 
 const showTrashed = ref(false);
+const resyncing = ref(false);
 
 function restoreItem(item) {
     router.post(`${base}/items/${item.id}/restore`, {}, { preserveScroll: true });
+}
+
+async function resyncPartitions() {
+    if (!await confirm({
+        title: 'Resync items to region child events?',
+        message: 'This will update category, class group, gender, squad rules, and item metadata on all regional child events to match this parent event. Regional fee and limit overrides will be preserved.',
+        confirmButtonText: 'Yes, resync items now',
+    })) {
+        return;
+    }
+
+    resyncing.value = true;
+    router.post(`${base}/items/resync-partitions`, {}, {
+        preserveScroll: true,
+        onFinish: () => { resyncing.value = false; }
+    });
 }
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
