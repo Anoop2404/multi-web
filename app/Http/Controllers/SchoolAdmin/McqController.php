@@ -54,14 +54,24 @@ class McqController extends SchoolAdminController
 
         $exam->load(['series:id,title', 'parentExam:id,title']);
 
-        $registrations = McqRegistration::where('exam_id', $exam->id)
+        $rawRegistrations = McqRegistration::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
             ->active()
             ->with(['student.user:id,username', 'student.schoolClass:id,name', 'teacher:id,name,employee_code,reg_no', 'mark', 'feeReceipt'])
             ->orderBy('hall_ticket_no')
-            ->get()
-            ->map(function (McqRegistration $reg) use ($exam) {
+            ->get();
+
+        $studentDupCounts = $rawRegistrations->whereNotNull('student_id')->groupBy('student_id')->map->count();
+        $teacherDupCounts = $rawRegistrations->whereNotNull('teacher_id')->groupBy('teacher_id')->map->count();
+
+        $registrations = $rawRegistrations->map(function (McqRegistration $reg) use ($exam, $studentDupCounts, $teacherDupCounts) {
                 $row = $reg->toArray();
+                $isStudentDup = $reg->student_id && ($studentDupCounts->get($reg->student_id, 0) > 1);
+                $isTeacherDup = $reg->teacher_id && ($teacherDupCounts->get($reg->teacher_id, 0) > 1);
+                $isDuplicate = $isStudentDup || $isTeacherDup;
+
+                $row['is_duplicate'] = $isDuplicate;
+                $row['duplicate_count'] = $isStudentDup ? $studentDupCounts->get($reg->student_id) : ($isTeacherDup ? $teacherDupCounts->get($reg->teacher_id) : 1);
                 $row['student'] = $reg->student
                     ? array_merge($reg->student->only('id', 'name', 'admission_number', 'reg_no'), [
                         'class_name'      => $reg->student->schoolClass?->name,

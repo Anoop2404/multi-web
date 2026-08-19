@@ -337,11 +337,35 @@
         <div v-else-if="tab === 'students'" class="card card--flush overflow-hidden p-4 space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <div>
+            <div v-if="duplicateRegistrationsCount > 0" class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 flex flex-wrap items-center justify-between gap-3 mb-2 shadow-sm">
+                <div>
+                    <p class="font-bold flex items-center gap-1.5 text-amber-950">
+                        <span>⚠️ Duplicate Registrations Detected</span>
+                        <span class="text-xs bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded-full">{{ duplicateRegistrationsCount }} candidate(s)</span>
+                    </p>
+                    <p class="text-xs text-amber-800 mt-0.5">
+                        Some candidates have duplicate registration records. They are highlighted in amber below — you can cancel the extra registration rows anytime.
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button"
+                            class="btn-secondary text-xs bg-white !border-amber-300 text-amber-900 font-semibold"
+                            @click="registeredDuplicateFilter = registeredDuplicateFilter === 'duplicates' ? '' : 'duplicates'">
+                        {{ registeredDuplicateFilter === 'duplicates' ? 'Show all candidates' : 'Filter duplicates only' }}
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
                     <h3 class="section-title !mb-0">Registered students</h3>
                     <p class="text-xs text-slate-500 mt-1">
                         {{ filteredRegisteredStudents.length }} student(s) registered for this exam ·
                         <span class="text-emerald-600 font-semibold">{{ schoolPaidCount }} paid</span> ·
                         <span class="text-amber-600 font-semibold">{{ schoolUnpaidCount }} unpaid</span>
+                        <template v-if="duplicateRegistrationsCount > 0"> ·
+                            <span class="text-amber-700 font-semibold">⚠️ {{ duplicateRegistrationsCount }} duplicate(s)</span>
+                        </template>
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
@@ -354,7 +378,11 @@
                         <option value="paid">Paid</option>
                         <option value="unpaid">Unpaid</option>
                     </select>
-                    <input v-model="registeredSearchQuery" type="text" placeholder="Search name, adm no, hall ticket..." class="field text-xs min-w-[240px] bg-slate-50 border-slate-300 py-2 rounded-lg" />
+                    <select v-model="registeredDuplicateFilter" class="field text-xs bg-slate-50 border-slate-300 py-2 rounded-lg">
+                        <option value="">All candidates</option>
+                        <option value="duplicates">⚠️ Duplicates only</option>
+                    </select>
+                    <input v-model="registeredSearchQuery" type="text" placeholder="Search name, adm no, hall ticket..." class="field text-xs min-w-[200px] bg-slate-50 border-slate-300 py-2 rounded-lg" />
                 </div>
             </div>
             <p class="text-xs text-slate-500 -mt-1">
@@ -364,9 +392,19 @@
                 <table class="data-table w-full">
                     <thead><tr><th class="w-12">#</th><th>Student</th><th>Class</th><th>Approval</th><th>Exam reg. no.</th><th>Seat</th><th>Status</th><th>Payment</th><th class="text-right">Action</th></tr></thead>
                     <tbody>
-                        <tr v-for="(r, i) in paginatedRegisteredStudents" :key="r.id">
+                        <tr v-for="(r, i) in paginatedRegisteredStudents" :key="r.id"
+                            :class="r.is_duplicate ? 'bg-amber-50/80 border-l-4 border-l-amber-500 hover:bg-amber-100/70' : ''">
                             <td class="text-xs font-bold text-slate-400">{{ (registeredPage - 1) * registeredPageSize + i + 1 }}</td>
-                            <td class="font-bold text-slate-900">{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</td>
+                            <td class="font-bold text-slate-900">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <span>{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</span>
+                                    <span v-if="r.is_duplicate"
+                                          class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 shadow-sm"
+                                          title="Duplicate registration record for this candidate">
+                                        ⚠️ Duplicate
+                                    </span>
+                                </div>
+                            </td>
                             <td class="text-xs">{{ r.student?.class_name || '—' }}</td>
                             <td><span class="text-xs capitalize">{{ r.approval_status_label || r.approval_status }}</span></td>
                             <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
@@ -383,8 +421,11 @@
                             <td class="text-right whitespace-nowrap space-x-2">
                                 <a v-if="examHasFee" :href="`${base}/registrations/${r.id}/invoice`" target="_blank" class="text-xs font-semibold text-indigo-600 hover:underline">Invoice</a>
                                 <button v-if="r.can_cancel && canRegister" type="button"
-                                        class="text-xs font-semibold text-red-600 hover:text-red-700"
-                                        @click="r.teacher_id ? cancelTeacher(r.teacher_id, r.participant_name || r.teacher?.name) : cancelStudent(r.student_id, r.participant_name || studentDisplayName(r.student))">Cancel</button>
+                                        class="text-xs font-semibold px-2 py-0.5 rounded transition-colors"
+                                        :class="r.is_duplicate ? 'bg-red-100 text-red-700 border border-red-200 hover:bg-red-200 font-bold' : 'text-red-600 hover:text-red-700'"
+                                        @click="r.teacher_id ? cancelTeacher(r.teacher_id, r.participant_name || r.teacher?.name, r.id) : cancelStudent(r.student_id, r.participant_name || studentDisplayName(r.student), r.id)">
+                                    {{ r.is_duplicate ? 'Cancel duplicate' : 'Cancel' }}
+                                </button>
                             </td>
                         </tr>
                     </tbody>
@@ -1243,10 +1284,16 @@ const paginatedReportRows = computed(() => {
 const registeredSearchQuery = ref('');
 const registeredClassFilter = ref('');
 const registeredPaymentFilter = ref('');
+const registeredDuplicateFilter = ref('');
+const showDuplicatesFirst = ref(true);
 const registeredPage = ref(1);
 const registeredPageSize = ref(50);
 
-watch([registeredSearchQuery, registeredClassFilter, registeredPaymentFilter], () => {
+const duplicateRegistrationsCount = computed(() => {
+    return (props.registrations || []).filter(r => r.is_duplicate).length;
+});
+
+watch([registeredSearchQuery, registeredClassFilter, registeredPaymentFilter, registeredDuplicateFilter], () => {
     registeredPage.value = 1;
 });
 
@@ -1260,6 +1307,9 @@ const filteredRegisteredStudents = computed(() => {
     } else if (registeredPaymentFilter.value === 'unpaid') {
         list = list.filter(r => !r.school_paid);
     }
+    if (registeredDuplicateFilter.value === 'duplicates') {
+        list = list.filter(r => r.is_duplicate);
+    }
     if (registeredSearchQuery.value.trim()) {
         const q = registeredSearchQuery.value.trim().toLowerCase();
         list = list.filter(r => {
@@ -1270,6 +1320,15 @@ const filteredRegisteredStudents = computed(() => {
             return name.includes(q) || adm.includes(q) || regNo.includes(q) || ht.includes(q);
         });
     }
+
+    if (showDuplicatesFirst.value) {
+        list = [...list].sort((a, b) => {
+            if (a.is_duplicate && !b.is_duplicate) return -1;
+            if (!a.is_duplicate && b.is_duplicate) return 1;
+            return 0;
+        });
+    }
+
     return list;
 });
 
@@ -1689,9 +1748,9 @@ function registerSelectedTeachers() {
         onFinish: () => { bulkRegisteringTeachers.value = false; },
     });
 }
-async function cancelTeacher(id, name) {
+async function cancelTeacher(id, name, registrationId = null) {
     if (!(await confirm({ message: `Cancel registration for ${name}?`, destructive: true }))) return;
-    router.post(`${base.value}/cancel`, { teacher_id: id }, { preserveScroll: true });
+    router.post(`${base.value}/cancel`, { teacher_id: id, registration_id: registrationId }, { preserveScroll: true });
 }
 
 function registerStudentById(id) {
@@ -1718,9 +1777,9 @@ function registerSelected() {
     });
 }
 
-async function cancelStudent(id, name) {
+async function cancelStudent(id, name, registrationId = null) {
     if (!(await confirm({ message: `Cancel registration for ${name}? You can re-add them later.`, destructive: true }))) return;
-    router.post(`${base.value}/cancel`, { student_id: id }, { preserveScroll: true });
+    router.post(`${base.value}/cancel`, { student_id: id, registration_id: registrationId }, { preserveScroll: true });
 }
 
 function markPaid(registration) {

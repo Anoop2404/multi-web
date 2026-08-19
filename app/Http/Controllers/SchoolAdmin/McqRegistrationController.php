@@ -491,17 +491,20 @@ class McqRegistrationController extends SchoolAdminController
     public function cancel(Request $request, string $tenantId, McqExam $exam)
     {
         $data = $request->validate([
-            'student_id' => 'nullable|integer|exists:students,id',
-            'teacher_id' => 'nullable|integer|exists:teachers,id',
+            'registration_id' => 'nullable|integer|exists:mcq_registrations,id',
+            'student_id'      => 'nullable|integer|exists:students,id',
+            'teacher_id'      => 'nullable|integer|exists:teachers,id',
         ]);
 
         abort_if($exam->tenant_id !== $this->school->parent_id, 403);
-        abort_if(empty($data['student_id']) && empty($data['teacher_id']), 422, 'Select a student or teacher to cancel.');
+        abort_if(empty($data['registration_id']) && empty($data['student_id']) && empty($data['teacher_id']), 422, 'Select a student, teacher, or registration to cancel.');
 
         $query = McqRegistration::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id);
 
-        if (! empty($data['teacher_id'])) {
+        if (! empty($data['registration_id'])) {
+            $query->where('id', $data['registration_id']);
+        } elseif (! empty($data['teacher_id'])) {
             $query->where('teacher_id', $data['teacher_id']);
         } else {
             $query->where('student_id', $data['student_id']);
