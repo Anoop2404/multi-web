@@ -74,9 +74,10 @@
                         </td>
                         <td class="text-xs">
                             <div v-if="u.fest_assignments?.length" class="flex flex-wrap gap-1">
-                                <span v-for="(a, i) in u.fest_assignments" :key="`f${i}`"
-                                      class="inline-flex items-center rounded-full bg-violet-50 border border-violet-200 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+                                <span v-for="a in u.fest_assignments" :key="`f${a.id}`"
+                                      class="inline-flex items-center gap-1 rounded-full bg-violet-50 border border-violet-200 pl-2 pr-1 py-0.5 text-[10px] font-medium text-violet-700">
                                     {{ a.event_title }} · {{ dutyLabel(a.duty) }}{{ a.region_name ? ` — ${a.region_name}` : '' }}
+                                    <button type="button" class="leading-none text-violet-400 hover:text-red-600" title="Remove this assignment" @click="removeFestAssignment(u, a)">✕</button>
                                 </span>
                             </div>
                             <div v-if="u.exam_assignments?.length" class="flex flex-wrap gap-1 mt-1">
@@ -427,7 +428,7 @@ const form = useForm({
     fest_ops_event_id: '', fest_ops_duties: [],
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
-    region_admin_event_id: '', region_admin_region_id: '',
+    region_admin_event_id: '', region_admin_region_id: '', region_admin_assignment_id: null,
     region_ids: [],
 });
 const editing = ref(null);
@@ -437,7 +438,7 @@ const editForm = useForm({
     fest_ops_event_id: '', fest_ops_duties: [],
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
-    region_admin_event_id: '', region_admin_region_id: '',
+    region_admin_event_id: '', region_admin_region_id: '', region_admin_assignment_id: null,
     region_ids: [],
 });
 
@@ -559,6 +560,7 @@ function openEdit(user) {
     const regionAdminAssignment = (user.fest_assignments || []).find(a => a.duty === 'region_admin');
     editForm.region_admin_event_id = regionAdminAssignment?.event_id ?? '';
     editForm.region_admin_region_id = regionAdminAssignment?.region_id ?? '';
+    editForm.region_admin_assignment_id = regionAdminAssignment?.id ?? null;
 
     const exam = user.exam_assignments?.[0];
     editForm.exam_staff_exam_id = exam?.exam_id ?? '';
@@ -577,6 +579,12 @@ function saveEdit() {
 async function remove(user) {
     if (!(await confirm({ message: `Remove ${user.name}?` }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/users/${user.id}`, { preserveScroll: true });
+}
+
+async function removeFestAssignment(user, assignment) {
+    const label = `${assignment.event_title} · ${dutyLabel(assignment.duty)}${assignment.region_name ? ` — ${assignment.region_name}` : ''}`;
+    if (!(await confirm({ message: `Remove this assignment from ${user.name}?\n\n${label}` }))) return;
+    router.delete(`/sahodaya-admin/${props.sahodaya.id}/users/${user.id}/fest-assignments/${assignment.id}`, { preserveScroll: true });
 }
 
 async function resetPw(user) {

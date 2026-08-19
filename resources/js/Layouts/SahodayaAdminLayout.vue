@@ -208,6 +208,7 @@ const navGroups = computed(() => {
         stateRemittancesEnabled: page.props.stateRemittancesEnabled !== false,
         navVisibility: page.props.navVisibility ?? null,
         competitionPrograms: page.props.competitionPrograms ?? {},
+        scopedEventTypes: page.props.scopedEventTypes ?? null,
     };
 
     const examId = detectSahodayaMcqExamIdFromUrl(page.url);

@@ -121,6 +121,43 @@ abstract class SahodayaAdminController extends Controller
         return array_values(array_intersect($schoolIds, $regionSchoolIds));
     }
 
+    /**
+     * The sidebar (sahodayaAdminNav.js) shows every program hub (Kalotsav, Sports Meet,
+     * English Fest, ...) plus "All events"/"Competition types" regardless of which specific
+     * event an event/region/phase-scoped admin actually holds — those links either 403 (a
+     * program hub redirects into a hub event they're not scoped for) or render empty ("All
+     * events" is already filtered server-side to eventAdminEventIds, which is empty for a
+     * pure region/phase admin — see FestEventController::index()/programIndex()). This
+     * resolves the set of event_types such an admin can actually reach, so the sidebar can
+     * hide the rest instead of advertising dead ends.
+     *
+     * Returns null for a full admin (not event/region/phase-scoped at all — unchanged, full
+     * nav), or a (possibly empty) list of event_type strings when scoped.
+     *
+     * @return list<string>|null
+     */
+    protected function sidebarEventScope(): ?array
+    {
+        $request = request();
+
+        if (! $request->attributes->has('eventAdminEventIds')) {
+            return null;
+        }
+
+        $eventIds = collect($request->attributes->get('eventAdminEventIds', []))
+            ->merge(collect($request->attributes->get('regionAdminScopes', []))->pluck('event_id'))
+            ->merge(collect($request->attributes->get('phaseAdminScopes', []))->pluck('event_id'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($eventIds->isEmpty()) {
+            return [];
+        }
+
+        return FestEvent::whereIn('id', $eventIds)->pluck('event_type')->unique()->values()->all();
+    }
+
     protected function inertia(string $component, array $props = [])
     {
         $props = $this->withFestNavContext($props);
@@ -131,6 +168,7 @@ abstract class SahodayaAdminController extends Controller
         }
 
         return inertia($component, array_merge([
+            'scopedEventTypes' => $this->sidebarEventScope(),
             'isStaff' => $this->isStaff,
             'staffPermissions' => $staffPermissions,
             'navVisibility' => SahodayaNavVisibility::forProfile(

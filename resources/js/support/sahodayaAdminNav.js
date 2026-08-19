@@ -344,12 +344,20 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
         stateRemittancesEnabled = true,
         navVisibility = null,
         competitionPrograms = {},
+        scopedEventTypes = null,
     } = options;
 
     const base = `/sahodaya-admin/${sahodayaId}`;
     const groups = [];
     const menuOn = (key) => isNavMenuVisible(navVisibility, key);
     const programOn = (slug) => isNavProgramVisible(navVisibility, slug);
+    // Event/region/phase-scoped admins (region_admin, event_admin, phase_admin without a
+    // broader role) only ever reach the specific event_type(s) they're assigned to — every
+    // other program hub redirects into a hub event they're not scoped for and 403s, and "All
+    // events" is already filtered server-side to nothing for them. null = not scoped (full
+    // nav, unchanged); an array (possibly empty) = only these event_types are reachable.
+    const isScoped = Array.isArray(scopedEventTypes);
+    const programAllowed = (eventType) => !isScoped || scopedEventTypes.includes(eventType);
 
     // ── Home ─────────────────────────────────────────────────────────
     groups.push({
@@ -423,26 +431,26 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
     // ── Fest & events ─────────────────────────────────────────────────
     if (canNav('fest')) {
         const festItems = [
-            programOn('kalotsav') ? { label: 'Kalotsav', href: `${base}/kalotsav`, icon: 'star' } : null,
-            programOn('sports-meet') ? { label: 'Sports Meet', href: `${base}/sports`, icon: 'award' } : null,
-            programOn('kids-fest') ? { label: 'Kids Fest', href: `${base}/kids-fest`, icon: 'users' } : null,
-            programOn('teacher-fest') ? { label: 'Teacher Fest', href: `${base}/teacher-fest`, icon: 'users' } : null,
-            programOn('english-fest') ? { label: 'English Fest', href: `${base}/english-fest`, icon: 'file-text' } : null,
-            programOn('science-fest') ? { label: 'Science Fest', href: `${base}/science-fest`, icon: 'layers' } : null,
-            { label: 'All events', href: `${base}/events`, icon: 'calendar', exact: true },
-            { label: 'Competition types', href: `${base}/competition-types`, icon: 'layers' },
+            programOn('kalotsav') && programAllowed('kalolsavam') ? { label: 'Kalotsav', href: `${base}/kalotsav`, icon: 'star' } : null,
+            programOn('sports-meet') && programAllowed('sports') ? { label: 'Sports Meet', href: `${base}/sports`, icon: 'award' } : null,
+            programOn('kids-fest') && programAllowed('kids_fest') ? { label: 'Kids Fest', href: `${base}/kids-fest`, icon: 'users' } : null,
+            programOn('teacher-fest') && programAllowed('teacher_fest') ? { label: 'Teacher Fest', href: `${base}/teacher-fest`, icon: 'users' } : null,
+            programOn('english-fest') && programAllowed('english_fest') ? { label: 'English Fest', href: `${base}/english-fest`, icon: 'file-text' } : null,
+            programOn('science-fest') && programAllowed('science_fest') ? { label: 'Science Fest', href: `${base}/science-fest`, icon: 'layers' } : null,
+            !isScoped ? { label: 'All events', href: `${base}/events`, icon: 'calendar', exact: true } : null,
+            !isScoped ? { label: 'Competition types', href: `${base}/competition-types`, icon: 'layers' } : null,
             menuOn('fest_appeals') ? { label: 'Appeals queue', href: `${base}/fest/appeals`, icon: 'inbox', badge: pendingFestAppealsCount } : null,
             menuOn('fest_payments') ? { label: 'Fest payments', href: `${base}/fest/payments`, icon: 'credit-card' } : null,
             menuOn('display_screens') ? { label: 'Display screens', href: `${base}/display-screens`, icon: 'monitor' } : null,
             menuOn('certificate_templates') ? { label: 'Certificate templates', href: `${base}/certificate-templates`, icon: 'award' } : null,
             menuOn('id_card_templates') ? { label: 'ID card templates', href: `${base}/id-card-templates`, icon: 'credit-card' } : null,
             { label: 'Find certificate', href: `${base}/events/certificates/search`, icon: 'file-text' },
-            programOn('custom') ? { label: 'Custom events', href: `${base}/programs/custom`, icon: 'layers' } : null,
+            programOn('custom') && programAllowed('custom') ? { label: 'Custom events', href: `${base}/programs/custom`, icon: 'layers' } : null,
         ].filter(Boolean);
 
         // Dynamic competition types (non-system) from Inertia shared props.
         Object.values(competitionPrograms || {}).forEach((p) => {
-            if (!p?.slug || p.is_system || p.slug === 'custom') return;
+            if (!p?.slug || p.is_system || p.slug === 'custom' || !programAllowed(p.eventType)) return;
             const insertAt = festItems.findIndex((i) => i.label === 'All events');
             festItems.splice(insertAt >= 0 ? insertAt : festItems.length, 0, {
                 label: p.label,

@@ -42,6 +42,7 @@ class TenantUserController extends SahodayaAdminController
                     ->with('event:id,title', 'stage:id,name', 'region:id,name')
                     ->get()
                     ->map(fn (FestEventStaff $s) => [
+                        'id'          => $s->id,
                         'event_id'    => $s->event_id,
                         'event_title' => $s->event?->title,
                         'duty'        => $s->duty,
@@ -189,6 +190,10 @@ class TenantUserController extends SahodayaAdminController
                 'nullable',
                 Rule::exists('regions', 'id')->where('tenant_id', $this->sahodaya->id),
             ],
+            'region_admin_assignment_id' => [
+                'nullable',
+                Rule::exists('fest_event_staff', 'id')->where('user_id', $user->id)->where('duty', 'region_admin'),
+            ],
             'region_ids'   => 'array',
             'region_ids.*' => [Rule::exists('regions', 'id')->where('tenant_id', $this->sahodaya->id)],
         ]);
@@ -241,6 +246,18 @@ class TenantUserController extends SahodayaAdminController
         $provisioner->destroy($user, $this->sahodaya->id, TenantUserCatalog::sahodayaAssignableRoles());
 
         return back()->with('success', 'User removed.');
+    }
+
+    /** Remove one fest event/region/duty assignment without deleting the whole user account. */
+    public function destroyFestAssignment(string $tenantId, User $user, FestEventStaff $assignment, PlatformAuditLogger $audit)
+    {
+        abort_if($user->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($assignment->user_id !== $user->id, 404);
+
+        $assignment->delete();
+        $audit->userUpdated($user);
+
+        return back()->with('success', 'Assignment removed.');
     }
 
     public function toggleActive(string $tenantId, User $user, PlatformAuditLogger $audit)
@@ -356,8 +373,16 @@ class TenantUserController extends SahodayaAdminController
     /**
      * Region admins are locked to one event + one region — EventRegionAdminScope reads this
      * pair off FestEventStaff.region_id to decide access (see app/Support/EventRegionAdminScope.php).
-     * Only ever adds/confirms the selected pair — never deletes, so it can't clobber additional
-     * assignments a user already has from the per-event Event Staff page (which supports several).
+     *
+     * This form edits exactly one pair in place, tracked via region_admin_assignment_id (the
+     * FestEventStaff row id, stashed on the form when opened — see Users/Index.vue's openEdit()).
+     * When that id is present and still belongs to this user/duty, its event_id/region_id are
+     * updated rather than inserting a new row — otherwise picking a different event here just
+     * accumulates a second row while the stale one keeps granting/denying access silently (the
+     * bug behind the "assigned the child event but the parent is what's loaded" report). A
+     * missing/foreign id falls back to firstOrCreate, so it still won't clobber additional
+     * assignments a user separately holds from the per-event Event Staff page (which supports
+     * several region_admin rows across different events).
      *
      * @param  array<string, mixed>  $data
      */
@@ -371,6 +396,20 @@ class TenantUserController extends SahodayaAdminController
         $regionId = $data['region_admin_region_id'] ?? null;
 
         if (! $eventId || ! $regionId) {
+            return;
+        }
+
+        $assignmentId = $data['region_admin_assignment_id'] ?? null;
+        $existing = $assignmentId
+            ? FestEventStaff::where('id', $assignmentId)
+                ->where('user_id', $user->id)
+                ->where('duty', 'region_admin')
+                ->first()
+            : null;
+
+        if ($existing) {
+            $existing->update(['event_id' => $eventId, 'region_id' => $regionId]);
+
             return;
         }
 

@@ -728,6 +728,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::put('/users/{user}', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'update'])->name('users.update');
         Route::post('/users/{user}/reset-password', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'resetPassword'])->name('users.reset-password');
         Route::patch('/users/{user}/toggle-active', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'toggleActive'])->name('users.toggle-active');
+        Route::delete('/users/{user}/fest-assignments/{assignment}', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'destroyFestAssignment'])->name('users.fest-assignments.destroy');
         Route::delete('/users/{user}', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'destroy'])->name('users.destroy');
 
         Route::get('/settings/nav-visibility', [\App\Http\Controllers\SahodayaAdmin\NavVisibilityController::class, 'edit'])->name('settings.nav-visibility');

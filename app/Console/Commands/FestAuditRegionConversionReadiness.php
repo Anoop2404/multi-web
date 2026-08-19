@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\FestAttendance;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestQualification;
@@ -27,7 +28,8 @@ class FestAuditRegionConversionReadiness extends Command
     protected $signature = 'fest:audit-region-conversion-readiness
         {--sahodaya= : Sahodaya tenant id or subdomain (required)}
         {--event= : Root fest_events id to check (required)}
-        {--format=table : table|json}';
+        {--format=table : table|json}
+        {--item-breakdown : Also list every item per legacy region child with its registration/participant/chest-number counts, for building a real item_phase_map (Branch B)}';
 
     protected $description = 'Read-only check of whether a region-wise event has operational/financial data that must be preserved before converting to phased_regional_billing';
 
@@ -55,11 +57,12 @@ class FestAuditRegionConversionReadiness extends Command
             return self::FAILURE;
         }
 
+        $itemBreakdown = (bool) $this->option('item-breakdown');
         $report = null;
 
         try {
-            $tenant->run(function () use ($eventOpt, &$report) {
-                $report = $this->buildReport((int) $eventOpt);
+            $tenant->run(function () use ($eventOpt, $itemBreakdown, &$report) {
+                $report = $this->buildReport((int) $eventOpt, $itemBreakdown);
             });
         } finally {
             if (function_exists('tenancy') && tenancy()->initialized) {
@@ -78,7 +81,7 @@ class FestAuditRegionConversionReadiness extends Command
         return self::SUCCESS;
     }
 
-    private function buildReport(int $eventId): ?array
+    private function buildReport(int $eventId, bool $itemBreakdown = false): ?array
     {
         $root = FestEvent::find($eventId);
         if (! $root) {
@@ -90,6 +93,7 @@ class FestAuditRegionConversionReadiness extends Command
 
         $rows = $events->map(fn (FestEvent $event) => $this->countsFor($event, $event->id === $root->id));
         $paidSchools = $this->paidHistorySchools($root);
+        $items = $itemBreakdown ? $this->itemBreakdown($children) : null;
 
         $totalRegistrations = $rows->sum('registrations');
         $totalSchools = $events
@@ -107,6 +111,7 @@ class FestAuditRegionConversionReadiness extends Command
             ],
             'events' => $rows->values()->all(),
             'paid_schools' => $paidSchools->values()->all(),
+            'items' => $items,
             'verdict' => $totalRegistrations === 0 && $paidSchools->isEmpty()
                 ? 'BRANCH A -- no operational or financial data found. Safe to configure the phased structure directly.'
                 : "BRANCH B REQUIRED -- {$totalRegistrations} registration(s) across {$totalSchools} school(s) need relocation before workflow_mode can be enabled."
@@ -146,6 +151,44 @@ class FestAuditRegionConversionReadiness extends Command
             ->map(fn ($f) => ['school_id' => $f->school_id, 'amount_paid' => (string) $f->amount_paid, 'fee_receipt_id' => $f->fee_receipt_id]);
     }
 
+    /**
+     * Every item on each legacy region child (only children carrying partition_role with no
+     * source_phase_id yet — a fresh phase leaf's own items aren't part of this decision),
+     * with real registration/participant/chest-number counts, so a committee categorizing
+     * item_phase_map for FestRegionRoundMigrationService is working from actual numbers
+     * instead of guessing which items matter. Grouped by item_code across children, since
+     * the same catalog item exists as one independent row per region today.
+     *
+     * @param  Collection<int, FestEvent>  $children
+     */
+    private function itemBreakdown(Collection $children): array
+    {
+        $legacyChildren = $children->filter(fn (FestEvent $c) => $c->source_phase_id === null && $c->partition_role !== null);
+
+        $rows = collect();
+        foreach ($legacyChildren as $child) {
+            $items = FestEventItem::where('event_id', $child->id)->orderBy('item_code')->get();
+            foreach ($items as $item) {
+                $registrationIds = FestRegistration::where('item_id', $item->id)->pluck('id');
+                $rows->push([
+                    'region' => $child->region_id,
+                    'child_event_id' => $child->id,
+                    'child_title' => $child->title,
+                    'item_id' => $item->id,
+                    'item_code' => $item->item_code,
+                    'title' => $item->title,
+                    'category' => $item->category,
+                    'stage_type' => $item->stage_type,
+                    'registrations' => $registrationIds->count(),
+                    'participants' => FestParticipant::whereIn('registration_id', $registrationIds)->count(),
+                    'chest_numbers_issued' => FestParticipant::whereIn('registration_id', $registrationIds)->whereNotNull('chest_no')->count(),
+                ]);
+            }
+        }
+
+        return $rows->sortBy('item_code')->values()->all();
+    }
+
     private function output(array $report, string $format): void
     {
         if ($format === 'json') {
@@ -173,6 +216,18 @@ class FestAuditRegionConversionReadiness extends Command
             $this->table(
                 ['School', 'Amount paid', 'Fee receipt'],
                 collect($report['paid_schools'])->map(fn ($s) => [$s['school_id'], $s['amount_paid'], $s['fee_receipt_id'] ?? '—'])->all()
+            );
+        }
+
+        if ($report['items'] !== null) {
+            $this->newLine();
+            $this->info(count($report['items']).' item row(s) across legacy region children — use item_code + these counts to build item_phase_map:');
+            $this->table(
+                ['Item code', 'Title', 'Category', 'Stage', 'Region event', 'Regs', 'Participants', 'Chest #s issued'],
+                collect($report['items'])->map(fn ($i) => [
+                    $i['item_code'], $i['title'], $i['category'] ?? '—', $i['stage_type'] ?? '—',
+                    $i['child_event_id'], $i['registrations'], $i['participants'], $i['chest_numbers_issued'],
+                ])->all()
             );
         }
 
