@@ -890,6 +890,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/schools/{school}/approve', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'approve'])->name('schools.approve');
         Route::post('/schools/{school}/reject', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'reject'])->name('schools.reject');
         Route::post('/schools/{school}/cancel-membership', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'cancelMembership'])->name('schools.cancel-membership');
+        Route::post('/schools/{school}/note', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'updateAdminNote'])->name('schools.note.update');
+        Route::post('/schools/{school}/payment-proof', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'uploadPaymentProof'])->name('schools.payment-proof.store');
         Route::put('/schools/{school}/email', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'updateSchoolEmail'])->name('schools.email.update');
         Route::post('/schools/{school}/resend-credentials', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'resendSchoolCredentials'])->name('schools.credentials.resend');
         Route::post('/schools/{school}/reset-password', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'resetSchoolPassword'])->name('schools.password.reset');

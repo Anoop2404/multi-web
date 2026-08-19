@@ -179,6 +179,7 @@ class MemberSchoolsController extends SahodayaAdminController
                 'fest_registration_closed', 'subdomain', 'created_at', 'application_payload'
             ), [
                 'contact_email'  => $payload['school_email'] ?? $payload['contact_email'] ?? null,
+                'admin_note'     => $payload['admin_note'] ?? null,
                 'student_count'  => Student::where('tenant_id', $school->id)->where('status', 'active')->count(),
                 'classes_count'  => SchoolClass::where('tenant_id', $school->id)->where('is_active', true)->count(),
                 'has_login'      => $this->schoolLoginUser($school) !== null,
@@ -194,6 +195,69 @@ class MemberSchoolsController extends SahodayaAdminController
             'recentPayments' => $payments,
             'academicYear'   => $year,
         ]);
+    }
+
+    public function updateAdminNote(Request $request, string $tenantId, Tenant $school, PlatformAuditLogger $audit)
+    {
+        abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+
+        $data = $request->validate([
+            'admin_note' => 'nullable|string|max:2000',
+        ]);
+
+        $payload = $school->application_payload ?? [];
+        $payload['admin_note'] = $data['admin_note'];
+        $school->update(['application_payload' => $payload]);
+
+        $audit->log(
+            'membership.school.note_updated',
+            "Admin note updated for school {$school->name}",
+            null,
+            ['school_id' => $school->id, 'sahodaya_id' => $this->sahodaya->id, 'note' => $data['admin_note']],
+        );
+
+        return back()->with('success', 'Admin note saved successfully.');
+    }
+
+    public function uploadPaymentProof(Request $request, string $tenantId, Tenant $school, PlatformAuditLogger $audit)
+    {
+        abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+
+        $data = $request->validate([
+            'amount'            => 'required|numeric|min:0',
+            'payment_reference' => 'nullable|string|max:255',
+            'proof'             => 'nullable|file|mimes:pdf,png,jpg,jpeg|max:5120',
+            'notes'             => 'nullable|string|max:1000',
+            'status'            => 'required|in:verified,submitted',
+        ]);
+
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
+
+        $proofPath = null;
+        if ($request->hasFile('proof')) {
+            $proofPath = TenantStorage::storeUploadedFile($school, $request->file('proof'), 'membership/payment_proofs');
+        }
+
+        $payment = MembershipPayment::create([
+            'school_id'            => $school->id,
+            'academic_year'        => $year,
+            'amount'               => $data['amount'],
+            'payment_reference'    => $data['payment_reference'],
+            'payment_proof_path'   => $proofPath,
+            'status'               => $data['status'],
+            'notes'                => $data['notes'],
+            'verified_by_user_id'  => $data['status'] === 'verified' ? $request->user()?->id : null,
+            'verified_at'          => $data['status'] === 'verified' ? now() : null,
+        ]);
+
+        $audit->log(
+            'membership.payment.uploaded_by_admin',
+            "Payment proof uploaded by Sahodaya Admin for {$school->name} (₹{$data['amount']})",
+            null,
+            ['school_id' => $school->id, 'payment_id' => $payment->id, 'status' => $data['status']],
+        );
+
+        return back()->with('success', "Payment proof uploaded and set to {$data['status']} for {$school->name}.");
     }
 
     public function reject(Request $request, string $tenantId, Tenant $school, MembershipNotifier $notifier)

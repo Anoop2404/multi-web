@@ -43,13 +43,22 @@
 
             <div v-else-if="school.can_cancel_membership"
                  class="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                <span>
-                    This school is <strong>approved</strong> but has <strong>no submitted/verified membership payment</strong>.
-                    You can cancel membership to remove it from the approved member list.
-                </span>
-                <button type="button" class="btn-secondary text-sm text-red-700 border-red-200 shrink-0" @click="cancelMembership">
-                    Cancel membership
-                </button>
+                <div>
+                    <p>
+                        This school is <strong>approved</strong> but has <strong>no submitted/verified membership payment</strong>.
+                    </p>
+                    <p v-if="school.admin_note" class="text-xs text-amber-800 font-semibold mt-1">
+                        📝 Admin note: {{ school.admin_note }}
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" class="btn-primary text-xs" @click="showUploadProofModal = true">
+                        + Upload / Attach Payment Proof
+                    </button>
+                    <button type="button" class="btn-secondary text-sm text-red-700 border-red-200 shrink-0" @click="cancelMembership">
+                        Cancel membership
+                    </button>
+                </div>
             </div>
 
             <div v-else-if="school.can_cancel_with_settlement"
@@ -58,11 +67,19 @@
                     <p>
                         This school is <strong>approved</strong> and has a verified payment. 
                     </p>
+                    <p v-if="school.admin_note" class="text-xs text-red-800 font-semibold mt-1">
+                        📝 Admin note: {{ school.admin_note }}
+                    </p>
                     <p class="text-xs text-red-700 font-medium">Cancelling will reject their membership and requires resolving their payment.</p>
                 </div>
-                <button type="button" class="btn-secondary text-sm text-red-700 border-red-200 shrink-0" @click="cancelMembershipWithSettlement">
-                    Cancel membership (with settlement)
-                </button>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" class="btn-secondary text-xs" @click="showUploadProofModal = true">
+                        Update payment proof
+                    </button>
+                    <button type="button" class="btn-secondary text-sm text-red-700 border-red-200 shrink-0" @click="cancelMembershipWithSettlement">
+                        Cancel membership (with settlement)
+                    </button>
+                </div>
             </div>
 
             <!-- Header -->
@@ -115,6 +132,27 @@
                     </div>
                 </dl>
                 <p v-else class="text-sm text-gray-400 text-center py-8">No application data on file.</p>
+            </div>
+
+            <!-- Sahodaya Admin Note Card -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-gray-900 flex items-center gap-2">
+                        <span>📝 Sahodaya Admin Note</span>
+                    </h3>
+                    <span v-if="adminNoteSaved" class="text-xs font-semibold text-emerald-600">Saved!</span>
+                </div>
+                <p class="text-xs text-gray-500">
+                    Internal note regarding this school's approval status, payment arrangement, or fee terms.
+                </p>
+                <textarea v-model="adminNoteText" rows="2"
+                          placeholder="e.g. Approved conditionally by Sahodaya President; payment proof to be submitted later / Cash collected at office"
+                          class="w-full text-sm border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-purple-200 focus:outline-none"></textarea>
+                <div class="flex justify-end">
+                    <button type="button" class="btn-primary text-xs !py-1.5" :disabled="savingAdminNote" @click="saveAdminNote">
+                        {{ savingAdminNote ? 'Saving note…' : 'Save Admin Note' }}
+                    </button>
+                </div>
             </div>
 
             <!-- Login -->
@@ -271,12 +309,57 @@
                 </div>
             </div>
         </div>
+
+        <!-- Upload Payment Proof Modal -->
+        <div v-if="showUploadProofModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl border border-gray-100">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <h3 class="font-bold text-gray-900 text-base">Upload / Attach Payment Proof</h3>
+                    <button type="button" class="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer" @click="showUploadProofModal = false">&times;</button>
+                </div>
+                <p class="text-xs text-gray-500">
+                    Attach proof document or record payment reference details for <strong>{{ school.name }}</strong> ({{ academicYear }}).
+                </p>
+
+                <form @submit.prevent="submitAdminPaymentProof" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Amount (₹)</label>
+                        <input v-model="proofForm.amount" type="number" step="0.01" class="field" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Reference / Receipt No / Note</label>
+                        <input v-model="proofForm.payment_reference" type="text" placeholder="e.g. Bank Ref # / Cash / Receipt No" class="field">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Payment Proof File (PDF or Image)</label>
+                        <input type="file" @change="e => proofForm.proof = e.target.files[0]" accept=".pdf,.png,.jpg,.jpeg" class="field text-xs">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Payment Status</label>
+                        <select v-model="proofForm.status" class="field">
+                            <option value="verified">✓ Verified (Fee cleared immediately)</option>
+                            <option value="submitted">⏳ Submitted (Pending Review)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                        <button type="button" class="btn-ghost text-xs" @click="showUploadProofModal = false">Cancel</button>
+                        <button type="submit" class="btn-primary text-xs" :disabled="proofForm.processing">
+                            {{ proofForm.processing ? 'Saving proof…' : 'Save & Verify Payment' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, defineComponent, h, ref } from 'vue';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
 import { useConfirm } from '@/composables/useConfirm';
@@ -298,6 +381,46 @@ const deleteProcessing = ref(false);
 const schoolEmail = ref(props.school.contact_email || props.school.login_email || '');
 const emailProcessing = ref(false);
 const credentialProcessing = ref(false);
+
+const adminNoteText = ref(props.school.admin_note || '');
+const savingAdminNote = ref(false);
+const adminNoteSaved = ref(false);
+
+const showUploadProofModal = ref(false);
+const proofForm = useForm({
+    amount: props.school.payment_amount ?? 4000,
+    payment_reference: '',
+    proof: null,
+    notes: '',
+    status: 'verified',
+});
+
+function saveAdminNote() {
+    savingAdminNote.value = true;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/note`, {
+        admin_note: adminNoteText.value,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            savingAdminNote.value = false;
+            adminNoteSaved.value = true;
+            setTimeout(() => { adminNoteSaved.value = false; }, 3000);
+        },
+        onError: () => {
+            savingAdminNote.value = false;
+        },
+    });
+}
+
+function submitAdminPaymentProof() {
+    proofForm.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/payment-proof`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showUploadProofModal.value = false;
+            proofForm.reset();
+        },
+    });
+}
 
 const canDeleteSchool = computed(() =>
     deleteReason.value.trim() !== '' && deleteConfirmName.value === props.school.name,
