@@ -123,7 +123,11 @@ class SchoolDocumentDownloadGateService
 
         $reason = null;
         if (! $membershipCleared) {
-            $reason = 'Sahodaya membership fee payment is pending.';
+            // Kept self-contained (not just "...is pending.") since the caller (Vue banner)
+            // shows this reason alone — it used to always append a generic "membership AND
+            // event fee" sentence regardless of which check actually failed, which was wrong
+            // whenever only membership was the blocker.
+            $reason = 'Sahodaya membership fee payment is pending. Pay and get it verified before downloading ID cards or hall tickets.';
         } elseif ($event && ! $eventFeeCleared) {
             $fee = \App\Models\FestSchoolEventFee::where('event_id', $event->id)->where('school_id', $school->id)->first();
             if ($fee && $fee->status === 'proof_uploaded') {
@@ -134,9 +138,9 @@ class SchoolDocumentDownloadGateService
         } elseif ($exam && ! $mcqFeeCleared) {
             $fee = \App\Models\McqSchoolFee::where('exam_id', $exam->id)->where('school_id', $school->id)->first();
             if ($fee && $fee->status === 'proof_uploaded') {
-                $reason = 'Talent Search exam fee payment proof is uploaded and awaiting Sahodaya approval.';
+                $reason = 'Talent Search exam fee payment proof is uploaded and awaiting Sahodaya approval. Hall ticket downloads unlock automatically right after approval.';
             } else {
-                $reason = 'Talent Search exam fee payment is pending.';
+                $reason = 'Talent Search exam fee payment is pending. Upload payment proof and get it approved to unlock hall ticket downloads.';
             }
         }
 

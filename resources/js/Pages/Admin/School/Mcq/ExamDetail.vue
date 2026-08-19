@@ -414,7 +414,7 @@
             <template v-else>
                 <div v-if="downloadGate?.blocked" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                     <p class="font-semibold">Payment pending</p>
-                    <p class="text-xs mt-1">{{ downloadGate.reason }} Pay Sahodaya membership and exam fees to download hall tickets.</p>
+                    <p class="text-xs mt-1">{{ downloadGate.reason }}</p>
                     <Link v-if="downloadGate.links?.payments" :href="downloadGate.links.payments" class="link-brand text-xs font-semibold mt-2 inline-block">Go to payments →</Link>
                 </div>
                 <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">

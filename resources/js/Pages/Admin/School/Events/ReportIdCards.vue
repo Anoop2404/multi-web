@@ -21,7 +21,7 @@
 
         <div v-if="downloadGate?.blocked" class="notice-banner notice-banner--warning mb-6 max-w-5xl text-sm">
             <p class="font-semibold">Payment pending</p>
-            <p class="mt-0.5">{{ downloadGate.reason }} Complete membership and event fee payment to preview or download ID cards.</p>
+            <p class="mt-0.5">{{ downloadGate.reason }}</p>
             <p v-if="downloadGate.links?.payments" class="mt-2">
                 <Link :href="downloadGate.links.payments" class="link-brand font-semibold">Go to payments →</Link>
             </p>

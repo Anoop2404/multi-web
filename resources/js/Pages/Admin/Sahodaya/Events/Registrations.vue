@@ -23,8 +23,9 @@
             <Link :href="competitionUrl" class="font-semibold underline ml-1">Back to item listing</Link>
         </p>
 
-        <!-- Sport Event / Region Switcher -->
-        <div v-if="childEvents.length" class="card mb-4 !py-3">
+        <!-- Sport Event / Region Switcher — hidden when scoped down to a single option
+             (nothing to actually switch to; see FestRegistrationReviewController::index()) -->
+        <div v-if="childEvents.length > 1" class="card mb-4 !py-3">
             <div class="flex flex-wrap gap-3 items-center">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}</label>
                 <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">

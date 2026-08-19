@@ -132,4 +132,41 @@ class SchoolDocumentDownloadGateServiceTest extends TestCase
         // Should not throw any exception
         $downloadGate->assertFestEventFeeForDownloads($event, $school);
     }
+
+    /**
+     * The membership-fee reason string used to be a bare "...is pending." fragment, relying
+     * on Vue templates (ReportIdCards.vue, ExamDetail.vue) to append a generic "Complete
+     * membership and event fee payment..." sentence — which was wrong whenever, like here,
+     * the event/exam fee was never even reached because membership already blocked. Now the
+     * reason itself is a complete, self-contained sentence with its own call-to-action.
+     */
+    public function test_membership_reason_is_a_complete_sentence_that_does_not_mention_the_event_fee(): void
+    {
+        $sahodaya = Tenant::create([
+            'id' => 'sahodaya-dl-gate-membership',
+            'name' => 'Sahodaya DL Gate Membership Test',
+            'type' => 'sahodaya',
+            'status' => 'active',
+            'is_active' => true,
+            'membership_status' => 'approved',
+        ]);
+
+        $school = Tenant::create([
+            'id' => 'school-dl-gate-membership',
+            'parent_id' => $sahodaya->id,
+            'name' => 'School DL Gate Membership Test',
+            'type' => 'school',
+            'status' => 'active',
+            'is_active' => true,
+            'membership_status' => 'approved',
+        ]);
+
+        // No Registration/MembershipPayment row at all — membership fee not cleared.
+        $downloadGate = app(SchoolDocumentDownloadGateService::class);
+        $payload = $downloadGate->payload($school);
+
+        $this->assertTrue($payload['blocked']);
+        $this->assertStringContainsString('Sahodaya membership fee payment is pending', $payload['reason']);
+        $this->assertStringNotContainsString('event fee', $payload['reason']);
+    }
 }

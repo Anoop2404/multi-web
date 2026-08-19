@@ -40,7 +40,9 @@ class MemberSchoolsController extends SahodayaAdminController
             ->paginate(20)
             ->withQueryString();
 
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
         $this->attachSchoolMetrics($schools->getCollection());
+        $this->attachSchoolPaymentStatuses($schools->getCollection(), $this->sahodaya->id, $year);
 
         $approvedIds = Tenant::where('parent_id', $this->sahodaya->id)
             ->where('type', 'school')

@@ -37,16 +37,16 @@ class PaymentDueResolver
 
         $coveredSchoolIds = $items->pluck('school_id')->all();
 
-        $pendingSchools = Tenant::query()
+        $unpaidSchools = Tenant::query()
             ->where('parent_id', $sahodayaId)
             ->where('type', 'school')
-            ->where('membership_status', 'pending')
+            ->whereIn('membership_status', ['pending', 'approved'])
             ->whereNotIn('id', $coveredSchoolIds)
             ->orderBy('name')
             ->get();
 
-        foreach ($pendingSchools as $school) {
-            if ($this->schoolHasSubmittedPayment($school->id, $academicYear)) {
+        foreach ($unpaidSchools as $school) {
+            if ($this->schoolHasSubmittedOrVerifiedPayment($school->id, $academicYear)) {
                 continue;
             }
 
@@ -81,12 +81,12 @@ class PaymentDueResolver
         );
     }
 
-    private function schoolHasSubmittedPayment(string $schoolId, string $academicYear): bool
+    private function schoolHasSubmittedOrVerifiedPayment(string $schoolId, string $academicYear): bool
     {
         return MembershipPayment::query()
             ->where('school_id', $schoolId)
             ->where('academic_year', $academicYear)
-            ->where('status', 'submitted')
+            ->whereIn('status', ['submitted', 'verified'])
             ->exists();
     }
 

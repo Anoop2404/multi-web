@@ -113,6 +113,18 @@
                                           class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
                                         Affiliated
                                     </span>
+                                    <span v-if="school.payment_status === 'payment_verified'"
+                                          class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700 ring-1 ring-emerald-200">
+                                        ✓ Fee verified
+                                    </span>
+                                    <span v-else-if="school.payment_status === 'payment_pending'"
+                                          class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                        ⏳ Payment uploaded
+                                    </span>
+                                    <span v-else-if="school.payment_status === 'payment_not_done'"
+                                          class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-rose-800 ring-1 ring-rose-200">
+                                        ⚠️ Fee due (Unpaid)
+                                    </span>
                                 </div>
                             </div>
                         </div>

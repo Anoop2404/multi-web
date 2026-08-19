@@ -133,6 +133,18 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
         $childEvents = $event->sportEventDropdownOptions();
 
+        // Picking an option here is a hard navigation to that event's own id (see
+        // Registrations.vue's switchSportEvent()) — for an event/region/phase-scoped admin,
+        // an out-of-scope option isn't a dead end, it's a 403 (EnsureSahodayaAdmin denies the
+        // resulting request). Narrow to what they can actually open, same scope resolution as
+        // the dashboard/sidebar use.
+        if (($scopedEventIds = $this->scopedFestEventIds()) !== null) {
+            $childEvents = array_values(array_filter(
+                $childEvents,
+                fn (array $option) => in_array($option['id'], $scopedEventIds, true),
+            ));
+        }
+
         return $this->inertia('Sahodaya/Events/Registrations', $this->withEventActivity($event, FestPageActivity::REGISTRATIONS, [
             'event'                => $event,
             'registrations'        => $registrations,
