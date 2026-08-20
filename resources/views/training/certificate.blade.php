@@ -4,27 +4,34 @@
     <meta charset="utf-8">
     <title>Certificate of Participation</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: "Times New Roman", Times, serif; background: #fff; color: #1e293b; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: "Times New Roman", Times, serif;
+            background: #fff;
+            color: #1e293b;
+        }
         .page {
-            width: 842px;
-            height: 595px;
-            max-height: 595px;
-            margin: 0 auto;
-            position: relative;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             border: 10px double #1e3a8a;
-            padding: 30px 45px 35px;
+            padding: 25px 40px 20px;
             box-sizing: border-box;
             overflow: hidden;
-            page-break-after: avoid;
-            page-break-inside: avoid;
         }
         .page.has-background {
             border: none;
             padding: 0;
-            width: 1123px;
-            height: 794px;
-            min-height: 794px;
+            width: 100%;
+            height: 100%;
             background-size: 100% 100%;
             background-position: center;
             background-repeat: no-repeat;
