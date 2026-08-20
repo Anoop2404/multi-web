@@ -158,11 +158,26 @@
                         </label>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <select v-model="addForm.registration_batch_id" class="field text-sm">
-                            <option :value="null">No payment level</option>
-                            <option v-for="batch in registrationBatches" :key="batch.id" :value="batch.id">{{ batch.name }}</option>
-                        </select>
-                        <label class="flex items-center gap-2 text-xs"><input v-model="addForm.is_regional" type="checkbox"> Regional phase</label>
+                        <label class="text-xs text-slate-500 block">
+                            Phase status
+                            <select v-model="addForm.status" class="field text-sm mt-0.5">
+                                <option value="registration_open">Registration Open</option>
+                                <option value="published">Published</option>
+                                <option value="draft">Draft</option>
+                                <option value="ongoing">Ongoing</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </label>
+                        <label class="text-xs text-slate-500 block">
+                            Payment batch
+                            <select v-model="addForm.registration_batch_id" class="field text-sm mt-0.5">
+                                <option :value="null">No payment level</option>
+                                <option v-for="batch in registrationBatches" :key="batch.id" :value="batch.id">{{ batch.name }}</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                        <label class="flex items-center gap-2 text-xs cursor-pointer"><input v-model="addForm.is_regional" type="checkbox" class="rounded border-slate-300"> Regional phase</label>
                     </div>
                     <div class="flex gap-2">
                         <button type="submit" class="btn-primary text-sm" :disabled="addForm.processing">Add phase</button>
@@ -217,11 +232,26 @@
                                     </label>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <select v-model="editForm.registration_batch_id" class="field !py-1 !text-xs">
-                                        <option :value="null">No payment level</option>
-                                        <option v-for="batch in registrationBatches" :key="batch.id" :value="batch.id">{{ batch.name }}</option>
-                                    </select>
-                                    <label class="flex items-center gap-2 text-[11px]"><input v-model="editForm.is_regional" type="checkbox"> Regional</label>
+                                    <label class="text-[11px] text-slate-500 block">
+                                        Phase status
+                                        <select v-model="editForm.status" class="field !py-1 !text-xs mt-0.5">
+                                            <option value="registration_open">Registration Open</option>
+                                            <option value="published">Published</option>
+                                            <option value="draft">Draft</option>
+                                            <option value="ongoing">Ongoing</option>
+                                            <option value="completed">Completed</option>
+                                        </select>
+                                    </label>
+                                    <label class="text-[11px] text-slate-500 block">
+                                        Payment batch
+                                        <select v-model="editForm.registration_batch_id" class="field !py-1 !text-xs mt-0.5">
+                                            <option :value="null">No payment level</option>
+                                            <option v-for="batch in registrationBatches" :key="batch.id" :value="batch.id">{{ batch.name }}</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <div class="flex items-center gap-2 pt-1">
+                                    <label class="flex items-center gap-2 text-[11px] cursor-pointer"><input v-model="editForm.is_regional" type="checkbox" class="rounded border-slate-300"> Regional</label>
                                 </div>
                             </div>
                             <div class="flex gap-2 shrink-0">
@@ -233,6 +263,10 @@
                             <div>
                                 <span class="font-semibold text-slate-700">{{ phase.name }}</span>
                                 <span v-if="phase.code" class="ml-2 text-xs font-mono text-slate-400">{{ phase.code }}</span>
+                                <span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border"
+                                      :class="phase.status === 'registration_open' || phase.status === 'published' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'">
+                                    {{ formatLabel(phase.status || 'registration_open') }}
+                                </span>
                                 <span class="ml-2 text-xs text-slate-400">{{ itemCountForPhase(phase.id) }} item(s)</span>
                                 <div class="text-xs text-slate-400 mt-0.5">
                                     <span v-if="phase.starts_at || phase.ends_at" class="text-slate-600 font-medium">
@@ -395,10 +429,10 @@ function formatLabel(value) {
 const addForm = useForm({
     name: '', code: '', sort_order: null, is_default: false,
     starts_at: '', ends_at: '',
-    registration_open: '', registration_close: '', school_registration_fee_share: null, student_registration_fee: null,
+    registration_open: '', registration_close: '', status: 'registration_open', school_registration_fee_share: null, student_registration_fee: null,
     registration_batch_id: null, is_regional: false,
 });
-const editForm = reactive({ name: '', code: '', starts_at: '', ends_at: '', registration_open: '', registration_close: '', school_registration_fee_share: null, student_registration_fee: null, registration_batch_id: null, is_regional: false });
+const editForm = reactive({ name: '', code: '', starts_at: '', ends_at: '', registration_open: '', registration_close: '', status: 'registration_open', school_registration_fee_share: null, student_registration_fee: null, registration_batch_id: null, is_regional: false });
 const assignForm = useForm({ phase_id: null, item_ids: [] });
 
 // Payment batches — a Sahodaya defines however many of these it needs (0, 1, 2, or more),
@@ -484,6 +518,7 @@ function startEdit(phase) {
         ends_at: toDatetimeLocal(phase.ends_at),
         registration_open: toDatetimeLocal(phase.registration_open),
         registration_close: toDatetimeLocal(phase.registration_close),
+        status: phase.status || 'registration_open',
         school_registration_fee_share: phase.school_registration_fee_share ?? null,
         student_registration_fee: phase.student_registration_fee ?? null,
         registration_batch_id: phase.registration_batch_id ?? null,
