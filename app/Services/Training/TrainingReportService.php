@@ -32,7 +32,7 @@ class TrainingReportService
             ->values()
             ->map(function (TrainingRegistration $registration) use ($sessions, $attendance) {
                 $bySession = $attendance->get($registration->id, collect())->keyBy('session_id');
-                $presentCount = $bySession->where('status', 'present')->count();
+                $presentCount = $bySession->whereIn('status', TrainingAttendance::PRESENT_LIKE)->count();
 
                 $row = [
                     'teacher_name'   => $registration->teacher?->name ?? '',
