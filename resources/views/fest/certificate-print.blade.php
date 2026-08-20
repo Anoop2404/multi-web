@@ -140,7 +140,7 @@
             @php $b = $layout['body'] ?? []; @endphp
             <div class="overlay-field body" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($b, ['top' => 48, 'left' => 12, 'width' => 76, 'font_size' => 12.5, 'font_family' => 'Montserrat']) }}">
                 @foreach($paragraphs as $paragraph)
-                    <p style="margin-bottom:8px;">{!! nl2br(e($paragraph)) !!}</p>
+                    <p style="margin-bottom:8px;">{!! nl2br($paragraph) !!}</p>
                 @endforeach
             </div>
 
@@ -200,7 +200,7 @@
 
             <div class="body-text" style="{{ $bStyle }}">
                 @foreach($paragraphs as $paragraph)
-                    <p>{!! nl2br(e($paragraph)) !!}</p>
+                    <p>{!! nl2br($paragraph) !!}</p>
                 @endforeach
                 @if($showCertificateDate)
                     <p class="date-line" style="{{ $dStyle }}"><strong>Date:</strong> {{ $fieldValues['certificate_date'] ?? now()->format('j F Y') }}</p>

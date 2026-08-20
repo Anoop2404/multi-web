@@ -71,7 +71,7 @@
                 <tbody>
                     <tr v-for="row in paginatedRows" :key="row.id" class="hover:bg-slate-50/80">
                         <td>
-                            <input v-if="!row.registered && row.hasDob && (row.isVerified || !requireVerified)" type="checkbox"
+                            <input v-if="!row.registered && (row.hasDob || !isSportsEvent) && (row.isVerified || !requireVerified)" type="checkbox"
                                    :checked="isSelected(row.id)"
                                    @change="toggleRow(row.id, $event)">
                             <span v-else-if="row.registered" class="text-emerald-600 text-xs">✓</span>
@@ -101,7 +101,7 @@
                                     @click="unregisterStudent(row.id)">
                                 Cancel
                             </button>
-                            <span v-else-if="!row.hasDob"
+                            <span v-else-if="isSportsEvent && !row.hasDob"
                                   class="text-[10px] text-amber-700" title="Add date of birth on student profile">
                                 DOB required
                             </span>
@@ -149,7 +149,7 @@
         </div>
         <p v-if="requireVerified && unregisteredVisibleCount && selectableVisibleCount < unregisteredVisibleCount"
            class="px-4 py-2 text-xs text-amber-800 border-t border-indigo-50 bg-amber-50/60">
-            {{ unregisteredVisibleCount - selectableVisibleCount }} student(s) need a date of birth and/or Sahodaya verification before they can be registered.
+            {{ unregisteredVisibleCount - selectableVisibleCount }} student(s) need {{ isSportsEvent ? 'a date of birth and/or ' : '' }}Sahodaya verification before they can be registered.
         </p>
     </section>
 </template>
@@ -306,7 +306,7 @@ const rows = computed(() => {
             event_reg_number: eventRegNumber,
             hasDob,
             isVerified: s.is_verified !== false,
-            ineligible_reason: !hasDob ? 'DOB required' : (needsVerification ? 'Verification required' : null),
+            ineligible_reason: (isSportsEvent.value && !hasDob) ? 'DOB required' : (needsVerification ? 'Verification required' : null),
         };
     }
     return result;
@@ -375,7 +375,7 @@ const unregisteredVisibleCount = computed(() => unregisteredVisible.value.length
 
 /** Unregistered students with DOB (and verification when required) — eligible for event registration. */
 const selectableVisible = computed(() => unregisteredVisible.value.filter((r) => {
-    if (!r.hasDob) return false;
+    if (isSportsEvent.value && !r.hasDob) return false;
     if (requireVerified.value && !r.isVerified) return false;
     return true;
 }));
