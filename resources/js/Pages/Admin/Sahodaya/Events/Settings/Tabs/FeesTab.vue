@@ -49,6 +49,20 @@
         </div>
 
         <form @submit.prevent="saveFeeSettings" class="space-y-6">
+            <section class="card space-y-3 border-blue-100 bg-gradient-to-br from-blue-50/20 to-white">
+                <div>
+                    <h3 class="section-title flex items-center gap-2"><span>🏦</span> Event Payment Instructions & Bank Details (Optional)</h3>
+                    <p class="section-desc">
+                        Specific bank account / UPI payment instructions for schools paying fees for this event.
+                    </p>
+                </div>
+                <FormField label="Event Payment Instructions" hint="Leave blank to automatically use default Sahodaya bank account & payment instructions.">
+                    <template #default="{ id }">
+                        <textarea :id="id" v-model="feeSettingsForm.payment_instructions" rows="3" class="field mt-1 text-xs font-mono" placeholder="Bank: State Bank of India&#10;Account: 12345678901&#10;IFSC: SBIN0001234&#10;UPI: event@oksbi"></textarea>
+                    </template>
+                </FormField>
+            </section>
+
             <section class="card space-y-4">
                 <div>
                     <h3 class="section-title">{{ event.event_type === 'sports' ? 'Event-wide fee override (optional)' : 'Fee model' }}</h3>

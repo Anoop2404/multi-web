@@ -829,6 +829,8 @@ class FestRegistrationController extends SchoolAdminController
                 ])->values());
         }
 
+        $event->setAttribute('payment_details_text', $event->paymentDetailsText());
+
         $feeRequired = $feeService->feeRequired($event);
         $enabledItems = $event->items->filter(fn ($i) => ($i->is_enabled ?? true));
         if ($headId !== null) {

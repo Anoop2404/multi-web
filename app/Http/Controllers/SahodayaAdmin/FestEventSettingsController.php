@@ -457,6 +457,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'default_item_fee' => 'nullable|numeric|min:0',
             'require_fee_before_registration' => 'nullable|boolean',
             'require_verified_students' => 'nullable|boolean',
+            'payment_instructions' => 'nullable|string|max:5000',
             'head_fees' => 'nullable|array',
             'head_fees.*.id' => 'required|exists:fest_item_heads,id',
             'head_fees.*.default_item_fee' => 'nullable|numeric|min:0',
@@ -500,6 +501,8 @@ class FestEventSettingsController extends SahodayaAdminController
                     ? (bool) $data['require_fee_before_registration'] : null,
                 'require_verified_students' => array_key_exists('require_verified_students', $data)
                     ? (bool) $data['require_verified_students'] : null,
+                'payment_instructions' => array_key_exists('payment_instructions', $data)
+                    ? (filled($data['payment_instructions']) ? trim((string) $data['payment_instructions']) : null) : null,
                 // normalizeEventFeeSettings() above only threads class_group_scheme through for
                 // fee_model === 'item_catalog' — for every other billing model (which is most of
                 // them, including this event's own Composite/sports_composite) it's entirely

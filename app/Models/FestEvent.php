@@ -129,6 +129,21 @@ class FestEvent extends Model
             || $this->extra_item_fee !== null;
     }
 
+    /** Formatted payment details for schools, falling back to Sahodaya default profile. */
+    public function paymentDetailsText(?SahodayaProfile $sahodayaProfile = null): string
+    {
+        $customInstructions = $this->fee_settings['payment_instructions'] ?? null;
+        if (filled($customInstructions)) {
+            return trim((string) $customInstructions);
+        }
+
+        if (! $sahodayaProfile) {
+            $sahodayaProfile = SahodayaProfile::where('tenant_id', $this->tenant_id)->first();
+        }
+
+        return $sahodayaProfile ? $sahodayaProfile->paymentDetailsText() : '';
+    }
+
     public function requiresManualApproval(): bool
     {
         return $this->approval_policy === 'manual';

@@ -177,8 +177,8 @@
                 <span class="text-2xl shrink-0">🏦</span>
                 <div class="flex-1 text-xs text-slate-700">
                     <h4 class="font-bold text-slate-900 text-sm mb-1">Official Sahodaya Bank Account & Payment Instructions</h4>
-                    <div v-if="paymentDetails" class="mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80 font-mono text-xs leading-relaxed text-slate-800">
-                        <pre class="whitespace-pre-wrap font-sans">{{ paymentDetails }}</pre>
+                    <div v-if="event?.payment_details_text || paymentDetails" class="mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80 font-mono text-xs leading-relaxed text-slate-800">
+                        <pre class="whitespace-pre-wrap font-sans">{{ event?.payment_details_text || paymentDetails }}</pre>
                     </div>
                     <div v-else class="grid sm:grid-cols-2 md:grid-cols-4 gap-3 mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80">
                         <div><span class="text-slate-500 block">Bank Name</span><strong class="text-slate-900">State Bank of India</strong></div>
