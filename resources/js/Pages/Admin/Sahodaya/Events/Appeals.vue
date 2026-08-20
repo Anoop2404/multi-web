@@ -11,8 +11,8 @@
             Appeals are closed for this event. Open them under Event settings → Locks.
         </div>
 
-        <div class="grid lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 space-y-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="min-w-0 lg:col-span-2 space-y-4">
                 <div class="card !p-4 flex flex-wrap gap-2 items-center">
                     <select v-model="filterStatus" class="field text-sm w-40">
                         <option value="">All statuses</option>
@@ -79,7 +79,7 @@
                 </div>
             </div>
 
-            <aside class="space-y-4">
+            <aside class="min-w-0 space-y-4">
                 <FormSection title="Disqualify participant" hint="Administrative disqualification (not an appeal).">
                     <form @submit.prevent="submitDisqualify" class="space-y-3">
                         <select v-model="disqualifyForm.participant_id" class="field text-sm" required>

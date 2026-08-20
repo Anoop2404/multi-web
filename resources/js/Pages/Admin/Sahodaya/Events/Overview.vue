@@ -129,9 +129,9 @@
             </div>
         </div>
 
-        <div class="grid lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left 2-cols: Event Configuration Form & Details -->
-            <div class="lg:col-span-2 space-y-6">
+            <div class="min-w-0 lg:col-span-2 space-y-6">
                 <form @submit.prevent="saveEvent" class="card space-y-6">
                     <div>
                         <div class="flex items-center justify-between">
@@ -333,7 +333,7 @@
             </div>
 
             <!-- Right Column: Single Clean Progress Tracker Card -->
-            <aside>
+            <aside class="min-w-0">
                 <EventLifecyclePanel :sahodaya-id="sahodaya.id" :event-id="event.id"
                                      :event-type="event.event_type" :current-status="event.status"
                                      :lifecycle="lifecycle" :suggested-status="suggestedStatus" />

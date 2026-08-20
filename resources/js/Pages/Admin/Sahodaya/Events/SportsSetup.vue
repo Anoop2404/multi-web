@@ -60,9 +60,9 @@
             </div>
         </div>
 
-        <div class="grid lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left Panel: Checklist & Sport Events -->
-            <div class="lg:col-span-2 space-y-6">
+            <div class="min-w-0 lg:col-span-2 space-y-6">
                 <!-- Section 1: Event Setup Checklist -->
                 <section class="card space-y-4">
                     <div class="flex items-center justify-between">
@@ -196,7 +196,7 @@
             </div>
 
             <!-- Right Sidebar: Single Clean Season & Masters Card -->
-            <aside class="space-y-5">
+            <aside class="min-w-0 space-y-5">
                 <section class="card space-y-4">
                     <h4 class="section-title !mb-0 text-xs font-bold uppercase tracking-wider text-slate-500">Season Summary &amp; Masters</h4>
                     
