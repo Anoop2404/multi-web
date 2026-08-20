@@ -61,7 +61,7 @@ class FestRegistrationBatchController extends SahodayaAdminController
             'registration_open' => $data['registration_open'] ?? null,
             'registration_close' => $data['registration_close'] ?? null,
             'payment_due_at' => $data['payment_due_at'] ?? null,
-            'status' => $data['status'] ?? 'draft',
+            'status' => $data['status'] ?? 'registration_open',
         ]);
 
         // Creating a payment batch is what actually opts an event into the full phased/
@@ -119,6 +119,10 @@ class FestRegistrationBatchController extends SahodayaAdminController
 
         if (isset($data['code'])) {
             $data['code'] = strtoupper($data['code']);
+        }
+
+        if (! isset($data['status']) && $batch->status === 'draft') {
+            $data['status'] = 'registration_open';
         }
 
         $batch->update($data);

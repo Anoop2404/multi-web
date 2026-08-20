@@ -58,6 +58,14 @@
                     </label>
                 </div>
                 <label class="text-xs text-slate-500 block">
+                    Batch status
+                    <select v-model="addBatchForm.status" class="field text-sm mt-0.5">
+                        <option value="registration_open">Registration Open</option>
+                        <option value="published">Published</option>
+                        <option value="draft">Draft</option>
+                    </select>
+                </label>
+                <label class="text-xs text-slate-500 block">
                     Student registration fee (₹ per student, optional)
                     <input v-model.number="addBatchForm.student_registration_fee" type="number" min="0" step="0.01" class="field text-sm mt-0.5" placeholder="Leave blank to use the event's own per-student rate">
                     <span class="text-[11px] text-slate-400">Charged once per student who registers under this batch — separate from, and on top of, the school base fee above. Leave blank unless this batch needs its own rate.</span>
@@ -89,7 +97,14 @@
                                 <input v-model="editBatchForm.registration_open" type="datetime-local" class="field !py-1 !text-xs">
                                 <input v-model="editBatchForm.registration_close" type="datetime-local" class="field !py-1 !text-xs">
                             </div>
-                            <input v-model.number="editBatchForm.student_registration_fee" type="number" min="0" step="0.01" class="field !py-1 !text-xs w-full" placeholder="Student registration fee (₹/student, blank = use event default)">
+                            <div class="grid grid-cols-2 gap-2">
+                                <select v-model="editBatchForm.status" class="field !py-1 !text-xs">
+                                    <option value="registration_open">Registration Open</option>
+                                    <option value="published">Published</option>
+                                    <option value="draft">Draft</option>
+                                </select>
+                                <input v-model.number="editBatchForm.student_registration_fee" type="number" min="0" step="0.01" class="field !py-1 !text-xs" placeholder="Student fee (₹/student)">
+                            </div>
                         </div>
                         <div class="flex gap-2 shrink-0">
                             <button type="button" class="text-xs font-semibold text-[#0f3d7a]" @click="saveBatchEdit(batch)">Save</button>
@@ -100,6 +115,10 @@
                         <div>
                             <span class="font-semibold text-slate-700">{{ batch.name }}</span>
                             <span class="ml-2 text-xs font-mono text-slate-400">{{ batch.code }}</span>
+                            <span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border"
+                                  :class="batch.status === 'registration_open' || batch.status === 'published' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'">
+                                {{ formatLabel(batch.status || 'registration_open') }}
+                            </span>
                             <div class="text-xs text-slate-400 mt-0.5">
                                 <span v-if="batch.school_base_fee">₹{{ batch.school_base_fee }} base fee</span>
                                 <span v-if="batch.student_registration_fee" class="ml-2">₹{{ batch.student_registration_fee }}/student</span>
@@ -442,9 +461,9 @@ const showAddBatch = ref(false);
 const editBatchId = ref(null);
 const addBatchForm = useForm({
     name: '', code: '', school_base_fee: 0, student_registration_fee: null, invoice_prefix: '',
-    registration_open: '', registration_close: '',
+    registration_open: '', registration_close: '', status: 'registration_open',
 });
-const editBatchForm = reactive({ name: '', code: '', school_base_fee: 0, student_registration_fee: null, invoice_prefix: '', registration_open: '', registration_close: '' });
+const editBatchForm = reactive({ name: '', code: '', school_base_fee: 0, student_registration_fee: null, invoice_prefix: '', registration_open: '', registration_close: '', status: 'registration_open' });
 
 // Per-phase allowed-region editing — posts to the existing generic
 // phases/{phase}/regions endpoint (FestPhasedWorkflowController::syncPhaseRegions), which
@@ -550,6 +569,7 @@ function startBatchEdit(batch) {
         invoice_prefix: batch.invoice_prefix ?? '',
         registration_open: toDatetimeLocal(batch.registration_open),
         registration_close: toDatetimeLocal(batch.registration_close),
+        status: batch.status || 'registration_open',
     });
 }
 
