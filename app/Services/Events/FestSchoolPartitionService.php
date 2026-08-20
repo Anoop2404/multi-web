@@ -54,20 +54,25 @@ class FestSchoolPartitionService
                 // Handle Phased Regional Billing workflow
                 if ($hub && $hub->usesPhasedRegionalBilling()) {
                     $sourcePhase = $event->sourcePhase;
-                    if ($sourcePhase && $sourcePhase->isRegional()) {
-                        $selection = app(FestSchoolPhaseRegionService::class)->resolve($hub, $sourcePhase, $schoolId);
-                        if ($selection && $selection->region_id) {
-                            return (int) $event->region_id !== (int) $selection->region_id;
+                    if ($sourcePhase) {
+                        if ($sourcePhase->isRegional()) {
+                            $selection = app(FestSchoolPhaseRegionService::class)->resolve($hub, $sourcePhase, $schoolId);
+                            if ($selection && $selection->region_id) {
+                                return (int) $event->region_id !== (int) $selection->region_id;
+                            }
+
+                            // If no region selected for this regional phase yet, keep 1 representative child event
+                            static $seenUnselectedPhases = [];
+                            $phaseGroupKey = $hub->id . ':phased_region:' . $sourcePhase->id;
+                            if (in_array($phaseGroupKey, $seenUnselectedPhases, true)) {
+                                return true;
+                            }
+                            $seenUnselectedPhases[] = $phaseGroupKey;
+
+                            return false;
                         }
 
-                        // If no region selected for this regional phase yet, keep 1 representative child event
-                        static $seenUnselectedPhases = [];
-                        $phaseGroupKey = $hub->id . ':phased_region:' . $sourcePhase->id;
-                        if (in_array($phaseGroupKey, $seenUnselectedPhases, true)) {
-                            return true;
-                        }
-                        $seenUnselectedPhases[] = $phaseGroupKey;
-
+                        // For a non-regional phase under a phased event, every school sees this phase's leaf event
                         return false;
                     }
                 }
