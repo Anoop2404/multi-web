@@ -1288,15 +1288,21 @@ class TrainingProgramController extends SahodayaAdminController
 
         $certificate = \App\Models\Certificate::where('entity_type', TrainingRegistration::class)
             ->where('entity_id', $registration->id)
-            ->first();
+            ->first() ?? new \App\Models\Certificate(['verification_uuid' => 'PREVIEW-ONLY-UUID']);
 
-        return view('training.certificate', array_merge($render, [
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
             'registration' => $registration,
             'certificate'  => $certificate,
             'sahodaya'     => $this->sahodaya,
             'fieldValues'  => $fieldValues,
-            'previewOnly'  => ! $certificate,
-        ]));
+            'isPdf'        => true,
+            'previewOnly'  => ! $certificate->exists,
+        ]))->setPaper('a4', 'landscape');
+
+        return response($pdf->output(), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="certificate-preview.pdf"',
+        ]);
     }
 
     public function registrationInvoice(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
@@ -1341,11 +1347,18 @@ class TrainingProgramController extends SahodayaAdminController
         $render = app(TrainingCertificateService::class)
             ->sampleRenderContext($program, $this->sahodaya, $templateId);
 
-        return view('training.certificate', array_merge($render, [
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
             'registration' => null,
+            'certificate'  => (object) ['verification_uuid' => 'SAMPLE-PREVIEW-UUID'],
             'sahodaya'     => $this->sahodaya,
             'isSample'     => true,
-        ]));
+            'isPdf'        => true,
+        ]))->setPaper('a4', 'landscape');
+
+        return response($pdf->output(), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="certificate-sample-preview.pdf"',
+        ]);
     }
 
     public function certificatesHub(string $tenantId, TrainingProgram $program)
