@@ -468,15 +468,26 @@ class TrainingCertificateService
             return false;
         }
 
-        $certificate = Certificate::where('entity_type', TrainingRegistration::class)
-            ->where('entity_id', $registration->id)
-            ->first();
+        $isTest = ! empty($overrideEmail);
+        $certificate = null;
+
+        if ($registration->exists) {
+            $certificate = Certificate::where('entity_type', TrainingRegistration::class)
+                ->where('entity_id', $registration->id)
+                ->first();
+        }
 
         if (! $certificate) {
-            try {
-                $certificate = $this->issue($registration);
-            } catch (\Throwable $e) {
-                return false;
+            if ($isTest) {
+                $certificate = new Certificate([
+                    'verification_uuid' => (string) Str::uuid(),
+                ]);
+            } else {
+                try {
+                    $certificate = $this->issue($registration);
+                } catch (\Throwable $e) {
+                    return false;
+                }
             }
         }
 

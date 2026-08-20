@@ -73,6 +73,8 @@ class SahodayaMailer
             ]);
 
             $this->logFailedMail($to, $subject, 'view', $view, ['data' => $data], $e->getMessage());
+
+            throw $e;
         }
     }
 
