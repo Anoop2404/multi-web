@@ -62,9 +62,8 @@ class FestEventPhaseController extends SahodayaAdminController
             'code' => 'nullable|string|max:64',
             'sort_order' => 'nullable|integer',
             'is_default' => 'nullable|boolean',
-            // Settable at creation too (not just via update()) so a Sahodaya can lay out a
-            // phase's registration window and its share of the school registration fee in
-            // one step — see docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3/§9 (Phase C).
+            'starts_at' => 'nullable|date',
+            'ends_at' => 'nullable|date|after_or_equal:starts_at',
             'registration_open' => 'nullable|date',
             'registration_close' => 'nullable|date|after_or_equal:registration_open',
             'school_registration_fee_share' => 'nullable|numeric|min:0',

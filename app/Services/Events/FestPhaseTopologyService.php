@@ -85,8 +85,8 @@ class FestPhaseTopologyService
             'cluster_label' => $phase->name.($region ? ' — '.$region->name : ''),
             'registration_open' => $phase->registration_open,
             'registration_close' => $phase->registration_close,
-            'event_start' => $phase->starts_at ?? $root->event_start,
-            'event_end' => $phase->ends_at ?? $root->event_end,
+            'event_start' => ($region ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->conduct_start_at : null) ?? $phase->starts_at ?? $root->event_start,
+            'event_end' => ($region ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->conduct_end_at : null) ?? $phase->ends_at ?? $root->event_end,
             'venue' => $region
                 ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->venue
                 : $root->venue,

@@ -129,6 +129,16 @@
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <label class="text-xs text-slate-500">
+                            Event start date
+                            <input v-model="addForm.starts_at" type="datetime-local" class="field text-sm mt-0.5">
+                        </label>
+                        <label class="text-xs text-slate-500">
+                            Event end date
+                            <input v-model="addForm.ends_at" type="datetime-local" class="field text-sm mt-0.5">
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="text-xs text-slate-500">
                             Registration opens
                             <input v-model="addForm.registration_open" type="datetime-local" class="field text-sm mt-0.5">
                         </label>
@@ -178,6 +188,16 @@
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
                                     <label class="text-[11px] text-slate-500">
+                                        Event start
+                                        <input v-model="editForm.starts_at" type="datetime-local" class="field !py-1 !text-xs mt-0.5">
+                                    </label>
+                                    <label class="text-[11px] text-slate-500">
+                                        Event end
+                                        <input v-model="editForm.ends_at" type="datetime-local" class="field !py-1 !text-xs mt-0.5">
+                                    </label>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <label class="text-[11px] text-slate-500">
                                         Reg. opens
                                         <input v-model="editForm.registration_open" type="datetime-local" class="field !py-1 !text-xs mt-0.5">
                                     </label>
@@ -215,7 +235,10 @@
                                 <span v-if="phase.code" class="ml-2 text-xs font-mono text-slate-400">{{ phase.code }}</span>
                                 <span class="ml-2 text-xs text-slate-400">{{ itemCountForPhase(phase.id) }} item(s)</span>
                                 <div class="text-xs text-slate-400 mt-0.5">
-                                    <span v-if="phase.registration_open || phase.registration_close">
+                                    <span v-if="phase.starts_at || phase.ends_at" class="text-slate-600 font-medium">
+                                        Event: {{ formatDate(phase.starts_at) }} &rarr; {{ formatDate(phase.ends_at) }}
+                                    </span>
+                                    <span v-if="phase.registration_open || phase.registration_close" :class="{'ml-2': phase.starts_at || phase.ends_at}">
                                         Reg: {{ formatDate(phase.registration_open) }} &rarr; {{ formatDate(phase.registration_close) }}
                                     </span>
                                     <span v-if="phase.school_registration_fee_share" class="ml-2">
@@ -371,10 +394,11 @@ function formatLabel(value) {
 
 const addForm = useForm({
     name: '', code: '', sort_order: null, is_default: false,
+    starts_at: '', ends_at: '',
     registration_open: '', registration_close: '', school_registration_fee_share: null, student_registration_fee: null,
     registration_batch_id: null, is_regional: false,
 });
-const editForm = reactive({ name: '', code: '', registration_open: '', registration_close: '', school_registration_fee_share: null, student_registration_fee: null, registration_batch_id: null, is_regional: false });
+const editForm = reactive({ name: '', code: '', starts_at: '', ends_at: '', registration_open: '', registration_close: '', school_registration_fee_share: null, student_registration_fee: null, registration_batch_id: null, is_regional: false });
 const assignForm = useForm({ phase_id: null, item_ids: [] });
 
 // Payment batches — a Sahodaya defines however many of these it needs (0, 1, 2, or more),
@@ -456,6 +480,8 @@ function startEdit(phase) {
     Object.assign(editForm, {
         name: phase.name,
         code: phase.code,
+        starts_at: toDatetimeLocal(phase.starts_at),
+        ends_at: toDatetimeLocal(phase.ends_at),
         registration_open: toDatetimeLocal(phase.registration_open),
         registration_close: toDatetimeLocal(phase.registration_close),
         school_registration_fee_share: phase.school_registration_fee_share ?? null,
