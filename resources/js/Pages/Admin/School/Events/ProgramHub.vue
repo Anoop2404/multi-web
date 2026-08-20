@@ -160,36 +160,40 @@
             <div class="p-4 border-b border-slate-100 bg-slate-50/80">
                 <h3 class="section-title !mb-0">My school events</h3>
             </div>
-            <table class="data-table">
-                <thead><tr><th>Event</th><th>Status</th><th>Items</th><th></th></tr></thead>
-                <tbody>
-                    <tr v-for="ev in schoolEvents" :key="ev.id">
-                        <td class="font-medium">{{ ev.title }}</td>
-                        <td class="text-xs capitalize">{{ ev.status }}</td>
-                        <td>{{ ev.items_count }}</td>
-                        <td class="text-right"><Link :href="ev.url" class="link-brand text-xs">Manage →</Link></td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead><tr><th>Event</th><th>Status</th><th>Items</th><th></th></tr></thead>
+                    <tbody>
+                        <tr v-for="ev in schoolEvents" :key="ev.id">
+                            <td class="font-medium">{{ ev.title }}</td>
+                            <td class="text-xs capitalize">{{ ev.status }}</td>
+                            <td>{{ ev.items_count }}</td>
+                            <td class="text-right"><Link :href="ev.url" class="link-brand text-xs">Manage →</Link></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
         <section v-if="events.length" class="card card--flush overflow-hidden">
             <div class="p-4 border-b border-slate-100 bg-slate-50/80">
                 <h3 class="section-title !mb-0">Open Sahodaya events</h3>
             </div>
-            <table class="data-table">
-                <thead><tr><th>Event</th><th>Level</th><th>Entries</th><th></th></tr></thead>
-                <tbody>
-                    <tr v-for="ev in events" :key="ev.id">
-                        <td class="font-medium">{{ ev.title }}</td>
-                        <td class="text-xs">{{ ev.level_label }}</td>
-                        <td>{{ ev.registrations_count }}</td>
-                        <td class="text-right">
-                            <Link :href="`${programBase}/events/${ev.id}/registration`" class="link-brand text-xs">Open event →</Link>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead><tr><th>Event</th><th>Level</th><th>Entries</th><th></th></tr></thead>
+                    <tbody>
+                        <tr v-for="ev in events" :key="ev.id">
+                            <td class="font-medium">{{ ev.title }}</td>
+                            <td class="text-xs">{{ ev.level_label }}</td>
+                            <td>{{ ev.registrations_count }}</td>
+                            <td class="text-right">
+                                <Link :href="`${programBase}/events/${ev.id}/registration`" class="link-brand text-xs">Open event →</Link>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
     </SchoolAdminLayout>
 </template>

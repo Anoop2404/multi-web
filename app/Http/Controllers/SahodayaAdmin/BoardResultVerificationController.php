@@ -6,12 +6,10 @@ use App\Models\BoardResult;
 use App\Models\BoardResultCertificationPackage;
 use App\Models\Tenant;
 use App\Models\Topper;
-use App\Models\TopperCountConfig;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\BoardResults\BoardResultCertificationService;
 use App\Services\BoardResults\BoardResultNotifier;
 use App\Services\BoardResults\BoardResultPublishPipeline;
-use App\Services\BoardResults\TopperCountService;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +32,10 @@ class BoardResultVerificationController extends SahodayaAdminController
             ->whereIn('tenant_id', $schoolIds)
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
             ->when($class, fn ($q) => $q->where('class', $class))
-            ->with(['uploads' => fn ($q) => $q->orderByDesc('version')->limit(5)])
+            ->with([
+                'uploads' => fn ($q) => $q->orderByDesc('version')->limit(5),
+                'certificationPackages',
+            ])
             ->orderByDesc('submitted_at')
             ->orderByDesc('updated_at')
             ->paginate(25)
@@ -47,6 +48,7 @@ class BoardResultVerificationController extends SahodayaAdminController
             $result->setAttribute('latest_proof_label', $this->proofLabelForResult($result));
             $result->setAttribute('latest_proof_type', $this->proofTypeForResult($result));
             $result->setAttribute('latest_proof_url', $this->proofUrlForResult($result));
+            $result->setAttribute('certification_package', $result->activeCertificationPackage());
 
             return $result;
         });
@@ -127,24 +129,6 @@ class BoardResultVerificationController extends SahodayaAdminController
                 'all' => 'All',
             ],
         ]);
-    }
-
-
-    public function updateTopperCap(Request $request)
-    {
-        $data = $request->validate([
-            'class' => 'nullable|integer|in:10,12',
-            'scope' => 'nullable|string|in:overall,stream,subject',
-            'top_n' => 'required|integer|min:1|max:50',
-            'tie_mode' => 'nullable|string|in:include_group,hard_cap',
-            'rank_style' => 'nullable|string|in:competition,dense,sequential',
-            'stream_id' => 'nullable|integer',
-            'subject_id' => 'nullable|integer',
-        ]);
-
-        $config = app(TopperCountService::class)->upsert($this->sahodaya->id, $data);
-
-        return back()->with('success', "Top-N set to {$config->top_n}.");
     }
 
     public function verify(Request $request, string $tenantId, BoardResult $boardResult)
@@ -414,6 +398,89 @@ class BoardResultVerificationController extends SahodayaAdminController
         }
 
         return back()->with('success', 'Board result published.');
+    }
+
+    /**
+     * Reopen a published result for correction. Deliberately narrow in scope, matching
+     * FestResultsController::unpublish()'s precedent: flips the status back and lets the
+     * school resubmit through the normal review chain — it does not reverse the publish
+     * pipeline's ranking/API/award recompute (use the Toppers hub's "Recalculate rankings"
+     * action afterward) and does not revoke certificates already issued to toppers, which
+     * is a materially different, larger feature.
+     *
+     * Targets Rejected, not Approved — BoardResult::isEditable() only allows draft/rejected/
+     * (unreviewed) submitted, so landing on Approved would reopen the result in name only
+     * and leave the school unable to actually fix anything. Rejected reuses the school's
+     * existing, working "sent back for correction" screen instead of inventing a new one.
+     */
+    public function unpublish(Request $request, string $tenantId, BoardResult $boardResult)
+    {
+        $this->assertInScope($boardResult);
+
+        $data = $request->validate([
+            'reason' => 'required|string|max:2000',
+        ]);
+
+        $package = $boardResult->activeCertificationPackage();
+        if ($package) {
+            abort_unless(
+                $package->status === BoardResultCertificationPackage::STATUS_PUBLISHED,
+                422,
+                'This result\'s certification package is not published.'
+            );
+        }
+
+        DB::transaction(function () use ($request, $boardResult, $data) {
+            $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
+            abort_unless($locked->status === BoardResult::STATUS_PUBLISHED, 422, 'Only published results can be unpublished.');
+
+            $reason = 'Unpublished for correction: '.$data['reason'];
+
+            $history = $locked->correction_history ?? [];
+            $history[] = [
+                'at' => now()->toIso8601String(),
+                'by' => $request->user()->id,
+                'action' => 'unpublished',
+                'reason' => $data['reason'],
+                'from_status' => $locked->status,
+                'submission_count' => (int) ($locked->submission_count ?? 0),
+                'pdf_path' => $locked->result_pdf_path,
+            ];
+
+            $locked->update([
+                'status' => BoardResult::STATUS_REJECTED,
+                'rejection_reason' => $reason,
+                'correction_history' => $history,
+                'reviewed_by_user_id' => $request->user()->id,
+                'reviewed_at' => now(),
+                'published_at' => null,
+                'verified_by' => null,
+                'verified_at' => null,
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
+
+            app(DataChangeLogger::class)->event(
+                'unpublished',
+                'Board result unpublished for correction',
+                $locked->tenant_id,
+                'board_result',
+                $locked,
+                ['reason' => $data['reason']],
+            );
+
+            try {
+                app(BoardResultNotifier::class)->rejected($locked->fresh());
+            } catch (\Throwable) {
+                // Notifications must never block workflow transitions.
+            }
+        });
+
+        if ($package) {
+            app(BoardResultCertificationService::class)->unpublish($package, $request->user(), $data['reason']);
+        }
+
+        return back()->with('success', 'Board result unpublished and sent back to the school for correction. Rankings will look stale until you recalculate them from the Toppers hub.');
     }
 
     public function downloadPdf(Request $request, string $tenantId, string $boardResult)

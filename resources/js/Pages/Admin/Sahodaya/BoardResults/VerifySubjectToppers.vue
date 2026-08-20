@@ -103,7 +103,7 @@ import PageHeader from '@/Components/ui/PageHeader.vue';
 import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
-const { confirm, prompt } = useConfirm();
+const { prompt } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -117,9 +117,8 @@ const props = defineProps({
 
 const pageTitle = computed(() => `Verify Subject Toppers - Class ${props.selectedClass === 12 ? 'XII' : 'X'}`);
 
-async function verifyTopper(t) {
-    if (!(await confirm({ message: `Are you sure you want to verify the marksheet for ${t.name}?`, destructive: false }))) return;
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/board-results/${t.board_result_id}/toppers/${t.id}/verify-marksheet`);
+function verifyTopper(t) {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/board-results/${t.board_result_id}/toppers/${t.id}/verify-marksheet`, {}, { preserveScroll: true });
 }
 
 async function rejectTopper(t) {

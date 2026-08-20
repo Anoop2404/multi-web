@@ -65,6 +65,7 @@
         </div>
 
         <div class="card overflow-hidden p-0">
+            <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -99,6 +100,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />

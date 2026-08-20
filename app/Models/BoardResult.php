@@ -110,9 +110,19 @@ class BoardResult extends Model
         return $this->hasMany(BoardResultCertificationPackage::class)->orderByDesc('version');
     }
 
-    /** The current (highest-version, non-superseded) certification package, if any. */
+    /**
+     * The current (highest-version, non-superseded) certification package, if any.
+     * Uses the eager-loaded `certificationPackages` collection when the caller has
+     * already loaded it (avoids an N+1 query per result), falling back to a direct
+     * query otherwise.
+     */
     public function activeCertificationPackage(): ?BoardResultCertificationPackage
     {
+        if ($this->relationLoaded('certificationPackages')) {
+            return $this->certificationPackages
+                ->firstWhere('status', '!=', BoardResultCertificationPackage::STATUS_SUPERSEDED);
+        }
+
         return $this->certificationPackages()
             ->where('status', '!=', BoardResultCertificationPackage::STATUS_SUPERSEDED)
             ->first();

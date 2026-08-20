@@ -13,7 +13,7 @@ class SetPublicCacheHeaders
         $response = $next($request);
 
         if ($request->isMethod('GET') && $response->isSuccessful()) {
-            if ($request->is('fest/*/live/data')) {
+            if ($request->is('fest/*/live/data') || $request->is('fest/*/scoreboard/data')) {
                 $response->headers->set('Cache-Control', 'no-store');
             } elseif ($request->is('fest/*/live') || $request->is('fest/*/scoreboard')) {
                 $response->headers->set('Cache-Control', 'no-cache, max-age=0, must-revalidate');

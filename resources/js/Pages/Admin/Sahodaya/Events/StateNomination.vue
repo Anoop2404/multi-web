@@ -138,6 +138,7 @@ async function select(candidate, nominationType) {
             .post(`${base}/state-nomination/select`, { preserveScroll: true });
         return;
     }
+    if (!(await confirm({ message: `Select ${candidate.student_name} as the primary nominee for ${candidate.item_title}? This locks in their state-round nomination and can't be trivially undone once the batch is certified.`, destructive: true }))) return;
     selectForm.transform(() => ({ ...candidate, nomination_type: nominationType }))
         .post(`${base}/state-nomination/select`, { preserveScroll: true });
 }

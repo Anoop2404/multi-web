@@ -51,25 +51,27 @@
         </div>
 
         <div class="card card--flush overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b"><tr>
-                    <th class="p-3 text-left">Rank</th><th class="p-3 text-left">Student</th>
-                    <th class="p-3 text-left">School</th><th class="p-3 text-left">Category</th><th class="p-3 text-right">Points</th>
-                </tr></thead>
-                <tbody>
-                    <tr v-for="row in filteredLeaderboard" :key="row.student.id" class="border-t">
-                        <td class="p-3 font-bold">#{{ row.rank }}</td>
-                        <td class="p-3">
-                            <span class="font-medium text-slate-800">{{ row.student.name }}</span>
-                            <span class="text-xs text-gray-400 font-mono ml-2">{{ row.student.reg_no }}</span>
-                        </td>
-                        <td class="p-3 text-slate-600">{{ row.school }}</td>
-                        <td class="p-3 uppercase text-xs text-indigo-700 font-medium">{{ row.category }} · {{ row.gender }}</td>
-                        <td class="p-3 text-right font-mono font-semibold text-slate-900">{{ row.points }}</td>
-                    </tr>
-                    <tr v-if="!filteredLeaderboard.length"><td colspan="5" class="p-8 text-gray-400 text-center">No matching leaderboard entries</td></tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b"><tr>
+                        <th class="p-3 text-left">Rank</th><th class="p-3 text-left">Student</th>
+                        <th class="p-3 text-left">School</th><th class="p-3 text-left">Category</th><th class="p-3 text-right">Points</th>
+                    </tr></thead>
+                    <tbody>
+                        <tr v-for="row in filteredLeaderboard" :key="row.student.id" class="border-t">
+                            <td class="p-3 font-bold">#{{ row.rank }}</td>
+                            <td class="p-3">
+                                <span class="font-medium text-slate-800">{{ row.student.name }}</span>
+                                <span class="text-xs text-gray-400 font-mono ml-2">{{ row.student.reg_no }}</span>
+                            </td>
+                            <td class="p-3 text-slate-600">{{ row.school }}</td>
+                            <td class="p-3 uppercase text-xs text-indigo-700 font-medium">{{ row.category }} · {{ row.gender }}</td>
+                            <td class="p-3 text-right font-mono font-semibold text-slate-900">{{ row.points }}</td>
+                        </tr>
+                        <tr v-if="!filteredLeaderboard.length"><td colspan="5" class="p-8 text-gray-400 text-center">No matching leaderboard entries</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>

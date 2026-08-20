@@ -23,8 +23,8 @@
         <div v-for="(rows, item) in grouped" :key="item" class="mb-4 bg-white border rounded-xl p-4">
             <h3 class="font-semibold text-sm mb-2">{{ item }}</h3>
             <ul class="text-sm divide-y">
-                <li v-for="(row, i) in rows" :key="i" class="py-1 flex justify-between">
-                    <span>{{ row.students }}</span>
+                <li v-for="(row, i) in rows" :key="i" class="py-1 flex justify-between gap-x-2 flex-wrap">
+                    <span class="min-w-0">{{ row.students }}</span>
                     <span class="text-gray-500">#{{ row.position ?? '—' }} · {{ row.grade ?? '—' }} · {{ row.score }}</span>
                 </li>
             </ul>

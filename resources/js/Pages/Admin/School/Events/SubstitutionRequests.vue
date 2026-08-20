@@ -41,7 +41,11 @@
                         <td>{{ r.registration?.item?.title }}</td>
                         <td>{{ r.original_participant?.student ? studentDisplayName(r.original_participant.student) : '—' }}</td>
                         <td>{{ r.replacement_participant?.student ? studentDisplayName(r.replacement_participant.student) : (r.replacement_student?.name || '—') }}</td>
-                        <td><span class="text-xs capitalize">{{ r.status }}</span></td>
+                        <td>
+                            <span :class="statusClass(r.status)" class="text-xs font-semibold px-2 py-0.5 rounded capitalize">{{ r.status }}</span>
+                            <p v-if="r.resolution_note" class="text-xs text-slate-500 mt-1 italic">Note: {{ r.resolution_note }}</p>
+                            <p v-if="r.reviewed_at" class="text-[11px] text-slate-400 mt-1">Reviewed {{ new Date(r.reviewed_at).toLocaleString() }}</p>
+                        </td>
                         <td class="text-xs">{{ r.created_at ? new Date(r.created_at).toLocaleString() : '—' }}</td>
                     </tr>
                     <tr v-if="!requests.length">
@@ -93,5 +97,13 @@ const standbys = computed(() =>
 
 function submit() {
     form.post(`${programBase}/events/${props.event.id}/substitution-requests`, { preserveScroll: true, onSuccess: () => form.reset() });
+}
+
+function statusClass(status) {
+    return {
+        pending: 'bg-amber-100 text-amber-800',
+        approved: 'bg-emerald-100 text-emerald-800',
+        rejected: 'bg-red-100 text-red-700',
+    }[status] ?? 'bg-slate-100 text-slate-600';
 }
 </script>

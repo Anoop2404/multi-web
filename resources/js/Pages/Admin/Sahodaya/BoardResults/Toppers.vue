@@ -14,9 +14,9 @@
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/settings`" class="btn-secondary text-xs flex items-center gap-1.5 font-bold !bg-white/10 !border-white/20 !text-white hover:!bg-white/20">
-                        <span>⚙</span> Ranking Settings
-                    </Link>
+                    <button type="button" @click="recalculate" :disabled="recalculating" class="btn-secondary text-xs flex items-center gap-1.5 font-bold !bg-white/10 !border-white/20 !text-white hover:!bg-white/20 disabled:opacity-60">
+                        <span>🔄</span> {{ recalculating ? 'Recalculating…' : 'Recalculate Rankings' }}
+                    </button>
                     <button type="button" @click="printReport" class="btn-secondary text-xs flex items-center gap-1.5 font-bold !bg-white/10 !border-white/20 !text-white hover:!bg-white/20">
                         <span>🖨</span> Print
                     </button>
@@ -69,7 +69,7 @@
                 </div>
             </div>
 
-            <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
+            <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-3 items-end">
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Class</label>
                     <select :value="selectedClass" class="field text-xs bg-white font-semibold" @change="switchClass($event.target.value)">
@@ -92,12 +92,6 @@
                             {{ ay.label }}
                         </option>
                     </select>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/settings`" class="btn-secondary text-xs px-3 py-2 font-bold w-full text-center flex items-center justify-center gap-1.5">
-                        <span>⚙</span> Engine Settings
-                    </Link>
                 </div>
             </div>
         </div>
@@ -164,7 +158,7 @@
 </template>
 
 <script setup>
-import { Link, router } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
@@ -184,6 +178,17 @@ const props = defineProps({
 });
 
 const searchQuery = ref('');
+const recalculating = ref(false);
+
+function recalculate() {
+    recalculating.value = true;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/recompute`, {
+        academic_year: props.filters.academic_year,
+    }, {
+        preserveScroll: true,
+        onFinish: () => { recalculating.value = false; },
+    });
+}
 
 const pageTitle = computed(() => props.selectedClass === 12 ? 'Class XII Stream Toppers' : 'Class X Sahodaya Toppers');
 const streamEntries = computed(() => Object.entries(props.streamOptions ?? {}));

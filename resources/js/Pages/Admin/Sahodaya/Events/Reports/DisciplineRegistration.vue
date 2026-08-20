@@ -30,27 +30,29 @@
         </div>
 
         <div class="card overflow-hidden p-0">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Discipline</th>
-                        <th>Items</th>
-                        <th>Approved</th>
-                        <th>Pending</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="row in rows" :key="row.discipline">
-                        <td class="font-medium">{{ row.discipline_label }}</td>
-                        <td>{{ row.item_count }}</td>
-                        <td>{{ row.approved }}</td>
-                        <td>{{ row.pending }}</td>
-                    </tr>
-                    <tr v-if="!rows.length">
-                        <td colspan="4" class="p-6 text-center text-slate-400">No discipline data for this event.</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Discipline</th>
+                            <th>Items</th>
+                            <th>Approved</th>
+                            <th>Pending</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in rows" :key="row.discipline">
+                            <td class="font-medium">{{ row.discipline_label }}</td>
+                            <td>{{ row.item_count }}</td>
+                            <td>{{ row.approved }}</td>
+                            <td>{{ row.pending }}</td>
+                        </tr>
+                        <tr v-if="!rows.length">
+                            <td colspan="4" class="p-6 text-center text-slate-400">No discipline data for this event.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />

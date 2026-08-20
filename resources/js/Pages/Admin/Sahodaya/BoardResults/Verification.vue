@@ -98,7 +98,8 @@
                             Class {{ r.class }} · {{ r.examination_type }} · {{ r.academic_year }}
                         </p>
                         <p class="text-xs text-slate-500 mt-1">
-                            <span class="capitalize">{{ r.status }}</span>
+                            <span class="font-semibold text-slate-700">{{ currentStepLabel(r) }}</span>
+                            <span v-if="r.certification_package" class="text-slate-400"> (certification v{{ r.certification_package.version }})</span>
                             · {{ r.pass_percent }}% pass
                             · {{ r.total_appeared }} appeared
                             <span v-if="r.highest_mark"> · high {{ r.highest_mark }}</span>
@@ -160,12 +161,19 @@
                             <button type="button" class="px-3 py-1.5 border border-red-300 text-red-700 text-xs font-semibold rounded-lg"
                                     @click="reject(r)">Reject</button>
                         </template>
+                        <template v-else-if="r.status === 'published'">
+                            <button type="button" class="px-3 py-1.5 border border-amber-300 text-amber-700 text-xs font-semibold rounded-lg hover:bg-amber-50"
+                                    @click="unpublish(r)">Unpublish for correction</button>
+                        </template>
                     </div>
                 </div>
 
                         <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                             <span class="text-xs text-slate-500 font-medium">Toppers / A1 included: <strong class="text-indigo-600">{{ r.toppers ? r.toppers.length : 0 }}</strong></span>
                             <div class="flex items-center gap-2">
+                                <Link v-if="r.certification_package" :href="`/sahodaya-admin/${sahodaya.id}/board-results/certifications/${r.certification_package.id}`" class="text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-md transition">
+                                    Review Certified Package →
+                                </Link>
                                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification/overall?class=${r.class}`" class="text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-md transition">
                                     Verify Toppers →
                                 </Link>
@@ -207,8 +215,29 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
 import { useConfirm } from '@/composables/useConfirm';
+import { buildBoardResultWorkflowSteps } from '@/support/boardResultWorkflowSteps.js';
 
-const { prompt } = useConfirm();
+function currentStepLabel(result) {
+    const steps = buildBoardResultWorkflowSteps({
+        boardResult: result,
+        certificationPackage: result.certification_package,
+    });
+    const step = steps.find((s) => s.state === 'current');
+    if (!step) return result.status || 'Draft';
+    return step.hint ? `${step.label} — ${step.hint}` : step.label;
+}
+
+const { prompt, confirm } = useConfirm();
+
+const HIGH_STAKES_CONFIRMATIONS = {
+    'verify-all': { message: 'Verify this result and all its submitted toppers/achievers together?' },
+    approve: { message: 'Approve this board result? It becomes publishable once approved.' },
+    publish: {
+        message: 'Publish this result? This notifies the school, issues topper certificates, and recomputes Sahodaya-wide rankings — visible to the public immediately.',
+        destructive: true,
+        confirmLabel: 'Yes, publish',
+    },
+};
 
 const props = defineProps({
     sahodaya: Object,
@@ -292,7 +321,9 @@ function proofTypeLabel(input) {
     }
 }
 
-function act(r, action) {
+async function act(r, action) {
+    const confirmation = HIGH_STAKES_CONFIRMATIONS[action];
+    if (confirmation && !await confirm(confirmation)) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/board-results/${r.id}/${action}`, {}, { preserveScroll: true });
 }
 
@@ -302,6 +333,19 @@ async function reject(r) {
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/board-results/${r.id}/reject`,
         { rejection_reason: reason },
+        { preserveScroll: true },
+    );
+}
+
+async function unpublish(r) {
+    const reason = await prompt({
+        message: 'This sends the result back to the school as Rejected so they can fix and resubmit it. Sahodaya-wide rankings will look stale until you recalculate them from the Toppers hub. Reason (required):',
+        inputMultiline: true,
+    });
+    if (!reason) return;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/board-results/${r.id}/unpublish`,
+        { reason },
         { preserveScroll: true },
     );
 }

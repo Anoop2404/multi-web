@@ -45,6 +45,7 @@
             <h3 class="section-title mb-3">Summary by head</h3>
             <p class="text-sm text-slate-500 mb-3">Select a head above to see the full participant list with photos and IDs.</p>
             <div class="card overflow-hidden p-0">
+                <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -80,12 +81,14 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </section>
 
         <section v-if="filterHeadId || headFilter">
             <h3 class="section-title mb-3">Participant list</h3>
             <div class="card overflow-hidden p-0">
+                <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -123,6 +126,7 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </section>
     </SchoolAdminLayout>

@@ -115,7 +115,7 @@
                             </div>
                         </div>
 
-                        <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+                        <div class="border border-gray-200 rounded-xl overflow-x-auto shadow-xs">
                             <table class="w-full text-sm">
                                 <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-gray-50 border-b border-gray-200">
                                     <tr>

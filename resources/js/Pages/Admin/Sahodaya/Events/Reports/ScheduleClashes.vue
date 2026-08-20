@@ -45,6 +45,7 @@
         <section v-if="filteredParticipant.length" class="mb-8">
             <h3 class="section-title mb-3">Participant clashes</h3>
             <div class="card overflow-hidden p-0">
+                <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -67,12 +68,14 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </section>
 
         <section v-if="filteredStage.length">
             <h3 class="section-title mb-3">Stage conflicts</h3>
             <div class="card overflow-hidden p-0">
+                <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -93,6 +96,7 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </section>
 

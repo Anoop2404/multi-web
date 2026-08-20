@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Mail\SahodayaMailer;
 use App\Services\Membership\MembershipNotifier;
 use App\Support\SahodayaHomepageContent;
 use App\Support\SchoolApplicationForm;
 use App\Support\TenantBranding;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -56,7 +59,7 @@ class SchoolApplicationController extends Controller
 
         $email = strtolower(trim($data['school_email'] ?? ''));
 
-        if (User::where('email', $email)->exists()) {
+        if (User::where('email', $email)->orWhere('username', $email)->exists()) {
             throw ValidationException::withMessages([
                 'school_email' => 'An account with this email address already exists.',
             ]);
@@ -70,22 +73,51 @@ class SchoolApplicationController extends Controller
 
         $schoolPrefix = strtoupper(trim($data['school_prefix'] ?? ''));
 
-        // No User account (and no credentials) is created here — only after a Sahodaya
-        // admin approves the application (see MemberSchoolsController::approveSchool()).
-        // Previously this created the login and emailed the password immediately on
-        // submission, before anyone had reviewed the application.
-        $school = Tenant::create([
-            'id'                  => (string) Str::uuid(),
-            'type'                => 'school',
-            'name'                => $data['school_name'],
-            'parent_id'           => $sahodaya->id,
-            'subdomain'           => $data['requested_subdomain'] ?? null,
-            'school_prefix'       => $schoolPrefix,
-            'membership_status'   => 'pending',
-            'is_non_affiliated'   => ($data['school_category'] ?? 'affiliated') === 'non_affiliated',
-            'is_active'           => true,
-            'application_payload' => $payload,
-        ]);
+        [$school, $user, $plainPassword] = DB::transaction(function () use ($data, $payload, $schoolPrefix, $sahodaya, $email) {
+            $school = Tenant::create([
+                'id'                  => (string) Str::uuid(),
+                'type'                => 'school',
+                'name'                => $data['school_name'],
+                'parent_id'           => $sahodaya->id,
+                'subdomain'           => $data['requested_subdomain'] ?? null,
+                'school_prefix'       => $schoolPrefix,
+                'membership_status'   => 'pending',
+                'is_non_affiliated'   => ($data['school_category'] ?? 'affiliated') === 'non_affiliated',
+                'is_active'           => true,
+                'application_payload' => $payload,
+            ]);
+
+            $plainPassword = Str::password(12);
+
+            // username defaults to the application email so sign-in works with either
+            // (AuthController::login() tries email first, then falls back to username).
+            $user = User::create([
+                'tenant_id' => $school->id,
+                'name'      => $data['school_name'],
+                'email'     => $email,
+                'username'  => $email,
+                'password'  => Hash::make($plainPassword),
+            ]);
+            $user->assignRole('school_admin');
+
+            return [$school, $user, $plainPassword];
+        });
+
+        $mailFailed = false;
+
+        try {
+            SahodayaMailer::for($sahodaya->id)->sendVerification($user);
+        } catch (\Throwable $e) {
+            report($e);
+            $mailFailed = true;
+        }
+
+        try {
+            $notifier->schoolCredentialsIssued($user, $plainPassword, $school);
+        } catch (\Throwable $e) {
+            report($e);
+            $mailFailed = true;
+        }
 
         try {
             $notifier->schoolApplicationSubmitted($school);
@@ -93,6 +125,13 @@ class SchoolApplicationController extends Controller
             report($e);
         }
 
-        return back()->with('success', 'Application submitted. The Sahodaya office will review it — your login and password will be emailed once your school is approved.');
+        if ($mailFailed) {
+            return back()->with(
+                'success',
+                'Application submitted and your account was created, but we could not send email. Contact the Sahodaya office for your login password, or try again after mail settings are fixed.',
+            );
+        }
+
+        return back()->with('success', 'Application submitted. Check your email for a verification link and login password. Your application is pending Sahodaya approval.');
     }
 }

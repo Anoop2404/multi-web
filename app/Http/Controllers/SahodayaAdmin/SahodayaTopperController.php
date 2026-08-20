@@ -5,7 +5,6 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Models\AcademicYearRecord;
 use App\Models\ExamStream;
 use App\Models\Subject;
-use App\Models\TopperCountConfig;
 use App\Models\TopperRankingSetting;
 use App\Services\BoardResults\SahodayaTopperSelectionService;
 use App\Services\BoardResults\TopperCountService;
@@ -14,13 +13,14 @@ use Illuminate\Http\Request;
 
 /**
  * Auto-computed Sahodaya-wide topper lists — pooled from every school's submitted toppers,
- * ranked centrally, then cut to the configured Top-N (see TopperCountConfig / TopperCountService).
+ * ranked centrally by percentage, uncapped (no Top-N/tie-break configuration — display is
+ * plain percentage-sorted, with an optional no_rank/percentage-only mode via TopperRankingSetting).
  * This is distinct from BoardResultVerificationController, which handles per-school approval workflow.
  */
 class SahodayaTopperController extends SahodayaAdminController
 {
     /**
-     * Settings hub: Top-N / tie-mode config + recompute, plus links out to the three
+     * Sahodaya-wide topper list for one class/stream/year, plus links out to the three
      * standalone report pages below.
      */
     public function index(Request $request, SahodayaTopperSelectionService $selection)
@@ -38,7 +38,6 @@ class SahodayaTopperController extends SahodayaAdminController
         $selectedStreamLabel = $selectedStream ? ($streams[$selectedStream] ?? null) : null;
         $selectedSubjectId = $this->resolveSelectedSubjectId($request, $subjects);
 
-        [$overallConfig, $streamConfigs, $subjectConfigs] = $this->loadConfigs($streams, $subjects, $class);
         $rankingSettings = TopperRankingSetting::forSahodaya($this->sahodaya->id);
 
         $overallRows = $class === 10 ? $selection->overallForClassX($this->sahodaya->id, $year) : [];
@@ -96,15 +95,6 @@ class SahodayaTopperController extends SahodayaAdminController
             'subjectOptions' => $subjects,
             'rows' => $streamRows,
             'counts' => $counts,
-            'settings' => [
-                'overall' => [
-                    'top_n' => $overallConfig?->top_n ?? TopperCountService::DEFAULT_TOP_N,
-                    'tie_mode' => $overallConfig?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP,
-                    'rank_style' => $overallConfig?->rank_style ?? TopperCountConfig::RANK_COMPETITION,
-                ],
-                'streams' => $streamConfigs,
-                'subjects' => $subjectConfigs,
-            ],
             'rankingSettings' => [
                 'use_common_ranking' => (bool) $rankingSettings->use_common_ranking,
                 'no_rank' => (bool) $rankingSettings->no_rank,
@@ -126,22 +116,6 @@ class SahodayaTopperController extends SahodayaAdminController
             'filters' => ['academic_year' => $year],
             'academicYearOptions' => app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->activeOrPopulatedYearOptions((string) $this->sahodaya->id),
         ]);
-    }
-
-    /** Save the sahodaya-wide "common ranking" / "no rank" toggles. */
-    public function updateRankingSettings(Request $request)
-    {
-        $data = $request->validate([
-            'use_common_ranking' => 'nullable|boolean',
-            'no_rank' => 'nullable|boolean',
-        ]);
-
-        TopperRankingSetting::forSahodaya($this->sahodaya->id)->update([
-            'use_common_ranking' => (bool) ($data['use_common_ranking'] ?? false),
-            'no_rank' => (bool) ($data['no_rank'] ?? false),
-        ]);
-
-        return back()->with('success', 'Ranking settings saved.');
     }
 
     /**
@@ -275,78 +249,6 @@ class SahodayaTopperController extends SahodayaAdminController
         }
 
         return array_key_first($streams) ?: null;
-    }
-
-    /** @param  list<array{id:int, label:string}>  $subjects
-     *  @return array{0: ?TopperCountConfig, 1: array<string, array{stream_id:int, stream_code:string, stream_label:string, top_n:int, tie_mode:string, rank_style:string}>, 2: array<string, array{subject_id:int, subject_label:string, top_n:int, tie_mode:string, rank_style:string}>}
-     */
-    private function loadConfigs(array $streams, array $subjects, int $class): array
-    {
-        $overallConfig = TopperCountConfig::query()
-            ->where('sahodaya_id', $this->sahodaya->id)
-            ->where('scope', TopperCountConfig::SCOPE_OVERALL)
-            ->where(function ($q) use ($class) { $q->where('class', $class)->orWhereNull('class'); })
-            ->first();
-
-        $streamIds = ExamStream::query()
-            ->where('sahodaya_id', $this->sahodaya->id)
-            ->whereIn('code', array_keys($streams))
-            ->pluck('id', 'code');
-
-        $defaultStreamConfig = TopperCountConfig::query()
-            ->where('sahodaya_id', $this->sahodaya->id)
-            ->where('scope', TopperCountConfig::SCOPE_STREAM)
-            ->where(function ($q) use ($class) { $q->where('class', $class)->orWhereNull('class'); })
-            ->whereNull('stream_id')
-            ->first();
-        $streamConfigsById = TopperCountConfig::query()
-            ->where('sahodaya_id', $this->sahodaya->id)
-            ->where('scope', TopperCountConfig::SCOPE_STREAM)
-            ->where(function ($q) use ($class) { $q->where('class', $class)->orWhereNull('class'); })
-            ->get()
-            ->keyBy(fn (TopperCountConfig $config) => (int) $config->stream_id);
-
-        $defaultSubjectConfig = TopperCountConfig::query()
-            ->where('sahodaya_id', $this->sahodaya->id)
-            ->where('scope', TopperCountConfig::SCOPE_SUBJECT)
-            ->where(function ($q) use ($class) { $q->where('class', $class)->orWhereNull('class'); })
-            ->whereNull('subject_id')
-            ->first();
-        $subjectConfigsById = TopperCountConfig::query()
-            ->where('sahodaya_id', $this->sahodaya->id)
-            ->where('scope', TopperCountConfig::SCOPE_SUBJECT)
-            ->where(function ($q) use ($class) { $q->where('class', $class)->orWhereNull('class'); })
-            ->get()
-            ->keyBy(fn (TopperCountConfig $config) => (int) $config->subject_id);
-
-        $mapped = [];
-        foreach ($streams as $code => $label) {
-            $streamId = (int) ($streamIds[$code] ?? 0);
-            $config = $streamId ? ($streamConfigsById->get($streamId) ?: $defaultStreamConfig) : $defaultStreamConfig;
-            $mapped[$code] = [
-                'stream_id' => $streamId,
-                'stream_code' => $code,
-                'stream_label' => $label,
-                'top_n' => $config?->top_n ?? TopperCountService::DEFAULT_TOP_N,
-                'tie_mode' => $config?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP,
-                'rank_style' => $config?->rank_style ?? TopperCountConfig::RANK_COMPETITION,
-            ];
-        }
-
-        $subjectMapped = [];
-        foreach ($subjects as $subject) {
-            $subjectId = (int) $subject['id'];
-            $config = $subjectConfigsById->get($subjectId) ?: $defaultSubjectConfig;
-            $subjectMapped[(string) $subjectId] = [
-                'subject_id' => $subjectId,
-                'subject_label' => $subject['label'],
-                'top_n' => $config?->top_n ?? TopperCountService::DEFAULT_TOP_N,
-                'tie_mode' => $config?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP,
-                'rank_style' => $config?->rank_style ?? TopperCountConfig::RANK_COMPETITION,
-            ];
-        }
-
-        return [$overallConfig, $mapped, $subjectMapped];
     }
 
     private function resolveSelectedSubjectId(Request $request, array $subjects): ?int

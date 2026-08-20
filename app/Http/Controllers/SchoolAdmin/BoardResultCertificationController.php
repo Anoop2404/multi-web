@@ -152,17 +152,30 @@ class BoardResultCertificationController extends SchoolAdminController
         $package = $this->activePackageOrFail($boardResult);
         $this->assertCanManage($request);
 
-        if ($package->status === BoardResultCertificationPackage::STATUS_AWAITING_REPORT_SIGNATURES) {
-            try {
-                $service->markIndividualReportsSigned($package, $request->user());
-            } catch (RuntimeException $e) {
-                return back()->withErrors(['package' => $e->getMessage()]);
-            }
+        // Auto-advance: the consolidated report is the only required document, so
+        // generating it must work standalone — without the Principal ever having
+        // touched an individual report. Draft -> leadership review -> report
+        // signatures -> individual reports signed (three hops), mirroring
+        // generateReport()'s own auto-advance chain.
+        if ($package->status === BoardResultCertificationPackage::STATUS_DRAFT) {
+            $service->requestLeadershipReview($boardResult, $request->user());
+            $package->refresh();
         }
+
+        if ($package->status === BoardResultCertificationPackage::STATUS_AWAITING_LEADERSHIP_REVIEW) {
+            $service->beginReportSignatures($package, $request->user());
+            $package->refresh();
+        }
+
+        if ($package->status === BoardResultCertificationPackage::STATUS_AWAITING_REPORT_SIGNATURES) {
+            $service->markIndividualReportsSigned($package, $request->user());
+            $package->refresh();
+        }
+
         abort_unless(
-            $package->fresh()->status === BoardResultCertificationPackage::STATUS_INDIVIDUAL_REPORTS_SIGNED,
+            $package->status === BoardResultCertificationPackage::STATUS_INDIVIDUAL_REPORTS_SIGNED,
             422,
-            'Every required individual report must be signed and accepted before generating the consolidated report.'
+            'The certification package is not ready for the consolidated report yet.'
         );
 
         $pdfService = app(BoardResultCertificationPdfService::class);
@@ -238,28 +251,14 @@ class BoardResultCertificationController extends SchoolAdminController
         $user = $this->assertCanSign($request);
         $service = app(BoardResultCertificationService::class);
 
-        // Auto-advance: if all individual reports are signed/accepted, move
-        // straight to submission without requiring a separate consolidated PDF step.
-        if ($package->status === BoardResultCertificationPackage::STATUS_AWAITING_REPORT_SIGNATURES) {
-            try {
-                $service->markIndividualReportsSigned($package, $user);
-                $package->refresh();
-            } catch (RuntimeException $e) {
-                return back()->withErrors(['package' => $e->getMessage()]);
-            }
-        }
-
-        // Allow submit from individual_reports_signed directly (skip consolidated PDF)
-        if ($package->status === BoardResultCertificationPackage::STATUS_INDIVIDUAL_REPORTS_SIGNED) {
-            // Fast-track: mark as school_certified without a consolidated PDF
-            $package->forceFill(['status' => BoardResultCertificationPackage::STATUS_SCHOOL_CERTIFIED])->save();
-            $package->refresh();
-        }
-
+        // Individual reports auto-advance to individual_reports_signed via
+        // generateConsolidated() — the consolidated report is the required next
+        // step from there, so by the time submit() is called the package must
+        // already be school_certified (signed consolidated report uploaded).
         abort_unless(
             $package->status === BoardResultCertificationPackage::STATUS_SCHOOL_CERTIFIED,
             422,
-            'All individual reports must be signed and accepted before submitting.'
+            'The signed consolidated certification report must be generated and uploaded before submitting.'
         );
 
         $service->submitToSahodaya($package, $user);

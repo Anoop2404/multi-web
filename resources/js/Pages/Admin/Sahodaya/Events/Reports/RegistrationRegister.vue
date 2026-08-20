@@ -64,85 +64,89 @@
             <div class="px-5 py-3 border-b bg-slate-50/80">
                 <h3 class="section-title text-sm">School fee summary</h3>
             </div>
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                    <tr>
-                        <th class="p-3 w-12">Sl No</th>
-                        <th class="p-3">School</th><th class="p-3">Items</th><th class="p-3">Total due</th>
-                        <th class="p-3">Status</th><th class="p-3">Receipt</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(s, idx) in schoolSummaries" :key="s.school_id" class="border-t">
-                        <td class="p-3 text-slate-400">{{ idx + 1 }}</td>
-                        <td class="p-3 font-medium">{{ (s.school_name || '').toUpperCase() }}</td>
-                        <td class="p-3">{{ s.item_count }}</td>
-                        <td class="p-3 font-semibold">₹{{ s.total_due }}</td>
-                        <td class="p-3"><span :class="feeStatusClass(s.fee_status)" class="text-xs font-semibold px-2 py-0.5 rounded">{{ s.fee_status }}</span></td>
-                        <td class="p-3 text-xs font-mono">{{ s.receipt_no ?? '—' }}</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                        <tr>
+                            <th class="p-3 w-12">Sl No</th>
+                            <th class="p-3">School</th><th class="p-3">Items</th><th class="p-3">Total due</th>
+                            <th class="p-3">Status</th><th class="p-3">Receipt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(s, idx) in schoolSummaries" :key="s.school_id" class="border-t">
+                            <td class="p-3 text-slate-400">{{ idx + 1 }}</td>
+                            <td class="p-3 font-medium">{{ (s.school_name || '').toUpperCase() }}</td>
+                            <td class="p-3">{{ s.item_count }}</td>
+                            <td class="p-3 font-semibold">₹{{ s.total_due }}</td>
+                            <td class="p-3"><span :class="feeStatusClass(s.fee_status)" class="text-xs font-semibold px-2 py-0.5 rounded">{{ s.fee_status }}</span></td>
+                            <td class="p-3 text-xs font-mono">{{ s.receipt_no ?? '—' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="card card--flush overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                    <tr>
-                        <th class="p-3 w-12">Sl No</th>
-                        <th class="p-3">{{ event.event_type === 'sports' ? 'Sport Event' : 'Head' }}</th>
-                        <th class="p-3">School</th>
-                        <th class="p-3">Participant</th>
-                        <th class="p-3">Fest ID</th>
-                        <th class="p-3">Item reg</th>
-                        <th class="p-3">Item</th>
-                        <th class="p-3">Chest</th>
-                        <th class="p-3">Fee</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template v-for="(row, idx) in displayRows" :key="row.participant_id">
-                        <tr v-if="idx === 0 || row.head_name !== displayRows[idx - 1]?.head_name" class="bg-slate-50/80">
-                            <td colspan="9" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                {{ row.head_name ?? 'Other items' }}
-                            </td>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                        <tr>
+                            <th class="p-3 w-12">Sl No</th>
+                            <th class="p-3">{{ event.event_type === 'sports' ? 'Sport Event' : 'Head' }}</th>
+                            <th class="p-3">School</th>
+                            <th class="p-3">Participant</th>
+                            <th class="p-3">Fest ID</th>
+                            <th class="p-3">Item reg</th>
+                            <th class="p-3">Item</th>
+                            <th class="p-3">Chest</th>
+                            <th class="p-3">Fee</th>
                         </tr>
-                        <tr class="border-t align-top">
-                            <td class="p-3 text-xs text-slate-400">{{ idx + 1 }}</td>
-                            <td class="p-3 text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
-                            <td class="p-3 text-xs">{{ (row.school_name || '').toUpperCase() }}</td>
-                             <td class="p-3">
-                                 <span class="font-medium text-slate-800">{{ row.participant_name }}</span>
-                                 <p class="text-xs font-mono text-[#0f3d7a]">{{ row.participant_reg_no }}</p>
-                                 <div class="flex flex-wrap gap-1 mt-1 text-[9px]">
-                                     <span v-if="row.role" class="px-1 py-0.5 rounded font-bold uppercase tracking-wide"
-                                           :class="row.role === 'standby' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'">
-                                         {{ row.role }}
-                                     </span>
-                                     <span v-if="row.team_name" class="px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
-                                         👥 {{ row.team_name }}
-                                     </span>
-                                 </div>
-                             </td>
-                             <td class="p-3 font-mono text-xs font-semibold text-[#0f3d7a]">{{ row.level_reg }}</td>
-                             <td class="p-3 font-mono text-xs">{{ row.item_reg }}</td>
-                             <td class="p-3 text-xs">
-                                 <span class="font-medium text-slate-900">{{ row.item_title }}</span>
-                                 <div v-if="row.competition_start && event.event_type === 'sports'" class="mt-0.5">
-                                     <span class="inline-flex items-center gap-1 rounded bg-sky-50 px-1 py-0.5 text-[9px] font-bold text-sky-800 border border-sky-100 uppercase tracking-wide">
-                                         📅 {{ formatDate(row.competition_start) }}<span v-if="row.competition_time"> @ {{ row.competition_time.slice(0, 5) }}</span>
-                                     </span>
-                                 </div>
-                             </td>
-                            <td class="p-3 font-mono text-xs">{{ row.chest_no }}</td>
-                            <td class="p-3 text-xs">{{ row.item_fee != null ? `₹${row.item_fee}` : '—' }}</td>
+                    </thead>
+                    <tbody>
+                        <template v-for="(row, idx) in displayRows" :key="row.participant_id">
+                            <tr v-if="idx === 0 || row.head_name !== displayRows[idx - 1]?.head_name" class="bg-slate-50/80">
+                                <td colspan="9" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                    {{ row.head_name ?? 'Other items' }}
+                                </td>
+                            </tr>
+                            <tr class="border-t align-top">
+                                <td class="p-3 text-xs text-slate-400">{{ idx + 1 }}</td>
+                                <td class="p-3 text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
+                                <td class="p-3 text-xs">{{ (row.school_name || '').toUpperCase() }}</td>
+                                 <td class="p-3">
+                                     <span class="font-medium text-slate-800">{{ row.participant_name }}</span>
+                                     <p class="text-xs font-mono text-[#0f3d7a]">{{ row.participant_reg_no }}</p>
+                                     <div class="flex flex-wrap gap-1 mt-1 text-[9px]">
+                                         <span v-if="row.role" class="px-1 py-0.5 rounded font-bold uppercase tracking-wide"
+                                               :class="row.role === 'standby' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'">
+                                             {{ row.role }}
+                                         </span>
+                                         <span v-if="row.team_name" class="px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
+                                             👥 {{ row.team_name }}
+                                         </span>
+                                     </div>
+                                 </td>
+                                 <td class="p-3 font-mono text-xs font-semibold text-[#0f3d7a]">{{ row.level_reg }}</td>
+                                 <td class="p-3 font-mono text-xs">{{ row.item_reg }}</td>
+                                 <td class="p-3 text-xs">
+                                     <span class="font-medium text-slate-900">{{ row.item_title }}</span>
+                                     <div v-if="row.competition_start && event.event_type === 'sports'" class="mt-0.5">
+                                         <span class="inline-flex items-center gap-1 rounded bg-sky-50 px-1 py-0.5 text-[9px] font-bold text-sky-800 border border-sky-100 uppercase tracking-wide">
+                                             📅 {{ formatDate(row.competition_start) }}<span v-if="row.competition_time"> @ {{ row.competition_time.slice(0, 5) }}</span>
+                                         </span>
+                                     </div>
+                                 </td>
+                                <td class="p-3 font-mono text-xs">{{ row.chest_no }}</td>
+                                <td class="p-3 text-xs">{{ row.item_fee != null ? `₹${row.item_fee}` : '—' }}</td>
+                            </tr>
+                        </template>
+                        <tr v-if="!displayRows.length">
+                            <td colspan="9" class="p-8 text-center text-gray-400">No registrations match filters.</td>
                         </tr>
-                    </template>
-                    <tr v-if="!displayRows.length">
-                        <td colspan="9" class="p-8 text-center text-gray-400">No registrations match filters.</td>
-                    </tr>
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />

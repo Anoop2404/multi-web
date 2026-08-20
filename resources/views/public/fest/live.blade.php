@@ -1,89 +1,95 @@
-@extends('layouts.public')
+@extends('layouts.public-event')
 
 @section('content')
-<section class="py-12 px-4 bg-slate-950 text-white min-h-screen" id="fest-live-root" data-live-url="{{ route('tenant.fest.live.data', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}">
+@php $medals = [1 => '🥇', 2 => '🥈', 3 => '🥉']; @endphp
+<section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen" id="fest-live-root" data-live-url="{{ route('tenant.fest.live.data', ['event' => $event->id]) }}">
     <div class="max-w-3xl mx-auto">
-        <p class="text-amber-400 text-xs uppercase tracking-widest text-center">Live</p>
-        <h1 class="text-3xl font-bold text-center mt-1">{{ $event->title }}</h1>
-        @if(count($scopes ?? []) > 1)
-        <nav class="flex flex-wrap justify-center gap-2 mt-5" aria-label="Event scope">
-            @foreach($scopes as $scopeOption)
-            <a href="{{ route('tenant.fest.live', ['event' => $event->id, 'scope' => $scopeOption['key']]) }}"
-               @if($selectedScope['key'] === $scopeOption['key']) aria-current="page" @endif
-               class="px-3 py-1.5 rounded-full text-xs border {{ $selectedScope['key'] === $scopeOption['key'] ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-white/5 text-white border-white/20 hover:border-amber-400' }}">
-                {{ $scopeOption['label'] }}
-            </a>
-            @endforeach
-        </nav>
-        @endif
-        <p id="live-refresh-badge" class="text-center text-[10px] text-white/40 mt-2">Auto-refreshing every 30s</p>
-        <div id="now-performing" class="mt-6 p-4 bg-white/10 rounded-xl text-center text-sm @if(!$nowPerforming) hidden @endif">
+
+        <header class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-red-500/20 p-6 sm:p-8 text-center shadow-2xl">
+            <div aria-hidden="true" class="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-red-500/10 blur-3xl"></div>
+            <div aria-hidden="true" class="absolute -left-16 -bottom-16 h-56 w-56 rounded-full bg-amber-500/10 blur-3xl"></div>
+            <div class="relative">
+                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-red-500/15 text-red-300 border border-red-500/30">
+                    <span class="relative flex h-2 w-2" aria-hidden="true"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-red-400"></span></span>
+                    LIVE
+                </span>
+                <h1 class="text-2xl sm:text-3xl font-extrabold font-heading mt-3 text-white">{{ $event->title }}</h1>
+                @if($event->venue)<p class="text-sm text-white/50 mt-2">📍 {{ $event->venue }}</p>@endif
+                <p id="live-refresh-badge" class="text-[11px] text-white/30 mt-3" aria-live="polite">Auto-refreshing every 30 seconds</p>
+            </div>
+        </header>
+
+        <div id="now-performing" class="mt-5 p-5 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 text-center shadow-[0_0_30px_-5px_rgba(245,158,11,0.35)] @if(!$nowPerforming) hidden @endif">
             @if($nowPerforming)
-            Now: <strong>{{ $nowPerforming['item_title'] ?? '—' }}</strong>
-            @if(($nowPerforming['reference'] ?? '—') !== '—')
-            — <span class="font-mono">#{{ $nowPerforming['reference'] }}</span>
-            @endif
+            <span class="text-xs font-bold uppercase tracking-widest text-amber-400 block mb-2">● Now performing</span>
+            <strong class="text-2xl font-extrabold text-white block leading-tight">{{ $nowPerforming['item_title'] ?? '—' }}</strong>
             @if(!empty($nowPerforming['show_name']) && !empty($nowPerforming['name']))
-            {{ $nowPerforming['name'] }}
+            <span class="text-amber-200 text-lg font-semibold mt-1 block">{{ $nowPerforming['name'] }}</span>
             @endif
             @endif
         </div>
-        <h2 class="font-semibold mt-10 mb-3">{{ $selectedScope['label'] }} School Standings</h2>
+
+        <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Event School Standings</h2>
         <ol id="school-scoreboard" class="space-y-2">
             @forelse($scoreboard as $row)
-            <li class="flex justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3">
-                <span><span class="text-amber-400 font-bold mr-2">#{{ $row['rank'] }}</span>{{ $row['school_name'] }}</span>
-                <span class="font-mono">{{ $row['total_points'] }}</span>
+            <li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
+                <span class="text-white flex items-center gap-2"><span class="text-lg leading-none">{{ $medals[$row['rank']] ?? '#'.$row['rank'] }}</span>{{ $row['school_name'] }}</span>
+                <span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span>
             </li>
             @empty
-            <li class="text-white/40 text-center py-6">{{ $standingsPublished ? 'No scores yet' : 'Official standings are not published yet' }}</li>
+            <li class="text-white/30 text-center py-6">{{ $standingsPublished ? 'No scores yet' : 'Official standings are not published yet' }}</li>
             @endforelse
         </ol>
+
         @if(count($houseScoreboard))
-        <h2 class="font-semibold mt-10 mb-3">House Standings</h2>
+        <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">House Standings</h2>
         <ol id="house-scoreboard" class="space-y-2">
             @foreach($houseScoreboard as $row)
-            <li class="flex justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3">
-                <span><span class="inline-block w-3 h-3 rounded-full mr-2" style="background:{{ $row['color'] ?? '#fbbf24' }}"></span>#{{ $row['rank'] }} {{ $row['house_name'] }}</span>
-                <span class="font-mono">{{ $row['total_points'] }}</span>
+            <li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
+                <span class="text-white flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-full" style="background:{{ $row['color'] ?? '#fbbf24' }}"></span>{{ $medals[$row['rank']] ?? '#'.$row['rank'] }} {{ $row['house_name'] }}</span>
+                <span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span>
             </li>
             @endforeach
         </ol>
         @endif
+
         @if(count($athleticRecords ?? []))
-        <h2 class="font-semibold mt-10 mb-3">Athletic Records</h2>
+        <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Athletic Records</h2>
         <ol id="athletic-records" class="space-y-2 text-sm">
             @foreach($athleticRecords as $r)
-            <li class="bg-white/5 border border-white/10 rounded-lg px-4 py-3">
-                <span class="font-medium">{{ $r['item'] }}</span>
-                <span class="text-white/60"> · {{ $r['class_group'] }} {{ $r['gender'] }}</span>
+            <li class="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3 text-white/80">
+                <span class="font-medium text-white">{{ $r['item'] }}</span>
+                <span class="text-white/40"> · {{ $r['class_group'] }} {{ $r['gender'] }}</span>
                 <span class="float-right font-mono text-amber-300">{{ $r['value'] }} {{ $r['unit'] }}</span>
             </li>
             @endforeach
         </ol>
         @endif
+
         @if(count($recentBreaks ?? []))
-        <h2 class="font-semibold mt-10 mb-3">Recent Record Breaks</h2>
+        <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Recent Record Breaks</h2>
         <ul id="recent-breaks" class="space-y-2 text-sm">
             @foreach($recentBreaks as $b)
-            <li class="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
-                <strong>{{ $b['name'] ?? 'Participant' }}</strong> — {{ $b['item'] }}
+            <li class="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+                <strong class="text-white">{{ $b['name'] ?? 'Participant' }}</strong> <span class="text-white/60">— {{ $b['item'] }}</span>
                 <span class="block text-amber-300 font-mono mt-1">{{ $b['new_value'] }} {{ $b['unit'] }} · {{ $b['prize_label'] }}</span>
             </li>
             @endforeach
         </ul>
         @endif
+
         @if(count($categoryLinks ?? []))
-        <h2 class="font-semibold mt-10 mb-3">Category Scoreboards</h2>
+        <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Category Scoreboards</h2>
         <div id="category-links" class="flex flex-wrap gap-2">
             @foreach($categoryLinks as $link)
-            <a href="{{ $link['url'] }}" class="px-3 py-1.5 rounded-full text-xs bg-white/10 border border-white/20 hover:border-amber-400">{{ $link['label'] }}</a>
+            <a href="{{ $link['url'] }}" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-900/60 border border-slate-800 text-white/70 hover:border-amber-500/50 hover:text-white transition">{{ $link['label'] }}</a>
             @endforeach
         </div>
         @endif
-        <p class="mt-8 text-center space-x-4">
-            <a href="{{ route('tenant.fest.records', $event->id) }}" class="text-amber-400 text-sm">All records →</a>
-            <a href="{{ route('tenant.fest.show', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}" class="text-amber-400 text-sm">← Festival hub</a>
+
+        <p class="mt-10 pt-6 border-t border-slate-800 text-center flex flex-wrap justify-center gap-5 text-xs">
+            <a href="{{ route('tenant.fest.records', $event->id) }}" class="text-amber-400 font-semibold hover:underline">All records →</a>
+            <a href="{{ route('tenant.fest.show', ['event' => $event->id]) }}" class="text-white/40 hover:text-white">← Event page</a>
         </p>
     </div>
 </section>
@@ -93,25 +99,27 @@
     if (!root) return;
     const url = root.dataset.liveUrl;
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const medals = {1: '🥇', 2: '🥈', 3: '🥉'};
+    const medalFor = (rank) => medals[rank] || ('#' + rank);
 
     function renderSchool(rows, published) {
         const el = document.getElementById('school-scoreboard');
         if (!el) return;
         if (!rows.length) {
-            el.innerHTML = `<li class="text-white/40 text-center py-6">${published ? 'No scores yet' : 'Official standings are not published yet'}</li>`;
+            el.innerHTML = `<li class="text-white/30 text-center py-6">${published ? 'No scores yet' : 'Official standings are not published yet'}</li>`;
             return;
         }
-        el.innerHTML = rows.map(r => `<li class="flex justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3">
-            <span><span class="text-amber-400 font-bold mr-2">#${esc(r.rank)}</span>${esc(r.school_name)}</span>
-            <span class="font-mono">${esc(r.total_points)}</span></li>`).join('');
+        el.innerHTML = rows.map(r => `<li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
+            <span class="text-white flex items-center gap-2"><span class="text-lg leading-none">${medalFor(r.rank)}</span>${esc(r.school_name)}</span>
+            <span class="font-mono font-bold text-white">${esc(r.total_points)}</span></li>`).join('');
     }
 
     function renderHouse(rows) {
         const el = document.getElementById('house-scoreboard');
         if (!el) return;
-        el.innerHTML = rows.map(r => `<li class="flex justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3">
-            <span><span class="inline-block w-3 h-3 rounded-full mr-2" style="background:${esc(r.color || '#fbbf24')}"></span>#${esc(r.rank)} ${esc(r.house_name)}</span>
-            <span class="font-mono">${esc(r.total_points)}</span></li>`).join('');
+        el.innerHTML = rows.map(r => `<li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
+            <span class="text-white flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-full" style="background:${esc(r.color || '#fbbf24')}"></span>${medalFor(r.rank)} ${esc(r.house_name)}</span>
+            <span class="font-mono font-bold text-white">${esc(r.total_points)}</span></li>`).join('');
     }
 
     function renderNow(p) {
@@ -119,9 +127,8 @@
         if (!el) return;
         if (!p) { el.classList.add('hidden'); return; }
         el.classList.remove('hidden');
-        let html = `Now: <strong>${esc(p.item_title || '—')}</strong>`;
-        if ((p.reference || '—') !== '—') html += ` — <span class="font-mono">#${esc(p.reference)}</span>`;
-        if (p.show_name && p.name) html += ` ${esc(p.name)}`;
+        let html = `<span class="text-xs font-bold uppercase tracking-widest text-amber-400 block mb-2">● Now performing</span><strong class="text-2xl font-extrabold text-white block leading-tight">${esc(p.item_title || '—')}</strong>`;
+        if (p.show_name && p.name) html += `<span class="text-amber-200 text-lg font-semibold mt-1 block">${esc(p.name)}</span>`;
         el.innerHTML = html;
     }
 

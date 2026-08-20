@@ -33,6 +33,7 @@
         <section v-if="byHead?.length" class="mb-8">
             <h3 class="section-title mb-3">{{ event.event_type === 'sports' ? 'Fee catalog by Event Head' : 'Fee catalog by item head' }}</h3>
             <div class="card overflow-hidden p-0">
+                <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -55,10 +56,12 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </section>
 
         <div class="card overflow-hidden p-0">
+            <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -91,6 +94,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
@@ -119,6 +123,6 @@ defineProps({
 function statusClass(status) {
     if (status === 'approved') return 'status-pill--completed';
     if (status === 'proof_uploaded') return 'status-pill--open';
-    return 'status-pill--pending';
+    return 'status-pill--ongoing';
 }
 </script>

@@ -9,6 +9,7 @@
         </PageHeader>
 
         <div class="card overflow-hidden p-0">
+            <div class="overflow-x-auto">
             <table class="data-table text-sm">
                 <thead>
                     <tr><th>Head</th><th>Item</th><th>Participant</th><th>Admission No</th><th>Status</th><th>Fest ID</th><th>Item reg</th></tr>
@@ -26,6 +27,7 @@
                     <tr v-if="!rows.data.length"><td colspan="7" class="p-6 text-center text-slate-400">No registrations yet.</td></tr>
                 </tbody>
             </table>
+            </div>
             <div v-if="rows.last_page > 1" class="px-4 py-3 border-t border-gray-100 flex flex-wrap justify-center gap-1">
                 <Link v-for="link in rows.links" :key="link.label"
                       :href="link.url || '#'"

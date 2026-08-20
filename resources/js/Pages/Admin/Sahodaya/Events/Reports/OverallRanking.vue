@@ -10,8 +10,8 @@
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="overall-ranking" />
 
         <ol class="mt-4 bg-white border rounded-xl divide-y">
-            <li v-for="row in rankings" :key="row.id" class="p-4 flex justify-between text-sm">
-                <span><strong>#{{ row.rank }}</strong> {{ row.name }}</span>
+            <li v-for="row in rankings" :key="row.id" class="p-4 flex justify-between gap-x-2 flex-wrap text-sm">
+                <span class="min-w-0"><strong>#{{ row.rank }}</strong> {{ row.name }}</span>
                 <span class="text-gray-500">🥇{{ row.gold }} 🥈{{ row.silver }} 🥉{{ row.bronze }} · <strong>{{ row.total_points }}</strong> pts</span>
             </li>
         </ol>

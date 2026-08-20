@@ -136,7 +136,9 @@ function loadCandidates() {
     });
 }
 
-function advance() {
+async function advance() {
+    const toItem = props.toItems.find((item) => item.id === toItemId.value);
+    if (!(await confirm({ message: `Advance ${selectedIds.value.length} selected candidate(s) to ${toItem?.title ?? 'the target item'}? They will be registered directly into that item.`, destructive: true }))) return;
     advanceForm.transform(() => ({
         from_item_id: fromItemId.value,
         to_item_id: toItemId.value,

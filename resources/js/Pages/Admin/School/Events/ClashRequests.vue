@@ -40,8 +40,14 @@
                 <tbody>
                     <tr v-for="r in requests" :key="r.id">
                         <td>{{ r.participant?.student ? studentDisplayName(r.participant.student) : '—' }}</td>
-                        <td class="text-sm">{{ r.description }}</td>
-                        <td><span class="text-xs capitalize">{{ r.status }}</span></td>
+                        <td class="text-sm">
+                            <p>{{ r.description }}</p>
+                            <p v-if="r.resolution_note" class="text-slate-500 mt-1 italic">Note: {{ r.resolution_note }}</p>
+                        </td>
+                        <td>
+                            <span :class="statusClass(r.status)" class="text-xs font-semibold px-2 py-0.5 rounded capitalize">{{ r.status }}</span>
+                            <p v-if="r.reviewed_at" class="text-[11px] text-slate-400 mt-1">Reviewed {{ formatTime(r.reviewed_at) }}</p>
+                        </td>
                         <td class="text-xs">{{ r.created_at ? new Date(r.created_at).toLocaleString() : '—' }}</td>
                     </tr>
                     <tr v-if="!requests.length">
@@ -91,6 +97,14 @@ function onParticipantChange() {
 
 function formatTime(value) {
     return value ? new Date(value).toLocaleString() : '—';
+}
+
+function statusClass(status) {
+    return {
+        pending: 'bg-amber-100 text-amber-800',
+        approved: 'bg-emerald-100 text-emerald-800',
+        rejected: 'bg-red-100 text-red-700',
+    }[status] ?? 'bg-slate-100 text-slate-600';
 }
 
 function submit() {

@@ -52,70 +52,74 @@
         <section class="mb-8">
             <h3 class="section-title mb-3">Summary by area</h3>
             <div class="card overflow-hidden p-0">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Area</th>
-                            <th>Items</th>
-                            <th>Regs</th>
-                            <th>Approved</th>
-                            <th>Pending</th>
-                            <th>Participants</th>
-                            <th>Default fee ₹</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="row in summary" :key="row.area_id">
-                            <td class="font-medium">{{ row.area_name }}</td>
-                            <td>{{ row.item_count }}</td>
-                            <td>{{ row.registration_count ?? 0 }}</td>
-                            <td>{{ row.approved_count ?? 0 }}</td>
-                            <td>{{ row.pending_count ?? 0 }}</td>
-                            <td>{{ row.participant_count }}</td>
-                            <td>{{ row.default_item_fee != null ? Number(row.default_item_fee).toLocaleString('en-IN') : '—' }}</td>
-                        </tr>
-                        <tr v-if="!summary.length">
-                            <td colspan="7" class="p-6 text-center text-slate-400">
-                                No competition areas yet. Create areas under Event home → Competition areas.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Area</th>
+                                <th>Items</th>
+                                <th>Regs</th>
+                                <th>Approved</th>
+                                <th>Pending</th>
+                                <th>Participants</th>
+                                <th>Default fee ₹</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in summary" :key="row.area_id">
+                                <td class="font-medium">{{ row.area_name }}</td>
+                                <td>{{ row.item_count }}</td>
+                                <td>{{ row.registration_count ?? 0 }}</td>
+                                <td>{{ row.approved_count ?? 0 }}</td>
+                                <td>{{ row.pending_count ?? 0 }}</td>
+                                <td>{{ row.participant_count }}</td>
+                                <td>{{ row.default_item_fee != null ? Number(row.default_item_fee).toLocaleString('en-IN') : '—' }}</td>
+                            </tr>
+                            <tr v-if="!summary.length">
+                                <td colspan="7" class="p-6 text-center text-slate-400">
+                                    No competition areas yet. Create areas under Event home → Competition areas.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
 
         <section>
             <h3 class="section-title mb-3">Participant list</h3>
             <div class="card overflow-hidden p-0">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Area</th>
-                            <th>School</th>
-                            <th>Participant</th>
-                            <th>Reg no</th>
-                            <th>Item</th>
-                            <th>Fest ID</th>
-                            <th>Item reg</th>
-                            <th>Chest</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(row, idx) in rows" :key="`${row.area_id}-${row.item_id}-${idx}`">
-                            <td>{{ row.area_name }}</td>
-                            <td>{{ row.school }}</td>
-                            <td class="font-medium">{{ row.student }}</td>
-                            <td>{{ row.reg_no }}</td>
-                            <td>{{ row.item }}</td>
-                            <td>{{ row.fest_id ?? '—' }}</td>
-                            <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
-                            <td>{{ row.chest_no ?? '—' }}</td>
-                        </tr>
-                        <tr v-if="!rows.length && summary.length">
-                            <td colspan="8" class="p-6 text-center text-slate-400">No participants for the selected filters.</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Area</th>
+                                <th>School</th>
+                                <th>Participant</th>
+                                <th>Reg no</th>
+                                <th>Item</th>
+                                <th>Fest ID</th>
+                                <th>Item reg</th>
+                                <th>Chest</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, idx) in rows" :key="`${row.area_id}-${row.item_id}-${idx}`">
+                                <td>{{ row.area_name }}</td>
+                                <td>{{ row.school }}</td>
+                                <td class="font-medium">{{ row.student }}</td>
+                                <td>{{ row.reg_no }}</td>
+                                <td>{{ row.item }}</td>
+                                <td>{{ row.fest_id ?? '—' }}</td>
+                                <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
+                                <td>{{ row.chest_no ?? '—' }}</td>
+                            </tr>
+                            <tr v-if="!rows.length && summary.length">
+                                <td colspan="8" class="p-6 text-center text-slate-400">No participants for the selected filters.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
     </SahodayaEventsLayout>

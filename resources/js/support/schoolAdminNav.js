@@ -286,7 +286,10 @@ export function schoolAdminNav(schoolId, options = {}) {
     // ── Home ──────────────────────────────────────────────────────────
     groups.push({
         section: 'Home',
-        items: [{ label: 'Dashboard', href: base, icon: 'grid', exact: true }],
+        items: [
+            { label: 'Dashboard', href: base, icon: 'grid', exact: true },
+            { label: 'Notifications', href: schoolAdminHref(schoolId, 'notifications'), icon: 'bell' },
+        ],
     });
 
     // ── School (students + core records) ──────────────────────────────
@@ -395,6 +398,7 @@ export function schoolAdminNav(schoolId, options = {}) {
             { label: 'Subject-Wise Toppers', href: `${base}/board-results/subject-toppers`, icon: 'award' },
             { label: 'Full A1 Achievers', href: `${base}/board-results/full-a1-achievers`, icon: 'star' },
             { label: 'Principal Verification', href: `${base}/board-results/principal-verification`, icon: 'shield' },
+            { label: 'Reports', href: `${base}/board-results/reports`, icon: 'file-text' },
         ],
     });
 

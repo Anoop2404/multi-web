@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestSportsAgeGroup;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * Builds the public school scoreboard for every supported event topology.
@@ -251,11 +252,24 @@ class PublicFestScoreboardService
         $root = $this->rootEvent($event);
 
         if ($root->event_type === 'sports') {
-            return FestSportsAgeGroup::labels($root->tenant_id)[$category] ?? strtoupper($category);
+            return FestSportsAgeGroup::labels($root->tenant_id)[$category] ?? self::humanizeCategoryKey($category);
         }
 
         return FestClassGroupScheme::labels(null, $root)[$category]
-            ?? config("fest_item_taxonomy.class_group.{$category}", strtoupper($category));
+            ?? config("fest_item_taxonomy.class_group.{$category}", self::humanizeCategoryKey($category));
+    }
+
+    /**
+     * Last-resort label when an item's class_group/category key isn't recognized by
+     * the event's configured scheme (e.g. items tagged "category_1" on an event whose
+     * scheme setting resolves to a preset keyed "lp"/"up"/"hs"/"hss" — a real scheme/item
+     * mismatch that belongs to whoever configures that event, not something guessable
+     * here). "Category 1" instead of a raw "CATEGORY_1" slug at least stays presentable
+     * on the public pages while that mismatch exists.
+     */
+    private static function humanizeCategoryKey(string $category): string
+    {
+        return Str::of($category)->replace('_', ' ')->title()->toString();
     }
 
     /** @return list<array{school_id: string, school_name: string, total_points: int, rank: int}> */
@@ -293,13 +307,16 @@ class PublicFestScoreboardService
             ->get()
             ->keyBy('id');
 
+        // Pair/group items save one FestMark per teammate (same registration_id,
+        // same position/score) — count each registration once, not once per teammate.
         $marks = FestMark::whereIn('event_id', $scope['event_ids'])
             ->with(['participant.registration.item', 'item'])
             ->whereHas('item', function ($query) use ($root, $category) {
                 $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
                 $query->where($column, $category);
             })
-            ->get();
+            ->get()
+            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
 
         $totals = [];
         foreach ($marks as $mark) {

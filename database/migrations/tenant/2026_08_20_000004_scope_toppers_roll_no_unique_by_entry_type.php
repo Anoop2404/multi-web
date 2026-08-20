@@ -27,7 +27,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (! Schema::hasTable('toppers')) {
+        if (! Schema::hasTable('toppers') || ! Schema::hasColumn('toppers', 'entry_type')) {
             return;
         }
 

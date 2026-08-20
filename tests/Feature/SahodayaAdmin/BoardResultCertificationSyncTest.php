@@ -175,4 +175,101 @@ class BoardResultCertificationSyncTest extends TestCase
         $this->assertSame(2, $newPackage->version);
         $this->assertSame(BoardResultCertificationPackage::STATUS_DRAFT, $newPackage->status);
     }
+
+    public function test_unpublish_reopens_result_for_correction_and_keeps_package_in_sync(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['sahodaya' => $sahodaya, 'school' => $school, 'principal' => $principal, 'sahodayaAdmin' => $sahodayaAdmin, 'result' => $result] = $this->makeContext();
+
+        $topper = Topper::create([
+            'board_result_id' => $result->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_OVERALL,
+            'name' => 'Certificate Holder',
+            'gender' => 'male',
+            'roll_no' => '2002',
+            'marks_obtained' => 470,
+            'total_marks' => 500,
+            'percentage' => 94,
+            'rank' => 1,
+        ]);
+
+        $package = $this->certifyAndSubmit($result, $principal);
+        $this->actingAs($sahodayaAdmin)->post("/sahodaya-admin/{$sahodaya->id}/board-results/{$result->id}/verify")->assertRedirect();
+        $this->actingAs($sahodayaAdmin)->post("/sahodaya-admin/{$sahodaya->id}/board-results/{$result->id}/approve")->assertRedirect();
+        $this->actingAs($sahodayaAdmin)->post("/sahodaya-admin/{$sahodaya->id}/board-results/{$result->id}/publish")->assertRedirect();
+
+        $result->refresh();
+        $package->refresh();
+        $this->assertSame(BoardResult::STATUS_PUBLISHED, $result->status);
+        $this->assertSame(BoardResultCertificationPackage::STATUS_PUBLISHED, $package->status);
+
+        // Certificate issuance depends on a configured certificate template, which this
+        // minimal fixture doesn't set up — the assertion below only cares that whatever
+        // certificate state existed at publish time is unchanged by unpublish, not that
+        // issuance itself succeeded (that's the publish pipeline's concern, not this one's).
+        $certificateCountBeforeUnpublish = \App\Models\Certificate::where('entity_type', 'topper')->where('entity_id', $topper->id)->count();
+
+        $this->actingAs($sahodayaAdmin)
+            ->post("/sahodaya-admin/{$sahodaya->id}/board-results/{$result->id}/unpublish", [
+                'reason' => 'Pass count was entered incorrectly.',
+            ])
+            ->assertRedirect();
+
+        $result->refresh();
+        $package->refresh();
+
+        // BoardResult reopens as Rejected (the only editable-again status besides draft),
+        // not a bespoke "approved but still locked" state.
+        $this->assertSame(BoardResult::STATUS_REJECTED, $result->status);
+        $this->assertNull($result->published_at);
+        $this->assertNull($result->verified_by);
+        $this->assertNull($result->approved_by);
+        $this->assertStringContainsString('Pass count was entered incorrectly.', $result->rejection_reason);
+        $this->assertTrue($result->isEditable(), 'The whole point of unpublish is that the result becomes editable again.');
+        $history = collect($result->correction_history);
+        $this->assertSame('unpublished', $history->last()['action'] ?? null);
+
+        // The published package is superseded, not force-mutated in place, and a fresh
+        // draft version exists — same shape as an ordinary Sahodaya return-for-correction.
+        $this->assertSame(BoardResultCertificationPackage::STATUS_SUPERSEDED, $package->status);
+        $newPackage = BoardResultCertificationPackage::where('board_result_id', $result->id)
+            ->where('id', '!=', $package->id)
+            ->first();
+        $this->assertNotNull($newPackage);
+        $this->assertSame(BoardResultCertificationPackage::STATUS_DRAFT, $newPackage->status);
+
+        // Deliberately narrow scope: unpublish does not claw back an already-issued
+        // certificate or delete topper data (matches FestResultsController::unpublish()'s
+        // precedent — revocation is a separate, larger feature).
+        $this->assertSame(
+            $certificateCountBeforeUnpublish,
+            \App\Models\Certificate::where('entity_type', 'topper')->where('entity_id', $topper->id)->count()
+        );
+        $this->assertNotNull(Topper::find($topper->id));
+
+        // Idempotency / state-machine guard: a second unpublish attempt must 422, not
+        // silently no-op or throw an unrelated error.
+        $this->actingAs($sahodayaAdmin)
+            ->post("/sahodaya-admin/{$sahodaya->id}/board-results/{$result->id}/unpublish", ['reason' => 'again'])
+            ->assertStatus(422);
+    }
+
+    public function test_unpublish_is_rejected_when_result_is_not_published(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['sahodaya' => $sahodaya, 'sahodayaAdmin' => $sahodayaAdmin, 'principal' => $principal, 'result' => $result] = $this->makeContext();
+
+        $this->certifyAndSubmit($result, $principal);
+        $this->actingAs($sahodayaAdmin)->post("/sahodaya-admin/{$sahodaya->id}/board-results/{$result->id}/verify")->assertRedirect();
+        $this->actingAs($sahodayaAdmin)->post("/sahodaya-admin/{$sahodaya->id}/board-results/{$result->id}/approve")->assertRedirect();
+
+        // Approved, not yet published.
+        $response = $this->actingAs($sahodayaAdmin)
+            ->post("/sahodaya-admin/{$sahodaya->id}/board-results/{$result->id}/unpublish", ['reason' => 'too early']);
+
+        $response->assertStatus(422);
+        $result->refresh();
+        $this->assertSame(BoardResult::STATUS_APPROVED, $result->status);
+    }
 }

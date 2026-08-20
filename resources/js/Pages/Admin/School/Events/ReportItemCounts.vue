@@ -57,6 +57,7 @@
         <section v-if="headSummary?.length && !headFilter" class="mb-8">
             <h3 class="section-title mb-3">{{ event.event_type === 'sports' ? 'Summary by Sport Event' : 'Summary by item head' }}</h3>
             <div class="card overflow-hidden p-0">
+                <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -89,6 +90,7 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </section>
 
@@ -98,6 +100,7 @@
                 <p class="text-xs text-slate-500">{{ searchedRows.length }} item(s) shown</p>
             </div>
             <div class="card overflow-hidden p-0">
+                <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -157,6 +160,7 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </section>
 

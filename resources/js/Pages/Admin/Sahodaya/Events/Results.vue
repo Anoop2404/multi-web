@@ -155,87 +155,89 @@
                     </button>
                 </div>
             </div>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th class="w-8 pl-5"></th>
-                        <th>Head</th>
-                        <th>Item</th>
-                        <th>Details</th>
-                        <th>Competition</th>
-                        <th>Marks</th>
-                        <th>Status</th>
-                        <th class="pr-5 text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template v-for="(row, idx) in filteredSummaries" :key="row.item_id">
-                        <tr v-if="shouldShowHeadDivider(row, filteredSummaries[idx - 1])" class="bg-slate-50/80">
-                            <td colspan="8" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                {{ row.head_name ?? 'Other items' }}
-                                <span v-if="headPublishCounts[row.head_id ?? 'other']" class="font-normal normal-case ml-2 text-slate-500">
-                                    {{ headPublishCounts[row.head_id ?? 'other'].published }}/{{ headPublishCounts[row.head_id ?? 'other'].total }} published
-                                </span>
-                            </td>
-                        </tr>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
                         <tr>
-                            <td class="pl-5 text-center">
-                                <input v-if="!row.results_published && row.marks_ready" type="checkbox" :value="row.item_id" v-model="selectedPublishIds" />
-                            </td>
-                            <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
-                            <td>
-                                <Link :href="itemResultsUrl(row)" class="font-medium text-indigo-700 hover:underline">
-                                    {{ row.title }}
-                                </Link>
-                                <p v-if="row.competition_start && isSports" class="mt-1">
-                                    <span class="inline-flex items-center gap-1 rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-800 border border-sky-100 uppercase tracking-wide">
-                                        🏆 Comp: {{ formatShortDate(row.competition_start) }}<span v-if="row.competition_time"> @ {{ row.competition_time.slice(0, 5) }}</span>
-                                    </span>
-                                </p>
-                                <p v-if="row.item_code" class="text-xs font-mono text-slate-400 mt-0.5">{{ row.item_code }}</p>
-                            </td>
-                            <td class="text-xs text-slate-600">
-                                <span v-if="row.age_group">{{ row.age_group }}</span>
-                                <span v-if="row.class_group && row.class_group !== 'open'"> · {{ row.class_group }}</span>
-                                <span v-if="row.sport_discipline"> · {{ row.sport_discipline }}</span>
-                                <span v-if="!row.age_group && !row.sport_discipline">—</span>
-                            </td>
-                            <td class="text-xs text-slate-600">{{ formatWindow(row) }}</td>
-                            <td class="text-sm">
-                                <span :class="row.marks_ready ? 'text-emerald-700' : 'text-amber-700'">
-                                    {{ row.marks_entered }}/{{ row.performers }}
-                                </span>
-                            </td>
-                            <td>
-                                <span class="status-pill text-xs"
-                                      :class="row.results_published ? 'status-pill--published' : (row.marks_ready ? 'status-pill--open' : 'status-pill--draft')">
-                                    {{ row.results_published ? 'Published' : (row.marks_ready ? 'Ready' : 'Marks pending') }}
-                                </span>
-                            </td>
-                            <td class="pr-5 text-right">
-                                <div class="flex flex-wrap justify-end gap-2">
-                                    <Link :href="marksUrl(row)" class="btn-secondary text-xs !min-h-0 px-2 py-1.5">Marks</Link>
-                                    <button v-if="!row.results_published && row.marks_ready"
-                                            type="button"
-                                            class="btn-primary text-xs !min-h-0 px-2 py-1.5"
-                                            @click="publishItem(row.item_id)">
-                                        Publish
-                                    </button>
-                                    <button v-if="row.results_published"
-                                            type="button"
-                                            class="text-xs px-2 py-1.5 rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
-                                            @click="unpublishItem(row.item_id)">
-                                        Unpublish
-                                    </button>
-                                </div>
-                            </td>
+                            <th class="w-8 pl-5"></th>
+                            <th>Head</th>
+                            <th>Item</th>
+                            <th>Details</th>
+                            <th>Competition</th>
+                            <th>Marks</th>
+                            <th>Status</th>
+                            <th class="pr-5 text-right">Actions</th>
                         </tr>
-                    </template>
-                    <tr v-if="!filteredSummaries.length">
-                        <td colspan="7" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
-                    </tr>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <template v-for="(row, idx) in filteredSummaries" :key="row.item_id">
+                            <tr v-if="shouldShowHeadDivider(row, filteredSummaries[idx - 1])" class="bg-slate-50/80">
+                                <td colspan="8" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                    {{ row.head_name ?? 'Other items' }}
+                                    <span v-if="headPublishCounts[row.head_id ?? 'other']" class="font-normal normal-case ml-2 text-slate-500">
+                                        {{ headPublishCounts[row.head_id ?? 'other'].published }}/{{ headPublishCounts[row.head_id ?? 'other'].total }} published
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="pl-5 text-center">
+                                    <input v-if="!row.results_published && row.marks_ready" type="checkbox" :value="row.item_id" v-model="selectedPublishIds" />
+                                </td>
+                                <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
+                                <td>
+                                    <Link :href="itemResultsUrl(row)" class="font-medium text-indigo-700 hover:underline">
+                                        {{ row.title }}
+                                    </Link>
+                                    <p v-if="row.competition_start && isSports" class="mt-1">
+                                        <span class="inline-flex items-center gap-1 rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-800 border border-sky-100 uppercase tracking-wide">
+                                            🏆 Comp: {{ formatShortDate(row.competition_start) }}<span v-if="row.competition_time"> @ {{ row.competition_time.slice(0, 5) }}</span>
+                                        </span>
+                                    </p>
+                                    <p v-if="row.item_code" class="text-xs font-mono text-slate-400 mt-0.5">{{ row.item_code }}</p>
+                                </td>
+                                <td class="text-xs text-slate-600">
+                                    <span v-if="row.age_group">{{ row.age_group }}</span>
+                                    <span v-if="row.class_group && row.class_group !== 'open'"> · {{ row.class_group }}</span>
+                                    <span v-if="row.sport_discipline"> · {{ row.sport_discipline }}</span>
+                                    <span v-if="!row.age_group && !row.sport_discipline">—</span>
+                                </td>
+                                <td class="text-xs text-slate-600">{{ formatWindow(row) }}</td>
+                                <td class="text-sm">
+                                    <span :class="row.marks_ready ? 'text-emerald-700' : 'text-amber-700'">
+                                        {{ row.marks_entered }}/{{ row.performers }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="status-pill text-xs"
+                                          :class="row.results_published ? 'status-pill--published' : (row.marks_ready ? 'status-pill--open' : 'status-pill--draft')">
+                                        {{ row.results_published ? 'Published' : (row.marks_ready ? 'Ready' : 'Marks pending') }}
+                                    </span>
+                                </td>
+                                <td class="pr-5 text-right">
+                                    <div class="flex flex-wrap justify-end gap-2">
+                                        <Link :href="marksUrl(row)" class="btn-secondary text-xs !min-h-0 px-2 py-1.5">Marks</Link>
+                                        <button v-if="!row.results_published && row.marks_ready"
+                                                type="button"
+                                                class="btn-primary text-xs !min-h-0 px-2 py-1.5"
+                                                @click="publishItem(row.item_id)">
+                                            Publish
+                                        </button>
+                                        <button v-if="row.results_published"
+                                                type="button"
+                                                class="text-xs px-2 py-1.5 rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
+                                                @click="unpublishItem(row.item_id)">
+                                            Unpublish
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr v-if="!filteredSummaries.length">
+                            <td colspan="7" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="card mb-6">
@@ -508,13 +510,16 @@ async function unpublishItem(itemId) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/items/${itemId}/unpublish`, {}, { preserveScroll: true });
 }
 
-function promote() {
+async function promote() {
+    const target = props.nextEvents.find((e) => e.id === promoteForm.next_event_id);
+    if (!(await confirm({ message: `Promote qualifiers to ${target?.title ?? 'the selected event'}? This registers them for the next round.` }))) return;
     promoteForm.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/promote`, {
         preserveScroll: true,
     });
 }
 
-function promoteAuto() {
+async function promoteAuto() {
+    if (!(await confirm({ message: 'Promote qualifiers to the suggested next level? This registers them for the next round.' }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/promote-auto`, {}, { preserveScroll: true });
 }
 

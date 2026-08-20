@@ -26,7 +26,7 @@ class SahodayaTopperSelectionService
     public function overallForClassX(string $sahodayaId, string $academicYear): array
     {
         $rows = $this->rankedRows($sahodayaId, $academicYear, RankingEngine::SCOPE_STUDENT_OVERALL, 10);
-        $hydrated = $this->cutAndHydrate($rows, $sahodayaId, 10, 'overall', null);
+        $hydrated = $this->cutAndHydrate($rows);
 
         if (empty($hydrated)) {
             $schoolNames = Tenant::where('parent_id', $sahodayaId)->where('type', 'school')->pluck('name', 'id');
@@ -73,16 +73,7 @@ class SahodayaTopperSelectionService
 
         $out = [];
         foreach ($grouped as $streamLabel => $streamRows) {
-            $streamKey = $streamRows->first()['meta']['stream_key'] ?? null;
-            $streamId = is_numeric($streamKey) ? (int) $streamKey : null;
-
-            $out[$streamLabel] = $this->cutAndHydrate(
-                $streamRows->sortBy('rank')->values()->all(),
-                $sahodayaId,
-                12,
-                'stream',
-                $streamId,
-            );
+            $out[$streamLabel] = $this->cutAndHydrate($streamRows->sortBy('rank')->values()->all());
         }
 
         if (empty($out)) {
@@ -255,7 +246,7 @@ class SahodayaTopperSelectionService
      * @param  list<array{rank: int, entity_id: string, score: float|null, meta: array<string, mixed>}>  $rows  sorted by rank ascending
      * @return list<array<string, mixed>>
      */
-    private function cutAndHydrate(array $rows, string $sahodayaId, int $class, string $configScope, ?int $streamId): array
+    private function cutAndHydrate(array $rows): array
     {
         if ($rows === []) {
             return [];

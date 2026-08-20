@@ -48,6 +48,7 @@
         </div>
 
         <div class="card card--flush overflow-hidden">
+            <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
@@ -88,6 +89,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
             <div v-if="rows.last_page > 1" class="px-4 py-3 border-t border-gray-100 flex flex-wrap justify-center gap-1">
                 <Link v-for="link in rows.links" :key="link.label"
                       :href="link.url || '#'"

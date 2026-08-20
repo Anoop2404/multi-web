@@ -236,6 +236,12 @@
                             <p class="font-semibold text-amber-900">{{ boardResultsWidget.pending_count }}</p>
                         </div>
                     </div>
+                    <ul v-if="boardResultsWidget.pending_results?.length" class="text-xs text-slate-600 space-y-1 mb-3">
+                        <li v-for="(r, i) in boardResultsWidget.pending_results" :key="i" class="flex justify-between">
+                            <span>Class {{ r.class }} · {{ r.academic_year }}</span>
+                            <span class="font-semibold text-amber-700">{{ currentStepLabel(r) }}</span>
+                        </li>
+                    </ul>
                     <ul v-if="boardResultsWidget.ranks?.length" class="text-xs text-slate-600 space-y-1 mb-3">
                         <li v-for="(r, i) in boardResultsWidget.ranks" :key="i">
                             Sahodaya rank #{{ r.rank }}
@@ -350,11 +356,23 @@ import QuickActionCard from '@/Components/ui/QuickActionCard.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { isNavMenuVisible } from '@/support/sahodayaAdminNav.js';
+import { buildBoardResultWorkflowSteps } from '@/support/boardResultWorkflowSteps.js';
 import {
     windowClosingDays,
     windowClosingSoon,
     windowDisplayEnd,
 } from '@/support/membershipRegistrationWindow.js';
+
+function currentStepLabel(pendingResult) {
+    const steps = buildBoardResultWorkflowSteps({
+        boardResult: pendingResult,
+        certificationPackage: pendingResult.certification_package,
+        certificationRequired: pendingResult.certification_required,
+    });
+    const step = steps.find((s) => s.state === 'current');
+    if (!step) return 'Preparing';
+    return step.hint ? `${step.label} — ${step.hint}` : step.label;
+}
 
 const props = defineProps({
     school: Object,

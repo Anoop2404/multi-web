@@ -16,10 +16,13 @@ use App\Models\FestSchedule;
 use App\Models\Tenant;
 use App\Services\Events\EventContext;
 use App\Services\Events\EventLifecycleGate;
+use App\Services\Events\FestCumulativeChampionshipService;
+use App\Services\Events\FestNumberingService;
 use App\Services\Events\FestPhaseScoreboardService;
 use App\Services\Events\FestPublicVisibilityService;
 use App\Services\Events\FestWinnerPosterService;
 use App\Services\Events\PublicFestScoreboardService;
+use App\Services\Events\PublicOperationalEventService;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -34,81 +37,72 @@ class FestPortalController extends Controller
         private FestPublicVisibilityService $visibility,
         private PublicFestScoreboardService $scoreboards,
         private FestPhaseScoreboardService $phaseScoreboards,
+        private PublicOperationalEventService $operationalEvents,
+        private FestCumulativeChampionshipService $cumulativeChampionship,
     ) {}
 
     public function index()
     {
         $tenant = $this->resolveTenant();
 
-        $events = FestEvent::where('tenant_id', $tenant->id)
-            ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])
-            // Region/Cluster/Finale children are views inside their public hub, not
-            // duplicate events in the public index. Non-partition children (notably
-            // promoted Sports discipline events) remain independently discoverable.
-            ->where(function ($query) {
-                $query->whereNull('parent_event_id')
-                    ->orWhere(function ($child) {
-                        $child->whereNull('partition_key')
-                            ->whereNull('cluster_key')
-                            ->where(function ($role) {
-                                $role->whereNull('partition_role')
-                                    ->orWhereNotIn('partition_role', ['region', 'cluster', 'finale', 'phase']);
-                            });
-                    });
-            })
-            ->orderByDesc('event_start')
-            ->get(['id', 'title', 'event_type', 'event_start', 'venue', 'status', 'results_published']);
+        $events = $this->operationalEvents->listedForTenant($tenant->id);
+        $eventGroups = $this->operationalEvents->catalogueGroups($events);
 
-        return $this->renderPublic('public.fest.index', $tenant, compact('events'));
+        return $this->renderPublic('public.fest.index', $tenant, compact('events', 'eventGroups'));
     }
 
     public function show(Request $request, int $eventId)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        $rootEvent = $this->scoreboards->rootEvent($event);
+        $selectedScope = $this->operationalEvents->directScope($event);
+        $scopes = [$selectedScope];
 
-        if ($event->id !== $rootEvent->id) {
-            $scope = $this->scoreboards->resolveScope($event);
-
-            return redirect()->route('tenant.fest.show', array_filter([
-                'event' => $rootEvent->id,
-                'scope' => $scope['key'],
-            ]));
-        }
-
-        $event = $rootEvent;
-        $selectedScope = $this->scoreboards->resolveScope(
-            $event,
-            $this->stringQuery($request, 'scope'),
-            $this->stringQuery($request, 'cluster'),
-        );
-        $scopes = $this->scoreboards->scopes($event);
-
-        // A single region/cluster/finale/phase-region scope maps to one real event.
-        // "Overall" has no registrations of its own once the hub has partition children —
-        // every child (region, cluster, finale, or phase-region leaf) carries its own
-        // synced item copies, so gather all of them rather than falling back to the hub.
-        $itemsEventIds = $selectedScope['event_id']
-            ? [(int) $selectedScope['event_id']]
-            : collect($scopes)->pluck('event_id')->filter()->map(fn ($id) => (int) $id)->all();
-        if ($itemsEventIds === []) {
-            $itemsEventIds = [$event->id];
-        }
-
-        $itemGroups = FestEventItem::whereIn('event_id', $itemsEventIds)
+        $itemGroups = FestEventItem::where('event_id', $event->id)
+            ->with('head:id,name')
             ->orderBy('display_order')
-            ->get(['id', 'title', 'stage_type', 'category', 'event_id'])
+            ->get(['id', 'title', 'stage_type', 'category', 'class_group', 'age_group', 'participant_type', 'head_id', 'event_id'])
             ->groupBy('event_id')
-            ->map(fn ($groupItems, $groupEventId) => [
-                'label' => collect($scopes)->firstWhere('event_id', (int) $groupEventId)['label'] ?? null,
+            ->map(fn ($groupItems) => [
+                'label' => $event->title,
                 'items' => $groupItems->values(),
             ])
             ->values();
 
+        $recentMarks = FestMark::where('event_id', $event->id)
+            ->whereIn('position', [1, 2, 3])
+            ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->latest('updated_at')
+            ->limit(30)
+            ->when(! $selectedScope['results_published'], fn ($query) => $query->whereRaw('1 = 0'))
+            ->get();
+        $recentRoster = $this->rosterForMarks($recentMarks);
+        $recentResults = $recentMarks
+            ->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id)
+            ->take(6)
+            ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $recentRoster) + [
+                'item_id' => $mark->item_id,
+                'item' => $mark->item?->title,
+                'participant_type' => $mark->item?->participant_type,
+            ])
+            ->values();
+
+        // The item finder groups by class_group/age_group/category — resolve each raw
+        // key (e.g. "category_1") through the same scheme-aware lookup the scoreboard and
+        // results tabs use, instead of the template ever falling back to strtoupper($key).
+        $itemCategoryKeys = $itemGroups->pluck('items')->flatten()
+            ->map(fn ($item) => $item->class_group ?: $item->age_group ?: $item->category)
+            ->filter()->unique()->values();
+        $categoryLabels = $itemCategoryKeys->mapWithKeys(
+            fn (string $key) => [$key => $this->scoreboards->categoryLabel($event, $key)]
+        );
+
         return $this->renderPublic('public.fest.show', $tenant, [
             'event' => $event,
+            'eventContext' => $this->operationalEvents->publicContext($event),
             'itemGroups' => $itemGroups,
+            'recentResults' => $recentResults,
+            'categoryLabels' => $categoryLabels,
             'scopes' => $scopes,
             'selectedScope' => $selectedScope,
             'scopeResultsPublished' => (bool) $selectedScope['results_published'],
@@ -121,34 +115,13 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        $rootEvent = $this->scoreboards->rootEvent($event);
+        abort_unless($event->results_published, 404);
 
-        if ($event->id !== $rootEvent->id) {
-            $scope = $this->scoreboards->resolveScope($event);
-
-            return redirect()->route('tenant.fest.results', array_filter([
-                'event' => $rootEvent->id,
-                'scope' => $scope['key'],
-                'tab' => $this->stringQuery($request, 'tab'),
-            ]));
-        }
-
-        $event = $rootEvent;
-        abort_unless(
-            $event->results_published
-                || ($event->usesPhasedRegionalBilling() && $event->phases()->where('results_published', true)->exists()),
-            404
-        );
-
-        $selectedScope = $this->scoreboards->resolveScope(
-            $event,
-            $this->stringQuery($request, 'scope'),
-            $this->stringQuery($request, 'cluster'),
-        );
+        $selectedScope = $this->operationalEvents->directScope($event);
         abort_unless($selectedScope['results_published'], 404);
-        $scopes = $this->scoreboards->scopes($event);
+        $scopes = [$selectedScope];
         $tab = $request->query('tab', 'school');
-        if (! in_array($tab, ['school', 'category', 'item', 'individual', 'championship'], true)) {
+        if (! in_array($tab, ['toppers', 'school', 'category', 'item', 'individual', 'championship'], true)) {
             $tab = 'school';
         }
 
@@ -157,13 +130,15 @@ class FestPortalController extends Controller
             ->max('published_at');
 
         $championshipEventId = $selectedScope['event_id'] ?: $event->id;
-        $championship = FestIndividualChampionshipPoint::where('event_id', $championshipEventId)
+        $championshipRows = FestIndividualChampionshipPoint::where('event_id', $championshipEventId)
             ->with(['student'])
             ->orderByDesc('points')
             ->orderBy('student_id')
-            ->get()
-            ->map(function (FestIndividualChampionshipPoint $row, int $index) {
-                $school = Tenant::find($row->student?->tenant_id);
+            ->get();
+        $championshipSchools = Tenant::whereIn('id', $championshipRows->pluck('student.tenant_id')->filter()->unique())
+            ->pluck('name', 'id');
+        $championship = $championshipRows
+            ->map(function (FestIndividualChampionshipPoint $row, int $index) use ($championshipSchools) {
 
                 return [
                     'rank' => $index + 1,
@@ -171,8 +146,9 @@ class FestPortalController extends Controller
                     'category' => $row->category,
                     'gender' => $row->gender,
                     'student' => $row->student?->name,
+                    'photo' => $row->student?->photoDataUri(),
                     'reg_no' => $row->student?->reg_no,
-                    'school' => $school?->name,
+                    'school' => $championshipSchools[$row->student?->tenant_id] ?? null,
                 ];
             })
             ->values()
@@ -183,7 +159,8 @@ class FestPortalController extends Controller
             ->map(fn (string $key) => [
                 'key' => $key,
                 'label' => $this->scoreboards->categoryLabel($event, $key),
-                'rows' => $this->scoreboards->scoreboard($event, $selectedScope, $key),
+                'rows' => $this->cumulativeChampionship->publicStanding($event, $key)['rows']
+                    ?? $this->scoreboards->scoreboard($event, $selectedScope, $key),
             ])
             ->all();
 
@@ -240,7 +217,15 @@ class FestPortalController extends Controller
                     'head' => $first->item?->head?->name,
                     'category' => $first->item?->{$categoryColumn},
                     'participant_type' => $first->item?->participant_type,
-                    'winners' => $group->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $rosterByRegistration))->values()->all(),
+                    'stage_type' => $first->item?->stage_type,
+                    // Pair/group items save one FestMark per teammate (all with the same
+                    // position/score — see the roster batch-fetch above), so without this
+                    // the same team would render as N identical winner cards.
+                    'winners' => $group
+                        ->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id)
+                        ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $rosterByRegistration))
+                        ->values()
+                        ->all(),
                 ];
             })
             ->values();
@@ -280,9 +265,13 @@ class FestPortalController extends Controller
         // scheme (FestGradePointService) that doesn't always track 1st/2nd/3rd counts
         // 1:1, so the official rank stays points-driven and medals are informational.
         // Built from the same top-3 $marks already fetched above for the item tab, scoped
-        // to whichever region/cluster/phase the page is currently showing.
+        // to whichever region/cluster/phase the page is currently showing. Deduped by
+        // registration first — pair/group items save one FestMark per teammate, so an
+        // 11-person choir's single silver would otherwise tally as 11 silvers for its
+        // school (same root cause as the scoring-dedup note on EventContext).
         $medalTally = $marks
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
+            ->unique(fn (FestMark $m) => $m->participant->registration_id ?? $m->id)
             ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
             ->map(fn ($group) => [
                 'gold' => $group->where('position', 1)->count(),
@@ -297,9 +286,37 @@ class FestPortalController extends Controller
                 'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
             ])
             ->all();
+        $lockedCumulativeStanding = $this->cumulativeChampionship->publicStanding($event);
+        if ($lockedCumulativeStanding !== null) {
+            $schoolBoard = collect($lockedCumulativeStanding['rows'])
+                ->map(fn (array $row) => $row + [
+                    'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
+                    'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
+                    'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
+                ])->all();
+        }
+
+        $showPhasePoints = collect($schoolBoard)->contains(
+            fn (array $row) => (int) ($row['event_points'] ?? 0) !== (int) ($row['phase_points'] ?? 0)
+        );
+        $overallSchoolToppers = collect($schoolBoard)->take(3)->values()->all();
+        $schoolCategoryToppers = collect($categoryBoards)
+            ->map(fn (array $board) => $board + ['rows' => collect($board['rows'])->take(3)->values()->all()])
+            ->filter(fn (array $board) => $board['rows'] !== [])
+            ->values()
+            ->all();
+        $studentCategoryToppers = collect($championship)
+            ->groupBy(fn (array $row) => trim(($row['category'] ?: 'Open').' · '.($row['gender'] ?: 'All')))
+            ->map(fn (Collection $rows, string $label) => [
+                'label' => $label,
+                'rows' => $rows->take(3)->values()->map(fn (array $row, int $index) => $row + ['category_rank' => $index + 1])->all(),
+            ])
+            ->values()
+            ->all();
 
         return $this->renderPublic('public.fest.results', $tenant, [
             'event' => $event,
+            'eventContext' => $this->operationalEvents->publicContext($event),
             'tab' => $tab,
             'schoolBoard' => $schoolBoard,
             'usesPhases' => $usesPhases,
@@ -312,6 +329,11 @@ class FestPortalController extends Controller
             'publishedAt' => $publishedAt,
             'scopes' => $scopes,
             'selectedScope' => $selectedScope,
+            'lockedCumulativeStanding' => $lockedCumulativeStanding,
+            'showPhasePoints' => $showPhasePoints,
+            'overallSchoolToppers' => $overallSchoolToppers,
+            'schoolCategoryToppers' => $schoolCategoryToppers,
+            'studentCategoryToppers' => $studentCategoryToppers,
             'pageSeo' => ['title' => $event->title.' — Results'],
         ]);
     }
@@ -320,30 +342,10 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        $rootEvent = $this->scoreboards->rootEvent($event);
-
-        if ($event->id !== $rootEvent->id) {
-            $scope = $this->scoreboards->resolveScope($event);
-
-            return redirect()->route('tenant.fest.schedule', [
-                'event' => $rootEvent->id,
-                'scope' => $scope['key'],
-            ]);
-        }
-
-        $event = $rootEvent;
-        if (! $event->usesPhasedRegionalBilling()) {
-            EventLifecycleGate::allowPublicSchedule($event);
-        } else {
-            abort_unless($event->phases()->where('schedule_published', true)->exists(), 404);
-        }
-        $selectedScope = $this->scoreboards->resolveScope(
-            $event,
-            $this->stringQuery($request, 'scope'),
-            $this->stringQuery($request, 'cluster'),
-        );
+        EventLifecycleGate::allowPublicSchedule($event);
+        $selectedScope = $this->operationalEvents->directScope($event);
         abort_unless($selectedScope['schedule_published'], 404);
-        $scopes = $this->scoreboards->scopes($event);
+        $scopes = [$selectedScope];
 
         $schedules = $this->mapScheduleRows($event, null, $selectedScope['event_ids']);
 
@@ -356,14 +358,10 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
-        if (! $event->usesPhasedRegionalBilling()) {
-            EventLifecycleGate::allowPublicSchedule($event);
-        }
-        $itemEvent = FestEvent::where('tenant_id', $tenant->id)->findOrFail($item->event_id);
-        abort_unless($itemEvent->schedule_published, 404);
+        abort_unless((int) $item->event_id === (int) $event->id, 404);
+        EventLifecycleGate::allowPublicSchedule($event);
 
-        $schedules = $this->mapScheduleRows($event, $item->id);
+        $schedules = $this->mapScheduleRows($event, $item->id, [$event->id]);
 
         return $this->renderPublic('public.fest.item-schedule', $tenant, compact('event', 'item', 'schedules'));
     }
@@ -372,17 +370,19 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
-        abort_unless($this->rootResultsAvailable($event), 404);
-        $itemEvent = FestEvent::where('tenant_id', $tenant->id)->findOrFail($item->event_id);
-        abort_unless($itemEvent->results_published, 404);
+        abort_unless((int) $item->event_id === (int) $event->id, 404);
+        abort_unless($event->results_published, 404);
 
         $marks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
             ->with(['participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('position')
             ->orderByDesc('score')
-            ->get();
+            ->get()
+            // Pair/group/team/trio items save one FestMark row PER TEAMMATE (same
+            // position/score, see the scoring-dedup note on EventContext) — without this,
+            // an 11-person choir would render its own result card 11 times over.
+            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
 
         // Pair/group/team/trio items: the mark is only ever attached to one performer
         // on the registration (see the same note in results() above) — resolve the rest
@@ -399,33 +399,12 @@ class FestPortalController extends Controller
                 ->groupBy('registration_id')
             : null;
 
-        $marks = $marks->map(function (FestMark $m) use ($event, $item, $rosterByRegistration) {
-            $row = [
-                'mark_id' => $m->id,
-                'reference' => $m->participant
-                    ? $this->visibility->publicReference($event, $m->participant)
-                    : '—',
-                'name' => $m->participant?->student?->name ?? $m->participant?->teacher?->name,
-                'school' => $m->participant?->registration?->school?->name,
-                'position' => $m->position,
-                'grade' => $m->grade,
-                'score' => $m->score,
-                'result' => trim(($m->measurement_value ?? '').' '.($m->measurement_unit ?? '')),
-                'poster_url' => in_array((int) $m->position, [1, 2, 3], true)
-                    ? route('tenant.fest.winner-poster', [$event->id, $item->id, $m->id])
-                    : null,
-            ];
-
-            if ($rosterByRegistration && $m->participant?->registration_id) {
-                $row['team'] = $rosterByRegistration->get($m->participant->registration_id, collect())
-                    ->map(fn (FestParticipant $member) => $member->student?->name ?? $member->teacher?->name)
-                    ->filter()
-                    ->values()
-                    ->all();
-            }
-
-            return $row;
-        });
+        $marks = $marks->map(fn (FestMark $m) => $this->publicWinnerRow($m, $event, $rosterByRegistration) + [
+            'mark_id' => $m->id,
+            'poster_url' => in_array((int) $m->position, [1, 2, 3], true)
+                ? route('tenant.fest.winner-poster', [$event->id, $item->id, $m->id])
+                : null,
+        ]);
 
         return $this->renderPublic('public.fest.item-results', $tenant, compact('event', 'item', 'marks'));
     }
@@ -434,11 +413,9 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
+        abort_unless((int) $item->event_id === (int) $event->id, 404);
         abort_if($mark->event_id !== $item->event_id || $mark->item_id !== $item->id, 404);
-        abort_unless($this->rootResultsAvailable($event), 404);
-        $itemEvent = FestEvent::where('tenant_id', $tenant->id)->findOrFail($item->event_id);
-        abort_unless($itemEvent->results_published, 404);
+        abort_unless($event->results_published, 404);
         abort_if(! in_array((int) $mark->position, [1, 2, 3], true), 404);
 
         $rendered = $posters->render($event, $item, $mark, $tenant);
@@ -453,10 +430,8 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
-        abort_unless($this->rootResultsAvailable($event), 404);
-        $itemEvent = FestEvent::where('tenant_id', $tenant->id)->findOrFail($item->event_id);
-        abort_unless($itemEvent->results_published, 404);
+        abort_unless((int) $item->event_id === (int) $event->id, 404);
+        abort_unless($event->results_published, 404);
 
         $marks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
@@ -481,26 +456,9 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        $rootEvent = $this->scoreboards->rootEvent($event);
-
-        if ($event->id !== $rootEvent->id) {
-            $scope = $this->scoreboards->resolveScope($event);
-
-            return redirect()->route('tenant.fest.scoreboard', array_filter([
-                'event' => $rootEvent->id,
-                'scope' => $scope['key'],
-                'category' => $this->stringQuery($request, 'category'),
-            ]));
-        }
-
-        $event = $rootEvent;
-        $selectedScope = $this->scoreboards->resolveScope(
-            $event,
-            $this->stringQuery($request, 'scope'),
-            $this->stringQuery($request, 'cluster'),
-        );
+        $selectedScope = $this->operationalEvents->directScope($event);
         $isPublished = (bool) $selectedScope['results_published'];
-        $scopes = $this->scoreboards->scopes($event);
+        $scopes = [$selectedScope];
         $categories = $this->scoreboards->categories($event, $selectedScope);
         $category = $this->stringQuery($request, 'category');
         if ($category !== null) {
@@ -510,27 +468,11 @@ class FestPortalController extends Controller
         $categoryLabels = collect($categories)
             ->mapWithKeys(fn (string $key) => [$key => $this->scoreboards->categoryLabel($event, $key)])
             ->all();
-        $scoreboard = $isPublished
-            ? $this->scoreboards->scoreboard($event, $selectedScope, $category)
-            : [];
+        $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished);
         $scoreboardTitle = $selectedScope['label'];
         if ($category) {
             $scoreboardTitle .= ' · '.($categoryLabels[$category] ?? strtoupper($category));
         }
-
-        $latestWinners = FestMark::whereIn('event_id', $selectedScope['event_ids'])
-            ->whereIn('position', [1, 2, 3])
-            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
-            ->latest('updated_at')
-            ->limit(12)
-            ->when(! $isPublished, fn ($query) => $query->whereRaw('1 = 0'))
-            ->get()
-            ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event) + [
-                'item' => $mark->item?->title,
-                'head' => $mark->item?->head?->name,
-            ])
-            ->values()
-            ->all();
 
         return $this->renderPublic('public.fest.scoreboard', $tenant, [
             'event' => $event,
@@ -539,12 +481,32 @@ class FestPortalController extends Controller
             'categories' => $categories,
             'category' => $category,
             'categoryLabels' => $categoryLabels,
-            'scoreboard' => $scoreboard,
             'scoreboardTitle' => $scoreboardTitle,
-            'latestWinners' => $latestWinners,
             'isPublished' => $isPublished,
+            'eventContext' => $this->operationalEvents->publicContext($event),
             'pageSeo' => ['title' => $event->title.' — Scoreboard'],
-        ]);
+        ] + $dynamic);
+    }
+
+    public function scoreboardData(Request $request, int $eventId)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        $selectedScope = $this->operationalEvents->directScope($event);
+        $categories = $this->scoreboards->categories($event, $selectedScope);
+        $category = $this->stringQuery($request, 'category');
+        if ($category !== null) {
+            abort_unless(in_array($category, $categories, true), 404);
+        }
+
+        $isPublished = (bool) $selectedScope['results_published'];
+        $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished);
+
+        return response()->json([
+            'standingsPublished' => $isPublished,
+            'contentHtml' => view('public.fest.partials.scoreboard-content', $dynamic + compact('event', 'isPublished'))->render(),
+            'refreshedAt' => now()->toIso8601String(),
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     }
 
     public function manual(int $eventId)
@@ -560,26 +522,10 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        $rootEvent = $this->scoreboards->rootEvent($event);
-
-        if ($event->id !== $rootEvent->id) {
-            $scope = $this->scoreboards->resolveScope($event);
-
-            return redirect()->route('tenant.fest.live', [
-                'event' => $rootEvent->id,
-                'scope' => $scope['key'],
-            ]);
-        }
-
-        $event = $rootEvent;
-        $selectedScope = $this->scoreboards->resolveScope(
-            $event,
-            $this->stringQuery($request, 'scope'),
-            $this->stringQuery($request, 'cluster'),
-        );
+        $selectedScope = $this->operationalEvents->directScope($event);
 
         return $this->renderPublic('public.fest.live', $tenant, array_merge(
-            ['event' => $event, 'selectedScope' => $selectedScope, 'scopes' => $this->scoreboards->scopes($event)],
+            ['event' => $event, 'selectedScope' => $selectedScope, 'scopes' => [$selectedScope]],
             $this->livePayload($event, $selectedScope)
         ));
     }
@@ -588,12 +534,7 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        $event = $this->scoreboards->rootEvent($event);
-        $selectedScope = $this->scoreboards->resolveScope(
-            $event,
-            $this->stringQuery($request, 'scope'),
-            $this->stringQuery($request, 'cluster'),
-        );
+        $selectedScope = $this->operationalEvents->directScope($event);
 
         return response()->json($this->livePayload($event, $selectedScope));
     }
@@ -608,7 +549,6 @@ class FestPortalController extends Controller
             'label' => $this->scoreboards->categoryLabel($event, $key),
             'url' => route('tenant.fest.scoreboard', [
                 'event' => $event->id,
-                'scope' => $selectedScope['key'],
                 'category' => $key,
             ]),
         ])->all();
@@ -630,11 +570,12 @@ class FestPortalController extends Controller
             // Live operations remain available before publish, but official school
             // standings do not leak through this alternate public endpoint.
             'scoreboard' => $selectedScope['results_published']
-                ? $this->scoreboards->scoreboard($event, $selectedScope)
+                ? ($this->cumulativeChampionship->publicStanding($event)['rows']
+                    ?? $this->scoreboards->scoreboard($event, $selectedScope))
                 : [],
             'standingsPublished' => (bool) $selectedScope['results_published'],
             'categoryLinks' => $categoryLinks,
-            'houseScoreboard' => $selectedScope['results_published'] && ! $selectedScope['event_id']
+            'houseScoreboard' => $selectedScope['results_published']
                 ? $ctx->scoreboardByHouse()
                 : [],
             'nowPerforming' => $nowPerforming,
@@ -680,6 +621,61 @@ class FestPortalController extends Controller
         return $row;
     }
 
+    /** @return array<string, mixed> */
+    private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished): array
+    {
+        $scoreboard = $isPublished
+            ? $this->scoreboards->scoreboard($event, $selectedScope, $category)
+            : [];
+        $cumulativeStanding = $isPublished
+            ? $this->cumulativeChampionship->publicStanding($event, $category)
+            : null;
+        if ($cumulativeStanding !== null) {
+            $scoreboard = $cumulativeStanding['rows'];
+        }
+
+        $winnerMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
+            ->whereIn('position', [1, 2, 3])
+            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->latest('updated_at')
+            ->limit(60)
+            ->when(! $isPublished, fn ($query) => $query->whereRaw('1 = 0'))
+            ->get();
+        $roster = $this->rosterForMarks($winnerMarks);
+        $latestWinners = $winnerMarks
+            ->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id)
+            ->take(12)
+            ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $roster) + [
+                'item' => $mark->item?->title,
+                'head' => $mark->item?->head?->name,
+                'participant_type' => $mark->item?->participant_type,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'scoreboard' => $scoreboard,
+            'latestWinners' => $latestWinners,
+            'cumulativeStanding' => $cumulativeStanding,
+            'showPhasePoints' => collect($scoreboard)->contains(
+                fn (array $row) => (int) ($row['event_points'] ?? 0) !== (int) ($row['phase_points'] ?? 0)
+            ),
+        ];
+    }
+
+    /** @return Collection<int|string, Collection<int, FestParticipant>> */
+    private function rosterForMarks(Collection $marks): Collection
+    {
+        return FestParticipant::whereIn(
+            'registration_id',
+            $marks->pluck('participant.registration_id')->filter()->unique()->values()
+        )
+            ->where('participant_role', 'performer')
+            ->with(['student', 'teacher'])
+            ->get()
+            ->groupBy('registration_id');
+    }
+
     public function records(int $eventId)
     {
         $tenant = $this->resolveTenant();
@@ -703,24 +699,38 @@ class FestPortalController extends Controller
 
         $results = collect();
         if (strlen($q) >= 1) {
-            $query = FestParticipant::whereHas('registration', fn ($r) => $r
+            $base = FestParticipant::whereHas('registration', fn ($r) => $r
                 ->where('event_id', $event->id)
                 ->where('status', 'approved'))
-                ->with(['student', 'teacher', 'registration.item', 'registration.event']);
+                ->with(['student', 'teacher', 'registration.item', 'registration.event', 'registration.school']);
 
             if (ctype_digit($q)) {
-                $query->where('chest_no', (int) $q);
+                // Fast path: chest number officially revealed and persisted to the column.
+                $matches = (clone $base)->where('chest_no', (int) $q)->limit(30)->get();
+                if ($matches->isEmpty()) {
+                    // Before reveal, the chest number shown/linked publicly is a *computed*
+                    // preview (FestNumberingService::effectiveChestNumber()) that isn't a
+                    // persisted column — see the matching note on findParticipantByRef().
+                    $numbering = app(FestNumberingService::class);
+                    $matches = $base->get()
+                        ->filter(fn (FestParticipant $p) => $numbering->effectiveChestNumber($p) === (int) $q)
+                        ->take(30);
+                }
             } elseif (preg_match('/^[A-Za-z]-\d+$/', $q)) {
-                $query->where('level_registration_number', strtoupper($q));
+                $matches = $base->where('level_registration_number', strtoupper($q))->limit(30)->get();
             } elseif ($this->visibility->allowNameSearch($event)) {
-                $query->where(function ($inner) use ($q) {
+                $matches = $base->where(function ($inner) use ($q) {
                     $inner->whereHas('student', fn ($s) => $s->where('name', 'like', "%{$q}%"))
                         ->orWhereHas('teacher', fn ($t) => $t->where('name', 'like', "%{$q}%"));
-                });
+                })->limit(30)->get();
+            } else {
+                $matches = collect();
             }
 
-            $results = $query->limit(30)->get()
-                ->map(fn (FestParticipant $p) => $this->visibility->formatPublicParticipant($event, $p));
+            $showSchool = $this->visibility->showSchoolName($event);
+            $results = $matches->map(fn (FestParticipant $p) => $this->visibility->formatPublicParticipant($event, $p) + [
+                'school' => $showSchool ? $p->registration?->school?->name : null,
+            ]);
         }
 
         return $this->renderPublic('public.fest.search', $tenant, [
@@ -744,52 +754,73 @@ class FestPortalController extends Controller
         $schedule = FestSchedule::where('participant_id', $participant->id)->first();
 
         $public = $this->visibility->formatPublicParticipant($event, $participant, $schedule, $mark);
+        $items = $this->visibility->publicParticipantItems($event, $participant);
 
         return $this->renderPublic('public.fest.participant', $tenant, compact(
-            'event', 'public', 'participant', 'schedule', 'mark'
+            'event', 'public', 'participant', 'schedule', 'mark', 'items'
         ));
     }
 
     /** @return list<array<string, mixed>> */
     private function mapScheduleRows(FestEvent $event, ?int $itemId = null, ?array $eventIds = null): array
     {
-        $query = FestSchedule::whereIn('event_id', $eventIds ?? $event->reportableEventIds())
+        $query = FestSchedule::whereIn('event_id', $eventIds ?? [(int) $event->id])
             ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.item', 'participant.registration.event']);
 
         if ($itemId) {
             $query->where('item_id', $itemId);
         }
 
-        return $query->orderBy('scheduled_at')
+        $rows = $query->orderBy('scheduled_at')
             ->orderBy('sort_order')
-            ->get()
-            ->map(function (FestSchedule $row) use ($event) {
+            ->get();
+
+        // Pair/group/team/trio items get one FestSchedule row PER PERFORMER (see
+        // FestScheduleController::autoGenerate()), so without grouping, an 11-person
+        // choir would repeat the same item 11 times back to back with one name each.
+        // Group by registration so the public schedule shows one slot per performance,
+        // with the full roster attached, matching how results()/itemResults() already
+        // resolve rosters for the same reason.
+        return $rows
+            ->groupBy(fn (FestSchedule $row) => $row->participant?->registration_id ?? 'solo-'.$row->id)
+            ->map(function (Collection $group) use ($event) {
+                $first = $group->first();
+                $showName = $first->participant ? $this->visibility->showParticipantName($event, $first->participant) : false;
+
+                $roster = $group->pluck('participant')
+                    ->filter()
+                    ->map(fn (FestParticipant $p) => $p->student?->name ?? $p->teacher?->name)
+                    ->filter()
+                    ->values()
+                    ->all();
+
                 return [
-                    'scheduled_at' => $row->scheduled_at,
-                    'item_id' => $row->item_id,
-                    'item_title' => $row->item?->title,
-                    'stage' => $row->stage,
-                    'sort_order' => $row->sort_order,
-                    'participant' => $row->participant
-                        ? $this->visibility->formatPublicParticipant($event, $row->participant, $row)
+                    'scheduled_at' => $first->scheduled_at,
+                    'item_id' => $first->item_id,
+                    'item_title' => $first->item?->title,
+                    'stage' => $first->stage,
+                    'sort_order' => $first->sort_order,
+                    'participant' => $first->participant
+                        ? $this->visibility->formatPublicParticipant($event, $first->participant, $first)
                         : null,
+                    'roster' => $showName ? $roster : [],
+                    'roster_count' => $group->pluck('participant')->filter()->count(),
                 ];
             })
+            ->values()
             ->all();
     }
 
     private function findEvent(string $tenantId, int $eventId): FestEvent
     {
-        return FestEvent::where('tenant_id', $tenantId)
+        $event = FestEvent::where('tenant_id', $tenantId)
             ->where('id', $eventId)
-            ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])
+            ->whereIn('status', PublicOperationalEventService::PUBLIC_STATUSES)
             ->firstOrFail();
-    }
 
-    private function rootResultsAvailable(FestEvent $event): bool
-    {
-        return (bool) $event->results_published
-            || ($event->usesPhasedRegionalBilling() && $event->phases()->where('results_published', true)->exists());
+        abort_unless($this->operationalEvents->isPubliclyAccessible($event), 404);
+
+        return $event;
     }
 
     private function stringQuery(Request $request, string $key): ?string

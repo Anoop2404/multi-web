@@ -18,7 +18,7 @@
                     @click="printReport"
                     class="btn-secondary text-xs py-1.5 font-bold flex items-center gap-1.5"
                 >
-                    <span>🖨</span> Print Rank Report
+                    <span>🖨</span> Print This Page
                 </button>
 
                 <!-- Class segmented switch -->
@@ -65,16 +65,17 @@
         </div>
 
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-6 print:hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <div>
-                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Board Result Workflow</p>
-                    <p class="text-sm text-gray-700 mt-0.5">Use this path to keep the school submission complete and reviewer-friendly.</p>
-                </div>
-                <span class="text-xs font-semibold px-3 py-1 rounded-full border" :class="statusClass(activeResult?.status || 'draft')">
-                    {{ activeResult?.status || 'draft' }}
-                </span>
+            <div class="mb-3">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Board Result Workflow</p>
+                <p class="text-sm text-gray-700 mt-0.5">Use this path to keep the school submission complete and reviewer-friendly.</p>
             </div>
-            <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <BoardResultWorkflowStepper
+                v-if="activeResult"
+                :board-result="activeResult"
+                :certification-package="activeResultContext?.certificationPackage"
+                :certification-required="activeResultContext?.certificationRequired"
+            />
+            <div v-else class="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <div v-for="step in workflowSteps" :key="step.key" class="rounded-xl border p-3"
                      :class="step.active ? 'border-[#0f3d7a] bg-[#0f3d7a]/5' : 'border-gray-200 bg-gray-50/60'">
                     <p class="text-[11px] font-bold uppercase tracking-wide" :class="step.active ? 'text-[#0f3d7a]' : 'text-gray-500'">{{ step.label }}</p>
@@ -351,7 +352,7 @@
                             </div>
                         </div>
 
-                        <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+                        <div class="border border-gray-200 rounded-xl overflow-x-auto shadow-xs">
                             <table class="w-full text-sm">
                                 <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-gray-50 border-b border-gray-200">
                                     <tr>
@@ -410,10 +411,14 @@
                                     class="btn-secondary text-sm px-5 py-2.5 font-semibold">
                                 Save Draft
                             </button>
-                            <button type="button" @click="submit(true)" :disabled="form.processing"
+                            <button v-if="!certificationBlocksDirectSubmit" type="button" @click="submit(true)" :disabled="form.processing"
                                     class="btn-primary text-sm px-6 py-2.5 font-bold shadow-md bg-emerald-600 hover:bg-emerald-700 border-none">
                                 Save &amp; Submit for Verification
                             </button>
+                            <Link v-else :href="`/school-admin/${school.id}/board-results/${activeResult.id}/principal-verification`"
+                                  class="btn-primary text-sm px-6 py-2.5 font-bold shadow-md bg-emerald-600 hover:bg-emerald-700 border-none inline-flex items-center">
+                                Continue in Principal Verification →
+                            </Link>
                         </div>
                         <div v-else class="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
                             {{ activeResultContext?.editLockReason || `This result is ${activeResult?.status} and locked from editing.` }}
@@ -435,7 +440,7 @@
                     </div>
                 </div>
 
-                <div v-if="results.length" class="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
+                <div v-if="results.length" class="border border-gray-200 rounded-xl overflow-x-auto shadow-2xs">
                     <table class="w-full text-sm">
                         <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-gray-50 border-b border-gray-200">
                             <tr>
@@ -507,6 +512,7 @@
 import { Link, useForm, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import BoardResultWorkflowStepper from '@/Components/BoardResults/BoardResultWorkflowStepper.vue';
 import { useConfirm } from '@/composables/useConfirm';
 const { confirm, prompt } = useConfirm();
 
@@ -628,6 +634,14 @@ const canEditActive = computed(() => {
         return props.activeResultContext.canEdit;
     }
     return ['draft', 'rejected'].includes(props.activeResult.status);
+});
+
+// Mirrors the exact guard in BoardResultController::update()'s submit_for_review
+// branch — direct submit is rejected server-side whenever a certification package
+// is already past draft, or the Sahodaya requires Principal Verification this year.
+const certificationBlocksDirectSubmit = computed(() => {
+    const pkg = props.activeResultContext?.certificationPackage;
+    return (!!pkg && pkg.status !== 'draft') || !!props.activeResultContext?.certificationRequired;
 });
 
 const workflowProgress = computed(() => {

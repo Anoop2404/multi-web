@@ -43,6 +43,19 @@ class FestCertificateController extends SahodayaAdminController
         ]));
     }
 
+    public function tally(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $tally = app(FestCertificateService::class)->certificateTally($event);
+
+        return $this->inertia('Sahodaya/Events/CertificateTally', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
+            'event'  => $event,
+            'rows'   => $tally['rows'],
+            'totals' => $tally['totals'],
+        ]));
+    }
+
     public function generate(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

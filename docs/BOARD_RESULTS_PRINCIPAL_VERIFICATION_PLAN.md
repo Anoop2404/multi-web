@@ -1,7 +1,7 @@
 # Board Results — Principal / Vice Principal Verification Plan
 
 Date: 7 August 2026  
-Status: Proposed; implementation not started
+Status: Implemented — package/report state machine, individual report signing, and the consolidated report requirement (§2, §7) are all live and enforced end-to-end. A later commit had introduced a "fast-track" that skipped the consolidated report by force-writing package status, bypassing the audit-logged transition path; that was reverted (20 Aug 2026) so this document's requirement stands as originally specified.
 
 ## 1. Decision
 
@@ -169,13 +169,7 @@ Cards/table columns:
 
 ### 5.2 Package review screen
 
-Use tabs or expandable sections without losing the selected class/year context:
-
-1. Summary & proof.
-2. School toppers.
-3. Subject-wise toppers.
-4. Full A1 achievers.
-5. Final certification.
+**Superseded (20 Aug 2026):** implemented as separate pages per report rather than tabs/expandable sections. `Review.vue` is an index/checklist (one row per required report + the consolidated report, each showing a status pill and a "Review →" link); each report's generate/print/sign/upload/accept flow lives on its own page (`ReportReview.vue`, route `.../principal-verification/reports/{report}`), and the consolidated report has its own page too (`ConsolidatedReview.vue`, route `.../principal-verification/consolidated`, locked until every individual report is accepted). Class/year context is preserved via the board result the whole route tree is scoped to, not via same-page tab state.
 
 Each report item has:
 

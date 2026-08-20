@@ -20,6 +20,7 @@
         </div>
 
         <div class="card overflow-hidden p-0">
+            <div class="overflow-x-auto">
             <table class="data-table text-sm">
                 <thead>
                     <tr>
@@ -43,6 +44,7 @@
                     <tr v-if="!rows.length"><td colspan="10" class="p-6 text-center text-slate-400">No items on this event.</td></tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />

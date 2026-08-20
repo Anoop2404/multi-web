@@ -121,17 +121,19 @@
                     <div class="border-b border-slate-100 px-5 py-3 bg-slate-50/80">
                         <h3 class="section-title">{{ reg.item?.title }}</h3>
                     </div>
-                    <table v-if="resultsByItem[reg.item?.id]?.length" class="data-table">
-                        <thead><tr><th>Place</th><th>Athlete</th><th>Measurement</th><th>Score</th></tr></thead>
-                        <tbody>
-                            <tr v-for="(row, idx) in resultsByItem[reg.item.id]" :key="idx">
-                                <td class="font-semibold">{{ row.position }}</td>
-                                <td>{{ row.name }}</td>
-                                <td>{{ row.measurement || '—' }}</td>
-                                <td>{{ row.score ?? '—' }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div v-if="resultsByItem[reg.item?.id]?.length" class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead><tr><th>Place</th><th>Athlete</th><th>Measurement</th><th>Score</th></tr></thead>
+                            <tbody>
+                                <tr v-for="(row, idx) in resultsByItem[reg.item.id]" :key="idx">
+                                    <td class="font-semibold">{{ row.position }}</td>
+                                    <td>{{ row.name }}</td>
+                                    <td>{{ row.measurement || '—' }}</td>
+                                    <td>{{ row.score ?? '—' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <p v-else class="p-4 text-sm text-slate-400">No ranks for this item yet.</p>
                 </section>
             </div>
@@ -238,7 +240,10 @@ function applyBulkRank(reg) {
     const rank = bulkRank[reg.id];
     if (!rank || rank < 1) return;
     for (const p of performers(reg)) {
-        if (forms[p.id]) forms[p.id].position = rank;
+        if (forms[p.id]) {
+            forms[p.id].position = rank;
+            save(p, reg.item);
+        }
     }
 }
 

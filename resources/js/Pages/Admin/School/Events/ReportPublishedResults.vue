@@ -46,38 +46,40 @@
         </div>
 
         <div class="card overflow-hidden p-0">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th class="pl-5">Participant</th>
-                        <th>Head</th>
-                        <th>Item</th>
-                        <th>Fest ID</th>
-                        <th>Position</th>
-                        <th>Grade</th>
-                        <th>Score</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(row, i) in displayRows" :key="i">
-                        <td class="pl-5">
-                            <ReportStudentCell :name="row.participant"
-                                               :reg-no="row.reg_no"
-                                               :class-label="row.class"
-                                               :photo-url="row.photo_url" />
-                        </td>
-                        <td class="text-sm">{{ row.head_name ?? '—' }}</td>
-                        <td class="text-sm">{{ row.item }}</td>
-                        <td class="font-mono text-xs">{{ row.fest_id ?? '—' }}</td>
-                        <td>{{ row.position ?? '—' }}</td>
-                        <td>{{ row.grade ?? '—' }}</td>
-                        <td>{{ row.score ?? '—' }}</td>
-                    </tr>
-                    <tr v-if="!displayRows.length">
-                        <td colspan="7" class="p-6 text-center text-slate-400">No results for the selected filters.</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="pl-5">Participant</th>
+                            <th>Head</th>
+                            <th>Item</th>
+                            <th>Fest ID</th>
+                            <th>Position</th>
+                            <th>Grade</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(row, i) in displayRows" :key="i">
+                            <td class="pl-5">
+                                <ReportStudentCell :name="row.participant"
+                                                   :reg-no="row.reg_no"
+                                                   :class-label="row.class"
+                                                   :photo-url="row.photo_url" />
+                            </td>
+                            <td class="text-sm">{{ row.head_name ?? '—' }}</td>
+                            <td class="text-sm">{{ row.item }}</td>
+                            <td class="font-mono text-xs">{{ row.fest_id ?? '—' }}</td>
+                            <td>{{ row.position ?? '—' }}</td>
+                            <td>{{ row.grade ?? '—' }}</td>
+                            <td>{{ row.score ?? '—' }}</td>
+                        </tr>
+                        <tr v-if="!displayRows.length">
+                            <td colspan="7" class="p-6 text-center text-slate-400">No results for the selected filters.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>

@@ -1,47 +1,61 @@
-@extends('layouts.public')
+@extends('layouts.public-event')
 
 @section('content')
-<section class="py-12 px-4">
-    <div class="max-w-3xl mx-auto">
-        <p class="text-xs text-amber-600 font-bold uppercase">Results</p>
-        <h1 class="text-2xl font-bold font-heading mb-1">{{ $item->title }}</h1>
-        <p class="text-gray-500 text-sm mb-6">{{ $event->title }}</p>
-        <table class="w-full text-sm bg-white border rounded-xl overflow-hidden">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="p-3 text-left">Position</th>
-                    <th class="p-3 text-left">Ref</th>
-                    <th class="p-3 text-left">Name / Team</th>
-                    <th class="p-3 text-left">School</th>
-                    <th class="p-3 text-left">Grade</th>
-                    <th class="p-3 text-left">Result</th>
-                </tr>
-            </thead>
-            <tbody>
-            @forelse($marks as $row)
-                <tr class="border-t">
-                <td class="p-3 font-mono">#{{ $row['position'] ?? '—' }}</td>
-                <td class="p-3 font-mono text-xs">{{ $row['reference'] }}</td>
-                <td class="p-3">{{ !empty($row['team']) ? implode(', ', $row['team']) : ($row['name'] ?? '—') }}</td>
-                <td class="p-3">{{ $row['school'] ?? '—' }}</td>
-                <td class="p-3 font-semibold text-amber-700">{{ !empty($row['grade']) ? 'Grade '.$row['grade'] : '—' }}</td>
-                <td class="p-3">
-                    @if(!empty($row['poster_url']))
-                    <a href="{{ $row['poster_url'] }}" class="inline-flex items-center text-xs font-semibold text-amber-700 hover:underline" download>Winner poster ↓</a>
-                    @else
-                    <span class="text-gray-400 text-xs">—</span>
-                    @endif
-                </td>
-            </tr>
-            @empty
-            <tr><td colspan="6" class="p-6 text-center text-gray-400">No published results for this item.</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-        <p class="mt-4 flex flex-wrap gap-4">
-            <a href="{{ route('tenant.fest.item-results.pdf', [$event->id, $item->id]) }}" class="text-sm text-amber-700 font-medium">Download PDF ↓</a>
-            <a href="{{ route('tenant.fest.show', $event->id) }}" class="text-sm text-amber-700">← Festival hub</a>
-        </p>
+@php
+    $medals = [1 => '🥇', 2 => '🥈', 3 => '🥉'];
+    $rankTint = [1 => 'border-amber-500/40 bg-gradient-to-br from-amber-500/10 to-slate-900/60', 2 => 'border-slate-500/30', 3 => 'border-orange-700/30'];
+    $typeLabels = ['individual' => 'Individual', 'pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
+@endphp
+<section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
+    <div class="max-w-5xl mx-auto">
+        @include('public.fest.partials.page-hero', [
+            'eyebrow' => 'Results',
+            'title' => $item->title,
+            'subtitle' => $event->title,
+            'badges' => [$typeLabels[$item->participant_type] ?? ucfirst($item->participant_type ?: 'individual')],
+        ])
+
+        @if($marks->isEmpty())
+        <div class="rounded-2xl border border-dashed border-slate-700 p-10 text-center text-white/30 mt-6">No published results for this item.</div>
+        @else
+        <div class="grid sm:grid-cols-2 gap-4 mt-6">
+            @foreach($marks as $row)
+            @php
+                $roster = ($row['team'] ?? []) ?: [['name' => $row['participant'], 'photo' => $row['photo'] ?? null]];
+            @endphp
+            <div class="rounded-2xl border bg-slate-900/60 p-5 {{ $rankTint[$row['position']] ?? 'border-slate-800' }}">
+                <div class="flex items-center justify-between gap-3">
+                    <span class="text-3xl leading-none">{{ $medals[$row['position']] ?? ($row['position'] ? '#'.$row['position'] : '—') }}</span>
+                    <div class="flex items-center gap-2 flex-wrap justify-end">
+                        @if(!empty($row['grade']))
+                        <span class="text-xs font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">Grade {{ $row['grade'] }}</span>
+                        @endif
+                        @if(!empty($row['measurement']))
+                        <span class="text-xs font-semibold text-white/60 bg-white/5 px-2 py-0.5 rounded border border-slate-700">{{ $row['measurement'] }}</span>
+                        @endif
+                    </div>
+                </div>
+
+                <p class="text-xs text-white/40 mt-3">{{ $row['school'] }}</p>
+
+                <div class="mt-2 space-y-2.5">
+                    @foreach($roster as $member)
+                    <div class="flex items-center gap-3">
+                        @if($member['photo'] ?? null)
+                        <img src="{{ $member['photo'] }}" alt="" class="w-16 h-16 rounded-full object-cover border-2 border-slate-800 shadow-sm shrink-0">
+                        @else
+                        <span class="w-16 h-16 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-xl font-bold border-2 border-slate-800 shadow-sm shrink-0">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
+                        @endif
+                        <span class="font-bold text-lg leading-snug text-white">{{ $member['name'] ?? '—' }}</span>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+            @endforeach
+        </div>
+        @endif
+
+        <p class="mt-6"><a href="{{ route('tenant.fest.show', $event->id) }}" class="text-sm text-white/40 hover:text-white">← Event page</a></p>
     </div>
 </section>
 @endsection

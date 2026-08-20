@@ -79,20 +79,10 @@ class BoardResultLeadershipReviewController extends SchoolAdminController
         $service = app(BoardResultCertificationService::class);
         $package = $service->getOrCreatePackage($boardResult);
 
-        // Auto-advance: Principal just opens the page and sees reports directly.
-        // No manual "Send for Leadership Review" step needed.
-        if ($package->status === BoardResultCertificationPackage::STATUS_DRAFT) {
-            $errors = app(BoardResultCertificationValidator::class)->errorsBeforeLeadershipReview($boardResult);
-            if (empty($errors)) {
-                // Data is complete — auto-advance to awaiting_leadership_review
-                $package = $service->requestLeadershipReview($boardResult, $request->user());
-            }
-        }
-
-        if ($package->status === BoardResultCertificationPackage::STATUS_AWAITING_LEADERSHIP_REVIEW) {
-            $service->beginReportSignatures($package, $request->user());
-            $package->refresh();
-        }
+        // Viewing this page must never itself move the package forward — that
+        // happens only via an authorized action (e.g. generateReport(), which
+        // performs the same auto-advance behind its own role check). A plain
+        // GET here just renders whatever state the package is already in.
 
         // Always sync report records so all required reports exist
         $service->syncReportRecords($package);
@@ -116,9 +106,42 @@ class BoardResultLeadershipReviewController extends SchoolAdminController
         ]);
     }
 
+    /** Standalone page for one individual report (generate/print/sign/upload/accept). */
+    public function showReport(Request $request, string $tenantId, BoardResult $boardResult, BoardResultCertificationReport $report)
+    {
+        abort_if($boardResult->tenant_id !== $this->school->id, 403);
+        abort_unless($report->package && (int) $report->package->board_result_id === (int) $boardResult->id, 404);
+
+        $report->load(['stream', 'signedBy', 'package']);
+
+        return $this->inertia('School/BoardResults/PrincipalVerification/ReportReview', [
+            'boardResult' => $boardResult,
+            'package' => $report->package,
+            'report' => $report,
+            'canSign' => $this->userCanSign($request),
+        ]);
+    }
+
+    /** Standalone page for the all-types consolidated certification report. */
+    public function showConsolidated(Request $request, string $tenantId, BoardResult $boardResult)
+    {
+        abort_if($boardResult->tenant_id !== $this->school->id, 403);
+
+        $service = app(BoardResultCertificationService::class);
+        $package = $service->getOrCreatePackage($boardResult);
+        $package->load(['reports', 'signedBy']);
+
+        return $this->inertia('School/BoardResults/PrincipalVerification/ConsolidatedReview', [
+            'boardResult' => $boardResult,
+            'package' => $package,
+            'canSign' => $this->userCanSign($request),
+        ]);
+    }
+
     public function requestReview(Request $request, string $tenantId, BoardResult $boardResult)
     {
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
+        abort_unless($this->userCanSign($request), 403, 'Only the Principal, Vice Principal, or school admin may send this for leadership review.');
 
         $errors = app(BoardResultCertificationValidator::class)->errorsBeforeLeadershipReview($boardResult);
         if ($errors !== []) {

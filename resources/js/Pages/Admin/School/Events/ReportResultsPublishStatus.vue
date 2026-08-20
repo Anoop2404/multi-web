@@ -44,54 +44,56 @@
         </div>
 
         <div class="card overflow-hidden p-0">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th class="pl-5">Head</th>
-                        <th>Item</th>
-                        <th>Details</th>
-                        <th>Competition window</th>
-                        <th>Marks</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template v-for="(row, idx) in displayRows" :key="row.item_id">
-                        <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                            <td colspan="7" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                {{ row.head_name ?? 'Other items' }}
-                            </td>
-                        </tr>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
                         <tr>
-                            <td class="pl-5 text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
-                            <td class="font-medium">
-                                {{ row.title }}
-                                <p v-if="row.item_code" class="text-xs font-mono text-slate-400 mt-0.5">{{ row.item_code }}</p>
-                            </td>
-                            <td class="text-xs text-slate-600">
-                                <span v-if="row.age_group">{{ row.age_group }}</span>
-                                <span v-if="row.sport_discipline"> · {{ row.sport_discipline }}</span>
-                                <span v-if="!row.age_group && !row.sport_discipline">—</span>
-                            </td>
-                            <td class="text-sm text-slate-600">{{ formatWindow(row) }}</td>
-                            <td class="text-sm">
-                                <span :class="row.marks_ready ? 'text-emerald-700' : 'text-slate-500'">
-                                    {{ row.marks_entered }}/{{ row.performers ?? (row.marks_entered + row.marks_pending) }}
-                                </span>
-                            </td>
-                            <td>
-                                <span class="status-pill text-xs"
-                                      :class="row.results_published ? 'status-pill--published' : 'status-pill--open'">
-                                    {{ row.results_published ? 'Published' : 'Not published' }}
-                                </span>
-                            </td>
+                            <th class="pl-5">Head</th>
+                            <th>Item</th>
+                            <th>Details</th>
+                            <th>Competition window</th>
+                            <th>Marks</th>
+                            <th>Status</th>
                         </tr>
-                    </template>
-                    <tr v-if="!displayRows.length">
-                        <td colspan="7" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
-                    </tr>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <template v-for="(row, idx) in displayRows" :key="row.item_id">
+                            <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
+                                <td colspan="7" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                    {{ row.head_name ?? 'Other items' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="pl-5 text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
+                                <td class="font-medium">
+                                    {{ row.title }}
+                                    <p v-if="row.item_code" class="text-xs font-mono text-slate-400 mt-0.5">{{ row.item_code }}</p>
+                                </td>
+                                <td class="text-xs text-slate-600">
+                                    <span v-if="row.age_group">{{ row.age_group }}</span>
+                                    <span v-if="row.sport_discipline"> · {{ row.sport_discipline }}</span>
+                                    <span v-if="!row.age_group && !row.sport_discipline">—</span>
+                                </td>
+                                <td class="text-sm text-slate-600">{{ formatWindow(row) }}</td>
+                                <td class="text-sm">
+                                    <span :class="row.marks_ready ? 'text-emerald-700' : 'text-slate-500'">
+                                        {{ row.marks_entered }}/{{ row.performers ?? (row.marks_entered + row.marks_pending) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="status-pill text-xs"
+                                          :class="row.results_published ? 'status-pill--published' : 'status-pill--open'">
+                                        {{ row.results_published ? 'Published' : 'Not published' }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr v-if="!displayRows.length">
+                            <td colspan="7" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>

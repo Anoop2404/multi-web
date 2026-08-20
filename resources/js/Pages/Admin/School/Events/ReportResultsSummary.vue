@@ -28,29 +28,31 @@
         </div>
 
         <div class="card overflow-hidden p-0">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Item</th>
-                        <th>Participant</th>
-                        <th>Position</th>
-                        <th>Grade</th>
-                        <th>Score</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(row, i) in results.items" :key="i">
-                        <td>{{ row.item }}</td>
-                        <td class="font-medium">{{ row.participant }}</td>
-                        <td>{{ row.position ?? '—' }}</td>
-                        <td>{{ row.grade ?? '—' }}</td>
-                        <td>{{ row.score ?? '—' }}</td>
-                    </tr>
-                    <tr v-if="!results.items?.length">
-                        <td colspan="5" class="p-6 text-center text-slate-400">No published results yet.</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Participant</th>
+                            <th>Position</th>
+                            <th>Grade</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(row, i) in results.items" :key="i">
+                            <td>{{ row.item }}</td>
+                            <td class="font-medium">{{ row.participant }}</td>
+                            <td>{{ row.position ?? '—' }}</td>
+                            <td>{{ row.grade ?? '—' }}</td>
+                            <td>{{ row.score ?? '—' }}</td>
+                        </tr>
+                        <tr v-if="!results.items?.length">
+                            <td colspan="5" class="p-6 text-center text-slate-400">No published results yet.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>

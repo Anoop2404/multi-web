@@ -156,6 +156,57 @@ class FestPublicVisibilityService
         ];
     }
 
+    /**
+     * Every item (within this same event/region) the student or teacher behind
+     * $participant is registered for — so the public participant page can show
+     * a competitor's full event footprint instead of just the one item their
+     * search match happened to land on.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function publicParticipantItems(FestEvent $event, FestParticipant $participant): array
+    {
+        $showMarks = $this->showIndividualMarks($event);
+
+        $entries = FestParticipant::where('event_id', $participant->event_id)
+            ->where('participant_role', '!=', 'standby')
+            ->when($participant->student_id, fn ($q) => $q->where('student_id', $participant->student_id))
+            ->when(! $participant->student_id, fn ($q) => $q->where('teacher_id', $participant->teacher_id))
+            ->with('registration.item')
+            ->get()
+            ->unique(fn (FestParticipant $p) => $p->registration_id);
+
+        $marksByParticipant = FestMark::whereIn('participant_id', $entries->pluck('id'))
+            ->get()
+            ->keyBy('participant_id');
+
+        return $entries
+            ->map(function (FestParticipant $p) use ($event, $showMarks, $marksByParticipant) {
+                $item = $p->registration?->item;
+                if (! $item) {
+                    return null;
+                }
+
+                $mark = $marksByParticipant->get($p->id);
+
+                return [
+                    'item_id'          => $item->id,
+                    'item_title'       => $item->title,
+                    'participant_type' => $item->participant_type ?: 'individual',
+                    'is_team_item'     => $item->isTeamItem(),
+                    'position'         => $showMarks ? $mark?->position : null,
+                    'grade'            => $showMarks ? $mark?->grade : null,
+                    'result'           => $showMarks ? trim(($mark?->measurement_value ?? '').' '.($mark?->measurement_unit ?? '')) : null,
+                    'disqualified'     => (bool) $p->disqualified_at,
+                    'results_url'      => $event->results_published ? route('tenant.fest.item-results', [$event->id, $item->id]) : null,
+                ];
+            })
+            ->filter()
+            ->sortBy('item_title')
+            ->values()
+            ->all();
+    }
+
     public function isPublicAudience(string $audience): bool
     {
         return $audience === 'public';
@@ -197,17 +248,29 @@ class FestPublicVisibilityService
             return null;
         }
 
-        return FestParticipant::whereHas('registration', fn ($r) => $r
+        $candidates = FestParticipant::whereHas('registration', fn ($r) => $r
             ->where('event_id', $event->id)
             ->where('status', 'approved'))
-            ->with(['student', 'teacher', 'registration.item', 'registration.event', 'group'])
-            ->where(function ($q) use ($ref) {
-                if (ctype_digit($ref)) {
-                    $q->where('chest_no', (int) $ref);
-                } else {
-                    $q->where('level_registration_number', $ref);
-                }
-            })
-            ->first();
+            ->with(['student', 'teacher', 'registration.item', 'registration.event', 'group']);
+
+        if (! ctype_digit($ref)) {
+            return $candidates->where('level_registration_number', $ref)->first();
+        }
+
+        // Fast path: chest number has been officially revealed and persisted to the column.
+        $found = (clone $candidates)->where('chest_no', (int) $ref)->first();
+        if ($found) {
+            return $found;
+        }
+
+        // Before reveal, chest_no's accessor (and every public-facing chest label built from
+        // it — participantLinkRef(), publicReference()) falls back to a *computed* preview
+        // number via FestNumberingService::effectiveChestNumber(), which isn't a persisted
+        // column and so can't be matched in SQL. Resolve it the same way here so links built
+        // from that preview number actually resolve instead of 404ing until reveal.
+        $numbering = app(FestNumberingService::class);
+
+        return $candidates->get()
+            ->first(fn (FestParticipant $p) => $numbering->effectiveChestNumber($p) === (int) $ref);
     }
 }

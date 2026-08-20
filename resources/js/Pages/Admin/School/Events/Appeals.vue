@@ -49,41 +49,43 @@
                 <h3 class="section-title">Your appeals</h3>
                 <p class="section-desc mt-0.5">{{ appeals.length }} total</p>
             </div>
-            <table v-if="appeals.length" class="w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                    <tr>
-                        <th class="p-3">Participant</th>
-                        <th class="p-3">Item</th>
-                        <th class="p-3">Reason</th>
-                        <th class="p-3">Fee</th>
-                        <th class="p-3">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="a in appeals" :key="a.id" class="border-t align-top">
-                        <td class="p-3 font-medium">
-                            {{ participantName(a) }}
-                            <p v-if="a.participant?.student?.admission_number || a.participant?.student?.reg_no" class="text-xs font-mono text-[#0f3d7a]">{{ a.participant.student.admission_number || a.participant.student.reg_no }}</p>
-                        </td>
-                        <td class="p-3 text-xs">{{ a.participant?.registration?.item?.title ?? '—' }}</td>
-                        <td class="p-3 text-xs max-w-xs">
-                            <p>{{ a.reason }}</p>
-                            <p v-if="a.resolution_note" class="text-slate-500 mt-1 italic">Note: {{ a.resolution_note }}</p>
-                        </td>
-                        <td class="p-3 text-xs whitespace-nowrap">
-                            <template v-if="a.fee_amount != null && Number(a.fee_amount) > 0">
-                                ₹{{ a.fee_amount }}
-                                <span v-if="a.fee_paid_at" class="text-emerald-700 block">Paid</span>
-                                <span v-else class="text-amber-700 block">Pending payment</span>
-                            </template>
-                            <span v-else class="text-slate-300">—</span>
-                        </td>
-                        <td class="p-3">
-                            <span :class="statusClass(a.status)" class="text-xs font-semibold px-2 py-0.5 rounded capitalize">{{ a.status }}</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div v-if="appeals.length" class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                        <tr>
+                            <th class="p-3">Participant</th>
+                            <th class="p-3">Item</th>
+                            <th class="p-3">Reason</th>
+                            <th class="p-3">Fee</th>
+                            <th class="p-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="a in appeals" :key="a.id" class="border-t align-top">
+                            <td class="p-3 font-medium">
+                                {{ participantName(a) }}
+                                <p v-if="a.participant?.student?.admission_number || a.participant?.student?.reg_no" class="text-xs font-mono text-[#0f3d7a]">{{ a.participant.student.admission_number || a.participant.student.reg_no }}</p>
+                            </td>
+                            <td class="p-3 text-xs">{{ a.participant?.registration?.item?.title ?? '—' }}</td>
+                            <td class="p-3 text-xs max-w-xs">
+                                <p>{{ a.reason }}</p>
+                                <p v-if="a.resolution_note" class="text-slate-500 mt-1 italic">Note: {{ a.resolution_note }}</p>
+                            </td>
+                            <td class="p-3 text-xs whitespace-nowrap">
+                                <template v-if="a.fee_amount != null && Number(a.fee_amount) > 0">
+                                    ₹{{ a.fee_amount }}
+                                    <span v-if="a.fee_paid_at" class="text-emerald-700 block">Paid</span>
+                                    <span v-else class="text-amber-700 block">Pending payment</span>
+                                </template>
+                                <span v-else class="text-slate-300">—</span>
+                            </td>
+                            <td class="p-3">
+                                <span :class="statusClass(a.status)" class="text-xs font-semibold px-2 py-0.5 rounded capitalize">{{ a.status }}</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <p v-else class="p-8 text-center text-gray-400 text-sm">No appeals submitted yet.</p>
         </div>
     </SchoolAdminLayout>

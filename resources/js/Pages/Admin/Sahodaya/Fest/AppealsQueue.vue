@@ -28,54 +28,56 @@
         </div>
 
         <div class="card card--flush overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                    <tr>
-                        <th class="p-3">Event</th>
-                        <th class="p-3">Participant</th>
-                        <th class="p-3">School / Item</th>
-                        <th class="p-3">Reason</th>
-                        <th class="p-3">Status</th>
-                        <th class="p-3"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="a in appeals.data" :key="a.id" class="border-t align-top">
-                        <td class="p-3">
-                            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${a.event_id}/appeals`"
-                                  class="font-semibold text-[#0f3d7a] hover:underline text-xs">
-                                {{ a.event?.title ?? 'Event' }}
-                            </Link>
-                        </td>
-                        <td class="p-3 font-medium">
-                            {{ participantName(a) }}
-                            <p v-if="a.participant?.student?.reg_no" class="text-xs font-mono text-slate-500">{{ a.participant.student.reg_no }}</p>
-                        </td>
-                        <td class="p-3 text-xs">
-                            <p>{{ a.participant?.registration?.school?.name ?? '—' }}</p>
-                            <p class="text-slate-500">{{ a.participant?.registration?.item?.title }}</p>
-                        </td>
-                        <td class="p-3 text-xs max-w-xs">{{ a.reason }}</td>
-                        <td class="p-3">
-                            <span :class="statusClass(a.status)" class="text-xs font-semibold px-2 py-0.5 rounded capitalize">{{ a.status }}</span>
-                        </td>
-                        <td class="p-3 text-right whitespace-nowrap">
-                            <template v-if="a.status === 'pending'">
-                                <button type="button" class="text-green-700 text-xs font-semibold mr-2"
-                                        @click="resolve(a.id, 'approved')">Approve</button>
-                                <button type="button" class="text-red-600 text-xs font-semibold mr-2"
-                                        @click="resolve(a.id, 'rejected')">Reject</button>
-                                <button v-if="a.fee_amount != null && Number(a.fee_amount) > 0 && !a.fee_paid_at"
-                                        type="button" class="text-[#0f3d7a] text-xs font-semibold"
-                                        @click="markFeePaid(a.id)">Mark fee paid</button>
-                            </template>
-                        </td>
-                    </tr>
-                    <tr v-if="!appeals.data?.length">
-                        <td colspan="6" class="p-8 text-center text-gray-400">No appeals in this queue.</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                        <tr>
+                            <th class="p-3">Event</th>
+                            <th class="p-3">Participant</th>
+                            <th class="p-3">School / Item</th>
+                            <th class="p-3">Reason</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="a in appeals.data" :key="a.id" class="border-t align-top">
+                            <td class="p-3">
+                                <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${a.event_id}/appeals`"
+                                      class="font-semibold text-[#0f3d7a] hover:underline text-xs">
+                                    {{ a.event?.title ?? 'Event' }}
+                                </Link>
+                            </td>
+                            <td class="p-3 font-medium">
+                                {{ participantName(a) }}
+                                <p v-if="a.participant?.student?.reg_no" class="text-xs font-mono text-slate-500">{{ a.participant.student.reg_no }}</p>
+                            </td>
+                            <td class="p-3 text-xs">
+                                <p>{{ a.participant?.registration?.school?.name ?? '—' }}</p>
+                                <p class="text-slate-500">{{ a.participant?.registration?.item?.title }}</p>
+                            </td>
+                            <td class="p-3 text-xs max-w-xs">{{ a.reason }}</td>
+                            <td class="p-3">
+                                <span :class="statusClass(a.status)" class="text-xs font-semibold px-2 py-0.5 rounded capitalize">{{ a.status }}</span>
+                            </td>
+                            <td class="p-3 text-right whitespace-nowrap">
+                                <template v-if="a.status === 'pending'">
+                                    <button type="button" class="text-green-700 text-xs font-semibold mr-2"
+                                            @click="resolve(a.id, 'approved')">Approve</button>
+                                    <button type="button" class="text-red-600 text-xs font-semibold mr-2"
+                                            @click="resolve(a.id, 'rejected')">Reject</button>
+                                    <button v-if="a.fee_amount != null && Number(a.fee_amount) > 0 && !a.fee_paid_at"
+                                            type="button" class="text-[#0f3d7a] text-xs font-semibold"
+                                            @click="markFeePaid(a.id)">Mark fee paid</button>
+                                </template>
+                            </td>
+                        </tr>
+                        <tr v-if="!appeals.data?.length">
+                            <td colspan="6" class="p-8 text-center text-gray-400">No appeals in this queue.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div v-if="appeals.links?.length > 3" class="mt-4 flex justify-center gap-1">

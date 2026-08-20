@@ -290,14 +290,17 @@ class BoardResultCertificationService
         return $reports->every(fn (BoardResultCertificationReport $r) => $r->isAccepted());
     }
 
+    /**
+     * Individual per-type reports are optional reference documents, not a
+     * submission requirement — the consolidated report alone is required.
+     * This transition is therefore unconditional; it exists purely to move
+     * the package through the state machine on the way to the consolidated
+     * step, regardless of how many individual reports (if any) were signed.
+     */
     public function markIndividualReportsSigned(BoardResultCertificationPackage $package, User $actor): void
     {
-        if (! $this->allRequiredReportsAccepted($package)) {
-            throw new RuntimeException('Every required individual report must be signed and accepted first.');
-        }
-
         $this->transition($package, BoardResultCertificationPackage::STATUS_INDIVIDUAL_REPORTS_SIGNED, $actor, [
-            'description' => "{$actor->name} confirmed all individual signed reports are complete.",
+            'description' => "{$actor->name} moved on to the consolidated certification report.",
         ]);
     }
 
@@ -382,6 +385,32 @@ class BoardResultCertificationService
             $boardResult = $package->boardResult ?? BoardResult::findOrFail($package->board_result_id);
 
             return $this->supersedeAndSpawnNextVersion($package, $boardResult, $actor, 'Returned by Sahodaya for correction.');
+        });
+    }
+
+    /**
+     * Reopen a published package for correction. Same shape as sahodayaReturn() — the
+     * current package moves through Sahodaya Returned and is immediately superseded by a
+     * fresh draft version — but kept as a distinct method so the transition, audit
+     * description, and triggering controller action stay clearly attributable to an
+     * unpublish rather than an ordinary pre-publish rejection.
+     */
+    public function unpublish(BoardResultCertificationPackage $package, User $actor, string $reason): BoardResultCertificationPackage
+    {
+        return DB::transaction(function () use ($package, $actor, $reason) {
+            $package->forceFill([
+                'return_reason' => $reason,
+                'returned_by_user_id' => $actor->id,
+                'returned_at' => now(),
+            ]);
+
+            $this->transition($package, BoardResultCertificationPackage::STATUS_SAHODAYA_RETURNED, $actor, [
+                'description' => "{$actor->name} unpublished the package for correction: {$reason}",
+            ]);
+
+            $boardResult = $package->boardResult ?? BoardResult::findOrFail($package->board_result_id);
+
+            return $this->supersedeAndSpawnNextVersion($package, $boardResult, $actor, "Unpublished by Sahodaya for correction: {$reason}");
         });
     }
 

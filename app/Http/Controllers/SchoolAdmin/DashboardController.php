@@ -104,13 +104,23 @@ class DashboardController extends SchoolAdminController
                 ->all();
         }
 
+        $pending = BoardResult::query()
+            ->where('tenant_id', $schoolId)
+            ->whereIn('status', [BoardResult::STATUS_DRAFT, BoardResult::STATUS_REJECTED, BoardResult::STATUS_SUBMITTED])
+            ->with('certificationPackages')
+            ->get(['id', 'class', 'examination_type', 'academic_year', 'status']);
+
         return [
             'academic_year' => $year,
             'published_count' => $published->count(),
-            'pending_count' => BoardResult::query()
-                ->where('tenant_id', $schoolId)
-                ->whereIn('status', [BoardResult::STATUS_DRAFT, BoardResult::STATUS_REJECTED, BoardResult::STATUS_SUBMITTED])
-                ->count(),
+            'pending_count' => $pending->count(),
+            'pending_results' => $pending->map(fn (BoardResult $r) => [
+                'class' => $r->class,
+                'academic_year' => $r->academic_year,
+                'status' => $r->status,
+                'certification_package' => $r->activeCertificationPackage(),
+                'certification_required' => app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->isCertificationRequired($r),
+            ])->values()->all(),
             'ranks' => $ranks,
             'toppers' => $published->flatMap(fn (BoardResult $r) => $r->toppers
                 ->where('entry_type', Topper::ENTRY_OVERALL)

@@ -110,6 +110,7 @@ class BoardResultController extends SchoolAdminController
             ->with([
                 'toppers' => fn ($q) => $q->overallEntries()->with(['subjectMarks', 'examStream']),
                 'uploads' => fn ($q) => $q->orderByDesc('version')->limit(5),
+                'certificationPackages',
             ])
             ->orderByDesc('academic_year')
             ->orderByDesc('class')
@@ -167,37 +168,6 @@ class BoardResultController extends SchoolAdminController
             ),
             'activeResult' => $activeResult,
         ], $activeResult ? ['activeResultContext' => $this->topperContext($activeResult)] : []));
-    }
-
-    public function rankReport(Request $request)
-    {
-        $class = $request->filled('class') ? $request->integer('class') : 12;
-        abort_if(! in_array($class, [10, 12], true), 404);
-
-        $academicYear = $request->string('academic_year')->trim()->toString();
-        abort_if($academicYear === '', 422, 'academic_year is required.');
-
-        $result = BoardResult::with(['toppers' => function ($q) {
-            $q->with(['subjectMarks', 'examStream'])->orderBy('rank');
-        }])
-            ->where('tenant_id', $this->school->id)
-            ->where('class', $class)
-            ->where('academic_year', $academicYear)
-            ->first();
-
-        abort_if($result === null, 404, 'No board result found for the given class and academic year.');
-
-        return view('school.board-results.rank-report', [
-            'school'       => $this->school,
-            'result'       => $result,
-            'toppers'      => $result->toppers
-                ->where('entry_type', Topper::ENTRY_OVERALL)
-                ->values(),
-            'academicYear' => $academicYear,
-            'class'        => $class,
-            'isClass12'    => $class === 12,
-            'subjectWiseLeaders' => BoardExamSubjects::subjectWiseLeaders($result->toppers),
-        ]);
     }
 
     public function store(Request $request)
@@ -1092,6 +1062,8 @@ class BoardResultController extends SchoolAdminController
                 ->where('entry_type', Topper::ENTRY_OVERALL)
                 ->count(),
             'marksConfig' => $this->marksConfigFor((int) $boardResult->class, $streamOptions, $sahodayaId),
+            'certificationPackage' => $boardResult->activeCertificationPackage(),
+            'certificationRequired' => app(BoardResultAcademicYearService::class)->isCertificationRequired($boardResult),
         ];
     }
 

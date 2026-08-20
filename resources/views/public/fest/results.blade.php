@@ -1,8 +1,9 @@
-@extends('layouts.public')
+@extends('layouts.public-event')
 
 @section('content')
 @php
     $tabs = [
+        'toppers' => 'Toppers',
         'school' => 'School-wise',
         'category' => 'Category-wise',
         'item' => 'Item-wise',
@@ -11,47 +12,140 @@
     ];
 @endphp
 
-<section class="py-12 px-4">
+<section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
     <div class="max-w-6xl mx-auto">
-        <p class="text-xs text-amber-600 font-bold uppercase">Published Results</p>
-        <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
-            <div>
-                <h1 class="text-3xl font-bold font-heading">{{ $event->title }}</h1>
-                <p class="text-gray-500 text-sm mt-1">Browse results by school, category, item, or participant.</p>
-                @if($publishedAt ?? null)
-                    <p class="text-xs text-gray-400 mt-1">Results published on {{ \Carbon\Carbon::parse($publishedAt)->format('d M Y, g:i A') }}</p>
-                @endif
-            </div>
-            <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id, 'scope' => $selectedScope['key']]) }}" class="text-sm font-semibold text-amber-700 hover:underline">Scoreboard →</a>
-        </div>
-
-        @include('public.fest.partials.scope-nav', [
-            'routeName' => 'tenant.fest.results',
-            'routeQuery' => ['tab' => $tab],
+        @php
+            $heroBadges = array_values(array_filter([$eventContext['phase'], $eventContext['region'], $event->venue]));
+        @endphp
+        @include('public.fest.partials.page-hero', [
+            'eyebrow' => 'Published Results',
+            'title' => $event->title,
+            'subtitle' => 'Browse official toppers and results by school, category, item, or participant.',
+            'badges' => $heroBadges,
+            'meta' => ($publishedAt ?? null) ? 'Results published on '.\Carbon\Carbon::parse($publishedAt)->format('d M Y, g:i A') : null,
         ])
 
-        <p class="text-sm font-semibold text-gray-600 mb-4">{{ $selectedScope['label'] }}</p>
+        <div class="flex justify-end mt-4">
+            <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id]) }}" class="text-sm font-semibold text-amber-400 hover:underline shrink-0">Scoreboard →</a>
+        </div>
 
-        <nav class="flex flex-wrap gap-2 mb-8">
+        <nav class="sticky top-16 z-20 flex gap-2 overflow-x-auto mt-4 mb-8 rounded-2xl border border-slate-800 bg-slate-900/90 backdrop-blur p-2 shadow-xl" aria-label="Result views">
             @foreach($tabs as $key => $label)
-                <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'scope' => $selectedScope['key'], 'tab' => $key]) }}"
-                   class="px-4 py-2 rounded-full text-sm border {{ $tab === $key ? 'bg-amber-500 text-white border-amber-500' : 'bg-white hover:border-amber-400' }}">
+                <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => $key]) }}"
+                   class="shrink-0 px-4 py-2 rounded-xl text-sm border font-semibold transition {{ $tab === $key ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-transparent text-white/60 border-transparent hover:border-amber-500/40 hover:text-white' }}">
                     {{ $label }}
                 </a>
             @endforeach
         </nav>
 
-        @if($tab === 'school')
+        @if($tab === 'toppers')
+            @php $podium = [1 => '1st', 2 => '2nd', 3 => '3rd']; @endphp
+            <div class="space-y-10">
+                <section aria-labelledby="overall-school-toppers">
+                    <div class="mb-4"><p class="text-xs font-bold uppercase tracking-widest text-amber-400">Overall championship</p><h2 id="overall-school-toppers" class="text-2xl font-bold mt-1 text-white">School Overall Toppers</h2></div>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        @forelse($overallSchoolToppers as $row)
+                        <article class="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-5 {{ $row['rank'] == 1 ? 'border-amber-500/40 bg-gradient-to-br from-amber-500/10 to-slate-900/60' : '' }}">
+                            <div class="flex items-start justify-between gap-3"><span class="text-xs font-extrabold uppercase tracking-widest text-amber-400">{{ $podium[$row['rank']] ?? '#'.$row['rank'] }}</span><span class="font-mono text-2xl font-extrabold text-white">{{ $row['total_points'] }} <small class="text-[10px] text-white/40">PTS</small></span></div>
+                            <h3 class="font-bold text-lg leading-snug mt-5 text-white">{{ $row['school_name'] }}</h3>
+                            @if($lockedCumulativeStanding ?? null)
+                            <dl class="grid {{ $showPhasePoints ? 'grid-cols-4' : 'grid-cols-3' }} gap-1 mt-4 pt-3 border-t border-slate-800 text-center">
+                                <div><dt class="text-[9px] uppercase text-white/30">Opening</dt><dd class="font-mono text-sm font-bold text-white">{{ $row['opening_points'] }}</dd></div>
+                                <div><dt class="text-[9px] uppercase text-white/30">Event</dt><dd class="font-mono text-sm font-bold text-sky-400">+{{ $row['event_points'] }}</dd></div>
+                                @if($showPhasePoints)<div><dt class="text-[9px] uppercase text-white/30">Phase</dt><dd class="font-mono text-sm font-bold text-indigo-400">+{{ $row['phase_points'] }}</dd></div>@endif
+                                <div><dt class="text-[9px] uppercase text-white/30">Closing</dt><dd class="font-mono text-sm font-bold text-amber-400">{{ $row['closing_points'] }}</dd></div>
+                            </dl>
+                            @endif
+                        </article>
+                        @empty
+                        <p class="md:col-span-3 rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">No school toppers published yet.</p>
+                        @endforelse
+                    </div>
+                </section>
+
+                <section aria-labelledby="school-category-toppers">
+                    <div class="mb-4"><p class="text-xs font-bold uppercase tracking-widest text-amber-400">Category leaders</p><h2 id="school-category-toppers" class="text-2xl font-bold mt-1 text-white">School Category-wise Toppers</h2></div>
+                    <div class="grid lg:grid-cols-2 gap-4">
+                        @forelse($schoolCategoryToppers as $board)
+                        <article class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+                            <h3 class="font-bold px-4 py-3 bg-white/5 border-b border-slate-800 text-white">{{ $board['label'] }}</h3>
+                            <ol class="divide-y divide-slate-800">
+                                @foreach($board['rows'] as $row)
+                                <li class="flex items-center gap-3 px-4 py-3"><span class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span><span class="font-semibold text-sm flex-1 min-w-0 truncate text-white">{{ $row['school_name'] }}</span><span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span></li>
+                                @endforeach
+                            </ol>
+                        </article>
+                        @empty
+                        <p class="lg:col-span-2 rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">No school category toppers published yet.</p>
+                        @endforelse
+                    </div>
+                </section>
+
+                <section aria-labelledby="student-category-toppers">
+                    <div class="mb-4"><p class="text-xs font-bold uppercase tracking-widest text-amber-400">Student championship</p><h2 id="student-category-toppers" class="text-2xl font-bold mt-1 text-white">Student Category-wise Toppers</h2></div>
+                    <div class="grid lg:grid-cols-2 gap-4">
+                        @forelse($studentCategoryToppers as $group)
+                        <article class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+                            <h3 class="font-bold px-4 py-3 bg-white/5 border-b border-slate-800 text-white">{{ $group['label'] }}</h3>
+                            <ol class="divide-y divide-slate-800">
+                                @foreach($group['rows'] as $row)
+                                <li class="flex items-center gap-3 px-4 py-3">
+                                    @if($row['photo'] ?? null)<img src="{{ $row['photo'] }}" alt="" class="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0">@else<span class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-sm font-extrabold text-amber-400 shrink-0">{{ strtoupper(substr($row['student'] ?? '?', 0, 1)) }}</span>@endif
+                                    <div class="min-w-0 flex-1"><p class="font-bold text-sm truncate text-white"><span class="text-amber-400 mr-1">#{{ $row['category_rank'] }}</span>{{ $row['student'] }}</p><p class="text-xs text-white/40 truncate mt-0.5">{{ $row['school'] }}</p></div><span class="font-mono font-bold text-white">{{ $row['points'] }}</span>
+                                </li>
+                                @endforeach
+                            </ol>
+                        </article>
+                        @empty
+                        <p class="lg:col-span-2 rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">Student championship toppers will appear after category points are published.</p>
+                        @endforelse
+                    </div>
+                </section>
+            </div>
+        @elseif($tab === 'school')
+            @if($lockedCumulativeStanding ?? null)
+                <div class="mb-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <p class="text-sm font-semibold text-emerald-300">Championship standing after {{ $lockedCumulativeStanding['phase']->name }}</p>
+                        <p class="text-xs text-emerald-400/80 mt-1">Opening + this phase = locked cumulative closing balance.</p>
+                    </div>
+                    <span class="text-xs font-bold text-emerald-300">Snapshot v{{ $lockedCumulativeStanding['version'] }}</span>
+                </div>
+                <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
+                            <tr>
+                                <th class="p-3">Rank</th><th class="p-3">School</th>
+                                <th class="p-3 text-right">Opening</th><th class="p-3 text-right">This Event</th>
+                                @if($showPhasePoints)<th class="p-3 text-right">This Phase</th>@endif<th class="p-3 text-right">Closing</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800">
+                            @forelse($schoolBoard as $row)
+                                <tr>
+                                    <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
+                                    <td class="p-3 font-semibold text-white">{{ $row['school_name'] }}</td>
+                                    <td class="p-3 text-right font-mono text-white/70">{{ $row['opening_points'] }}</td>
+                                    <td class="p-3 text-right font-mono text-sky-400">+{{ $row['event_points'] }}</td>
+                                    @if($showPhasePoints)<td class="p-3 text-right font-mono text-indigo-400">+{{ $row['phase_points'] }}</td>@endif
+                                    <td class="p-3 text-right font-mono font-bold text-white">{{ $row['closing_points'] }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="{{ $showPhasePoints ? 6 : 5 }}" class="p-8 text-center text-white/30">No cumulative points published yet.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             {{-- §7.3a (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): phased events show
                  the cumulative overall (sum of every published phase's points, revealed
                  progressively as phases publish) instead of the plain school board.
                  $phaseCumulativeBoard is null for every non-phased event and for any
                  non-'overall' scope — falls straight through to the unchanged table below,
                  exactly today's display. --}}
-            @if(($phaseCumulativeBoard ?? null) !== null)
-                <div class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                    <p class="text-sm font-semibold text-amber-800">Cumulative overall standing</p>
-                    <p class="text-xs text-amber-700 mt-1">
+            @elseif(($phaseCumulativeBoard ?? null) !== null)
+                <div class="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+                    <p class="text-sm font-semibold text-amber-300">Cumulative overall standing</p>
+                    <p class="text-xs text-amber-400/80 mt-1">
                         Running total across published phases so far —
                         @if(count($phaseBreakdown ?? []))
                             {{ collect($phaseBreakdown)->map(fn ($p) => $p['name'].($p['results_published'] ? '' : ' (not yet published)'))->implode(', ') }}.
@@ -60,9 +154,9 @@
                         @endif
                     </p>
                 </div>
-                <div class="bg-white border rounded-2xl overflow-hidden shadow-sm">
+                <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                        <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
                             <tr>
                                 <th class="p-3">Rank</th>
                                 <th class="p-3">School</th>
@@ -72,27 +166,27 @@
                                 <th class="p-3 text-right">Cumulative Points</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-slate-800">
                             @forelse($phaseCumulativeBoard as $row)
-                                <tr class="border-t">
-                                    <td class="p-3 font-bold text-amber-700">#{{ $row['rank'] }}</td>
-                                    <td class="p-3 font-semibold">{{ $row['school_name'] }}</td>
+                                <tr>
+                                    <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
+                                    <td class="p-3 font-semibold text-white">{{ $row['school_name'] }}</td>
                                     @foreach(collect($phaseBreakdown ?? [])->where('results_published', true) as $phase)
-                                        <td class="p-3 text-right font-mono">{{ $row['phase_points'][$phase['phase_id']] ?? 0 }}</td>
+                                        <td class="p-3 text-right font-mono text-white/70">{{ $row['phase_points'][$phase['phase_id']] ?? 0 }}</td>
                                     @endforeach
-                                    <td class="p-3 text-right font-mono">{{ $row['total_points'] }}</td>
+                                    <td class="p-3 text-right font-mono font-bold text-white">{{ $row['total_points'] }}</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="{{ 3 + collect($phaseBreakdown ?? [])->where('results_published', true)->count() }}" class="p-8 text-center text-gray-400">No phase results published yet.</td></tr>
+                                <tr><td colspan="{{ 3 + collect($phaseBreakdown ?? [])->where('results_published', true)->count() }}" class="p-8 text-center text-white/30">No phase results published yet.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
             @else
-            <div class="bg-white border rounded-2xl overflow-hidden shadow-sm">
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
                 <div class="overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                    <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
                         <tr>
                             <th class="p-3">Rank</th>
                             <th class="p-3">School</th>
@@ -102,18 +196,18 @@
                             <th class="p-3 text-right">Points</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-slate-800">
                         @forelse($schoolBoard as $row)
-                            <tr class="border-t">
-                                <td class="p-3 font-bold text-amber-700">#{{ $row['rank'] }}</td>
-                                <td class="p-3 font-semibold">{{ $row['school_name'] }}</td>
-                                <td class="p-3 text-center font-mono {{ $row['gold'] ? 'font-bold text-amber-600' : 'text-gray-300' }}">{{ $row['gold'] }}</td>
-                                <td class="p-3 text-center font-mono {{ $row['silver'] ? 'font-bold text-slate-500' : 'text-gray-300' }}">{{ $row['silver'] }}</td>
-                                <td class="p-3 text-center font-mono {{ $row['bronze'] ? 'font-bold text-amber-800' : 'text-gray-300' }}">{{ $row['bronze'] }}</td>
-                                <td class="p-3 text-right font-mono">{{ $row['total_points'] }}</td>
+                            <tr>
+                                <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
+                                <td class="p-3 font-semibold text-white">{{ $row['school_name'] }}</td>
+                                <td class="p-3 text-center font-mono {{ $row['gold'] ? 'font-bold text-amber-400' : 'text-white/20' }}">{{ $row['gold'] }}</td>
+                                <td class="p-3 text-center font-mono {{ $row['silver'] ? 'font-bold text-slate-300' : 'text-white/20' }}">{{ $row['silver'] }}</td>
+                                <td class="p-3 text-center font-mono {{ $row['bronze'] ? 'font-bold text-orange-400' : 'text-white/20' }}">{{ $row['bronze'] }}</td>
+                                <td class="p-3 text-right font-mono text-white">{{ $row['total_points'] }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="p-8 text-center text-gray-400">No school points published yet.</td></tr>
+                            <tr><td colspan="6" class="p-8 text-center text-white/30">No school points published yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -123,82 +217,82 @@
         @elseif($tab === 'category')
             <div class="grid lg:grid-cols-2 gap-5">
                 @forelse($categoryBoards as $board)
-                    <section class="bg-white border rounded-2xl overflow-hidden shadow-sm">
-                        <div class="px-4 py-3 bg-gray-50 border-b">
-                            <h2 class="font-bold">{{ $board['label'] }}</h2>
+                    <section class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
+                        <div class="px-4 py-3 bg-white/5 border-b border-slate-800">
+                            <h2 class="font-bold text-white">{{ $board['label'] }}</h2>
                         </div>
                         <table class="w-full text-sm">
-                            <tbody>
+                            <tbody class="divide-y divide-slate-800">
                                 @forelse($board['rows'] as $row)
-                                    <tr class="border-t">
-                                        <td class="p-3 font-bold text-amber-700">#{{ $row['rank'] }}</td>
-                                        <td class="p-3">{{ $row['school_name'] }}</td>
-                                        <td class="p-3 text-right font-mono">{{ $row['total_points'] }}</td>
+                                    <tr>
+                                        <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
+                                        <td class="p-3 text-white">{{ $row['school_name'] }}</td>
+                                        <td class="p-3 text-right font-mono text-white">{{ $row['total_points'] }}</td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="3" class="p-6 text-center text-gray-400">No scores yet.</td></tr>
+                                    <tr><td colspan="3" class="p-6 text-center text-white/30">No scores yet.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
                     </section>
                 @empty
-                    <p class="text-gray-400">No categories found.</p>
+                    <p class="text-white/40">No categories found.</p>
                 @endforelse
             </div>
         @elseif($tab === 'item')
             @php
                 $medals = [1 => '🥇', 2 => '🥈', 3 => '🥉'];
                 $participantTypeLabels = ['pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
-                $rankTint = [1 => 'bg-amber-50/70', 2 => 'bg-slate-50/70', 3 => 'bg-orange-50/40'];
+                $rankTint = [1 => 'bg-amber-500/10', 2 => 'bg-white/5', 3 => 'bg-orange-500/5'];
             @endphp
-            <div class="space-y-10">
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-3 sm:p-4 grid md:grid-cols-[1fr_auto_auto_auto] gap-3 mb-6 sticky top-32 z-10 shadow-xl">
+                <label><span class="sr-only">Search item results</span><input id="result-item-search" type="search" placeholder="Search event item" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white placeholder:text-white/30 text-sm focus:border-amber-500 focus:ring-amber-500"></label>
+                <label><span class="sr-only">Filter result category</span><select id="result-item-category" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500"><option value="">All categories</option>@foreach($itemResultsByCategory as $group)<option value="{{ Str::slug($group['key'] ?? 'other') }}">{{ $group['label'] }}</option>@endforeach</select></label>
+                <label><span class="sr-only">Filter participant type</span><select id="result-item-mode" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500"><option value="">Individual & group</option>@foreach(collect($itemResultsByCategory)->pluck('items')->flatten(1)->pluck('participant_type')->filter()->unique() as $mode)<option value="{{ $mode }}">{{ ucfirst($mode) }}</option>@endforeach</select></label>
+                <label><span class="sr-only">Filter stage</span><select id="result-item-stage" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500"><option value="">All stages</option><option value="on_stage">On stage</option><option value="off_stage">Off stage</option></select></label>
+            </div>
+            <p id="result-item-summary" class="text-xs text-white/40 mb-5" aria-live="polite"></p>
+            <div class="space-y-10" id="result-item-groups">
                 @forelse($itemResultsByCategory as $group)
-                    <section>
-                        <h2 class="text-sm font-bold text-accent uppercase tracking-widest mb-4">{{ $group['label'] }}</h2>
+                    <section data-result-category="{{ Str::slug($group['key'] ?? 'other') }}">
+                        <h2 class="text-sm font-bold text-amber-400 uppercase tracking-widest mb-4">{{ $group['label'] }}</h2>
                         <div class="space-y-5">
                             @foreach($group['items'] as $item)
-                                <div class="v2-card overflow-hidden">
-                                    <div class="px-4 py-3 bg-gray-50 border-b flex items-start gap-3">
+                                <div class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden" data-result-item data-search="{{ Str::lower(collect([$item['item'], $item['head']])->filter()->implode(' ')) }}" data-mode="{{ $item['participant_type'] ?? 'individual' }}" data-stage="{{ $item['stage_type'] ?? '' }}">
+                                    <div class="px-4 py-3 bg-white/5 border-b border-slate-800 flex items-start gap-3">
                                         <div class="min-w-0">
-                                            <h3 class="font-bold">{{ $item['item'] }}</h3>
-                                            @if($item['head'])<p class="text-xs text-gray-500">{{ $item['head'] }}</p>@endif
+                                            <h3 class="font-bold text-white">{{ $item['item'] }}</h3>
+                                            @if($item['head'])<p class="text-xs text-white/40">{{ $item['head'] }}</p>@endif
                                         </div>
                                         @if($typeLabel = $participantTypeLabels[$item['participant_type'] ?? ''] ?? null)
-                                        <span class="ml-auto shrink-0 text-[11px] font-semibold text-gray-500 bg-white border px-2 py-0.5 rounded-full">{{ $typeLabel }}</span>
+                                        <span class="ml-auto shrink-0 text-[11px] font-semibold text-white/60 bg-white/5 border border-slate-700 px-2 py-0.5 rounded-full">{{ $typeLabel }}</span>
                                         @endif
                                     </div>
-                                    <div class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x">
+                                    <div class="divide-y divide-slate-800">
                                         @foreach($item['winners'] as $winner)
                                         @php
                                             $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]];
-                                            $visibleRoster = array_slice($roster, 0, 4);
                                         @endphp
-                                        <div class="p-4 flex flex-col items-center text-center gap-2 {{ $rankTint[$winner['position']] ?? '' }}">
-                                            <span class="text-2xl leading-none">{{ $medals[$winner['position']] ?? '#'.$winner['position'] }}</span>
-
-                                            <div class="flex -space-x-3">
-                                                @foreach($visibleRoster as $member)
-                                                    @if($member['photo'] ?? null)
-                                                    <img src="{{ $member['photo'] }}" alt="" class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm">
-                                                    @else
-                                                    <span class="w-12 h-12 rounded-full v2-badge-accent flex items-center justify-center text-sm font-bold border-2 border-white shadow-sm">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
-                                                    @endif
-                                                @endforeach
-                                                @if(count($roster) > 4)
-                                                <span class="w-12 h-12 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs font-bold border-2 border-white shadow-sm">+{{ count($roster) - 4 }}</span>
+                                        <div class="p-4 {{ $rankTint[$winner['position']] ?? '' }}">
+                                            <div class="flex items-center justify-between gap-3">
+                                                <span class="text-2xl leading-none">{{ $medals[$winner['position']] ?? '#'.$winner['position'] }}</span>
+                                                @if(!empty($winner['grade']))
+                                                <span class="text-xs font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">Grade {{ $winner['grade'] }}</span>
                                                 @endif
                                             </div>
-
-                                            <div>
-                                                <p class="font-semibold text-sm leading-snug">
-                                                    {{ collect($roster)->pluck('name')->filter()->implode(', ') ?: '—' }}
-                                                </p>
-                                                <p class="text-xs text-gray-500 mt-0.5 truncate max-w-[16rem]">{{ $winner['school'] }}</p>
+                                            <p class="text-xs text-white/40 mt-2">{{ $winner['school'] }}</p>
+                                            <div class="mt-2 space-y-2.5">
+                                                @foreach($roster as $member)
+                                                <div class="flex items-center gap-3">
+                                                    @if($member['photo'] ?? null)
+                                                    <img src="{{ $member['photo'] }}" alt="" class="w-14 h-14 rounded-full object-cover border-2 border-slate-800 shadow-sm shrink-0">
+                                                    @else
+                                                    <span class="w-14 h-14 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-lg font-bold border-2 border-slate-800 shadow-sm shrink-0">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
+                                                    @endif
+                                                    <span class="font-bold text-white leading-snug">{{ $member['name'] ?? '—' }}</span>
+                                                </div>
+                                                @endforeach
                                             </div>
-
-                                            @if(!empty($winner['grade']))
-                                            <span class="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">Grade {{ $winner['grade'] }}</span>
-                                            @endif
                                         </div>
                                         @endforeach
                                     </div>
@@ -207,61 +301,62 @@
                         </div>
                     </section>
                 @empty
-                    <p class="text-gray-400">No item winners published yet.</p>
+                    <p class="text-white/40">No item winners published yet.</p>
                 @endforelse
             </div>
+            <div id="result-item-empty" class="hidden rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">No published item results match those filters.</div>
         @elseif($tab === 'individual')
-            <div class="bg-white border rounded-2xl overflow-hidden shadow-sm">
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                    <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
                         <tr><th class="p-3">Participant</th><th class="p-3">School</th><th class="p-3">Item</th><th class="p-3">Position</th><th class="p-3">Grade</th></tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-slate-800">
                         @forelse($individualResults as $row)
-                            <tr class="border-t">
-                                <td class="p-3 font-semibold">
+                            <tr>
+                                <td class="p-3 font-semibold text-white">
                                     <div class="flex items-center gap-2">
                                         @if($row['photo'] ?? null)
-                                        <img src="{{ $row['photo'] }}" alt="" class="w-7 h-7 rounded-full object-cover border shrink-0">
+                                        <img src="{{ $row['photo'] }}" alt="" class="w-7 h-7 rounded-full object-cover border border-slate-700 shrink-0">
                                         @else
-                                        <span class="w-7 h-7 rounded-full v2-badge-primary flex items-center justify-center text-[10px] font-bold shrink-0">{{ strtoupper(substr($row['participant'] ?? '?', 0, 1)) }}</span>
+                                        <span class="w-7 h-7 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-[10px] font-bold shrink-0">{{ strtoupper(substr($row['participant'] ?? '?', 0, 1)) }}</span>
                                         @endif
                                         {{ $row['participant'] }}
                                     </div>
                                 </td>
-                                <td class="p-3">{{ $row['school'] }}</td>
-                                <td class="p-3">{{ $row['item'] }}</td>
-                                <td class="p-3 font-bold">#{{ $row['position'] }}</td>
-                                <td class="p-3 font-semibold text-amber-700">{{ !empty($row['grade']) ? 'Grade '.$row['grade'] : '—' }}</td>
+                                <td class="p-3 text-white/70">{{ $row['school'] }}</td>
+                                <td class="p-3 text-white/70">{{ $row['item'] }}</td>
+                                <td class="p-3 font-bold text-white">#{{ $row['position'] }}</td>
+                                <td class="p-3 font-semibold text-amber-400">{{ !empty($row['grade']) ? 'Grade '.$row['grade'] : '—' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="p-8 text-center text-gray-400">No individual results published yet.</td></tr>
+                            <tr><td colspan="5" class="p-8 text-center text-white/30">No individual results published yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         @else
-            <div class="bg-white border rounded-2xl overflow-hidden shadow-sm">
-                <div class="px-4 py-3 bg-gray-50 border-b">
-                    <h2 class="font-bold">Individual Championship</h2>
-                    <p class="text-xs text-gray-500">Total points across the whole meet, per student.</p>
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
+                <div class="px-4 py-3 bg-white/5 border-b border-slate-800">
+                    <h2 class="font-bold text-white">Individual Championship</h2>
+                    <p class="text-xs text-white/40">Total points across the whole meet, per student.</p>
                 </div>
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                    <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
                         <tr><th class="p-3">Rank</th><th class="p-3">Student</th><th class="p-3">School</th><th class="p-3">Category</th><th class="p-3">Gender</th><th class="p-3 text-right">Points</th></tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-slate-800">
                         @forelse($championship as $row)
-                            <tr class="border-t">
-                                <td class="p-3 font-bold text-amber-700">#{{ $row['rank'] }}</td>
-                                <td class="p-3 font-semibold">{{ $row['student'] }}</td>
-                                <td class="p-3">{{ $row['school'] }}</td>
-                                <td class="p-3">{{ $row['category'] }}</td>
-                                <td class="p-3">{{ $row['gender'] }}</td>
-                                <td class="p-3 text-right font-mono">{{ $row['points'] }}</td>
+                            <tr>
+                                <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
+                                <td class="p-3 font-semibold text-white">{{ $row['student'] }}</td>
+                                <td class="p-3 text-white/70">{{ $row['school'] }}</td>
+                                <td class="p-3 text-white/70">{{ $row['category'] }}</td>
+                                <td class="p-3 text-white/70">{{ $row['gender'] }}</td>
+                                <td class="p-3 text-right font-mono text-white">{{ $row['points'] }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="p-8 text-center text-gray-400">No championship points published yet.</td></tr>
+                            <tr><td colspan="6" class="p-8 text-center text-white/30">No championship points published yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -269,4 +364,33 @@
         @endif
     </div>
 </section>
+@if($tab === 'item')
+<script>
+(() => {
+    const search = document.getElementById('result-item-search');
+    const category = document.getElementById('result-item-category');
+    const mode = document.getElementById('result-item-mode');
+    const stage = document.getElementById('result-item-stage');
+    const items = [...document.querySelectorAll('[data-result-item]')];
+    const groups = [...document.querySelectorAll('[data-result-category]')];
+    const summary = document.getElementById('result-item-summary');
+    const empty = document.getElementById('result-item-empty');
+    const apply = () => {
+        const query = search.value.trim().toLocaleLowerCase();
+        let count = 0;
+        items.forEach(item => {
+            const group = item.closest('[data-result-category]');
+            const visible = (!query || item.dataset.search.includes(query)) && (!category.value || group.dataset.resultCategory === category.value) && (!mode.value || item.dataset.mode === mode.value) && (!stage.value || item.dataset.stage === stage.value);
+            item.hidden = !visible;
+            if (visible) count++;
+        });
+        groups.forEach(group => group.hidden = !group.querySelector('[data-result-item]:not([hidden])'));
+        summary.textContent = `Showing ${count} published ${count === 1 ? 'item result' : 'item results'}`;
+        empty.classList.toggle('hidden', count !== 0);
+    };
+    [search, category, mode, stage].forEach(control => control.addEventListener(control === search ? 'input' : 'change', apply));
+    apply();
+})();
+</script>
+@endif
 @endsection

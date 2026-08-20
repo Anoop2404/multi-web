@@ -44,6 +44,7 @@
                         <h3 class="section-title text-sm">{{ item.title }}</h3>
                         <p v-if="item.item_code" class="text-xs font-mono text-slate-500">{{ item.item_code }}</p>
                     </div>
+                    <div class="overflow-x-auto">
                     <table class="data-table w-full text-sm">
                         <thead>
                             <tr>
@@ -79,6 +80,7 @@
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </template>
         </ReportHeadItemNavigator>

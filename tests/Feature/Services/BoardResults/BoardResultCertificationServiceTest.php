@@ -131,7 +131,13 @@ class BoardResultCertificationServiceTest extends TestCase
         $this->assertSame(1, $package->reports()->where('report_type', BoardResultCertificationReport::TYPE_SUBJECT_TOPPERS)->whereNull('stream_id')->count());
     }
 
-    public function test_full_lifecycle_from_draft_to_submitted_to_sahodaya(): void
+    /**
+     * Individual per-type reports are optional reference documents — moving on to
+     * the consolidated report must succeed even when none of them have been
+     * touched (see BoardResultPrincipalVerificationPagesTest for the HTTP-level
+     * equivalent of this same guarantee).
+     */
+    public function test_individual_reports_are_optional_before_consolidated_step(): void
     {
         ['school' => $school, 'principal' => $principal] = $this->makeSchool();
         $result = $this->makeBoardResult($school, 10);
@@ -140,10 +146,11 @@ class BoardResultCertificationServiceTest extends TestCase
         $this->service->beginReportSignatures($package, $principal);
         $package->refresh();
         $this->assertSame(BoardResultCertificationPackage::STATUS_AWAITING_REPORT_SIGNATURES, $package->status);
+        $this->assertSame(0, $package->reports()->where('status', BoardResultCertificationReport::STATUS_ACCEPTED)->count());
 
-        // Cannot mark individual reports signed before every report is generated/signed/accepted.
-        $this->expectException(RuntimeException::class);
         $this->service->markIndividualReportsSigned($package, $principal);
+        $package->refresh();
+        $this->assertSame(BoardResultCertificationPackage::STATUS_INDIVIDUAL_REPORTS_SIGNED, $package->status);
     }
 
     public function test_full_lifecycle_succeeds_once_every_report_is_signed_and_accepted(): void

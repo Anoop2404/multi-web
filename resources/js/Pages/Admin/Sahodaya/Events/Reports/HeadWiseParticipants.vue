@@ -74,115 +74,119 @@
         <section class="mb-8">
             <h3 class="section-title mb-3">{{ event.event_type === 'sports' ? 'Summary by Sport Event' : 'Summary by head' }}</h3>
             <div class="card overflow-hidden p-0">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>{{ event.event_type === 'sports' ? 'Sport Event' : 'Head' }}</th>
-                            <th>Items</th>
-                            <th>Regs</th>
-                            <th>Approved</th>
-                            <th>Pending</th>
-                            <th>Waitlist</th>
-                            <th>Participants</th>
-                            <th>Verified</th>
-                            <th>Due ₹</th>
-                            <th>Collected ₹</th>
-                            <th>Pending ₹</th>
-                            <th>Max item regs</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="row in summary" :key="row.head_id">
-                            <td class="font-medium">{{ row.head_name }}</td>
-                            <td>{{ row.item_count }}</td>
-                            <td>{{ row.registration_count ?? 0 }}</td>
-                            <td>{{ row.approved_count ?? 0 }}</td>
-                            <td>{{ row.pending_count ?? 0 }}</td>
-                            <td>{{ row.waitlisted_count ?? 0 }}</td>
-                            <td>{{ row.participant_count }}</td>
-                            <td>
-                                {{ row.verified_count ?? 0 }}
-                                <span v-if="(row.unverified_count ?? 0) > 0" class="text-xs text-amber-700">
-                                    / {{ row.unverified_count }} unverified
-                                </span>
-                            </td>
-                            <td>{{ Number(row.due_total ?? 0).toLocaleString('en-IN') }}</td>
-                            <td class="text-emerald-700">{{ Number(row.collected_total ?? 0).toLocaleString('en-IN') }}</td>
-                            <td class="text-amber-700">{{ Number(row.pending_fee_total ?? 0).toLocaleString('en-IN') }}</td>
-                            <td>
-                                <span v-if="row.max_item_title" class="text-xs text-slate-500 block">{{ row.max_item_title }}</span>
-                                {{ row.busiest_item_regs ?? row.max_item_reg_count ?? 0 }}
-                            </td>
-                        </tr>
-                        <tr v-if="!summary.length">
-                            <td colspan="12" class="p-6 text-center text-slate-400">
-                                {{ event.event_type === 'sports'
-                                    ? 'No Event Heads on this event. Sync heads from Event settings → Event Heads.'
-                                    : 'No item heads on this event. Sync heads from Event settings → Item heads.' }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>{{ event.event_type === 'sports' ? 'Sport Event' : 'Head' }}</th>
+                                <th>Items</th>
+                                <th>Regs</th>
+                                <th>Approved</th>
+                                <th>Pending</th>
+                                <th>Waitlist</th>
+                                <th>Participants</th>
+                                <th>Verified</th>
+                                <th>Due ₹</th>
+                                <th>Collected ₹</th>
+                                <th>Pending ₹</th>
+                                <th>Max item regs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in summary" :key="row.head_id">
+                                <td class="font-medium">{{ row.head_name }}</td>
+                                <td>{{ row.item_count }}</td>
+                                <td>{{ row.registration_count ?? 0 }}</td>
+                                <td>{{ row.approved_count ?? 0 }}</td>
+                                <td>{{ row.pending_count ?? 0 }}</td>
+                                <td>{{ row.waitlisted_count ?? 0 }}</td>
+                                <td>{{ row.participant_count }}</td>
+                                <td>
+                                    {{ row.verified_count ?? 0 }}
+                                    <span v-if="(row.unverified_count ?? 0) > 0" class="text-xs text-amber-700">
+                                        / {{ row.unverified_count }} unverified
+                                    </span>
+                                </td>
+                                <td>{{ Number(row.due_total ?? 0).toLocaleString('en-IN') }}</td>
+                                <td class="text-emerald-700">{{ Number(row.collected_total ?? 0).toLocaleString('en-IN') }}</td>
+                                <td class="text-amber-700">{{ Number(row.pending_fee_total ?? 0).toLocaleString('en-IN') }}</td>
+                                <td>
+                                    <span v-if="row.max_item_title" class="text-xs text-slate-500 block">{{ row.max_item_title }}</span>
+                                    {{ row.busiest_item_regs ?? row.max_item_reg_count ?? 0 }}
+                                </td>
+                            </tr>
+                            <tr v-if="!summary.length">
+                                <td colspan="12" class="p-6 text-center text-slate-400">
+                                    {{ event.event_type === 'sports'
+                                        ? 'No Event Heads on this event. Sync heads from Event settings → Event Heads.'
+                                        : 'No item heads on this event. Sync heads from Event settings → Item heads.' }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
 
         <section>
             <h3 class="section-title mb-3">Participant list</h3>
             <div class="card overflow-hidden p-0">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Head</th>
-                            <th>School</th>
-                            <th>Participant</th>
-                            <th>Reg no</th>
-                            <th>Item</th>
-                            <th>Fest ID</th>
-                            <th>Item reg</th>
-                            <th>Chest</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template v-for="(row, idx) in displayRows" :key="`${row.head_id}-${row.item_id}-${idx}`">
-                            <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                                <td colspan="8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                    {{ row.head_name ?? 'Other items' }}
-                                </td>
-                            </tr>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
                             <tr>
-                                <td>{{ row.head_name }}</td>
-                                <td>{{ row.school }}</td>
-                                <td class="font-medium">
-                                    {{ row.student }}
-                                    <div class="flex flex-wrap gap-1 mt-0.5 text-[10px]">
-                                        <span v-if="row.role" class="px-1.5 py-0.5 rounded font-bold uppercase tracking-wide"
-                                              :class="row.role === 'standby' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'">
-                                            {{ row.role }}
-                                        </span>
-                                        <span v-if="row.team_name" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
-                                            👥 {{ row.team_name }}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td>{{ row.reg_no }}</td>
-                                <td>
-                                    {{ row.item }}
-                                    <div v-if="row.competition_start && event.event_type === 'sports'" class="mt-0.5">
-                                        <span class="inline-flex items-center gap-1 rounded bg-sky-50 px-1 py-0.5 text-[9px] font-bold text-sky-800 border border-sky-100 uppercase tracking-wide">
-                                            📅 {{ formatDate(row.competition_start) }}<span v-if="row.competition_time"> @ {{ row.competition_time.slice(0, 5) }}</span>
-                                        </span>
-                                    </div>
-                                </td>
-                                <td>{{ row.fest_id ?? '—' }}</td>
-                                <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
-                                <td>{{ row.chest_no ?? '—' }}</td>
+                                <th>Head</th>
+                                <th>School</th>
+                                <th>Participant</th>
+                                <th>Reg no</th>
+                                <th>Item</th>
+                                <th>Fest ID</th>
+                                <th>Item reg</th>
+                                <th>Chest</th>
                             </tr>
-                        </template>
-                        <tr v-if="!displayRows.length && summary.length">
-                            <td colspan="8" class="p-6 text-center text-slate-400">No participants for the selected filters.</td>
-                        </tr>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            <template v-for="(row, idx) in displayRows" :key="`${row.head_id}-${row.item_id}-${idx}`">
+                                <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
+                                    <td colspan="8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                        {{ row.head_name ?? 'Other items' }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>{{ row.head_name }}</td>
+                                    <td>{{ row.school }}</td>
+                                    <td class="font-medium">
+                                        {{ row.student }}
+                                        <div class="flex flex-wrap gap-1 mt-0.5 text-[10px]">
+                                            <span v-if="row.role" class="px-1.5 py-0.5 rounded font-bold uppercase tracking-wide"
+                                                  :class="row.role === 'standby' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'">
+                                                {{ row.role }}
+                                            </span>
+                                            <span v-if="row.team_name" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
+                                                👥 {{ row.team_name }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>{{ row.reg_no }}</td>
+                                    <td>
+                                        {{ row.item }}
+                                        <div v-if="row.competition_start && event.event_type === 'sports'" class="mt-0.5">
+                                            <span class="inline-flex items-center gap-1 rounded bg-sky-50 px-1 py-0.5 text-[9px] font-bold text-sky-800 border border-sky-100 uppercase tracking-wide">
+                                                📅 {{ formatDate(row.competition_start) }}<span v-if="row.competition_time"> @ {{ row.competition_time.slice(0, 5) }}</span>
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>{{ row.fest_id ?? '—' }}</td>
+                                    <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
+                                    <td>{{ row.chest_no ?? '—' }}</td>
+                                </tr>
+                            </template>
+                            <tr v-if="!displayRows.length && summary.length">
+                                <td colspan="8" class="p-6 text-center text-slate-400">No participants for the selected filters.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
 

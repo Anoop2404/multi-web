@@ -1,40 +1,40 @@
-@extends('layouts.public')
+@extends('layouts.public-event')
 
 @section('content')
-<section class="py-12 px-4">
+<section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
     <div class="max-w-xl mx-auto">
-        <div class="mb-4">
-            <a href="{{ route('tenant.fest.show', $event->id) }}" class="text-sm font-semibold text-amber-700 hover:underline">← Back to Festival Hub</a>
-        </div>
-        <h1 class="text-2xl font-bold font-heading mb-4">{{ $event->title }} — Search</h1>
-        <form method="get" action="{{ route('tenant.fest.search', $event->id) }}" class="flex gap-2 mb-2">
-            <input name="q" value="{{ $q }}" placeholder="{{ $searchHint }}" class="flex-1 border rounded-lg px-3 py-2 text-sm" autofocus>
-            <button class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm">Search</button>
+        @include('public.fest.partials.page-hero', [
+            'eyebrow' => 'Search',
+            'title' => $event->title.' — Search',
+        ])
+        <form method="get" action="{{ route('tenant.fest.search', $event->id) }}" class="flex gap-2 mt-6 mb-2">
+            <input name="q" value="{{ $q }}" placeholder="{{ $searchHint }}" class="flex-1 rounded-lg border-slate-700 bg-slate-900 text-white placeholder:text-white/30 px-3 py-2 text-sm focus:border-amber-500 focus:ring-amber-500" autofocus>
+            <button class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-sm font-bold transition">Search</button>
         </form>
         @unless($nameSearch)
-        <p class="text-xs text-gray-500 mb-6">Names are hidden until results are published. Search by chest number or level registration number.</p>
+        <p class="text-xs text-white/40 mb-6">Names are hidden until results are published. Search by chest number or level registration number.</p>
         @else
         <p class="mb-6"></p>
         @endunless
-        <ul class="divide-y bg-white border rounded-xl">
+        <ul class="divide-y divide-slate-800 bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
             @forelse($results as $p)
             <li class="p-4">
                 @if($p['link_ref'])
-                <a href="{{ route('tenant.fest.participant', [$event->id, $p['link_ref']]) }}" class="font-medium text-amber-800 hover:underline">
-                    @if(($p['reference'] ?? '—') !== '—')
-                    <span class="font-mono">#{{ $p['reference'] }}</span>
-                    @endif
+                <a href="{{ route('tenant.fest.participant', [$event->id, $p['link_ref']]) }}" class="font-medium text-amber-300 hover:underline">
                     @if($p['show_name'] && $p['name'])
                     {{ $p['name'] }}
+                    @else
+                    <span class="text-white/40 font-normal">(name hidden until results)</span>
                     @endif
                 </a>
                 @endif
-                <p class="text-xs text-gray-500">{{ $p['item_title'] ?? '' }}</p>
+                <p class="text-xs text-white/40">{{ $p['item_title'] ?? '' }}{{ ($p['item_title'] ?? null) && ($p['school'] ?? null) ? ' · ' : '' }}{{ $p['school'] ?? '' }}</p>
             </li>
             @empty
-            @if($q)<li class="p-4 text-gray-400 text-sm">No matches for "{{ $q }}"</li>@endif
+            @if($q)<li class="p-4 text-white/30 text-sm">No matches for "{{ $q }}"</li>@endif
             @endforelse
         </ul>
+        <p class="mt-6"><a href="{{ route('tenant.fest.show', $event->id) }}" class="text-sm font-semibold text-amber-400 hover:underline">← Back to event</a></p>
     </div>
 </section>
 @endsection

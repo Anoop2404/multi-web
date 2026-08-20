@@ -3,42 +3,52 @@
         <PageHeader :title="`Schedule clash reports`" :description="event.title" />
 
         <div class="card overflow-hidden p-0">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>School</th>
-                        <th>Participant</th>
-                        <th>Description</th>
-                        <th>Requested resolution</th>
-                        <th>Status</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="r in requests.data" :key="r.id">
-                        <td>{{ r.school?.name }}</td>
-                        <td>{{ r.participant?.student?.name || '—' }}</td>
-                        <td class="text-sm max-w-xs">{{ r.description }}</td>
-                        <td class="text-sm max-w-xs">{{ r.requested_resolution || '—' }}</td>
-                        <td><span class="text-xs capitalize">{{ r.status }}</span></td>
-                        <td class="text-right whitespace-nowrap">
-                            <template v-if="r.status === 'pending'">
-                                <button type="button" class="btn-primary text-xs mr-1" @click="approve(r)">Resolve</button>
-                                <button type="button" class="btn-secondary text-xs" @click="reject(r)">Reject</button>
-                            </template>
-                        </td>
-                    </tr>
-                    <tr v-if="!requests.data?.length">
-                        <td colspan="6" class="text-center text-slate-400 py-8">No clash reports.</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>School</th>
+                            <th>Participant</th>
+                            <th>Description</th>
+                            <th>Requested resolution</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="r in requests.data" :key="r.id">
+                            <td>{{ r.school?.name }}</td>
+                            <td>{{ r.participant?.student?.name || '—' }}</td>
+                            <td class="text-sm max-w-xs">{{ r.description }}</td>
+                            <td class="text-sm max-w-xs">{{ r.requested_resolution || '—' }}</td>
+                            <td><span class="text-xs capitalize">{{ r.status }}</span></td>
+                            <td class="text-right whitespace-nowrap">
+                                <template v-if="r.status === 'pending'">
+                                    <button type="button" class="btn-primary text-xs mr-1" @click="approve(r)">Resolve</button>
+                                    <button type="button" class="btn-secondary text-xs" @click="reject(r)">Reject</button>
+                                </template>
+                            </td>
+                        </tr>
+                        <tr v-if="!requests.data?.length">
+                            <td colspan="6" class="text-center text-slate-400 py-8">No clash reports.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div v-if="requests.links?.length > 3" class="mt-4 flex justify-center gap-1">
+            <Link v-for="link in requests.links" :key="link.label"
+                  :href="link.url || '#'"
+                  class="px-3 py-1 rounded text-sm"
+                  :class="link.active ? 'bg-[#0f3d7a] text-white' : 'text-gray-600 hover:bg-gray-100'"
+                  v-html="link.label" />
         </div>
     </SahodayaEventsLayout>
 </template>
 
 <script setup>
-import { router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import { useConfirm } from '@/composables/useConfirm';
 

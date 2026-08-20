@@ -17,6 +17,7 @@
         </div>
 
         <div class="card overflow-hidden p-0">
+            <div class="overflow-x-auto">
             <table class="data-table text-sm">
                 <thead>
                     <tr><th>Head</th><th>Item</th><th>Approved</th><th>Pending</th><th>Performers</th><th>Chest</th><th>Item reg</th><th>Marks</th></tr>
@@ -35,6 +36,7 @@
                     <tr v-if="!rows.length"><td colspan="8" class="p-6 text-center text-slate-400">No items yet.</td></tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>

@@ -2,9 +2,9 @@
     <SahodayaAdminLayout title="School-Certified Result Packages" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader title="School-Certified Result Packages" eyebrow="Academic Results"
-                    description="Packages that have completed Principal Verification — every individual report and the consolidated report signed and submitted by the school.">
+                    description="Packages that have completed Principal Verification — the signed consolidated report submitted by the school.">
             <template #actions>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification`" class="btn-secondary text-sm">Legacy Verification Queue</Link>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification`" class="btn-secondary text-sm">All Board Results</Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/certifications/report`" class="btn-secondary text-sm">Status Report</Link>
             </template>
         </PageHeader>

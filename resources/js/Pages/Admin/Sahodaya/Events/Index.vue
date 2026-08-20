@@ -110,110 +110,112 @@
                     description="Open a program above to create Kalotsav, Sports, or Kids Fest events."
                     icon="🏆"
                 />
-                <table v-else class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Title</th>
-                            <th>Type</th>
-                            <th>Level</th>
-                            <th>Status</th>
-                            <th>Sidebar</th>
-                            <th>Items</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                         <template v-for="event in groupedEvents" :key="event.id">
-                            <tr class="hover:bg-slate-50/70 font-medium">
-                                <td class="font-medium text-slate-900">
-                                    <div v-if="event.parentEvent || event.parent" class="text-xs text-indigo-700 font-semibold flex items-center gap-1 mb-0.5">
-                                        <span>↳ Sub-Event of {{ (event.parentEvent || event.parent)?.title }}</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <span class="font-bold text-slate-900">{{ event.title }}</span>
-                                        <span v-if="event.children && event.children.length" class="text-[10px] uppercase font-extrabold bg-sky-100 text-sky-800 px-2 py-0.5 rounded border border-sky-200">
-                                            Main Hub ({{ event.children.length }} Regions)
-                                        </span>
-                                        <span v-else-if="event.parent_event_id && event.partition_role === 'phase'" class="text-[10px] uppercase font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100">
-                                            Phase Partition
-                                        </span>
-                                        <span v-else-if="event.parent_event_id && (event.partition_role === 'school' || event.level_round === 'school')" class="text-[10px] uppercase font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100">
-                                            School Round
-                                        </span>
-                                        <span v-else-if="event.parent_event_id || event.parent" class="text-[10px] uppercase font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">
-                                            Region Partition
-                                        </span>
-                                        <span v-else-if="event.conduct_mode === 'partitioned'" class="text-[10px] uppercase font-bold bg-sky-50 text-sky-800 px-1.5 py-0.5 rounded border border-sky-100">
-                                            Main Hub (Region-wise)
-                                        </span>
-                                        <span v-if="event.state_program_id" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200/80 uppercase tracking-wider">State Linked</span>
-                                    </div>
-                                </td>
-                                <td>{{ eventTypes[event.event_type] ?? event.event_type }}</td>
-                                <td class="text-xs">{{ levelLabels[event.level_round] ?? event.level_round }}</td>
-                                <td>
-                                    <span class="status-pill" :class="statusClass(event.status)">{{ event.status }}</span>
-                                </td>
-                                <td>
-                                    <button type="button"
-                                            class="text-xs font-medium"
-                                            :class="event.nav_hidden ? 'text-slate-400' : 'text-emerald-700'"
-                                            @click="toggleNavHidden(event)">
-                                        {{ event.nav_hidden ? 'Hidden' : 'Visible' }}
-                                    </button>
-                                </td>
-                                <td>{{ event.items_count }}</td>
-                                <td class="text-right whitespace-nowrap">
-                                    <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}`" class="link-brand font-bold">
-                                        Manage →
-                                    </Link>
-                                    <button v-if="!event.registrations_count && !event.state_program_id"
-                                            type="button"
-                                            class="ml-3 text-xs font-semibold text-rose-600 hover:text-rose-800"
-                                            @click="deleteEvent(event)">
-                                        Delete
-                                    </button>
-                                </td>
+                <div v-else class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Type</th>
+                                <th>Level</th>
+                                <th>Status</th>
+                                <th>Sidebar</th>
+                                <th>Items</th>
+                                <th></th>
                             </tr>
+                        </thead>
+                        <tbody>
+                             <template v-for="event in groupedEvents" :key="event.id">
+                                <tr class="hover:bg-slate-50/70 font-medium">
+                                    <td class="font-medium text-slate-900">
+                                        <div v-if="event.parentEvent || event.parent" class="text-xs text-indigo-700 font-semibold flex items-center gap-1 mb-0.5">
+                                            <span>↳ Sub-Event of {{ (event.parentEvent || event.parent)?.title }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="font-bold text-slate-900">{{ event.title }}</span>
+                                            <span v-if="event.children && event.children.length" class="text-[10px] uppercase font-extrabold bg-sky-100 text-sky-800 px-2 py-0.5 rounded border border-sky-200">
+                                                Main Hub ({{ event.children.length }} Regions)
+                                            </span>
+                                            <span v-else-if="event.parent_event_id && event.partition_role === 'phase'" class="text-[10px] uppercase font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100">
+                                                Phase Partition
+                                            </span>
+                                            <span v-else-if="event.parent_event_id && (event.partition_role === 'school' || event.level_round === 'school')" class="text-[10px] uppercase font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100">
+                                                School Round
+                                            </span>
+                                            <span v-else-if="event.parent_event_id || event.parent" class="text-[10px] uppercase font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">
+                                                Region Partition
+                                            </span>
+                                            <span v-else-if="event.conduct_mode === 'partitioned'" class="text-[10px] uppercase font-bold bg-sky-50 text-sky-800 px-1.5 py-0.5 rounded border border-sky-100">
+                                                Main Hub (Region-wise)
+                                            </span>
+                                            <span v-if="event.state_program_id" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200/80 uppercase tracking-wider">State Linked</span>
+                                        </div>
+                                    </td>
+                                    <td>{{ eventTypes[event.event_type] ?? event.event_type }}</td>
+                                    <td class="text-xs">{{ levelLabels[event.level_round] ?? event.level_round }}</td>
+                                    <td>
+                                        <span class="status-pill" :class="statusClass(event.status)">{{ event.status }}</span>
+                                    </td>
+                                    <td>
+                                        <button type="button"
+                                                class="text-xs font-medium"
+                                                :class="event.nav_hidden ? 'text-slate-400' : 'text-emerald-700'"
+                                                @click="toggleNavHidden(event)">
+                                            {{ event.nav_hidden ? 'Hidden' : 'Visible' }}
+                                        </button>
+                                    </td>
+                                    <td>{{ event.items_count }}</td>
+                                    <td class="text-right whitespace-nowrap">
+                                        <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}`" class="link-brand font-bold">
+                                            Manage →
+                                        </Link>
+                                        <button v-if="!event.registrations_count && !event.state_program_id"
+                                                type="button"
+                                                class="ml-3 text-xs font-semibold text-rose-600 hover:text-rose-800"
+                                                @click="deleteEvent(event)">
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
 
-                            <!-- Child region rows nested under parent -->
-                            <tr v-for="(child, idx) in event.children" :key="`child-${child.id}`" class="bg-indigo-50/20 border-l-4 border-indigo-400">
-                                <td class="pl-7 py-2.5">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-indigo-400 font-mono text-xs font-bold">{{ idx === event.children.length - 1 ? '└─' : '├─' }}</span>
-                                        <span class="font-bold text-slate-800 text-xs">{{ child.title }}</span>
-                                        <span class="text-[10px] uppercase font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200">
-                                            {{ child.partition_role || 'Region' }} Partition
-                                        </span>
-                                    </div>
-                                </td>
-                                <td class="text-xs text-slate-500">{{ eventTypes[child.event_type] ?? child.event_type }}</td>
-                                <td class="text-xs text-slate-500">{{ levelLabels[child.level_round] ?? child.level_round }}</td>
-                                <td><span class="status-pill text-[10px]" :class="statusClass(child.status)">{{ child.status }}</span></td>
-                                <td>
-                                    <button type="button"
-                                            class="text-xs font-medium"
-                                            :class="child.nav_hidden ? 'text-slate-400' : 'text-emerald-700'"
-                                            @click="toggleNavHidden(child)">
-                                        {{ child.nav_hidden ? 'Hidden' : 'Visible' }}
-                                    </button>
-                                </td>
-                                <td class="text-xs text-slate-600">{{ child.items_count ?? 0 }}</td>
-                                <td class="text-right whitespace-nowrap">
-                                    <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${child.id}`" class="text-xs font-bold text-indigo-700 hover:underline">
-                                        Manage Region →
-                                    </Link>
-                                    <button v-if="!child.registrations_count && !child.state_program_id"
-                                            type="button"
-                                            class="ml-3 text-xs font-semibold text-rose-600 hover:text-rose-800"
-                                            @click="deleteEvent(child)">
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
+                                <!-- Child region rows nested under parent -->
+                                <tr v-for="(child, idx) in event.children" :key="`child-${child.id}`" class="bg-indigo-50/20 border-l-4 border-indigo-400">
+                                    <td class="pl-7 py-2.5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-indigo-400 font-mono text-xs font-bold">{{ idx === event.children.length - 1 ? '└─' : '├─' }}</span>
+                                            <span class="font-bold text-slate-800 text-xs">{{ child.title }}</span>
+                                            <span class="text-[10px] uppercase font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200">
+                                                {{ child.partition_role || 'Region' }} Partition
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="text-xs text-slate-500">{{ eventTypes[child.event_type] ?? child.event_type }}</td>
+                                    <td class="text-xs text-slate-500">{{ levelLabels[child.level_round] ?? child.level_round }}</td>
+                                    <td><span class="status-pill text-[10px]" :class="statusClass(child.status)">{{ child.status }}</span></td>
+                                    <td>
+                                        <button type="button"
+                                                class="text-xs font-medium"
+                                                :class="child.nav_hidden ? 'text-slate-400' : 'text-emerald-700'"
+                                                @click="toggleNavHidden(child)">
+                                            {{ child.nav_hidden ? 'Hidden' : 'Visible' }}
+                                        </button>
+                                    </td>
+                                    <td class="text-xs text-slate-600">{{ child.items_count ?? 0 }}</td>
+                                    <td class="text-right whitespace-nowrap">
+                                        <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${child.id}`" class="text-xs font-bold text-indigo-700 hover:underline">
+                                            Manage Region →
+                                        </Link>
+                                        <button v-if="!child.registrations_count && !child.state_program_id"
+                                                type="button"
+                                                class="ml-3 text-xs font-semibold text-rose-600 hover:text-rose-800"
+                                                @click="deleteEvent(child)">
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </SahodayaEventsLayout>

@@ -49,40 +49,42 @@
         </div>
 
         <div class="card card--flush overflow-hidden">
-            <table class="data-table w-full text-sm">
-                <thead>
-                    <tr>
-                        <th>Head</th>
-                        <th>Item</th>
-                        <th>Age</th>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Venue</th>
-                        <th>Stage</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template v-for="(row, idx) in displayRows" :key="row.item_id">
-                        <tr v-if="shouldShowHeadDivider(idx)" class="bg-slate-50/80">
-                            <td colspan="7" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                {{ row.head_name ?? 'Other items' }}
-                            </td>
+            <div class="overflow-x-auto">
+                <table class="data-table w-full text-sm">
+                    <thead>
+                        <tr>
+                            <th>Head</th>
+                            <th>Item</th>
+                            <th>Age</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Venue</th>
+                            <th>Stage</th>
                         </tr>
-                        <tr class="border-t">
-                            <td class="text-xs text-slate-500">{{ row.head_name ?? '—' }}</td>
-                            <td class="font-medium">{{ row.item_title }}</td>
-                            <td class="text-xs">{{ row.age_group_label ?? row.age_group ?? '—' }}</td>
-                            <td>{{ row.date ?? '—' }}</td>
-                            <td>{{ row.time ?? '—' }}</td>
-                            <td class="text-xs">{{ row.venue ?? '—' }}</td>
-                            <td class="text-xs">{{ row.stage ?? '—' }}</td>
+                    </thead>
+                    <tbody>
+                        <template v-for="(row, idx) in displayRows" :key="row.item_id">
+                            <tr v-if="shouldShowHeadDivider(idx)" class="bg-slate-50/80">
+                                <td colspan="7" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                    {{ row.head_name ?? 'Other items' }}
+                                </td>
+                            </tr>
+                            <tr class="border-t">
+                                <td class="text-xs text-slate-500">{{ row.head_name ?? '—' }}</td>
+                                <td class="font-medium">{{ row.item_title }}</td>
+                                <td class="text-xs">{{ row.age_group_label ?? row.age_group ?? '—' }}</td>
+                                <td>{{ row.date ?? '—' }}</td>
+                                <td>{{ row.time ?? '—' }}</td>
+                                <td class="text-xs">{{ row.venue ?? '—' }}</td>
+                                <td class="text-xs">{{ row.stage ?? '—' }}</td>
+                            </tr>
+                        </template>
+                        <tr v-if="!displayRows.length">
+                            <td colspan="7" class="p-8 text-center text-slate-400">No schedule rows match filters.</td>
                         </tr>
-                    </template>
-                    <tr v-if="!displayRows.length">
-                        <td colspan="7" class="p-8 text-center text-slate-400">No schedule rows match filters.</td>
-                    </tr>
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>

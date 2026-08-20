@@ -19,38 +19,40 @@
                           :is-sports="event.event_type === 'sports'" />
 
         <div class="card overflow-hidden p-0">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th class="pl-5">Student</th>
-                        <th>Fest ID</th>
-                        <th>Items</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="row in rows" :key="row.student_id">
-                        <td class="pl-5">
-                            <ReportStudentCell :name="row.student"
-                                               :reg-no="row.reg_no"
-                                               :class-label="row.class"
-                                               :photo-url="row.photo_url" />
-                        </td>
-                        <td class="font-mono text-xs">{{ row.fest_id ?? '—' }}</td>
-                        <td class="text-xs">
-                            <p v-for="(item, idx) in row.items" :key="idx" class="py-0.5">
-                                <span class="font-medium text-slate-800">{{ item.item }}</span>
-                                <span v-if="item.head_name" class="text-slate-500"> · {{ item.head_name }}</span>
-                                <span v-if="item.item_reg" class="text-slate-400 font-mono"> · {{ item.item_reg }}</span>
-                            </p>
-                        </td>
-                    </tr>
-                    <tr v-if="!rows?.length">
-                        <td colspan="3" class="p-6 text-center text-slate-400">
-                            No students match the selected filters.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="pl-5">Student</th>
+                            <th>Fest ID</th>
+                            <th>Items</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in rows" :key="row.student_id">
+                            <td class="pl-5">
+                                <ReportStudentCell :name="row.student"
+                                                   :reg-no="row.reg_no"
+                                                   :class-label="row.class"
+                                                   :photo-url="row.photo_url" />
+                            </td>
+                            <td class="font-mono text-xs">{{ row.fest_id ?? '—' }}</td>
+                            <td class="text-xs">
+                                <p v-for="(item, idx) in row.items" :key="idx" class="py-0.5">
+                                    <span class="font-medium text-slate-800">{{ item.item }}</span>
+                                    <span v-if="item.head_name" class="text-slate-500"> · {{ item.head_name }}</span>
+                                    <span v-if="item.item_reg" class="text-slate-400 font-mono"> · {{ item.item_reg }}</span>
+                                </p>
+                            </td>
+                        </tr>
+                        <tr v-if="!rows?.length">
+                            <td colspan="3" class="p-6 text-center text-slate-400">
+                                No students match the selected filters.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>

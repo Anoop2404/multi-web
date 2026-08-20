@@ -35,7 +35,7 @@ class FestCertificateService
 
         foreach ($marks as $mark) {
             $participant = $mark->participant;
-            if (! $participant || $participant->disqualified_at) {
+            if (! $participant || $participant->disqualified_at || $participant->participant_role === 'standby') {
                 continue;
             }
 
@@ -74,6 +74,7 @@ class FestCertificateService
             ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'approved'))
             ->whereNull('disqualified_at')
+            ->where('participant_role', '!=', 'standby')
             ->with('registration.item')
             ->get();
 
@@ -97,6 +98,93 @@ class FestCertificateService
         }
 
         return $created;
+    }
+
+    /**
+     * Project how many winner and participation certificates an event needs, per item,
+     * without generating anything — for checking print-shop quantities before or after
+     * actually running generateForEvent()/generateParticipationForEvent(). Mirrors those
+     * two methods' exact eligibility rules (same position<=3 cutoff, same disqualified/
+     * standby exclusions) so the count this returns always matches what generation would
+     * actually produce.
+     *
+     * Team/group items count certificates per individual member, not per team — a squad
+     * win writes the same position to every member's own FestMark row (see
+     * FestMarkEntryController::expandToTeam()), so counting FestMark/FestParticipant rows
+     * directly already yields the right per-member number with no special-casing here.
+     *
+     * @return array{rows: list<array<string, mixed>>, totals: array<string, int>}
+     */
+    public function certificateTally(FestEvent $event): array
+    {
+        $eventIds = $event->reportableEventIds();
+
+        $winnerMarks = FestMark::whereIn('event_id', $eventIds)
+            ->whereNotNull('position')
+            ->where('position', '<=', 3)
+            ->with(['participant.registration.item', 'participant.group'])
+            ->get()
+            ->filter(fn (FestMark $mark) => $mark->participant
+                && ! $mark->participant->disqualified_at
+                && $mark->participant->participant_role !== 'standby'
+                && $mark->participant->registration?->item);
+
+        $participants = FestParticipant::whereHas('registration', fn ($q) => $q
+            ->whereIn('event_id', $eventIds)
+            ->where('status', 'approved'))
+            ->whereNull('disqualified_at')
+            ->where('participant_role', '!=', 'standby')
+            ->with(['registration.item', 'group'])
+            ->get()
+            ->filter(fn (FestParticipant $p) => $p->registration?->item);
+
+        /** @var array<int, array{item: \App\Models\FestEventItem, winners: array, participants: array}> $byItem */
+        $byItem = [];
+
+        foreach ($winnerMarks as $mark) {
+            $item = $mark->participant->registration->item;
+            $byItem[$item->id]['item'] ??= $item;
+            $byItem[$item->id]['winners'][] = $mark->participant;
+        }
+
+        foreach ($participants as $participant) {
+            $item = $participant->registration->item;
+            $byItem[$item->id]['item'] ??= $item;
+            $byItem[$item->id]['participants'][] = $participant;
+        }
+
+        $rows = [];
+        foreach ($byItem as $itemId => $data) {
+            $item = $data['item'];
+            $winners = $data['winners'] ?? [];
+            $entrants = $data['participants'] ?? [];
+            $isTeam = $item->isTeamItem();
+
+            $rows[] = [
+                'item_id'             => $itemId,
+                'title'               => $item->title,
+                'head_name'           => $item->head?->name,
+                'category'            => $item->age_group ?: $item->class_group,
+                'is_team'             => $isTeam,
+                'entry_count'         => $isTeam
+                    ? collect($entrants)->pluck('group_id')->unique()->count()
+                    : count($entrants),
+                'member_count'        => count($entrants),
+                'winner_certs'        => count($winners),
+                'participation_certs' => count($entrants),
+            ];
+        }
+
+        usort($rows, fn ($a, $b) => strcmp($a['title'], $b['title']));
+
+        $totals = [
+            'items'               => count($rows),
+            'winner_certs'        => array_sum(array_column($rows, 'winner_certs')),
+            'participation_certs' => array_sum(array_column($rows, 'participation_certs')),
+        ];
+        $totals['grand_total'] = $totals['winner_certs'] + $totals['participation_certs'];
+
+        return ['rows' => $rows, 'totals' => $totals];
     }
 
     public function issueRecordBreakCertificate(FestRecordBreak $break): Certificate

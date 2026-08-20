@@ -21,6 +21,7 @@
         </form>
 
         <div class="card overflow-hidden p-0">
+            <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr><th>School</th><th>Head</th><th>Item</th><th>Participants</th><th>Names</th></tr>
@@ -36,6 +37,7 @@
                     <tr v-if="!rows.length"><td colspan="5" class="p-6 text-center text-slate-400">No pending registrations.</td></tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />

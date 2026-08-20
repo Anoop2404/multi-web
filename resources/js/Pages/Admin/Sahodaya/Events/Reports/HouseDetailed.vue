@@ -10,8 +10,8 @@
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="house-detailed" />
 
         <ol class="mt-4 bg-white border rounded-xl divide-y">
-            <li v-for="row in board" :key="row.house_id" class="p-4 flex justify-between text-sm">
-                <span>#{{ row.rank }} {{ row.house_name }}</span>
+            <li v-for="row in board" :key="row.house_id" class="p-4 flex justify-between gap-x-2 flex-wrap text-sm">
+                <span class="min-w-0">#{{ row.rank }} {{ row.house_name }}</span>
                 <span class="font-mono">{{ row.total_points }} pts</span>
             </li>
             <li v-if="!board.length" class="p-4 text-gray-400">No houses configured.</li>

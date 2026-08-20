@@ -15,37 +15,39 @@
                 Public schedule is not published yet. Times shown here are for your school coordination.
             </div>
             <div class="card card--flush">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                        <tr>
-                            <th class="p-3">Participant</th>
-                            <th class="p-3">Item</th>
-                            <th class="p-3">Level reg</th>
-                            <th class="p-3">Chest</th>
-                            <th class="p-3">Order</th>
-                            <th class="p-3">Time</th>
-                            <th class="p-3">Stage</th>
-                            <th class="p-3">Called</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(row, i) in rows" :key="i" class="border-t">
-                            <td class="p-3 font-medium">{{ row.name }}</td>
-                            <td class="p-3">{{ row.item }}</td>
-                            <td class="p-3 font-mono text-xs">{{ row.level_reg || '—' }}</td>
-                            <td class="p-3 font-mono text-xs">{{ row.chest_no || '—' }}</td>
-                            <td class="p-3">{{ row.order ?? '—' }}</td>
-                            <td class="p-3 text-xs">{{ row.scheduled_at ? new Date(row.scheduled_at).toLocaleString() : '—' }}</td>
-                            <td class="p-3">{{ row.stage || '—' }}</td>
-                            <td class="p-3">
-                                <span class="text-xs px-2 py-0.5 rounded" :class="row.called ? 'bg-green-100 text-green-800' : 'bg-gray-100'">
-                                    {{ row.called ? 'Yes' : 'No' }}
-                                </span>
-                            </td>
-                        </tr>
-                        <tr v-if="!rows.length"><td colspan="8" class="p-6 text-center text-gray-400">No approved participants.</td></tr>
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                            <tr>
+                                <th class="p-3">Participant</th>
+                                <th class="p-3">Item</th>
+                                <th class="p-3">Level reg</th>
+                                <th class="p-3">Chest</th>
+                                <th class="p-3">Order</th>
+                                <th class="p-3">Time</th>
+                                <th class="p-3">Stage</th>
+                                <th class="p-3">Called</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, i) in rows" :key="i" class="border-t">
+                                <td class="p-3 font-medium">{{ row.name }}</td>
+                                <td class="p-3">{{ row.item }}</td>
+                                <td class="p-3 font-mono text-xs">{{ row.level_reg || '—' }}</td>
+                                <td class="p-3 font-mono text-xs">{{ row.chest_no || '—' }}</td>
+                                <td class="p-3">{{ row.order ?? '—' }}</td>
+                                <td class="p-3 text-xs">{{ row.scheduled_at ? new Date(row.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—' }}</td>
+                                <td class="p-3">{{ row.stage || '—' }}</td>
+                                <td class="p-3">
+                                    <span class="text-xs px-2 py-0.5 rounded" :class="row.called ? 'bg-green-100 text-green-800' : 'bg-gray-100'">
+                                        {{ row.called ? 'Yes' : 'No' }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr v-if="!rows.length"><td colspan="8" class="p-6 text-center text-gray-400">No approved participants.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
             <a :href="`${programBase}/registration`" class="inline-block mt-4 text-sm text-indigo-600">← Back to registrations</a>
         </div>

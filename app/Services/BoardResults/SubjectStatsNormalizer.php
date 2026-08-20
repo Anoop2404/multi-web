@@ -3,6 +3,7 @@
 namespace App\Services\BoardResults;
 
 use App\Models\BoardResult;
+use App\Models\Topper;
 use App\Models\TopperSubjectMark;
 use Illuminate\Support\Facades\Schema;
 
@@ -25,7 +26,11 @@ class SubjectStatsNormalizer
             return [];
         }
 
-        $topperIds = $boardResult->toppers->pluck('id')->all();
+        // Genuine subject-wise topper nominations only — otherwise an 'overall'
+        // topper's or a Full A1 achiever's incidental subject marks get pulled
+        // in here too and crowd out the real subject topper (#161 follow-up,
+        // already fixed the same way in SubjectMeritRegisterService/AwardsEngine).
+        $topperIds = $boardResult->toppers->where('entry_type', Topper::ENTRY_SUBJECT)->pluck('id')->all();
         if ($topperIds === []) {
             $boardResult->update(['subject_stats' => null]);
 

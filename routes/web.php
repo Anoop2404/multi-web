@@ -557,7 +557,6 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/board-results/reports',                           [BoardResultController::class, 'reports'])->name('board-results.reports');
     Route::get('/board-results/reports/summary/pdf',               [BoardResultController::class, 'summaryPdf'])->name('board-results.reports.summary.pdf');
     Route::get('/board-results/reports/toppers/pdf',               [BoardResultController::class, 'toppersPdf'])->name('board-results.reports.toppers.pdf');
-    Route::get('/board-results/rank-report',                       [BoardResultController::class, 'rankReport'])->name('board-results.rank-report');
     Route::get('/board-results/subject-toppers',                   [BoardResultController::class, 'subjectToppers'])->name('board-results.subject-toppers');
     Route::get('/board-results/full-a1-achievers',                 [BoardResultController::class, 'fullA1Achievers'])->name('board-results.full-a1-achievers');
     Route::get('/board-results/student-history',                   [\App\Http\Controllers\BoardResultStudentHistoryController::class, 'schoolHistory'])->name('board-results.student-history');
@@ -581,6 +580,8 @@ Route::prefix('school-admin/{tenantId}')
     Route::prefix('board-results')->name('board-results.')->group(function () {
         Route::get('/principal-verification', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'dashboard'])->name('principal-verification.dashboard');
         Route::get('/{boardResult}/principal-verification', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'show'])->name('principal-verification.show');
+        Route::get('/{boardResult}/principal-verification/reports/{report}', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'showReport'])->name('principal-verification.reports.show');
+        Route::get('/{boardResult}/principal-verification/consolidated', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'showConsolidated'])->name('principal-verification.consolidated.show');
         Route::post('/{boardResult}/request-leadership-review', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'requestReview'])->name('request-leadership-review');
 
         Route::post('/{boardResult}/certification/reports/{report}/generate', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'generateReport'])->name('certification.reports.generate');
@@ -1086,6 +1087,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{boardResult}/approve', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'approve'])->name('approve');
             Route::post('/{boardResult}/reject', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'reject'])->name('reject');
             Route::post('/{boardResult}/publish', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'publish'])->name('publish');
+            Route::post('/{boardResult}/unpublish', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'unpublish'])->name('unpublish');
             Route::get('/{boardResult}/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'downloadPdf'])->name('pdf');
             Route::post('/{boardResult}/toppers/verify-a1', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyAllA1Achievers'])->name('toppers.verify-a1');
             Route::post('/{boardResult}/toppers/verify-all-toppers', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyAllToppers'])->name('toppers.verify-all-toppers');
@@ -1378,6 +1380,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/marks/import-template', [FestMarksImportController::class, 'importTemplate'])->name('marks.import-template');
             Route::post('/{event}/marks/import', [FestMarksImportController::class, 'importStore'])->name('marks.import.store');
             Route::get('/{event}/certificates', [FestCertificateController::class, 'index'])->name('certificates.index');
+            Route::get('/{event}/certificates/tally', [FestCertificateController::class, 'tally'])->name('certificates.tally');
             Route::post('/{event}/certificates/generate', [FestCertificateController::class, 'generate'])->name('certificates.generate');
             Route::get('/{event}/certificates/download-zip', [FestCertificateController::class, 'downloadZip'])->name('certificates.download-zip');
             Route::get('/{event}/houses', [FestHouseController::class, 'index'])->name('houses.index');

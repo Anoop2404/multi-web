@@ -142,7 +142,11 @@ class EventContext
             $marksQuery->whereHas('item', fn ($q) => $q->where('class_group', $category));
         }
 
-        $marks = $marksQuery->get();
+        // Pair/group items save one FestMark per teammate (all sharing the same
+        // registration_id and the same position/score) — sum each registration once,
+        // not once per teammate, or a team's points scale with its squad size.
+        $marks = $marksQuery->get()
+            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
         $pointsBySchool = [];
 
         foreach ($marks as $mark) {
@@ -189,10 +193,13 @@ class EventContext
     {
         $gradePointService = app(FestGradePointService::class);
 
+        // Same dedupe as scoreboardByCategory() above — one FestMark per teammate on
+        // pair/group items must not multiply a team's points by its squad size.
         $marks = FestMark::where('event_id', $this->event->id)
             ->whereHas('item', fn ($q) => $q->where('phase_id', $phaseId))
             ->with(['participant.registration', 'item'])
-            ->get();
+            ->get()
+            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
 
         $pointsBySchool = [];
 
@@ -323,9 +330,11 @@ class EventContext
     {
         $gradePointService = app(FestGradePointService::class);
 
+        // Same dedupe as scoreboardByCategory()/scoreboardByPhase() above.
         $marks = FestMark::where('event_id', $this->event->id)
             ->with(['participant.registration'])
-            ->get();
+            ->get()
+            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
 
         $pointsBySchool = [];
 

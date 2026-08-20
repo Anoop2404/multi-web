@@ -26,24 +26,52 @@
         <section v-if="filteredParticipant.length" class="mb-8">
             <h3 class="section-title mb-3">Participant clashes</h3>
             <div class="card overflow-hidden p-0">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Student</th>
-                            <th>Item 1</th>
-                            <th>Item 2</th>
-                            <th>Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(c, i) in filteredParticipant" :key="'p-'+i">
-                            <td>{{ c.student_name }}</td>
-                            <td>{{ c.event1 }}</td>
-                            <td>{{ c.event2 }}</td>
-                            <td class="text-xs">{{ c.time }}</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Item 1</th>
+                                <th>Item 2</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(c, i) in filteredParticipant" :key="'p-'+i">
+                                <td>{{ c.student_name }}</td>
+                                <td>{{ c.event1 }}</td>
+                                <td>{{ c.event2 }}</td>
+                                <td class="text-xs">{{ c.time }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section v-if="filteredStage.length">
+            <h3 class="section-title mb-3">Stage clashes</h3>
+            <div class="card overflow-hidden p-0">
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Stage</th>
+                                <th>Item 1</th>
+                                <th>Item 2</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(c, i) in filteredStage" :key="'s-'+i">
+                                <td>{{ c.stage }}<span v-if="c.venue" class="text-slate-400"> · {{ c.venue }}</span></td>
+                                <td>{{ c.item1 }}</td>
+                                <td>{{ c.item2 }}</td>
+                                <td class="text-xs">{{ c.time }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
     </SchoolAdminLayout>

@@ -42,42 +42,44 @@
         </div>
 
         <div class="card overflow-hidden p-0">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Head</th>
-                        <th>Item</th>
-                        <th>Participants</th>
-                        <th>Marked</th>
-                        <th>Pending</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template v-for="(row, idx) in displayRows" :key="row.item_id">
-                        <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                            <td colspan="6" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                {{ row.head_name ?? 'Other items' }}
-                            </td>
-                        </tr>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
                         <tr>
-                            <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
-                            <td class="font-medium">{{ row.title }}</td>
-                            <td>{{ row.participants }}</td>
-                            <td>{{ row.marked }}</td>
-                            <td>{{ row.pending }}</td>
-                            <td>
-                                <span class="status-pill text-xs" :class="row.complete ? 'status-pill--completed' : 'status-pill--open'">
-                                    {{ row.complete ? 'Complete' : 'Pending' }}
-                                </span>
-                            </td>
+                            <th>Head</th>
+                            <th>Item</th>
+                            <th>Participants</th>
+                            <th>Marked</th>
+                            <th>Pending</th>
+                            <th>Status</th>
                         </tr>
-                    </template>
-                    <tr v-if="!displayRows.length">
-                        <td colspan="6" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
-                    </tr>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <template v-for="(row, idx) in displayRows" :key="row.item_id">
+                            <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
+                                <td colspan="6" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                    {{ row.head_name ?? 'Other items' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
+                                <td class="font-medium">{{ row.title }}</td>
+                                <td>{{ row.participants }}</td>
+                                <td>{{ row.marked }}</td>
+                                <td>{{ row.pending }}</td>
+                                <td>
+                                    <span class="status-pill text-xs" :class="row.complete ? 'status-pill--completed' : 'status-pill--open'">
+                                        {{ row.complete ? 'Complete' : 'Pending' }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr v-if="!displayRows.length">
+                            <td colspan="6" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>

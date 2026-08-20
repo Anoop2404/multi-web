@@ -61,12 +61,13 @@ class BoardResultCertificationPackage extends Model
         self::STATUS_SAHODAYA_RETURNED => [],
         // Sahodaya may still reject a result after verifying (or even after approving,
         // before publish) — matches BoardResultVerificationController::reject(), which
-        // allows rejection from submitted/verified/approved. Publish is the only point
-        // of no return; a published package must be unpublished through a separate,
-        // more deliberate operation rather than this "return for correction" path.
+        // allows rejection from submitted/verified/approved. A published package reopens
+        // through the same Sahodaya Returned edge, but only via the separate, deliberate
+        // BoardResultVerificationController::unpublish() action
+        // (BoardResultCertificationService::unpublish()), never the ordinary reject() path.
         self::STATUS_SAHODAYA_VERIFIED => [self::STATUS_APPROVED, self::STATUS_SAHODAYA_RETURNED],
         self::STATUS_APPROVED => [self::STATUS_PUBLISHED, self::STATUS_SAHODAYA_RETURNED],
-        self::STATUS_PUBLISHED => [],
+        self::STATUS_PUBLISHED => [self::STATUS_SAHODAYA_RETURNED],
         self::STATUS_SUPERSEDED => [],
     ];
 

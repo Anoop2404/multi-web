@@ -12,27 +12,29 @@
         </PageHeader>
 
         <div class="card card--flush">
-            <table class="w-full text-sm data-table">
-                <thead>
-                    <tr>
-                        <th>Participant</th>
-                        <th>Item</th>
-                        <th>From round</th>
-                        <th>Next round</th>
-                        <th>Promoted</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(q, i) in qualifications" :key="i">
-                        <td>{{ q.participant }} <span class="text-xs text-gray-400">{{ q.reg_no }}</span></td>
-                        <td>{{ q.item }}</td>
-                        <td class="text-xs">{{ q.from_event }} ({{ q.from_level }})</td>
-                        <td class="text-xs">{{ q.next_event || '—' }} <span v-if="q.next_level">({{ q.next_level }})</span></td>
-                        <td class="text-xs">{{ q.promoted_at ? new Date(q.promoted_at).toLocaleDateString() : '—' }}</td>
-                    </tr>
-                    <tr v-if="!qualifications.length"><td colspan="5" class="p-8 text-center text-gray-400">No qualifiers yet.</td></tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm data-table">
+                    <thead>
+                        <tr>
+                            <th>Participant</th>
+                            <th>Item</th>
+                            <th>From round</th>
+                            <th>Next round</th>
+                            <th>Promoted</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(q, i) in qualifications" :key="i">
+                            <td>{{ q.participant }} <span class="text-xs text-gray-400">{{ q.reg_no }}</span></td>
+                            <td>{{ q.item }}</td>
+                            <td class="text-xs">{{ q.from_event }} ({{ q.from_level }})</td>
+                            <td class="text-xs">{{ q.next_event || '—' }} <span v-if="q.next_level">({{ q.next_level }})</span></td>
+                            <td class="text-xs">{{ q.promoted_at ? new Date(q.promoted_at).toLocaleDateString() : '—' }}</td>
+                        </tr>
+                        <tr v-if="!qualifications.length"><td colspan="5" class="p-8 text-center text-gray-400">No qualifiers yet.</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>

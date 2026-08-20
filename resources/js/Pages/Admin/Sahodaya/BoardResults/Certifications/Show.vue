@@ -14,36 +14,43 @@
 
             <!-- Submitted — can Verify or Return -->
             <div v-if="pkg.status === 'submitted_to_sahodaya'" class="flex flex-wrap gap-2">
-                <form :action="`/sahodaya-admin/${sahodaya.id}/board-results/${pkg.board_result_id}/verify`" method="POST">
-                    <input type="hidden" name="_token" :value="csrf">
-                    <button type="submit" class="btn-primary text-sm">✅ Verify Package</button>
-                </form>
+                <button type="button" class="btn-primary text-sm" :disabled="busy" @click="verifyPackage">✅ Verify Package</button>
                 <button type="button" class="btn-secondary text-sm text-rose-600" @click="showReturnModal = true">↩️ Return for Correction</button>
             </div>
 
             <!-- Verified — can Approve or Return -->
             <div v-else-if="pkg.status === 'sahodaya_verified'" class="flex flex-wrap gap-2">
-                <form :action="`/sahodaya-admin/${sahodaya.id}/board-results/${pkg.board_result_id}/approve`" method="POST">
-                    <input type="hidden" name="_token" :value="csrf">
-                    <button type="submit" class="btn-primary text-sm">✅ Approve Package</button>
-                </form>
+                <button type="button" class="btn-primary text-sm" :disabled="busy" @click="approvePackage">✅ Approve Package</button>
                 <button type="button" class="btn-secondary text-sm text-rose-600" @click="showReturnModal = true">↩️ Return for Correction</button>
             </div>
 
             <!-- Approved — can Publish or Return -->
             <div v-else-if="pkg.status === 'approved'" class="flex flex-wrap gap-2">
-                <form :action="`/sahodaya-admin/${sahodaya.id}/board-results/${pkg.board_result_id}/publish`" method="POST">
-                    <input type="hidden" name="_token" :value="csrf">
-                    <button type="submit" class="btn-primary text-sm">🌐 Publish Result</button>
-                </form>
+                <button type="button" class="btn-primary text-sm" :disabled="busy" @click="publishPackage">🌐 Publish Result</button>
                 <button type="button" class="btn-secondary text-sm text-rose-600" @click="showReturnModal = true">↩️ Return for Correction</button>
             </div>
 
-            <!-- Published / Returned / Other -->
+            <!-- Published — can Unpublish -->
+            <div v-else-if="pkg.status === 'published'" class="flex flex-wrap gap-2">
+                <button type="button" class="btn-secondary text-sm text-amber-700" @click="showUnpublishModal = true">↩️ Unpublish for Correction</button>
+            </div>
+
+            <!-- Returned / Other -->
             <div v-else>
                 <span class="text-sm text-slate-500">Status: <strong>{{ statusLabel(pkg.status) }}</strong> — no further actions available on this package.</span>
             </div>
         </div>
+
+        <!-- Unpublish for Correction Modal -->
+        <Modal :show="showUnpublishModal" title="Unpublish for Correction" subtitle="This sends the result back to the school as Rejected so they can fix and resubmit it. Sahodaya-wide rankings will look stale until recalculated from the Toppers hub." @close="showUnpublishModal = false">
+            <textarea v-model="unpublishReason" rows="4" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300" placeholder="Reason for unpublishing..."></textarea>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn-secondary text-xs" @click="showUnpublishModal = false">Cancel</button>
+                    <button type="button" class="btn-primary text-xs bg-amber-600 hover:bg-amber-700" :disabled="busy || !unpublishReason.trim()" @click="unpublishPackage">Unpublish</button>
+                </div>
+            </template>
+        </Modal>
 
         <!-- Return for Correction Modal -->
         <Modal :show="showReturnModal" title="Return for Correction" subtitle="Provide a clear reason so the school knows what to fix." @close="showReturnModal = false">
@@ -51,17 +58,14 @@
             <template #footer>
                 <div class="flex justify-end gap-2">
                     <button type="button" class="btn-secondary text-xs" @click="showReturnModal = false">Cancel</button>
-                    <form :action="`/sahodaya-admin/${sahodaya.id}/board-results/${pkg.board_result_id}/reject`" method="POST">
-                        <input type="hidden" name="_token" :value="csrf">
-                        <input type="hidden" name="rejection_reason" :value="returnReason">
-                        <button type="submit" class="btn-primary text-xs bg-rose-600 hover:bg-rose-700" :disabled="!returnReason.trim()">Return</button>
-                    </form>
+                    <button type="button" class="btn-primary text-xs bg-rose-600 hover:bg-rose-700" :disabled="busy || !returnReason.trim()" @click="returnPackage">Return</button>
                 </div>
             </template>
         </Modal>
 
         <div class="card !p-5 mb-4">
-            <h3 class="text-sm font-bold text-slate-800 mb-3">Individual Reports</h3>
+            <h3 class="text-sm font-bold text-slate-800 mb-1">Individual Reports <span class="text-slate-400 font-normal">(optional)</span></h3>
+            <p class="text-xs text-slate-500 mb-3">Reference documents the school may sign for its own records — not required before submission. The consolidated report below is what's authoritative.</p>
             <table class="w-full text-sm">
                 <thead class="text-left text-[11px] uppercase tracking-wide text-slate-400">
                     <tr>
@@ -95,11 +99,19 @@
             </table>
         </div>
 
-        <!-- Individual Report Proof — consolidated PDF not required in simplified flow -->
+        <!-- Consolidated Certification Report — the one authoritative signed snapshot of the whole package -->
         <div class="card !p-5 mb-4">
-            <h3 class="text-sm font-bold text-slate-800 mb-2">Certification Proof</h3>
-            <p class="text-xs text-slate-500 mb-3">Each individual report above has been signed by the Principal/VP. A separate consolidated PDF is not required.</p>
-            <p class="text-[11px] text-slate-400 font-mono">Package data hash: {{ pkg.data_hash }}</p>
+            <h3 class="text-sm font-bold text-slate-800 mb-2">Consolidated Certification Report</h3>
+            <p class="text-xs text-slate-500 mb-3">The one document required before submission — a signed all-types report covering the full result, downloaded, signed, and uploaded by the Principal/VP.</p>
+            <div class="flex flex-wrap items-center gap-3 mb-2">
+                <a v-if="pkg.generated_pdf_path" :href="consolidatedPdfUrl(false)" target="_blank" class="text-indigo-600 hover:underline text-xs font-semibold">Unsigned copy</a>
+                <a v-if="pkg.signed_pdf_path" :href="consolidatedPdfUrl(true)" target="_blank" class="text-indigo-600 hover:underline text-xs font-semibold">Signed copy</a>
+                <span v-if="!pkg.generated_pdf_path" class="text-xs text-amber-600">Not generated by the school yet.</span>
+            </div>
+            <p v-if="pkg.signed_by" class="text-[11px] text-slate-500">
+                Signed by {{ pkg.signed_by?.name ?? '—' }} <span v-if="pkg.signer_role">({{ pkg.signer_role }})</span> on {{ formatDate(pkg.signed_at) }}
+            </p>
+            <p class="text-[11px] text-slate-400 font-mono mt-1">Package data hash: {{ pkg.data_hash }}</p>
         </div>
 
         <div v-if="history.length" class="card !p-5">
@@ -121,10 +133,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -135,12 +148,52 @@ const props = defineProps({
     history: { type: Array, default: () => [] },
 });
 
-const pkg = props.package;
+const pkg = computed(() => props.package);
 const showReturnModal = ref(false);
 const returnReason = ref('');
+const showUnpublishModal = ref(false);
+const unpublishReason = ref('');
+const busy = ref(false);
+const { confirm } = useConfirm();
 
-// Get CSRF token from meta tag
-const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+const base = `/sahodaya-admin/${props.sahodaya.id}/board-results/${pkg.value.board_result_id}`;
+
+function postAction(path, data = {}) {
+    busy.value = true;
+    router.post(`${base}/${path}`, data, {
+        preserveScroll: true,
+        onFinish: () => { busy.value = false; },
+    });
+}
+
+async function verifyPackage() {
+    if (!await confirm({ message: 'Verify this certified package? Sahodaya can still approve or return it afterward.' })) return;
+    postAction('verify');
+}
+
+async function approvePackage() {
+    if (!await confirm({ message: 'Approve this certified package? It becomes publishable once approved.' })) return;
+    postAction('approve');
+}
+
+async function publishPackage() {
+    if (!await confirm({
+        message: 'Publish this result? This notifies the school, issues topper certificates, and recomputes Sahodaya-wide rankings — visible to the public immediately.',
+        destructive: true,
+        confirmLabel: 'Yes, publish',
+    })) return;
+    postAction('publish');
+}
+
+function returnPackage() {
+    postAction('reject', { rejection_reason: returnReason.value });
+    showReturnModal.value = false;
+}
+
+function unpublishPackage() {
+    postAction('unpublish', { reason: unpublishReason.value });
+    showUnpublishModal.value = false;
+}
 
 function reportLabel(report) {
     const names = { summary: 'Result Summary & Proof', overall_toppers: 'School Topper(s)', subject_toppers: 'Subject-wise Toppers', full_a1: 'Full A1 Achievers' };
@@ -154,11 +207,11 @@ function statusLabel(status) {
 }
 
 function reportPdfUrl(report, signed) {
-    return `/sahodaya-admin/${props.sahodaya.id}/board-results/certifications/${pkg.id}/reports/${report.id}/pdf?signed=${signed ? 1 : 0}&preview=1`;
+    return `/sahodaya-admin/${props.sahodaya.id}/board-results/certifications/${pkg.value.id}/reports/${report.id}/pdf?signed=${signed ? 1 : 0}&preview=1`;
 }
 
 function consolidatedPdfUrl(signed) {
-    return `/sahodaya-admin/${props.sahodaya.id}/board-results/certifications/${pkg.id}/consolidated/pdf?signed=${signed ? 1 : 0}&preview=1`;
+    return `/sahodaya-admin/${props.sahodaya.id}/board-results/certifications/${pkg.value.id}/consolidated/pdf?signed=${signed ? 1 : 0}&preview=1`;
 }
 
 function formatDate(value) {

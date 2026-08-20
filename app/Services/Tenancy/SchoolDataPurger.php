@@ -50,7 +50,9 @@ use App\Models\TrainingSchoolFee;
 use App\Models\UploadedFileBackup;
 use App\Models\User;
 use App\Models\UserProfileChangeRequest;
+use App\Support\TenancyDatabase;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 
 class SchoolDataPurger
 {
@@ -126,16 +128,33 @@ class SchoolDataPurger
 
     public function purgeCentralData(Tenant $school): int
     {
-        $users = User::query()->where('tenant_id', $school->id)->get();
-        foreach ($users as $user) {
-            $user->syncRoles([]);
-            $user->delete();
-        }
+        // Portal logins live in the Sahodaya's own database (database_per_sahodaya),
+        // not the central connection despite this method's name — query them there or
+        // this silently matches zero rows and leaves orphaned logins behind.
+        $userCount = TenancyDatabase::whenDatabaseReady($school, function () use ($school) {
+            if (! Schema::hasTable('users')) {
+                return 0;
+            }
+
+            $users = User::query()->where('tenant_id', $school->id)->get();
+            foreach ($users as $user) {
+                try {
+                    if (Schema::hasTable('roles')) {
+                        $user->syncRoles([]);
+                    }
+                } catch (\Throwable) {
+                    // Role tables may be incomplete on a half-migrated DB.
+                }
+                $user->delete();
+            }
+
+            return $users->count();
+        }, 0);
 
         $school->domains()->delete();
         $school->delete();
 
-        return $users->count();
+        return $userCount;
     }
 
     public function purgeStorage(Tenant $school): bool

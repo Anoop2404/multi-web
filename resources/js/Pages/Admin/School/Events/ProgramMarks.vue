@@ -107,6 +107,7 @@ function applyBulkRank(reg) {
     for (const p of performers(reg)) {
         if (forms[p.id]) {
             forms[p.id].position = rank;
+            save(p, reg.item);
         }
     }
 }

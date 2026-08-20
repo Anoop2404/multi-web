@@ -18,6 +18,10 @@ use Illuminate\Support\Facades\Schema;
  *
  *  - no_login:         a school tenant with zero school_admin users in its Sahodaya
  *                       database (or the central connection, for a standalone school).
+ *  - no_working_password: a school_admin user exists but has never logged in AND has no
+ *                       plain_password on file — nobody can currently get in (e.g. a
+ *                       credentials email that failed to send, or a login created outside
+ *                       UserCredentialService without storing one). Needs a password reset.
  *  - not_ready:        a school whose Sahodaya database isn't provisioned/migrated yet,
  *                       so login state can't be determined either way.
  *  - orphaned_login:   a school_admin user whose tenant_id no longer matches ANY row in
@@ -122,14 +126,31 @@ class AuditSchoolLogins extends Command
                 return;
             }
 
-            $admins = User::role('school_admin')->get(['id', 'tenant_id', 'email', 'username', 'name']);
+            $hasPlainPassword = Schema::hasColumn('users', 'plain_password');
+            $columns = array_filter([
+                'id', 'tenant_id', 'email', 'username', 'name', 'last_login_at',
+                $hasPlainPassword ? 'plain_password' : null,
+            ]);
+
+            $admins = User::role('school_admin')->get($columns);
             $byTenant = $admins->groupBy('tenant_id');
             $idsInThisGroup = $schoolsInThisGroup->pluck('id')->flip();
 
             foreach ($schoolsInThisGroup as $school) {
-                if ($byTenant->get($school->id, collect())->isEmpty()) {
+                $schoolUsers = $byTenant->get($school->id, collect());
+
+                if ($schoolUsers->isEmpty()) {
                     $this->addFinding('no_login', $label, $school->id, $school->name,
                         'membership_status='.($school->membership_status ?? '—').', is_active='.($school->is_active ? 'true' : 'false'));
+
+                    continue;
+                }
+
+                foreach ($schoolUsers as $user) {
+                    if (! $user->last_login_at && empty($user->plain_password)) {
+                        $this->addFinding('no_working_password', $label, $school->id, $school->name,
+                            "user #{$user->id} {$user->email} — never logged in, no password on file. Use Reset Password.");
+                    }
                 }
             }
 

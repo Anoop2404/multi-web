@@ -8,10 +8,13 @@
             <a v-if="certificates.length"
                :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip`"
                class="btn-secondary">Download all (ZIP)</a>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/tally`" class="btn-secondary">
+                How many do I need to print?
+            </Link>
         </div>
         <ul class="card-list">
-            <li v-for="c in certificates" :key="c.id" class="p-4 flex justify-between items-center text-sm">
-                <div>
+            <li v-for="c in certificates" :key="c.id" class="p-4 flex flex-wrap gap-2 justify-between items-center text-sm">
+                <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
                         <p class="font-medium">{{ c.student?.name ?? 'Participant' }}</p>
                         <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
@@ -36,7 +39,7 @@
 </template>
 
 <script setup>
-import { router } from '@inertiajs/vue3';
+import { router, Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 

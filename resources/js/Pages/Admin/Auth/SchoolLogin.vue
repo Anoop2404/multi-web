@@ -28,7 +28,7 @@
                         <p v-if="motto" class="login-motto">"{{ motto }}"</p>
 
                         <ol class="login-steps">
-                            <li>Sign in with your school admin email</li>
+                            <li>Sign in with your school admin email or username</li>
                             <li>Add students with date of birth &amp; gender for sports</li>
                             <li>Register for events and submit annual data</li>
                         </ol>
@@ -60,13 +60,13 @@
                                 <AuthLoginAlerts :session-expired="sessionExpired" :auth-error="authError" />
 
                                 <div>
-                                    <label class="login-label" for="email">School admin email</label>
+                                    <label class="login-label" for="email">Email or username</label>
                                     <input
                                         id="email"
                                         v-model="form.email"
-                                        type="email"
+                                        type="text"
                                         required
-                                        autocomplete="email"
+                                        autocomplete="username"
                                         class="login-input"
                                         :class="{ 'login-input-error': fieldErrors.email }"
                                         placeholder="admin@yourschool.edu"

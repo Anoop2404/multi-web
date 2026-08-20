@@ -80,28 +80,57 @@ class FestPublicScoreboardTest extends TestCase
         ]);
     }
 
-    public function test_public_index_lists_hub_once_and_hides_partition_children(): void
+    public function test_public_index_lists_operational_children_and_hides_administrative_hub(): void
     {
         $response = $this->get('http://public-scoreboard.test/fest');
 
         $response->assertOk();
-        $response->assertSee('Regional Arts Fest');
-        $response->assertDontSee('North Region');
-        $response->assertDontSee('South Region');
+        $response->assertSee('Regional Arts Fest — North Region');
+        $response->assertSee('Regional Arts Fest — South Region');
+        $response->assertSee("/fest/{$this->north->id}", false);
+        $response->assertSee("/fest/{$this->south->id}", false);
+        $response->assertDontSee("href=\"http://public-scoreboard.test/fest/{$this->hub->id}\"", false);
     }
 
-    public function test_each_hub_has_dedicated_pages_with_region_navigation(): void
+    public function test_public_index_orders_events_by_display_order_then_date(): void
     {
-        $response = $this->get("http://public-scoreboard.test/fest/{$this->hub->id}");
+        FestEvent::create([
+            'tenant_id' => $this->sahodaya->id,
+            'title' => 'Late Event',
+            'event_type' => 'kalotsav',
+            'conduct_mode' => 'standard',
+            'status' => 'published',
+            'event_start' => '2026-09-25',
+            'sort_order' => 10,
+        ]);
+
+        FestEvent::create([
+            'tenant_id' => $this->sahodaya->id,
+            'title' => 'Early Event',
+            'event_type' => 'kalotsav',
+            'conduct_mode' => 'standard',
+            'status' => 'published',
+            'event_start' => '2026-09-05',
+            'sort_order' => 10,
+        ]);
+
+        $this->get('http://public-scoreboard.test/fest')
+            ->assertOk()
+            ->assertSeeInOrder(['Early Event', 'Late Event']);
+    }
+
+    public function test_each_operational_event_has_dedicated_pages_without_region_navigation(): void
+    {
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}");
 
         $response->assertOk();
-        $response->assertSee('Overall Championship');
-        $response->assertSee('North Region');
-        $response->assertSee('South Region');
-        $response->assertSee("/fest/{$this->hub->id}/schedule", false);
-        $response->assertSee("/fest/{$this->hub->id}/scoreboard", false);
-        $response->assertSee("/fest/{$this->hub->id}/results", false);
-        $response->assertSee("/fest/{$this->hub->id}/live", false);
+        $response->assertSee('Regional Arts Fest — North Region');
+        $response->assertDontSee('South Region');
+        $response->assertSee("/fest/{$this->north->id}/schedule", false);
+        $response->assertSee("/fest/{$this->north->id}/scoreboard", false);
+        $response->assertSee("/fest/{$this->north->id}/results", false);
+        $response->assertSee("/fest/{$this->north->id}/live", false);
+        $response->assertDontSee('aria-label="Event scoreboard scope"', false);
     }
 
     public function test_standard_event_has_its_own_hub_schedule_scoreboard_results_and_live_pages(): void
@@ -136,22 +165,17 @@ class FestPublicScoreboardTest extends TestCase
         $this->get("http://public-scoreboard.test/fest/{$event->id}/live")->assertOk();
     }
 
-    public function test_region_scope_is_isolated_and_overall_scope_is_combined(): void
+    public function test_region_event_scoreboards_are_isolated_and_hub_is_not_public(): void
     {
-        $region = $this->get("http://public-scoreboard.test/fest/{$this->hub->id}/scoreboard?scope=partition:north");
+        $region = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
 
         $region->assertOk();
         $region->assertSee('North Star School');
         $region->assertDontSee('South Valley School');
         $region->assertSee('60');
 
-        $overall = $this->get("http://public-scoreboard.test/fest/{$this->hub->id}/scoreboard?scope=overall");
-
-        $overall->assertOk();
-        $overall->assertSee('North Star School');
-        $overall->assertSee('South Valley School');
-        $overall->assertSee('60');
-        $overall->assertSee('45');
+        $this->get("http://public-scoreboard.test/fest/{$this->hub->id}/scoreboard")
+            ->assertNotFound();
     }
 
     public function test_region_and_category_filters_work_together(): void
@@ -160,7 +184,7 @@ class FestPublicScoreboardTest extends TestCase
         $this->markCategoryWinner($this->south, $this->southSchool, 'South HS Winner');
 
         $response = $this->get(
-            "http://public-scoreboard.test/fest/{$this->hub->id}/scoreboard?scope=partition:north&category=hs"
+            "http://public-scoreboard.test/fest/{$this->north->id}/scoreboard?category=hs"
         );
 
         $response->assertOk();
@@ -172,19 +196,40 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertDontSee('South HS Winner');
     }
 
-    public function test_direct_partition_page_redirects_to_canonical_hub_scope(): void
+    public function test_item_results_cannot_cross_the_operational_event_boundary(): void
+    {
+        $northItem = $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+        $southItem = $this->markCategoryWinner($this->south, $this->southSchool, 'South Poetry');
+
+        $this->get("http://public-scoreboard.test/fest/{$this->north->id}")
+            ->assertOk()
+            ->assertSee('North Poetry')
+            ->assertDontSee('South Poetry');
+
+        $this->get("http://public-scoreboard.test/fest/{$this->north->id}/items/{$northItem->id}/results")
+            ->assertOk()
+            ->assertSee('North Poetry')
+            ->assertSee('NORTH STAR SCHOOL')
+            ->assertDontSee('South Valley School');
+
+        $this->get("http://public-scoreboard.test/fest/{$this->north->id}/items/{$southItem->id}/results")
+            ->assertNotFound();
+    }
+
+    public function test_direct_partition_page_is_the_canonical_standalone_event(): void
     {
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
 
-        $response->assertRedirect();
-        $this->assertStringContainsString("/fest/{$this->hub->id}/scoreboard", $response->headers->get('Location'));
-        $this->assertStringContainsString('scope=partition%3Anorth', $response->headers->get('Location'));
+        $response->assertOk();
+        $response->assertSee('Regional Arts Fest — North Region');
+        $response->assertSee('North Star School');
+        $response->assertDontSee('South Valley School');
     }
 
-    public function test_existing_cluster_query_links_remain_compatible(): void
+    public function test_legacy_scope_query_cannot_switch_a_standalone_event(): void
     {
         $response = $this->get(
-            "http://public-scoreboard.test/fest/{$this->hub->id}/scoreboard?cluster=north"
+            "http://public-scoreboard.test/fest/{$this->north->id}/scoreboard?scope=partition:south&cluster=south"
         );
 
         $response->assertOk();
@@ -192,17 +237,23 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertDontSee('South Valley School');
     }
 
-    public function test_invalid_partition_scope_returns_not_found(): void
+    public function test_published_child_results_are_independent_of_root_publication(): void
     {
-        $this->get("http://public-scoreboard.test/fest/{$this->hub->id}/scoreboard?scope=partition:unknown")
-            ->assertNotFound();
+        $this->hub->update(['results_published' => false, 'status' => 'ongoing']);
+
+        $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard")
+            ->assertOk()
+            ->assertSee('North Star School');
+
+        $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results")
+            ->assertOk();
     }
 
     public function test_unpublished_standings_do_not_leak_through_live_json(): void
     {
-        $this->hub->update(['results_published' => false, 'status' => 'ongoing']);
+        $this->north->update(['results_published' => false, 'status' => 'ongoing']);
 
-        $response = $this->getJson("http://public-scoreboard.test/fest/{$this->hub->id}/live/data?scope=overall");
+        $response = $this->getJson("http://public-scoreboard.test/fest/{$this->north->id}/live/data");
 
         $response->assertOk()
             ->assertJsonPath('standingsPublished', false)
@@ -211,21 +262,21 @@ class FestPublicScoreboardTest extends TestCase
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
     }
 
-    public function test_unpublished_child_scope_does_not_leak_when_hub_is_published(): void
+    public function test_unpublished_child_does_not_leak_when_hub_is_published(): void
     {
         $this->north->update(['results_published' => false, 'status' => 'ongoing']);
 
         $scoreboard = $this->get(
-            "http://public-scoreboard.test/fest/{$this->hub->id}/scoreboard?scope=partition:north"
+            "http://public-scoreboard.test/fest/{$this->north->id}/scoreboard"
         );
         $scoreboard->assertOk();
-        $scoreboard->assertSee('Standings are not published yet');
+        $scoreboard->assertSee('Official Standings Not Published Yet');
         $scoreboard->assertDontSee('North Star School');
 
-        $this->get("http://public-scoreboard.test/fest/{$this->hub->id}/results?scope=partition:north")
+        $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results")
             ->assertNotFound();
 
-        $this->getJson("http://public-scoreboard.test/fest/{$this->hub->id}/live/data?scope=partition:north")
+        $this->getJson("http://public-scoreboard.test/fest/{$this->north->id}/live/data")
             ->assertOk()
             ->assertJsonPath('standingsPublished', false)
             ->assertJsonCount(0, 'scoreboard');
@@ -233,10 +284,69 @@ class FestPublicScoreboardTest extends TestCase
 
     public function test_scoreboard_page_has_event_day_cache_policy(): void
     {
-        $response = $this->get("http://public-scoreboard.test/fest/{$this->hub->id}/scoreboard");
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
 
         $response->assertOk();
         $this->assertStringContainsString('no-cache', $response->headers->get('Cache-Control'));
+    }
+
+    public function test_catalogue_has_search_and_status_discovery_without_phase_navigation(): void
+    {
+        $response = $this->get('http://public-scoreboard.test/fest');
+
+        $response->assertOk()
+            ->assertSee('Search event, venue, phase or region')
+            ->assertSee('Live &amp; Open', false)
+            ->assertSee('Completed')
+            ->assertSee('data-event-card', false)
+            ->assertDontSee('Event scoreboard scope');
+    }
+
+    public function test_event_page_exposes_item_finder_and_recent_result_entry_points(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        $this->get("http://public-scoreboard.test/fest/{$this->north->id}")
+            ->assertOk()
+            ->assertSee('Event item finder')
+            ->assertSee('Search schedules and results')
+            ->assertSee('Search item name or head')
+            ->assertSee('Latest results')
+            ->assertSee('Topper Highlights');
+    }
+
+    public function test_results_offer_dedicated_topper_modules_and_item_filters(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=toppers")
+            ->assertOk()
+            ->assertSee('School Overall Toppers')
+            ->assertSee('School Category-wise Toppers')
+            ->assertSee('Student Category-wise Toppers');
+
+        $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=item")
+            ->assertOk()
+            ->assertSee('Search event item')
+            ->assertSee('All categories')
+            ->assertSee('All stages')
+            ->assertSee('data-result-item', false);
+    }
+
+    public function test_scoreboard_refreshes_a_partial_without_reloading_the_page(): void
+    {
+        $page = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
+
+        $page->assertOk()
+            ->assertSee('Updates in the background every 30 seconds')
+            ->assertDontSee('window.location.reload', false);
+
+        $data = $this->getJson("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard/data");
+        $data->assertOk()
+            ->assertJsonPath('standingsPublished', true)
+            ->assertJsonStructure(['contentHtml', 'refreshedAt']);
+        $this->assertStringContainsString('North Star School', $data->json('contentHtml'));
+        $this->assertStringContainsString('no-store', $data->headers->get('Cache-Control'));
     }
 
     private function school(string $name): Tenant
@@ -267,7 +377,7 @@ class FestPublicScoreboardTest extends TestCase
         ]);
     }
 
-    private function markCategoryWinner(FestEvent $event, Tenant $school, string $title): void
+    private function markCategoryWinner(FestEvent $event, Tenant $school, string $title): FestEventItem
     {
         $item = FestEventItem::create([
             'event_id' => $event->id,
@@ -299,5 +409,7 @@ class FestPublicScoreboardTest extends TestCase
             'position' => 1,
             'score' => 80,
         ]);
+
+        return $item;
     }
 }

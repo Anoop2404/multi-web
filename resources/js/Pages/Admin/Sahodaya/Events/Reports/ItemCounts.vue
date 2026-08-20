@@ -82,33 +82,35 @@
         <section v-if="headSummary?.length" class="mb-8">
             <h3 class="section-title mb-3">{{ event.event_type === 'sports' ? 'Summary by Sport Event' : 'Summary by item head' }}</h3>
             <div class="card overflow-hidden p-0">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>{{ event.event_type === 'sports' ? 'Sport Event' : 'Head' }}</th>
-                            <th>Items</th>
-                            <th>Regs</th>
-                            <th>Approved</th>
-                            <th>Pending</th>
-                            <th>Participants</th>
-                            <th>Max item regs</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="row in filteredHeadSummary" :key="row.head_id">
-                            <td class="font-medium">{{ row.head_name }}</td>
-                            <td>{{ row.item_count }}</td>
-                            <td>{{ row.registration_count ?? 0 }}</td>
-                            <td>{{ row.approved_count ?? 0 }}</td>
-                            <td>{{ row.pending_count ?? 0 }}</td>
-                            <td>{{ row.participant_count }}</td>
-                            <td>
-                                <span v-if="row.max_item_title" class="text-xs text-slate-500 block">{{ row.max_item_title }}</span>
-                                {{ row.busiest_item_regs ?? row.max_item_reg_count ?? 0 }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>{{ event.event_type === 'sports' ? 'Sport Event' : 'Head' }}</th>
+                                <th>Items</th>
+                                <th>Regs</th>
+                                <th>Approved</th>
+                                <th>Pending</th>
+                                <th>Participants</th>
+                                <th>Max item regs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in filteredHeadSummary" :key="row.head_id">
+                                <td class="font-medium">{{ row.head_name }}</td>
+                                <td>{{ row.item_count }}</td>
+                                <td>{{ row.registration_count ?? 0 }}</td>
+                                <td>{{ row.approved_count ?? 0 }}</td>
+                                <td>{{ row.pending_count ?? 0 }}</td>
+                                <td>{{ row.participant_count }}</td>
+                                <td>
+                                    <span v-if="row.max_item_title" class="text-xs text-slate-500 block">{{ row.max_item_title }}</span>
+                                    {{ row.busiest_item_regs ?? row.max_item_reg_count ?? 0 }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
 
@@ -119,56 +121,58 @@
                 <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
             </div>
             <div class="card overflow-hidden p-0 shadow-sm border border-slate-200/80">
-                <table class="data-table">
-                    <thead class="bg-slate-50/90 border-b border-slate-200">
-                        <tr>
-                            <th class="w-10 text-center">#</th>
-                            <th>Item Name</th>
-                            <th>Category</th>
-                            <th>Type</th>
-                            <th class="text-center">Total Entries</th>
-                            <th class="text-center">Approved</th>
-                            <th class="text-center">Pending</th>
-                            <th class="text-center">Total Participants</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <template v-for="(row, idx) in displayRows" :key="row.item_id">
-                            <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-100/70 border-y border-slate-200">
-                                <td colspan="8" class="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-700">
-                                    {{ row.head_name ?? 'Other items' }}
-                                </td>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead class="bg-slate-50/90 border-b border-slate-200">
+                            <tr>
+                                <th class="w-10 text-center">#</th>
+                                <th>Item Name</th>
+                                <th>Category</th>
+                                <th>Type</th>
+                                <th class="text-center">Total Entries</th>
+                                <th class="text-center">Approved</th>
+                                <th class="text-center">Pending</th>
+                                <th class="text-center">Total Participants</th>
                             </tr>
-                            <tr class="hover:bg-slate-50/80 transition-colors">
-                                <td class="text-center text-xs text-slate-400 font-mono">{{ idx + 1 }}</td>
-                                <td class="font-semibold text-slate-900">
-                                    {{ row.title }}
-                                    <span v-if="row.item_code" class="block text-xs font-mono text-slate-400 font-normal">{{ row.item_code }}</span>
-                                </td>
-                                <td class="text-slate-600 font-medium">{{ row.age_group || row.class_group || '—' }}</td>
-                                <td>
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block"
-                                          :class="row.participant_type === 'individual' ? 'bg-slate-100 text-slate-700 border border-slate-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'">
-                                        {{ row.participant_type === 'individual' ? 'Indiv' : 'Team' }}
-                                    </span>
-                                </td>
-                                <td class="font-bold text-indigo-950 text-center">
-                                    {{ row.registration_count }}
-                                    <span class="block text-[10px] font-normal text-slate-400">{{ row.participant_type === 'individual' ? 'entries' : 'groups' }}</span>
-                                </td>
-                                <td class="text-emerald-700 font-bold text-center">{{ row.approved }}</td>
-                                <td class="text-amber-700 font-bold text-center">{{ row.pending }}</td>
-                                <td class="font-bold text-slate-900 text-center">
-                                    {{ row.participant_count }}
-                                    <span class="block text-[10px] font-normal text-slate-400">students</span>
-                                </td>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template v-for="(row, idx) in displayRows" :key="row.item_id">
+                                <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-100/70 border-y border-slate-200">
+                                    <td colspan="8" class="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-700">
+                                        {{ row.head_name ?? 'Other items' }}
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="text-center text-xs text-slate-400 font-mono">{{ idx + 1 }}</td>
+                                    <td class="font-semibold text-slate-900">
+                                        {{ row.title }}
+                                        <span v-if="row.item_code" class="block text-xs font-mono text-slate-400 font-normal">{{ row.item_code }}</span>
+                                    </td>
+                                    <td class="text-slate-600 font-medium">{{ row.age_group || row.class_group || '—' }}</td>
+                                    <td>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block"
+                                              :class="row.participant_type === 'individual' ? 'bg-slate-100 text-slate-700 border border-slate-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'">
+                                            {{ row.participant_type === 'individual' ? 'Indiv' : 'Team' }}
+                                        </span>
+                                    </td>
+                                    <td class="font-bold text-indigo-950 text-center">
+                                        {{ row.registration_count }}
+                                        <span class="block text-[10px] font-normal text-slate-400">{{ row.participant_type === 'individual' ? 'entries' : 'groups' }}</span>
+                                    </td>
+                                    <td class="text-emerald-700 font-bold text-center">{{ row.approved }}</td>
+                                    <td class="text-amber-700 font-bold text-center">{{ row.pending }}</td>
+                                    <td class="font-bold text-slate-900 text-center">
+                                        {{ row.participant_count }}
+                                        <span class="block text-[10px] font-normal text-slate-400">students</span>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr v-if="!displayRows.length">
+                                <td colspan="8" class="p-8 text-center text-slate-400">No items match the selected filters.</td>
                             </tr>
-                        </template>
-                        <tr v-if="!displayRows.length">
-                            <td colspan="8" class="p-8 text-center text-slate-400">No items match the selected filters.</td>
-                        </tr>
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
 

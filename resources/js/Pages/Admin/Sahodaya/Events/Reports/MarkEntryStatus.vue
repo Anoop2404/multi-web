@@ -40,6 +40,7 @@
         </div>
 
         <div class="card overflow-hidden p-0">
+            <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -83,7 +84,7 @@
                             <td>{{ row.marked }}</td>
                             <td>{{ row.pending }}</td>
                             <td>
-                                <span class="status-pill" :class="row.complete ? 'status-pill--completed' : 'status-pill--open'">
+                                <span class="status-pill" :class="row.complete ? 'status-pill--completed' : 'status-pill--ongoing'">
                                     {{ row.complete ? 'Complete' : 'Pending' }}
                                 </span>
                             </td>
@@ -94,6 +95,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />

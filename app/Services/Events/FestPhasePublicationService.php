@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 
 class FestPhasePublicationService
 {
+    public function __construct(private FestCumulativeChampionshipService $cumulative) {}
+
     public function publishSchedule(FestEvent $leaf): void
     {
         [$root, $source, $childPhase] = $this->context($leaf);
@@ -57,13 +59,17 @@ class FestPhasePublicationService
                 'results_published' => $allComplete,
                 'status' => $allComplete ? 'completed' : $root->status,
             ]);
+
+            if ($phaseComplete) {
+                $this->cumulative->lockPublishedThrough($root, $source, $actorId);
+            }
         });
     }
 
-    public function unpublishResults(FestEvent $leaf): void
+    public function unpublishResults(FestEvent $leaf, ?int $actorId = null): void
     {
         [$root, $source, $childPhase] = $this->context($leaf);
-        DB::transaction(function () use ($leaf, $root, $source, $childPhase) {
+        DB::transaction(function () use ($leaf, $root, $source, $childPhase, $actorId) {
             $leaf->update(['results_published' => false]);
             $childPhase->update(['results_published' => false]);
             $source->update(['results_published' => false]);
@@ -72,6 +78,7 @@ class FestPhasePublicationService
                 'published_at' => null,
                 'published_by' => null,
             ]);
+            $this->cumulative->invalidateFrom($root, $source, $actorId);
         });
     }
 

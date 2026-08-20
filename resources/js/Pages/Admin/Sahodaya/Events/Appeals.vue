@@ -24,58 +24,60 @@
                 </div>
 
                 <div class="card card--flush overflow-hidden">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                            <tr>
-                                <th class="p-3">Participant</th>
-                                <th class="p-3">School / Item</th>
-                                <th class="p-3">Reason</th>
-                                <th class="p-3">Fee</th>
-                                <th class="p-3">Status</th>
-                                <th class="p-3"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="a in filteredAppeals" :key="a.id" class="border-t align-top">
-                                <td class="p-3 font-medium">
-                                    {{ participantName(a) }}
-                                    <p v-if="a.participant?.student?.reg_no" class="text-xs font-mono text-[#0f3d7a]">{{ a.participant.student.reg_no }}</p>
-                                </td>
-                                <td class="p-3 text-xs">
-                                    <p>{{ a.participant?.registration?.school?.name ?? '—' }}</p>
-                                    <p class="text-slate-500">{{ a.participant?.registration?.item?.title }}</p>
-                                </td>
-                                <td class="p-3 text-xs max-w-xs">
-                                    <p>{{ a.reason }}</p>
-                                    <p v-if="a.resolution_note" class="text-slate-500 mt-1 italic">Note: {{ a.resolution_note }}</p>
-                                </td>
-                                <td class="p-3 text-xs whitespace-nowrap">
-                                    <template v-if="a.fee_amount != null && Number(a.fee_amount) > 0">
-                                        ₹{{ a.fee_amount }}
-                                        <span v-if="a.fee_paid_at" class="text-emerald-700 block">Paid</span>
-                                        <button v-else-if="a.status === 'pending'" type="button"
-                                                class="text-[#0f3d7a] font-semibold block mt-0.5"
-                                                @click="markFeePaid(a.id)">Mark paid</button>
-                                    </template>
-                                    <span v-else class="text-slate-300">—</span>
-                                </td>
-                                <td class="p-3">
-                                    <span :class="statusClass(a.status)" class="text-xs font-semibold px-2 py-0.5 rounded capitalize">{{ a.status }}</span>
-                                </td>
-                                <td class="p-3 text-right">
-                                    <button v-if="a.status === 'pending'" type="button"
-                                            class="text-green-700 text-xs font-semibold mr-2"
-                                            @click="openResolve(a, 'approved')">Approve</button>
-                                    <button v-if="a.status === 'pending'" type="button"
-                                            class="text-red-600 text-xs font-semibold"
-                                            @click="openResolve(a, 'rejected')">Reject</button>
-                                </td>
-                            </tr>
-                            <tr v-if="!filteredAppeals.length">
-                                <td colspan="6" class="p-8 text-center text-gray-400">No appeals</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                                <tr>
+                                    <th class="p-3">Participant</th>
+                                    <th class="p-3">School / Item</th>
+                                    <th class="p-3">Reason</th>
+                                    <th class="p-3">Fee</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="a in filteredAppeals" :key="a.id" class="border-t align-top">
+                                    <td class="p-3 font-medium">
+                                        {{ participantName(a) }}
+                                        <p v-if="a.participant?.student?.reg_no" class="text-xs font-mono text-[#0f3d7a]">{{ a.participant.student.reg_no }}</p>
+                                    </td>
+                                    <td class="p-3 text-xs">
+                                        <p>{{ a.participant?.registration?.school?.name ?? '—' }}</p>
+                                        <p class="text-slate-500">{{ a.participant?.registration?.item?.title }}</p>
+                                    </td>
+                                    <td class="p-3 text-xs max-w-xs">
+                                        <p>{{ a.reason }}</p>
+                                        <p v-if="a.resolution_note" class="text-slate-500 mt-1 italic">Note: {{ a.resolution_note }}</p>
+                                    </td>
+                                    <td class="p-3 text-xs whitespace-nowrap">
+                                        <template v-if="a.fee_amount != null && Number(a.fee_amount) > 0">
+                                            ₹{{ a.fee_amount }}
+                                            <span v-if="a.fee_paid_at" class="text-emerald-700 block">Paid</span>
+                                            <button v-else-if="a.status === 'pending'" type="button"
+                                                    class="text-[#0f3d7a] font-semibold block mt-0.5"
+                                                    @click="markFeePaid(a.id)">Mark paid</button>
+                                        </template>
+                                        <span v-else class="text-slate-300">—</span>
+                                    </td>
+                                    <td class="p-3">
+                                        <span :class="statusClass(a.status)" class="text-xs font-semibold px-2 py-0.5 rounded capitalize">{{ a.status }}</span>
+                                    </td>
+                                    <td class="p-3 text-right">
+                                        <button v-if="a.status === 'pending'" type="button"
+                                                class="text-green-700 text-xs font-semibold mr-2"
+                                                @click="openResolve(a, 'approved')">Approve</button>
+                                        <button v-if="a.status === 'pending'" type="button"
+                                                class="text-red-600 text-xs font-semibold"
+                                                @click="openResolve(a, 'rejected')">Reject</button>
+                                    </td>
+                                </tr>
+                                <tr v-if="!filteredAppeals.length">
+                                    <td colspan="6" class="p-8 text-center text-gray-400">No appeals</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
