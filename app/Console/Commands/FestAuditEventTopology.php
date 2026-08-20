@@ -171,7 +171,11 @@ class FestAuditEventTopology extends Command
             ->whereNotNull('region_id')
             ->selectRaw('region_id, partition_role, source_phase_id, count(*) as c')
             ->groupBy('region_id', 'partition_role', 'source_phase_id')
-            ->having('c', '>', 1)
+            // ->having('c', ...) references the "c" select alias directly, which MySQL/SQLite
+            // accept but Postgres rejects ("column c does not exist") since HAVING is
+            // evaluated before SELECT aliases exist there. havingRaw() re-states the
+            // aggregate expression instead, which all three drivers accept.
+            ->havingRaw('count(*) > 1')
             ->get();
 
         foreach ($dupes as $dupe) {

@@ -228,7 +228,7 @@ class FestPartitionService
     public function combinedScoreboard(FestEvent $hub): array
     {
         $config = $this->aggregationConfig($hub);
-        $includeRoles = $config['include_roles'] ?? ['region', 'finale', 'cluster'];
+        $includeRoles = $config['include_roles'] ?? ['region', 'finale', 'cluster', 'phase'];
 
         $partitions = $this->partitions($hub)->filter(function (FestEvent $partition) use ($includeRoles) {
             $role = $this->partitionRole($partition);
@@ -383,7 +383,13 @@ class FestPartitionService
         }
 
         return [
-            'include_roles' => ['region', 'finale'],
+            // 'phase' is included so a phased_regional_billing hub's non-regional leaves
+            // (e.g. Digi Fest, District Kalotsav) count toward the combined/overall board —
+            // without it, combinedScoreboard() (and EventContext::scoreboardBySchool(),
+            // which calls it for any partitioned hub) silently summed only the regional
+            // phases' points and dropped the non-regional ones entirely. Harmless for
+            // legacy (non-phased) events, since those never have a 'phase'-role child.
+            'include_roles' => ['region', 'finale', 'phase'],
             'method' => 'sum_points',
             'overall_label' => 'Overall Championship',
         ];

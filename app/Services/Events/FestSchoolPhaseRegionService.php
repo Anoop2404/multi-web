@@ -64,6 +64,11 @@ class FestSchoolPhaseRegionService
                 'school_id' => $schoolId,
                 'selected_at' => now(),
                 'selected_by' => $actorId,
+                // Locked the moment a school makes its first pick for this phase, not
+                // deferred until their first registration (lockForRegistration() below) —
+                // a region choice must not be self-service-changeable at all once made; only
+                // the audited admin override ($override above) can move a school afterward.
+                'locked_at' => now(),
             ]);
 
             $selection->fill([

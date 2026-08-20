@@ -9,6 +9,12 @@
         <FestEventWorkflowStepper v-else :sahodaya-id="sahodaya.id" :event-id="event.id"
                                   :event-type="event.event_type" :current-step="'reports'" />
 
+        <div v-if="event.workflow_mode === 'phased_regional_billing'" class="mb-4">
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/results/advancement`" class="link-brand text-sm">
+                Advance regional winners to a later phase &rarr;
+            </Link>
+        </div>
+
         <!-- Sport Event / Region Switcher -->
         <div v-if="childEvents.length" class="card mb-4">
             <div class="flex flex-wrap gap-3 items-center">

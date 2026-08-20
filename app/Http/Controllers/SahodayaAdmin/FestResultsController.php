@@ -6,6 +6,7 @@ use App\Events\FestScoreboardUpdated;
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestPhaseAdvancement;
 use App\Models\FestQualification;
 use App\Models\FestResult;
 use App\Services\Audit\PlatformAuditLogger;
@@ -16,6 +17,7 @@ use App\Services\Events\FestCmsAutoPush;
 use App\Services\Events\FestEventNotifier;
 use App\Services\Events\FestItemHeadService;
 use App\Services\Events\FestItemResultsService;
+use App\Services\Events\FestPhaseAdvancementService;
 use App\Services\Events\FestQualificationService;
 use App\Services\Events\FestRegionPartitionService;
 use App\Support\FestPageActivity;
@@ -371,5 +373,89 @@ class FestResultsController extends SahodayaAdminController
         app(FestQualificationService::class)->revokeQualification($qualification);
 
         return back()->with('success', 'Promotion revoked and next-level registration cancelled.');
+    }
+
+    /**
+     * Same-event, phase-to-phase advancement (e.g. Off Stage/Sargadhara region winners ->
+     * District Kalotsav) — distinct from promote()/promoteAuto() above, which drive the
+     * Sahodaya->State qualification cascade. See FestPhaseAdvancementService's docblock.
+     */
+    public function advancement(Request $request, string $tenantId, FestEvent $event, FestPhaseAdvancementService $service)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $root = $event->rootEvent();
+
+        $phases = $root->phases()->orderBy('sort_order')->get();
+        $items = FestEventItem::where('event_id', $root->id)
+            ->where('is_enabled', true)
+            ->whereNotNull('phase_id')
+            ->orderBy('title')
+            ->get(['id', 'event_id', 'title', 'item_code', 'phase_id', 'participant_type']);
+
+        $fromItems = $items->filter(fn (FestEventItem $i) => $phases->firstWhere('id', $i->phase_id)?->isRegional());
+        $toItems = $items->filter(fn (FestEventItem $i) => ! $phases->firstWhere('id', $i->phase_id)?->isRegional());
+
+        $advancements = FestPhaseAdvancement::where('root_event_id', $root->id)
+            ->with(['fromItem:id,title', 'toItem:id,title', 'fromRegistration.school:id,name', 'region:id,name'])
+            ->latest('advanced_at')
+            ->get();
+
+        $selectedFromItemId = $request->integer('from_item_id') ?: null;
+        $candidates = [];
+        if ($selectedFromItemId) {
+            $fromItem = $items->firstWhere('id', $selectedFromItemId);
+            if ($fromItem) {
+                $candidates = $service->eligibleCandidates($fromItem);
+            }
+        }
+
+        return $this->inertia('Sahodaya/Events/PhaseAdvancement', [
+            'event' => $event,
+            'fromItems' => $fromItems->values(),
+            'toItems' => $toItems->values(),
+            'advancements' => $advancements,
+            'selectedFromItemId' => $selectedFromItemId,
+            'candidates' => $candidates,
+        ]);
+    }
+
+    public function advanceToPhase(Request $request, string $tenantId, FestEvent $event, FestPhaseAdvancementService $service, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $root = $event->rootEvent();
+        $data = $request->validate([
+            'from_item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('fest_event_items', 'id')->where('event_id', $root->id)],
+            'to_item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('fest_event_items', 'id')->where('event_id', $root->id)],
+            'registration_ids' => 'required|array|min:1',
+            'registration_ids.*' => 'integer',
+        ]);
+
+        $fromItem = FestEventItem::findOrFail($data['from_item_id']);
+        $toItem = FestEventItem::findOrFail($data['to_item_id']);
+
+        $advanced = $service->advance($fromItem, $toItem, $data['registration_ids'], $request->user()?->id);
+
+        $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.phase_advancement', "Advanced {$advanced->count()} entr(ies) from {$fromItem->title} to {$toItem->title}", [
+            'from_item_id' => $fromItem->id,
+            'to_item_id' => $toItem->id,
+            'registration_ids' => $data['registration_ids'],
+        ]);
+
+        return back()->with('success', "Advanced {$advanced->count()} entr(ies) to {$toItem->title}.");
+    }
+
+    public function withdrawAdvancement(string $tenantId, FestEvent $event, FestPhaseAdvancement $advancement, FestPhaseAdvancementService $service, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($advancement->root_event_id !== $event->rootEvent()->id, 404);
+
+        $service->withdraw($advancement, request()->user()?->id);
+
+        $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.phase_advancement_withdrawn', 'Phase advancement withdrawn', [
+            'advancement_id' => $advancement->id,
+        ]);
+
+        return back()->with('success', 'Advancement withdrawn.');
     }
 }

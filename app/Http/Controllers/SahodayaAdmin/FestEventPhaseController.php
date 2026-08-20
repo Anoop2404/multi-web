@@ -137,6 +137,16 @@ class FestEventPhaseController extends SahodayaAdminController
 
         $updated = $service->updatePhase($phase, $data);
 
+        // Push the phase's lifecycle fields (dates, status, lock flags) onto its already-
+        // materialized leaf events immediately — without this, a leaf's own stale snapshot
+        // from the last sync silently blocks/allows registration regardless of what the
+        // phase now says, since FestItemRegistrationGate::assertOpen() checks the leaf's own
+        // fields before the phase-aware EventLifecycleGate is ever consulted. Previously
+        // this only happened via a separate, easy-to-miss "Sync operational events" button.
+        if ($event->usesPhasedRegionalBilling()) {
+            app(\App\Services\Events\FestPhaseTopologyService::class)->sync($event->fresh());
+        }
+
         $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.phase.updated', "Updated phase {$updated->name}", [
             'phase_id' => $updated->id,
         ]);
@@ -160,6 +170,10 @@ class FestEventPhaseController extends SahodayaAdminController
         ]);
 
         $updated = $service->transitionStatus($phase, $data['status']);
+
+        if ($event->usesPhasedRegionalBilling()) {
+            app(\App\Services\Events\FestPhaseTopologyService::class)->sync($event->fresh());
+        }
 
         $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.phase.status_changed', "Phase {$updated->name} status → {$data['status']}", [
             'phase_id' => $updated->id,

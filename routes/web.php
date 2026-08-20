@@ -1237,6 +1237,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/results/promote', [FestResultsController::class, 'promote'])->name('results.promote');
             Route::post('/{event}/results/promote-auto', [FestResultsController::class, 'promoteAuto'])->name('results.promote-auto');
             Route::post('/{event}/results/qualifications/{qualification}/revoke', [FestResultsController::class, 'revokePromotion'])->name('results.qualifications.revoke');
+            Route::get('/{event}/results/advancement', [FestResultsController::class, 'advancement'])->name('results.advancement.index');
+            Route::post('/{event}/results/advancement', [FestResultsController::class, 'advanceToPhase'])->name('results.advancement.store');
+            Route::post('/{event}/results/advancement/{advancement}/withdraw', [FestResultsController::class, 'withdrawAdvancement'])->name('results.advancement.withdraw');
             Route::get('/{event}/fees', [FestEventFeesController::class, 'index'])->name('fees.index');
             Route::get('/{event}/fees/ledger', [FestEventFeesController::class, 'ledger'])->name('fees.ledger');
             Route::get('/{event}/fees/export', [FestEventFeesController::class, 'exportPayments'])->name('fees.export');

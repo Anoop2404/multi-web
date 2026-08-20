@@ -77,20 +77,72 @@ class FestRegistrationBatchFeeService
                 ];
             })->values();
 
-            // Per-student rate: Check payment batch first; if 0 or null, fall back to rate configured on linked phase(s)
-            $phaseStudentFee = FestEventPhase::where('event_id', $root->id)
-                ->where('registration_batch_id', $batch->id)
-                ->whereNotNull('student_registration_fee')
-                ->where('student_registration_fee', '>', 0)
-                ->value('student_registration_fee');
-
+            // Per-student rate: the batch's own rate wins outright when set (an explicit
+            // admin override, applied once per unique student across the whole batch). Only
+            // when the batch has no rate of its own do we fall back to each phase's own
+            // rate — and since two phases in one batch can have different rates (e.g. Digi
+            // Fest ₹50 vs Off Stage ₹75), that fallback must be computed PER PHASE, deduping
+            // students within each phase, never by picking one phase's rate via a bare
+            // ->value() and applying it to every student in the batch regardless of which
+            // phase they actually registered under.
             $batchFeeNum = $batch->student_registration_fee !== null ? (float) $batch->student_registration_fee : null;
+            $batchRateSet = $batchFeeNum !== null && $batchFeeNum > 0;
 
-            $studentFeeRate = ($batchFeeNum !== null && $batchFeeNum > 0)
-                ? $batchFeeNum
-                : ($phaseStudentFee !== null ? (float) $phaseStudentFee : $batchFeeNum);
+            $studentFeeLines = [];
 
-            $batchStudentFeeSet = $studentFeeRate !== null && $studentFeeRate > 0;
+            if ($batchRateSet) {
+                $batchStudentFee = round($studentCount * $batchFeeNum, 2);
+                if ($batchStudentFee > 0) {
+                    $studentFeeLines[] = [
+                        'label' => $batch->name.' student registration fee',
+                        'quantity' => $studentCount,
+                        'unit_amount' => $batchFeeNum,
+                        'amount' => $batchStudentFee,
+                    ];
+                }
+            } else {
+                $studentKeysByPhase = [];
+                foreach ($registrations as $registration) {
+                    $phase = $registration->item?->phase;
+                    $sourcePhase = $phase?->sourcePhase ?: $phase;
+                    $phaseId = $sourcePhase?->id ?? 0;
+                    foreach ($registration->participants as $participant) {
+                        if ($participant->participant_role === 'standby') {
+                            continue;
+                        }
+                        $key = $participant->student_id
+                            ? 'student:'.$participant->student_id
+                            : ($participant->teacher_id ? 'teacher:'.$participant->teacher_id : null);
+                        if ($key === null) {
+                            continue;
+                        }
+                        $studentKeysByPhase[$phaseId][$key] = true;
+                    }
+                }
+
+                $phaseNames = FestEventPhase::whereIn('id', array_keys($studentKeysByPhase))->pluck('name', 'id');
+                $phaseRates = FestEventPhase::whereIn('id', array_keys($studentKeysByPhase))->pluck('student_registration_fee', 'id');
+
+                $batchStudentFee = 0.0;
+                foreach ($studentKeysByPhase as $phaseId => $keys) {
+                    $rate = (float) ($phaseRates[$phaseId] ?? 0);
+                    if ($rate <= 0) {
+                        continue;
+                    }
+                    $count = count($keys);
+                    $amount = round($count * $rate, 2);
+                    $batchStudentFee += $amount;
+                    $studentFeeLines[] = [
+                        'label' => ($phaseNames[$phaseId] ?? $batch->name).' student registration fee',
+                        'quantity' => $count,
+                        'unit_amount' => $rate,
+                        'amount' => $amount,
+                    ];
+                }
+                $batchStudentFee = round($batchStudentFee, 2);
+            }
+
+            $batchStudentFeeSet = $batchStudentFee > 0;
 
             $participationFee = match ($feeModel) {
                 'item_catalog' => round((float) $itemLines->sum('amount'), 2),
@@ -100,14 +152,6 @@ class FestRegistrationBatchFeeService
                 'student_count_slab' => $this->fees->studentCountSlabFee($studentCount, $schedule),
                 default => round((float) $itemLines->sum('amount'), 2),
             };
-
-            // Additive, independent of fee_model — see FestRegistrationBatch::
-            // student_registration_fee migration docblock. Null (every batch before this
-            // feature existed, and any batch that hasn't opted in) contributes 0, so
-            // existing events keep billing exactly as before.
-            $batchStudentFee = $batchStudentFeeSet
-                ? round($studentCount * (float) $studentFeeRate, 2)
-                : 0.0;
 
             $school = \App\Models\Tenant::find($schoolId);
             $categoryBaseFee = $school ? $this->fees->schoolRegistrationAmount($school, $schedule) : 0.0;
@@ -171,13 +215,13 @@ class FestRegistrationBatchFeeService
                 ]);
             }
 
-            if ($batchStudentFee > 0) {
+            foreach ($studentFeeLines as $studentFeeLine) {
                 $lines->push([
                     'line_type' => 'student_registration',
-                    'label' => $batch->name.' student registration fee',
-                    'quantity' => $studentCount,
-                    'unit_amount' => $studentFeeRate,
-                    'amount' => $batchStudentFee,
+                    'label' => $studentFeeLine['label'],
+                    'quantity' => $studentFeeLine['quantity'],
+                    'unit_amount' => $studentFeeLine['unit_amount'],
+                    'amount' => $studentFeeLine['amount'],
                     'meta' => ['registration_batch_id' => $batch->id],
                 ]);
             }

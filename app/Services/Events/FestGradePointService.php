@@ -54,7 +54,12 @@ class FestGradePointService
         $grade = $this->normalizeGrade($event, $mark->grade);
         $pos = (string) ($mark->position ?? '');
 
-        return (int) (self::DEFAULT_POINTS[$grade][$pos] ?? ($mark->score ?? 0));
+        // A position with no configured table entry (e.g. 4th place, when only the top 3
+        // score) earns zero championship points — never the raw judged score. Falling back
+        // to $mark->score here used to silently add raw marks into the awarded-points total,
+        // which the platform's own scoring rules forbid (see mcsPointsForMark()/
+        // confedPointsForMark() above, which both already return 0 in the equivalent case).
+        return (int) (self::DEFAULT_POINTS[$grade][$pos] ?? 0);
     }
 
     /**

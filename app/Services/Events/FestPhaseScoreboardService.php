@@ -70,13 +70,15 @@ class FestPhaseScoreboardService
             return [];
         }
 
+        // Deliberately NOT filtered by FestPhaseRegion.enabled: "enabled" gates whether a
+        // school can newly select/register into that region (FestSchoolPhaseRegionService,
+        // FestPhasedWorkflowService::syncAllowedRegions()), not whether the region's
+        // already-conducted, already-published results still count. Disabling a region
+        // after its results are published (e.g. to close it off from further registration)
+        // must not silently erase its earned points from the phase or overall board — a
+        // leaf with no registrations/marks simply contributes zero either way.
         $phaseLeaves = FestEvent::where('parent_event_id', $hub->id)
             ->where('source_phase_id', $sourcePhase->id)
-            ->when($sourcePhase->isRegional(), function ($query) use ($sourcePhase) {
-                $query->whereIn('region_id', $sourcePhase->allowedRegions()
-                    ->where('enabled', true)
-                    ->select('region_id'));
-            })
             ->get();
 
         if ($phaseLeaves->isNotEmpty()) {
