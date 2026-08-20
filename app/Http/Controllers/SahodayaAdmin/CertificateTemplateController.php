@@ -102,18 +102,15 @@ class CertificateTemplateController extends SahodayaAdminController
         $render = app(TrainingCertificateService::class)
             ->sampleRenderContextForTemplate($template, $this->sahodaya);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
+        $html = view('training.certificate', array_merge($render, [
             'registration' => null,
             'certificate'  => (object) ['verification_uuid' => 'SAMPLE-PREVIEW-UUID'],
             'sahodaya'     => $this->sahodaya,
             'isSample'     => true,
             'isPdf'        => true,
-        ]))->setPaper('a4', 'landscape');
+        ]))->render();
 
-        return response($pdf->output(), 200, [
-            'Content-Type'        => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="certificate-template-preview.pdf"',
-        ]);
+        return \App\Support\PdfGenerator::download($html, 'certificate-template-preview.pdf', true, true);
     }
 
     public function store(Request $request)

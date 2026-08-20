@@ -447,17 +447,17 @@ class TrainingCertificateService
         $render = $this->renderContext($registration, $sahodaya);
         $fieldValues = $this->resolveFieldValues($registration, $sahodaya);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
+        $html = view('training.certificate', array_merge($render, [
             'registration' => $registration,
             'certificate'  => $certificate,
             'sahodaya'     => $sahodaya,
             'fieldValues'  => $fieldValues,
             'isPdf'        => true,
-        ]))->setPaper('a4', 'landscape');
+        ]))->render();
 
         $filename = Str::slug($registration->teacher?->name ?? 'certificate').'-training-certificate.pdf';
 
-        return $pdf->download($filename);
+        return \App\Support\PdfGenerator::download($html, $filename, false, true);
     }
 
     public function sendCertificateEmailToRegistration(TrainingRegistration $registration, Tenant $sahodaya, ?string $overrideEmail = null): bool
@@ -497,13 +497,13 @@ class TrainingCertificateService
         $render = $this->renderContext($registration, $sahodaya);
         $fieldValues = $this->resolveFieldValues($registration, $sahodaya);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
+        $html = view('training.certificate', array_merge($render, [
             'registration' => $registration,
             'certificate'  => $certificate,
             'sahodaya'     => $sahodaya,
             'fieldValues'  => $fieldValues,
             'isPdf'        => true,
-        ]))->setPaper('a4', 'landscape');
+        ]))->render();
 
         $isTest = ! empty($overrideEmail);
         $recipientName = $registration->teacher?->name ?? 'Participant';
@@ -513,7 +513,7 @@ class TrainingCertificateService
 
         $attachmentName = Str::slug($recipientName).'-certificate.pdf';
         $attachment = [
-            'content' => $pdf->output(),
+            'content' => \App\Support\PdfGenerator::render($html, true),
             'name'    => $attachmentName,
             'mime'    => 'application/pdf',
         ];

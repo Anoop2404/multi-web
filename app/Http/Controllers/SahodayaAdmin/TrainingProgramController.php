@@ -1290,19 +1290,16 @@ class TrainingProgramController extends SahodayaAdminController
             ->where('entity_id', $registration->id)
             ->first() ?? new \App\Models\Certificate(['verification_uuid' => 'PREVIEW-ONLY-UUID']);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
+        $html = view('training.certificate', array_merge($render, [
             'registration' => $registration,
             'certificate'  => $certificate,
             'sahodaya'     => $this->sahodaya,
             'fieldValues'  => $fieldValues,
             'isPdf'        => true,
             'previewOnly'  => ! $certificate->exists,
-        ]))->setPaper('a4', 'landscape');
+        ]))->render();
 
-        return response($pdf->output(), 200, [
-            'Content-Type'        => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="certificate-preview.pdf"',
-        ]);
+        return \App\Support\PdfGenerator::download($html, 'certificate-preview.pdf', true, true);
     }
 
     public function registrationInvoice(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
@@ -1347,18 +1344,15 @@ class TrainingProgramController extends SahodayaAdminController
         $render = app(TrainingCertificateService::class)
             ->sampleRenderContext($program, $this->sahodaya, $templateId);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
+        $html = view('training.certificate', array_merge($render, [
             'registration' => null,
             'certificate'  => (object) ['verification_uuid' => 'SAMPLE-PREVIEW-UUID'],
             'sahodaya'     => $this->sahodaya,
             'isSample'     => true,
             'isPdf'        => true,
-        ]))->setPaper('a4', 'landscape');
+        ]))->render();
 
-        return response($pdf->output(), 200, [
-            'Content-Type'        => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="certificate-sample-preview.pdf"',
-        ]);
+        return \App\Support\PdfGenerator::download($html, 'certificate-sample-preview.pdf', true, true);
     }
 
     public function certificatesHub(string $tenantId, TrainingProgram $program)
