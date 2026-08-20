@@ -505,20 +505,25 @@ class TrainingCertificateService
             'mime'    => 'application/pdf',
         ];
 
-        $mailer = \App\Services\Mail\SahodayaMailer::for($sahodaya->id);
-        if ($mailer->isConfigured()) {
-            $mailer->sendViewWithAttachments(
-                $targetEmail,
-                $subject,
-                'emails.notification-plain',
-                ['title' => $subject, 'body' => $body],
-                [$attachment],
-            );
-        } else {
-            \Illuminate\Support\Facades\Mail::raw($body, function ($message) use ($targetEmail, $subject, $attachment) {
-                $message->to($targetEmail)->subject($subject)
-                    ->attachData($attachment['content'], $attachment['name'], ['mime' => $attachment['mime']]);
-            });
+        try {
+            $mailer = \App\Services\Mail\SahodayaMailer::for($sahodaya->id);
+            if ($mailer->isConfigured()) {
+                $mailer->sendViewWithAttachments(
+                    $targetEmail,
+                    $subject,
+                    'emails.notification-plain',
+                    ['title' => $subject, 'body' => $body],
+                    [$attachment],
+                );
+            } else {
+                \Illuminate\Support\Facades\Mail::raw($body, function ($message) use ($targetEmail, $subject, $attachment) {
+                    $message->to($targetEmail)->subject($subject)
+                        ->attachData($attachment['content'], $attachment['name'], ['mime' => $attachment['mime']]);
+                });
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to send certificate email to {$targetEmail}: ".$e->getMessage());
+            return false;
         }
 
         if (! $isTest && $certificate) {

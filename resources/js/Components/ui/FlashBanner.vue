@@ -25,7 +25,7 @@ import { usePage } from '@inertiajs/vue3';
 
 const page = usePage();
 const success = computed(() => page.props.flash?.success ?? '');
-const error = computed(() => page.props.flash?.error ?? '');
+const error = computed(() => success.value ? '' : (page.props.flash?.error ?? ''));
 const warning = computed(() => page.props.flash?.warning ?? '');
 const info = computed(() => page.props.flash?.info ?? '');
 

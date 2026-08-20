@@ -1416,15 +1416,25 @@ class TrainingProgramController extends SahodayaAdminController
             'test_email' => 'required|email|max:255',
         ]);
 
-        $sent = app(TrainingCertificateService::class)->sendTestCertificateEmail(
-            $program,
-            $this->sahodaya,
-            $data['test_email']
-        );
+        try {
+            $sent = app(TrainingCertificateService::class)->sendTestCertificateEmail(
+                $program,
+                $this->sahodaya,
+                $data['test_email']
+            );
+        } catch (\Throwable $e) {
+            session()->forget(['success']);
+            return back()->with('error', 'Could not send test email: '.$e->getMessage());
+        }
 
-        abort_unless($sent, 422, 'Could not send test email.');
+        if (! $sent) {
+            session()->forget(['success']);
+            return back()->with('error', 'Could not send test email. Please check your email/SMTP configuration.');
+        }
 
-        return back()->with('success', "Test certificate email successfully sent to {$data['test_email']}.");
+        session()->forget(['error', 'warning', 'info']);
+
+        return back()->with('success', "Test certificate email successfully sent to {$data['test_email']}! Check your inbox.");
     }
 
     public function bulkSendCertificatesEmail(Request $request, string $tenantId, TrainingProgram $program)
