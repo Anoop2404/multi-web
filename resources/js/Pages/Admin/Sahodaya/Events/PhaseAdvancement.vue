@@ -33,9 +33,9 @@
         </div>
 
         <div v-if="fromItemId" class="card space-y-3 mb-6">
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <h4 class="section-title">Candidates ({{ candidates.length }})</h4>
-                <button type="button" class="btn-primary text-sm" :disabled="selectedIds.length === 0 || !toItemId || advanceForm.processing"
+                <button type="button" class="btn-primary text-sm shrink-0" :disabled="selectedIds.length === 0 || !toItemId || advanceForm.processing"
                         @click="advance">
                     Advance selected ({{ selectedIds.length }})
                 </button>
@@ -48,9 +48,9 @@
                 <li v-for="c in candidates" :key="c.registration_id" class="py-2.5 flex items-start gap-3">
                     <input type="checkbox" class="mt-1" :checked="selectedIds.includes(c.registration_id)"
                            :disabled="c.already_advanced" @change="toggleSelected(c.registration_id)" />
-                    <div class="flex-1">
-                        <div class="flex items-center justify-between gap-2">
-                            <div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                            <div class="min-w-0">
                                 <span class="font-semibold text-slate-700">{{ c.school_name || c.school_id }}</span>
                                 <span v-if="c.team_name" class="ml-1.5 text-xs text-slate-500">({{ c.team_name }})</span>
                                 <span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-slate-200 text-slate-700">
