@@ -21,10 +21,16 @@
                         <span v-if="session.venue"> · {{ session.venue }}</span>
                     </p>
                 </div>
-                <button v-if="registrations.length" type="button" @click="markAllPresent(session)"
-                        class="text-xs text-indigo-600 font-semibold border border-indigo-200 px-2 py-1 rounded">
-                    Mark all present
-                </button>
+                <div v-if="registrations.length" class="flex items-center gap-2">
+                    <button type="button" @click="markUnmarkedPresent(session)"
+                            class="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded font-semibold hover:bg-indigo-100 transition">
+                        Mark unmarked present
+                    </button>
+                    <button type="button" @click="markAllPresent(session)"
+                            class="text-xs text-slate-600 border border-slate-200 px-2 py-1 rounded hover:bg-slate-50 transition">
+                        Mark all present
+                    </button>
+                </div>
             </div>
 
             <div class="overflow-x-auto">
@@ -129,10 +135,28 @@ function setAttendance(session, registration, status) {
     );
 }
 
+function markUnmarkedPresent(session) {
+    router.post(
+        `/school-admin/${props.school.id}/training/${props.program.id}/sessions/${session.id}/attendance`,
+        { unmarked_only: true },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                for (const r of props.registrations) {
+                    if (!localAttendance[session.id]) localAttendance[session.id] = {};
+                    if (!localAttendance[session.id][r.id]) {
+                        localAttendance[session.id][r.id] = 'present';
+                    }
+                }
+            },
+        }
+    );
+}
+
 function markAllPresent(session) {
     router.post(
         `/school-admin/${props.school.id}/training/${props.program.id}/sessions/${session.id}/attendance`,
-        {},
+        { unmarked_only: false },
         {
             preserveScroll: true,
             onSuccess: () => {

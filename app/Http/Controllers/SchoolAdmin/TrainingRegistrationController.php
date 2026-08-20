@@ -471,27 +471,43 @@ class TrainingRegistrationController extends SchoolAdminController
         abort_unless($program->allow_school_attendance ?? true, 403, 'This training program doesn\'t track school-level attendance.');
         abort_if($session->program_id !== $program->id, 404);
 
+        $unmarkedOnly = $request->boolean('unmarked_only', false);
+
         $registrations = TrainingRegistration::where('program_id', $program->id)
             ->where('school_id', $this->school->id)
             ->with('teacher')
             ->get()
             ->filter(fn (TrainingRegistration $r) => $lifecycle->canMarkAttendance($r, $program));
 
+        $count = 0;
         foreach ($registrations as $registration) {
+            if ($unmarkedOnly) {
+                $exists = TrainingAttendance::where('session_id', $session->id)
+                    ->where('registration_id', $registration->id)
+                    ->whereNotNull('status')
+                    ->exists();
+                if ($exists) {
+                    continue;
+                }
+            }
+
             TrainingAttendance::updateOrCreate(
                 ['session_id' => $session->id, 'registration_id' => $registration->id],
                 ['status' => 'present', 'marked_by' => $request->user()->id, 'marked_at' => now()]
             );
+            $count++;
         }
 
         $audit->training(
             $program,
             'training.school.attendance_bulk',
-            "School marked all present for {$session->title} ({$registrations->count()} teachers)",
-            ['session_id' => $session->id, 'school_id' => $this->school->id, 'count' => $registrations->count()],
+            "School marked present for {$session->title} ({$count} teachers)",
+            ['session_id' => $session->id, 'school_id' => $this->school->id, 'count' => $count],
         );
 
-        return back()->with('success', 'Marked '.$registrations->count().' teacher(s) present.');
+        $label = $unmarkedOnly ? 'unmarked teacher(s)' : 'teacher(s)';
+
+        return back()->with('success', "Marked {$count} {$label} present.");
     }
 
     public function uploadPayment(Request $request, string $tenantId, TrainingRegistration $registration)

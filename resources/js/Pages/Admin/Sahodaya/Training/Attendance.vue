@@ -49,10 +49,16 @@
                         <span v-if="session.duration_minutes"> · {{ session.duration_minutes }} min</span>
                     </p>
                 </div>
-                <button type="button" @click="markAllPresent(session)"
-                        class="text-xs text-indigo-600 font-semibold border border-indigo-200 px-2 py-1 rounded">
-                    Mark all present
-                </button>
+                <div class="flex items-center gap-2">
+                    <button type="button" @click="markUnmarkedPresent(session)"
+                            class="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded font-semibold hover:bg-indigo-100 transition">
+                        Mark unmarked present
+                    </button>
+                    <button type="button" @click="markAllPresent(session)"
+                            class="text-xs text-slate-600 border border-slate-200 px-2 py-1 rounded hover:bg-slate-50 transition">
+                        Mark all present
+                    </button>
+                </div>
             </div>
 
             <div class="overflow-x-auto">
@@ -188,10 +194,28 @@ function formatDate(value) {
     return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+function markUnmarkedPresent(session) {
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/sessions/${session.id}/attendance`,
+        { unmarked_only: true },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                for (const r of confirmedRegistrations.value) {
+                    if (!localAttendance[session.id]) localAttendance[session.id] = {};
+                    if (!localAttendance[session.id][r.id]?.status) {
+                        localAttendance[session.id][r.id] = { status: 'present', approval_status: null, correction_reason: null };
+                    }
+                }
+            },
+        }
+    );
+}
+
 function markAllPresent(session) {
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/sessions/${session.id}/attendance`,
-        {},
+        { unmarked_only: false },
         {
             preserveScroll: true,
             onSuccess: () => {

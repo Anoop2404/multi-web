@@ -1082,23 +1082,39 @@ class TrainingProgramController extends SahodayaAdminController
         return TenantStorage::downloadResponse($this->sahodaya, $path);
     }
 
-    public function storeSessionAttendance(string $tenantId, TrainingProgram $program, TrainingSession $session)
+    public function storeSessionAttendance(Request $request, string $tenantId, TrainingProgram $program, TrainingSession $session)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
         abort_if($session->program_id !== $program->id, 403);
+
+        $unmarkedOnly = $request->boolean('unmarked_only', false);
 
         $registrations = TrainingRegistration::where('program_id', $program->id)
             ->get()
             ->filter(fn (TrainingRegistration $r) => app(\App\Services\Training\TrainingRegistrationLifecycle::class)->canMarkAttendance($r, $program));
 
+        $count = 0;
         foreach ($registrations as $registration) {
+            if ($unmarkedOnly) {
+                $exists = TrainingAttendance::where('session_id', $session->id)
+                    ->where('registration_id', $registration->id)
+                    ->whereNotNull('status')
+                    ->exists();
+                if ($exists) {
+                    continue;
+                }
+            }
+
             TrainingAttendance::updateOrCreate(
                 ['session_id' => $session->id, 'registration_id' => $registration->id],
                 ['status' => 'present', 'marked_by' => auth()->id(), 'marked_at' => now()]
             );
+            $count++;
         }
 
-        return back()->with('success', 'Attendance marked for '.$registrations->count().' participant(s).');
+        $label = $unmarkedOnly ? 'unmarked participant(s)' : 'participant(s)';
+
+        return back()->with('success', "Attendance marked present for {$count} {$label}.");
     }
 
     public function updateAttendance(Request $request, string $tenantId, TrainingProgram $program, TrainingSession $session, TrainingRegistration $registration)
