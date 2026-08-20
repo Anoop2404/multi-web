@@ -151,31 +151,7 @@
     $hasBackground = ! empty($backgroundUrl);
 @endphp
 
-@if(empty($isPdf))
-    <div class="no-print" style="font-family:system-ui,-apple-system,sans-serif;font-size:13px;padding:12px 18px;margin:16px auto;max-width:842px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-        <div>
-            @if(!empty($isSample))
-                <span style="color:#b45309;font-weight:600;">Sample Certificate Preview</span>
-                <span style="color:#64748b;font-size:12px;margin-left:6px;">— demo mode</span>
-            @elseif(!empty($previewOnly))
-                <span style="color:#0f3d7a;font-weight:600;">Unissued Certificate Preview</span>
-                <span style="color:#64748b;font-size:12px;margin-left:6px;">— not yet issued</span>
-            @else
-                <span style="color:#166534;font-weight:600;">Official Certificate Preview</span>
-            @endif
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-            @if(!empty($pdfPreviewUrl))
-                <a href="{{ $pdfPreviewUrl }}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:#0f172a;color:#fff;text-decoration:none;border-radius:6px;font-weight:500;font-size:12.5px;">
-                    📄 Open PDF Preview
-                </a>
-            @endif
-            <button type="button" onclick="window.print()" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:#1e3a8a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:500;font-size:12.5px;">
-                🖨 Print / Save
-            </button>
-        </div>
-    </div>
-@endif
+
 
 @if($hasBackground)
     <div class="page has-background" style="background-image:url('{{ $backgroundUrl }}');">
@@ -305,10 +281,6 @@
     </div>
 @endif
 
-@if(empty($isPdf))
-    <p class="no-print" style="text-align:center;margin-top:16px;font-family:sans-serif;font-size:13px;">
-        <button type="button" onclick="window.print()" style="padding:8px 20px;background:#1e3a8a;color:#fff;border:none;border-radius:6px;cursor:pointer;">Print Certificate</button>
-    </p>
-@endif
+
 </body>
 </html>
