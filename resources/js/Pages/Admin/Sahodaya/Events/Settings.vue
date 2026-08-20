@@ -14,9 +14,12 @@
 
         <EventSettingsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event" :active-tab="activeTab" />
 
-        <div class="grid lg:grid-cols-3 gap-6">
-            <!-- Left Column: Active Settings Forms -->
-            <div class="lg:col-span-2 space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Column: Active Settings Forms. min-w-0 lets this column's content
+                 (tables, long form rows) shrink to fit instead of a grid item's default
+                 min-width:auto letting a wide child force the whole grid track — and the
+                 page along with it — wider than the viewport. -->
+            <div class="min-w-0 lg:col-span-2 space-y-6">
                 <!-- Group Tab 1: Fees & Windows -->
                 <template v-if="['fees', 'registration', 'participation'].includes(activeTab)">
                     <div id="section-fees" class="scroll-mt-6"><FeesTab /></div>
@@ -49,7 +52,7 @@
             </div>
 
             <!-- Right Column: Quick Navigation & Shortcuts -->
-            <aside class="lg:col-span-1 space-y-4">
+            <aside class="min-w-0 lg:col-span-1 space-y-4">
                 <div class="card space-y-3">
                     <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
                         <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">

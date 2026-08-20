@@ -53,12 +53,36 @@
                 <div>
                     <h3 class="section-title flex items-center gap-2"><span>🏦</span> Event Payment Instructions & Bank Details (Optional)</h3>
                     <p class="section-desc">
-                        Specific bank account / UPI payment instructions for schools paying fees for this event.
+                        Specific bank account / UPI payment details for schools paying fees for this event. Leave every field blank to automatically use the default Sahodaya bank account & payment instructions.
                     </p>
                 </div>
-                <FormField label="Event Payment Instructions" hint="Leave blank to automatically use default Sahodaya bank account & payment instructions.">
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <FormField label="Bank Name">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="feeSettingsForm.payment_bank_name" type="text" class="field mt-1 text-sm" placeholder="State Bank of India">
+                        </template>
+                    </FormField>
+                    <FormField label="Account Number">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="feeSettingsForm.payment_account_no" type="text" class="field mt-1 text-sm font-mono" placeholder="12345678901">
+                        </template>
+                    </FormField>
+                    <FormField label="IFSC Code">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="feeSettingsForm.payment_ifsc" type="text" class="field mt-1 text-sm font-mono uppercase" placeholder="SBIN0001234">
+                        </template>
+                    </FormField>
+                    <FormField label="UPI ID">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="feeSettingsForm.payment_upi" type="text" class="field mt-1 text-sm font-mono" placeholder="event@oksbi">
+                        </template>
+                    </FormField>
+                </div>
+
+                <FormField label="Additional Instructions (optional)" hint="Anything schools need beyond the bank details above — e.g. a cutoff time or a note to include the school code in the transfer reference.">
                     <template #default="{ id }">
-                        <textarea :id="id" v-model="feeSettingsForm.payment_instructions" rows="3" class="field mt-1 text-xs font-mono" placeholder="Bank: State Bank of India&#10;Account: 12345678901&#10;IFSC: SBIN0001234&#10;UPI: event@oksbi"></textarea>
+                        <textarea :id="id" v-model="feeSettingsForm.payment_instructions" rows="2" class="field mt-1 text-sm"></textarea>
                     </template>
                 </FormField>
 
@@ -80,6 +104,13 @@
                             </div>
                         </template>
                     </FormField>
+                </div>
+
+                <div class="border-t border-slate-100 pt-3 flex items-center gap-3">
+                    <button type="button" class="btn-primary text-sm" :disabled="feeSettingsForm.processing" @click="saveFeeSettings">
+                        Save Payment Details
+                    </button>
+                    <span v-if="feeSettingsForm.recentlySuccessful" class="text-xs text-emerald-700 font-semibold">Saved ✓</span>
                 </div>
             </section>
 

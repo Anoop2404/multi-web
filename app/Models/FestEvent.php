@@ -129,12 +129,26 @@ class FestEvent extends Model
             || $this->extra_item_fee !== null;
     }
 
-    /** Formatted payment details for schools, falling back to Sahodaya default profile. */
+    /**
+     * Formatted payment details for schools, falling back to Sahodaya default profile.
+     * Structured bank_name/account_no/ifsc/upi fields (matching SahodayaProfile's own
+     * fields) plus an optional freeform notes line — set as separate fee_settings JSON
+     * keys, not one freeform blob, so the admin form can expose them as individual
+     * labeled inputs instead of a single hard-to-validate textarea.
+     */
     public function paymentDetailsText(?SahodayaProfile $sahodayaProfile = null): string
     {
-        $customInstructions = $this->fee_settings['payment_instructions'] ?? null;
-        if (filled($customInstructions)) {
-            return trim((string) $customInstructions);
+        $settings = $this->fee_settings ?? [];
+        $lines = array_filter([
+            filled($settings['payment_bank_name'] ?? null) ? "Bank: {$settings['payment_bank_name']}" : null,
+            filled($settings['payment_account_no'] ?? null) ? "Account: {$settings['payment_account_no']}" : null,
+            filled($settings['payment_ifsc'] ?? null) ? "IFSC: {$settings['payment_ifsc']}" : null,
+            filled($settings['payment_upi'] ?? null) ? "UPI: {$settings['payment_upi']}" : null,
+            filled($settings['payment_instructions'] ?? null) ? trim((string) $settings['payment_instructions']) : null,
+        ]);
+
+        if ($lines !== []) {
+            return implode("\n", $lines);
         }
 
         if (! $sahodayaProfile) {

@@ -457,6 +457,10 @@ class FestEventSettingsController extends SahodayaAdminController
             'default_item_fee' => 'nullable|numeric|min:0',
             'require_fee_before_registration' => 'nullable|boolean',
             'require_verified_students' => 'nullable|boolean',
+            'payment_bank_name' => 'nullable|string|max:255',
+            'payment_account_no' => 'nullable|string|max:64',
+            'payment_ifsc' => 'nullable|string|max:20',
+            'payment_upi' => 'nullable|string|max:255',
             'payment_instructions' => 'nullable|string|max:5000',
             'payment_qr_code' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:3072',
             'remove_payment_qr_code' => 'nullable|boolean',
@@ -503,6 +507,14 @@ class FestEventSettingsController extends SahodayaAdminController
                     ? (bool) $data['require_fee_before_registration'] : null,
                 'require_verified_students' => array_key_exists('require_verified_students', $data)
                     ? (bool) $data['require_verified_students'] : null,
+                'payment_bank_name' => array_key_exists('payment_bank_name', $data)
+                    ? (filled($data['payment_bank_name']) ? trim((string) $data['payment_bank_name']) : null) : null,
+                'payment_account_no' => array_key_exists('payment_account_no', $data)
+                    ? (filled($data['payment_account_no']) ? trim((string) $data['payment_account_no']) : null) : null,
+                'payment_ifsc' => array_key_exists('payment_ifsc', $data)
+                    ? (filled($data['payment_ifsc']) ? trim((string) $data['payment_ifsc']) : null) : null,
+                'payment_upi' => array_key_exists('payment_upi', $data)
+                    ? (filled($data['payment_upi']) ? trim((string) $data['payment_upi']) : null) : null,
                 'payment_instructions' => array_key_exists('payment_instructions', $data)
                     ? (filled($data['payment_instructions']) ? trim((string) $data['payment_instructions']) : null) : null,
                 // normalizeEventFeeSettings() above only threads class_group_scheme through for
