@@ -60,6 +60,7 @@ class MembershipSettingsController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Membership/Settings', [
             'profile'            => array_merge($profile->toArray(), [
                 'mail_configured' => $profile->mailIsConfigured(),
+                'payment_qr_code_url' => $profile->paymentQrCodeUrl(),
             ]),
             'feeSlabs'           => MembershipFeeSlab::where('sahodaya_id', $this->sahodaya->id)->where('academic_year', $academicYear)->orderBy('min_students')->get(),
             'registrationWindow' => $registrationWindow,
@@ -124,9 +125,17 @@ class MembershipSettingsController extends SahodayaAdminController
             'payment_account_no'           => 'nullable|string|max:50',
             'payment_ifsc'                 => 'nullable|string|max:20',
             'payment_upi'                  => 'nullable|string|max:100',
+            'payment_qr_code'              => 'nullable|image|mimes:png,jpg,jpeg,webp|max:3072',
+            'remove_payment_qr_code'       => 'nullable|boolean',
             'active_academic_year'         => ['nullable', 'string', 'max:10', 'regex:/^\d{4}-\d{2}$/'],
             'fest_class_group_scheme'      => 'nullable|in:cbse,sahodaya,cluster',
         ]);
+
+        if ($request->hasFile('payment_qr_code')) {
+            $data['payment_qr_code'] = \App\Support\TenantStorage::storeUploadedFile($request->file('payment_qr_code'), 'payment_qr_codes');
+        } elseif ($request->boolean('remove_payment_qr_code')) {
+            $data['payment_qr_code'] = null;
+        }
 
         if ($profile->prefixes_locked && isset($data['prefix']) && $data['prefix'] !== $profile->prefix) {
             return back()->with('error', 'Sahodaya prefix is locked after first registration number was issued.');

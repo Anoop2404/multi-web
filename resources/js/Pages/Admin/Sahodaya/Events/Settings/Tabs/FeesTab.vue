@@ -49,7 +49,7 @@
         </div>
 
         <form @submit.prevent="saveFeeSettings" class="space-y-6">
-            <section class="card space-y-3 border-blue-100 bg-gradient-to-br from-blue-50/20 to-white">
+            <section class="card space-y-4 border-blue-100 bg-gradient-to-br from-blue-50/20 to-white">
                 <div>
                     <h3 class="section-title flex items-center gap-2"><span>🏦</span> Event Payment Instructions & Bank Details (Optional)</h3>
                     <p class="section-desc">
@@ -61,6 +61,26 @@
                         <textarea :id="id" v-model="feeSettingsForm.payment_instructions" rows="3" class="field mt-1 text-xs font-mono" placeholder="Bank: State Bank of India&#10;Account: 12345678901&#10;IFSC: SBIN0001234&#10;UPI: event@oksbi"></textarea>
                     </template>
                 </FormField>
+
+                <div class="border-t border-slate-100 pt-3">
+                    <FormField label="Event Payment QR Code Image (Optional)" hint="Upload a UPI QR Code image (PNG/JPG/WEBP). Leave blank to use Sahodaya default QR code.">
+                        <template #default="{ id }">
+                            <div class="flex flex-wrap items-center gap-4 mt-1">
+                                <div v-if="event.payment_qr_code_url" class="shrink-0 p-2 bg-white rounded-lg border border-slate-200 shadow-xs flex items-center gap-3">
+                                    <img :src="event.payment_qr_code_url" alt="Current QR Code" class="w-16 h-16 object-contain rounded border border-slate-100">
+                                    <div class="text-xs">
+                                        <p class="font-bold text-slate-800">Current QR Code</p>
+                                        <label class="inline-flex items-center gap-1.5 mt-1 text-red-600 cursor-pointer font-medium hover:underline text-[11px]">
+                                            <input type="checkbox" v-model="feeSettingsForm.remove_payment_qr_code" class="rounded text-red-600">
+                                            Remove custom QR code
+                                        </label>
+                                    </div>
+                                </div>
+                                <input :id="id" type="file" accept="image/png,image/jpeg,image/webp" class="field text-xs max-w-xs" @change="feeSettingsForm.payment_qr_code = $event.target.files[0]">
+                            </div>
+                        </template>
+                    </FormField>
+                </div>
             </section>
 
             <section class="card space-y-4">

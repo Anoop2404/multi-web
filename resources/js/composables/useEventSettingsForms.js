@@ -272,6 +272,8 @@ export function useEventSettingsForms(props) {
             ?? schedule.require_verified_students
             ?? false,
         payment_instructions: existingFeeSettings.payment_instructions ?? '',
+        payment_qr_code: null,
+        remove_payment_qr_code: false,
         head_fees: (props.itemHeads ?? []).map((head) => ({
             id: head.id,
             name: head.name,

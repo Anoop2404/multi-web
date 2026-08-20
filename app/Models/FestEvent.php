@@ -144,6 +144,24 @@ class FestEvent extends Model
         return $sahodayaProfile ? $sahodayaProfile->paymentDetailsText() : '';
     }
 
+    /** Resolved payment QR code image URL for schools, falling back to Sahodaya default profile. */
+    public function paymentQrCodeUrl(?SahodayaProfile $sahodayaProfile = null): ?string
+    {
+        $customQr = $this->fee_settings['payment_qr_code'] ?? null;
+        if (filled($customQr)) {
+            $path = (string) $customQr;
+            return str_starts_with($path, '/') || str_starts_with($path, 'http')
+                ? $path
+                : '/storage/' . ltrim($path, '/');
+        }
+
+        if (! $sahodayaProfile) {
+            $sahodayaProfile = SahodayaProfile::where('tenant_id', $this->tenant_id)->first();
+        }
+
+        return $sahodayaProfile ? $sahodayaProfile->paymentQrCodeUrl() : null;
+    }
+
     public function requiresManualApproval(): bool
     {
         return $this->approval_policy === 'manual';

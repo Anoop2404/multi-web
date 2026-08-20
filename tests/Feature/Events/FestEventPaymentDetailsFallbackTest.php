@@ -27,6 +27,7 @@ class FestEventPaymentDetailsFallbackTest extends TestCase
             'payment_ifsc' => 'SBIN0009999',
             'payment_upi' => 'default@oksbi',
             'payment_instructions' => 'Include school code in transfer reference.',
+            'payment_qr_code' => 'payment_qr_codes/default_qr.png',
         ]);
 
         $event = FestEvent::create([
@@ -37,9 +38,10 @@ class FestEventPaymentDetailsFallbackTest extends TestCase
         ]);
 
         $this->assertEquals($profile->paymentDetailsText(), $event->paymentDetailsText());
+        $this->assertEquals('/storage/payment_qr_codes/default_qr.png', $event->paymentQrCodeUrl());
     }
 
-    public function test_event_uses_custom_payment_instructions_when_configured(): void
+    public function test_event_uses_custom_payment_instructions_and_qr_code_when_configured(): void
     {
         $sahodaya = Tenant::create([
             'type' => 'sahodaya',
@@ -53,9 +55,11 @@ class FestEventPaymentDetailsFallbackTest extends TestCase
             'payment_account_no' => '99988877766',
             'payment_ifsc' => 'SBIN0009999',
             'payment_upi' => 'default@oksbi',
+            'payment_qr_code' => 'payment_qr_codes/default_qr.png',
         ]);
 
         $customText = "Custom Event Bank Account:\nBank: HDFC Bank\nAccount: 112233445566\nIFSC: HDFC0001234\nUPI: event@okhdfc";
+        $customQr = 'payment_qr_codes/event_custom_qr.png';
 
         $event = FestEvent::create([
             'tenant_id' => $sahodaya->id,
@@ -64,9 +68,11 @@ class FestEventPaymentDetailsFallbackTest extends TestCase
             'fee_settings' => [
                 'fee_model' => 'none',
                 'payment_instructions' => $customText,
+                'payment_qr_code' => $customQr,
             ],
         ]);
 
         $this->assertEquals($customText, $event->paymentDetailsText());
+        $this->assertEquals('/storage/payment_qr_codes/event_custom_qr.png', $event->paymentQrCodeUrl());
     }
 }

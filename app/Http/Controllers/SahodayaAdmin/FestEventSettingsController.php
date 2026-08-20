@@ -458,6 +458,8 @@ class FestEventSettingsController extends SahodayaAdminController
             'require_fee_before_registration' => 'nullable|boolean',
             'require_verified_students' => 'nullable|boolean',
             'payment_instructions' => 'nullable|string|max:5000',
+            'payment_qr_code' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:3072',
+            'remove_payment_qr_code' => 'nullable|boolean',
             'head_fees' => 'nullable|array',
             'head_fees.*.id' => 'required|exists:fest_item_heads,id',
             'head_fees.*.default_item_fee' => 'nullable|numeric|min:0',
@@ -517,6 +519,19 @@ class FestEventSettingsController extends SahodayaAdminController
                     ? $data['class_group_scheme'] : null,
             ], fn ($v) => $v !== null),
         );
+
+        $existingQrCode = $event->fee_settings['payment_qr_code'] ?? null;
+        if ($request->hasFile('payment_qr_code')) {
+            $existingQrCode = \App\Support\TenantStorage::storeUploadedFile($request->file('payment_qr_code'), 'payment_qr_codes');
+        } elseif ($request->boolean('remove_payment_qr_code')) {
+            $existingQrCode = null;
+        }
+
+        if ($existingQrCode !== null) {
+            $feeSettings['payment_qr_code'] = $existingQrCode;
+        } else {
+            unset($feeSettings['payment_qr_code']);
+        }
 
         $event->update(['fee_settings' => $feeSettings]);
 

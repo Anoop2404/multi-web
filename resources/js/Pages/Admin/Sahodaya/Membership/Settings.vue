@@ -264,6 +264,21 @@
                             <textarea v-model="paymentForm.payment_instructions" rows="4" class="field w-full"
                                       placeholder="e.g. Include school name and registration number in the payment reference."></textarea>
                         </FormField>
+                        <FormField label="Default Sahodaya Payment QR Code Image (Optional)" class-extra="sm:col-span-2" hint="Upload a default UPI QR Code image (PNG/JPG/WEBP) for your Sahodaya.">
+                            <div class="flex flex-wrap items-center gap-4 mt-1">
+                                <div v-if="profile?.payment_qr_code_url" class="shrink-0 p-2 bg-white rounded-lg border border-gray-200 shadow-xs flex items-center gap-3">
+                                    <img :src="profile.payment_qr_code_url" alt="Current Default QR Code" class="w-16 h-16 object-contain rounded border border-gray-100">
+                                    <div class="text-xs">
+                                        <p class="font-bold text-gray-800">Current Default QR Code</p>
+                                        <label class="inline-flex items-center gap-1.5 mt-1 text-red-600 cursor-pointer font-medium hover:underline text-[11px]">
+                                            <input type="checkbox" v-model="paymentForm.remove_payment_qr_code" class="rounded text-red-600">
+                                            Remove default QR code
+                                        </label>
+                                    </div>
+                                </div>
+                                <input type="file" accept="image/png,image/jpeg,image/webp" class="field text-xs max-w-xs" @change="paymentForm.payment_qr_code = $event.target.files[0]">
+                            </div>
+                        </FormField>
                     </FormGrid>
                 </FormSection>
 
@@ -1251,6 +1266,8 @@ const paymentForm = useForm({
     payment_ifsc:          props.profile?.payment_ifsc ?? '',
     payment_upi:           props.profile?.payment_upi ?? '',
     payment_instructions:  props.profile?.payment_instructions ?? '',
+    payment_qr_code:       null,
+    remove_payment_qr_code: false,
 });
 const mailForm = useForm({
     zeptomail_region:  props.profile?.zeptomail_region ?? 'in',

@@ -830,6 +830,7 @@ class FestRegistrationController extends SchoolAdminController
         }
 
         $event->setAttribute('payment_details_text', $event->paymentDetailsText());
+        $event->setAttribute('payment_qr_code_url', $event->paymentQrCodeUrl());
 
         $feeRequired = $feeService->feeRequired($event);
         $enabledItems = $event->items->filter(fn ($i) => ($i->is_enabled ?? true));

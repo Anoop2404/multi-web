@@ -19,7 +19,7 @@ class SahodayaProfile extends Model
         'teacher_registration_enabled', 'auto_approve_submissions', 'student_edit_lock_enabled', 'student_edit_lock_at',
         'require_student_verification', 'payment_instructions', 'prefixes_locked',
         'setup_wizard_complete', 'setup_wizard_dismissed_at',
-        'payment_bank_name', 'payment_account_no', 'payment_ifsc', 'payment_upi',
+        'payment_bank_name', 'payment_account_no', 'payment_ifsc', 'payment_upi', 'payment_qr_code',
         'application_form_config', 'active_academic_year', 'fest_class_group_scheme', 'nav_visibility',
         'sports_age_cutoff_date',
         'receipt_template_json', 'receipt_next_number',
@@ -145,5 +145,18 @@ class SahodayaProfile extends Model
         ]);
 
         return implode("\n", $lines);
+    }
+
+    public function paymentQrCodeUrl(): ?string
+    {
+        if (blank($this->payment_qr_code)) {
+            return null;
+        }
+
+        $path = (string) $this->payment_qr_code;
+
+        return str_starts_with($path, '/') || str_starts_with($path, 'http')
+            ? $path
+            : '/storage/' . ltrim($path, '/');
     }
 }

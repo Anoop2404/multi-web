@@ -173,22 +173,31 @@
 
         <!-- Official Bank Account Details Box -->
         <div class="card border-blue-200 bg-blue-50/50 p-5 rounded-2xl">
-            <div class="flex items-start gap-3">
-                <span class="text-2xl shrink-0">🏦</span>
-                <div class="flex-1 text-xs text-slate-700">
-                    <h4 class="font-bold text-slate-900 text-sm mb-1">Official Sahodaya Bank Account & Payment Instructions</h4>
-                    <div v-if="event?.payment_details_text || paymentDetails" class="mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80 font-mono text-xs leading-relaxed text-slate-800">
-                        <pre class="whitespace-pre-wrap font-sans">{{ event?.payment_details_text || paymentDetails }}</pre>
+            <div class="flex flex-col md:flex-row items-start gap-4">
+                <div class="flex items-start gap-3 flex-1 w-full">
+                    <span class="text-2xl shrink-0">🏦</span>
+                    <div class="flex-1 text-xs text-slate-700">
+                        <h4 class="font-bold text-slate-900 text-sm mb-1">Official Sahodaya Bank Account & Payment Instructions</h4>
+                        <div v-if="event?.payment_details_text || paymentDetails" class="mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80 font-mono text-xs leading-relaxed text-slate-800">
+                            <pre class="whitespace-pre-wrap font-sans">{{ event?.payment_details_text || paymentDetails }}</pre>
+                        </div>
+                        <div v-else class="grid sm:grid-cols-2 md:grid-cols-4 gap-3 mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80">
+                            <div><span class="text-slate-500 block">Bank Name</span><strong class="text-slate-900">State Bank of India</strong></div>
+                            <div><span class="text-slate-500 block">Account Number</span><strong class="text-slate-900 font-mono">12345678901</strong></div>
+                            <div><span class="text-slate-500 block">IFSC Code</span><strong class="text-slate-900 font-mono">SBIN0001234</strong></div>
+                            <div><span class="text-slate-500 block">UPI Handle</span><strong class="text-slate-900 font-mono">malappuramsahodaya@oksbi</strong></div>
+                        </div>
+                        <p class="text-[11px] text-blue-900 mt-2 font-medium">
+                            💡 <strong>Note:</strong> Include your school prefix in the transaction remarks when transferring funds. Upload the payment reference number and screenshot proof above after completing the transfer.
+                        </p>
                     </div>
-                    <div v-else class="grid sm:grid-cols-2 md:grid-cols-4 gap-3 mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80">
-                        <div><span class="text-slate-500 block">Bank Name</span><strong class="text-slate-900">State Bank of India</strong></div>
-                        <div><span class="text-slate-500 block">Account Number</span><strong class="text-slate-900 font-mono">12345678901</strong></div>
-                        <div><span class="text-slate-500 block">IFSC Code</span><strong class="text-slate-900 font-mono">SBIN0001234</strong></div>
-                        <div><span class="text-slate-500 block">UPI Handle</span><strong class="text-slate-900 font-mono">malappuramsahodaya@oksbi</strong></div>
-                    </div>
-                    <p class="text-[11px] text-blue-900 mt-2 font-medium">
-                        💡 <strong>Note:</strong> Include your school prefix in the transaction remarks when transferring funds. Upload the payment reference number and screenshot proof above after completing the transfer.
-                    </p>
+                </div>
+
+                <!-- Payment QR Code Image Box -->
+                <div v-if="event?.payment_qr_code_url" class="shrink-0 flex flex-col items-center p-3 bg-white rounded-xl border border-blue-200 shadow-sm text-center self-stretch md:self-auto justify-center">
+                    <span class="text-[11px] font-bold text-slate-800 mb-1 flex items-center gap-1">📱 Scan & Pay via UPI</span>
+                    <img :src="event.payment_qr_code_url" alt="Payment QR Code" class="w-36 h-36 object-contain rounded-lg border border-slate-100 p-1 bg-white">
+                    <span class="text-[9px] text-slate-500 mt-1">Accepts GPay, PhonePe, Paytm, etc.</span>
                 </div>
             </div>
         </div>
