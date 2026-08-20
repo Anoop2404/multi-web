@@ -1573,7 +1573,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{program}/registrations/{registration}/id-card', [TrainingProgramController::class, 'registrationIdCard'])->name('registrations.id-card');
             Route::get('/{program}/certificates-hub', [TrainingProgramController::class, 'certificatesHub'])->name('certificates.hub');
             Route::get('/{program}/certificate/preview', [TrainingProgramController::class, 'previewCertificate'])->name('certificate.preview');
+            Route::get('/{program}/certificate/preview-pdf', [TrainingProgramController::class, 'previewCertificatePdf'])->name('certificate.preview-pdf');
             Route::get('/{program}/registrations/{registration}/certificate/preview', [TrainingProgramController::class, 'previewRegistrationCertificate'])->name('registrations.certificate.preview');
+            Route::get('/{program}/registrations/{registration}/certificate/preview-pdf', [TrainingProgramController::class, 'previewRegistrationCertificatePdf'])->name('registrations.certificate.preview-pdf');
             Route::get('/{program}/registrations/{registration}/certificate/print', [TrainingProgramController::class, 'printCertificate'])->name('registrations.certificate.print');
             Route::post('/{program}/registrations/{registration}/certificate', [TrainingProgramController::class, 'issueCertificate'])->name('registrations.certificate.issue');
             Route::post('/{program}/certificates/send-test-email', [TrainingProgramController::class, 'sendTestCertificateEmail'])->name('certificates.send-test-email');
@@ -1613,6 +1615,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'index'])->name('index');
             Route::post('/', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'store'])->name('store');
             Route::get('/{template}/preview', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'preview'])->name('preview');
+            Route::get('/{template}/preview-pdf', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'previewPdf'])->name('preview-pdf');
             Route::put('/{template}', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'update'])->name('update');
             Route::delete('/{template}', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'destroy'])->name('destroy');
         });

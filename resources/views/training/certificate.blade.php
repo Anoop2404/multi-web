@@ -124,15 +124,29 @@
 @endphp
 
 @if(empty($isPdf))
-    @if(!empty($isSample))
-        <p class="no-print" style="text-align:center;font-family:system-ui,sans-serif;font-size:13px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;padding:10px 16px;margin:16px auto;max-width:842px;border-radius:8px;">
-            <strong>Sample certificate</strong> — for client demo only. Configure layout under Certificate Templates.
-        </p>
-    @elseif(!empty($previewOnly))
-        <p class="no-print" style="text-align:center;font-family:system-ui,sans-serif;font-size:13px;color:#0f3d7a;background:#eff6ff;border:1px solid #bfdbfe;padding:10px 16px;margin:16px auto;max-width:842px;border-radius:8px;">
-            <strong>Preview only</strong> — this certificate has not been issued yet. Use "Issue cert" to generate the final version with a verification number.
-        </p>
-    @endif
+    <div class="no-print" style="font-family:system-ui,-apple-system,sans-serif;font-size:13px;padding:12px 18px;margin:16px auto;max-width:842px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+        <div>
+            @if(!empty($isSample))
+                <span style="color:#b45309;font-weight:600;">Sample Certificate Preview</span>
+                <span style="color:#64748b;font-size:12px;margin-left:6px;">— demo mode</span>
+            @elseif(!empty($previewOnly))
+                <span style="color:#0f3d7a;font-weight:600;">Unissued Certificate Preview</span>
+                <span style="color:#64748b;font-size:12px;margin-left:6px;">— not yet issued</span>
+            @else
+                <span style="color:#166534;font-weight:600;">Official Certificate Preview</span>
+            @endif
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            @if(!empty($pdfPreviewUrl))
+                <a href="{{ $pdfPreviewUrl }}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:#0f172a;color:#fff;text-decoration:none;border-radius:6px;font-weight:500;font-size:12.5px;">
+                    📄 Open PDF Preview
+                </a>
+            @endif
+            <button type="button" onclick="window.print()" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:#1e3a8a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:500;font-size:12.5px;">
+                🖨 Print / Save
+            </button>
+        </div>
+    </div>
 @endif
 
 @if($hasBackground)

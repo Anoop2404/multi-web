@@ -1290,6 +1290,33 @@ class TrainingProgramController extends SahodayaAdminController
             ->where('entity_id', $registration->id)
             ->first() ?? new \App\Models\Certificate(['verification_uuid' => 'PREVIEW-ONLY-UUID']);
 
+        $pdfPreviewUrl = url("/sahodaya-admin/{$tenantId}/training/{$program->id}/registrations/{$registration->id}/certificate/preview-pdf");
+
+        return view('training.certificate', array_merge($render, [
+            'registration'  => $registration,
+            'certificate'   => $certificate,
+            'sahodaya'      => $this->sahodaya,
+            'fieldValues'   => $fieldValues,
+            'previewOnly'   => ! $certificate->exists,
+            'pdfPreviewUrl' => $pdfPreviewUrl,
+        ]));
+    }
+
+    public function previewRegistrationCertificatePdf(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->program_id !== $program->id, 403);
+
+        $registration->load(['program', 'teacher', 'school']);
+
+        $certificateService = app(TrainingCertificateService::class);
+        $fieldValues = $certificateService->resolveFieldValues($registration, $this->sahodaya);
+        $render = $certificateService->renderContext($registration, $this->sahodaya);
+
+        $certificate = \App\Models\Certificate::where('entity_type', TrainingRegistration::class)
+            ->where('entity_id', $registration->id)
+            ->first() ?? new \App\Models\Certificate(['verification_uuid' => 'PREVIEW-ONLY-UUID']);
+
         $html = view('training.certificate', array_merge($render, [
             'registration' => $registration,
             'certificate'  => $certificate,
@@ -1337,6 +1364,25 @@ class TrainingProgramController extends SahodayaAdminController
     }
 
     public function previewCertificate(Request $request, string $tenantId, TrainingProgram $program)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        $templateId = $request->filled('template_id') ? (int) $request->input('template_id') : null;
+        $render = app(TrainingCertificateService::class)
+            ->sampleRenderContext($program, $this->sahodaya, $templateId);
+
+        $pdfPreviewUrl = url("/sahodaya-admin/{$tenantId}/training/{$program->id}/certificate/preview-pdf".($templateId ? "?template_id={$templateId}" : ''));
+
+        return view('training.certificate', array_merge($render, [
+            'registration'  => null,
+            'certificate'   => (object) ['verification_uuid' => 'SAMPLE-PREVIEW-UUID'],
+            'sahodaya'      => $this->sahodaya,
+            'isSample'      => true,
+            'pdfPreviewUrl' => $pdfPreviewUrl,
+        ]));
+    }
+
+    public function previewCertificatePdf(Request $request, string $tenantId, TrainingProgram $program)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 
