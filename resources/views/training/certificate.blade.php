@@ -8,11 +8,16 @@
         body { font-family: "Times New Roman", Times, serif; background: #fff; color: #1e293b; }
         .page {
             width: 842px;
-            min-height: 595px;
+            height: 595px;
+            max-height: 595px;
             margin: 0 auto;
             position: relative;
             border: 10px double #1e3a8a;
-            padding: 40px 52px 56px;
+            padding: 30px 45px 35px;
+            box-sizing: border-box;
+            overflow: hidden;
+            page-break-after: avoid;
+            page-break-inside: avoid;
         }
         .page.has-background {
             border: none;
@@ -70,18 +75,15 @@
         .seal { max-height: 64px; opacity: 0.9; }
         .date-line { margin-top: 14px; font-size: 13px; }
         .footer {
-            margin-top: 28px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 24px 32px;
+            margin-top: 20px;
+            width: 100%;
         }
-        .sign-block { text-align: center; min-width: 140px; max-width: 180px; }
+        .sign-block { text-align: center; min-width: 130px; max-width: 170px; display: inline-block; }
         .sign-img { max-height: 40px; max-width: 120px; margin-bottom: 2px; }
         .sign-line { border-top: 1px solid #0f172a; width: 140px; margin: 0 auto 4px; min-height: 1px; }
         .sign-name { font-size: 11px; font-weight: 600; color: #0f172a; }
         .sign-label { font-size: 10px; color: #64748b; margin-top: 2px; }
-        .uuid { text-align: center; font-size: 9px; color: #94a3b8; margin-top: 16px; }
+        .uuid { text-align: center; font-size: 9px; color: #94a3b8; margin-top: 12px; }
         @media print {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .no-print { display: none; }
@@ -229,19 +231,25 @@
         @endif
 
         <div class="footer">
-            @foreach($signatories ?? [] as $signatory)
-                <div class="sign-block">
-                    @if(!empty($signatory['signature_url']))
-                        <img src="{{ $signatory['signature_url'] }}" alt="" class="sign-img">
-                    @else
-                        <div class="sign-line"></div>
-                    @endif
-                    @if(!empty($signatory['name']))
-                        <p class="sign-name">{{ $signatory['name'] }}</p>
-                    @endif
-                    <p class="sign-label">{{ $signatory['designation'] ?? '' }}</p>
-                </div>
-            @endforeach
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    @foreach($signatories ?? [] as $signatory)
+                        <td style="text-align: center; vertical-align: bottom; width: {{ 100 / max(1, count($signatories ?? [1])) }}%;">
+                            <div class="sign-block" style="margin: 0 auto;">
+                                @if(!empty($signatory['signature_url']))
+                                    <img src="{{ $signatory['signature_url'] }}" alt="" class="sign-img">
+                                @else
+                                    <div class="sign-line"></div>
+                                @endif
+                                @if(!empty($signatory['name']))
+                                    <p class="sign-name">{{ $signatory['name'] }}</p>
+                                @endif
+                                <p class="sign-label">{{ $signatory['designation'] ?? '' }}</p>
+                            </div>
+                        </td>
+                    @endforeach
+                </tr>
+            </table>
         </div>
 
         <p class="uuid">Verification: {{ $certificate->verification_uuid ?? 'Not yet issued' }}</p>
