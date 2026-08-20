@@ -114,14 +114,16 @@
     $hasBackground = ! empty($backgroundUrl);
 @endphp
 
-@if(!empty($isSample))
-    <p class="no-print" style="text-align:center;font-family:system-ui,sans-serif;font-size:13px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;padding:10px 16px;margin:16px auto;max-width:842px;border-radius:8px;">
-        <strong>Sample certificate</strong> — for client demo only. Configure layout under Certificate Templates.
-    </p>
-@elseif(!empty($previewOnly))
-    <p class="no-print" style="text-align:center;font-family:system-ui,sans-serif;font-size:13px;color:#0f3d7a;background:#eff6ff;border:1px solid #bfdbfe;padding:10px 16px;margin:16px auto;max-width:842px;border-radius:8px;">
-        <strong>Preview only</strong> — this certificate has not been issued yet. Use "Issue cert" to generate the final version with a verification number.
-    </p>
+@if(empty($isPdf))
+    @if(!empty($isSample))
+        <p class="no-print" style="text-align:center;font-family:system-ui,sans-serif;font-size:13px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;padding:10px 16px;margin:16px auto;max-width:842px;border-radius:8px;">
+            <strong>Sample certificate</strong> — for client demo only. Configure layout under Certificate Templates.
+        </p>
+    @elseif(!empty($previewOnly))
+        <p class="no-print" style="text-align:center;font-family:system-ui,sans-serif;font-size:13px;color:#0f3d7a;background:#eff6ff;border:1px solid #bfdbfe;padding:10px 16px;margin:16px auto;max-width:842px;border-radius:8px;">
+            <strong>Preview only</strong> — this certificate has not been issued yet. Use "Issue cert" to generate the final version with a verification number.
+        </p>
+    @endif
 @endif
 
 @if($hasBackground)
@@ -246,8 +248,10 @@
     </div>
 @endif
 
+@if(empty($isPdf))
     <p class="no-print" style="text-align:center;margin-top:16px;font-family:sans-serif;font-size:13px;">
         <button type="button" onclick="window.print()" style="padding:8px 20px;background:#1e3a8a;color:#fff;border:none;border-radius:6px;cursor:pointer;">Print Certificate</button>
     </p>
+@endif
 </body>
 </html>

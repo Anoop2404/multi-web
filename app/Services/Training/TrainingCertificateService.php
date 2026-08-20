@@ -452,6 +452,7 @@ class TrainingCertificateService
             'certificate'  => $certificate,
             'sahodaya'     => $sahodaya,
             'fieldValues'  => $fieldValues,
+            'isPdf'        => true,
         ]))->setPaper('a4', 'landscape');
 
         $filename = Str::slug($registration->teacher?->name ?? 'certificate').'-training-certificate.pdf';
@@ -501,6 +502,7 @@ class TrainingCertificateService
             'certificate'  => $certificate,
             'sahodaya'     => $sahodaya,
             'fieldValues'  => $fieldValues,
+            'isPdf'        => true,
         ]))->setPaper('a4', 'landscape');
 
         $isTest = ! empty($overrideEmail);
