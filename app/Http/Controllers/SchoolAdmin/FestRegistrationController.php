@@ -785,7 +785,7 @@ class FestRegistrationController extends SchoolAdminController
             $root = $event->rootEvent();
             $batchFees = app(\App\Services\Events\FestRegistrationBatchFeeService::class)
                 ->recalculateAll($root, $this->school->id);
-            $event->setAttribute('phased_billing_batches', $batchFees->map(function ($fee) use ($event) {
+            $event->setAttribute('school_registration_batch_fees', $batchFees->map(function ($fee) use ($event) {
                 $phase = $fee->registrationBatch?->phase ?? $fee->phase;
 
                 return [

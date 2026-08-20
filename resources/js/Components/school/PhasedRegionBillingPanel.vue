@@ -181,13 +181,10 @@
                         <div v-if="activePaymentDetails" class="mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80 font-mono text-xs leading-relaxed text-slate-800">
                             <pre class="whitespace-pre-wrap font-sans">{{ activePaymentDetails }}</pre>
                         </div>
-                        <div v-else class="grid sm:grid-cols-2 md:grid-cols-4 gap-3 mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80">
-                            <div><span class="text-slate-500 block">Bank Name</span><strong class="text-slate-900">State Bank of India</strong></div>
-                            <div><span class="text-slate-500 block">Account Number</span><strong class="text-slate-900 font-mono">12345678901</strong></div>
-                            <div><span class="text-slate-500 block">IFSC Code</span><strong class="text-slate-900 font-mono">SBIN0001234</strong></div>
-                            <div><span class="text-slate-500 block">UPI Handle</span><strong class="text-slate-900 font-mono">malappuramsahodaya@oksbi</strong></div>
+                        <div v-else class="mt-2 bg-amber-50 p-3 rounded-xl border border-amber-200 text-amber-900 text-xs font-medium">
+                            Payment details haven't been configured by your Sahodaya yet. Contact your Sahodaya admin for bank/UPI details before making any transfer &mdash; do not use details from anywhere else.
                         </div>
-                        <p class="text-[11px] text-blue-900 mt-2 font-medium">
+                        <p v-if="activePaymentDetails" class="text-[11px] text-blue-900 mt-2 font-medium">
                             💡 <strong>Note:</strong> Include your school prefix in the transaction remarks when transferring funds. Upload the payment reference number and screenshot proof above after completing the transfer.
                         </p>
                     </div>
