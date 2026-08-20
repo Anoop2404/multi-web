@@ -87,6 +87,12 @@ class FestRegistrationBatchController extends SahodayaAdminController
             ]);
         }
 
+        // Any phases already created before this first batch existed had no batch to
+        // attach to and therefore no operational leaves yet -- sync now so they're created
+        // immediately, instead of leaving registration silently blocked until an admin
+        // separately discovers and clicks "Sync operational events" on the Phases page.
+        app(\App\Services\Events\FestPhaseTopologyService::class)->sync($event->fresh());
+
         $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.registration_batch.created', "Created payment batch {$batch->name}", [
             'batch_id' => $batch->id,
             'code' => $batch->code,

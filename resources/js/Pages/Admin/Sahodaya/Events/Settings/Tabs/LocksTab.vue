@@ -83,7 +83,8 @@
                 <button type="submit" class="btn-primary">Save locks & gates</button>
             </form>
             <div class="border-t border-slate-100 pt-4">
-                <button type="button" @click="backfillRegs" class="btn-secondary">Backfill level registration numbers</button>
+                <button type="button" @click="backfillRegs" class="btn-secondary">Backfill Missing Fest IDs</button>
+                <p class="text-xs text-slate-400 mt-1">Same action as the button under Numbering — assigns event registration IDs to any student missing one.</p>
             </div>
     </div>
 

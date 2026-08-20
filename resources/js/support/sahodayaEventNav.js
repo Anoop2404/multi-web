@@ -107,6 +107,10 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
             { label: 'Competition areas', href: `${base}/areas`, icon: 'layers', permissions: FEST_SETTINGS },
             { label: 'Eligibility rules', href: `${base}/eligibility-rules`, icon: 'check-square', permissions: FEST_SETTINGS },
             { label: 'Rounds & levels', href: `${base}/levels`, icon: 'repeat', permissions: FEST_SETTINGS },
+            // Previously only reachable via an in-page button on Rounds & levels, three
+            // clicks from the sidebar, and invisible to the sidebar's own search — the most
+            // operationally important screen for any phased_regional_billing event.
+            { label: 'Phases', href: `${base}/phases`, icon: 'layers', permissions: FEST_SETTINGS },
             { label: 'Activity log', href: `${base}/activity`, icon: 'clock', permissions: FEST_VIEW },
         ],
     });
@@ -161,7 +165,10 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
     groups.push({ section: 'Outputs', items: outputItems });
 
     const adminItems = [
-        { label: 'Judges & staff', href: `${base}/judges`, icon: 'user-check', permissions: FEST_MANAGE },
+        // Was labeled "Judges & staff" — the page itself is judges-only (Judges.vue), and
+        // a genuinely separate "Event staff" item sits right below; the old label made the
+        // two adjacent items look redundant.
+        { label: 'Judges', href: `${base}/judges`, icon: 'user-check', permissions: FEST_MANAGE },
         { label: 'Appeals', href: `${base}/appeals`, icon: 'inbox', permissions: FEST_MANAGE },
         { label: 'Event staff', href: `${base}/event-staff`, icon: 'users', permissions: FEST_MANAGE },
         { label: 'School invoices', href: `${base}/finance`, icon: 'file-text', permissions: FEST_FINANCE },

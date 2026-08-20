@@ -179,8 +179,15 @@
                         <p v-if="levelItems.length" class="text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">
                             {{ ownerLevelLabels[level] ?? level }}
                         </p>
-                        <ul v-if="levelItems.length" class="divide-y divide-slate-100 rounded-xl border border-slate-200 overflow-hidden">
-                            <li v-for="item in levelItems" :key="item.id"
+                        <div v-for="sub in categorySubgroups(level, levelItems)" :key="sub.category ?? 'all'" class="space-y-2">
+                            <button v-if="sub.category !== null" type="button"
+                                    class="w-full flex items-center justify-between gap-2 text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 transition"
+                                    @click="toggleGroup(level, sub.category)">
+                                <span>{{ sub.category }} <span class="font-normal text-slate-400">({{ sub.items.length }})</span></span>
+                                <span class="text-slate-400">{{ isGroupCollapsed(level, sub.category) ? '▸ Show' : '▾ Hide' }}</span>
+                            </button>
+                            <ul v-if="!isGroupCollapsed(level, sub.category)" class="divide-y divide-slate-100 rounded-xl border border-slate-200 overflow-hidden">
+                            <li v-for="item in sub.items" :key="item.id"
                                 class="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 hover:bg-slate-50/70 transition text-sm"
                                 :class="item.is_enabled === false ? 'opacity-60 bg-slate-50/50' : ''">
                                 <div class="flex items-center gap-3 min-w-0 flex-1">
@@ -219,6 +226,7 @@
                                 </div>
                             </li>
                         </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -632,6 +640,51 @@ const filteredItemsByLevel = computed(() => {
 });
 
 const filteredItemCount = computed(() => Object.values(filteredItemsByLevel.value).flat().length);
+
+// Large catalogs (a normal Kalotsav runs ~150 items, almost always all in one owner
+// level) render as one long list otherwise. Sub-grouping by category — the same field
+// items already carry, no backend change — and collapsing each sub-group by default
+// lets an admin see the catalog's shape (N categories, counts) before scanning every
+// row. A search/filter always shows full, uncollapsed results so a match is never
+// hidden behind a collapsed section.
+const COLLAPSE_THRESHOLD = 15;
+// Sub-groups start collapsed; a key in this set has been explicitly expanded by the admin.
+const expandedGroups = ref(new Set());
+
+function categoryLabel(category) {
+    return category && category !== 'general' ? category : 'Uncategorized';
+}
+
+function groupKey(level, category) {
+    return `${level}::${category ?? ''}`;
+}
+
+function isGroupCollapsed(level, category) {
+    if (hasActiveFilters.value || category === null) return false;
+    return !expandedGroups.value.has(groupKey(level, category));
+}
+
+function toggleGroup(level, category) {
+    const key = groupKey(level, category);
+    const next = new Set(expandedGroups.value);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    expandedGroups.value = next;
+}
+
+/** @returns {Array<{category: string, items: Array}>} sub-groups by category, collapsed by default once a level has enough items to benefit from it. */
+function categorySubgroups(level, items) {
+    if (items.length <= COLLAPSE_THRESHOLD) {
+        return [{ category: null, items }];
+    }
+    const byCategory = new Map();
+    for (const item of items) {
+        const key = categoryLabel(item.category);
+        if (!byCategory.has(key)) byCategory.set(key, []);
+        byCategory.get(key).push(item);
+    }
+    return Array.from(byCategory.entries()).map(([category, groupItems]) => ({ category, items: groupItems }));
+}
 
 function clearFilters() {
     searchQuery.value = '';

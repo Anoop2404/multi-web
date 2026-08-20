@@ -109,6 +109,12 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
     );
 
     workflowItems.push(
+        // Previously a school working inside this event had no way to see this event's own
+        // published results/standings without leaving to the program-hub-level "Results"
+        // (which aggregates across the whole program, not scoped to this event) or the
+        // public fest portal. published-results already existed as a report route — just
+        // never linked from this per-event sidebar.
+        { label: 'Results', href: `${reportsBase}/published-results`, icon: 'award' },
         { label: 'Reports', href: reportsBase, icon: 'file-text', exact: true },
         { label: 'Student-wise report', href: `${reportsBase}/student-wise`, icon: 'users' },
         { label: 'Item-wise report', href: `${reportsBase}/item-wise`, icon: 'list' },

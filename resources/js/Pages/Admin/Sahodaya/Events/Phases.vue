@@ -11,6 +11,15 @@
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/phase-plan-wizard`" class="btn-secondary text-xs">
                 ⚡ Set up in bulk with the Phase Plan Wizard
             </Link>
+            <Link v-if="event.workflow_mode === 'phased_regional_billing'" :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/results/advancement`" class="link-brand text-xs">
+                Advance regional winners to a later phase &rarr;
+            </Link>
+        </div>
+
+        <div class="mb-4 max-w-5xl rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-3 text-xs text-indigo-900 space-y-1">
+            <p><strong>How this works:</strong> a phase is a named stage of the event (e.g. Off Stage day). A payment batch groups phases into a payment level, so a school pays once per level instead of once per phase — decide on batches before assigning items to phases, since a phase with no batch has no effect on registration routing yet.</p>
+            <p>"Operational events" are the actual per-phase (and per-region, for regional phases) child events students register under. Click "Sync operational events" any time after adding or editing a phase, region, or payment batch to (re)generate them.</p>
+            <p>Looking for intra-school selection rounds or promoting round winners? See <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/levels`" class="underline font-semibold">Rounds &amp; Levels</Link> instead — that's a separate concept from phases.</p>
         </div>
 
         <div v-if="conductSystemLocked === 'partitioned'" class="mb-4 max-w-5xl rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -198,6 +207,12 @@
                     <div class="flex items-center gap-2 pt-1">
                         <label class="flex items-center gap-2 text-xs cursor-pointer"><input v-model="addForm.is_regional" type="checkbox" class="rounded border-slate-300"> Regional phase</label>
                     </div>
+                    <p v-if="addForm.is_regional && !regions.length" class="text-xs text-amber-700">
+                        No regions are configured for this Sahodaya yet, so you won't be able to pick which regions run this phase after saving. Add regions under Membership → Regions first.
+                    </p>
+                    <p v-else-if="addForm.is_regional" class="text-xs text-slate-400">
+                        After saving, a "Regions" button will appear on this phase to choose which regions run it.
+                    </p>
                     <div class="flex gap-2">
                         <button type="submit" class="btn-primary text-sm" :disabled="addForm.processing">Add phase</button>
                         <button type="button" class="btn-ghost text-sm" @click="showAdd = false">Cancel</button>

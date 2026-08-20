@@ -33,7 +33,11 @@ export function capabilitiesForEvent(event) {
         isTeacherFest: type === 'teacher_fest',
         athleticRecords: type === 'sports',
         catering: type === 'sports',
-        foodCoupons: type === 'sports',
+        // "Food menu" and "Food billing" below are pushed unconditionally for every event
+        // type — but this gate used to restrict "Food coupons" (the actual issue/redeem/
+        // print screen) to sports only, leaving every other event type with a food menu
+        // and bills but no sidebar path to the screen that issues/redeems/prints them.
+        foodCoupons: true,
         houses: type === 'sports',
         championship: type === 'kalolsavam' || type === 'kids_fest' || type === 'english_fest' || type === 'science_fest',
         venues: true,

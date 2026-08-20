@@ -30,6 +30,16 @@
                     <input v-model="numberingSettingsForm.event_reg_prefix" type="text" class="field text-xs" placeholder="e.g. ATH-, REG- or blank for 1, 2, 3…">
                 </div>
             </div>
+            <div class="border-t border-slate-100 pt-3 space-y-2">
+                <label class="flex items-start gap-2 text-xs">
+                    <input type="checkbox" v-model="numberingSettingsForm.auto_assign_chest_on_create" class="mt-0.5">
+                    <span>Assign chest numbers as soon as a registration is created, not just on approval</span>
+                </label>
+                <label class="flex items-start gap-2 text-xs">
+                    <input type="checkbox" v-model="numberingSettingsForm.auto_assign_on_approve" class="mt-0.5">
+                    <span>Auto-assign chest numbers when a registration is approved</span>
+                </label>
+            </div>
             <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button type="button" class="btn-secondary text-xs" @click="backfillRegs">Backfill Missing Fest IDs</button>
                 <button type="submit" class="btn-primary text-xs !py-1.5 !px-4" :disabled="numberingSettingsForm.processing">

@@ -1,9 +1,9 @@
 <template>
-    <SahodayaEventsLayout :title="`${event.title} — Levels & Regions`" :sahodaya="sahodaya" :event="event"
+    <SahodayaEventsLayout :title="`${event.title} — Rounds & Levels`" :sahodaya="sahodaya" :event="event"
                           :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        
+
         <!-- Header -->
-        <PageHeader :title="`${event.title} — Rounds & Regions`" eyebrow="Topology & Partitioning"
+        <PageHeader :title="`${event.title} — Rounds & Levels`" eyebrow="Topology & Partitioning"
                     :description="isPartitionedHub ? 'Regional preliminary partitions, school rounds, and overall championship aggregation.' : (event.event_type === 'kids_fest' ? 'Kids Fest clusters, school rounds, and promotions.' : 'Configure region-based preliminaries, school rounds, and child event routing.')">
             <template #actions>
                 <div class="flex items-center gap-2">
@@ -23,7 +23,11 @@
                  visual weight on purpose: the old hero gave Region Split a full-width bold
                  CTA and Phases two small text links, which is how a Sahodaya ended up with
                  both systems half-configured on the same event in the first place. -->
-            <div v-if="showConductChoice && conductSystemLocked === null" class="grid sm:grid-cols-2 gap-4">
+            <div v-if="showConductChoice && conductSystemLocked === null" class="space-y-3">
+                <p class="text-xs text-slate-500 max-w-2xl">
+                    Pick <strong>Region Split</strong> if the event runs as one stage split only by region, with one flat registration fee. Pick <strong>Phases &amp; Payment Levels</strong> if it runs as several named stages (e.g. a district Kalotsav with Digi Fest, Off Stage, Sargadhara, District days) that schools pay for separately, level by level. These are mutually exclusive — whichever gets its first region/batch first locks in for this event.
+                </p>
+                <div class="grid sm:grid-cols-2 gap-4">
                 <div class="card space-y-3 border-2 border-slate-200 hover:border-indigo-300 transition">
                     <div class="flex items-center gap-3">
                         <div class="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl shrink-0">🗺️</div>
@@ -43,6 +47,7 @@
                     <Link :href="`${base}/phases`" class="btn-primary text-xs w-full justify-center !py-2.5 block text-center">
                         Set Up Phases &amp; Levels
                     </Link>
+                </div>
                 </div>
             </div>
 

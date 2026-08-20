@@ -3,7 +3,7 @@
         <form @submit.prevent="saveRegistrationSettings" class="card space-y-4">
             <div>
                 <h3 class="section-title">Event vs item registration</h3>
-                <p class="section-desc">Require students to register for the event (₹300 student fee) before item entries.</p>
+                <p class="section-desc">Require students to register for the event (per-student fee, configured on the Fees & Registration tab) before item entries.</p>
             </div>
             <label class="flex items-start gap-2 text-sm">
                 <input type="checkbox" v-model="registrationSettingsForm.require_event_registration" class="mt-0.5">

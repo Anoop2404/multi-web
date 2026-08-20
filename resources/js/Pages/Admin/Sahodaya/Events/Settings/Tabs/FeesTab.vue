@@ -31,19 +31,19 @@
             <div class="flex flex-wrap gap-2 pt-1">
                 <button type="button" @click="applyFeePreset('kochi_metro')"
                         class="btn-secondary text-xs font-semibold !py-1.5 !px-3 hover:bg-amber-100 hover:text-amber-900 border-amber-300 transition shadow-xs">
-                    🏷️ Fee Type 1 (₹8k/₹7k + ₹100 Student + 1 Free Item)
+                    🏷️ {{ rawPresets.kochi_metro?.name ?? 'Fee Type 1' }} (₹8k/₹7k + ₹100 Student + 1 Free Item)
                 </button>
                 <button type="button" @click="applyFeePreset('wayanad')"
                         class="btn-secondary text-xs font-semibold !py-1.5 !px-3 hover:bg-amber-100 hover:text-amber-900 border-amber-300 transition shadow-xs">
-                    🏷️ Fee Type 2 (₹30k/₹25k + ₹250/Phase)
+                    🏷️ {{ rawPresets.wayanad?.name ?? 'Fee Type 2' }} (₹30k/₹25k + ₹250/Phase)
                 </button>
                 <button type="button" @click="applyFeePreset('malabar')"
                         class="btn-secondary text-xs font-semibold !py-1.5 !px-3 hover:bg-amber-100 hover:text-amber-900 border-amber-300 transition shadow-xs">
-                    🏷️ Fee Type 3 (Student Count Slabs + ₹450)
+                    🏷️ {{ rawPresets.malabar?.name ?? 'Fee Type 3' }} (Student Count Slabs + ₹450)
                 </button>
                 <button type="button" @click="applyFeePreset('kannur_dist')"
                         class="btn-secondary text-xs font-semibold !py-1.5 !px-3 hover:bg-amber-100 hover:text-amber-900 border-amber-300 transition shadow-xs">
-                    🏷️ Fee Type 4 (₹250 Indiv / ₹250+100 Group)
+                    🏷️ {{ rawPresets.kannur_dist?.name ?? 'Fee Type 4' }} (₹250 Indiv / ₹250+100 Group)
                 </button>
             </div>
         </div>
@@ -1034,9 +1034,10 @@ if (event.event_type === 'sports') {
     feeSettingsForm.fee_model = 'sports_composite';
 }
 
+const rawPresets = computed(() => feePresets?.value ?? feePresets ?? {});
+
 function applyFeePreset(presetKey) {
-    const rawPresets = feePresets?.value ?? feePresets ?? {};
-    const preset = rawPresets[presetKey];
+    const preset = rawPresets.value[presetKey];
     if (!preset) return;
 
     feeSettingsForm.fee_model = preset.fee_model;

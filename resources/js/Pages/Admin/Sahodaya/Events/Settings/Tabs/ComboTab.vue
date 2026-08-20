@@ -27,7 +27,7 @@
                         <input :id="id" v-model.number="comboForm.max_arts_events" type="number" min="0" class="field" placeholder="—">
                     </template>
                 </FormField>
-                <FormField label="Max sports events">
+                <FormField v-if="event?.event_type === 'sports'" label="Max sports events">
                     <template #default="{ id }">
                         <input :id="id" v-model.number="comboForm.max_sports_events" type="number" min="0" class="field" placeholder="—">
                     </template>
@@ -81,5 +81,5 @@
 <script setup>
 import { inject } from 'vue';
 
-const { comboForm, comboRules, schools, classGroups, addComboRule, removeComboRule } = inject('eventSettings');
+const { comboForm, comboRules, schools, classGroups, addComboRule, removeComboRule, event } = inject('eventSettings');
 </script>
