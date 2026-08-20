@@ -12,7 +12,7 @@ class TrainingAttendance extends Model
     public const STATUSES = ['present', 'absent', 'late', 'with_permission'];
 
     /** Statuses that count toward certificate / CPD presence. */
-    public const PRESENT_LIKE = ['present', 'late'];
+    public const PRESENT_LIKE = ['present', 'late', 'with_permission'];
 
     protected $fillable = [
         'session_id', 'registration_id', 'status', 'previous_status', 'marked_by', 'marked_at',
