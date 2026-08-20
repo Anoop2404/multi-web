@@ -229,6 +229,7 @@ export function sahodayaTrainingProgramScopedNav(sahodayaId, programId, options 
                 { label: 'Attendance', href: `${programBase}/attendance`, icon: 'clipboard', exact: true },
                 { label: 'Attendance sheet', href: `${programBase}/attendance/sheet`, icon: 'file-text' },
                 { label: 'Attendance report', href: `${programBase}/attendance/report`, icon: 'bar-chart' },
+                { label: 'Certificates & Dispatch', href: `${programBase}/certificates-hub`, icon: 'award' },
                 { label: 'Certificates (ZIP)', href: `${programBase}/certificates/export`, icon: 'award' },
             ],
         },
