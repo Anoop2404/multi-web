@@ -74,6 +74,9 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+
+const page = usePage();
 
 const props = defineProps({
     backgroundUrl: { type: String, default: null },
@@ -160,27 +163,30 @@ const sampleRecipientName = computed(() => {
     return 'Dr. Rajesh Kumar';
 });
 
-const sampleData = computed(() => ({
-    recipient_name: sampleRecipientName.value,
-    school_name: 'Chinmaya Vidyalaya Kannur',
-    sahodaya_name: 'Kannur Sahodaya',
-    program_title: props.title || 'Sahodaya Teacher Leadership Training',
-    event_title: props.title || 'Annual Sports Meet 2026',
-    item_title: '100m Sprint Boys (U17)',
-    event_dates: '21st - 23rd July 2026',
-    conducted_on: '22nd July 2026',
-    certificate_date: '22nd July 2026',
-    venue: 'Sahodaya Central Complex',
-    days_attended: '2',
-    training_hours: '12',
-    salutation: 'Mr.',
-    designation: 'Senior PGT Teacher',
-    class: 'Class X',
-    academic_year: '2026-27',
-    percentage: '98.4%',
-    rank: 'First Rank',
-    achievement_line: 'secured First Place in 100m Sprint',
-}));
+const sampleData = computed(() => {
+    const pageSahodaya = page.props.sahodaya?.name || page.props.tenant?.name || 'Sahodaya Complex';
+    return {
+        recipient_name: sampleRecipientName.value,
+        school_name: 'Sample Model School',
+        sahodaya_name: pageSahodaya,
+        program_title: props.title || 'Sahodaya Teacher Leadership Training',
+        event_title: props.title || 'Annual Sports Meet 2026',
+        item_title: '100m Sprint Boys (U17)',
+        event_dates: '21st - 23rd July 2026',
+        conducted_on: '22nd July 2026',
+        certificate_date: '22nd July 2026',
+        venue: `${pageSahodaya} Central Complex`,
+        days_attended: '2',
+        training_hours: '12',
+        salutation: 'Mr.',
+        designation: 'Senior PGT Teacher',
+        class: 'Class X',
+        academic_year: '2026-27',
+        percentage: '98.4%',
+        rank: 'First Rank',
+        achievement_line: 'secured First Place in 100m Sprint',
+    };
+});
 
 const paragraphs = computed(() => {
     let raw = props.bodyText;
