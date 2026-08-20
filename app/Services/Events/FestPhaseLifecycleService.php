@@ -125,11 +125,18 @@ class FestPhaseLifecycleService
         $registrationOpen = $this->laterDate($phase->registration_open, $batch?->registration_open);
         $registrationClose = $this->earlierDate($phase->registration_close, $batch?->registration_close);
 
+        $batchOpen = ! $batch || $batch->isRegistrationOpen() || (
+            ! $batch->registration_locked
+            && (! $batch->registration_open || now()->gte($batch->registration_open))
+            && (! $batch->registration_close || now()->lte($batch->registration_close))
+            && in_array($phase->status, ['published', 'registration_open'], true)
+        );
+
         return (object) [
             'registration_open'   => $registrationOpen,
             'registration_close'  => $registrationClose,
             'registration_locked' => (bool) $phase->registration_locked || (bool) ($batch?->registration_locked),
-            'registration_batch_open' => ! $batch || $batch->isRegistrationOpen(),
+            'registration_batch_open' => $batchOpen,
             'registration_batch_id' => $batch?->id,
             'food_cutoff_at'      => $phase->food_cutoff_at,
             'scoring_locked'      => (bool) $phase->scoring_locked,
