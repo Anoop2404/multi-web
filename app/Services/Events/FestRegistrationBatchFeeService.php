@@ -77,17 +77,20 @@ class FestRegistrationBatchFeeService
                 ];
             })->values();
 
-            // Per-student rate: Check payment batch first, then fall back to the rate configured on linked phase(s)
+            // Per-student rate: Check payment batch first; if 0 or null, fall back to rate configured on linked phase(s)
             $phaseStudentFee = FestEventPhase::where('event_id', $root->id)
                 ->where('registration_batch_id', $batch->id)
                 ->whereNotNull('student_registration_fee')
+                ->where('student_registration_fee', '>', 0)
                 ->value('student_registration_fee');
 
-            $studentFeeRate = $batch->student_registration_fee !== null
-                ? (float) $batch->student_registration_fee
-                : ($phaseStudentFee !== null ? (float) $phaseStudentFee : null);
+            $batchFeeNum = $batch->student_registration_fee !== null ? (float) $batch->student_registration_fee : null;
 
-            $batchStudentFeeSet = $studentFeeRate !== null;
+            $studentFeeRate = ($batchFeeNum !== null && $batchFeeNum > 0)
+                ? $batchFeeNum
+                : ($phaseStudentFee !== null ? (float) $phaseStudentFee : $batchFeeNum);
+
+            $batchStudentFeeSet = $studentFeeRate !== null && $studentFeeRate > 0;
 
             $participationFee = match ($feeModel) {
                 'item_catalog' => round((float) $itemLines->sum('amount'), 2),
