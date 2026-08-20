@@ -27,6 +27,8 @@ class FestEventPhase extends Model
         'is_default',
         'school_registration_fee_share',
         'student_registration_fee',
+        'payment_instructions',
+        'payment_qr_code',
         'starts_at',
         'ends_at',
         'registration_open',
@@ -106,5 +108,36 @@ class FestEventPhase extends Model
     public function isRegional(): bool
     {
         return (bool) $this->is_regional || filled($this->region_partition_group);
+    }
+
+    /** Formatted payment instructions for this phase, falling back to event then Sahodaya default. */
+    public function paymentDetailsText(?FestEvent $event = null, ?SahodayaProfile $sahodayaProfile = null): string
+    {
+        if (filled($this->payment_instructions)) {
+            return trim((string) $this->payment_instructions);
+        }
+
+        if (! $event) {
+            $event = $this->event;
+        }
+
+        return $event ? $event->paymentDetailsText($sahodayaProfile) : '';
+    }
+
+    /** Payment QR code image URL for this phase, falling back to event then Sahodaya default. */
+    public function paymentQrCodeUrl(?FestEvent $event = null, ?SahodayaProfile $sahodayaProfile = null): ?string
+    {
+        if (filled($this->payment_qr_code)) {
+            $path = (string) $this->payment_qr_code;
+            return str_starts_with($path, '/') || str_starts_with($path, 'http')
+                ? $path
+                : '/storage/' . ltrim($path, '/');
+        }
+
+        if (! $event) {
+            $event = $this->event;
+        }
+
+        return $event ? $event->paymentQrCodeUrl($sahodayaProfile) : null;
     }
 }

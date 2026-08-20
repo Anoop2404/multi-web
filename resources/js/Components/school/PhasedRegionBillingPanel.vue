@@ -178,8 +178,8 @@
                     <span class="text-2xl shrink-0">🏦</span>
                     <div class="flex-1 text-xs text-slate-700">
                         <h4 class="font-bold text-slate-900 text-sm mb-1">Official Sahodaya Bank Account & Payment Instructions</h4>
-                        <div v-if="event?.payment_details_text || paymentDetails" class="mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80 font-mono text-xs leading-relaxed text-slate-800">
-                            <pre class="whitespace-pre-wrap font-sans">{{ event?.payment_details_text || paymentDetails }}</pre>
+                        <div v-if="activePaymentDetails" class="mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80 font-mono text-xs leading-relaxed text-slate-800">
+                            <pre class="whitespace-pre-wrap font-sans">{{ activePaymentDetails }}</pre>
                         </div>
                         <div v-else class="grid sm:grid-cols-2 md:grid-cols-4 gap-3 mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80">
                             <div><span class="text-slate-500 block">Bank Name</span><strong class="text-slate-900">State Bank of India</strong></div>
@@ -194,9 +194,9 @@
                 </div>
 
                 <!-- Payment QR Code Image Box -->
-                <div v-if="event?.payment_qr_code_url" class="shrink-0 flex flex-col items-center p-3 bg-white rounded-xl border border-blue-200 shadow-sm text-center self-stretch md:self-auto justify-center">
+                <div v-if="activePaymentQrCodeUrl" class="shrink-0 flex flex-col items-center p-3 bg-white rounded-xl border border-blue-200 shadow-sm text-center self-stretch md:self-auto justify-center">
                     <span class="text-[11px] font-bold text-slate-800 mb-1 flex items-center gap-1">📱 Scan & Pay via UPI</span>
-                    <img :src="event.payment_qr_code_url" alt="Payment QR Code" class="w-36 h-36 object-contain rounded-lg border border-slate-100 p-1 bg-white">
+                    <img :src="activePaymentQrCodeUrl" alt="Payment QR Code" class="w-36 h-36 object-contain rounded-lg border border-slate-100 p-1 bg-white">
                     <span class="text-[9px] text-slate-500 mt-1">Accepts GPay, PhonePe, Paytm, etc.</span>
                 </div>
             </div>
@@ -301,6 +301,17 @@ const totalItemFeesSubtotal = computed(() => {
 const paymentBatch = ref(null);
 const paymentFiles = ref([]);
 const paymentForm = useForm({ transaction_ref: '', bank_name: '', amount: null });
+
+const activePaymentDetails = computed(() => {
+    return paymentBatch.value?.payment_details_text
+        || props.event?.payment_details_text
+        || props.paymentDetails;
+});
+
+const activePaymentQrCodeUrl = computed(() => {
+    return paymentBatch.value?.payment_qr_code_url
+        || props.event?.payment_qr_code_url;
+});
 
 function openPayment(fee) {
     paymentBatch.value = fee;

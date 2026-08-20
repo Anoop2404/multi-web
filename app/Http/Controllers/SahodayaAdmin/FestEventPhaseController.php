@@ -119,7 +119,17 @@ class FestEventPhaseController extends SahodayaAdminController
             'registration_batch_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('fest_registration_batches', 'id')->where('event_id', $event->id)],
             'is_regional' => 'nullable|boolean',
             'result_publish_mode' => 'nullable|in:all_regions,per_region',
+            'payment_instructions' => 'nullable|string|max:5000',
+            'payment_qr_code' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:3072',
+            'remove_payment_qr_code' => 'nullable|boolean',
         ]);
+
+        if ($request->hasFile('payment_qr_code')) {
+            $data['payment_qr_code'] = \App\Support\TenantStorage::storeUploadedFile($request->file('payment_qr_code'), 'payment_qr_codes');
+        } elseif ($request->boolean('remove_payment_qr_code')) {
+            $data['payment_qr_code'] = null;
+        }
+        unset($data['remove_payment_qr_code']);
 
         if (! empty($data['status']) && $data['status'] !== $phase->status) {
             $service->transitionStatus($phase, $data['status']);

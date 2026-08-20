@@ -3,6 +3,7 @@
 namespace Tests\Feature\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventPhase;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,5 +75,52 @@ class FestEventPaymentDetailsFallbackTest extends TestCase
 
         $this->assertEquals($customText, $event->paymentDetailsText());
         $this->assertEquals('/storage/payment_qr_codes/event_custom_qr.png', $event->paymentQrCodeUrl());
+    }
+
+    public function test_phase_resolves_custom_instructions_or_falls_back_to_event_or_sahodaya(): void
+    {
+        $sahodaya = Tenant::create([
+            'type' => 'sahodaya',
+            'name' => 'Test Sahodaya 3',
+            'subdomain' => 'test-sahodaya-'.uniqid(),
+        ]);
+
+        $profile = SahodayaProfile::create([
+            'tenant_id' => $sahodaya->id,
+            'payment_bank_name' => 'Canara Bank',
+            'payment_account_no' => '111222333',
+            'payment_ifsc' => 'CNRB0001111',
+            'payment_qr_code' => 'payment_qr_codes/sahodaya_qr.png',
+        ]);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Phased Event Test',
+            'event_type' => 'kalotsav',
+            'fee_settings' => [
+                'payment_instructions' => "Event Level Account:\nBank: SBI\nAccount: 555666777",
+                'payment_qr_code' => 'payment_qr_codes/event_qr.png',
+            ],
+        ]);
+
+        $phase1 = FestEventPhase::create([
+            'event_id' => $event->id,
+            'name' => 'Phase 1 - Regional',
+            'payment_instructions' => "Phase 1 Account:\nBank: Axis Bank\nAccount: 999111222",
+            'payment_qr_code' => 'payment_qr_codes/phase1_qr.png',
+        ]);
+
+        $phase2 = FestEventPhase::create([
+            'event_id' => $event->id,
+            'name' => 'Phase 2 - State Finale',
+        ]);
+
+        // Phase 1 has custom payment details
+        $this->assertStringContainsString('Axis Bank', $phase1->paymentDetailsText($event, $profile));
+        $this->assertEquals('/storage/payment_qr_codes/phase1_qr.png', $phase1->paymentQrCodeUrl($event, $profile));
+
+        // Phase 2 falls back to Event level
+        $this->assertStringContainsString('SBI', $phase2->paymentDetailsText($event, $profile));
+        $this->assertEquals('/storage/payment_qr_codes/event_qr.png', $phase2->paymentQrCodeUrl($event, $profile));
     }
 }

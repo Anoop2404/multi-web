@@ -785,24 +785,30 @@ class FestRegistrationController extends SchoolAdminController
             $root = $event->rootEvent();
             $batchFees = app(\App\Services\Events\FestRegistrationBatchFeeService::class)
                 ->recalculateAll($root, $this->school->id);
-            $event->setAttribute('school_registration_batch_fees', $batchFees->map(fn (FestSchoolEventFee $fee) => [
-                'id' => $fee->id,
-                'registration_batch_id' => $fee->registration_batch_id,
-                'batch_code' => $fee->registrationBatch?->code,
-                'batch_name' => $fee->registrationBatch?->name ?? 'Registration level',
-                'registration_open' => $fee->registrationBatch?->registration_open?->toIso8601String(),
-                'registration_close' => $fee->registrationBatch?->registration_close?->toIso8601String(),
-                'payment_due_at' => $fee->registrationBatch?->payment_due_at?->toIso8601String(),
-                'school_registration_fee' => (float) $fee->school_registration_fee,
-                'participation_fee' => (float) $fee->participation_fee,
-                'participation_item_count' => (int) $fee->participation_item_count,
-                'total_due' => (float) $fee->total_due,
-                'amount_paid' => (float) $fee->amount_paid,
-                'outstanding' => (float) $fee->outstandingBalance(),
-                'status' => $fee->status,
-                'lines' => $fee->lines->map(fn ($line) => $line->only(['line_type', 'label', 'quantity', 'unit_amount', 'amount', 'meta']))->values(),
-                'receipt_history' => $this->receiptHistoryPayload($fee),
-            ])->values()->all());
+            $event->setAttribute('phased_billing_batches', $batchFees->map(function ($fee) use ($event) {
+                $phase = $fee->registrationBatch?->phase ?? $fee->phase;
+
+                return [
+                    'id' => $fee->id,
+                    'registration_batch_id' => $fee->registration_batch_id,
+                    'batch_code' => $fee->registrationBatch?->code,
+                    'batch_name' => $fee->registrationBatch?->name ?? 'Registration level',
+                    'registration_open' => $fee->registrationBatch?->registration_open?->toIso8601String(),
+                    'registration_close' => $fee->registrationBatch?->registration_close?->toIso8601String(),
+                    'payment_due_at' => $fee->registrationBatch?->payment_due_at?->toIso8601String(),
+                    'school_registration_fee' => (float) $fee->school_registration_fee,
+                    'participation_fee' => (float) $fee->participation_fee,
+                    'participation_item_count' => (int) $fee->participation_item_count,
+                    'total_due' => (float) $fee->total_due,
+                    'amount_paid' => (float) $fee->amount_paid,
+                    'outstanding' => (float) $fee->outstandingBalance(),
+                    'status' => $fee->status,
+                    'payment_details_text' => $phase ? $phase->paymentDetailsText($event) : $event->paymentDetailsText(),
+                    'payment_qr_code_url' => $phase ? $phase->paymentQrCodeUrl($event) : $event->paymentQrCodeUrl(),
+                    'lines' => $fee->lines->map(fn ($line) => $line->only(['line_type', 'label', 'quantity', 'unit_amount', 'amount', 'meta']))->values(),
+                    'receipt_history' => $this->receiptHistoryPayload($fee),
+                ];
+            })->values()->all());
 
             $selections = FestSchoolPhaseRegionSelection::where('event_id', $root->id)
                 ->where('school_id', $this->school->id)
