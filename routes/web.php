@@ -1572,6 +1572,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{program}/registrations/{registration}/invoice', [TrainingProgramController::class, 'registrationInvoice'])->name('registrations.invoice');
             Route::get('/{program}/registrations/{registration}/id-card', [TrainingProgramController::class, 'registrationIdCard'])->name('registrations.id-card');
             Route::get('/{program}/certificates-hub', [TrainingProgramController::class, 'certificatesHub'])->name('certificates.hub');
+            Route::get('/{program}/certificate/preview', [TrainingProgramController::class, 'previewCertificate'])->name('certificate.preview');
+            Route::get('/{program}/registrations/{registration}/certificate/preview', [TrainingProgramController::class, 'previewRegistrationCertificate'])->name('registrations.certificate.preview');
+            Route::get('/{program}/registrations/{registration}/certificate/print', [TrainingProgramController::class, 'printCertificate'])->name('registrations.certificate.print');
+            Route::post('/{program}/registrations/{registration}/certificate', [TrainingProgramController::class, 'issueCertificate'])->name('registrations.certificate.issue');
             Route::post('/{program}/certificates/send-test-email', [TrainingProgramController::class, 'sendTestCertificateEmail'])->name('certificates.send-test-email');
             Route::post('/{program}/certificates/bulk-send-email', [TrainingProgramController::class, 'bulkSendCertificatesEmail'])->name('certificates.bulk-send-email');
             Route::post('/{program}/certificates/{registration}/send-single-email', [TrainingProgramController::class, 'sendSingleCertificateEmail'])->name('certificates.send-single-email');
