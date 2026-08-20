@@ -189,7 +189,15 @@ class BoardResultAcademicYearService
             return 'open';
         }
 
-        return $record?->isClosed() ? 'closed' : 'open';
+        if ($window?->board_entry_enabled === true) {
+            return 'open';
+        }
+
+        if ($record?->isClosed()) {
+            return 'closed';
+        }
+
+        return 'open';
     }
 
     public function attachToPayload(array $data): array

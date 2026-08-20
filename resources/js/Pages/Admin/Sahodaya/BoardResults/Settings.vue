@@ -175,24 +175,42 @@ function onYearChange() {
     router.get(`${base.value}/settings`, { academic_year: selectedYear.value }, { preserveScroll: true });
 }
 
-const currentYearOption = computed(() => props.academicYearOptions.find(a => a.label === props.academicYear));
-const entryStatusLabel = computed(() => {
-    const status = currentYearOption.value?.entry_status ?? 'open';
-    return { open: 'Entry Open', upcoming: 'Entry Upcoming', closed: 'Entry Closed', disabled: 'Entry Disabled' }[status] ?? status;
-});
-const entryStatusBadgeClass = computed(() => ({
-    open: 'bg-emerald-100 text-emerald-800',
-    upcoming: 'bg-amber-100 text-amber-800',
-    closed: 'bg-rose-100 text-rose-700',
-    disabled: 'bg-gray-200 text-gray-700',
-}[currentYearOption.value?.entry_status ?? 'open'] ?? 'bg-gray-100 text-gray-700'));
-
 // ── Entry window ─────────────────────────────────────────────────────────
 const entryForm = reactive({
     enabled: props.entryWindow?.enabled ?? false,
     starts_at: props.entryWindow?.starts_at ?? '',
     ends_at: props.entryWindow?.ends_at ?? '',
     processing: false,
+});
+
+const currentYearOption = computed(() => props.academicYearOptions.find(a => a.label === selectedYear.value));
+
+const entryStatusLabel = computed(() => {
+    if (!entryForm.enabled) {
+        return 'Entry Disabled';
+    }
+    const today = new Date().toISOString().split('T')[0];
+    if (entryForm.starts_at && today < entryForm.starts_at) {
+        return 'Entry Upcoming';
+    }
+    if (entryForm.ends_at && today > entryForm.ends_at) {
+        return 'Entry Closed';
+    }
+    return 'Entry Open';
+});
+
+const entryStatusBadgeClass = computed(() => {
+    if (!entryForm.enabled) {
+        return 'bg-gray-200 text-gray-700';
+    }
+    const today = new Date().toISOString().split('T')[0];
+    if (entryForm.starts_at && today < entryForm.starts_at) {
+        return 'bg-amber-100 text-amber-800';
+    }
+    if (entryForm.ends_at && today > entryForm.ends_at) {
+        return 'bg-rose-100 text-rose-700';
+    }
+    return 'bg-emerald-100 text-emerald-800';
 });
 
 function saveEntryWindow() {
