@@ -4,39 +4,67 @@
     <meta charset="utf-8">
     <title>Certificate of Participation</title>
     <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
             font-family: "Times New Roman", Times, serif;
-            background: #fff;
+            background: #f1f5f9;
             color: #1e293b;
+            padding-bottom: 40px;
         }
+
         .page {
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            width: 842px;
+            height: 595px;
+            margin: 20px auto;
+            position: relative;
+            background: #fff;
             border: 10px double #1e3a8a;
-            padding: 25px 40px 20px;
-            box-sizing: border-box;
+            padding: 30px 45px 25px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
+
         .page.has-background {
             border: none;
             padding: 0;
-            width: 100%;
-            height: 100%;
+            width: 1123px;
+            height: 794px;
+            margin: 20px auto;
+            position: relative;
             background-size: 100% 100%;
             background-position: center;
             background-repeat: no-repeat;
             overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
         }
+
+        @if(!empty($isPdf))
+            html, body {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: #fff;
+            }
+            .page {
+                width: 100%;
+                height: 100%;
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                margin: 0;
+                box-shadow: none;
+            }
+            .page.has-background {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                box-shadow: none;
+            }
+        @endif
         .overlay-field {
             position: absolute;
             text-align: center;
