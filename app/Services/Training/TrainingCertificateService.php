@@ -534,7 +534,6 @@ class TrainingCertificateService
         $recipientName = $registration->teacher?->name ?? 'Participant';
         $subjectPrefix = $isTest ? '[TEST CERTIFICATE EMAIL] ' : '';
         $subject = "{$subjectPrefix}Your Certificate for {$programTitle}";
-        $body = "Dear {$recipientName},\n\nYour official training certificate for \"{$programTitle}\" is attached to this email as a PDF.\n\nYou can also view or verify your certificate online anytime here: {$printUrl}\n\nVerification Code: {$certificate->verification_uuid}";
 
         $attachmentName = Str::slug($recipientName).'-certificate.pdf';
         $attachment = [
@@ -543,18 +542,31 @@ class TrainingCertificateService
             'mime'    => 'application/pdf',
         ];
 
+        $viewData = [
+            'subject'        => $subject,
+            'recipientName'  => $recipientName,
+            'programTitle'   => $programTitle,
+            'printUrl'       => $printUrl,
+            'certificate'    => $certificate,
+            'sahodayaName'   => $sahodaya->name,
+            'headerTitle'    => $sahodaya->name,
+            'headerSubtitle' => 'Training Program Certificate',
+            'logoUrl'        => \App\Support\TenantBranding::logoUrl($sahodaya),
+            'portalUrl'      => url('/'),
+        ];
+
         try {
             $mailer = \App\Services\Mail\SahodayaMailer::for($sahodaya->id);
             if ($mailer->isConfigured()) {
                 $mailer->sendViewWithAttachments(
                     $targetEmail,
                     $subject,
-                    'emails.notification-plain',
-                    ['title' => $subject, 'body' => $body],
+                    'emails.training-certificate',
+                    $viewData,
                     [$attachment],
                 );
             } else {
-                \Illuminate\Support\Facades\Mail::raw($body, function ($message) use ($targetEmail, $subject, $attachment) {
+                \Illuminate\Support\Facades\Mail::send('emails.training-certificate', $viewData, function ($message) use ($targetEmail, $subject, $attachment) {
                     $message->to($targetEmail)->subject($subject)
                         ->attachData($attachment['content'], $attachment['name'], ['mime' => $attachment['mime']]);
                 });
