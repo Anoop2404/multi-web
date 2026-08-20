@@ -77,13 +77,17 @@ class FestRegistrationBatchFeeService
                 ];
             })->values();
 
-            // This batch's own per-student rate, when set, takes over from the event-wide
-            // fee_model='per_student' amount below rather than stacking with it — a batch
-            // opting into its own rate means "this phase has its own explicit per-student
-            // charge," not "add my rate on top of the shared one." Any other fee_model
-            // (item_catalog, cksc_tiered, etc.) is unaffected either way: the batch rate is
-            // always additive on top of those, since they're a different kind of charge.
-            $batchStudentFeeSet = $batch->student_registration_fee !== null;
+            // Per-student rate: Check payment batch first, then fall back to the rate configured on linked phase(s)
+            $phaseStudentFee = FestEventPhase::where('event_id', $root->id)
+                ->where('registration_batch_id', $batch->id)
+                ->whereNotNull('student_registration_fee')
+                ->value('student_registration_fee');
+
+            $studentFeeRate = $batch->student_registration_fee !== null
+                ? (float) $batch->student_registration_fee
+                : ($phaseStudentFee !== null ? (float) $phaseStudentFee : null);
+
+            $batchStudentFeeSet = $studentFeeRate !== null;
 
             $participationFee = match ($feeModel) {
                 'item_catalog' => round((float) $itemLines->sum('amount'), 2),
@@ -99,13 +103,18 @@ class FestRegistrationBatchFeeService
             // feature existed, and any batch that hasn't opted in) contributes 0, so
             // existing events keep billing exactly as before.
             $batchStudentFee = $batchStudentFeeSet
-                ? round($studentCount * (float) $batch->student_registration_fee, 2)
+                ? round($studentCount * (float) $studentFeeRate, 2)
                 : 0.0;
 
             $school = \App\Models\Tenant::find($schoolId);
             $categoryBaseFee = $school ? $this->fees->schoolRegistrationAmount($school, $schedule) : 0.0;
+            $phaseBaseFee = FestEventPhase::where('event_id', $root->id)
+                ->where('registration_batch_id', $batch->id)
+                ->whereNotNull('school_registration_fee_share')
+                ->sum('school_registration_fee_share');
+
             $baseFee = $registrations->isNotEmpty()
-                ? ($categoryBaseFee > 0 ? $categoryBaseFee : (float) $batch->school_base_fee)
+                ? ($categoryBaseFee > 0 ? $categoryBaseFee : ($phaseBaseFee > 0 ? (float) $phaseBaseFee : (float) $batch->school_base_fee))
                 : 0.0;
             $total = round($baseFee + $participationFee + $batchStudentFee, 2);
 
@@ -164,7 +173,7 @@ class FestRegistrationBatchFeeService
                     'line_type' => 'student_registration',
                     'label' => $batch->name.' student registration fee',
                     'quantity' => $studentCount,
-                    'unit_amount' => $batch->student_registration_fee,
+                    'unit_amount' => $studentFeeRate,
                     'amount' => $batchStudentFee,
                     'meta' => ['registration_batch_id' => $batch->id],
                 ]);
