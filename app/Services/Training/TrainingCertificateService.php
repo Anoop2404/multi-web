@@ -201,6 +201,19 @@ class TrainingCertificateService
         return array_merge($defaults, $resolved);
     }
 
+    public static function toAbsoluteUrl(?string $url): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://') || str_starts_with($url, 'data:')) {
+            return $url;
+        }
+
+        return url($url);
+    }
+
     /** @return array{template: ?CertificateTemplate, fieldValues: array<string, string>, logoUrl: ?string, sealUrl: ?string, signatories: list<array>, backgroundUrl: ?string, overlayLayout: array} */
     public function renderContext(TrainingRegistration $registration, Tenant $sahodaya): array
     {
@@ -208,27 +221,33 @@ class TrainingCertificateService
         $template = $this->resolveTemplate($registration);
         $fieldValues = $this->resolveFieldValues($registration, $sahodaya);
 
-        $logoUrl = $template?->logo_path
-            ? TenantStorage::logoUrl($sahodaya, $template->logo_path)
-            : TenantBranding::logoUrl($sahodaya);
+        $logoUrl = self::toAbsoluteUrl(
+            $template?->logo_path
+                ? TenantStorage::logoUrl($sahodaya, $template->logo_path)
+                : TenantBranding::logoUrl($sahodaya)
+        );
 
-        $sealUrl = $template?->seal_path
-            ? TenantStorage::logoUrl($sahodaya, $template->seal_path)
-            : null;
+        $sealUrl = self::toAbsoluteUrl(
+            $template?->seal_path
+                ? TenantStorage::logoUrl($sahodaya, $template->seal_path)
+                : null
+        );
 
-        $backgroundUrl = $template?->background_path
-            ? TenantStorage::logoUrl($sahodaya, $template->background_path)
-            : null;
+        $backgroundUrl = self::toAbsoluteUrl(
+            $template?->background_path
+                ? TenantStorage::logoUrl($sahodaya, $template->background_path)
+                : null
+        );
 
         $overlayLayout = $template?->overlayLayout() ?? CertificateTemplate::defaultBackgroundLayout();
 
         $signatories = collect($template?->signatories ?? CertificateTemplate::defaultTrainingSignatories())
             ->map(fn ($s) => [
-                'name'           => $s['name'] ?? '',
-                'designation'    => $s['designation'] ?? '',
-                'signature_url'  => ! empty($s['signature_path'])
+                'name'          => $s['name'] ?? '',
+                'designation'   => $s['designation'] ?? '',
+                'signature_url' => self::toAbsoluteUrl(! empty($s['signature_path'])
                     ? TenantStorage::logoUrl($sahodaya, $s['signature_path'])
-                    : null,
+                    : null),
             ])->values()->all();
 
         return compact('template', 'fieldValues', 'logoUrl', 'sealUrl', 'signatories', 'backgroundUrl', 'overlayLayout');
@@ -359,17 +378,23 @@ class TrainingCertificateService
      */
     private function buildSampleContext(?CertificateTemplate $template, Tenant $sahodaya, array $fieldValues): array
     {
-        $logoUrl = $template?->logo_path
-            ? TenantStorage::logoUrl($sahodaya, $template->logo_path)
-            : TenantBranding::logoUrl($sahodaya);
+        $logoUrl = self::toAbsoluteUrl(
+            $template?->logo_path
+                ? TenantStorage::logoUrl($sahodaya, $template->logo_path)
+                : TenantBranding::logoUrl($sahodaya)
+        );
 
-        $sealUrl = $template?->seal_path
-            ? TenantStorage::logoUrl($sahodaya, $template->seal_path)
-            : null;
+        $sealUrl = self::toAbsoluteUrl(
+            $template?->seal_path
+                ? TenantStorage::logoUrl($sahodaya, $template->seal_path)
+                : null
+        );
 
-        $backgroundUrl = $template?->background_path
-            ? TenantStorage::logoUrl($sahodaya, $template->background_path)
-            : null;
+        $backgroundUrl = self::toAbsoluteUrl(
+            $template?->background_path
+                ? TenantStorage::logoUrl($sahodaya, $template->background_path)
+                : null
+        );
 
         $overlayLayout = $template?->overlayLayout() ?? CertificateTemplate::defaultBackgroundLayout();
 
@@ -377,9 +402,9 @@ class TrainingCertificateService
             ->map(fn ($s) => [
                 'name'          => $s['name'] ?? '',
                 'designation'   => $s['designation'] ?? '',
-                'signature_url' => ! empty($s['signature_path'])
+                'signature_url' => self::toAbsoluteUrl(! empty($s['signature_path'])
                     ? TenantStorage::logoUrl($sahodaya, $s['signature_path'])
-                    : null,
+                    : null),
             ])->values()->all();
 
         $certificate = (object) [
