@@ -51,7 +51,14 @@
                 <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
                     <dt class="text-xs font-medium text-slate-500">Participation Items</dt>
                     <dd class="text-base font-extrabold text-slate-900 mt-0.5">₹{{ money(fee.participation_fee) }}</dd>
-                    <p class="text-[10px] text-slate-500 mt-0.5">{{ fee.participation_item_count || 0 }} registered items</p>
+                    <p class="text-[10px] text-slate-500 mt-0.5">
+                        <span v-if="studentCountForFee(fee) != null" class="font-semibold text-slate-700">
+                            {{ studentCountForFee(fee) }} student{{ studentCountForFee(fee) === 1 ? '' : 's' }} ({{ itemCountForFee(fee) }} item{{ itemCountForFee(fee) === 1 ? '' : 's' }})
+                        </span>
+                        <span v-else>
+                            {{ fee.participation_item_count || 0 }} registered item{{ fee.participation_item_count === 1 ? '' : 's' }}
+                        </span>
+                    </p>
                 </div>
                 <div class="p-3 rounded-xl bg-indigo-50/60 border border-indigo-100">
                     <dt class="text-xs font-semibold text-indigo-900">Total Due</dt>
@@ -76,16 +83,25 @@
                         <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                             <tr>
                                 <th class="px-3 py-2">Line Item Description</th>
+                                <th class="px-3 py-2 text-center">Qty / Count</th>
+                                <th class="px-3 py-2 text-right">Unit Rate (₹)</th>
                                 <th class="px-3 py-2 text-right">Amount (₹)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 bg-white">
                             <tr v-for="(line, idx) in fee.lines" :key="idx" class="hover:bg-slate-50/50">
                                 <td class="px-3 py-2 font-medium text-slate-800">{{ line.label }}</td>
+                                <td class="px-3 py-2 text-center text-slate-700 font-semibold">
+                                    {{ line.quantity != null ? line.quantity : 1 }}
+                                    <span v-if="line.line_type === 'student_registration'" class="text-[10px] text-slate-500 font-normal ml-0.5">student{{ line.quantity === 1 ? '' : 's' }}</span>
+                                </td>
+                                <td class="px-3 py-2 text-right font-mono text-slate-600">
+                                    {{ line.unit_amount != null ? `₹${money(line.unit_amount)}` : '—' }}
+                                </td>
                                 <td class="px-3 py-2 text-right font-mono font-bold text-slate-900">₹{{ money(line.amount) }}</td>
                             </tr>
                             <tr class="bg-slate-50/80 font-bold border-t border-slate-200">
-                                <td class="px-3 py-2 text-slate-900">Total Invoice Amount</td>
+                                <td colspan="3" class="px-3 py-2 text-slate-900">Total Invoice Amount</td>
                                 <td class="px-3 py-2 text-right font-mono text-indigo-900">₹{{ money(fee.total_due) }}</td>
                             </tr>
                         </tbody>
@@ -297,6 +313,24 @@ function submitPayment() {
             paymentFiles.value = [];
         },
     });
+}
+
+function studentCountForFee(fee) {
+    if (!fee) return null;
+    const studentLine = (fee.lines || []).find((l) => l.line_type === 'student_registration');
+    if (studentLine && studentLine.quantity != null) {
+        return studentLine.quantity;
+    }
+    return null;
+}
+
+function itemCountForFee(fee) {
+    if (!fee) return 0;
+    const itemLines = (fee.lines || []).filter((l) => l.line_type === 'item_fee');
+    if (itemLines.length) {
+        return itemLines.length;
+    }
+    return fee.participation_item_count || 0;
 }
 
 function money(value) { return Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
