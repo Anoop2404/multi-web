@@ -339,8 +339,8 @@ const attendanceXlsxHref = computed(() => {
 });
 
 const attendanceSheetPdfHref = computed(() => {
-    const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet`;
-    return itemFilter.value ? `${base}?item_id=${itemFilter.value}` : base;
+    const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet?download=1`;
+    return itemFilter.value ? `${base}&item_id=${itemFilter.value}` : base;
 });
 
 const attendanceSheetPreviewHref = computed(() => {

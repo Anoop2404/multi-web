@@ -130,9 +130,7 @@ function buildUrl(headId, itemId = null) {
         }
     }
     if (headId !== undefined && headId !== false) {
-        if (headId != null) {
-            q.set(props.headQueryKey, headParam(headId));
-        }
+        q.set(props.headQueryKey, headParam(headId));
     } else {
         q.delete(props.headQueryKey);
         q.delete(props.itemQueryKey);

@@ -66,7 +66,15 @@ class FestRankPointService
             return (int) $configured;
         }
 
-        if ($event->event_type === 'sports' && ! $isGroup) {
+        if ($isGroup) {
+            // Points tab copy promises "leave empty to fallback to individual ranks" for
+            // the team/relay table — resolve whatever the individual table would give for
+            // this same rank (an explicit individual row, or the athletics-standard
+            // default) instead of silently awarding 0 to every team/relay placement.
+            return $this->pointsForRank($event, $rank, false);
+        }
+
+        if ($event->event_type === 'sports') {
             return (int) (self::ATHLETICS_STANDARD[$rank] ?? 0);
         }
 
