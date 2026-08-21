@@ -10,13 +10,20 @@
 
         <FestEventMetaBar v-if="eventMeta" :meta="eventMeta" :show-edit-hint="false" />
 
-        <ReportHeadSubNav v-if="hasItemHeads"
-                          :head-item-groups="headItemGroups"
-                          :base-url="base"
-                          :selected-head-id="filterHeadId ?? headFilter"
-                          :selected-item-id="filterItemId ?? itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`"
-                          :is-sports="true" />
+        <section v-if="hasItemHeads" class="mb-6">
+            <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-800">Filter by item</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Search or pick an item — the list below updates instantly.</p>
+                </div>
+                <Link :href="`${programBase}/reports/${event.id}`" class="text-xs font-semibold text-indigo-600 hover:underline">← All sections</Link>
+            </div>
+            <ReportItemSearchSelect :items="flatItems"
+                                    :model-value="itemFilter"
+                                    :all-items-label="`All ${flatItems.length} items`"
+                                    search-placeholder="Search by item name or code…"
+                                    @select="onItemSelect" />
+        </section>
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
@@ -41,7 +48,7 @@
             </div>
         </div>
 
-        <section v-if="!filterHeadId && !headFilter">
+        <section v-if="!filterHeadId && !headFilter && !filterItemId && !itemFilter">
             <h3 class="section-title mb-3">Summary by head</h3>
             <p class="text-sm text-slate-500 mb-3">Select a head above to see the full participant list with photos and IDs.</p>
             <div class="card overflow-hidden p-0">
@@ -85,7 +92,7 @@
             </div>
         </section>
 
-        <section v-if="filterHeadId || headFilter">
+        <section v-if="filterHeadId || headFilter || filterItemId || itemFilter">
             <h3 class="section-title mb-3">Participant list</h3>
             <div class="card overflow-hidden p-0">
                 <div class="overflow-x-auto">
@@ -137,7 +144,7 @@ import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import FestEventMetaBar from '@/Components/reports/FestEventMetaBar.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import ReportStudentCell from '@/Components/reports/ReportStudentCell.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
@@ -173,6 +180,16 @@ const {
 
 if (props.filterHeadId) headFilter.value = String(props.filterHeadId);
 if (props.filterItemId) itemFilter.value = String(props.filterItemId);
+
+const flatItems = computed(() => headItemGroups.value.flatMap((h) => h.items ?? []));
+
+// Item selection here is client-side only (no server round trip): headWiseParticipantRows()
+// already returns every head's rows regardless of $headId, so useReportHeadFilters'
+// displayRows can narrow to one item purely in-memory — see useReportHeadFilters()'s
+// filterReportRows()/rowMatchesItem() in resources/js/composables/useReportHeadFilters.js.
+function onItemSelect(itemId) {
+    itemFilter.value = itemId;
+}
 
 const totals = computed(() => ({
     heads: (props.summary ?? []).filter((r) => (r.participant_count ?? 0) > 0 || (r.registration_count ?? 0) > 0).length,

@@ -7,14 +7,11 @@
                     :description="filterDescription">
             <template #actions>
                 <div class="flex flex-wrap items-center gap-2">
-                    <Link v-if="competitionUrl" :href="competitionUrl" class="btn-secondary text-xs">
-                        ← {{ isSports ? 'By Event Head' : 'By Item Head' }}
-                    </Link>
                     <a :href="markEntrySheetUrl" target="_blank" class="btn-secondary text-xs !bg-indigo-50 !text-indigo-800 hover:!bg-indigo-100 font-bold border-indigo-200">
                         🖨️ Print Blank Judge Sheets (Paper)
                     </a>
                     <a v-if="cumulativeSheetUrl" :href="cumulativeSheetUrl" target="_blank" class="btn-secondary text-xs">
-                        📊 Digital Sum Sheet (Online Tabulation)
+                        📊 {{ props.judgeCount > 1 ? 'Digital Sum Sheet' : 'Digital Mark Sheet' }} (Online Tabulation)
                     </a>
                     <Link :href="importUrl" class="btn-primary text-xs">
                         Import Marks
@@ -22,6 +19,14 @@
                 </div>
             </template>
         </PageHeader>
+
+        <!-- Missing chest numbers warning -->
+        <div v-if="props.missingChestCount" class="card !p-4 mb-5 border border-amber-200 bg-amber-50 flex flex-wrap items-center justify-between gap-3">
+            <p class="text-xs text-amber-900">
+                <strong>{{ props.missingChestCount }}</strong> participant(s) in this item {{ props.missingChestCount === 1 ? "doesn't" : "don't" }} have a chest number yet — the printed sheet will show a blank for them.
+            </p>
+            <Link :href="chestNumbersUrl" class="btn-secondary text-xs !bg-white shrink-0">Generate chest numbers</Link>
+        </div>
 
         <!-- Signed Mark Sheet Upload -->
         <div v-if="props.selectedItemId" class="card !p-4 mb-5 space-y-3 border border-slate-200">
@@ -73,9 +78,11 @@
 
             <!-- Item Picker -->
             <div v-if="itemOptions.length > 1" class="space-y-3">
-                <ReportHeadSubNav :head-item-groups="headItemGroups" :base-url="marksBaseUrl"
-                                  :selected-head-id="selectedHeadId" :selected-item-id="selectedItemId"
-                                  :show-item-links="true" :preserve-state="false" :status-for="itemConfiguredMark" />
+                <ReportItemSearchSelect :items="flatItems" :model-value="props.selectedItemId"
+                                        :all-items-label="`All ${flatItems.length} items`"
+                                        search-placeholder="Search by item name or code…"
+                                        :status-for="itemConfiguredMark"
+                                        @select="onItemSelect" />
 
                 <div class="flex items-center justify-end gap-3">
                     <span class="text-[11px] text-slate-400">
@@ -221,7 +228,7 @@
                             </button>
                         </div>
 
-                        <button v-if="isSports && section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5" @click="autoRank(section.item)">
+                        <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5" @click="autoRank(section.item)">
                             Auto-rank
                         </button>
                     </div>
@@ -367,7 +374,6 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
 import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import { useFestMarkEntryDisplay } from '@/composables/useFestMarkEntryDisplay.js';
 
@@ -382,7 +388,6 @@ const props = defineProps({
     activityLogs: { type: Array, default: () => [] },
     selectedHeadId: { type: [String, Number], default: null },
     selectedItemId: { type: [Number, String], default: null },
-    competitionUrl: { type: String, default: null },
     rankPoints: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
     itemHeads: { type: Array, default: () => [] },
@@ -396,10 +401,12 @@ const props = defineProps({
     judgeScores: { type: Object, default: () => ({}) },
     cumulativeSheetUrl: { type: String, default: null },
     sheetUploads: { type: Array, default: () => [] },
+    missingChestCount: { type: Number, default: 0 },
 });
 
 const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/import`);
 const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
+const chestNumbersUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/chest-numbers?item_id=${props.selectedItemId}`);
 const isSports = computed(() => props.event?.event_type === 'sports');
 
 // Grade is auto-computed from score (and stored) for any non-sports event, regardless of
@@ -434,6 +441,21 @@ const itemOptions = computed(() => {
     }
     return items.filter((it) => String(it.head_id) === String(props.selectedHeadId));
 });
+
+// Flat, head-agnostic item list for the main navigation picker — headItemGroups always
+// carries every item across every head (FestHeadItemNavigationService::navigationForEvent()
+// doesn't filter by the request's head_id), unlike itemOptions above which still narrows by
+// selectedHeadId and only stays flat in practice because this page no longer ever sends
+// head_id itself.
+const flatItems = computed(() => (props.headItemGroups ?? []).flatMap((h) => h.items ?? []));
+
+function onItemSelect(itemId) {
+    // FestMarkEntryController scopes registrations/marks/criteria to a single item
+    // server-side, so switching items needs a real round trip. preserveState: false
+    // (matching ReportHeadSubNav's old preserve-state="false") resets local form state
+    // (markForms/judgeForms/etc.) for the newly-selected item's registrations.
+    router.get(marksBaseUrl.value, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: false });
+}
 
 function switchSportEvent(evt) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/marks`);
@@ -703,8 +725,6 @@ async function saveAll() {
 }
 
 function autoRank(item) {
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/auto-rank`, {
-        item_id: item.id,
-    }, { preserveScroll: true });
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${item.id}/auto-rank`, {}, { preserveScroll: true });
 }
 </script>

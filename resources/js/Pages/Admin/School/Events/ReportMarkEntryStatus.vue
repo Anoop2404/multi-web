@@ -10,13 +10,13 @@
             </template>
         </PageHeader>
 
-        <ReportHeadSubNav v-if="hasItemHeads"
-                          :head-item-groups="headItemGroups"
-                          :base-url="base"
-                          :selected-head-id="headFilter"
-                          :selected-item-id="itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`"
-                          :is-sports="event.event_type === 'sports'" />
+        <ReportItemSearchSelect v-if="hasItemHeads"
+                                class="mb-6"
+                                :items="flatItems"
+                                :model-value="itemFilter"
+                                :all-items-label="`All ${flatItems.length} items`"
+                                search-placeholder="Search by item name or code…"
+                                @select="onItemSelect" />
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
@@ -88,7 +88,7 @@
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
@@ -117,6 +117,13 @@ const {
     applyFilter,
     shouldShowHeadDivider,
 } = useReportHeadFilters(base, () => props.rows);
+
+const flatItems = computed(() => headItemGroups.value.flatMap((h) => h.items ?? []));
+
+function onItemSelect(itemId) {
+    headFilter.value = '';
+    itemFilter.value = itemId || '';
+}
 
 const filteredSummary = computed(() => ({
     items: displayRows.value.length,

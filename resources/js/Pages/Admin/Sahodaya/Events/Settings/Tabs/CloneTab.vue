@@ -6,7 +6,7 @@
             <form @submit.prevent="cloneEvent" class="flex flex-wrap gap-3 items-end">
                 <FormField label="New event title" class-extra="flex-1 min-w-[12rem]" required>
                     <template #default="{ id }">
-                        <input :id="id" v-model="cloneForm.title" class="field" placeholder="Copy of {{ event?.title }}" required>
+                        <input :id="id" v-model="cloneForm.title" class="field" :placeholder="`Copy of ${event?.title}`" required>
                     </template>
                 </FormField>
                 <button type="submit" class="btn-primary" :disabled="cloneForm.processing">Clone event</button>

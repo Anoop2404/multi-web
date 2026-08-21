@@ -91,7 +91,7 @@ const searchQuery = ref('');
 
 const filteredVolunteers = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();
-    if (!q) return volunteers;
-    return volunteers.filter((v) => [v.name, v.duty, v.phone, v.notes].filter(Boolean).join(' ').toLowerCase().includes(q));
+    if (!q) return volunteers.value;
+    return volunteers.value.filter((v) => [v.name, v.duty, v.phone, v.notes].filter(Boolean).join(' ').toLowerCase().includes(q));
 });
 </script>

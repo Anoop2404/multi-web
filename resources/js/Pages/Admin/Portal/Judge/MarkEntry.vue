@@ -11,13 +11,13 @@
             <p class="text-sm text-slate-500">Mark entry — enter grades and scores for each item below.</p>
         </div>
 
-        <ReportHeadSubNav v-if="hasItemHeads && isSports"
-                          :head-item-groups="headItemGroups"
-                          :base-url="marksBaseUrl"
-                          :selected-head-id="selectedHeadId"
-                          :selected-item-id="selectedItemId"
-                          :show-item-links="true"
-                          :is-sports="true" />
+        <ReportItemSearchSelect v-if="flatItems.length"
+                                :items="flatItems"
+                                :model-value="selectedItemId"
+                                label="Competition Item"
+                                :all-items-label="`All ${flatItems.length} items`"
+                                search-placeholder="Search by item name or code…"
+                                @select="onItemSelect" />
 
         <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
             You are entering <strong>your judge scores</strong>. When all judges for an item have scored a participant, the official mark is averaged automatically.
@@ -27,7 +27,7 @@
         </p>
 
         <p v-if="!registrations.length" class="text-sm text-slate-500 py-6 text-center">
-            No participants in this section. Pick another {{ isSports ? 'Event Head' : 'item head' }} above.
+            No participants in this section. Pick another item above.
         </p>
 
         <div v-for="reg in registrations" :key="reg.id" class="card mb-4">
@@ -60,7 +60,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import { judgePortalNavItems } from '@/support/judgePortalNav.js';
 import { computed, reactive, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
@@ -85,6 +85,12 @@ const forms = reactive({});
 const isSports = computed(() => props.event?.event_type === 'sports');
 const marksBaseUrl = computed(() => `/portal/judge/${props.sahodaya.id}/events/${props.event.id}/marks`);
 const navItems = computed(() => judgePortalNavItems(props.sahodaya.id, props.event.id));
+
+const flatItems = computed(() => (props.headItemGroups ?? []).flatMap((h) => h.items ?? []));
+
+function onItemSelect(itemId) {
+    router.get(marksBaseUrl.value, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: true });
+}
 
 onMounted(() => {
     for (const reg of props.registrations) {

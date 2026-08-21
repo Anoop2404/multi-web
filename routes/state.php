@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Admin\StateAdminDashboardController;
-use App\Http\Controllers\StateAdmin\StateBoardResultsController;
 use App\Http\Controllers\StateAdmin\StateFestWorkspaceController;
 use App\Http\Controllers\StateAdmin\StateAttendanceController;
 use App\Http\Controllers\StateAdmin\StateQualifierReviewController;
@@ -59,6 +58,4 @@ Route::domain(config('state.domain'))
             Route::post('/{event}/marks', [StateFestWorkspaceController::class, 'enterMark'])->name('marks.enter');
             Route::post('/{event}/publish-results', [StateFestWorkspaceController::class, 'publishResults'])->name('results.publish');
         });
-
-        Route::get('/board-results', [StateBoardResultsController::class, 'index'])->name('board-results');
     });

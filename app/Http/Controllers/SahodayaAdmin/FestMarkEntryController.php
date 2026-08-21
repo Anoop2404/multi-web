@@ -120,6 +120,7 @@ class FestMarkEntryController extends SahodayaAdminController
         $judgeCount = 1;
         $judgeScores = [];
         $sheetUploads = [];
+        $missingChestCount = 0;
         $selectedItemModel = $itemId ? FestEventItem::find($itemId) : null;
         if ($selectedItemModel) {
             $criteriaService = app(FestMarkCriteriaService::class);
@@ -141,6 +142,34 @@ class FestMarkEntryController extends SahodayaAdminController
                     'downloadUrl'   => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/mark-sheet-uploads/{$u->id}",
                 ])
                 ->all();
+
+            // So the page can warn before anyone prints/judges off a sheet with blank
+            // chest numbers — cheaper to flag here than to let a judge discover it on paper.
+            // Mirrors markEntrySheet()'s own group-vs-individual resolution so the count
+            // matches what that PDF will actually show.
+            $numbering = app(FestNumberingService::class);
+            $isGroupItem = $numbering->isGroupItem($selectedItemModel);
+            $seenGroups = [];
+            $missingChestCount = FestParticipant::whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $event->id)
+                    ->where('item_id', $itemId)
+                    ->whereNotIn('status', ['rejected', 'withdrawn']))
+                ->where('participant_role', '!=', 'standby')
+                ->with('group')
+                ->get()
+                ->filter(function (FestParticipant $p) use ($isGroupItem, $numbering, &$seenGroups) {
+                    if ($isGroupItem && $p->group_id) {
+                        if (isset($seenGroups[$p->group_id])) {
+                            return false;
+                        }
+                        $seenGroups[$p->group_id] = true;
+
+                        return $p->group?->chest_no === null;
+                    }
+
+                    return $numbering->effectiveChestNumber($p) === null;
+                })
+                ->count();
         }
 
         return $this->inertia('Sahodaya/Events/MarkEntry', $this->withEventActivity($event, FestPageActivity::MARKS, [
@@ -154,7 +183,6 @@ class FestMarkEntryController extends SahodayaAdminController
             'configuredItemIds' => $configuredItemIds,
             'rubricTemplates' => $rubricTemplates,
             'gradeOptions' => $gradeOptions,
-            'competitionUrl' => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/competition",
             'rankPoints'     => $event->event_type === 'sports'
                 ? app(FestRankPointService::class)->listForEvent($event)
                 : [],
@@ -163,7 +191,8 @@ class FestMarkEntryController extends SahodayaAdminController
             'judgeCount'       => $judgeCount,
             'judgeScores'      => $judgeScores,
             'sheetUploads'     => $sheetUploads,
-            'cumulativeSheetUrl' => ($itemId && $judgeCount > 1)
+            'missingChestCount' => $missingChestCount,
+            'cumulativeSheetUrl' => $itemId
                 ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/reports/mark-criteria-sheet?item_id={$itemId}"
                 : null,
         ]));
@@ -328,7 +357,19 @@ class FestMarkEntryController extends SahodayaAdminController
         abort_if($item->event_id !== $event->id, 404);
 
         $judgeCount = $criteriaService->judgeCountForItem($item);
-        $scores = $judgeCount > 1 ? $criteriaService->judgeScoresForItem($item) : [];
+
+        // Multi-judge items keep per-judge subtotals in FestMarkJudgeScore. A single-judge
+        // item never writes there — its one score lives directly on FestMark — so build the
+        // same participant_id => [judge_number => score] shape from that instead, letting
+        // the rest of this method (and the shared blade view) treat both cases identically.
+        if ($judgeCount > 1) {
+            $scores = $criteriaService->judgeScoresForItem($item);
+        } else {
+            $scores = FestMark::where('item_id', $item->id)
+                ->pluck('score', 'participant_id')
+                ->map(fn ($score) => [1 => $score === null ? null : (float) $score])
+                ->all();
+        }
 
         $isGroup = $numbering->isGroupItem($item);
 
@@ -376,14 +417,25 @@ class FestMarkEntryController extends SahodayaAdminController
 
         usort($rows, fn ($a, $b) => ($a['chest_no'] ?? PHP_INT_MAX) <=> ($b['chest_no'] ?? PHP_INT_MAX));
 
+        $sheetTitle = $judgeCount > 1 ? 'Digital Sum Sheet' : 'Digital Mark Sheet';
+
+        $nameParts = [$event->title];
+        if ($item->category && $item->category !== 'general') {
+            $nameParts[] = $item->category;
+        }
+        $nameParts[] = $item->title;
+        $nameParts[] = $sheetTitle;
+        $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
+
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-criteria-sheet', [
             'event'      => $event,
             'item'       => $item,
             'judgeCount' => $judgeCount,
+            'sheetTitle' => $sheetTitle,
             'rows'       => $rows,
             'orgName'    => $this->sahodaya->name ?? 'Sahodaya',
             'logoSrc'    => TenantBranding::logoEmbedSrc($this->sahodaya),
-        ])->download("mark-sum-sheet-{$item->id}.pdf");
+        ])->download($fileName);
     }
 
     /**
@@ -481,11 +533,18 @@ class FestMarkEntryController extends SahodayaAdminController
             'event'    => $event,
             'sheets'   => $sheets,
             'logoSrc'  => TenantBranding::logoEmbedSrc($this->sahodaya),
-        ])->setPaper('a4', 'landscape');
+        ])->setPaper('a4', 'portrait');
 
-        $fileName = $itemId
-            ? "mark-entry-sheet-item-{$itemId}.pdf"
-            : "mark-entry-sheets-{$event->id}.pdf";
+        $nameParts = [$event->title];
+        if ($itemId) {
+            $singleItem = $items->first();
+            if ($singleItem->category && $singleItem->category !== 'general') {
+                $nameParts[] = $singleItem->category;
+            }
+            $nameParts[] = $singleItem->title;
+        }
+        $nameParts[] = 'mark entry sheet';
+        $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
         return $pdf->download($fileName);
     }
@@ -494,7 +553,6 @@ class FestMarkEntryController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($item->event_id !== $event->id, 404);
-        abort_unless($event->event_type === 'sports', 422, 'Auto-rank applies to sports events only.');
 
         $result = $ranker->rankItem($event, $item);
 

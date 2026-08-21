@@ -89,7 +89,7 @@ const props = defineProps({
 
 const form = useForm({
     title: '',
-    event_type: 'kalolsavam',
+    event_type: 'kalotsavam',
     conduct_levels: ['state', 'sahodaya'],
 });
 

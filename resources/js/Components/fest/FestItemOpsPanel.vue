@@ -31,12 +31,11 @@
         </div>
 
         <div class="flex flex-wrap gap-2 pt-1">
-            <button v-if="isSports"
-                    type="button"
+            <button type="button"
                     class="btn-secondary text-sm"
                     :disabled="autoRanking"
                     @click="autoRank">
-                {{ autoRanking ? 'Ranking…' : 'Auto-rank (sports)' }}
+                {{ autoRanking ? 'Ranking…' : 'Auto-rank' }}
             </button>
             <button v-if="!item.results_published"
                     type="button"

@@ -148,10 +148,6 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::post('/fest/{event}/publish-results', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'publishResults'])->name('fest.results.publish');
         });
 
-        Route::get('/sports', [\App\Http\Controllers\Admin\SportsResultsController::class, 'index'])->name('sports.index');
-        Route::get('/mcq-results', [\App\Http\Controllers\Admin\McqStateResultsController::class, 'index'])->name('mcq-results.index');
-        Route::get('/board-results', [\App\Http\Controllers\StateAdmin\StateBoardResultsController::class, 'index'])->name('board-results.index');
-
         Route::get('/sahodayas', [TenantController::class, 'indexSahodayas'])->name('sahodayas.index');
         Route::get('/sahodayas/export-admin-credentials', [TenantController::class, 'exportSahodayaAdminCredentials'])->name('sahodayas.export-admin-credentials');
 

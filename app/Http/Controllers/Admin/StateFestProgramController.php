@@ -27,10 +27,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class StateFestProgramController extends Controller
 {
     /**
-     * Event types that get a generic results/winners rollup here. Kalolsavam and sports
-     * have their own dedicated controllers (KalotsavStateController, SportsResultsController)
-     * with the same underlying data shape — this covers the remaining program types, which
-     * previously had setup/propagation tracking but no results view at all (Path_breaks.md 3.3).
+     * Event types that get a generic results/winners rollup here. Kalotsav has its own
+     * dedicated controller (KalotsavStateController) with the same underlying data shape —
+     * this covers the remaining program types, which previously had setup/propagation
+     * tracking but no results view at all (Path_breaks.md 3.3). Program creation is
+     * currently restricted to Kalotsav only (see eventTypes()), so none of these types
+     * are reachable today — kept for when/if State Admin's scope widens again.
      */
     private const RESULTS_EVENT_TYPES = ['kids_fest', 'teacher_fest', 'custom'];
 
@@ -505,7 +507,7 @@ class StateFestProgramController extends Controller
         $data = $request->validate([
             'title'              => 'required|string|max:255',
             'status'             => 'nullable|in:draft,published,inactive',
-            'event_type'         => ['required', \Illuminate\Validation\Rule::in(array_keys(config('fest_competition_types', [])))],
+            'event_type'         => ['required', Rule::in(array_keys($this->eventTypes()))],
             'conduct_levels'     => 'required|array|min:1',
             'conduct_levels.*'   => Rule::in(['state', 'sahodaya', 'school']),
             'academic_year'      => 'nullable|string|max:20',
@@ -653,11 +655,7 @@ class StateFestProgramController extends Controller
     private function eventTypes(): array
     {
         return [
-            'kalolsavam'   => 'Kalolsavam',
-            'sports'       => 'Sports Meet',
-            'kids_fest'    => 'Kids Fest',
-            'teacher_fest' => 'Teacher Fest',
-            'custom'       => 'Custom',
+            'kalotsavam' => 'Kalotsav',
         ];
     }
 }

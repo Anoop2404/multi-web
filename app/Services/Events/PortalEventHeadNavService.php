@@ -14,7 +14,10 @@ class PortalEventHeadNavService
     ) {}
 
     /**
-     * Head tabs + selection for portal mark/registration pages (sports only).
+     * Head/item data for portal mark/registration pages, any event type. Items are
+     * always included (unlike the old sports-only, head-tabs-without-items shape this
+     * returned) so callers can build a single flat item picker instead of a two-step
+     * "pick a head, then an item" UI.
      *
      * @return array{
      *     headItemGroups: list<array<string, mixed>>,
@@ -26,18 +29,8 @@ class PortalEventHeadNavService
      */
     public function context(FestEvent $event, Request $request, ?string $schoolId = null): array
     {
-        if ($event->event_type !== 'sports') {
-            return [
-                'headItemGroups'  => [],
-                'headsForFilter'    => [],
-                'hasItemHeads'      => false,
-                'selectedHeadId'    => null,
-                'selectedItemId'    => null,
-            ];
-        }
-
         $nav = $this->navigation->navigationForEvent($event, $schoolId);
-        $slim = $this->navigation->slimNavigation($nav);
+        $slim = $this->navigation->slimNavigation($nav, includeItems: true);
 
         return array_merge($slim, [
             'selectedHeadId' => $this->parseHeadId($request),
@@ -58,15 +51,15 @@ class PortalEventHeadNavService
         $allowed = array_flip(array_map('intval', $itemIds));
 
         $filtered = collect($full['headItemGroups'] ?? [])
-            ->filter(function (array $group) use ($allowed) {
-                foreach ($group['items'] ?? [] as $item) {
-                    if (isset($allowed[(int) $item['id']])) {
-                        return true;
-                    }
-                }
+            ->map(function (array $group) use ($allowed) {
+                $group['items'] = collect($group['items'] ?? [])
+                    ->filter(fn (array $item) => isset($allowed[(int) $item['id']]))
+                    ->values()
+                    ->all();
 
-                return false;
+                return $group;
             })
+            ->filter(fn (array $group) => $group['items'] !== [])
             ->values()
             ->all();
 
@@ -79,7 +72,7 @@ class PortalEventHeadNavService
             'headsForFilter'  => $full['headsForFilter'] ?? [],
             'hasItemHeads'    => true,
             'unassignedItems' => [],
-        ]));
+        ], includeItems: true));
     }
 
     /** @param  Collection<int, FestRegistration>  $registrations */

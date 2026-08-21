@@ -191,7 +191,7 @@ const { event, pointRules, pointForm, rankPoints, groupRankPoints, gradeConfigs,
 // rendered as a <select> here since point rules reference an existing grade rather than
 // defining a new one. Falls back to the legacy four when nothing's been customized.
 const gradeOptions = computed(() => {
-    const used = [...new Set((gradeConfigs ?? []).map((g) => String(g.grade || '').replace('_plus', '+')).filter(Boolean))];
+    const used = [...new Set((gradeConfigs.value ?? []).map((g) => String(g.grade || '').replace('_plus', '+')).filter(Boolean))];
     return used.length ? used : ['A+', 'A', 'B', 'C'];
 });
 

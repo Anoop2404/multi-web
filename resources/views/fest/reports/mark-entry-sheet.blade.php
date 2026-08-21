@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Mark Entry Sheet — {{ $event->title }}</title>
     <style>
-        @page { margin: 16px 20px; size: landscape; }
+        @page { margin: 16px 20px; size: portrait; }
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
         .sheet { page-break-after: always; }
         .sheet:last-child { page-break-after: avoid; }
@@ -58,7 +58,12 @@
                             <td style="padding: 2px 0; text-align: right;"><strong>SHEET:</strong> {{ !empty($sheet['sheet_label']) ? $sheet['sheet_label'] : 'MARK ENTRY SHEET' }}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 2px 0;"><strong>ITEM:</strong> {{ $sheet['item']->item_code ? "[{$sheet['item']->item_code}] " : '' }}{{ $sheet['item']->title }}</td>
+                            <td style="padding: 2px 0;">
+                                <strong>ITEM:</strong> {{ $sheet['item']->item_code ? "[{$sheet['item']->item_code}] " : '' }}{{ $sheet['item']->title }}
+                                @if($sheet['item']->category && $sheet['item']->category !== 'general')
+                                    <strong>&middot; CATEGORY:</strong> {{ ucwords(str_replace(['_', '-'], ' ', $sheet['item']->category)) }}
+                                @endif
+                            </td>
                             <td style="padding: 2px 0; text-align: right;"><strong>TOTAL PARTICIPANTS:</strong> {{ count($sheet['rows']) }}</td>
                         </tr>
                     </table>

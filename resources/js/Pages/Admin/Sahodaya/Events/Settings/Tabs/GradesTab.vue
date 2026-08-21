@@ -98,19 +98,19 @@ const searchQuery = ref('');
 
 const selectedItemUsesPercentage = computed(() => {
     if (!gradeForm.item_id) return false;
-    const item = (event.value?.items ?? event.items ?? []).find((i) => i.id === gradeForm.item_id);
+    const item = (event.value?.items ?? []).find((i) => i.id === gradeForm.item_id);
     return !!item?.total_marks;
 });
 
 const existingGradeKeys = computed(() => {
-    const used = gradeConfigs.map((g) => g.grade).filter(Boolean);
+    const used = gradeConfigs.value.map((g) => g.grade).filter(Boolean);
     return [...new Set([...used, 'A_plus', 'A', 'B', 'C'])];
 });
 
 const filteredGrades = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();
-    if (!q) return gradeConfigs;
-    return gradeConfigs.filter((g) =>
+    if (!q) return gradeConfigs.value;
+    return gradeConfigs.value.filter((g) =>
         [g.item?.title, g.grade, String(g.min_score), String(g.max_score)].filter(Boolean).join(' ').toLowerCase().includes(q),
     );
 });

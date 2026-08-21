@@ -130,7 +130,7 @@ const {
     eventNotifForm, savingEventNotifications, saveEventNotifications,
     notificationTriggers, eligibleNotificationUsers,
 } = inject('eventSettings');
-const isSports = computed(() => event?.event_type === 'sports');
+const isSports = computed(() => event.value?.event_type === 'sports');
 
 function triggerLabel(trigger) {
     return trigger.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());

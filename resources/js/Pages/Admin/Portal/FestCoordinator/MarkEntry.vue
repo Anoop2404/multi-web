@@ -5,13 +5,13 @@
         accent="indigo"
         :nav-items="navItems"
     >
-        <ReportHeadSubNav v-if="hasItemHeads && isSports"
-                          :head-item-groups="headItemGroups"
-                          :base-url="marksBaseUrl"
-                          :selected-head-id="selectedHeadId"
-                          :selected-item-id="selectedItemId"
-                          :show-item-links="true"
-                          :is-sports="true" />
+        <ReportItemSearchSelect v-if="flatItems.length"
+                                :items="flatItems"
+                                :model-value="selectedItemId"
+                                label="Competition Item"
+                                :all-items-label="`All ${flatItems.length} items`"
+                                search-placeholder="Search by item name or code…"
+                                @select="onItemSelect" />
 
         <p v-if="isSports && event.record_tracking_enabled" class="text-xs text-amber-800 bg-amber-50 border rounded-lg px-3 py-2 mb-3">
             Record tracking is on — new records may trigger prize labels when marks are saved.
@@ -36,7 +36,7 @@
                         <span v-if="section.item?.head?.name" class="text-xs font-normal text-slate-500 mr-2">{{ section.item.head.name }}</span>
                         {{ section.item?.title }}
                     </p>
-                    <button v-if="isSports && section.item?.id"
+                    <button v-if="section.item?.id"
                             type="button"
                             class="btn-secondary text-xs !min-h-0"
                             @click="autoRank(section.item)">
@@ -130,7 +130,7 @@
 import { reactive, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import { festMarkPortalPaths, festOpsEventNav } from '@/support/festOpsPortalNav.js';
 import { festCoordinatorPortalNavItems } from '@/support/festCoordinatorPortalNav.js';
 import { useFestMarkEntryDisplay } from '@/composables/useFestMarkEntryDisplay.js';
@@ -157,6 +157,12 @@ const portalPaths = computed(() =>
 );
 
 const marksBaseUrl = computed(() => portalPaths.value.marksHref);
+
+const flatItems = computed(() => (props.headItemGroups ?? []).flatMap((h) => h.items ?? []));
+
+function onItemSelect(itemId) {
+    router.get(marksBaseUrl.value, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: true });
+}
 
 const navItems = computed(() => {
     if (props.festOpsBase) {
@@ -211,7 +217,7 @@ function saveMark(participant, item) {
 }
 
 async function autoRank(item) {
-    if (!item?.id || !(await confirm({ message: `Auto-rank "${item.title}" from measurements? Absent athletes are skipped.`, destructive: false }))) {
+    if (!item?.id || !(await confirm({ message: `Auto-rank "${item.title}" from the entered measurements or scores? Absent participants are skipped.`, destructive: false }))) {
         return;
     }
 

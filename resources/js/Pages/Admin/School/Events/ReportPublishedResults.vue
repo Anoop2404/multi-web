@@ -18,13 +18,13 @@
             Some items have published results. Full event release may still be pending.
         </div>
 
-        <ReportHeadSubNav v-if="hasItemHeads"
-                          :head-item-groups="headItemGroups"
-                          :base-url="base"
-                          :selected-head-id="filterHeadId ?? headFilter"
-                          :selected-item-id="filterItemId ?? itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`"
-                          :is-sports="event.event_type === 'sports'" />
+        <ReportItemSearchSelect v-if="hasItemHeads"
+                                class="mb-6"
+                                :items="flatItems"
+                                :model-value="filterItemId ?? itemFilter"
+                                :all-items-label="`All ${flatItems.length} items`"
+                                search-placeholder="Search by item name or code…"
+                                @select="onItemSelect" />
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="card text-center">
@@ -85,9 +85,10 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import ReportStudentCell from '@/Components/reports/ReportStudentCell.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
@@ -117,4 +118,12 @@ const {
 
 if (props.filterHeadId) headFilter.value = String(props.filterHeadId);
 if (props.filterItemId) itemFilter.value = String(props.filterItemId);
+
+const flatItems = computed(() => headItemGroups.value.flatMap((h) => h.items ?? []));
+
+function onItemSelect(itemId) {
+    headFilter.value = '';
+    itemFilter.value = itemId || '';
+    router.get(base, { item_id: itemId || undefined }, { preserveScroll: true, preserveState: true });
+}
 </script>

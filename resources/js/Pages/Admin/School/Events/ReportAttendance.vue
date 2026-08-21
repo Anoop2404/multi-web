@@ -10,13 +10,20 @@
 
         <FestEventMetaBar v-if="eventMeta" :meta="eventMeta" :show-edit-hint="false" />
 
-        <ReportHeadSubNav v-if="hasItemHeads"
-                          :head-item-groups="headItemGroups"
-                          :base-url="base"
-                          :selected-head-id="filterHeadId ?? headFilter"
-                          :selected-item-id="filterItemId ?? itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`"
-                          :is-sports="event.event_type === 'sports'" />
+        <section v-if="hasItemHeads" class="mb-6">
+            <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-800">Filter by item</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Search or pick an item — the register below updates for that item.</p>
+                </div>
+                <Link :href="`${programBase}/reports/${event.id}`" class="text-xs font-semibold text-indigo-600 hover:underline">← All sections</Link>
+            </div>
+            <ReportItemSearchSelect :items="flatItems"
+                                    :model-value="filterItemId ?? itemFilter"
+                                    :all-items-label="`All ${flatItems.length} items`"
+                                    search-placeholder="Search by item name or code…"
+                                    @select="onItemSelect" />
+        </section>
 
         <div class="card overflow-hidden p-0">
             <div class="overflow-x-auto">
@@ -58,10 +65,11 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import FestEventMetaBar from '@/Components/reports/FestEventMetaBar.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import ReportStudentCell from '@/Components/reports/ReportStudentCell.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
@@ -83,12 +91,16 @@ const { programLabel, programBase } = useSchoolProgramContext(props);
 const base = `${programBase.value}/reports/${props.event.id}/attendance`;
 
 const {
-    headFilter,
     itemFilter,
     headItemGroups,
     hasItemHeads,
 } = useReportHeadFilters(base, () => props.rows);
 
-if (props.filterHeadId) headFilter.value = String(props.filterHeadId);
 if (props.filterItemId) itemFilter.value = String(props.filterItemId);
+
+const flatItems = computed(() => headItemGroups.value.flatMap((h) => h.items ?? []));
+
+function onItemSelect(itemId) {
+    router.get(base, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: true });
+}
 </script>

@@ -6,12 +6,13 @@
         accent="emerald"
         :nav-items="navItems"
     >
-        <ReportHeadSubNav v-if="hasItemHeads && event.event_type === 'sports'"
-                          :head-item-groups="headItemGroups"
-                          :base-url="`${base}/registrations`"
-                          :selected-head-id="selectedHeadId"
-                          :selected-item-id="selectedItemId"
-                          :show-item-links="true" />
+        <ReportItemSearchSelect v-if="flatItems.length"
+                                :items="flatItems"
+                                :model-value="selectedItemId"
+                                label="Competition Item"
+                                :all-items-label="`All ${flatItems.length} items`"
+                                search-placeholder="Search by item name or code…"
+                                @select="onItemSelect" />
 
         <p v-if="feeRequired" class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
             School event fees must be approved before registrations can be approved.
@@ -69,7 +70,7 @@
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import { festOpsEventNav } from '@/support/festOpsPortalNav.js';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -87,6 +88,12 @@ const { confirm } = useConfirm();
 const selectedIds = ref([]);
 
 const base = computed(() => `/portal/fest-ops/${props.sahodaya.id}/events/${props.event.id}`);
+
+const flatItems = computed(() => (props.headItemGroups ?? []).flatMap((h) => h.items ?? []));
+
+function onItemSelect(itemId) {
+    router.get(`${base.value}/registrations`, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: true });
+}
 
 const navItems = computed(() => festOpsEventNav(props.sahodaya.id, props.event.id, props.duties));
 

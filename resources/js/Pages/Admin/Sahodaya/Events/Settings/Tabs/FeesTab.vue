@@ -1061,7 +1061,7 @@ const {
 
 const { confirm } = useConfirm();
 
-if (event.event_type === 'sports') {
+if (event.value.event_type === 'sports') {
     feeSettingsForm.fee_model = 'sports_composite';
 }
 
@@ -1149,7 +1149,7 @@ async function confirmDeleteSchemeGroup(scheme, group) {
 // existed, whose fee_settings.fee_model is still the literal 'sports_composite' string —
 // those keep showing the friendlier label rather than "Sports composite" on a non-sports event.
 function billingModelLabel(key, label) {
-    if (key === 'sports_composite' && event.event_type !== 'sports') {
+    if (key === 'sports_composite' && event.value.event_type !== 'sports') {
         return 'Composite (school + student + included items)';
     }
     return label;
@@ -1189,10 +1189,10 @@ function removeStudentCountSlab(index) {
     feeSettingsForm.student_count_slabs.splice(index, 1);
 }
 
-const ledgerForm = useForm({ name: ledgerAccount?.name ?? '' });
+const ledgerForm = useForm({ name: ledgerAccount.value?.name ?? '' });
 
 function saveLedgerAccount() {
-    ledgerForm.put(`/sahodaya-admin/${sahodaya.id}/events/${event.id}/ledger-account`, { preserveScroll: true });
+    ledgerForm.put(`/sahodaya-admin/${sahodaya.value.id}/events/${event.value.id}/ledger-account`, { preserveScroll: true });
 }
 
 const itemSearch = ref('');
@@ -1239,7 +1239,7 @@ function formatAmount(value, asPlaceholder = false) {
 }
 
 function categoryRateForRow(row) {
-    if (event.event_type === 'sports') {
+    if (event.value.event_type === 'sports') {
         // Composite billing has no per-age-group rate — the flat default/extra item
         // fee from "Sport event billing" is what every non-overridden item bills at.
         const flat = feeSettingsForm.sport_event_fees.default_item_fee;
@@ -1275,11 +1275,11 @@ function categoryRateForRow(row) {
         return fallback;
     }
 
-    if (event.event_type === 'sports' && row.age_group) {
-        return defaultAgeGroupFees[row.age_group] ?? null;
+    if (event.value.event_type === 'sports' && row.age_group) {
+        return defaultAgeGroupFees.value[row.age_group] ?? null;
     }
     if (row.class_group) {
-        return defaultClassGroupFees[row.class_group] ?? null;
+        return defaultClassGroupFees.value[row.class_group] ?? null;
     }
 
     return null;
@@ -1290,8 +1290,8 @@ function itemMeta(row) {
     if (row.item_code) {
         parts.push(row.item_code);
     }
-    if (event.event_type === 'sports' && row.age_group) {
-        parts.push(ageGroupLabels[row.age_group] ?? row.age_group);
+    if (event.value.event_type === 'sports' && row.age_group) {
+        parts.push(ageGroupLabels.value[row.age_group] ?? row.age_group);
     } else if (row.class_group) {
         parts.push(effectiveClassGroupLabels.value[row.class_group] ?? row.class_group);
     }

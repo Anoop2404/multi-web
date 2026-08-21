@@ -144,7 +144,6 @@ class FestMarkCoordinatorController extends Controller
         abort_if($event->tenant_id !== $tenantId, 403);
         abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403, 'You\'re not assigned as a mark coordinator for this event.');
         abort_if($item->event_id !== $event->id, 404);
-        abort_unless($event->event_type === 'sports', 422, 'Auto-rank applies to sports events only.');
 
         app(FestMarkEntryScopeService::class)->assertCanEnterMark($request->user(), $event, $item->id);
 

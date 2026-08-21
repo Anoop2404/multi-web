@@ -34,9 +34,6 @@ export function superadminNav(options = {}) {
                 { label: 'Qualifier Intakes', href: '/admin/state-workspace/qualifiers', icon: 'inbox' },
                 { label: 'State Finals', href: '/admin/state-workspace/fest', icon: 'award' },
                 { label: 'Kalotsav View', href: '/admin/kalotsav', icon: 'star' },
-                { label: 'Sports Results', href: '/admin/sports', icon: 'award' },
-                { label: 'MCQ Results', href: '/admin/mcq-results', icon: 'clipboard' },
-                { label: 'Board Results', href: '/admin/board-results', icon: 'bar-chart' },
             ],
         },
         {
@@ -102,9 +99,6 @@ export function stateAdminNav() {
                 { label: 'Qualifier Intakes', href: '/admin/state-workspace/qualifiers', icon: 'inbox' },
                 { label: 'State Finals', href: '/admin/state-workspace/fest', icon: 'award' },
                 { label: 'Cross-Cluster View', href: '/admin/kalotsav', icon: 'star' },
-                { label: 'Sports Results', href: '/admin/sports', icon: 'award' },
-                { label: 'MCQ Results', href: '/admin/mcq-results', icon: 'clipboard' },
-                { label: 'Board Results', href: '/admin/board-results', icon: 'bar-chart' },
             ],
         },
         {

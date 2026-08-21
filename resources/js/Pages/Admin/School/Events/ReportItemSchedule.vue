@@ -11,14 +11,20 @@
             </template>
         </PageHeader>
 
-        <ReportHeadSubNav v-if="hasItemHeads"
-                          :head-item-groups="headItemGroups"
-                          :base-url="base"
-                          :selected-head-id="headFilter"
-                          :selected-item-id="itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`"
-                          :is-sports="event.event_type === 'sports'"
-                          :preserve-query="scheduleQuery" />
+        <section v-if="hasItemHeads" class="mb-6">
+            <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-800">Filter by item</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Search or pick an item — the schedule below updates instantly.</p>
+                </div>
+                <Link :href="`${programBase}/reports/${event.id}`" class="text-xs font-semibold text-indigo-600 hover:underline">← All sections</Link>
+            </div>
+            <ReportItemSearchSelect :items="flatItems"
+                                    :model-value="itemFilter"
+                                    :all-items-label="`All ${flatItems.length} items`"
+                                    search-placeholder="Search by item name or code…"
+                                    @select="onItemSelect" />
+        </section>
 
         <form class="card mb-4 flex flex-wrap gap-3 items-end p-4" @submit.prevent="applyFilters">
             <FormField label="Date" class-extra="mb-0">
@@ -64,7 +70,7 @@
                     </thead>
                     <tbody>
                         <template v-for="(row, idx) in displayRows" :key="row.item_id">
-                            <tr v-if="shouldShowHeadDivider(idx)" class="bg-slate-50/80">
+                            <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
                                 <td colspan="7" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                     {{ row.head_name ?? 'Other items' }}
                                 </td>
@@ -93,7 +99,7 @@
 import { computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
@@ -126,6 +132,15 @@ const {
     shouldShowHeadDivider,
 } = useReportHeadFilters(base, () => props.rows);
 
+const flatItems = computed(() => props.headItemGroups.flatMap((h) => h.items ?? []));
+
+// Item selection is client-side only here (no server round trip): itemScheduleRows()
+// is scoped by date/stage only, never by head_id/item_id, so the item filter just
+// narrows the already-loaded rows in-memory via useReportHeadFilters' displayRows.
+function onItemSelect(itemId) {
+    itemFilter.value = itemId;
+}
+
 const filteredSummary = computed(() => {
     const list = displayRows.value;
     const scheduled = list.filter((r) => r.scheduled_at || r.date).length;
@@ -135,11 +150,6 @@ const filteredSummary = computed(() => {
         unscheduled: list.length - scheduled,
     };
 });
-
-const scheduleQuery = computed(() => ({
-    date: filterDate.value || undefined,
-    stage_id: filterStageId.value || undefined,
-}));
 
 function stageLabel(stage) {
     return stage.venue?.name ? `${stage.name} · ${stage.venue.name}` : stage.name;

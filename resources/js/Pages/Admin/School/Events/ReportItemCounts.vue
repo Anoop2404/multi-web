@@ -10,15 +10,20 @@
 
         <FestEventMetaBar v-if="eventMeta" :meta="eventMeta" :show-edit-hint="false" />
 
-        <ReportHeadSubNav v-if="hasItemHeads"
-                          :head-item-groups="headItemGroups"
-                          :base-url="base"
-                          :selected-head-id="headFilter"
-                          :selected-item-id="itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`"
-                          :participant-counts-by-item="participantCountsByItem"
-                          :is-sports="event.event_type === 'sports'"
-                          @view-participants="openParticipantsModal" />
+        <div v-if="hasItemHeads" class="mb-6">
+            <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
+                <h3 class="text-sm font-semibold text-slate-800">Filter by item</h3>
+                <Link :href="`${programBase}/reports/${event.id}`" class="text-xs font-semibold text-indigo-600 hover:underline">← All sections</Link>
+            </div>
+            <ReportItemSearchSelect :items="flatItems"
+                                    :model-value="itemFilter"
+                                    :all-items-label="`All ${flatItems.length} items`"
+                                    search-placeholder="Search by item name or code…"
+                                    :show-view-button="showParticipantView"
+                                    :view-enabled-for="hasParticipants"
+                                    @select="onItemSelect"
+                                    @view="openParticipantsModal" />
+        </div>
 
         <div v-if="!headFilter" class="mb-4">
             <label class="block text-xs font-semibold text-slate-600 mb-1.5">Filter table</label>
@@ -177,7 +182,7 @@ import { computed, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import FestEventMetaBar from '@/Components/reports/FestEventMetaBar.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import ReportItemParticipantsModal from '@/Components/reports/ReportItemParticipantsModal.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
@@ -222,6 +227,28 @@ const participantCountsByItem = computed(() => {
     }
     return map;
 });
+
+// Flat item list across every head — headItemGroups already carries complete, unstripped
+// item arrays per head (FestHeadItemNavigationService::navigationForEvent()), so this is
+// lossless versus the old head-then-item picker.
+const flatItems = computed(() => headItemGroups.value.flatMap((h) => h.items ?? []));
+
+// This page filters entirely client-side (see displayRows/searchedRows below), so picking
+// an item from the flat picker just needs to update the local itemFilter ref — no
+// server round trip.
+function onItemSelect(itemId) {
+    itemFilter.value = itemId;
+}
+
+// Mirrors ReportHeadSubNav's own showParticipantView/hasParticipants logic, now that this
+// page drives ReportItemSearchSelect directly instead of through that wrapper, so the
+// "view participants" eye button keeps working the same way it did before.
+const showParticipantView = computed(() => Object.keys(participantCountsByItem.value ?? {}).length > 0);
+
+function hasParticipants(itemId) {
+    return (participantCountsByItem.value?.[itemId] ?? 0) > 0
+        || (participantCountsByItem.value?.[String(itemId)] ?? 0) > 0;
+}
 
 const searchedRows = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();

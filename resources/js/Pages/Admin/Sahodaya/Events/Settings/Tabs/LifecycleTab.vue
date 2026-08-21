@@ -97,7 +97,7 @@ function onManualFile(e) {
 
 async function toggleVerification(row, verified) {
     const notes = verified ? ((await prompt({ message: 'Verification notes (optional)', inputMultiline: true, inputRequired: false })) || '') : '';
-    router.post(`/sahodaya-admin/${sahodaya.id}/events/${event.id}/school-verifications/${row.school_id}`, {
+    router.post(`/sahodaya-admin/${sahodaya.value.id}/events/${event.value.id}/school-verifications/${row.school_id}`, {
         documents_verified: verified,
         notes,
     }, { preserveScroll: true });

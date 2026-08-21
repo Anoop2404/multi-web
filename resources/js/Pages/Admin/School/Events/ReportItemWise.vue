@@ -20,13 +20,13 @@
             </template>
         </PageHeader>
 
-        <ReportHeadSubNav v-if="hasItemHeads"
-                          :head-item-groups="headItemGroups"
-                          :base-url="base"
-                          :selected-head-id="headFilter"
-                          :selected-item-id="itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`"
-                          :is-sports="event.event_type === 'sports'" />
+        <ReportItemSearchSelect v-if="hasItemHeads"
+                                class="mb-6"
+                                :items="flatItems"
+                                :model-value="itemFilter"
+                                :all-items-label="`All ${flatItems.length} items`"
+                                search-placeholder="Search by item name or code…"
+                                @select="onItemSelect" />
 
         <div v-if="!itemId" class="notice-banner notice-banner--info mb-4">
             Select a head and item above to view participants.
@@ -65,9 +65,10 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
@@ -98,4 +99,11 @@ const {
 } = useReportHeadFilters(base, () => []);
 
 if (props.itemId) itemFilter.value = String(props.itemId);
+
+const flatItems = computed(() => headItemGroups.value.flatMap((h) => h.items ?? []));
+
+function onItemSelect(itemId) {
+    itemFilter.value = itemId || '';
+    router.get(base, { item_id: itemId || undefined }, { preserveScroll: true, preserveState: true });
+}
 </script>

@@ -8,14 +8,20 @@
             </template>
         </PageHeader>
 
-        <ReportHeadSubNav v-if="hasItemHeads"
-                          :head-item-groups="headItemGroups"
-                          :base-url="base"
-                          :selected-head-id="headFilter"
-                          :selected-item-id="itemFilter"
-                          :show-item-links="false"
-                          :hub-url="`${programBase}/reports/${event.id}`"
-                          :is-sports="event.event_type === 'sports'" />
+        <section v-if="hasItemHeads" class="mb-6">
+            <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-800">Filter by item</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Search or pick an item — the table below updates instantly.</p>
+                </div>
+                <Link :href="`${programBase}/reports/${event.id}`" class="text-xs font-semibold text-indigo-600 hover:underline">← All sections</Link>
+            </div>
+            <ReportItemSearchSelect :items="flatItems"
+                                    :model-value="itemFilter"
+                                    :all-items-label="`All ${flatItems.length} items`"
+                                    search-placeholder="Search by item name or code…"
+                                    @select="onItemSelect" />
+        </section>
 
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
@@ -102,7 +108,7 @@
 import { computed, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
 
@@ -132,6 +138,15 @@ const {
     hasItemHeads,
 } = useReportHeadFilters(base, () => props.rows ?? []);
 
+const flatItems = computed(() => headItemGroups.value.flatMap((h) => h.items ?? []));
+
+// Client-side only, like the rest of this page's filtering — resultsPublishStatus()
+// already returns every one of the school's items unfiltered, so picking an item
+// just narrows displayRows in-memory (no server round trip needed).
+function onItemSelect(itemId) {
+    itemFilter.value = itemId;
+}
+
 const headScopedRows = computed(() => {
     let rows = props.rows ?? [];
     const head = headFilter.value;
@@ -140,8 +155,15 @@ const headScopedRows = computed(() => {
     return rows.filter((r) => String(r.head_id) === String(head));
 });
 
+const itemScopedRows = computed(() => {
+    const rows = headScopedRows.value;
+    const item = itemFilter.value;
+    if (!item) return rows;
+    return rows.filter((r) => String(r.item_id) === String(item));
+});
+
 const displayRows = computed(() => {
-    let rows = headScopedRows.value;
+    let rows = itemScopedRows.value;
     if (statusFilter.value === 'published') {
         rows = rows.filter((r) => r.results_published);
     } else if (statusFilter.value === 'pending') {

@@ -10,10 +10,20 @@ use Illuminate\Validation\ValidationException;
 
 class FestSportsAutoRankService
 {
-    /** @return array{ranked: int, item_title: string} */
+    /**
+     * Auto-rank one item's marks, dense tie-style (two tied for 1st -> next distinct
+     * value is 2nd, not 3rd). Prefers measurement_value (sports track/field, where
+     * "score" is otherwise unused and gets overwritten with the resulting points) when
+     * present; otherwise ranks by score (a judged Grand Total) instead, in which case
+     * score is left untouched since it already holds the real judged total, not a
+     * placeholder — only position is written, and points continue to resolve live from
+     * position/grade via FestRankPointService/FestGradePointService wherever they're
+     * needed, exactly as they already do for every other mark on the platform.
+     *
+     * @return array{ranked: int, item_title: string}
+     */
     public function rankItem(FestEvent $event, FestEventItem $item): array
     {
-        abort_unless($event->event_type === 'sports', 422, 'Auto-rank applies to sports events only.');
         abort_if($item->event_id !== $event->id, 404);
 
         $absentParticipantIds = FestAttendance::query()
@@ -22,69 +32,109 @@ class FestSportsAutoRankService
             ->where('status', 'absent')
             ->pluck('participant_id');
 
-        $marks = FestMark::where('event_id', $event->id)
+        $measurementMarks = FestMark::where('event_id', $event->id)
             ->where('item_id', $item->id)
             ->whereNotNull('measurement_value')
             ->where('measurement_value', '!=', '')
             ->when($absentParticipantIds->isNotEmpty(), fn ($q) => $q->whereNotIn('participant_id', $absentParticipantIds))
             ->get();
 
-        if ($marks->isEmpty()) {
+        if ($measurementMarks->isNotEmpty()) {
+            $lowerIsBetter = $this->lowerIsBetter($item);
+
+            $sorted = $measurementMarks->sort(fn ($a, $b) => $this->compareNumeric(
+                $this->parseNumeric((string) $a->measurement_value),
+                $this->parseNumeric((string) $b->measurement_value),
+                $lowerIsBetter,
+            ))->values();
+
+            $rankPointService = app(FestRankPointService::class);
+            $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+
+            $this->assignDenseRanks($sorted, fn ($mark) => $this->parseNumeric((string) $mark->measurement_value), function ($mark, int $rank) use ($event, $rankPointService, $isGroup) {
+                $points = $rankPointService->pointsForRank($event, $rank, $isGroup);
+                $mark->update(['position' => $rank, 'score' => $points > 0 ? $points : null]);
+            });
+
+            EventContext::for($event)->recalculateSchoolPoints();
+
+            return ['ranked' => $sorted->count(), 'item_title' => $item->title];
+        }
+
+        $scoredMarks = FestMark::where('event_id', $event->id)
+            ->where('item_id', $item->id)
+            ->whereNotNull('score')
+            ->when($absentParticipantIds->isNotEmpty(), fn ($q) => $q->whereNotIn('participant_id', $absentParticipantIds))
+            ->get();
+
+        if ($scoredMarks->isEmpty()) {
             throw ValidationException::withMessages([
-                'measurement' => 'Enter measurement values before auto-ranking this item.',
+                'measurement' => 'Enter measurement values or judged scores before auto-ranking this item.',
             ]);
         }
 
-        $lowerIsBetter = $this->lowerIsBetter($item);
+        // Higher score is better for every judged Grand Total in this platform — unlike
+        // measurement events, there's no "lower is better" case here (no judged item is
+        // scored like a race time).
+        $sorted = $scoredMarks->sort(fn ($a, $b) => $this->compareNumeric(
+            (float) $a->score,
+            (float) $b->score,
+            lowerIsBetter: false,
+        ))->values();
 
-        $sorted = $marks->sort(function ($a, $b) use ($lowerIsBetter) {
-            $va = $this->parseNumeric((string) $a->measurement_value);
-            $vb = $this->parseNumeric((string) $b->measurement_value);
-            if ($va === null && $vb === null) {
-                return 0;
-            }
-            if ($va === null) {
-                return 1;
-            }
-            if ($vb === null) {
-                return -1;
-            }
+        $this->assignDenseRanks($sorted, fn ($mark) => (float) $mark->score, function ($mark, int $rank) {
+            // Score already holds the real judged Grand Total — only position changes.
+            $mark->update(['position' => $rank]);
+        });
 
-            return $lowerIsBetter ? ($va <=> $vb) : ($vb <=> $va);
-        })->values();
+        EventContext::for($event)->recalculateSchoolPoints();
 
-        $position = 0;
+        return ['ranked' => $sorted->count(), 'item_title' => $item->title];
+    }
+
+    private function compareNumeric(?float $a, ?float $b, bool $lowerIsBetter): int
+    {
+        if ($a === null && $b === null) {
+            return 0;
+        }
+        if ($a === null) {
+            return 1;
+        }
+        if ($b === null) {
+            return -1;
+        }
+
+        return $lowerIsBetter ? ($a <=> $b) : ($b <=> $a);
+    }
+
+    /**
+     * Walk $sorted (best to worst) assigning dense ranks — a tie shares one rank number
+     * and the next distinct value continues immediately after it (1,1,2,3 — never 1,1,3).
+     * $valueOf reads the comparable numeric value off a mark; $assign receives (mark, rank)
+     * for every mark with a non-null value and is expected to persist it.
+     *
+     * @param  \Illuminate\Support\Collection<int, FestMark>  $sorted
+     * @param  callable(FestMark): ?float  $valueOf
+     * @param  callable(FestMark, int): void  $assign
+     */
+    private function assignDenseRanks($sorted, callable $valueOf, callable $assign): void
+    {
+        $rank = 0;
         $lastValue = null;
-        $lastAssigned = 0;
-        $rankPointService = app(FestRankPointService::class);
-        $isGroup = in_array($item->participant_type, ['group', 'team'], true);
 
         foreach ($sorted as $mark) {
-            $value = $this->parseNumeric((string) $mark->measurement_value);
+            $value = $valueOf($mark);
             if ($value === null) {
                 continue;
             }
 
             if ($lastValue === null || abs($value - $lastValue) > 0.000001) {
-                $position++;
-                $lastAssigned = $position;
+                $rank++;
                 $lastValue = $value;
             }
 
-            $points = $rankPointService->pointsForRank($event, $lastAssigned, $isGroup);
-
-            $mark->update([
-                'position' => $lastAssigned,
-                'score'    => $points > 0 ? $points : null,
-            ]);
+            $assign($mark, $rank);
         }
-
-        EventContext::for($event)->recalculateSchoolPoints();
-
-        return [
-            'ranked'     => $sorted->count(),
-            'item_title' => $item->title,
-        ];
     }
 
     private function lowerIsBetter(FestEventItem $item): bool

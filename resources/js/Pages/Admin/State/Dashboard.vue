@@ -122,7 +122,6 @@
                 </div>
                 <div class="flex flex-wrap gap-2 mb-3">
                     <Link href="/admin/kalotsav" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-800 hover:bg-indigo-100">Kalotsav hub</Link>
-                    <Link href="/admin/sports" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-50 text-green-800 hover:bg-green-100">Sports results</Link>
                 </div>
                 <ul class="text-sm divide-y">
                     <li v-for="p in recentPrograms" :key="p.id" class="py-2 flex justify-between gap-2">

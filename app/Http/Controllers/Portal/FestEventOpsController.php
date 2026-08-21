@@ -643,7 +643,6 @@ class FestEventOpsController extends Controller
         abort_if($event->tenant_id !== $tenantId, 403);
         $this->authorizeDuty($request, $event->id, 'marks');
         abort_if($item->event_id !== $event->id, 404);
-        abort_unless($event->event_type === 'sports', 422, 'Auto-rank applies to sports events only.');
 
         app(FestMarkEntryScopeService::class)->assertCanEnterMark($request->user(), $event, $item->id);
 

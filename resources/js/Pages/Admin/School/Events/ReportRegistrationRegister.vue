@@ -20,13 +20,17 @@
             </p>
         </div>
 
-        <ReportHeadSubNav v-if="hasItemHeads"
-                          :head-item-groups="headItemGroups"
-                          :base-url="base"
-                          :selected-head-id="headFilter"
-                          :selected-item-id="itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`"
-                          :is-sports="event.event_type === 'sports'" />
+        <div v-if="hasItemHeads" class="mb-6">
+            <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
+                <h3 class="text-sm font-semibold text-slate-800">Filter by item</h3>
+                <Link :href="`${programBase}/reports/${event.id}`" class="text-xs font-semibold text-indigo-600 hover:underline">← All sections</Link>
+            </div>
+            <ReportItemSearchSelect :items="flatItems"
+                                    :model-value="itemFilter"
+                                    :all-items-label="`All ${flatItems.length} items`"
+                                    search-placeholder="Search by item name or code…"
+                                    @select="onItemSelect" />
+        </div>
 
         <div v-if="schoolSummary && totals.fee_required" class="grid sm:grid-cols-4 gap-3 mb-6">
             <div class="card card--muted !py-4 text-center">
@@ -105,9 +109,10 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
@@ -130,15 +135,21 @@ const base = `${programBase.value}/reports/${props.event.id}/registration-regist
 
 // Filtering now happens server-side (see FestRegistrationRegisterService::build()) since
 // 'rows' is a paginated slice — client-side post-filtering would only ever see whatever
-// happened to land on the current page. applyFilter() still does a full page navigation
-// with head_id/item_id in the query string; the server does the actual filtering + paging.
+// happened to land on the current page. onItemSelect() below does a full page navigation
+// with item_id in the query string; the server does the actual filtering + paging.
 const {
-    headFilter,
     itemFilter,
     headItemGroups,
-    headsForFilter,
     hasItemHeads,
-    applyFilter,
     shouldShowHeadDivider,
 } = useReportHeadFilters(base, () => props.rows.data);
+
+// Flat item list across every head — headItemGroups already carries complete, unstripped
+// item arrays per head (FestHeadItemNavigationService::navigationForEvent()), so this is
+// lossless versus the old head-then-item picker.
+const flatItems = computed(() => headItemGroups.value.flatMap((h) => h.items ?? []));
+
+function onItemSelect(itemId) {
+    router.get(base, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: true });
+}
 </script>
