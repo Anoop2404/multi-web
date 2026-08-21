@@ -139,6 +139,10 @@ class FestExportService
                     default           => 'General',
                 };
 
+                $metaParts = array_filter([$category, $type, $gender]);
+                $itemMetaStr = !empty($metaParts) ? ' (' . implode(' - ', $metaParts) . ')' : '';
+                $itemTitle = ($item?->title ?? '') . $itemMetaStr;
+
                 $chestNo = $p->group?->chest_no
                     ?? $p->chest_no
                     ?? $numbering->effectiveChestNumber($p)
@@ -147,11 +151,7 @@ class FestExportService
 
                 return [
                     $index + 1,
-                    $item?->code ?? '',
-                    $item?->title ?? '',
-                    $category,
-                    $type,
-                    $gender,
+                    $itemTitle,
                     $p->student?->name ?? $p->teacher?->name ?? $p->group?->team_name ?? 'Participant',
                     $p->student?->admission_number ?? $p->student?->reg_no ?? '',
                     strtoupper((string) $schoolName),
@@ -166,7 +166,7 @@ class FestExportService
 
         return ExcelExport::download(
             $this->filename($event, $filenameSuffix),
-            ['Sl No', 'Item Code', 'Item Title', 'Category', 'Type', 'Gender', 'Participant / Team', 'Doc / Reg No', 'School', 'Chest No', 'Status', 'Marked At'],
+            ['Sl No', 'Item', 'Participant', 'Doc', 'School', 'Chest No', 'Status', 'Marked At'],
             $rows,
         );
     }
