@@ -373,12 +373,15 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $isGroup = $numbering->isGroupItem($item);
 
+        // Chest number only — no name/school. Judges and convenors work off chest numbers
+        // everywhere else in this app (blind judging); this tabulation sheet shouldn't be
+        // the one place that leaks who's who.
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $event->reportableEventIds())
                 ->where('item_id', $item->id)
                 ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->where('participant_role', '!=', 'standby')
-            ->with(['student', 'teacher', 'registration.school', 'group'])
+            ->with(['group'])
             ->get();
 
         $rows = [];
@@ -390,14 +393,11 @@ class FestMarkEntryController extends SahodayaAdminController
                     continue;
                 }
                 $seenGroups[$p->group_id] = true;
-                $name = $p->group?->team_name ?: 'Team';
                 $chest = $p->group?->chest_no;
             } else {
-                $name = $p->student?->name ?? $p->teacher?->name ?? '—';
                 $chest = $numbering->effectiveChestNumber($p);
             }
 
-            $regNo = $p->student?->reg_no ?? $p->teacher?->reg_no ?? null;
             $rowScores = $scores[$p->id] ?? [];
 
             $judgeValues = [];
@@ -407,9 +407,6 @@ class FestMarkEntryController extends SahodayaAdminController
 
             $rows[] = [
                 'chest_no' => $chest,
-                'reg_no'   => $regNo,
-                'name'     => $name,
-                'school'   => strtoupper($p->registration?->school?->name ?? ''),
                 'scores'   => $judgeValues,
                 'total'    => array_sum(array_map(fn ($v) => (float) ($v ?? 0), $rowScores)),
             ];
@@ -417,7 +414,7 @@ class FestMarkEntryController extends SahodayaAdminController
 
         usort($rows, fn ($a, $b) => ($a['chest_no'] ?? PHP_INT_MAX) <=> ($b['chest_no'] ?? PHP_INT_MAX));
 
-        $sheetTitle = $judgeCount > 1 ? 'Digital Sum Sheet' : 'Digital Mark Sheet';
+        $sheetTitle = 'Digital Sum Sheet';
         $categoryLabel = $this->itemCategoryLabel($item, \App\Support\FestClassGroupScheme::labels(null, $event));
 
         $nameParts = [$event->title];
@@ -437,7 +434,7 @@ class FestMarkEntryController extends SahodayaAdminController
             'rows'          => $rows,
             'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
             'logoSrc'       => TenantBranding::logoEmbedSrc($this->sahodaya),
-        ])->download($fileName);
+        ])->setPaper('a4', 'portrait')->download($fileName);
     }
 
     /**

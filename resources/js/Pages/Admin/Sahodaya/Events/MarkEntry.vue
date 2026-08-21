@@ -11,7 +11,7 @@
                         🖨️ Print Blank Judge Sheets (Paper)
                     </a>
                     <a v-if="cumulativeSheetUrl" :href="cumulativeSheetUrl" target="_blank" class="btn-secondary text-xs">
-                        📊 {{ props.judgeCount > 1 ? 'Digital Sum Sheet' : 'Digital Mark Sheet' }} (Online Tabulation)
+                        📊 Digital Sum Sheet (Online Tabulation)
                     </a>
                     <Link :href="importUrl" class="btn-primary text-xs">
                         Import Marks
