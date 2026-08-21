@@ -712,7 +712,7 @@ const props = defineProps({
     profile: { type: Object, default: null },
 });
 
-const paymentDetails = computed(() => props.profile?.payment_details_text || '');
+const paymentDetails = computed(() => focusEvent.value?.payment_details_text || props.profile?.payment_details_text || '');
 
 const regionForm = useForm({
     region_id: '',

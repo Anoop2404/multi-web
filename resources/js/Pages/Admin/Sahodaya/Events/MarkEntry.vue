@@ -300,7 +300,7 @@ const props = defineProps({
     activityLogs: { type: Array, default: () => [] },
     selectedHeadId: { type: [String, Number], default: null },
     selectedItemId: { type: [Number, String], default: null },
-    rankPoints: { type: Array, default: () => [] },
+    rankPointsByType: { type: Object, default: () => ({}) },
     childEvents: { type: Array, default: () => [] },
     itemHeads: { type: Array, default: () => [] },
     headItemGroups: { type: Array, default: () => [] },

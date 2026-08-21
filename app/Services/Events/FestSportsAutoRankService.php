@@ -49,10 +49,10 @@ class FestSportsAutoRankService
             ))->values();
 
             $rankPointService = app(FestRankPointService::class);
-            $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+            $participantType = $item->participant_type;
 
-            $this->assignDenseRanks($sorted, fn ($mark) => $this->parseNumeric((string) $mark->measurement_value), function ($mark, int $rank) use ($event, $rankPointService, $isGroup) {
-                $points = $rankPointService->pointsForRank($event, $rank, $isGroup);
+            $this->assignDenseRanks($sorted, fn ($mark) => $this->parseNumeric((string) $mark->measurement_value), function ($mark, int $rank) use ($event, $rankPointService, $participantType) {
+                $points = $rankPointService->pointsForRank($event, $rank, $participantType);
                 $mark->update(['position' => $rank, 'score' => $points > 0 ? $points : null]);
             });
 

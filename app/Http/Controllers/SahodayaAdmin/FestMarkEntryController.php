@@ -175,9 +175,7 @@ class FestMarkEntryController extends SahodayaAdminController
             'headItemGroups' => $nav['headItemGroups'],
             'configuredItemIds' => $configuredItemIds,
             'gradeOptions' => $gradeOptions,
-            'rankPoints'     => $event->event_type === 'sports'
-                ? app(FestRankPointService::class)->listForEvent($event)
-                : [],
+            'rankPointsByType' => app(FestRankPointService::class)->rowsForAllTypes($event),
             'childEvents'      => $childEvents,
             'judgeCount'       => $judgeCount,
             'judgeScores'      => $judgeScores,

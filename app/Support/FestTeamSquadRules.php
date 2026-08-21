@@ -17,6 +17,9 @@ class FestTeamSquadRules
 {
     public const MULTI_PERSON_TYPES = ['team', 'group', 'pair', 'trio'];
 
+    /** Every real participant_type value — single source of truth for "all types" lists. */
+    public const ALL_TYPES = ['individual', 'team', 'group', 'pair', 'trio'];
+
     public function __construct(
         public ?int $minPlaying = null,
         public ?int $maxPlaying = null,

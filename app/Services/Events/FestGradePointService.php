@@ -34,7 +34,9 @@ class FestGradePointService
         }
 
         if ($event->event_type === 'sports' && $mark->position) {
-            return app(FestRankPointService::class)->pointsForRank($event, (int) $mark->position, $isGroup);
+            $participantType = $mark->participant?->registration?->item?->participant_type ?? 'individual';
+
+            return app(FestRankPointService::class)->pointsForRank($event, (int) $mark->position, $participantType);
         }
 
         $rule = FestPointRule::where('event_id', $event->id)

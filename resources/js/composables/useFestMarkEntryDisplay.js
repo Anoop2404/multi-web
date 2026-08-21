@@ -95,9 +95,11 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
             return null;
         }
 
-        const isGroup = ['group', 'team'].includes(item?.participant_type);
-        const row = props.rankPoints.find((r) => r.rank === rank && Boolean(r.is_group) === isGroup)
-            ?? props.rankPoints.find((r) => r.rank === rank && !r.is_group);
+        // rankPointsByType is pre-resolved server-side per participant_type (including
+        // the individual/athletics-standard fallback chain) — see
+        // FestRankPointService::rowsForAllTypes(). No fallback logic needed here.
+        const rows = props.rankPointsByType?.[item?.participant_type] ?? [];
+        const row = rows.find((r) => r.rank === rank);
 
         return row?.points ?? null;
     }
@@ -113,12 +115,7 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
             return [];
         }
 
-        const isGroup = ['group', 'team'].includes(item?.participant_type);
-        let rows = props.rankPoints.filter((r) => Boolean(r.is_group) === isGroup);
-
-        if (!rows.length) {
-            rows = props.rankPoints.filter((r) => !r.is_group);
-        }
+        const rows = props.rankPointsByType?.[item?.participant_type] ?? [];
 
         return rows
             .slice()

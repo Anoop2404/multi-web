@@ -36,9 +36,16 @@
             </p>
         </div>
 
-        <div v-if="paymentDetails" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">How to pay</p>
-            <pre class="text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{{ paymentDetails }}</pre>
+        <div v-if="resolvedPaymentDetails" class="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-col md:flex-row items-start gap-4">
+            <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">How to pay</p>
+                <pre class="text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{{ resolvedPaymentDetails }}</pre>
+            </div>
+            <div v-if="resolvedPaymentQrCodeUrl" class="shrink-0 flex flex-col items-center p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs text-center">
+                <span class="text-[11px] font-bold text-slate-800 mb-1 flex items-center gap-1">📱 Scan & Pay via UPI</span>
+                <img :src="resolvedPaymentQrCodeUrl" alt="Payment QR Code" class="w-32 h-32 object-contain rounded-lg border border-slate-100 p-1 bg-white">
+                <span class="text-[9px] text-slate-500 mt-1">Accepts GPay, PhonePe, Paytm, etc.</span>
+            </div>
         </div>
 
         <!-- Per-head invoices (sports_composite) -->
@@ -229,6 +236,14 @@ defineEmits([
     'update-phase-bank',
     'update-phase-amount',
 ]);
+
+const resolvedPaymentDetails = computed(() => {
+    return props.event?.payment_details_text || props.paymentDetails || '';
+});
+
+const resolvedPaymentQrCodeUrl = computed(() => {
+    return props.event?.payment_qr_code_url || '';
+});
 
 // Real, authoritative figures from the school_fee record itself — not the item-only
 // subtotal passed in via itemFeesDue, which excludes the school registration fee and

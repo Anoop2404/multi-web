@@ -630,9 +630,7 @@ class FestEventOpsController extends Controller
             'registrations' => $registrations,
             'marks'         => $marks,
             'attendance'    => $attendance,
-            'rankPoints'    => $event->event_type === 'sports'
-                ? app(FestRankPointService::class)->listForEvent($event)
-                : [],
+            'rankPointsByType' => app(FestRankPointService::class)->rowsForAllTypes($event),
             'festOpsBase'   => "/portal/fest-ops/{$tenantId}/events/{$event->id}",
             ...$headContext,
         ]);

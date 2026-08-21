@@ -142,7 +142,7 @@ const props = defineProps({
     registrations: Array,
     marks: Object,
     attendance: { type: Object, default: () => ({}) },
-    rankPoints: { type: Array, default: () => [] },
+    rankPointsByType: { type: Object, default: () => ({}) },
     festOpsBase: { type: String, default: null },
     headItemGroups: { type: Array, default: () => [] },
     hasItemHeads: { type: Boolean, default: false },

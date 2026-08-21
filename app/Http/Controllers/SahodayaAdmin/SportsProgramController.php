@@ -120,9 +120,7 @@ class SportsProgramController extends SahodayaAdminController
                     }
 
                     if ($configuredEventIds->has($mark->event_id)) {
-                        $isGroup = in_array($mark->item?->participant_type, ['team', 'group'], true);
-
-                        return $rankPoints->pointsForRank($event, $position, $isGroup);
+                        return $rankPoints->pointsForRank($event, $position, $mark->item?->participant_type ?? 'individual');
                     }
 
                     // Legacy fallback when the event has no FestRankPoint rows configured.

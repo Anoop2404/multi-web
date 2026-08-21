@@ -101,9 +101,7 @@ class FestMarkCoordinatorController extends Controller
             'registrations' => $registrations,
             'marks'         => $marks,
             'attendance'    => $attendance,
-            'rankPoints'    => $event->event_type === 'sports'
-                ? app(FestRankPointService::class)->listForEvent($event)
-                : [],
+            'rankPointsByType' => app(FestRankPointService::class)->rowsForAllTypes($event),
             ...$headContext,
         ]);
     }

@@ -8,6 +8,7 @@ use App\Models\FestEventItem;
 use App\Models\FestEvent;
 use App\Models\FestGradeConfig;
 use App\Models\FestPointRule;
+use App\Models\FestRankPointTemplate;
 use App\Models\FestStage;
 use App\Models\FestVenue;
 use App\Models\FestVolunteer;
@@ -205,8 +206,8 @@ class FestEventSettingsController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/RankPoints', $this->withEventActivity($event, FestPageActivity::settingsTab('points'), [
             'event'           => $event,
             'pointRules'      => FestPointRule::where('event_id', $event->id)->orderBy('grade')->orderBy('position')->get(),
-            'rankPoints'      => app(FestRankPointService::class)->listForEvent($event),
-            'groupRankPoints' => app(FestRankPointService::class)->listForEvent($event, true),
+            'templates'       => app(FestRankPointService::class)->templatesForEvent($event),
+            'allParticipantTypes' => \App\Support\FestTeamSquadRules::ALL_TYPES,
             // Read-only here — the non-sports "Grade Points Master" rule form's Grade
             // dropdown is built from this, even though grades are edited on the
             // separate Grade Master page now.
@@ -1280,21 +1281,80 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', 'Point rule removed.');
     }
 
-    public function updateRankPoints(Request $request, string $tenantId, FestEvent $event, FestRankPointService $rankPoints)
+    public function storeRankTemplate(Request $request, string $tenantId, FestEvent $event, FestRankPointService $rankPoints)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_unless($event->event_type === 'sports', 422, 'Rank points apply to sports events only.');
+        abort_unless($event->event_type === 'sports', 422, 'Rank point templates apply to sports events only.');
+
+        $data = $request->validate(['name' => 'required|string|max:100']);
+
+        $template = $rankPoints->createTemplate($event, $data['name']);
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event, FestPageActivity::settingsTab('points'), 'fest.settings.rank_template_created',
+            "Rank point template \"{$template->name}\" created", ['template_id' => $template->id],
+        );
+
+        return back()->with('success', "Template \"{$template->name}\" created.");
+    }
+
+    public function updateRankTemplate(Request $request, string $tenantId, FestEvent $event, FestRankPointTemplate $template, FestRankPointService $rankPoints)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($template->event_id !== $event->id, 404);
 
         $data = $request->validate([
-            'ranks'             => 'required|array|min:1',
-            'ranks.*.rank'      => 'required|integer|min:1|max:255',
-            'ranks.*.points'    => 'required|integer|min:0',
-            'ranks.*.is_group'  => 'nullable|boolean',
-            'is_group'          => 'nullable|boolean',
+            'name'                 => 'required|string|max:100',
+            'participant_types'    => 'nullable|array',
+            'participant_types.*'  => ['string', Rule::in(\App\Support\FestTeamSquadRules::ALL_TYPES)],
         ]);
 
-        $isGroup = (bool) ($data['is_group'] ?? false);
-        $count = $rankPoints->replaceForEvent($event, $data['ranks'], $isGroup);
+        $rankPoints->renameTemplate($template, $data['name']);
+        $rankPoints->assignTypes($template, $data['participant_types'] ?? []);
+
+        EventContext::for($event)->recalculateSchoolPoints();
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event, FestPageActivity::settingsTab('points'), 'fest.settings.rank_template_updated',
+            "Rank point template \"{$template->name}\" updated", [
+                'template_id' => $template->id,
+                'participant_types' => $data['participant_types'] ?? [],
+            ],
+        );
+
+        return back()->with('success', "Template \"{$template->name}\" saved.");
+    }
+
+    public function destroyRankTemplate(string $tenantId, FestEvent $event, FestRankPointTemplate $template, FestRankPointService $rankPoints)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($template->event_id !== $event->id, 404);
+
+        $name = $template->name;
+        $rankPoints->deleteTemplate($template);
+
+        EventContext::for($event)->recalculateSchoolPoints();
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event, FestPageActivity::settingsTab('points'), 'fest.settings.rank_template_deleted',
+            "Rank point template \"{$name}\" deleted", ['template_name' => $name],
+        );
+
+        return back()->with('success', "Template \"{$name}\" deleted.");
+    }
+
+    public function updateRankPoints(Request $request, string $tenantId, FestEvent $event, FestRankPointTemplate $template, FestRankPointService $rankPoints)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($template->event_id !== $event->id, 404);
+
+        $data = $request->validate([
+            'ranks'          => 'required|array|min:1',
+            'ranks.*.rank'   => 'required|integer|min:1|max:255',
+            'ranks.*.points' => 'required|integer|min:0',
+        ]);
+
+        $count = $rankPoints->replaceRows($template, $data['ranks']);
 
         EventContext::for($event)->recalculateSchoolPoints();
 
@@ -1302,19 +1362,19 @@ class FestEventSettingsController extends SahodayaAdminController
             $event,
             FestPageActivity::settingsTab('points'),
             'fest.settings.rank_points_updated',
-            "Rank points master saved ({$count} rank(s))",
-            ['count' => $count, 'is_group' => $isGroup],
+            "Rank points for \"{$template->name}\" saved ({$count} rank(s))",
+            ['template_id' => $template->id, 'count' => $count],
         );
 
         return back()->with('success', "Rank points saved ({$count} rank(s)).");
     }
 
-    public function seedRankPoints(string $tenantId, FestEvent $event, FestRankPointService $rankPoints)
+    public function seedRankPoints(string $tenantId, FestEvent $event, FestRankPointTemplate $template, FestRankPointService $rankPoints)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_unless($event->event_type === 'sports', 422, 'Rank points apply to sports events only.');
+        abort_if($template->event_id !== $event->id, 404);
 
-        $count = $rankPoints->seedAthleticsStandard($event);
+        $count = $rankPoints->seedAthleticsStandard($template);
 
         EventContext::for($event)->recalculateSchoolPoints();
 
@@ -1322,8 +1382,8 @@ class FestEventSettingsController extends SahodayaAdminController
             $event,
             FestPageActivity::settingsTab('points'),
             'fest.settings.rank_points_seeded',
-            'Athletics standard rank points loaded',
-            ['count' => $count],
+            "Athletics standard loaded into \"{$template->name}\"",
+            ['template_id' => $template->id, 'count' => $count],
         );
 
         return back()->with('success', "Loaded athletics standard ({$count} ranks).");

@@ -1363,8 +1363,11 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/rank-points', [FestEventSettingsController::class, 'rankPoints'])->name('rank-points.index');
             Route::post('/{event}/point-rules', [FestEventSettingsController::class, 'storePointRule'])->name('point-rules.store');
             Route::delete('/{event}/point-rules/{pointRule}', [FestEventSettingsController::class, 'destroyPointRule'])->name('point-rules.destroy');
-            Route::put('/{event}/rank-points', [FestEventSettingsController::class, 'updateRankPoints'])->name('rank-points.update');
-            Route::post('/{event}/rank-points/seed-athletics', [FestEventSettingsController::class, 'seedRankPoints'])->name('rank-points.seed-athletics');
+            Route::post('/{event}/rank-point-templates', [FestEventSettingsController::class, 'storeRankTemplate'])->name('rank-point-templates.store');
+            Route::put('/{event}/rank-point-templates/{template}', [FestEventSettingsController::class, 'updateRankTemplate'])->name('rank-point-templates.update');
+            Route::delete('/{event}/rank-point-templates/{template}', [FestEventSettingsController::class, 'destroyRankTemplate'])->name('rank-point-templates.destroy');
+            Route::put('/{event}/rank-point-templates/{template}/points', [FestEventSettingsController::class, 'updateRankPoints'])->name('rank-point-templates.points');
+            Route::post('/{event}/rank-point-templates/{template}/seed-athletics', [FestEventSettingsController::class, 'seedRankPoints'])->name('rank-point-templates.seed-athletics');
             Route::post('/{event}/volunteers', [FestEventSettingsController::class, 'storeVolunteer'])->name('volunteers.store');
             Route::delete('/{event}/volunteers/{volunteer}', [FestEventSettingsController::class, 'destroyVolunteer'])->name('volunteers.destroy');
             Route::post('/{event}/clone', [FestEventSettingsController::class, 'cloneEvent'])->name('clone');

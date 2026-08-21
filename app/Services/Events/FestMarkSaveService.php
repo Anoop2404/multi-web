@@ -59,8 +59,7 @@ class FestMarkSaveService
         }
 
         if ($event->event_type === 'sports' && ! empty($data['position']) && ($data['score'] ?? '') === '') {
-            $isGroup = in_array($item?->participant_type, ['group', 'team'], true);
-            $data['score'] = app(FestRankPointService::class)->pointsForRank($event, (int) $data['position'], $isGroup);
+            $data['score'] = app(FestRankPointService::class)->pointsForRank($event, (int) $data['position'], $item?->participant_type ?? 'individual');
         }
 
         $mark = FestMark::updateOrCreate(

@@ -7,14 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FestRankPoint extends Model
 {
-    protected $fillable = ['event_id', 'rank', 'points', 'is_group'];
-
-    protected $casts = [
-        'is_group' => 'boolean',
-    ];
+    protected $fillable = ['event_id', 'template_id', 'rank', 'points'];
 
     public function event(): BelongsTo
     {
         return $this->belongsTo(FestEvent::class, 'event_id');
+    }
+
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(FestRankPointTemplate::class, 'template_id');
     }
 }
