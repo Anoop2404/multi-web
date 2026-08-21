@@ -191,10 +191,10 @@
                 </div>
 
                 <!-- Payment QR Code Image Box -->
-                <div v-if="activePaymentQrCodeUrl" class="shrink-0 flex flex-col items-center p-3 bg-white rounded-xl border border-blue-200 shadow-sm text-center self-stretch md:self-auto justify-center">
-                    <span class="text-[11px] font-bold text-slate-800 mb-1 flex items-center gap-1">📱 Scan & Pay via UPI</span>
-                    <img :src="activePaymentQrCodeUrl" alt="Payment QR Code" class="w-36 h-36 object-contain rounded-lg border border-slate-100 p-1 bg-white">
-                    <span class="text-[9px] text-slate-500 mt-1">Accepts GPay, PhonePe, Paytm, etc.</span>
+                <div v-if="activePaymentQrCodeUrl" class="shrink-0 flex flex-col items-center p-3 bg-white rounded-2xl border border-blue-200 shadow-sm text-center self-stretch md:self-auto justify-center">
+                    <span class="text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1">📱 Scan & Pay via UPI</span>
+                    <img :src="activePaymentQrCodeUrl" alt="Payment QR Code" class="w-52 h-52 sm:w-60 sm:h-60 object-contain rounded-xl border border-slate-100 p-2 bg-white">
+                    <span class="text-[10px] text-slate-500 mt-1.5 font-medium">Accepts GPay, PhonePe, Paytm, etc.</span>
                 </div>
             </div>
         </div>

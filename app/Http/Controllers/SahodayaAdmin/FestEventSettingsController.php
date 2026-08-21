@@ -579,7 +579,7 @@ class FestEventSettingsController extends SahodayaAdminController
 
         $existingQrCode = $event->fee_settings['payment_qr_code'] ?? null;
         if ($request->hasFile('payment_qr_code')) {
-            $existingQrCode = \App\Support\TenantStorage::storeUploadedFile($request->file('payment_qr_code'), 'payment_qr_codes');
+            $existingQrCode = \App\Support\TenantStorage::storeUploadedFile($request->file('payment_qr_code'), 'payment_qr_codes', 'public');
         } elseif ($request->boolean('remove_payment_qr_code')) {
             $existingQrCode = null;
         }

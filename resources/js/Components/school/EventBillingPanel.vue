@@ -41,10 +41,10 @@
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">How to pay</p>
                 <pre class="text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{{ resolvedPaymentDetails }}</pre>
             </div>
-            <div v-if="resolvedPaymentQrCodeUrl" class="shrink-0 flex flex-col items-center p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs text-center">
-                <span class="text-[11px] font-bold text-slate-800 mb-1 flex items-center gap-1">📱 Scan & Pay via UPI</span>
-                <img :src="resolvedPaymentQrCodeUrl" alt="Payment QR Code" class="w-32 h-32 object-contain rounded-lg border border-slate-100 p-1 bg-white">
-                <span class="text-[9px] text-slate-500 mt-1">Accepts GPay, PhonePe, Paytm, etc.</span>
+            <div v-if="resolvedPaymentQrCodeUrl" class="shrink-0 flex flex-col items-center p-3 bg-white rounded-2xl border border-slate-200 shadow-sm text-center">
+                <span class="text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1">📱 Scan & Pay via UPI</span>
+                <img :src="resolvedPaymentQrCodeUrl" alt="Payment QR Code" class="w-52 h-52 sm:w-60 sm:h-60 object-contain rounded-xl border border-slate-100 p-2 bg-white">
+                <span class="text-[10px] text-slate-500 mt-1.5 font-medium">Accepts GPay, PhonePe, Paytm, etc.</span>
             </div>
         </div>
 

@@ -164,9 +164,12 @@ class FestEvent extends Model
         $customQr = $this->fee_settings['payment_qr_code'] ?? null;
         if (filled($customQr)) {
             $path = (string) $customQr;
-            return str_starts_with($path, '/') || str_starts_with($path, 'http')
-                ? $path
-                : '/storage/' . ltrim($path, '/');
+            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
+                return $path;
+            }
+            return \App\Support\TenantStorage::assetUrl(null, $path)
+                ?? \App\Support\TenantStorage::logoUrl(null, $path)
+                ?? ('/storage/' . ltrim($path, '/'));
         }
 
         if (! $sahodayaProfile) {

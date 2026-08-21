@@ -155,8 +155,12 @@ class SahodayaProfile extends Model
 
         $path = (string) $this->payment_qr_code;
 
-        return str_starts_with($path, '/') || str_starts_with($path, 'http')
-            ? $path
-            : '/storage/' . ltrim($path, '/');
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
+            return $path;
+        }
+
+        return \App\Support\TenantStorage::assetUrl(null, $path)
+            ?? \App\Support\TenantStorage::logoUrl(null, $path)
+            ?? ('/storage/' . ltrim($path, '/'));
     }
 }
