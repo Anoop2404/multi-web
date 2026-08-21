@@ -36,22 +36,24 @@
             </p>
         </div>
 
-        <div v-if="resolvedPaymentDetails" class="rounded-2xl border border-blue-200 bg-blue-50/40 p-5 flex flex-col md:flex-row items-start gap-5">
-            <div class="flex-1 min-w-0">
-                <h4 class="font-extrabold text-slate-900 text-sm tracking-wide uppercase flex items-center gap-2 mb-2">
-                    <span>🏦</span> How to Pay / Bank Account Details
-                </h4>
-                <div class="bg-white/95 p-4 rounded-xl border border-blue-200/90 shadow-2xs">
-                    <pre class="whitespace-pre-wrap font-sans text-sm font-bold leading-relaxed text-slate-900 tracking-wide">{{ resolvedPaymentDetails }}</pre>
+        <div v-if="resolvedPaymentDetails" class="rounded-2xl border border-blue-200 bg-blue-50/40 p-5 flex flex-col md:flex-row items-stretch gap-6">
+            <div class="flex-1 min-w-0 flex flex-col justify-between">
+                <div>
+                    <h4 class="font-extrabold text-slate-900 text-sm tracking-wide uppercase flex items-center gap-2 mb-2">
+                        <span>🏦</span> How to Pay / Bank Account Details
+                    </h4>
+                    <div class="bg-white/95 p-4.5 rounded-xl border border-blue-200/90 shadow-2xs">
+                        <pre class="whitespace-pre-wrap font-sans text-sm font-bold leading-relaxed text-slate-900 tracking-wide">{{ resolvedPaymentDetails }}</pre>
+                    </div>
                 </div>
-                <p class="text-xs text-blue-900 mt-2 font-medium">
+                <p class="text-xs text-blue-900 mt-3 font-medium">
                     💡 <strong>Note:</strong> Include your school prefix in transaction remarks when transferring funds.
                 </p>
             </div>
-            <div v-if="resolvedPaymentQrCodeUrl" class="shrink-0 flex flex-col items-center p-3 bg-white rounded-2xl border border-blue-200 shadow-sm text-center">
-                <span class="text-xs font-extrabold text-slate-900 mb-1.5 flex items-center gap-1">📱 Scan & Pay via UPI</span>
-                <img :src="resolvedPaymentQrCodeUrl" alt="Payment QR Code" class="w-56 h-56 sm:w-64 sm:h-64 object-contain rounded-xl border border-slate-100 p-2 bg-white">
-                <span class="text-[10px] text-slate-600 mt-1.5 font-semibold">Accepts GPay, PhonePe, Paytm, etc.</span>
+            <div v-if="resolvedPaymentQrCodeUrl" class="shrink-0 flex flex-col items-center p-4 bg-white rounded-2xl border border-blue-200 shadow-sm text-center md:max-w-md w-full md:w-auto">
+                <span class="text-xs font-extrabold text-slate-900 mb-2 flex items-center gap-1">📱 Scan & Pay via UPI</span>
+                <img :src="resolvedPaymentQrCodeUrl" alt="Payment QR Code" class="w-72 sm:w-80 md:w-96 h-80 sm:h-96 md:h-[26rem] object-contain rounded-xl border border-slate-100 p-2 bg-white">
+                <span class="text-xs text-slate-600 mt-2 font-semibold">Accepts GPay, PhonePe, Paytm, etc.</span>
             </div>
         </div>
 
