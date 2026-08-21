@@ -1011,7 +1011,7 @@ class FestReportService
             $studentRows[$id] ??= ['student' => $p->student, 'events' => []];
             $studentRows[$id]['events'][] = [
                 'event_name'   => $p->registration?->item?->title ?? '',
-                'chest_number' => $p->chest_no ?? '—',
+                'chest_number' => $p->group?->chest_no ?? $p->chest_no ?? '—',
             ];
         }
 

@@ -230,8 +230,17 @@ class FestPublicVisibilityService
             $schoolName = Tenant::find($participant->registration->school_id)?->name;
         }
 
+        $chestNo = $participant->group?->chest_no
+            ?? $participant->chest_no
+            ?? app(FestNumberingService::class)->effectiveChestNumber($participant)
+            ?? $participant->level_registration_number;
+
+        $reference = $public
+            ? $this->publicReference($event, $participant)
+            : ($chestNo ? (string) $chestNo : '—');
+
         return [
-            'reference' => $this->publicReference($event, $participant),
+            'reference' => $reference,
             'name'      => $showName ? ($participant->student?->name ?? $participant->teacher?->name) : null,
             'school'    => $showSchool ? ($schoolName ?? '') : null,
             'order'     => $schedule?->sort_order,

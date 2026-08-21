@@ -27,10 +27,12 @@ use Illuminate\Support\Collection;
 class FestResultsController extends SahodayaAdminController
 {
     use BuildsItemHeadReportContext;
+    use \App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
 
     public function show(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $event = $this->regionAwareTargetEvent($request, $event);
 
         if ($event->event_type === 'sports') {
             app(FestItemHeadService::class)->syncEventHeads($event);

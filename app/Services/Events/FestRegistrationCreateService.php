@@ -12,6 +12,7 @@ use App\Models\Teacher;
 use App\Models\Tenant;
 use App\Services\Events\Concerns\HandlesFestRegistrationDuplicates;
 use App\Services\Events\EventLifecycleGate;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -202,7 +203,7 @@ class FestRegistrationCreateService
                 }
 
                 $groupId = null;
-                if ($isGroup) {
+                if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
                     $group = FestGroup::create([
                         'registration_id' => $registration->id,
                         'team_name'       => $teamName,
@@ -404,7 +405,7 @@ class FestRegistrationCreateService
             $registration->participants()->delete();
 
             $groupId = null;
-            if ($isGroup) {
+            if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
                 $group = FestGroup::updateOrCreate(
                     ['registration_id' => $registration->id],
                     [

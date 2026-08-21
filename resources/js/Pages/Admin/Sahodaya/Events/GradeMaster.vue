@@ -18,7 +18,7 @@
                 <form @submit.prevent="saveGradeConfig" class="grid gap-3 sm:grid-cols-2">
                     <FormField label="Item" class-extra="sm:col-span-2">
                         <template #default="{ id }">
-                            <select :id="id" v-model="gradeForm.item_id" class="field">
+                            <select :id="id" v-model="gradeForm.item_id" class="field" @change="clearRangeFields">
                                 <option value="">Event-wide (all items)</option>
                                 <option v-for="item in event.items" :key="item.id" :value="item.id">
                                     {{ item.title }}{{ item.total_marks ? ` — /${item.total_marks}` : '' }}
@@ -122,6 +122,16 @@ const selectedItemUsesPercentage = computed(() => {
     const item = (props.event?.items ?? []).find((i) => i.id === gradeForm.item_id);
     return !!item?.total_marks;
 });
+
+// Switching the item dropdown flips the range inputs between raw-score and
+// percentage mode — without this, values typed under the old mode stayed in
+// the form and got submitted alongside whatever was typed under the new one.
+function clearRangeFields() {
+    gradeForm.min_score = null;
+    gradeForm.max_score = null;
+    gradeForm.min_percent = null;
+    gradeForm.max_percent = null;
+}
 
 const existingGradeKeys = computed(() => {
     const used = props.gradeConfigs.map((g) => g.grade).filter(Boolean);

@@ -112,13 +112,19 @@ class FestExportService
                 $a = $attendance->get($p->registration?->item_id.'-'.$p->id);
                 $schoolName = $schools[$p->registration?->school_id] ?? $p->registration?->school_id ?? '';
 
+                $chestNo = $p->group?->chest_no
+                    ?? $p->chest_no
+                    ?? $numbering->effectiveChestNumber($p)
+                    ?? $p->level_registration_number
+                    ?? '';
+
                 return [
                     $index + 1,
                     $p->registration?->item?->title ?? '',
                     $p->student?->name ?? $p->teacher?->name ?? '',
                     $p->student?->admission_number ?? $p->student?->reg_no ?? '',
                     strtoupper((string) $schoolName),
-                    $numbering->effectiveChestNumber($p) ?? '',
+                    $chestNo,
                     $a?->status ?? 'Not marked',
                     $a?->marked_at?->format('Y-m-d H:i') ?? '',
                 ];
