@@ -881,23 +881,33 @@ class FestReportService
         $sahodaya = Tenant::find($this->event->tenant_id);
         $logo = $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null;
 
-        // Single-item filter → header can name the item; combined report → just the event name.
-        $singleItemName = $rowsByItem->count() === 1
-            ? str_replace('_', ' ', $rowsByItem->keys()->first())
-            : null;
+        // Single-item filter → header can name the item with Category, Type, and Gender
+        $singleItemName = null;
+        $singleItemMetaStr = null;
+        if ($rowsByItem->count() === 1) {
+            $singleItemName = str_replace('_', ' ', (string) $rowsByItem->keys()->first());
+            $firstItemRow = $rowsByItem->first()[0] ?? null;
+            if ($firstItemRow) {
+                $catLabel = $firstItemRow['item_category'] ?? null;
+                $typeLabel = $firstItemRow['item_type'] ?? null;
+                $genderLabel = $firstItemRow['item_gender'] ?? null;
+                $singleItemMetaStr = implode(' • ', array_filter([$singleItemName, $catLabel, $typeLabel, $genderLabel]));
+            }
+        }
 
         $bladeData = [
-            'event'          => $this->event,
-            'sahodaya'       => $sahodaya,
-            'logo'           => $logo,
-            'rowsByItem'     => $rowsByItem,
-            'audience'       => $audience,
-            'isPreview'      => $isPreview,
-            'singleItemName' => $singleItemName,
+            'event'             => $this->event,
+            'sahodaya'          => $sahodaya,
+            'logo'              => $logo,
+            'rowsByItem'        => $rowsByItem,
+            'audience'          => $audience,
+            'isPreview'         => $isPreview,
+            'singleItemName'    => $singleItemName,
+            'singleItemMetaStr' => $singleItemMetaStr,
             // dompdf supports literal {PAGE_NUM}/{PAGE_COUNT} substitution; an external
             // Chromium-based converter (PDF_CONVERTER_URL) does not, so avoid printing
             // unresolved placeholder text on that path.
-            'isDomPdf'       => $isDomPdf,
+            'isDomPdf'          => $isDomPdf,
         ];
 
         // Preview mode: return raw HTML (browser handles S3 images, proper page layout)
@@ -910,7 +920,7 @@ class FestReportService
         // server.js) — pass its native repeating headerTemplate/footerTemplate instead of
         // relying on any CSS trick. Ignored by the dompdf fallback (only used locally),
         // which gets its own branding baked into the page content — see the blade file.
-        [$headerTemplate, $footerTemplate] = $this->attendanceSheetHeaderFooterTemplates($sahodaya, $logo, $singleItemName);
+        [$headerTemplate, $footerTemplate] = $this->attendanceSheetHeaderFooterTemplates($sahodaya, $logo, $singleItemName, $singleItemMetaStr);
         $filename = ReportFilename::build(
             'attendance-sheet',
             $sahodaya?->name ?? 'Sahodaya',
@@ -937,7 +947,7 @@ class FestReportService
      *
      * @return array{0: string, 1: string}
      */
-    private function attendanceSheetHeaderFooterTemplates(?Tenant $sahodaya, ?string $logo, ?string $singleItemName): array
+    private function attendanceSheetHeaderFooterTemplates(?Tenant $sahodaya, ?string $logo, ?string $singleItemName, ?string $singleItemMetaStr = null): array
     {
         $orgName = e($sahodaya->name ?? 'SAHODAYA');
         $eventTitle = e($this->event->title);
@@ -945,8 +955,9 @@ class FestReportService
         // Mirrors the "sep"/item span in the preview's .event-context-bar
         // (see fest.reports.attendance-sheet blade, lines ~274-280) so the
         // event/item line matches what the on-screen preview shows.
-        $itemLine = $singleItemName
-            ? ' <span style="color:#94a3b8; padding:0 4px;">&bull;</span> <span>'.e($singleItemName).'</span>'
+        $itemMetaLabel = $singleItemMetaStr ?: $singleItemName;
+        $itemLine = $itemMetaLabel
+            ? ' <span style="color:#94a3b8; padding:0 4px;">&bull;</span> <span style="font-weight:bold; color:#0f172a;">'.e($itemMetaLabel).'</span>'
             : '';
 
         $logoImg = $logo

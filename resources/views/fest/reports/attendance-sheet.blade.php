@@ -272,9 +272,12 @@
     ])
     <div class="event-context-bar">
         <span class="event-name">{{ $event->title }}</span>
-        @if(!empty($singleItemName))
+        @if(!empty($singleItemMetaStr))
             <span class="sep">&bull;</span>
-            <span>{{ $singleItemName }}</span>
+            <span style="font-weight: bold; color: #0f172a;">{{ $singleItemMetaStr }}</span>
+        @elseif(!empty($singleItemName))
+            <span class="sep">&bull;</span>
+            <span style="font-weight: bold; color: #0f172a;">{{ $singleItemName }}</span>
         @endif
     </div>
 </div>
