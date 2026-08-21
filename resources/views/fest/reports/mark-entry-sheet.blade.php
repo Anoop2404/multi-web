@@ -60,8 +60,8 @@
                         <tr>
                             <td style="padding: 2px 0;">
                                 <strong>ITEM:</strong> {{ $sheet['item']->item_code ? "[{$sheet['item']->item_code}] " : '' }}{{ $sheet['item']->title }}
-                                @if($sheet['item']->category && $sheet['item']->category !== 'general')
-                                    <strong>&middot; CATEGORY:</strong> {{ ucwords(str_replace(['_', '-'], ' ', $sheet['item']->category)) }}
+                                @if(!empty($sheet['category_label']))
+                                    <strong>&middot; CATEGORY:</strong> {{ $sheet['category_label'] }}
                                 @endif
                             </td>
                             <td style="padding: 2px 0; text-align: right;"><strong>TOTAL PARTICIPANTS:</strong> {{ count($sheet['rows']) }}</td>

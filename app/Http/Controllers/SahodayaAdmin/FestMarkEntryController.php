@@ -418,23 +418,25 @@ class FestMarkEntryController extends SahodayaAdminController
         usort($rows, fn ($a, $b) => ($a['chest_no'] ?? PHP_INT_MAX) <=> ($b['chest_no'] ?? PHP_INT_MAX));
 
         $sheetTitle = $judgeCount > 1 ? 'Digital Sum Sheet' : 'Digital Mark Sheet';
+        $categoryLabel = $this->itemCategoryLabel($item, \App\Support\FestClassGroupScheme::labels(null, $event));
 
         $nameParts = [$event->title];
-        if ($item->category && $item->category !== 'general') {
-            $nameParts[] = $item->category;
+        if ($categoryLabel) {
+            $nameParts[] = $categoryLabel;
         }
         $nameParts[] = $item->title;
         $nameParts[] = $sheetTitle;
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-criteria-sheet', [
-            'event'      => $event,
-            'item'       => $item,
-            'judgeCount' => $judgeCount,
-            'sheetTitle' => $sheetTitle,
-            'rows'       => $rows,
-            'orgName'    => $this->sahodaya->name ?? 'Sahodaya',
-            'logoSrc'    => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'event'         => $event,
+            'item'          => $item,
+            'judgeCount'    => $judgeCount,
+            'sheetTitle'    => $sheetTitle,
+            'categoryLabel' => $categoryLabel,
+            'rows'          => $rows,
+            'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
+            'logoSrc'       => TenantBranding::logoEmbedSrc($this->sahodaya),
         ])->download($fileName);
     }
 
@@ -458,12 +460,18 @@ class FestMarkEntryController extends SahodayaAdminController
 
         abort_if($items->isEmpty(), 404, 'No competition items found.');
 
+        // "Category" on a Kalotsav item almost always means its class/age bracket
+        // (e.g. "Category 1 — Classes 3 & 4"), not the arts_category genre tag —
+        // this is the same scheme FestIdCardService resolves for ID cards.
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+
         $sheets = [];
 
         foreach ($items as $item) {
             $isGroup = $numbering->isGroupItem($item);
             $criteria = $criteriaService->criteriaForItem($item);
             $judgeCount = $criteriaService->judgeCountForItem($item);
+            $categoryLabel = $this->itemCategoryLabel($item, $classGroupLabels);
 
             $participants = FestParticipant::whereHas('registration', fn ($q) => $q
                     ->where('event_id', $event->id)
@@ -499,31 +507,34 @@ class FestMarkEntryController extends SahodayaAdminController
                 // per-judge totals into the online Mark Entry page.
                 for ($judgeNumber = 1; $judgeNumber <= $judgeCount; $judgeNumber++) {
                     $sheets[] = [
-                        'item'         => $item,
-                        'criteria'     => $criteria,
-                        'rows'         => $rows,
-                        'sheet_label'  => "JUDGE {$judgeNumber} SHEET",
-                        'is_sum_sheet' => false,
-                        'judge_count'  => $judgeCount,
+                        'item'          => $item,
+                        'criteria'      => $criteria,
+                        'rows'          => $rows,
+                        'sheet_label'   => "JUDGE {$judgeNumber} SHEET",
+                        'is_sum_sheet'  => false,
+                        'judge_count'   => $judgeCount,
+                        'category_label' => $categoryLabel,
                     ];
                 }
 
                 $sheets[] = [
-                    'item'         => $item,
-                    'criteria'     => $criteria,
-                    'rows'         => $rows,
-                    'sheet_label'  => 'SUM SHEET',
-                    'is_sum_sheet' => true,
-                    'judge_count'  => $judgeCount,
+                    'item'          => $item,
+                    'criteria'      => $criteria,
+                    'rows'          => $rows,
+                    'sheet_label'   => 'SUM SHEET',
+                    'is_sum_sheet'  => true,
+                    'judge_count'   => $judgeCount,
+                    'category_label' => $categoryLabel,
                 ];
             } else {
                 $sheets[] = [
-                    'item'         => $item,
-                    'criteria'     => $criteria,
-                    'rows'         => $rows,
-                    'sheet_label'  => null,
-                    'is_sum_sheet' => false,
-                    'judge_count'  => 1,
+                    'item'          => $item,
+                    'criteria'      => $criteria,
+                    'rows'          => $rows,
+                    'sheet_label'   => null,
+                    'is_sum_sheet'  => false,
+                    'judge_count'   => 1,
+                    'category_label' => $categoryLabel,
                 ];
             }
         }
@@ -538,8 +549,9 @@ class FestMarkEntryController extends SahodayaAdminController
         $nameParts = [$event->title];
         if ($itemId) {
             $singleItem = $items->first();
-            if ($singleItem->category && $singleItem->category !== 'general') {
-                $nameParts[] = $singleItem->category;
+            $singleItemCategory = $this->itemCategoryLabel($singleItem, $classGroupLabels);
+            if ($singleItemCategory) {
+                $nameParts[] = $singleItemCategory;
             }
             $nameParts[] = $singleItem->title;
         }
@@ -547,6 +559,25 @@ class FestMarkEntryController extends SahodayaAdminController
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
         return $pdf->download($fileName);
+    }
+
+    /**
+     * "Category" for a Kalotsav item means its class/age bracket (e.g. "Category 1 —
+     * Classes 3 & 4"), not the internal arts_category genre tag. Falls back to the arts
+     * genre only when the item has no meaningful class/age scoping (class_group is the
+     * universal 'open' bucket), and to null when neither says anything distinctive.
+     */
+    private function itemCategoryLabel(FestEventItem $item, array $classGroupLabels): ?string
+    {
+        if ($item->class_group && $item->class_group !== 'open') {
+            return $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
+        }
+
+        if ($item->category && $item->category !== 'general') {
+            return ucwords(str_replace(['_', '-'], ' ', $item->category));
+        }
+
+        return null;
     }
 
     public function autoRankItem(string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)

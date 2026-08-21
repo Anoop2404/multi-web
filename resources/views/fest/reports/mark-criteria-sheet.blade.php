@@ -6,8 +6,8 @@
 
 <h2>
     {{ $event->title }} — {{ $sheetTitle ?? 'Digital Sum Sheet' }}: {{ $item?->title }}
-    @if($item?->category && $item->category !== 'general')
-        <small>({{ ucwords(str_replace(['_', '-'], ' ', $item->category)) }})</small>
+    @if(!empty($categoryLabel))
+        <small>({{ $categoryLabel }})</small>
     @endif
 </h2>
 <table>
