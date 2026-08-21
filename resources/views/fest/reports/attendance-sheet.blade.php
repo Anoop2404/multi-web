@@ -368,9 +368,21 @@
             </table>
         </div>
         @endif
+        @php
+            $firstRow = $rows[0] ?? null;
+            $catLabel = $firstRow['item_category'] ?? null;
+            $typeLabel = $firstRow['item_type'] ?? null;
+            $genderLabel = $firstRow['item_gender'] ?? null;
+            $metaBadges = array_filter([$catLabel, $typeLabel, $genderLabel]);
+        @endphp
         @if(!empty($isPreview) || ($isDomPdf ?? true) || empty($singleItemName))
         <div class="item-heading-bar">
-            {{ $cleanTitle }}
+            <span>{{ $cleanTitle }}</span>
+            @if(!empty($metaBadges))
+                <span style="font-weight: normal; font-size: 10px; color: #94a3b8; margin-left: 8px; text-transform: none;">
+                    &bull; {{ implode(' &bull; ', $metaBadges) }}
+                </span>
+            @endif
             <span class="count-badge">{!! $countLabel !!}</span>
         </div>
         @endif

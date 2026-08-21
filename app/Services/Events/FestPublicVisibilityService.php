@@ -230,6 +230,33 @@ class FestPublicVisibilityService
             $schoolName = Tenant::find($participant->registration->school_id)?->name;
         }
 
+        $item = $participant->registration?->item;
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+
+        $category = null;
+        if ($item?->class_group && $item->class_group !== 'open') {
+            $category = $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
+        } elseif ($item?->age_group) {
+            $category = $item->age_group;
+        } elseif ($item?->category && $item->category !== 'general') {
+            $category = ucwords(str_replace(['_', '-'], ' ', $item->category));
+        } else {
+            $category = 'General Category';
+        }
+
+        $itemType = match (strtolower((string) $item?->participant_type)) {
+            'group' => 'Group Item',
+            'team'  => 'Team Item',
+            default => 'Individual Item',
+        };
+
+        $gender = match (strtolower((string) $item?->gender)) {
+            'boys', 'male'    => 'Boys',
+            'girls', 'female' => 'Girls',
+            'mixed'           => 'Mixed',
+            default           => 'General (Boys & Girls)',
+        };
+
         $chestNo = $participant->group?->chest_no
             ?? $participant->chest_no
             ?? app(FestNumberingService::class)->effectiveChestNumber($participant)
@@ -240,13 +267,16 @@ class FestPublicVisibilityService
             : ($chestNo ? (string) $chestNo : '—');
 
         return [
-            'reference' => $reference,
-            'name'      => $showName ? ($participant->student?->name ?? $participant->teacher?->name) : null,
-            'school'    => $showSchool ? ($schoolName ?? '') : null,
-            'order'     => $schedule?->sort_order,
-            'item'      => $participant->registration?->item?->title,
-            'team_name' => $showName ? $teamName : null,
-            'group_id'  => $participant->group_id,
+            'reference'     => $reference,
+            'name'          => $showName ? ($participant->student?->name ?? $participant->teacher?->name) : null,
+            'school'        => $showSchool ? ($schoolName ?? '') : null,
+            'order'         => $schedule?->sort_order,
+            'item'          => $participant->registration?->item?->title,
+            'item_category' => $category,
+            'item_type'     => $itemType,
+            'item_gender'   => $gender,
+            'team_name'     => $showName ? $teamName : null,
+            'group_id'      => $participant->group_id,
         ];
     }
 

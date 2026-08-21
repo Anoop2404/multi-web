@@ -127,7 +127,12 @@
                                 {{ (row.school || '').toUpperCase() }}
                             </td>
                             <td class="p-3.5 font-medium text-slate-700">
-                                {{ row.item_title }}
+                                <div>{{ row.item_title }}</div>
+                                <div class="flex items-center gap-1 mt-0.5 text-[10px] text-slate-500 font-normal">
+                                    <span v-if="row.item_category" class="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 font-semibold text-slate-700">{{ row.item_category }}</span>
+                                    <span v-if="row.item_type" class="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 font-semibold text-blue-700">{{ row.item_type }}</span>
+                                    <span v-if="row.item_gender" class="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-50 font-semibold text-purple-700">{{ row.item_gender }}</span>
+                                </div>
                             </td>
                             <td class="p-3.5 text-right">
                                 <div class="inline-flex items-center gap-2">
@@ -260,6 +265,35 @@ const filteredParticipants = computed(() => {
     return list;
 });
 
+function formatItemCat(item) {
+    if (!item) return '';
+    if (item.class_group && item.class_group !== 'open') {
+        return item.class_group.toUpperCase();
+    }
+    if (item.age_group) return item.age_group;
+    if (item.category && item.category !== 'general') {
+        return item.category.replace(/_/g, ' ').toUpperCase();
+    }
+    return '';
+}
+
+function formatItemTypeLabel(item) {
+    if (!item) return 'Individual';
+    const t = (item.participant_type || 'individual').toLowerCase();
+    if (t === 'group') return 'Group';
+    if (t === 'team') return 'Team';
+    return 'Individual';
+}
+
+function formatItemGenderLabel(item) {
+    if (!item) return '';
+    const g = (item.gender || 'open').toLowerCase();
+    if (g === 'boys' || g === 'male') return 'Boys';
+    if (g === 'girls' || g === 'female') return 'Girls';
+    if (g === 'mixed') return 'Mixed';
+    return 'General';
+}
+
 const displayRows = computed(() => {
     const rows = [];
     const seenGroups = new Set();
@@ -285,7 +319,10 @@ const displayRows = computed(() => {
                 name: p.group?.team_name || 'Team',
                 chest_no: p.group?.chest_no,
                 school: p.registration?.school?.name ?? '—',
-                item_title: item.title,
+                item_title: item?.title ?? '—',
+                item_category: formatItemCat(item),
+                item_type: formatItemTypeLabel(item),
+                item_gender: formatItemGenderLabel(item),
                 status: statusFor(p),
                 representative: p,
                 photo_url: p.student?.photo_url ?? null,
@@ -311,7 +348,10 @@ const displayRows = computed(() => {
             name: p.student?.name ?? p.teacher?.name ?? 'Participant',
             chest_no: p.chest_no,
             school: p.registration?.school?.name ?? '—',
-            item_title: item?.title,
+            item_title: item?.title ?? '—',
+            item_category: formatItemCat(item),
+            item_type: formatItemTypeLabel(item),
+            item_gender: formatItemGenderLabel(item),
             status: statusFor(p),
             representative: p,
             photo_url: p.student?.photo_url ?? null,

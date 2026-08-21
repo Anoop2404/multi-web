@@ -98,6 +98,8 @@ class FestExportService
             ->get()
             ->keyBy(fn (FestAttendance $a) => $a->item_id.'-'.$a->participant_id);
 
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+
         $rows = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'approved')
@@ -108,9 +110,34 @@ class FestExportService
             ->get()
             ->sortBy(fn (FestParticipant $p) => $p->registration?->item?->title)
             ->values()
-            ->map(function (FestParticipant $p, int $index) use ($attendance, $schools, $numbering) {
+            ->map(function (FestParticipant $p, int $index) use ($attendance, $schools, $numbering, $classGroupLabels) {
                 $a = $attendance->get($p->registration?->item_id.'-'.$p->id);
                 $schoolName = $schools[$p->registration?->school_id] ?? $p->registration?->school_id ?? '';
+
+                $item = $p->registration?->item;
+                $category = null;
+                if ($item?->class_group && $item->class_group !== 'open') {
+                    $category = $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
+                } elseif ($item?->age_group) {
+                    $category = $item->age_group;
+                } elseif ($item?->category && $item->category !== 'general') {
+                    $category = ucwords(str_replace(['_', '-'], ' ', $item->category));
+                } else {
+                    $category = 'General';
+                }
+
+                $type = match (strtolower((string) $item?->participant_type)) {
+                    'group' => 'Group',
+                    'team'  => 'Team',
+                    default => 'Individual',
+                };
+
+                $gender = match (strtolower((string) $item?->gender)) {
+                    'boys', 'male'    => 'Boys',
+                    'girls', 'female' => 'Girls',
+                    'mixed'           => 'Mixed',
+                    default           => 'General',
+                };
 
                 $chestNo = $p->group?->chest_no
                     ?? $p->chest_no
@@ -120,8 +147,12 @@ class FestExportService
 
                 return [
                     $index + 1,
-                    $p->registration?->item?->title ?? '',
-                    $p->student?->name ?? $p->teacher?->name ?? '',
+                    $item?->code ?? '',
+                    $item?->title ?? '',
+                    $category,
+                    $type,
+                    $gender,
+                    $p->student?->name ?? $p->teacher?->name ?? $p->group?->team_name ?? 'Participant',
                     $p->student?->admission_number ?? $p->student?->reg_no ?? '',
                     strtoupper((string) $schoolName),
                     $chestNo,
@@ -135,7 +166,7 @@ class FestExportService
 
         return ExcelExport::download(
             $this->filename($event, $filenameSuffix),
-            ['Sl No', 'Item', 'Participant', 'Doc', 'School', 'Chest No', 'Status', 'Marked At'],
+            ['Sl No', 'Item Code', 'Item Title', 'Category', 'Type', 'Gender', 'Participant / Team', 'Doc / Reg No', 'School', 'Chest No', 'Status', 'Marked At'],
             $rows,
         );
     }
