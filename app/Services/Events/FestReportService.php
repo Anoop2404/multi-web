@@ -935,7 +935,7 @@ class FestReportService
             false,
             $headerTemplate,
             $footerTemplate,
-            ['top' => '102px', 'right' => '38px', 'bottom' => '55px', 'left' => '38px'],
+            ['top' => '112px', 'right' => '38px', 'bottom' => '55px', 'left' => '38px'],
         );
     }
 
@@ -952,12 +952,9 @@ class FestReportService
         $orgName = e($sahodaya->name ?? 'SAHODAYA');
         $eventTitle = e($this->event->title);
         $generated = e(now()->format('d M Y, h:i A'));
-        // Mirrors the "sep"/item span in the preview's .event-context-bar
-        // (see fest.reports.attendance-sheet blade, lines ~274-280) so the
-        // event/item line matches what the on-screen preview shows.
-        $itemMetaLabel = $singleItemMetaStr ?: $singleItemName;
+        $itemMetaLabel = $singleItemMetaStr ?: ($singleItemName ? e($singleItemName) : null);
         $itemLine = $itemMetaLabel
-            ? ' <span style="color:#94a3b8; padding:0 4px;">&bull;</span> <span style="font-weight:bold; color:#0f172a;">'.e($itemMetaLabel).'</span>'
+            ? '<div style="font-size:11px; font-weight:800; color:#0f172a; margin-top:2px;">'.$itemMetaLabel.'</div>'
             : '';
 
         $logoImg = $logo
@@ -980,8 +977,9 @@ class FestReportService
                     </div>
                     <div style="background:#0f172a; color:#fff; padding:4px 10px; border-radius:4px; font-size:8px; font-weight:bold; letter-spacing:0.4px; white-space:nowrap;">ATTENDANCE SHEET</div>
                 </div>
-                <div style="font-size:8px; color:#334155; margin-top:3px;">
-                    <span style="font-weight:bold; color:#0f172a;">{$eventTitle}</span>{$itemLine}
+                <div style="margin-top:5px; padding-top:4px; border-top:1px solid #e2e8f0;">
+                    <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.3px;">{$eventTitle}</div>
+                    {$itemLine}
                 </div>
             </div>
             HTML;

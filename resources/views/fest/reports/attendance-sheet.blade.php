@@ -270,14 +270,18 @@
         'logoSrc' => $logo ?? null,
         'docTitle' => 'ATTENDANCE SHEET',
     ])
-    <div class="event-context-bar">
-        <span class="event-name">{{ $event->title }}</span>
+    <div class="event-context-bar" style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #e2e8f0; display: block;">
+        <div style="font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px;">
+            {{ $event->title }}
+        </div>
         @if(!empty($singleItemMetaStr))
-            <span class="sep">&bull;</span>
-            <span style="font-weight: bold; color: #0f172a;">{{ $singleItemMetaStr }}</span>
+            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+                {!! $singleItemMetaStr !!}
+            </div>
         @elseif(!empty($singleItemName))
-            <span class="sep">&bull;</span>
-            <span style="font-weight: bold; color: #0f172a;">{{ $singleItemName }}</span>
+            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+                {{ $singleItemName }}
+            </div>
         @endif
     </div>
 </div>
