@@ -1217,6 +1217,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/event-staff/{assignment}', [\App\Http\Controllers\SahodayaAdmin\FestEventStaffController::class, 'destroy'])->name('event-staff.destroy');
             Route::get('/{event}/marks', [FestMarkEntryController::class, 'index'])->name('marks.index');
             Route::post('/{event}/marks', [FestMarkEntryController::class, 'store'])->name('marks.store');
+            Route::get('/{event}/mark-settings', [FestMarkEntryController::class, 'markSettings'])->name('mark-settings.index');
             Route::post('/{event}/items/{item}/mark-criteria', [FestMarkEntryController::class, 'saveCriteria'])->name('items.mark-criteria.save');
             Route::post('/{event}/items/{item}/mark-criteria/copy', [FestMarkEntryController::class, 'copyCriteria'])->name('items.mark-criteria.copy');
             Route::post('/{event}/items/{item}/mark-criteria/apply-template', [FestMarkEntryController::class, 'applyTemplate'])->name('items.mark-criteria.apply-template');
@@ -1343,7 +1344,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/eligibility-rules/{eligibilityRule}', [\App\Http\Controllers\SahodayaAdmin\FestEligibilityRuleController::class, 'destroy'])->name('eligibility-rules.destroy');
             Route::put('/{event}/eligibility-settings', [FestEventSettingsController::class, 'updateEligibilitySettings'])->name('eligibility-settings.update');
             Route::post('/{event}/lifecycle-settings', [FestEventSettingsController::class, 'updateLifecycleSettings'])->name('lifecycle-settings.update');
-            Route::put('/{event}/fee-settings', [FestEventSettingsController::class, 'updateFeeSettings'])->name('fee-settings.update');
+            Route::match(['put', 'post'], '/{event}/fee-settings', [FestEventSettingsController::class, 'updateFeeSettings'])->name('fee-settings.update');
             Route::put('/{event}/ledger-account', [FestEventSettingsController::class, 'updateLedgerAccount'])->name('ledger-account.update');
             Route::patch('/{event}/items/{item}/fee', [FestEventSettingsController::class, 'updateItemFee'])->name('items.fee.update');
             Route::post('/{event}/class-groups', [FestEventSettingsController::class, 'storeClassGroup'])->name('class-groups.store');
@@ -1355,9 +1356,11 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/stages/{stage}', [FestEventSettingsController::class, 'destroyStage'])->name('stages.destroy');
             Route::post('/{event}/combo-rules', [FestEventSettingsController::class, 'storeComboRule'])->name('combo-rules.store');
             Route::delete('/{event}/combo-rules/{comboRule}', [FestEventSettingsController::class, 'destroyComboRule'])->name('combo-rules.destroy');
+            Route::get('/{event}/grade-master', [FestEventSettingsController::class, 'gradeMaster'])->name('grade-master.index');
             Route::post('/{event}/grade-configs', [FestEventSettingsController::class, 'storeGradeConfig'])->name('grade-configs.store');
             Route::put('/{event}/grade-configs/{gradeConfig}', [FestEventSettingsController::class, 'updateGradeConfig'])->name('grade-configs.update');
             Route::delete('/{event}/grade-configs/{gradeConfig}', [FestEventSettingsController::class, 'destroyGradeConfig'])->name('grade-configs.destroy');
+            Route::get('/{event}/rank-points', [FestEventSettingsController::class, 'rankPoints'])->name('rank-points.index');
             Route::post('/{event}/point-rules', [FestEventSettingsController::class, 'storePointRule'])->name('point-rules.store');
             Route::delete('/{event}/point-rules/{pointRule}', [FestEventSettingsController::class, 'destroyPointRule'])->name('point-rules.destroy');
             Route::put('/{event}/rank-points', [FestEventSettingsController::class, 'updateRankPoints'])->name('rank-points.update');

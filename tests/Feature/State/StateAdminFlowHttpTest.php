@@ -46,7 +46,7 @@ class StateAdminFlowHttpTest extends TestCase
         $program = FestStateProgram::create([
             'state_id' => $state->id,
             'title' => 'State Route Flow 2026',
-            'event_type' => 'kalotsavam',
+            'event_type' => 'kalolsavam',
             'conduct_levels' => ['sahodaya', 'state'],
             'status' => 'published',
             'level_fees' => ['state' => ['fee_model' => 'per_student', 'individual_amount' => 500]],
@@ -147,7 +147,7 @@ class StateAdminFlowHttpTest extends TestCase
         $program = FestStateProgram::create([
             'state_id' => $state->id,
             'title' => 'State Program Show Test',
-            'event_type' => 'kalotsavam',
+            'event_type' => 'kalolsavam',
             'conduct_levels' => ['sahodaya', 'state'],
             'status' => 'published',
         ]);
@@ -205,7 +205,7 @@ class StateAdminFlowHttpTest extends TestCase
         $program = FestStateProgram::create([
             'state_id' => $state->id,
             'title' => 'State Item Update Program',
-            'event_type' => 'kalotsavam',
+            'event_type' => 'kalolsavam',
             'conduct_levels' => ['sahodaya', 'state'],
             'status' => 'draft',
         ]);
@@ -245,7 +245,7 @@ class StateAdminFlowHttpTest extends TestCase
         $program = FestStateProgram::create([
             'state_id' => $state->id,
             'title' => 'State Qualifier Test Program',
-            'event_type' => 'kalotsavam',
+            'event_type' => 'kalolsavam',
             'conduct_levels' => ['sahodaya', 'state'],
             'status' => 'published',
         ]);

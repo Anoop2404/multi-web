@@ -34,7 +34,7 @@ class FestStateNominationTest extends TestCase
 
         $program = FestStateProgram::create([
             'title'          => 'Kerala State Kalotsavam 2026',
-            'event_type'     => 'kalotsavam',
+            'event_type'     => 'kalolsavam',
             'conduct_levels' => ['sahodaya', 'state'],
             'status'         => 'published',
         ]);
@@ -42,7 +42,7 @@ class FestStateNominationTest extends TestCase
         $hubEvent = FestEvent::create([
             'tenant_id'         => 'sahodaya-1',
             'title'             => 'Sahodaya Kalotsavam 2026',
-            'event_type'        => 'kalotsavam',
+            'event_type'        => 'kalolsavam',
             'level_round'       => 'sahodaya',
             'results_published' => true,
             'status'            => 'published',
@@ -93,7 +93,7 @@ class FestStateNominationTest extends TestCase
     {
         $program = FestStateProgram::create([
             'title'          => 'Kerala State Kalotsavam 2026',
-            'event_type'     => 'kalotsavam',
+            'event_type'     => 'kalolsavam',
             'conduct_levels' => ['sahodaya', 'state'],
             'status'         => 'published',
         ]);
@@ -101,7 +101,7 @@ class FestStateNominationTest extends TestCase
         $hubEvent = FestEvent::create([
             'tenant_id'   => 'sahodaya-1',
             'title'       => 'Sahodaya Kalotsavam 2026',
-            'event_type'  => 'kalotsavam',
+            'event_type'  => 'kalolsavam',
             'level_round' => 'sahodaya',
             'status'      => 'published',
         ]);

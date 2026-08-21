@@ -19,6 +19,7 @@ class FestPageActivity
     public const EVENT_STAFF = 'event.event-staff';
     public const MARKS = 'event.marks';
     public const MARKS_IMPORT = 'event.marks.import';
+    public const MARK_SETTINGS = 'event.mark-settings';
     public const RESULTS = 'event.results';
     public const LEADERBOARD = 'event.leaderboard';
     public const CHAMPIONSHIP = 'event.championship';
@@ -73,6 +74,7 @@ class FestPageActivity
             self::EVENT_STAFF => 'Event staff',
             self::MARKS => 'Mark entry',
             self::MARKS_IMPORT => 'Import marks',
+            self::MARK_SETTINGS => 'Mark settings',
             self::RESULTS => 'Results',
             self::LEADERBOARD => 'Leaderboard',
             self::CHAMPIONSHIP => 'Championship',

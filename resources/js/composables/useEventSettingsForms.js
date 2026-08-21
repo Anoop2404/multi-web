@@ -30,33 +30,6 @@ function labelsForSchemeId(schemes, schemeId) {
     return labels;
 }
 
-const ATHLETICS_RANK_DEFAULTS = { 1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3 };
-
-function initRankRows(source, fallbackCount = 6) {
-    const rows = (source ?? []).map((row, index) => ({
-        _key: `rank-${row.rank}-${index}`,
-        rank: row.rank,
-        points: row.points,
-    }));
-
-    if (rows.length) {
-        return rows;
-    }
-
-    if (fallbackCount <= 0) {
-        return [];
-    }
-
-    return Array.from({ length: fallbackCount }, (_, index) => {
-        const rank = index + 1;
-        return {
-            _key: `default-${rank}`,
-            rank,
-            points: ATHLETICS_RANK_DEFAULTS[rank] ?? 0,
-        };
-    });
-}
-
 export function useEventSettingsForms(props) {
     const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
     const settingsDescription = computed(() => settingsDescriptionForEvent(props.event));
@@ -143,13 +116,6 @@ export function useEventSettingsForms(props) {
     const venueForm = useForm({ name: '', location: '', capacity: null, region_id: '' });
     const stageForm = useForm({ name: '', venue_id: '' });
     const comboForm = useForm({ school_id: '', class_group: '', max_arts_events: null, max_sports_events: null, max_on_stage: null, max_off_stage: null });
-    const gradeForm = useForm({ item_id: '', grade: 'A', min_score: null, max_score: null, min_percent: null, max_percent: null });
-    const pointForm = useForm({ grade: '', position: null, points: null, is_group: false });
-    const rankRows = ref(initRankRows(props.rankPoints));
-    const groupRankRows = ref(initRankRows(props.groupRankPoints, 0));
-    const savingRanks = ref(false);
-    const savingGroupRanks = ref(false);
-    const seedingRanks = ref(false);
     const volunteerForm = useForm({ name: '', phone: '', duty: '', notes: '' });
     const cloneForm = useForm({ title: '' });
 
@@ -220,8 +186,8 @@ export function useEventSettingsForms(props) {
 
     const feeSettingsForm = useForm({
         fee_model: existingFeeSettings.fee_model
-            ?? schedule.fee_model
-            ?? (props.event?.event_type === 'sports' ? 'sports_composite' : 'none'),
+            || schedule.fee_model
+            || (props.event?.event_type === 'sports' ? 'sports_composite' : (props.event?.event_type === 'kalolsavam' ? 'kalolsavam_composite' : 'none')),
         first_item: existingFeeSettings.first_item ?? schedule.first_item ?? '',
         additional_item: existingFeeSettings.additional_item ?? schedule.additional_item ?? '',
         charge_standbys: existingFeeSettings.charge_standbys ?? schedule.charge_standbys ?? false,
@@ -334,7 +300,18 @@ export function useEventSettingsForms(props) {
     }
 
     function saveFeeSettings() {
-        feeSettingsForm.put(`${base}/fee-settings`, { preserveScroll: true });
+        if (!feeSettingsForm.fee_model) {
+            feeSettingsForm.fee_model = props.event?.event_type === 'sports'
+                ? 'sports_composite'
+                : (props.event?.event_type === 'kalolsavam' ? 'kalolsavam_composite' : 'none');
+        }
+        feeSettingsForm.transform((data) => ({
+            ...data,
+            _method: 'put',
+        })).post(`${base}/fee-settings`, {
+            preserveScroll: true,
+            forceFormData: true,
+        });
     }
 
     function saveEligibility() {
@@ -521,95 +498,6 @@ export function useEventSettingsForms(props) {
         router.delete(`${base}/combo-rules/${id}`, { preserveScroll: true });
     }
 
-    const editingGradeConfigId = ref(null);
-
-    function addGradeConfig() {
-        gradeForm.post(`${base}/grade-configs`, { preserveScroll: true, onSuccess: () => gradeForm.reset({ grade: 'A' }) });
-    }
-
-    function startEditGradeConfig(config) {
-        editingGradeConfigId.value = config.id;
-        gradeForm.clearErrors();
-        gradeForm.item_id = config.item_id ?? '';
-        gradeForm.grade = config.grade;
-        gradeForm.min_score = config.min_score;
-        gradeForm.max_score = config.max_score;
-        gradeForm.min_percent = config.min_percent;
-        gradeForm.max_percent = config.max_percent;
-    }
-
-    function cancelEditGradeConfig() {
-        editingGradeConfigId.value = null;
-        gradeForm.reset({ grade: 'A' });
-    }
-
-    function saveGradeConfig() {
-        if (! editingGradeConfigId.value) {
-            addGradeConfig();
-            return;
-        }
-
-        gradeForm.put(`${base}/grade-configs/${editingGradeConfigId.value}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                editingGradeConfigId.value = null;
-                gradeForm.reset({ grade: 'A' });
-            },
-        });
-    }
-
-    function removeGradeConfig(id) {
-        router.delete(`${base}/grade-configs/${id}`, { preserveScroll: true });
-    }
-
-    function addPointRule() {
-        pointForm.post(`${base}/point-rules`, { preserveScroll: true, onSuccess: () => pointForm.reset() });
-    }
-
-    function removePointRule(id) {
-        router.delete(`${base}/point-rules/${id}`, { preserveScroll: true });
-    }
-
-    function rankLabel(rank) {
-        const labels = { 1: '1st', 2: '2nd', 3: '3rd' };
-        return labels[rank] ?? `#${rank}`;
-    }
-
-    function addRankRow() {
-        const next = (rankRows.value.at(-1)?.rank ?? 0) + 1;
-        rankRows.value.push({ _key: `new-${Date.now()}`, rank: next, points: 0 });
-    }
-
-    function removeRankRow(index) {
-        rankRows.value.splice(index, 1);
-    }
-
-    function addGroupRankRow() {
-        const next = (groupRankRows.value.at(-1)?.rank ?? 0) + 1;
-        groupRankRows.value.push({ _key: `g-${Date.now()}`, rank: next, points: 0 });
-    }
-
-    function saveRankPoints(isGroup = false) {
-        const rows = isGroup ? groupRankRows.value : rankRows.value;
-        const loading = isGroup ? savingGroupRanks : savingRanks;
-        loading.value = true;
-        router.put(`${base}/rank-points`, {
-            ranks: rows.map((row) => ({ rank: row.rank, points: row.points, is_group: isGroup })),
-            is_group: isGroup,
-        }, {
-            preserveScroll: true,
-            onFinish: () => { loading.value = false; },
-        });
-    }
-
-    function seedAthletics() {
-        seedingRanks.value = true;
-        router.post(`${base}/rank-points/seed-athletics`, {}, {
-            preserveScroll: true,
-            onFinish: () => { seedingRanks.value = false; },
-        });
-    }
-
     function addVolunteer() {
         volunteerForm.post(`${base}/volunteers`, { preserveScroll: true, onSuccess: () => volunteerForm.reset() });
     }
@@ -634,8 +522,6 @@ export function useEventSettingsForms(props) {
         venueForm,
         stageForm,
         comboForm,
-        gradeForm,
-        pointForm,
         volunteerForm,
         cloneForm,
         eligibilityForm,
@@ -688,25 +574,6 @@ export function useEventSettingsForms(props) {
         removeStage,
         addComboRule,
         removeComboRule,
-        addGradeConfig,
-        removeGradeConfig,
-        editingGradeConfigId,
-        startEditGradeConfig,
-        cancelEditGradeConfig,
-        saveGradeConfig,
-        addPointRule,
-        removePointRule,
-        rankRows,
-        groupRankRows,
-        saveRankPoints,
-        seedAthletics,
-        addRankRow,
-        removeRankRow,
-        addGroupRankRow,
-        rankLabel,
-        savingRanks,
-        savingGroupRanks,
-        seeding: seedingRanks,
         addVolunteer,
         removeVolunteer,
         cloneEvent,

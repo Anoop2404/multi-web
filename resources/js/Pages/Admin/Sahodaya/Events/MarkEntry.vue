@@ -7,6 +7,9 @@
                     :description="filterDescription">
             <template #actions>
                 <div class="flex flex-wrap items-center gap-2">
+                    <Link :href="markSettingsUrl" class="btn-secondary text-xs">
+                        🎚️ Mark Settings
+                    </Link>
                     <a :href="markEntrySheetUrl" target="_blank" class="btn-secondary text-xs !bg-indigo-50 !text-indigo-800 hover:!bg-indigo-100 font-bold border-indigo-200">
                         🖨️ Print Blank Judge Sheets (Paper)
                     </a>
@@ -88,100 +91,9 @@
                     <span class="text-[11px] text-slate-400">
                         ✓ {{ configuredCountInView }}/{{ itemOptions.length }} items configured
                     </span>
-                    <button v-if="props.selectedItemId" type="button" class="btn-secondary text-xs !py-1.5 !px-3"
-                            @click="showColumnConfig = !showColumnConfig">
-                        {{ showColumnConfig ? 'Close Columns ✕' : '⚙️ Configure Columns' }}
-                    </button>
                     <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4"
                             :disabled="bulkSaving" @click="saveAll">
                         {{ bulkSaving ? 'Saving all…' : 'Save All Marks ✓' }}
-                    </button>
-                </div>
-            </div>
-
-            <!-- Judge count + paper column configuration panel -->
-            <div v-if="showColumnConfig" class="border-t border-slate-100 pt-3 space-y-4">
-                <div class="flex items-center gap-3">
-                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                        No. of Judges
-                    </label>
-                    <input v-model.number="judgeCountDraft" type="number" min="1" max="20"
-                           class="field text-xs !py-1 w-20">
-                    <p class="text-[11px] text-slate-400">
-                        1 = single evaluator, entered directly online. 2+ = each judge gets their own printed sheet,
-                        plus a Sum Sheet, and you type each judge's paper subtotal into the table below.
-                    </p>
-                </div>
-
-                <div class="flex items-center gap-3 pb-3">
-                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                        Copy from item
-                    </label>
-                    <div class="flex-1 max-w-sm">
-                        <ReportItemSearchSelect :items="copySourceOptions" :model-value="copyFromItemId"
-                                                all-items-label="Select an item to copy from"
-                                                search-placeholder="Search by item name or code…"
-                                                @select="(id) => { copyFromItemId = id; }" />
-                    </div>
-                    <button type="button" class="btn-secondary text-xs !py-1.5 !px-3 self-end"
-                            :disabled="!copyFromItemId || copyingCriteria" @click="copyCriteriaFromItem">
-                        {{ copyingCriteria ? 'Copying…' : 'Copy' }}
-                    </button>
-                </div>
-
-                <div v-if="rubricTemplates.length" class="flex items-center gap-3 pb-4 border-b border-slate-100">
-                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                        Apply template
-                    </label>
-                    <select v-model="applyTemplateId" class="field text-xs !py-1.5 flex-1 max-w-sm">
-                        <option value="">Select a rubric template…</option>
-                        <option v-for="t in rubricTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
-                    </select>
-                    <button type="button" class="btn-secondary text-xs !py-1.5 !px-3"
-                            :disabled="!applyTemplateId || applyingTemplate" @click="applyRubricTemplate">
-                        {{ applyingTemplate ? 'Applying…' : 'Apply' }}
-                    </button>
-                    <a :href="`/sahodaya-admin/${sahodaya.id}/scoring-rubric-templates`" target="_blank"
-                       class="text-[11px] text-indigo-600 hover:underline whitespace-nowrap">Manage templates ↗</a>
-                </div>
-
-                <div class="space-y-2">
-                    <p class="text-xs text-slate-500">
-                        Scoring columns printed on each judge's paper sheet (e.g. "Content", "Presentation"). SL NO,
-                        CHEST NO. and TOTAL are always included automatically — name the criteria columns in between.
-                    </p>
-                    <div v-if="columnDraft.length" class="grid grid-cols-12 gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 items-center">
-                        <div class="col-span-1 text-center">#</div>
-                        <div class="col-span-7">Column / Criterion Name</div>
-                        <div class="col-span-3">Max Marks</div>
-                        <div class="col-span-1 text-right"></div>
-                    </div>
-                    <div v-for="(row, idx) in columnDraft" :key="row._key" class="grid grid-cols-12 gap-2 items-center px-1">
-                        <div class="col-span-1 text-center text-xs font-bold text-slate-400">{{ idx + 1 }}.</div>
-                        <div class="col-span-7">
-                            <input v-model="row.label" type="text" :placeholder="`e.g. Content / Presentation / Criterion ${idx + 1}`"
-                                   class="field text-xs w-full">
-                        </div>
-                        <div class="col-span-3">
-                            <input v-model.number="row.max_score" type="number" min="0.5" step="0.5" placeholder="10"
-                                   class="field text-xs w-full">
-                        </div>
-                        <div class="col-span-1 text-right">
-                            <button type="button" class="text-rose-500 hover:underline text-xs font-semibold"
-                                    @click="removeColumnRow(idx)">
-                                Remove
-                            </button>
-                        </div>
-                    </div>
-                    <button type="button" class="btn-secondary text-xs !py-1 !px-3 mt-1" @click="addColumnRow">
-                        + Add Column
-                    </button>
-                </div>
-
-                <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
-                    <button type="button" class="btn-primary text-xs !py-1.5 !px-4"
-                            :disabled="savingColumns" @click="saveColumnConfig">
-                        {{ savingColumns ? 'Saving…' : 'Save Settings' }}
                     </button>
                 </div>
             </div>
@@ -393,10 +305,7 @@ const props = defineProps({
     itemHeads: { type: Array, default: () => [] },
     headItemGroups: { type: Array, default: () => [] },
     configuredItemIds: { type: Array, default: () => [] },
-    rubricTemplates: { type: Array, default: () => [] },
     gradeOptions: { type: Array, default: () => ['A+', 'A', 'B', 'C'] },
-    initialItemCriteria: { type: Array, default: () => [] },
-    criteria: { type: Array, default: () => [] },
     judgeCount: { type: Number, default: 1 },
     judgeScores: { type: Object, default: () => ({}) },
     cumulativeSheetUrl: { type: String, default: null },
@@ -469,43 +378,11 @@ const configuredCountInView = computed(() =>
     itemOptions.value.filter((it) => (props.configuredItemIds ?? []).includes(it.id)).length
 );
 
-const copySourceOptions = computed(() => (props.event?.items ?? [])
-    .filter((it) => it.is_enabled !== false && String(it.id) !== String(props.selectedItemId)));
-const copyFromItemId = ref(null);
-const copyingCriteria = ref(false);
-
-function copyCriteriaFromItem() {
-    if (!copyFromItemId.value || !props.selectedItemId) return;
-    copyingCriteria.value = true;
-    router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria/copy`,
-        { source_item_id: copyFromItemId.value },
-        {
-            preserveScroll: true,
-            onFinish: () => {
-                copyingCriteria.value = false;
-            },
-        }
-    );
-}
-
-const applyTemplateId = ref('');
-const applyingTemplate = ref(false);
-
-function applyRubricTemplate() {
-    if (!applyTemplateId.value || !props.selectedItemId) return;
-    applyingTemplate.value = true;
-    router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria/apply-template`,
-        { template_id: applyTemplateId.value },
-        {
-            preserveScroll: true,
-            onFinish: () => {
-                applyingTemplate.value = false;
-            },
-        }
-    );
-}
+const markSettingsUrl = computed(() => {
+    let url = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/mark-settings`;
+    if (props.selectedItemId) url += `?item_id=${props.selectedItemId}`;
+    return url;
+});
 
 const displayCtx = useFestMarkEntryDisplay(props, isSports);
 const {
@@ -581,49 +458,6 @@ function participantGrandTotal(participantId) {
 
 function judgeScoresPayload(participantId) {
     return { ...(judgeForms[participantId] ?? {}) };
-}
-
-// Judge count + paper-column configuration
-let draftKeySeq = 0;
-const showColumnConfig = ref(false);
-const savingColumns = ref(false);
-const judgeCountDraft = ref(props.judgeCount ?? 1);
-const columnDraft = reactive(
-    (props.criteria ?? []).map((c) => ({
-        _key: draftKeySeq++,
-        id: c.id,
-        label: c.label,
-        max_score: c.max_score ?? 10,
-    }))
-);
-
-function addColumnRow() {
-    columnDraft.push({ _key: draftKeySeq++, id: null, label: '', max_score: 10 });
-}
-
-function removeColumnRow(idx) {
-    columnDraft.splice(idx, 1);
-}
-
-function saveColumnConfig() {
-    if (!props.selectedItemId) return;
-    savingColumns.value = true;
-    const rows = columnDraft.map((r, idx) => ({
-        id: r.id,
-        label: (r.label ?? '').trim() || `Criterion ${idx + 1}`,
-        max_score: r.max_score || 10,
-    }));
-
-    router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria`,
-        { judge_count: judgeCountDraft.value || 1, criteria: rows },
-        {
-            preserveScroll: true,
-            onFinish: () => {
-                savingColumns.value = false;
-            },
-        }
-    );
 }
 
 // Signed mark sheet upload

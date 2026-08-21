@@ -1,5 +1,6 @@
 <template>
     <div class="space-y-6 max-w-5xl">
+        <ValidationBanner :errors="registrationSettingsForm.errors" class="mb-4" />
         <form @submit.prevent="saveRegistrationSettings" class="card space-y-4">
             <div>
                 <h3 class="section-title">Event vs item registration</h3>
@@ -159,6 +160,7 @@
 <script setup>
 import { inject, ref, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
+import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 
 const { registrationSettingsForm, saveRegistrationSettings, saveItemWindow, saveAllItemWindows, bulkSavingItemWindows, saveHeadWindow, sahodaya, event, itemHeads, clusterRequireStudentVerification } = inject('eventSettings');
 

@@ -136,6 +136,9 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
 
     const competitionItems = [
         { label: 'Mark entry', href: `${base}/marks`, icon: 'edit', permissions: FEST_MARKS },
+        { label: 'Mark settings', href: `${base}/mark-settings`, icon: 'check-square', permissions: FEST_MARKS },
+        { label: 'Grade master', href: `${base}/grade-master`, icon: 'tag', permissions: FEST_SETTINGS },
+        { label: 'Rank points', href: `${base}/rank-points`, icon: 'arrow-up-circle', permissions: FEST_SETTINGS },
         { label: 'Results & publish', href: `${base}/results`, icon: 'award', permissions: FEST_RESULTS },
         { label: 'Leaderboard', href: `${base}/leaderboard`, icon: 'bar-chart', permissions: FEST_RESULTS },
     ];

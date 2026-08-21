@@ -57,6 +57,9 @@ const tabs = computed(() => {
         { key: 'chest-numbers', label: 'Chest Numbers', icon: '🔢', href: `${base.value}/chest-numbers`, permissions: FEST_MANAGE },
         { key: 'attendance', label: 'Attendance', icon: '📋', href: `${base.value}/attendance`, permissions: FEST_REGISTRATIONS },
         { key: 'marks', label: 'Marks', icon: '✍️', href: `${base.value}/marks`, permissions: FEST_MARKS },
+        { key: 'mark-settings', label: 'Mark Settings', icon: '🎚️', href: `${base.value}/mark-settings`, permissions: FEST_MARKS },
+        { key: 'grade-master', label: 'Grade Master', icon: '🎓', href: `${base.value}/grade-master`, permissions: FEST_SETTINGS },
+        { key: 'rank-points', label: 'Rank Points', icon: '🏅', href: `${base.value}/rank-points`, permissions: FEST_SETTINGS },
         { key: 'results', label: 'Results', icon: '🥇', href: `${base.value}/results`, permissions: FEST_RESULTS },
         { key: 'activity', label: 'Log', icon: '🕒', href: `${base.value}/activity`, permissions: FEST_VIEW },
     ];

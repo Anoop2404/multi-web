@@ -48,6 +48,8 @@
             </div>
         </div>
 
+        <ValidationBanner :errors="feeSettingsForm.errors" class="mb-4" />
+
         <form @submit.prevent="saveFeeSettings" class="space-y-6">
             <section class="card space-y-4 border-blue-100 bg-gradient-to-br from-blue-50/20 to-white">
                 <div>
@@ -58,36 +60,36 @@
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-2">
-                    <FormField label="Bank Name">
+                    <FormField label="Bank Name" :error="feeSettingsForm.errors.payment_bank_name">
                         <template #default="{ id }">
                             <input :id="id" v-model="feeSettingsForm.payment_bank_name" type="text" class="field mt-1 text-sm" placeholder="State Bank of India">
                         </template>
                     </FormField>
-                    <FormField label="Account Number">
+                    <FormField label="Account Number" :error="feeSettingsForm.errors.payment_account_no">
                         <template #default="{ id }">
                             <input :id="id" v-model="feeSettingsForm.payment_account_no" type="text" class="field mt-1 text-sm font-mono" placeholder="12345678901">
                         </template>
                     </FormField>
-                    <FormField label="IFSC Code">
+                    <FormField label="IFSC Code" :error="feeSettingsForm.errors.payment_ifsc">
                         <template #default="{ id }">
                             <input :id="id" v-model="feeSettingsForm.payment_ifsc" type="text" class="field mt-1 text-sm font-mono uppercase" placeholder="SBIN0001234">
                         </template>
                     </FormField>
-                    <FormField label="UPI ID">
+                    <FormField label="UPI ID" :error="feeSettingsForm.errors.payment_upi">
                         <template #default="{ id }">
                             <input :id="id" v-model="feeSettingsForm.payment_upi" type="text" class="field mt-1 text-sm font-mono" placeholder="event@oksbi">
                         </template>
                     </FormField>
                 </div>
 
-                <FormField label="Additional Instructions (optional)" hint="Anything schools need beyond the bank details above — e.g. a cutoff time or a note to include the school code in the transfer reference.">
+                <FormField label="Additional Instructions (optional)" hint="Anything schools need beyond the bank details above — e.g. a cutoff time or a note to include the school code in the transfer reference." :error="feeSettingsForm.errors.payment_instructions">
                     <template #default="{ id }">
                         <textarea :id="id" v-model="feeSettingsForm.payment_instructions" rows="2" class="field mt-1 text-sm"></textarea>
                     </template>
                 </FormField>
 
                 <div class="border-t border-slate-100 pt-3">
-                    <FormField label="Event Payment QR Code Image (Optional)" hint="Upload a UPI QR Code image (PNG/JPG/WEBP). Leave blank to use Sahodaya default QR code.">
+                    <FormField label="Event Payment QR Code Image (Optional)" hint="Upload a UPI QR Code image (PNG/JPG/WEBP). Leave blank to use Sahodaya default QR code." :error="feeSettingsForm.errors.payment_qr_code">
                         <template #default="{ id }">
                             <div class="flex flex-wrap items-center gap-4 mt-1">
                                 <div v-if="event.payment_qr_code_url" class="shrink-0 p-2 bg-white rounded-lg border border-slate-200 shadow-xs flex items-center gap-3">
@@ -127,7 +129,7 @@
                     </p>
                 </div>
 
-                <FormField v-if="event.event_type !== 'sports'" label="Billing model">
+                <FormField v-if="event.event_type !== 'sports'" label="Billing model" :error="feeSettingsForm.errors.fee_model">
                     <template #default="{ id }">
                         <select :id="id" v-model="feeSettingsForm.fee_model" class="field mt-1">
                             <option v-for="(label, key) in feeModels" :key="key" :value="key">{{ billingModelLabel(key, label) }}</option>
@@ -1047,6 +1049,7 @@
 import { computed, inject, ref } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
+import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 
 const {
     feeSettingsForm, feeModels, feePresets, event, classGroupLabels,

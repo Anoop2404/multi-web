@@ -71,6 +71,8 @@ export function sportsEventSidebarNav(base, caps) {
             { label: 'Registrations', href: `${base}/registrations`, icon: 'inbox', permissions: FEST_REGISTRATIONS },
             { label: 'Chest numbers', href: `${base}/chest-numbers`, icon: 'hash', permissions: FEST_MANAGE },
             { label: 'Marks', href: `${base}/marks`, icon: 'edit', permissions: FEST_MARKS },
+            { label: 'Mark settings', href: `${base}/mark-settings`, icon: 'check-square', permissions: FEST_MARKS },
+            { label: 'Rank points', href: `${base}/rank-points`, icon: 'arrow-up-circle', permissions: FEST_SETTINGS },
             { label: 'Results', href: `${base}/results`, icon: 'award', permissions: FEST_RESULTS },
         ],
     });

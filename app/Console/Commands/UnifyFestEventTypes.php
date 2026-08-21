@@ -19,7 +19,7 @@ class UnifyFestEventTypes extends Command
         $this->info('Unifying central database event_types...');
 
         $updatedCentralPrograms = DB::table('fest_state_programs')
-            ->whereIn('event_type', ['kalotsav', 'art_fest', 'co_curricular'])
+            ->whereIn('event_type', ['kalotsav', 'kalotsavam', 'art_fest', 'co_curricular'])
             ->update(['event_type' => 'kalolsavam']);
 
         $updatedCentralSports = DB::table('fest_state_programs')
@@ -39,7 +39,7 @@ class UnifyFestEventTypes extends Command
 
                     if (Schema::hasTable('fest_events')) {
                         $eventsCount += DB::table('fest_events')
-                            ->whereIn('event_type', ['kalotsav', 'art_fest', 'co_curricular'])
+                            ->whereIn('event_type', ['kalotsav', 'kalotsavam', 'art_fest', 'co_curricular'])
                             ->update(['event_type' => 'kalolsavam']);
                         $eventsCount += DB::table('fest_events')
                             ->whereIn('event_type', ['sports_meet', 'athletics'])
@@ -48,7 +48,7 @@ class UnifyFestEventTypes extends Command
 
                     if (Schema::hasTable('fest_catalog_items')) {
                         $catalogCount += DB::table('fest_catalog_items')
-                            ->whereIn('event_type', ['kalotsav', 'art_fest', 'co_curricular'])
+                            ->whereIn('event_type', ['kalotsav', 'kalotsavam', 'art_fest', 'co_curricular'])
                             ->update(['event_type' => 'kalolsavam']);
                         $catalogCount += DB::table('fest_catalog_items')
                             ->whereIn('event_type', ['sports_meet', 'athletics'])

@@ -36,7 +36,7 @@ class RunStatePilotDrill extends Command
         // 1. Program Publishing & Effective Settings
         $program = FestStateProgram::create([
             'title'               => 'Kerala State Kalotsavam 2026 (Pilot)',
-            'event_type'          => 'kalotsavam',
+            'event_type'          => 'kalolsavam',
             'conduct_levels'      => ['sahodaya', 'state'],
             'status'              => 'published',
             'level_event_settings' => [

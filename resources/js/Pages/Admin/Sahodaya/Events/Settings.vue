@@ -27,11 +27,12 @@
                     <div id="section-participation" class="scroll-mt-6"><ParticipationTab /></div>
                 </template>
 
-                <!-- Group Tab 2: Scoring & Rules -->
-                <template v-else-if="['points', 'eligibility', 'grades', 'combo', 'records'].includes(activeTab)">
-                    <div id="section-points" class="scroll-mt-6"><PointsTab /></div>
+                <!-- Group Tab 2: Scoring & Rules. Rank Points and Grade Master used to live
+                     here too (PointsTab/GradesTab) — promoted to their own top-level pages;
+                     FestEventSettingsController::settings() redirects the old
+                     ?tab=points/?tab=grades URLs there instead of rendering this group. -->
+                <template v-else-if="['eligibility', 'combo', 'records'].includes(activeTab)">
                     <div v-if="isSports" id="section-eligibility" class="scroll-mt-6"><EligibilityTab /></div>
-                    <div v-if="!isSports" id="section-grades" class="scroll-mt-6"><GradesTab /></div>
                     <div v-if="!isSports" id="section-combo" class="scroll-mt-6"><ComboTab /></div>
                     <div v-if="isSports" id="section-records" class="scroll-mt-6"><RecordsTab /></div>
                 </template>
@@ -121,8 +122,6 @@ import EligibilityTab from './Settings/Tabs/EligibilityTab.vue';
 import LocksTab from './Settings/Tabs/LocksTab.vue';
 import VenuesTab from './Settings/Tabs/VenuesTab.vue';
 import ComboTab from './Settings/Tabs/ComboTab.vue';
-import GradesTab from './Settings/Tabs/GradesTab.vue';
-import PointsTab from './Settings/Tabs/PointsTab.vue';
 import VolunteersTab from './Settings/Tabs/VolunteersTab.vue';
 import RecordsTab from './Settings/Tabs/RecordsTab.vue';
 import LifecycleTab from './Settings/Tabs/LifecycleTab.vue';
@@ -141,10 +140,6 @@ const props = defineProps({
     customClassGroups: { type: Array, default: () => [] },
     stages: Array,
     comboRules: Array,
-    gradeConfigs: Array,
-    pointRules: Array,
-    rankPoints: { type: Array, default: () => [] },
-    groupRankPoints: { type: Array, default: () => [] },
     volunteers: Array,
     schools: Array,
     judgeGate: Object,
@@ -204,12 +199,9 @@ const activeCategory = computed(() => {
         return { title: '💳 Fees & Windows', sections };
     }
 
-    if (['points', 'eligibility', 'grades', 'combo', 'records'].includes(a)) {
-        const sections = [
-            { id: 'points', label: 'Rank Points Table', href: `${base.value}/settings/points` },
-        ];
+    if (['eligibility', 'combo', 'records'].includes(a)) {
+        const sections = [];
         if (isSports.value) sections.push({ id: 'eligibility', label: 'Age Cutoff Rules', href: `${base.value}/settings/eligibility` });
-        if (!isSports.value) sections.push({ id: 'grades', label: 'Grade Master', href: `${base.value}/settings/grades` });
         if (!isSports.value) sections.push({ id: 'combo', label: 'Combo Rules', href: `${base.value}/settings/combo` });
         if (isSports.value) sections.push({ id: 'records', label: 'Meet Records', href: `${base.value}/settings/records` });
         return { title: '🏆 Scoring & Rules', sections };

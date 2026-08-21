@@ -54,7 +54,11 @@ export function settingsTabsForEvent(event) {
     const caps = capabilitiesForEvent(event);
     return [
         { id: 'fees', label: caps.isSports ? '💳 Fees & Windows' : '💳 Fees & Registration', icon: '💳' },
-        { id: 'points', label: caps.isSports ? '🏆 Scoring & Rules' : '🏆 Points & Rules', icon: '🏆' },
+        // Grade Master and Rank Points moved to their own top-level pages, so this pill's
+        // target is whichever tab is still actually in the "Scoring & Rules" group —
+        // Eligibility (sports) or Combo Rules (everyone else) — not the no-longer-present
+        // 'points' tab, which would otherwise redirect the admin straight out of Settings.
+        { id: caps.isSports ? 'eligibility' : 'combo', label: caps.isSports ? '🏆 Scoring & Rules' : '🏆 Points & Rules', icon: '🏆' },
         { id: 'venues', label: '📍 Venues & Numbering', icon: '📍' },
         { id: 'lifecycle', label: '⚙️ General & Operations', icon: '⚙️' },
     ];

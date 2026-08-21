@@ -37,7 +37,7 @@ class StateFullPipelineTest extends TestCase
         // 1. Create and Publish Program (WP-02)
         $program = FestStateProgram::create([
             'title'               => 'Kerala State Kalotsavam 2026',
-            'event_type'          => 'kalotsavam',
+            'event_type'          => 'kalolsavam',
             'conduct_levels'      => ['sahodaya', 'state'],
             'academic_year'       => '2026-2027',
             'status'              => 'published',

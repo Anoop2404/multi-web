@@ -655,7 +655,7 @@ class StateFestProgramController extends Controller
     private function eventTypes(): array
     {
         return [
-            'kalotsavam' => 'Kalotsav',
+            'kalolsavam' => 'Kalotsav',
         ];
     }
 }

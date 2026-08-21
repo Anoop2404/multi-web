@@ -31,7 +31,7 @@ class StateConductAndRemittanceTest extends TestCase
     {
         $program = FestStateProgram::create([
             'title'          => 'Kerala State Kalotsavam 2026',
-            'event_type'     => 'kalotsavam',
+            'event_type'     => 'kalolsavam',
             'conduct_levels' => ['sahodaya', 'state'],
             'status'         => 'published',
             'level_fees'     => ['state' => ['individual_amount' => 500]],

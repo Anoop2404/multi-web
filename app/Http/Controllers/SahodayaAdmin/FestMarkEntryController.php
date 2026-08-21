@@ -109,14 +109,8 @@ class FestMarkEntryController extends SahodayaAdminController
             ->pluck('item_id')
             ->all();
 
-        $rubricTemplates = FestScoringRubricTemplate::forTenant($this->sahodaya->id)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
         $gradeOptions = app(\App\Services\Events\FestGradePointService::class)->validGradesForEvent($event);
 
-        $criteria = [];
         $judgeCount = 1;
         $judgeScores = [];
         $sheetUploads = [];
@@ -124,7 +118,6 @@ class FestMarkEntryController extends SahodayaAdminController
         $selectedItemModel = $itemId ? FestEventItem::find($itemId) : null;
         if ($selectedItemModel) {
             $criteriaService = app(FestMarkCriteriaService::class);
-            $criteria = $criteriaService->criteriaForItem($selectedItemModel)->values()->all();
             $judgeCount = $criteriaService->judgeCountForItem($selectedItemModel);
             if ($judgeCount > 1) {
                 $judgeScores = $criteriaService->judgeScoresForItem($selectedItemModel);
@@ -181,13 +174,11 @@ class FestMarkEntryController extends SahodayaAdminController
             'selectedItemId' => $itemId,
             'headItemGroups' => $nav['headItemGroups'],
             'configuredItemIds' => $configuredItemIds,
-            'rubricTemplates' => $rubricTemplates,
             'gradeOptions' => $gradeOptions,
             'rankPoints'     => $event->event_type === 'sports'
                 ? app(FestRankPointService::class)->listForEvent($event)
                 : [],
             'childEvents'      => $childEvents,
-            'criteria'         => $criteria,
             'judgeCount'       => $judgeCount,
             'judgeScores'      => $judgeScores,
             'sheetUploads'     => $sheetUploads,
@@ -252,6 +243,7 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $data = $request->validate([
             'judge_count'           => 'nullable|integer|min:1|max:20',
+            'total_marks'           => 'nullable|numeric|min:0',
             'criteria'              => 'nullable|array',
             'criteria.*.id'         => 'nullable|integer',
             'criteria.*.label'      => 'required|string|max:100',
@@ -260,8 +252,9 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $criteria = $criteriaService->saveCriteria($event, $item, $data['criteria'] ?? []);
         $criteriaService->setJudgeCount($item, $data['judge_count'] ?? 1);
+        $item->update(['total_marks' => $data['total_marks'] ?? null]);
 
-        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.criteria.saved', "Mark criteria updated for item #{$item->id}", [
+        $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.criteria.saved', "Mark criteria updated for item #{$item->id}", [
             'item_id' => $item->id,
             'criteria_count' => $criteria->count(),
             'judge_count' => $data['judge_count'] ?? 1,
@@ -284,7 +277,7 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $criteria = $criteriaService->copyCriteriaFromItem($event, $sourceItem, $item);
 
-        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.criteria.copied', "Mark criteria copied from item #{$sourceItem->id} to item #{$item->id}", [
+        $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.criteria.copied', "Mark criteria copied from item #{$sourceItem->id} to item #{$item->id}", [
             'source_item_id' => $sourceItem->id,
             'item_id'        => $item->id,
             'criteria_count' => $criteria->count(),
@@ -307,13 +300,86 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $criteria = $criteriaService->applyTemplateToItem($event, $template, $item);
 
-        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.criteria.template_applied', "Rubric template \"{$template->name}\" applied to item #{$item->id}", [
+        $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.criteria.template_applied', "Rubric template \"{$template->name}\" applied to item #{$item->id}", [
             'template_id' => $template->id,
             'item_id'     => $item->id,
             'criteria_count' => $criteria->count(),
         ]);
 
         return back()->with('success', "Rubric template \"{$template->name}\" applied.");
+    }
+
+    /** Per-item marking config: judge count, scoring criteria columns, total marks. */
+    public function markSettings(Request $request, string $tenantId, FestEvent $event, FestMarkCriteriaService $criteriaService)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event = $this->regionAwareTargetEvent($request, $event);
+        $event->load('items');
+
+        $nav = app(FestHeadItemNavigationService::class)->navigationForEvent($event);
+
+        $headId = $this->resolveHeadQueryParam($request->query('head_id') ?? $request->query('head'));
+        $itemId = $request->integer('item_id') ?: null;
+
+        if (! $itemId) {
+            $fallbackQuery = ($event->event_type === 'sports' && $headId !== null && $headId > 0)
+                ? FestEventItem::where('event_id', $headId)
+                : FestEventItem::where('event_id', $event->id);
+
+            $fallbackQuery->where('is_enabled', true);
+
+            if ($event->event_type !== 'sports' || $headId === null || $headId <= 0) {
+                if ($headId === 0) {
+                    $fallbackQuery->whereNull('head_id');
+                } elseif ($headId !== null) {
+                    $fallbackQuery->where('head_id', $headId);
+                }
+            }
+
+            $itemId = $fallbackQuery->orderBy('id')->value('id');
+        }
+
+        $selectedHeadId = match (true) {
+            $headId === 0 => 'other',
+            $headId !== null => $headId,
+            ! $nav['hasItemHeads'] => 'other',
+            default => null,
+        };
+
+        $configuredItemIds = FestMarkCriterion::whereIn('item_id', $event->items->pluck('id'))
+            ->distinct()
+            ->pluck('item_id')
+            ->all();
+
+        $rubricTemplates = FestScoringRubricTemplate::forTenant($this->sahodaya->id)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $criteria = [];
+        $judgeCount = 1;
+        $selectedItem = null;
+        $selectedItemModel = $itemId ? FestEventItem::find($itemId) : null;
+        if ($selectedItemModel) {
+            $criteria = $criteriaService->criteriaForItem($selectedItemModel)->values()->all();
+            $judgeCount = $criteriaService->judgeCountForItem($selectedItemModel);
+            $selectedItem = $selectedItemModel->only('id', 'title', 'item_code', 'total_marks');
+        }
+
+        return $this->inertia('Sahodaya/Events/MarkSettings', $this->withEventActivity($event, FestPageActivity::MARK_SETTINGS, [
+            'event'          => $event,
+            'headItemGroups' => $nav['headItemGroups'],
+            'hasItemHeads'   => $nav['hasItemHeads'],
+            'selectedHeadId' => $selectedHeadId,
+            'selectedItemId' => $itemId,
+            'selectedItem'   => $selectedItem,
+            'configuredItemIds' => $configuredItemIds,
+            'rubricTemplates' => $rubricTemplates,
+            'criteria'       => $criteria,
+            'judgeCount'     => $judgeCount,
+            'childEvents'    => $event->sportEventDropdownOptions(),
+        ]));
     }
 
     /**
@@ -405,10 +471,14 @@ class FestMarkEntryController extends SahodayaAdminController
                 $judgeValues[] = $rowScores[$j] ?? null;
             }
 
+            // Blank (not 0) when nothing's been entered yet — this sheet doubles as a paper
+            // form for typing in judges' subtotals by hand, and a "0" reads as a real score.
+            $hasAnyScore = collect($judgeValues)->contains(fn ($v) => $v !== null);
+
             $rows[] = [
                 'chest_no' => $chest,
                 'scores'   => $judgeValues,
-                'total'    => array_sum(array_map(fn ($v) => (float) ($v ?? 0), $rowScores)),
+                'total'    => $hasAnyScore ? array_sum(array_map(fn ($v) => (float) ($v ?? 0), $rowScores)) : null,
             ];
         }
 

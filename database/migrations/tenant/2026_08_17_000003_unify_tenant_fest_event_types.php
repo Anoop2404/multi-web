@@ -10,7 +10,7 @@ return new class extends Migration
     {
         if (Schema::hasTable('fest_events')) {
             DB::table('fest_events')
-                ->whereIn('event_type', ['kalotsav', 'art_fest', 'co_curricular'])
+                ->whereIn('event_type', ['kalotsav', 'kalotsavam', 'art_fest', 'co_curricular'])
                 ->update(['event_type' => 'kalolsavam']);
 
             DB::table('fest_events')
@@ -20,7 +20,7 @@ return new class extends Migration
 
         if (Schema::hasTable('fest_catalog_items')) {
             DB::table('fest_catalog_items')
-                ->whereIn('event_type', ['kalotsav', 'art_fest', 'co_curricular'])
+                ->whereIn('event_type', ['kalotsav', 'kalotsavam', 'art_fest', 'co_curricular'])
                 ->update(['event_type' => 'kalolsavam']);
 
             DB::table('fest_catalog_items')

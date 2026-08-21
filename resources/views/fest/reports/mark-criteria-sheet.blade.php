@@ -83,11 +83,11 @@
                     <td style="font-weight: bold; font-family: monospace;">{{ $row['chest_no'] ? '#'.$row['chest_no'] : '—' }}</td>
                     @if($judgeCount > 1)
                         @foreach($row['scores'] as $s)
-                            <td class="num">{{ $s === null ? '—' : rtrim(rtrim(number_format($s, 2), '0'), '.') }}</td>
+                            <td class="num">{{ $s === null ? '' : rtrim(rtrim(number_format($s, 2), '0'), '.') }}</td>
                         @endforeach
-                        <td class="num">{{ rtrim(rtrim(number_format($row['total'], 2), '0'), '.') }}</td>
+                        <td class="num">{{ $row['total'] === null ? '' : rtrim(rtrim(number_format($row['total'], 2), '0'), '.') }}</td>
                     @else
-                        <td class="num">{{ $row['scores'][0] === null ? '—' : rtrim(rtrim(number_format($row['scores'][0], 2), '0'), '.') }}</td>
+                        <td class="num">{{ $row['scores'][0] === null ? '' : rtrim(rtrim(number_format($row['scores'][0], 2), '0'), '.') }}</td>
                     @endif
                 </tr>
             @empty

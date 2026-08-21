@@ -38,6 +38,16 @@ class FestEventSettingsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        // Grade Master and Rank Points moved to their own top-level pages — keep the
+        // route accepting these tab values (removing them would 404 instead of
+        // redirecting) so old bookmarks/links still land somewhere useful.
+        if ($tab === 'grades') {
+            return redirect()->route('sahodaya.events.grade-master.index', [$tenantId, $event->id]);
+        }
+        if ($tab === 'points') {
+            return redirect()->route('sahodaya.events.rank-points.index', [$tenantId, $event->id]);
+        }
+
         $allowed = ['lifecycle', 'locks', 'venues', 'combo', 'grades', 'points', 'participation', 'eligibility', 'fees', 'registration', 'numbering', 'volunteers', 'records', 'clone'];
         $initialTab = ($tab && in_array($tab, $allowed, true)) ? $tab : 'lifecycle';
 
@@ -136,10 +146,6 @@ class FestEventSettingsController extends SahodayaAdminController
                 ...$r->toArray(),
                 'school_name' => $r->school_id ? ($schoolNames[$r->school_id] ?? $r->school_id) : null,
             ]),
-            'gradeConfigs' => FestGradeConfig::where('event_id', $event->id)->with('item')->get(),
-            'pointRules'   => FestPointRule::where('event_id', $event->id)->orderBy('grade')->orderBy('position')->get(),
-            'rankPoints'   => app(FestRankPointService::class)->listForEvent($event),
-            'groupRankPoints' => app(FestRankPointService::class)->listForEvent($event, true),
             'volunteers'   => FestVolunteer::where('event_id', $event->id)->orderBy('name')->get(),
             'schools'      => $schools,
             'judgeGate'    => app(FestJudgeGateService::class)->status($event),
@@ -173,6 +179,39 @@ class FestEventSettingsController extends SahodayaAdminController
                 ->orderBy('name')
                 ->get(['id', 'name', 'email']),
         ]);
+    }
+
+    /** Score/percentage range → grade label bands. Non-sports only (sports ranks by measurement/position, not grade bands). */
+    public function gradeMaster(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type === 'sports', 404);
+
+        $event->load('items');
+
+        return $this->inertia('Sahodaya/Events/GradeMaster', $this->withEventActivity($event, FestPageActivity::settingsTab('grades'), [
+            'event'        => $event,
+            'gradeConfigs' => FestGradeConfig::where('event_id', $event->id)->with('item')->get(),
+        ]));
+    }
+
+    /** Rank/grade → championship points. Sports: Individual + Team/Relay rank tables. Non-sports: Grade Points Master. */
+    public function rankPoints(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event->load('items');
+
+        return $this->inertia('Sahodaya/Events/RankPoints', $this->withEventActivity($event, FestPageActivity::settingsTab('points'), [
+            'event'           => $event,
+            'pointRules'      => FestPointRule::where('event_id', $event->id)->orderBy('grade')->orderBy('position')->get(),
+            'rankPoints'      => app(FestRankPointService::class)->listForEvent($event),
+            'groupRankPoints' => app(FestRankPointService::class)->listForEvent($event, true),
+            // Read-only here — the non-sports "Grade Points Master" rule form's Grade
+            // dropdown is built from this, even though grades are edited on the
+            // separate Grade Master page now.
+            'gradeConfigs'    => FestGradeConfig::where('event_id', $event->id)->with('item')->get(),
+        ]));
     }
 
     /** @return list<array<string, mixed>> */
@@ -404,7 +443,7 @@ class FestEventSettingsController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'fee_model' => 'required|in:none,sports_composite,kalolsavam_composite,cksc_tiered,item_catalog,flat_school,per_item,per_student,student_count_slab',
+            'fee_model' => 'nullable|in:none,sports_composite,kalolsavam_composite,cksc_tiered,item_catalog,flat_school,per_item,per_student,student_count_slab',
             'school_registration_flat' => 'nullable|numeric|min:0',
             'included_items_per_student' => 'nullable|integer|min:0|max:50',
             'first_item' => 'nullable|numeric|min:0',
@@ -495,6 +534,11 @@ class FestEventSettingsController extends SahodayaAdminController
             'item_fees.*.group_item_flat_fee' => 'nullable|numeric|min:0',
             'item_fees.*.group_item_per_participant_rate' => 'nullable|numeric|min:0',
         ]);
+
+        if (empty($data['fee_model'])) {
+            $data['fee_model'] = $event->fee_settings['fee_model']
+                ?? ($event->event_type === 'sports' ? 'sports_composite' : ($event->event_type === 'kalolsavam' ? 'kalolsavam_composite' : 'none'));
+        }
 
         if ($event->event_type === 'sports') {
             $data['fee_model'] = 'sports_composite';

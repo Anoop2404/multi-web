@@ -16,7 +16,7 @@ class StateKalotsavProgramSeeder extends Seeder
             $programs = collect([
                 FestStateProgram::create([
                     'title'               => 'Kerala State Kalotsavam 2026',
-                    'event_type'          => 'kalotsavam',
+                    'event_type'          => 'kalolsavam',
                     'academic_year'       => '2026-2027',
                     'conduct_levels'      => ['sahodaya', 'state'],
                     'status'              => 'published',
