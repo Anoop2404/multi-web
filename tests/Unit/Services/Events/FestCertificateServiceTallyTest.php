@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services\Events;
 
+use App\Models\Certificate;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestGroup;
@@ -44,6 +45,12 @@ class FestCertificateServiceTallyTest extends TestCase
         ]);
     }
 
+    /** Auto-incremented per call so each individualParticipant() is a distinct person —
+     *  needed now that participation certificates aggregate by student_id (see
+     *  FestCertificateService::participationGroupsForEvent()); a shared student_id would
+     *  make unrelated entries collapse into a single certificate. */
+    private int $nextStudentId = 1;
+
     private function individualParticipant(
         FestEvent $event, FestEventItem $item, string $schoolId,
         ?int $position = null, string $role = 'performer', bool $disqualified = false,
@@ -55,7 +62,7 @@ class FestCertificateServiceTallyTest extends TestCase
 
         $participant = FestParticipant::create([
             'registration_id' => $registration->id, 'event_id' => $event->id,
-            'student_id' => 1, 'participant_type' => 'student', 'participant_role' => $role,
+            'student_id' => $this->nextStudentId++, 'participant_type' => 'student', 'participant_role' => $role,
             'disqualified_at' => $disqualified ? now() : null,
         ]);
 
@@ -183,5 +190,61 @@ class FestCertificateServiceTallyTest extends TestCase
         $participationEntityIds = collect($participationCerts)->pluck('entity_id')->all();
         $this->assertContains($winner->id, $participationEntityIds);
         $this->assertNotContains($standbyEntrant->id, $participationEntityIds, 'Standby participants must not receive participation certificates.');
+    }
+
+    public function test_participation_certificates_are_aggregated_one_per_student_across_items(): void
+    {
+        $event = $this->makeEvent();
+        $school = $this->makeSchool($event->tenant_id);
+
+        $itemA = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Elocution', 'participant_type' => 'individual',
+            'category' => 'literary', 'is_enabled' => true, 'display_order' => 1,
+        ]);
+        $itemB = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Quiz', 'participant_type' => 'individual',
+            'category' => 'literary', 'is_enabled' => true, 'display_order' => 2,
+        ]);
+
+        // Same student enters both items -> two FestParticipant rows, one real person.
+        $multiA = $this->individualParticipant($event, $itemA, $school->id);
+        $registrationB = FestRegistration::create([
+            'event_id' => $event->id, 'item_id' => $itemB->id, 'school_id' => $school->id,
+            'status' => 'approved', 'submitted_at' => now(),
+        ]);
+        $multiB = FestParticipant::create([
+            'registration_id' => $registrationB->id, 'event_id' => $event->id,
+            'student_id' => $multiA->student_id, 'participant_type' => 'student', 'participant_role' => 'performer',
+        ]);
+
+        // A different student, single item.
+        $solo = $this->individualParticipant($event, $itemA, $school->id);
+
+        $service = app(FestCertificateService::class);
+        $created = $service->generateParticipationForEvent($event);
+
+        $this->assertCount(2, $created, 'One certificate per distinct student, not per item entry.');
+
+        $multiCert = Certificate::where('entity_type', FestParticipant::class)
+            ->whereIn('entity_id', [$multiA->id, $multiB->id])
+            ->first();
+        $this->assertNotNull($multiCert);
+        $this->assertSame($multiA->id, $multiCert->entity_id, 'Anchors to the lower-id participant row.');
+
+        $context = $service->renderContext($multiCert);
+        $this->assertSame('Elocution and Quiz', $context['fieldValues']['item_title'], 'Body text lists every item the student entered.');
+        $this->assertSame(
+            'Elocution (Literary - Individual Item - General (Boys & Girls)) and Quiz (Literary - Individual Item - General (Boys & Girls))',
+            $context['fieldValues']['item_details'],
+            'item_details appends category/type/gender to each item, same taxonomy as attendance reports.',
+        );
+
+        $soloCert = Certificate::where('entity_type', FestParticipant::class)->where('entity_id', $solo->id)->first();
+        $soloContext = $service->renderContext($soloCert);
+        $this->assertSame('Elocution', $soloContext['fieldValues']['item_title'], 'A single-item student sees just that item, no dangling "and".');
+        $this->assertSame('Elocution (Literary - Individual Item - General (Boys & Girls))', $soloContext['fieldValues']['item_details']);
+
+        $tally = $service->certificateTally($event);
+        $this->assertSame(2, $tally['totals']['participation_certs'], 'Tally total matches generation: 2 distinct students, not 3 item entries.');
     }
 }

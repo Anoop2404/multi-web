@@ -190,9 +190,9 @@
                         <tr>
                             <th class="p-3">Rank</th>
                             <th class="p-3">School</th>
-                            <th class="p-3 text-center" title="Gold — 1st place finishes">🥇</th>
-                            <th class="p-3 text-center" title="Silver — 2nd place finishes">🥈</th>
-                            <th class="p-3 text-center" title="Bronze — 3rd place finishes">🥉</th>
+                            <th class="p-3 text-center" title="Gold — 1st place finishes"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold" class="w-5 h-5 inline-block"></th>
+                            <th class="p-3 text-center" title="Silver — 2nd place finishes"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Silver" class="w-5 h-5 inline-block"></th>
+                            <th class="p-3 text-center" title="Bronze — 3rd place finishes"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Bronze" class="w-5 h-5 inline-block"></th>
                             <th class="p-3 text-right">Points</th>
                         </tr>
                     </thead>
@@ -241,7 +241,6 @@
             </div>
         @elseif($tab === 'item')
             @php
-                $medals = [1 => '🥇', 2 => '🥈', 3 => '🥉'];
                 $participantTypeLabels = ['pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
                 $rankTint = [1 => 'bg-amber-500/10', 2 => 'bg-white/5', 3 => 'bg-orange-500/5'];
             @endphp
@@ -275,21 +274,25 @@
                                         @endphp
                                         <div class="p-4 {{ $rankTint[$winner['position']] ?? '' }}">
                                             <div class="flex items-center justify-between gap-3">
-                                                <span class="text-2xl leading-none">{{ $medals[$winner['position']] ?? '#'.$winner['position'] }}</span>
+                                                @if($winner['position'] <= 3)
+                                                <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-8 h-8">
+                                                @else
+                                                <span class="text-lg font-mono font-bold text-white/50">#{{ $winner['position'] }}</span>
+                                                @endif
                                                 @if(!empty($winner['grade']))
                                                 <span class="text-xs font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">Grade {{ $winner['grade'] }}</span>
                                                 @endif
                                             </div>
                                             <p class="text-xs text-white/40 mt-2">{{ $winner['school'] }}</p>
-                                            <div class="mt-2 space-y-2.5">
+                                            <div class="mt-3 grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2.5 justify-items-center">
                                                 @foreach($roster as $member)
-                                                <div class="flex items-center gap-3">
+                                                <div class="flex flex-col items-center gap-1 w-16">
                                                     @if($member['photo'] ?? null)
-                                                    <img src="{{ $member['photo'] }}" alt="" class="w-14 h-14 rounded-full object-cover border-2 border-slate-800 shadow-sm shrink-0">
+                                                    <img src="{{ $member['photo'] }}" alt="" class="w-16 h-16 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
                                                     @else
-                                                    <span class="w-14 h-14 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-lg font-bold border-2 border-slate-800 shadow-sm shrink-0">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
+                                                    <span class="w-16 h-16 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center text-base font-bold border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                                                     @endif
-                                                    <span class="font-bold text-white leading-snug">{{ $member['name'] ?? '—' }}</span>
+                                                    <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
                                                 </div>
                                                 @endforeach
                                             </div>

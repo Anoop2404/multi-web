@@ -48,7 +48,12 @@ class FestPortalController extends Controller
         $events = $this->operationalEvents->listedForTenant($tenant->id);
         $eventGroups = $this->operationalEvents->catalogueGroups($events);
 
-        return $this->renderPublic('public.fest.index', $tenant, compact('events', 'eventGroups'));
+        $typeLabels = collect(\App\Support\SchoolFestProgram::MAP)->keyBy('eventType')->map(fn (array $m) => $m['label']);
+        $eventTypes = $events->pluck('event_type')->filter()->unique()->sort()
+            ->map(fn (string $type) => ['value' => $type, 'label' => $typeLabels[$type] ?? ucfirst(str_replace('_', ' ', $type))])
+            ->values();
+
+        return $this->renderPublic('public.fest.index', $tenant, compact('events', 'eventGroups', 'eventTypes'));
     }
 
     public function show(Request $request, int $eventId)
@@ -61,13 +66,24 @@ class FestPortalController extends Controller
         $itemGroups = FestEventItem::where('event_id', $event->id)
             ->with('head:id,name')
             ->orderBy('display_order')
-            ->get(['id', 'title', 'stage_type', 'category', 'class_group', 'age_group', 'participant_type', 'head_id', 'event_id'])
+            ->get(['id', 'title', 'stage_type', 'category', 'class_group', 'age_group', 'participant_type', 'head_id', 'event_id', 'results_published_at'])
             ->groupBy('event_id')
             ->map(fn ($groupItems) => [
                 'label' => $event->title,
                 'items' => $groupItems->values(),
             ])
             ->values();
+
+        // The item finder's Schedule/Results links used to show for every item once the
+        // scope-wide flag was on, regardless of whether that specific item had a schedule
+        // slot or published results yet — e.g. every catalog item got an equally-weighted
+        // "Results" button even ones with no marks at all. Item-level gates: a schedule
+        // link only for items that actually have a FestSchedule row, a results link only
+        // for items with their own results_published_at.
+        $scheduledItemIds = FestSchedule::where('event_id', $event->id)
+            ->whereNotNull('item_id')
+            ->distinct()
+            ->pluck('item_id');
 
         $recentMarks = FestMark::where('event_id', $event->id)
             ->whereIn('position', [1, 2, 3])
@@ -79,7 +95,14 @@ class FestPortalController extends Controller
         $recentRoster = $this->rosterForMarks($recentMarks);
         $recentResults = $recentMarks
             ->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id)
-            ->take(6)
+            ->groupBy('item_id')
+            // Same fix as scoreboardDynamicData()'s $latestWinners: group by item (most
+            // recently updated item first) before flattening, so one item's winners stay
+            // together and rank-ordered instead of interleaving with other items purely by
+            // each individual mark's own updated_at.
+            ->sortByDesc(fn ($marksForItem) => $marksForItem->max('updated_at'))
+            ->take(3)
+            ->flatMap(fn ($marksForItem) => $marksForItem->sortBy('position'))
             ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $recentRoster) + [
                 'item_id' => $mark->item_id,
                 'item' => $mark->item?->title,
@@ -107,6 +130,7 @@ class FestPortalController extends Controller
             'selectedScope' => $selectedScope,
             'scopeResultsPublished' => (bool) $selectedScope['results_published'],
             'scopeSchedulePublished' => (bool) $selectedScope['schedule_published'],
+            'scheduledItemIds' => $scheduledItemIds,
             'pageSeo' => ['title' => $event->title.' — '.$tenant->name],
         ]);
     }
@@ -133,6 +157,7 @@ class FestPortalController extends Controller
         $championshipRows = FestIndividualChampionshipPoint::where('event_id', $championshipEventId)
             ->with(['student'])
             ->orderByDesc('points')
+            ->orderByDesc('group_points')
             ->orderBy('student_id')
             ->get();
         $championshipSchools = Tenant::whereIn('id', $championshipRows->pluck('student.tenant_id')->filter()->unique())
@@ -644,7 +669,15 @@ class FestPortalController extends Controller
         $roster = $this->rosterForMarks($winnerMarks);
         $latestWinners = $winnerMarks
             ->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id)
-            ->take(12)
+            ->groupBy('item_id')
+            // Order by item, most recently updated first, so a newly-published item's
+            // winners surface together as a group. Sorting the flat mark list alone (the
+            // old behavior) ordered every row by its own updated_at independently — one
+            // item's 2nd place could land ahead of that same item's 1st, or between two
+            // unrelated items, whenever marks were saved a moment apart.
+            ->sortByDesc(fn ($marksForItem) => $marksForItem->max('updated_at'))
+            ->take(5)
+            ->flatMap(fn ($marksForItem) => $marksForItem->sortBy('position'))
             ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $roster) + [
                 'item' => $mark->item?->title,
                 'head' => $mark->item?->head?->name,
@@ -785,7 +818,16 @@ class FestPortalController extends Controller
             ->groupBy(fn (FestSchedule $row) => $row->participant?->registration_id ?? 'solo-'.$row->id)
             ->map(function (Collection $group) use ($event) {
                 $first = $group->first();
-                $showName = $first->participant ? $this->visibility->showParticipantName($event, $first->participant) : false;
+                // showParticipantName()'s $item param gates on THIS item's own publish
+                // state, not just the event-wide results_published flag — that flag flips
+                // once for the whole event's final "Publish Results" action, which would
+                // otherwise reveal every participant across every item (including ones
+                // that haven't run/been judged yet) the moment any part of the event is
+                // finalized. The schedule's job is logistics (when does it happen);
+                // identity belongs on that item's own results page, after that item
+                // specifically has published.
+                $showName = $first->participant
+                    && $this->visibility->showParticipantName($event, $first->participant, $first->item);
 
                 $roster = $group->pluck('participant')
                     ->filter()

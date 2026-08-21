@@ -73,6 +73,7 @@ class CertificateTemplateController extends SahodayaAdminController
                     'school_name'      => 'Sample Model School',
                     'event_title'      => 'Annual Kalotsav 2026',
                     'item_title'       => 'Classical Music (Solo)',
+                    'item_details'     => 'Classical Music (Solo) (CATEGORY I - Individual Item - Boys)',
                     'event_dates'      => '12-14 October 2026',
                     'achievement_line' => 'First Prize with A Grade',
                     'sahodaya_name'    => strtoupper($this->sahodaya->name),
@@ -149,10 +150,13 @@ class CertificateTemplateController extends SahodayaAdminController
             'signatories.*.signature' => 'nullable|image|max:1024',
             'dynamic_fields_json' => 'nullable|array',
             'layout_json'         => 'nullable|array',
+            'layout_json.orientation' => 'nullable|in:landscape,portrait',
             'layout_json.show_recipient_name' => 'nullable|boolean',
             'layout_json.show_participation_label' => 'nullable|boolean',
             'layout_json.bold_variables' => 'nullable|boolean',
             'layout_json.show_certificate_date' => 'nullable|boolean',
+            'layout_json.show_logo_overlay' => 'nullable|boolean',
+            'layout_json.show_qr' => 'nullable|boolean',
             'layout_json.recipient_name.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.recipient_name.left' => 'nullable|numeric|min:0|max:100',
             'layout_json.recipient_name.width' => 'nullable|numeric|min:0|max:100',
@@ -197,11 +201,13 @@ class CertificateTemplateController extends SahodayaAdminController
 
         $templatePath = null;
         $backgroundPath = null;
+        $detectedOrientation = null;
         if ($request->hasFile('template_file')) {
             $stored = app(CertificateBackgroundConverter::class)
                 ->storeFromUpload($request->file('template_file'), $baseDir, $disk);
             $templatePath = $stored['template_file_path'];
             $backgroundPath = $stored['background_path'];
+            $detectedOrientation = $stored['orientation'];
         }
 
         $logoPath = $request->hasFile('logo')
@@ -228,6 +234,9 @@ class CertificateTemplateController extends SahodayaAdminController
         $layout = null;
         if ($backgroundPath || (in_array($data['event_type'], ['training', 'fest'], true) && isset($data['layout_json']))) {
             $layout = $this->mergeLayout($data['layout_json'] ?? null);
+            if ($detectedOrientation) {
+                $layout['orientation'] = $detectedOrientation;
+            }
         }
 
         if ($data['is_active'] ?? true) {
@@ -279,10 +288,13 @@ class CertificateTemplateController extends SahodayaAdminController
             // below) — it used to be read straight from this validated field, letting a
             // sahodaya-admin reference another tenant's file path on the shared public disk.
             'layout_json'         => 'nullable|array',
+            'layout_json.orientation' => 'nullable|in:landscape,portrait',
             'layout_json.show_recipient_name' => 'nullable|boolean',
             'layout_json.show_participation_label' => 'nullable|boolean',
             'layout_json.bold_variables' => 'nullable|boolean',
             'layout_json.show_certificate_date' => 'nullable|boolean',
+            'layout_json.show_logo_overlay' => 'nullable|boolean',
+            'layout_json.show_qr' => 'nullable|boolean',
             'layout_json.recipient_name.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.recipient_name.left' => 'nullable|numeric|min:0|max:100',
             'layout_json.recipient_name.width' => 'nullable|numeric|min:0|max:100',
@@ -319,11 +331,13 @@ class CertificateTemplateController extends SahodayaAdminController
             'body'  => $data['body'] ?? null,
         ], fn ($v) => $v !== null);
 
+        $detectedOrientation = null;
         if ($request->hasFile('template_file')) {
             $stored = app(CertificateBackgroundConverter::class)
                 ->storeFromUpload($request->file('template_file'), $baseDir, $disk);
             $updates['template_file_path'] = $stored['template_file_path'];
             $updates['background_path'] = $stored['background_path'];
+            $detectedOrientation = $stored['orientation'];
             if (! isset($data['layout_json']) && ! $template->layout_json) {
                 $updates['layout_json'] = CertificateTemplate::defaultBackgroundLayout();
             }
@@ -338,6 +352,17 @@ class CertificateTemplateController extends SahodayaAdminController
 
         if (array_key_exists('layout_json', $data)) {
             $updates['layout_json'] = $this->mergeLayout($data['layout_json'], $template->layout_json);
+        }
+
+        // A freshly uploaded image's real dimensions are authoritative for orientation,
+        // regardless of which of the branches above did or didn't touch layout_json —
+        // otherwise swapping a landscape background for a portrait one (or vice versa)
+        // without also touching the layout form would silently keep the stale value.
+        if ($detectedOrientation) {
+            $updates['layout_json'] = array_merge(
+                $updates['layout_json'] ?? $template->layout_json ?? CertificateTemplate::defaultBackgroundLayout(),
+                ['orientation' => $detectedOrientation]
+            );
         }
 
         if (array_key_exists('signatories', $data)) {
@@ -421,10 +446,14 @@ class CertificateTemplateController extends SahodayaAdminController
             return $layout;
         }
 
-        foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date'] as $flag) {
+        foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date', 'show_logo_overlay', 'show_qr'] as $flag) {
             if (array_key_exists($flag, $input)) {
                 $layout[$flag] = filter_var($input[$flag], FILTER_VALIDATE_BOOLEAN);
             }
+        }
+
+        if (in_array($input['orientation'] ?? null, ['landscape', 'portrait'], true)) {
+            $layout['orientation'] = $input['orientation'];
         }
 
         foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover'] as $key) {
@@ -471,6 +500,7 @@ class CertificateTemplateController extends SahodayaAdminController
             ['key' => 'school_name', 'source' => 'school_name', 'label' => 'School name'],
             ['key' => 'event_title', 'source' => 'event_title', 'label' => 'Event title'],
             ['key' => 'item_title', 'source' => 'item_title', 'label' => 'Item title'],
+            ['key' => 'item_details', 'source' => 'item_details', 'label' => 'Item with category/type/gender'],
             ['key' => 'event_dates', 'source' => 'event_dates', 'label' => 'Event dates'],
             ['key' => 'achievement_line', 'source' => 'achievement_line', 'label' => 'Achievement line'],
             ['key' => 'sahodaya_name', 'source' => 'sahodaya_name', 'label' => 'Sahodaya name'],

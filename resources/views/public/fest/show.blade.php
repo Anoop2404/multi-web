@@ -62,10 +62,27 @@
                 @foreach($recentResults as $winner)
                 @php $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]]; @endphp
                 <a href="{{ route('tenant.fest.item-results', [$event->id, $winner['item_id']]) }}" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 hover:border-amber-500/50 hover:bg-slate-900 transition">
-                    <div class="flex items-start justify-between gap-3"><div><p class="text-xs font-bold text-amber-400">Position {{ $winner['position'] }}</p><h3 class="font-bold mt-1 text-white">{{ $winner['item'] }}</h3></div><span class="text-xl" aria-label="Rank {{ $winner['position'] }}">{{ [1 => '🥇', 2 => '🥈', 3 => '🥉'][$winner['position']] ?? '#'.$winner['position'] }}</span></div>
-                    <p class="text-sm font-semibold mt-3 line-clamp-2 text-white/90">{{ collect($roster)->pluck('name')->filter()->implode(', ') ?: 'Participant' }}</p>
-                    <p class="text-xs text-white/40 mt-1 truncate">{{ $winner['school'] }}</p>
-                    @if(count($roster) > 1)<span class="inline-flex mt-3 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/60">{{ count($roster) }} participants</span>@endif
+                    <div class="flex items-start justify-between gap-3">
+                        <p class="text-xs font-bold text-amber-400">Position {{ $winner['position'] }}</p>
+                        @if($winner['position'] <= 3)<img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-7 h-7 shrink-0">@else<span class="text-lg font-mono text-white/50" aria-label="Rank {{ $winner['position'] }}">#{{ $winner['position'] }}</span>@endif
+                    </div>
+                    <h3 class="font-bold mt-1 text-white">{{ $winner['item'] }}</h3>
+                    <div class="flex items-center gap-3 mt-3">
+                        <div class="flex -space-x-2 shrink-0">
+                            @foreach(array_slice($roster, 0, 3) as $member)
+                                @if($member['photo'] ?? null)
+                                <img src="{{ $member['photo'] }}" alt="" class="w-10 h-10 rounded-xl object-cover border-2 border-slate-900">
+                                @else
+                                <span class="w-10 h-10 rounded-xl bg-amber-500/15 border-2 border-slate-900 flex items-center justify-center text-xs font-extrabold text-amber-300">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
+                                @endif
+                            @endforeach
+                            @if(count($roster) > 3)<span class="w-10 h-10 rounded-xl bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-[10px] font-bold text-white">+{{ count($roster) - 3 }}</span>@endif
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold line-clamp-2 text-white/90">{{ collect($roster)->pluck('name')->filter()->implode(', ') ?: 'Participant' }}</p>
+                            <p class="text-xs text-white/40 truncate">{{ $winner['school'] }}</p>
+                        </div>
+                    </div>
                 </a>
                 @endforeach
             </div>
@@ -104,8 +121,11 @@
                         <span class="rounded-full border border-slate-700 px-2 py-1">{{ $item->stage_type === 'on_stage' ? '🎤 On stage' : ($item->stage_type === 'off_stage' ? '📝 Off stage' : 'Stage') }}</span>
                     </div>
                     <div class="mt-auto pt-4 flex gap-2">
-                        @if($scopeSchedulePublished)<a href="{{ route('tenant.fest.item-schedule', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold text-white hover:bg-white/15">Schedule</a>@endif
-                        @if($scopeResultsPublished)<a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>@endif
+                        @if($scopeSchedulePublished && $scheduledItemIds->contains($item->id))<a href="{{ route('tenant.fest.item-schedule', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold text-white hover:bg-white/15">Schedule</a>@endif
+                        @if($scopeResultsPublished && $item->results_published_at)<a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>@endif
+                        @if(!($scopeSchedulePublished && $scheduledItemIds->contains($item->id)) && !($scopeResultsPublished && $item->results_published_at))
+                        <span class="flex-1 rounded-xl border border-dashed border-slate-700 px-3 py-2 text-center text-xs font-semibold text-white/30">Not yet scheduled</span>
+                        @endif
                     </div>
                 </article>
                 @endforeach

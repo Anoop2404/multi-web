@@ -19,10 +19,14 @@
         <h1>{{ $student?->name ?? 'Participant' }}</h1>
         <p style="color:#64748b;margin:.5rem 0 0">{{ $event?->title ?? 'Event' }} · {{ $item?->title ?? '' }}</p>
         <dl>
-            @if($mark?->position)
+            {{-- A participation certificate's anchor participant row may carry its own
+                 mark/position from that one item, but the certificate itself covers every
+                 item the person entered — showing that one item's position here would
+                 misleadingly read as if this were a winner certificate. --}}
+            @if($certificate->cert_type === 'winner' && $mark?->position)
             <dt>Position</dt><dd>#{{ $mark->position }}</dd>
             @endif
-            @if($mark?->grade)
+            @if($certificate->cert_type === 'winner' && $mark?->grade)
             <dt>Grade</dt><dd>{{ $mark->grade }}</dd>
             @endif
             <dt>Certificate ID</dt><dd style="font-family:monospace;font-size:.85rem">{{ $certificate->verification_uuid }}</dd>

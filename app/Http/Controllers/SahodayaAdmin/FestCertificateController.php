@@ -50,9 +50,10 @@ class FestCertificateController extends SahodayaAdminController
         $tally = app(FestCertificateService::class)->certificateTally($event);
 
         return $this->inertia('Sahodaya/Events/CertificateTally', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
-            'event'  => $event,
-            'rows'   => $tally['rows'],
-            'totals' => $tally['totals'],
+            'event'       => $event,
+            'rows'        => $tally['rows'],
+            'totals'      => $tally['totals'],
+            'childEvents' => $event->sportEventDropdownOptions(),
         ]));
     }
 
@@ -102,6 +103,7 @@ class FestCertificateController extends SahodayaAdminController
         // FestCertificateService::payloadsFor() and renderContext()'s $templateCache param.
         $payloads = $service->payloadsFor($certificates);
         $templateCache = [];
+        $participantsCache = [];
 
         $zipPath = storage_path('app/tmp/fest-certs-'.$event->id.'-'.time().'.zip');
         @mkdir(dirname($zipPath), 0755, true);
@@ -110,7 +112,7 @@ class FestCertificateController extends SahodayaAdminController
         $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
 
         foreach ($certificates as $certificate) {
-            $payload = $service->renderContext($certificate, $payloads->get($certificate->id), $templateCache);
+            $payload = $service->renderContext($certificate, $payloads->get($certificate->id), $templateCache, $participantsCache);
             $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.html';
             $html = view('fest.certificate-print', $payload)->render();
             $zip->addFromString($name, $html);

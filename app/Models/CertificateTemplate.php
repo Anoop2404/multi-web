@@ -34,9 +34,12 @@ class CertificateTemplate extends Model
      * Tuned for landscape certificate designs like Malappuram Central Sahodaya.
      *
      * @return array{
+     *     orientation: string,
      *     show_recipient_name: bool,
      *     show_participation_label: bool,
      *     bold_variables: bool,
+     *     show_logo_overlay: bool,
+     *     show_qr: bool,
      *     participation_label_cover: array{top: float, left: float, width: float, height: float},
      *     recipient_name: array{top: float, left: float, width: float, font_size: int},
      *     body: array{top: float, left: float, width: float, font_size: int},
@@ -47,10 +50,13 @@ class CertificateTemplate extends Model
     public static function defaultBackgroundLayout(): array
     {
         return [
+            'orientation' => 'landscape',
             'show_recipient_name' => false,
             'show_participation_label' => true,
             'bold_variables' => true,
             'show_certificate_date' => true,
+            'show_logo_overlay' => true,
+            'show_qr' => true,
             'participation_label_cover' => [
                 'top' => 28,
                 'left' => 18,
@@ -172,10 +178,14 @@ class CertificateTemplate extends Model
         $defaults = self::defaultBackgroundLayout();
         $custom = is_array($this->layout_json) ? $this->layout_json : [];
 
-        foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date'] as $flag) {
+        foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date', 'show_logo_overlay', 'show_qr'] as $flag) {
             if (array_key_exists($flag, $custom)) {
                 $defaults[$flag] = filter_var($custom[$flag], FILTER_VALIDATE_BOOLEAN);
             }
+        }
+
+        if (in_array($custom['orientation'] ?? null, ['landscape', 'portrait'], true)) {
+            $defaults['orientation'] = $custom['orientation'];
         }
 
         $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style', 'align'];

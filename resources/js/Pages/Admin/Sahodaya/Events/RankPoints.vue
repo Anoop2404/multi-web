@@ -8,6 +8,15 @@
                            :event="event" active="rank-points" class="mb-4" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="rank-points" class="mb-4" />
 
+        <div v-if="childEvents.length" class="card !p-4 mb-5 flex flex-wrap items-center gap-2">
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ isSports ? 'Sport Event / Region:' : 'Region:' }}</label>
+            <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
+                <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
+                    {{ ev.short_title || ev.title }}
+                </option>
+            </select>
+        </div>
+
         <div class="space-y-6">
             <div v-if="isSports" class="rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-4 text-xs text-indigo-950 shadow-sm space-y-1.5">
                 <p class="font-bold text-indigo-900 flex items-center gap-1.5 text-sm">
@@ -194,10 +203,15 @@ const props = defineProps({
     allParticipantTypes: { type: Array, default: () => ['individual', 'pair', 'trio', 'group', 'team'] },
     gradeConfigs: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
 
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`);
 const isSports = computed(() => props.event?.event_type === 'sports');
+
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/rank-points`);
+}
 
 // Same "this event's actual grade set" derivation as Grade Master's datalist, just
 // rendered as a <select> here since point rules reference an existing grade rather than

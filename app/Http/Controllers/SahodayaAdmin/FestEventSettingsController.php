@@ -193,6 +193,7 @@ class FestEventSettingsController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/GradeMaster', $this->withEventActivity($event, FestPageActivity::settingsTab('grades'), [
             'event'        => $event,
             'gradeConfigs' => FestGradeConfig::where('event_id', $event->id)->with('item')->get(),
+            'childEvents'  => $event->sportEventDropdownOptions(),
         ]));
     }
 
@@ -212,6 +213,7 @@ class FestEventSettingsController extends SahodayaAdminController
             // dropdown is built from this, even though grades are edited on the
             // separate Grade Master page now.
             'gradeConfigs'    => FestGradeConfig::where('event_id', $event->id)->with('item')->get(),
+            'childEvents'     => $event->sportEventDropdownOptions(),
         ]));
     }
 

@@ -1,5 +1,4 @@
 @php
-    $medals = [1 => '🥇', 2 => '🥈', 3 => '🥉'];
     $maxPoints = collect($scoreboard ?? [])->max('total_points') ?: 0;
 @endphp
 
@@ -31,7 +30,7 @@
             <li class="relative overflow-hidden rounded-2xl bg-slate-900 border {{ $rankClass }} p-4 shadow-lg">
                 <div class="absolute inset-y-0 left-0 bg-slate-800/40 pointer-events-none" style="width: {{ $pct }}%" aria-hidden="true"></div>
                 <div class="relative flex items-center justify-between gap-4">
-                    <div class="flex items-center gap-3 min-w-0"><span class="shrink-0 w-10 h-10 rounded-xl {{ $podium ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300 border border-slate-700' }} flex items-center justify-center font-extrabold">{{ $medals[$row['rank']] ?? $row['rank'] }}</span><span class="font-bold text-white text-sm sm:text-base truncate">{{ $row['school_name'] }}</span></div>
+                    <div class="flex items-center gap-3 min-w-0"><span class="shrink-0 w-10 h-10 rounded-xl {{ $podium ? 'bg-amber-400/20' : 'bg-slate-800 text-slate-300 border border-slate-700' }} flex items-center justify-center font-extrabold">@if($podium)<img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-8 h-8">@else{{ $row['rank'] }}@endif</span><span class="font-bold text-white text-sm sm:text-base truncate">{{ $row['school_name'] }}</span></div>
                     <div class="text-right shrink-0"><span class="font-mono font-extrabold text-xl text-amber-400">{{ $row['total_points'] }}</span><span class="text-[10px] text-slate-400 uppercase block font-bold">PTS</span></div>
                 </div>
                 @if($cumulativeStanding ?? null)
@@ -75,19 +74,27 @@
             @forelse($latestWinners ?? [] as $winner)
             @php $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]]; @endphp
             <article class="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-md">
-                <div class="flex items-start gap-3">
-                    <div class="flex -space-x-2 shrink-0">
-                        @foreach(array_slice($roster, 0, 4) as $member)
-                            @if($member['photo'] ?? null)<img src="{{ $member['photo'] }}" alt="" class="w-10 h-10 rounded-xl object-cover border-2 border-slate-900">@else<span class="w-10 h-10 rounded-xl bg-slate-800 border-2 border-slate-900 flex items-center justify-center text-xs font-extrabold text-amber-400">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>@endif
-                        @endforeach
-                        @if(count($roster) > 4)<span class="w-10 h-10 rounded-xl bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-[10px] font-bold">+{{ count($roster) - 4 }}</span>@endif
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <div class="flex items-start justify-between gap-2"><p class="font-bold text-white text-sm leading-snug">{{ collect($roster)->pluck('name')->filter()->implode(', ') ?: 'Participant' }}</p><span class="shrink-0 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-2 py-0.5" aria-label="Position {{ $winner['position'] }}">{{ $medals[$winner['position']] ?? '#'.$winner['position'] }}</span></div>
-                        <p class="text-xs text-slate-400 mt-1">{{ $winner['school'] }}</p><p class="text-xs text-amber-400 font-medium mt-1">{{ $winner['item'] }}</p>
-                        @if(count($roster) > 1)<p class="text-[10px] text-slate-500 mt-2">All {{ count($roster) }} group participants shown</p>@endif
-                    </div>
+                <div class="flex items-center justify-between gap-2">
+                    <p class="text-xs text-amber-400 font-semibold truncate">{{ $winner['item'] }}</p>
+                    @if($winner['position'] <= 3)
+                    <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Position {{ $winner['position'] }}" class="shrink-0 w-7 h-7">
+                    @else
+                    <span class="shrink-0 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-2 py-0.5" aria-label="Position {{ $winner['position'] }}">#{{ $winner['position'] }}</span>
+                    @endif
                 </div>
+                <div class="mt-3 grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-2.5 justify-items-center">
+                    @foreach($roster as $member)
+                    <div class="flex flex-col items-center gap-1 w-14">
+                        @if($member['photo'] ?? null)
+                        <img src="{{ $member['photo'] }}" alt="" class="w-12 h-12 rounded-xl object-cover border-2 border-slate-800 shadow-sm">
+                        @else
+                        <span class="w-12 h-12 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-sm border-2 border-slate-800 shadow-sm">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
+                        @endif
+                        <span class="text-[10px] font-semibold leading-tight text-white/90 text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
+                    </div>
+                    @endforeach
+                </div>
+                <p class="text-xs text-slate-400 mt-3 truncate">{{ $winner['school'] }}</p>
             </article>
             @empty
             <div class="rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 text-center py-12">No winners announced yet.</div>

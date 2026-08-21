@@ -1,9 +1,13 @@
 @extends('layouts.public-event')
 
 @section('content')
-@php $medals = [1 => '🥇', 2 => '🥈', 3 => '🥉']; @endphp
+@php
+    $medalImg = fn ($rank) => $rank >= 1 && $rank <= 3
+        ? '<img src="'.asset('images/fest/medals/rank-'.$rank.'.webp').'" alt="Rank '.$rank.'" class="inline-block w-5 h-5 align-middle">'
+        : '<span class="font-mono">#'.$rank.'</span>';
+@endphp
 <section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen" id="fest-live-root" data-live-url="{{ route('tenant.fest.live.data', ['event' => $event->id]) }}">
-    <div class="max-w-3xl mx-auto">
+    <div class="max-w-2xl mx-auto">
 
         <header class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-red-500/20 p-6 sm:p-8 text-center shadow-2xl">
             <div aria-hidden="true" class="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-red-500/10 blur-3xl"></div>
@@ -33,7 +37,7 @@
         <ol id="school-scoreboard" class="space-y-2">
             @forelse($scoreboard as $row)
             <li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
-                <span class="text-white flex items-center gap-2"><span class="text-lg leading-none">{{ $medals[$row['rank']] ?? '#'.$row['rank'] }}</span>{{ $row['school_name'] }}</span>
+                <span class="text-white flex items-center gap-2">{!! $medalImg($row['rank']) !!}{{ $row['school_name'] }}</span>
                 <span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span>
             </li>
             @empty
@@ -46,7 +50,7 @@
         <ol id="house-scoreboard" class="space-y-2">
             @foreach($houseScoreboard as $row)
             <li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
-                <span class="text-white flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-full" style="background:{{ $row['color'] ?? '#fbbf24' }}"></span>{{ $medals[$row['rank']] ?? '#'.$row['rank'] }} {{ $row['house_name'] }}</span>
+                <span class="text-white flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-full" style="background:{{ $row['color'] ?? '#fbbf24' }}"></span>{!! $medalImg($row['rank']) !!} {{ $row['house_name'] }}</span>
                 <span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span>
             </li>
             @endforeach
@@ -99,8 +103,9 @@
     if (!root) return;
     const url = root.dataset.liveUrl;
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    const medals = {1: '🥇', 2: '🥈', 3: '🥉'};
-    const medalFor = (rank) => medals[rank] || ('#' + rank);
+    const medalFor = (rank) => (rank >= 1 && rank <= 3)
+        ? `<img src="/images/fest/medals/rank-${rank}.webp" alt="Rank ${rank}" class="inline-block w-5 h-5 align-middle">`
+        : `<span class="font-mono">#${rank}</span>`;
 
     function renderSchool(rows, published) {
         const el = document.getElementById('school-scoreboard');
@@ -110,7 +115,7 @@
             return;
         }
         el.innerHTML = rows.map(r => `<li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
-            <span class="text-white flex items-center gap-2"><span class="text-lg leading-none">${medalFor(r.rank)}</span>${esc(r.school_name)}</span>
+            <span class="text-white flex items-center gap-2">${medalFor(r.rank)}${esc(r.school_name)}</span>
             <span class="font-mono font-bold text-white">${esc(r.total_points)}</span></li>`).join('');
     }
 

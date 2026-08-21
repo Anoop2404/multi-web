@@ -5,12 +5,14 @@ namespace App\Services\Events;
 use App\Models\Certificate;
 use App\Models\CertificateTemplate;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestMark;
 use App\Models\FestEventStaff;
 use App\Models\FestParticipant;
 use App\Models\FestVolunteer;
 use App\Models\FestRecordBreak;
 use App\Models\Tenant;
+use App\Support\FestClassGroupScheme;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Illuminate\Support\Str;
@@ -60,7 +62,15 @@ class FestCertificateService
         return $created;
     }
 
-    /** @return list<Certificate> */
+    /**
+     * One certificate per person for the whole event, not per item — a person who enters
+     * several items gets a single aggregated certificate (see resolveFieldValues(), which
+     * lists every item on it). entity_id anchors to whichever of that person's
+     * FestParticipant rows has the lowest id; the item list itself is computed live at
+     * render time, never stored on the Certificate row.
+     *
+     * @return list<Certificate>
+     */
     public function generateParticipationForEvent(FestEvent $event): array
     {
         if ($event->usesPhasedRegionalBilling()) {
@@ -70,21 +80,17 @@ class FestCertificateService
 
         $created = [];
 
-        $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->whereIn('event_id', $event->reportableEventIds())
-            ->where('status', 'approved'))
-            ->whereNull('disqualified_at')
-            ->where('participant_role', '!=', 'standby')
-            ->with('registration.item')
-            ->get();
+        // itemId is deliberately null: an aggregate cert must resolve the event-level
+        // (or tenant-wide) participation template, never one item's narrow one.
+        $template = $this->resolveTemplate($event, null, 'participation');
 
-        foreach ($participants as $participant) {
-            $template = $this->resolveTemplate($event, $participant->registration?->item?->id, 'participation');
+        foreach ($this->participationGroupsForEvent($event) as $group) {
+            $anchor = $group->sortBy('id')->first();
 
             $cert = Certificate::firstOrCreate(
                 [
                     'entity_type' => FestParticipant::class,
-                    'entity_id'   => $participant->id,
+                    'entity_id'   => $anchor->id,
                     'cert_type'   => 'participation',
                 ],
                 [
@@ -98,6 +104,36 @@ class FestCertificateService
         }
 
         return $created;
+    }
+
+    /**
+     * Base eligible-for-participation-certificate query, shared by
+     * generateParticipationForEvent(), certificateTally(), and resolveFieldValues()'s
+     * per-person item list — so all three can never drift out of sync on what counts as
+     * "eligible" (approved registration, not disqualified, not standby).
+     */
+    private function eligibleParticipantsForEvent(FestEvent $event): \Illuminate\Support\Collection
+    {
+        return FestParticipant::whereHas('registration', fn ($q) => $q
+            ->whereIn('event_id', $event->reportableEventIds())
+            ->where('status', 'approved'))
+            ->whereNull('disqualified_at')
+            ->where('participant_role', '!=', 'standby')
+            ->with(['registration.item', 'group'])
+            ->get();
+    }
+
+    /**
+     * Eligible participants grouped by person (student or teacher) — the unit a single
+     * aggregated participation certificate is issued to. One FestParticipant row is
+     * scoped to a single item (via FestRegistration), but one person can enter several.
+     *
+     * @return \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, FestParticipant>>
+     */
+    private function participationGroupsForEvent(FestEvent $event): \Illuminate\Support\Collection
+    {
+        return $this->eligibleParticipantsForEvent($event)
+            ->groupBy(fn (FestParticipant $p) => $p->student_id ? 'student:'.$p->student_id : 'teacher:'.$p->teacher_id);
     }
 
     /**
@@ -129,16 +165,27 @@ class FestCertificateService
                 && $mark->participant->participant_role !== 'standby'
                 && $mark->participant->registration?->item);
 
-        $participants = FestParticipant::whereHas('registration', fn ($q) => $q
+        $participants = $this->eligibleParticipantsForEvent($event)
+            ->filter(fn (FestParticipant $p) => $p->registration?->item);
+
+        // Participation certificates are now issued once per person for the whole event
+        // (see generateParticipationForEvent()), not once per item — so the grand total
+        // below must count distinct people, not sum the per-item entry counts.
+        $participationCertificateCount = $this->participationGroupsForEvent($event)->count();
+
+        // Standbys never get a certificate (see the filters above) but a team's admin
+        // still wants to see how many are sitting in reserve — tracked separately so it
+        // never leaks into member/participation-cert counts.
+        $standbys = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $eventIds)
             ->where('status', 'approved'))
             ->whereNull('disqualified_at')
-            ->where('participant_role', '!=', 'standby')
-            ->with(['registration.item', 'group'])
+            ->where('participant_role', 'standby')
+            ->with('registration.item')
             ->get()
             ->filter(fn (FestParticipant $p) => $p->registration?->item);
 
-        /** @var array<int, array{item: \App\Models\FestEventItem, winners: array, participants: array}> $byItem */
+        /** @var array<int, array{item: \App\Models\FestEventItem, winners: array, participants: array, standbys: array}> $byItem */
         $byItem = [];
 
         foreach ($winnerMarks as $mark) {
@@ -151,6 +198,12 @@ class FestCertificateService
             $item = $participant->registration->item;
             $byItem[$item->id]['item'] ??= $item;
             $byItem[$item->id]['participants'][] = $participant;
+        }
+
+        foreach ($standbys as $standby) {
+            $item = $standby->registration->item;
+            $byItem[$item->id]['item'] ??= $item;
+            $byItem[$item->id]['standbys'][] = $standby;
         }
 
         $rows = [];
@@ -170,7 +223,10 @@ class FestCertificateService
                     ? collect($entrants)->pluck('group_id')->unique()->count()
                     : count($entrants),
                 'member_count'        => count($entrants),
+                'standby_count'       => $isTeam ? count($data['standbys'] ?? []) : 0,
                 'winner_certs'        => count($winners),
+                // Entries for this item, not certificates — one person's participation
+                // certificate can cover several items, see totals.participation_certs.
                 'participation_certs' => count($entrants),
             ];
         }
@@ -180,7 +236,7 @@ class FestCertificateService
         $totals = [
             'items'               => count($rows),
             'winner_certs'        => array_sum(array_column($rows, 'winner_certs')),
-            'participation_certs' => array_sum(array_column($rows, 'participation_certs')),
+            'participation_certs' => $participationCertificateCount,
         ];
         $totals['grand_total'] = $totals['winner_certs'] + $totals['participation_certs'];
 
@@ -298,15 +354,24 @@ class FestCertificateService
      *                                           isn't re-queried for every certificate. Defaults
      *                                           to a fresh (unshared) array, so single calls
      *                                           behave exactly as before.
+     * @param  array<int, \Illuminate\Support\Collection>  $participantsCache  Same idea as
+     *                                           $templateCache, keyed by event id, so a bulk
+     *                                           render loop (e.g. downloadZip()) doesn't re-query
+     *                                           every eligible participant in the event once per
+     *                                           participation certificate.
      * @return array<string, mixed>
      */
-    public function renderContext(Certificate $certificate, ?array $payload = null, array &$templateCache = []): array
+    public function renderContext(Certificate $certificate, ?array $payload = null, array &$templateCache = [], array &$participantsCache = []): array
     {
         $payload ??= $this->payloadFor($certificate);
 
         /** @var ?FestEvent $event */
         $event = $payload['event'] ?? null;
-        $itemId = $payload['item']?->id ?? null;
+
+        // An aggregated participation certificate must resolve the event-level (or
+        // tenant-wide) template, never the narrow template of whichever single item its
+        // anchor FestParticipant row happens to belong to.
+        $itemId = $certificate->cert_type === 'participation' ? null : ($payload['item']?->id ?? null);
 
         $sahodaya = $event ? Tenant::find($event->tenant_id) : null;
 
@@ -343,7 +408,15 @@ class FestCertificateService
                     : null,
             ])->values()->all();
 
-        $fieldValues = $this->resolveFieldValues($payload, $sahodaya, $certificate->cert_type);
+        $eventParticipants = null;
+        if ($certificate->cert_type === 'participation' && $event) {
+            if (! array_key_exists($event->id, $participantsCache)) {
+                $participantsCache[$event->id] = $this->eligibleParticipantsForEvent($event);
+            }
+            $eventParticipants = $participantsCache[$event->id];
+        }
+
+        $fieldValues = $this->resolveFieldValues($payload, $sahodaya, $certificate->cert_type, $eventParticipants);
 
         return array_merge($payload, [
             'sahodaya'      => $sahodaya,
@@ -358,13 +431,14 @@ class FestCertificateService
     }
 
     /** @return array<string, string> */
-    private function resolveFieldValues(array $payload, ?Tenant $sahodaya, string $certType): array
+    private function resolveFieldValues(array $payload, ?Tenant $sahodaya, string $certType, ?\Illuminate\Support\Collection $eventParticipants = null): array
     {
         $event = $payload['event'] ?? null;
         $item = $payload['item'] ?? null;
         $student = $payload['student'] ?? null;
         $recordBreak = $payload['recordBreak'] ?? null;
         $mark = $payload['mark'] ?? null;
+        $participant = $payload['participant'] ?? null;
 
         $recipientName = $recordBreak?->participant?->student?->name
             ?? $student?->name
@@ -391,16 +465,112 @@ class FestCertificateService
             ])->filter()->implode(' - '))
             : '';
 
+        // Participation certificates are aggregated per person (see
+        // generateParticipationForEvent()) — item_title/item_details become every item
+        // this person took part in, not just the one their anchor FestParticipant row
+        // belongs to.
+        $itemTitle = $item?->title ?? '';
+        $itemDetails = ($item && $event) ? $this->itemWithTaxonomy($item, $event) : '';
+        if ($certType === 'participation' && $participant && $event) {
+            $items = $this->participationItems($participant, $event, $eventParticipants);
+            $itemTitle = $this->humanJoin($items->pluck('title')->all());
+            $itemDetails = $this->humanJoin($items->map(fn (FestEventItem $i) => $this->itemWithTaxonomy($i, $event))->all());
+        }
+
         return [
             'recipient_name'   => $recipientName,
             'school_name'      => $schoolName,
             'event_title'      => $event?->title ?? '',
-            'item_title'       => $item?->title ?? '',
+            'item_title'       => $itemTitle,
+            // Same item_title, with each item's category/type/gender appended inline —
+            // the same taxonomy already shown on attendance sheets/exports (see
+            // FestPublicVisibilityService::formatReportRow()), now available on certificates.
+            'item_details'     => $itemDetails,
             'event_dates'      => $eventDates,
             'achievement_line' => $achievementLine,
             'sahodaya_name'    => $sahodaya ? strtoupper($sahodaya->name) : '',
             'certificate_date' => now()->format('j F Y'),
         ];
+    }
+
+    /**
+     * Distinct items a person entered for an event, in display order — the shared list
+     * behind item_title's aggregation and item_details' per-item taxonomy labels, so both
+     * build from one query instead of two.
+     *
+     * @return \Illuminate\Support\Collection<int, FestEventItem>
+     */
+    private function participationItems(FestParticipant $participant, FestEvent $event, ?\Illuminate\Support\Collection $eventParticipants = null): \Illuminate\Support\Collection
+    {
+        $eventParticipants ??= $this->eligibleParticipantsForEvent($event);
+
+        return $eventParticipants
+            ->filter(fn (FestParticipant $p) => $participant->student_id
+                ? $p->student_id === $participant->student_id
+                : $p->teacher_id === $participant->teacher_id)
+            ->map(fn (FestParticipant $p) => $p->registration?->item)
+            ->filter()
+            ->unique('id')
+            ->sortBy(fn (FestEventItem $i) => $i->display_order ?? PHP_INT_MAX)
+            ->values();
+    }
+
+    private function itemWithTaxonomy(FestEventItem $item, FestEvent $event): string
+    {
+        $t = $this->itemTaxonomyLabels($item, $event);
+
+        return "{$item->title} ({$t['category']} - {$t['type']} - {$t['gender']})";
+    }
+
+    /**
+     * Human-readable category/type/gender labels for a fest item — the same taxonomy
+     * already used on attendance sheets/exports (see
+     * FestPublicVisibilityService::formatReportRow(), which independently computes the
+     * identical values; kept as a separate copy here rather than a shared call because
+     * that service has unrelated in-flight changes at the time of writing).
+     *
+     * @return array{category: string, type: string, gender: string}
+     */
+    private function itemTaxonomyLabels(?FestEventItem $item, FestEvent $event): array
+    {
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+
+        $category = match (true) {
+            (bool) $item?->class_group && $item->class_group !== 'open' => $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group),
+            (bool) $item?->age_group => $item->age_group,
+            (bool) $item?->category && $item->category !== 'general' => ucwords(str_replace(['_', '-'], ' ', $item->category)),
+            default => 'General Category',
+        };
+
+        $type = match (strtolower((string) $item?->participant_type)) {
+            'group' => 'Group Item',
+            'team' => 'Team Item',
+            default => 'Individual Item',
+        };
+
+        $gender = match (strtolower((string) $item?->gender)) {
+            'boys', 'male' => 'Boys',
+            'girls', 'female' => 'Girls',
+            'mixed' => 'Mixed',
+            default => 'General (Boys & Girls)',
+        };
+
+        return ['category' => $category, 'type' => $type, 'gender' => $gender];
+    }
+
+    /** @param  list<string>  $items */
+    private function humanJoin(array $items): string
+    {
+        if (count($items) === 0) {
+            return '';
+        }
+        if (count($items) === 1) {
+            return $items[0];
+        }
+
+        $last = array_pop($items);
+
+        return implode(', ', $items).' and '.$last;
     }
 
     public function payloadFor(Certificate $certificate): array

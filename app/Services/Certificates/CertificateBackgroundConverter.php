@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 class CertificateBackgroundConverter
 {
     /**
-     * @return array{template_file_path: ?string, background_path: string}
+     * @return array{template_file_path: ?string, background_path: string, orientation: string}
      */
     public function storeFromUpload(UploadedFile $file, string $baseDir, string $disk): array
     {
@@ -23,12 +23,14 @@ class CertificateBackgroundConverter
         $mime = (string) $file->getMimeType();
 
         if (in_array($ext, ['png', 'jpg', 'jpeg'], true) || str_starts_with($mime, 'image/')) {
+            $orientation = $this->detectOrientation($file->getRealPath());
             $path = $this->storeSafely($file, $baseDir.'/backgrounds', $disk);
             $this->mirrorToPublic($path);
 
             return [
                 'template_file_path' => $path,
                 'background_path'    => $path,
+                'orientation'        => $orientation,
             ];
         }
 
@@ -55,7 +57,31 @@ class CertificateBackgroundConverter
         return [
             'template_file_path' => $originalPath,
             'background_path'    => $backgroundPath,
+            'orientation'        => $this->detectOrientationFromBytes($pngBytes),
         ];
+    }
+
+    private function detectOrientation(string $absolutePath): string
+    {
+        $size = @getimagesize($absolutePath);
+
+        return $this->orientationFromDimensions($size[0] ?? null, $size[1] ?? null);
+    }
+
+    private function detectOrientationFromBytes(string $bytes): string
+    {
+        $size = @getimagesizefromstring($bytes);
+
+        return $this->orientationFromDimensions($size[0] ?? null, $size[1] ?? null);
+    }
+
+    private function orientationFromDimensions(?int $width, ?int $height): string
+    {
+        if (! $width || ! $height) {
+            return 'landscape';
+        }
+
+        return $height > $width ? 'portrait' : 'landscape';
     }
 
     /**

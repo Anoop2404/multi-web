@@ -3,15 +3,32 @@
 @section('content')
 @php
     $typeLabels = ['individual' => 'Individual', 'pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
-    $medals = [1 => '🥇', 2 => '🥈', 3 => '🥉'];
 @endphp
 <section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
-    <div class="max-w-lg mx-auto">
+    <div class="max-w-2xl mx-auto">
         @include('public.fest.partials.page-hero', [
             'eyebrow' => 'Participant',
             'title' => ($public['show_name'] && $public['name']) ? $public['name'] : 'Participant (identity hidden until results)',
             'subtitle' => $event->title,
         ])
+
+        @if($public['show_name'] && ($public['photo'] || $public['school']))
+        <div class="mt-4 flex items-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+            @if($public['photo'])
+            <img src="{{ $public['photo'] }}" alt="" class="w-16 h-16 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30 shrink-0">
+            @else
+            <span class="w-16 h-16 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-xl border-2 border-slate-700/60 shadow-md shadow-black/30 shrink-0">
+                {{ strtoupper(substr($public['name'] ?? '?', 0, 1)) }}
+            </span>
+            @endif
+            @if($public['school'])
+            <div class="min-w-0">
+                <p class="text-[11px] uppercase tracking-wide text-white/40 font-bold">School</p>
+                <p class="font-bold text-white truncate">{{ $public['school'] }}</p>
+            </div>
+            @endif
+        </div>
+        @endif
 
         @if($public['team_name'] || $schedule?->sort_order || $public['scheduled_at'])
         <dl class="mt-4 grid grid-cols-2 gap-3 text-sm rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
@@ -43,7 +60,9 @@
                         @if($row['disqualified'])
                         <span class="text-red-400 font-semibold">Disqualified</span>
                         @elseif($row['position'])
-                        <span class="text-lg leading-none">{{ $medals[$row['position']] ?? '#'.$row['position'] }}</span>
+                        @if($row['position'] <= 3)
+                        <img src="{{ asset('images/fest/medals/rank-'.$row['position'].'.webp') }}" alt="" class="w-6 h-6">
+                        @endif
                         <span class="font-bold text-amber-400">Position #{{ $row['position'] }}</span>
                         @if($row['grade'])<span class="text-white/50">· Grade {{ $row['grade'] }}</span>@endif
                         @if($row['result'])<span class="text-white/50">· {{ $row['result'] }}</span>@endif

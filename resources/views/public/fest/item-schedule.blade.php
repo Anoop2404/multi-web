@@ -2,7 +2,7 @@
 
 @section('content')
 <section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
-    <div class="max-w-3xl mx-auto">
+    <div class="max-w-4xl mx-auto">
         @include('public.fest.partials.page-hero', [
             'eyebrow' => 'Item schedule',
             'title' => $item->title,

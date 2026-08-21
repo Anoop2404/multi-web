@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FestIndividualChampionshipPoint extends Model
 {
-    protected $fillable = ['event_id', 'student_id', 'category', 'gender', 'points'];
+    protected $fillable = ['event_id', 'student_id', 'category', 'gender', 'points', 'group_points'];
 
     public function event(): BelongsTo
     {

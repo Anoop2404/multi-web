@@ -3,6 +3,7 @@
 namespace App\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestSchedule;
@@ -49,12 +50,8 @@ class FestPublicVisibilityService
         return in_array($level, ['cluster', 'subdistrict', 'district', 'state', 'sahodaya'], true);
     }
 
-    public function showParticipantName(FestEvent $event, FestParticipant $participant): bool
+    public function showParticipantName(FestEvent $event, FestParticipant $participant, ?FestEventItem $item = null): bool
     {
-        if ($event->results_published) {
-            return true;
-        }
-
         if ($this->isSportsEvent($event)) {
             return true;
         }
@@ -63,7 +60,17 @@ class FestPublicVisibilityService
             return true;
         }
 
-        return false;
+        // Under strict anonymity, a name only reveals once results are actually
+        // out — for the specific item when known, via that item's own publish
+        // timestamp, not just the event's catch-all flag. That flag flips once
+        // for the whole festival and would otherwise reveal every participant
+        // the moment any part of the event finalizes, including items that
+        // haven't run or been judged yet.
+        if ($item) {
+            return (bool) $item->results_published_at;
+        }
+
+        return (bool) $event->results_published;
     }
 
     public function showSchoolName(FestEvent $event): bool
@@ -134,12 +141,16 @@ class FestPublicVisibilityService
         ?FestMark $mark = null,
     ): array {
         $showMarks = $this->showIndividualMarks($event);
-        $showName = $this->showParticipantName($event, $participant);
+        $showName = $this->showParticipantName($event, $participant, $participant->registration?->item);
 
         return [
             'reference'          => $this->publicReference($event, $participant),
             'link_ref'           => $this->participantLinkRef($participant),
             'name'               => $showName ? ($participant->student?->name ?? $participant->teacher?->name) : null,
+            // Gated on the same $showName check as the name itself — a photo or school
+            // identifies a specific competitor just as directly as their name would.
+            'photo'              => $showName ? ($participant->student?->photoDataUri() ?? $participant->teacher?->photoDataUri()) : null,
+            'school'             => $showName ? $participant->registration?->school?->name : null,
             'item_title'         => $participant->registration?->item?->title,
             'team_name'          => $showName ? $participant->group?->team_name : null,
             'scheduled_at'       => $schedule?->scheduled_at,
@@ -221,7 +232,7 @@ class FestPublicVisibilityService
     public function formatReportRow(FestEvent $event, FestParticipant $participant, string $audience = 'staff', ?FestSchedule $schedule = null): array
     {
         $public = $this->isPublicAudience($audience);
-        $showName = ! $public || $this->showParticipantName($event, $participant);
+        $showName = ! $public || $this->showParticipantName($event, $participant, $participant->registration?->item);
         $showSchool = ! $public || $this->showSchoolName($event);
 
         $teamName = $participant->group?->team_name ?? $participant->registration?->team_name;
@@ -308,8 +319,18 @@ class FestPublicVisibilityService
         // column and so can't be matched in SQL. Resolve it the same way here so links built
         // from that preview number actually resolve instead of 404ing until reveal.
         $numbering = app(FestNumberingService::class);
-
-        return $candidates->get()
+        $found = $candidates->get()
             ->first(fn (FestParticipant $p) => $numbering->effectiveChestNumber($p) === (int) $ref);
+        if ($found) {
+            return $found;
+        }
+
+        // participantLinkRef() falls back to level_registration_number whenever chest_no
+        // isn't set, with no assumption about whether that number happens to be all-digits
+        // — so a digit-only $ref isn't necessarily a chest number. Try it as a level
+        // registration number too before giving up, or a link this service itself built
+        // (from a participant with no chest_no and an all-digit level_registration_number)
+        // 404s.
+        return (clone $candidates)->where('level_registration_number', $ref)->first();
     }
 }

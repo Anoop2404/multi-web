@@ -1242,7 +1242,7 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function medalTallyBySchool(): array
     {
-        $service = new FestReportService($this->event);
+        $service = new FestReportService($this->event, $this->scope);
         $marks = $service->marks();
 
         $bySchool = [];

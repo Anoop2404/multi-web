@@ -3,6 +3,14 @@
 <head>
     <meta charset="utf-8">
     <title>Certificate — {{ $student?->name ?? 'Participant' }}</title>
+    @php
+        // Computed ahead of the stylesheet (rather than only inside the has-background
+        // branch further down) because the static @page rule needs it too, and this view
+        // is rendered for the legacy/no-background branches as well, where $overlayLayout
+        // may not be set — fall back the same way renderContext() does.
+        $__layout = $overlayLayout ?? (!empty($template) ? $template->overlayLayout() : \App\Models\CertificateTemplate::defaultBackgroundLayout());
+        $__orientation = ($__layout['orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape';
+    @endphp
     <style>
         * { box-sizing: border-box; }
         body { font-family: "Times New Roman", Times, serif; background: #fff; color: #1e293b; margin: 0; }
@@ -24,6 +32,11 @@
             background-position: center;
             background-repeat: no-repeat;
             overflow: hidden;
+        }
+        .page.has-background.portrait {
+            width: 794px;
+            height: 1123px;
+            min-height: 1123px;
         }
         .overlay-field { position: absolute; text-align: center; color: #1e293b; line-height: 1.45; word-wrap: break-word; }
         .overlay-field.recipient { color: #0f172a; }
@@ -81,9 +94,9 @@
         @media print {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .no-print, .actions { display: none; }
-            .page.has-background { width: 100%; height: 100vh; min-height: 100vh; }
+            .page.has-background, .page.has-background.portrait { width: 100%; height: 100vh; min-height: 100vh; }
         }
-        @page { size: landscape; margin: 0; }
+        @page { size: {{ $__orientation }}; margin: 0; }
     </style>
 </head>
 <body>
@@ -112,11 +125,13 @@
     </div>
 
     @if($hasBackground)
-        <div class="page has-background" style="background-image:url('{{ $backgroundUrl }}');">
+        <div class="page has-background {{ $__orientation === 'portrait' ? 'portrait' : '' }}" style="background-image:url('{{ $backgroundUrl }}');">
             {{-- Sahodaya branding is otherwise entirely dependent on the uploaded
                  background image, which may not carry any logo/name of its own.
-                 Keep a small, unobtrusive overlay so branding is always present. --}}
-            @if(!empty($logoUrl) || !empty($sahodaya?->name))
+                 Keep a small, unobtrusive overlay so branding is always present —
+                 unless the template's own background already has real branding baked
+                 in (show_logo_overlay:false), where this would just duplicate it. --}}
+            @if(($layout['show_logo_overlay'] ?? true) && (!empty($logoUrl) || !empty($sahodaya?->name)))
                 <div class="logo-overlay">
                     @if(!empty($logoUrl))
                         <img src="{{ $logoUrl }}" alt="">
@@ -156,7 +171,7 @@
                 Verification: {{ $certificate->verification_uuid ?? 'Not yet issued' }}
             </div>
 
-            @if(!empty($qr_src))
+            @if(($layout['show_qr'] ?? true) && !empty($qr_src))
                 <div class="qr-box"><img src="{{ $qr_src }}" alt="Verify QR" width="70" height="70"></div>
             @endif
         </div>
@@ -227,7 +242,7 @@
                 @endforeach
             </div>
 
-            @if(!empty($qr_src))
+            @if(($layout['show_qr'] ?? true) && !empty($qr_src))
                 <div class="qr-box"><img src="{{ $qr_src }}" alt="Verify QR" width="70" height="70"></div>
             @endif
 
@@ -243,7 +258,7 @@
         <div class="inner">
             <p class="org">{{ ($recordBreak ?? null) ? 'Record Break Achievement' : 'Certificate of Achievement' }}</p>
             <h1>{{ $event?->title ?? 'Kalotsav' }}</h1>
-            <p class="subtitle">{{ $item?->title ?? '' }}</p>
+            <p class="subtitle">{{ $fieldValues['item_title'] ?? $item?->title ?? '' }}</p>
             <p class="detail">This is to certify that</p>
             <p class="name">{{ $student?->name ?? 'Participant' }}</p>
             @if($recordBreak)

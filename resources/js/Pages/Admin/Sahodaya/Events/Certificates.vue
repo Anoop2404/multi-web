@@ -5,6 +5,7 @@
                     description="Generate and manage participant certificates." />
         <div class="mb-4 flex flex-wrap gap-2">
             <button @click="generate" class="btn-primary">Generate for top 3</button>
+            <button @click="generateParticipation" class="btn-secondary">Generate participation certificates</button>
             <a v-if="certificates.length"
                :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip`"
                class="btn-secondary">Download all (ZIP)</a>
@@ -51,6 +52,10 @@ const props = defineProps({
 
 function generate() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/generate`, {}, { preserveScroll: true });
+}
+
+function generateParticipation() {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/participation`, {}, { preserveScroll: true });
 }
 
 function certificateTypeLabel(type) {

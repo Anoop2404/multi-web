@@ -6,6 +6,15 @@
 
         <EventSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="grade-master" class="mb-4" />
 
+        <div v-if="childEvents.length" class="card !p-4 mb-5 flex flex-wrap items-center gap-2">
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Region:</label>
+            <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
+                <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
+                    {{ ev.short_title || ev.title }}
+                </option>
+            </select>
+        </div>
+
         <div class="space-y-6 max-w-3xl">
             <section class="card space-y-4">
                 <div>
@@ -109,9 +118,14 @@ const props = defineProps({
     event: Object,
     gradeConfigs: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
 
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`);
+
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/grade-master`);
+}
 
 const gradeForm = useForm({ item_id: '', grade: 'A', min_score: null, max_score: null, min_percent: null, max_percent: null });
 const editingGradeConfigId = ref(null);
