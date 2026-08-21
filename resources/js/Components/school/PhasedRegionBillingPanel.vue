@@ -178,13 +178,13 @@
                     <span class="text-2xl shrink-0">🏦</span>
                     <div class="flex-1 text-xs text-slate-700">
                         <h4 class="font-bold text-slate-900 text-sm mb-1">Official Sahodaya Bank Account & Payment Instructions</h4>
-                        <div v-if="activePaymentDetails" class="mt-2 bg-white/90 p-3 rounded-xl border border-blue-200/80 font-mono text-xs leading-relaxed text-slate-800">
-                            <pre class="whitespace-pre-wrap font-sans">{{ activePaymentDetails }}</pre>
+                        <div v-if="activePaymentDetails" class="mt-2 bg-white/95 p-4 rounded-xl border border-blue-200/90 shadow-2xs font-sans text-sm font-bold leading-relaxed text-slate-900 tracking-wide">
+                            <pre class="whitespace-pre-wrap font-sans text-sm font-bold leading-relaxed text-slate-900 tracking-wide">{{ activePaymentDetails }}</pre>
                         </div>
                         <div v-else class="mt-2 bg-amber-50 p-3 rounded-xl border border-amber-200 text-amber-900 text-xs font-medium">
                             Payment details haven't been configured by your Sahodaya yet. Contact your Sahodaya admin for bank/UPI details before making any transfer &mdash; do not use details from anywhere else.
                         </div>
-                        <p v-if="activePaymentDetails" class="text-[11px] text-blue-900 mt-2 font-medium">
+                        <p v-if="activePaymentDetails" class="text-xs text-blue-900 mt-2 font-medium">
                             💡 <strong>Note:</strong> Include your school prefix in the transaction remarks when transferring funds. Upload the payment reference number and screenshot proof above after completing the transfer.
                         </p>
                     </div>
@@ -192,9 +192,9 @@
 
                 <!-- Payment QR Code Image Box -->
                 <div v-if="activePaymentQrCodeUrl" class="shrink-0 flex flex-col items-center p-3 bg-white rounded-2xl border border-blue-200 shadow-sm text-center self-stretch md:self-auto justify-center">
-                    <span class="text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1">📱 Scan & Pay via UPI</span>
-                    <img :src="activePaymentQrCodeUrl" alt="Payment QR Code" class="w-52 h-52 sm:w-60 sm:h-60 object-contain rounded-xl border border-slate-100 p-2 bg-white">
-                    <span class="text-[10px] text-slate-500 mt-1.5 font-medium">Accepts GPay, PhonePe, Paytm, etc.</span>
+                    <span class="text-xs font-extrabold text-slate-900 mb-1.5 flex items-center gap-1">📱 Scan & Pay via UPI</span>
+                    <img :src="activePaymentQrCodeUrl" alt="Payment QR Code" class="w-56 h-56 sm:w-64 sm:h-64 object-contain rounded-xl border border-slate-100 p-2 bg-white">
+                    <span class="text-[10px] text-slate-600 mt-1.5 font-semibold">Accepts GPay, PhonePe, Paytm, etc.</span>
                 </div>
             </div>
         </div>
