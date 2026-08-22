@@ -24,8 +24,16 @@ class FestGradePointService
     public function pointsForMark(FestEvent $event, FestMark $mark): int
     {
         $item = $mark->item ?? $mark->participant?->registration?->item;
+        $itemId = $mark->item_id ?? $item?->id;
         $participantType = strtolower((string) ($item?->participant_type ?? 'individual'));
         $isGroup = $participantType !== 'individual';
+
+        if ($mark->score !== null && $itemId) {
+            $effectiveGrade = $this->resolveGradeFromScore($event, (int) $itemId, (float) $mark->score);
+            if ($effectiveGrade !== $mark->grade) {
+                $mark->grade = $effectiveGrade;
+            }
+        }
 
         if ($event->scoring_preset === 'mcs_kalotsav') {
             return $this->mcsPointsForMark($mark, $isGroup);

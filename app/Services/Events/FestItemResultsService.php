@@ -157,11 +157,16 @@ class FestItemResultsService
                 return 'team:' . $schoolId . ':' . $chest;
             });
 
-            $rows = $grouped->map(function ($teamParticipants) {
+            $gradePointService = app(FestGradePointService::class);
+            $rows = $grouped->map(function ($teamParticipants) use ($event, $itemId, $gradePointService) {
                 $first = $teamParticipants->first();
                 $names = $teamParticipants->map(fn ($p) => $p->student?->name ?? $p->teacher?->name)->filter()->unique()->join(' & ');
                 $regNos = $teamParticipants->map(fn ($p) => $p->student?->reg_no ?? $p->teacher?->reg_no)->filter()->unique()->join(', ');
                 $mark = $teamParticipants->pluck('mark')->filter()->first();
+
+                $effectiveGrade = ($mark?->score !== null)
+                    ? $gradePointService->resolveGradeFromScore($event, $itemId, (float) $mark->score)
+                    : $mark?->grade;
 
                 return [
                     'participant_id'   => $first->id,
@@ -169,7 +174,7 @@ class FestItemResultsService
                     'name'             => $names ?: 'Team Entry',
                     'reg_no'           => $regNos ?: null,
                     'chest_no'         => $first->group?->chest_no ?? $first->chest_no,
-                    'grade'            => $mark?->grade,
+                    'grade'            => $effectiveGrade,
                     'position'         => $mark?->position,
                     'score'            => $mark?->score,
                     'measurement'      => $mark?->measurement_value,
@@ -177,18 +182,25 @@ class FestItemResultsService
                 ];
             })->values();
         } else {
-            $rows = $participants->map(fn (FestParticipant $p) => [
-                'participant_id'   => $p->id,
-                'school'           => $p->registration?->school?->name,
-                'name'             => $p->student?->name ?? $p->teacher?->name,
-                'reg_no'           => $p->student?->reg_no ?? $p->teacher?->reg_no,
-                'chest_no'         => $p->group?->chest_no ?? $p->chest_no,
-                'grade'            => $p->mark?->grade,
-                'position'         => $p->mark?->position,
-                'score'            => $p->mark?->score,
-                'measurement'      => $p->mark?->measurement_value,
-                'measurement_unit' => $p->mark?->measurement_unit,
-            ]);
+            $gradePointService = app(FestGradePointService::class);
+            $rows = $participants->map(function (FestParticipant $p) use ($event, $itemId, $gradePointService) {
+                $effectiveGrade = ($p->mark?->score !== null)
+                    ? $gradePointService->resolveGradeFromScore($event, $itemId, (float) $p->mark->score)
+                    : $p->mark?->grade;
+
+                return [
+                    'participant_id'   => $p->id,
+                    'school'           => $p->registration?->school?->name,
+                    'name'             => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no'           => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    'chest_no'         => $p->group?->chest_no ?? $p->chest_no,
+                    'grade'            => $effectiveGrade,
+                    'position'         => $p->mark?->position,
+                    'score'            => $p->mark?->score,
+                    'measurement'      => $p->mark?->measurement_value,
+                    'measurement_unit' => $p->mark?->measurement_unit,
+                ];
+            });
         }
 
         return $rows->sortBy([
