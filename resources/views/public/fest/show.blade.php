@@ -19,7 +19,7 @@
 
                 <dl class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-7 text-sm">
                     <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Date</dt><dd class="font-bold mt-1">{{ $event->event_start?->format('d M Y') ?? 'To be announced' }}@if($event->event_start && $event->event_end && !$event->event_end->isSameDay($event->event_start)) – {{ $event->event_end->format('d M Y') }}@endif</dd></div>
-                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Venue</dt><dd class="font-bold mt-1">{{ $event->venue ?: 'To be announced' }}</dd></div>
+                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Venue</dt><dd class="font-bold mt-1">{{ $event->resolvedVenueName() ?: 'To be announced' }}</dd></div>
                     @if($eventContext['series'])<div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Festival series</dt><dd class="font-bold mt-1">{{ $eventContext['series'] }}</dd></div>@endif
                     <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Results</dt><dd class="font-bold mt-1 {{ $scopeResultsPublished ? 'text-amber-300' : '' }}">{{ $scopeResultsPublished ? 'Official results published' : 'Awaiting publication' }}</dd></div>
                 </dl>
@@ -59,29 +59,39 @@
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'item']) }}" class="text-sm font-bold text-amber-400 hover:underline shrink-0">All item results →</a>
             </div>
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                @foreach($recentResults as $winner)
-                @php $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]]; @endphp
-                <a href="{{ route('tenant.fest.item-results', [$event->id, $winner['item_id']]) }}" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 hover:border-amber-500/50 hover:bg-slate-900 transition">
-                    <div class="flex items-start justify-between gap-3">
-                        <p class="text-xs font-bold text-amber-400">Position {{ $winner['position'] }}</p>
-                        @if($winner['position'] <= 3)<img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-7 h-7 shrink-0">@else<span class="text-lg font-mono text-white/50" aria-label="Rank {{ $winner['position'] }}">#{{ $winner['position'] }}</span>@endif
+                @foreach($recentResults as $itemGroup)
+                <a href="{{ route('tenant.fest.item-results', [$event->id, $itemGroup['item_id']]) }}" class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden hover:border-amber-500/50 hover:bg-slate-900 transition">
+                    <div class="px-4 py-3 border-b border-slate-800/60">
+                        <h3 class="font-bold text-white truncate">{{ $itemGroup['item'] }}</h3>
                     </div>
-                    <h3 class="font-bold mt-1 text-white">{{ $winner['item'] }}</h3>
-                    <div class="flex items-center gap-3 mt-3">
-                        <div class="flex -space-x-2 shrink-0">
-                            @foreach(array_slice($roster, 0, 3) as $member)
-                                @if($member['photo'] ?? null)
-                                <img src="{{ $member['photo'] }}" alt="" class="w-10 h-10 rounded-xl object-cover border-2 border-slate-900">
+                    <div class="flex flex-wrap">
+                        @foreach($itemGroup['winners'] as $winner)
+                        @php $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]]; @endphp
+                        <div class="flex gap-3 p-4 flex-1 min-w-[16rem] border-l border-slate-800/60 first:border-l-0">
+                            <div class="shrink-0">
+                                @if($winner['position'] <= 3)
+                                <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-12 h-12">
                                 @else
-                                <span class="w-10 h-10 rounded-xl bg-amber-500/15 border-2 border-slate-900 flex items-center justify-center text-xs font-extrabold text-amber-300">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
+                                <span class="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-extrabold" aria-label="Rank {{ $winner['position'] }}">#{{ $winner['position'] }}</span>
                                 @endif
-                            @endforeach
-                            @if(count($roster) > 3)<span class="w-10 h-10 rounded-xl bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-[10px] font-bold text-white">+{{ count($roster) - 3 }}</span>@endif
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2.5">
+                                    @foreach($roster as $member)
+                                    <div class="flex flex-col items-center gap-1 w-20">
+                                        @if($member['photo'] ?? null)
+                                        <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
+                                        @else
+                                        <span class="w-20 h-20 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-lg border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
+                                        @endif
+                                        <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
+                                    </div>
+                                    @endforeach
+                                </div>
+                                <p class="text-xs text-white/40 mt-3 truncate">{{ $winner['school'] }}</p>
+                            </div>
                         </div>
-                        <div class="min-w-0">
-                            <p class="text-sm font-semibold line-clamp-2 text-white/90">{{ collect($roster)->pluck('name')->filter()->implode(', ') ?: 'Participant' }}</p>
-                            <p class="text-xs text-white/40 truncate">{{ $winner['school'] }}</p>
-                        </div>
+                        @endforeach
                     </div>
                 </a>
                 @endforeach

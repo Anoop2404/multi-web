@@ -98,6 +98,38 @@ class FestResultsController extends SahodayaAdminController
         ])));
     }
 
+    /**
+     * Full ranked results for one item, as a PDF — deliberately separate from
+     * FestReportService::export()'s 'item-wise' report, which is Top-N capped
+     * and gated behind the event-wide results_published flag. This is scoped
+     * to whatever item the admin already has open on the Results page, so it
+     * should work as soon as that item's own marks are in, regardless of
+     * whether the rest of the event has been published yet.
+     */
+    public function downloadItemResults(Request $request, string $tenantId, FestEvent $event, FestEventItem $item)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($item->event_id !== $event->id, 404);
+
+        $event = $this->regionAwareTargetEvent($request, $event);
+
+        $rows = app(FestItemResultsService::class)->resultRowsForItem($event, $item->id);
+        usort($rows, fn ($a, $b) => ($a['position'] ?? PHP_INT_MAX) <=> ($b['position'] ?? PHP_INT_MAX));
+
+        $html = view('fest.reports.item-results-ranked', [
+            'event'   => $event,
+            'item'    => $item,
+            'rows'    => $rows,
+            'orgName' => $this->sahodaya->name,
+            'logoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->render();
+
+        $filename = str($event->title.'-'.$item->title)->slug()->limit(60)->toString().'-results.pdf';
+        $preview = $request->boolean('preview') || $request->boolean('inline');
+
+        return \App\Support\PdfGenerator::download($html, $filename, $preview);
+    }
+
     /** @param list<array<string, mixed>> $groups */
     private function enrichHeadGroupsWithPublishStatus(array $groups, Collection $summaryByItem): array
     {

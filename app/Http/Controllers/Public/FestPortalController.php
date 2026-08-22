@@ -89,25 +89,33 @@ class FestPortalController extends Controller
             ->whereIn('position', [1, 2, 3])
             ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->latest('updated_at')
-            ->limit(30)
+            // Raw safety ceiling only (protects against a pathologically large event, not
+            // a "recent teaser" cap) — every published item's winners should show here, not
+            // just a handful of the most recently updated. At ~3 marks/item that's headroom
+            // for roughly 65 items; nothing in this event comes close.
+            ->limit(200)
             ->when(! $selectedScope['results_published'], fn ($query) => $query->whereRaw('1 = 0'))
             ->get();
         $recentRoster = $this->rosterForMarks($recentMarks);
         $recentResults = $recentMarks
             ->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id)
             ->groupBy('item_id')
-            // Same fix as scoreboardDynamicData()'s $latestWinners: group by item (most
-            // recently updated item first) before flattening, so one item's winners stay
-            // together and rank-ordered instead of interleaving with other items purely by
-            // each individual mark's own updated_at.
+            // One card per ITEM (most recently updated item first) with every one of that
+            // item's winners nested inside — every published item, not a capped teaser.
             ->sortByDesc(fn ($marksForItem) => $marksForItem->max('updated_at'))
-            ->take(3)
-            ->flatMap(fn ($marksForItem) => $marksForItem->sortBy('position'))
-            ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $recentRoster) + [
-                'item_id' => $mark->item_id,
-                'item' => $mark->item?->title,
-                'participant_type' => $mark->item?->participant_type,
-            ])
+            ->map(function ($marksForItem) use ($event, $recentRoster) {
+                $first = $marksForItem->first();
+
+                return [
+                    'item_id' => $first->item_id,
+                    'item' => $first->item?->title,
+                    'participant_type' => $first->item?->participant_type,
+                    'winners' => $marksForItem->sortBy('position')
+                        ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $recentRoster))
+                        ->values()
+                        ->all(),
+                ];
+            })
             ->values();
 
         // The item finder groups by class_group/age_group/category — resolve each raw
@@ -534,6 +542,133 @@ class FestPortalController extends Controller
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     }
 
+    /**
+     * Big-format, no-chrome, unattended view meant for a projector/TV at the venue — not
+     * a phone or laptop, and nobody's there to click a category filter. Auto-rotates
+     * through a fixed sequence of slides (overall school medal tally + points, the same
+     * table per category, then latest item winners) instead of showing one static view.
+     * The medal tally here mirrors results()'s $schoolBoard computation (see the note
+     * there) but additionally scopes it per category, which nothing else in the portal
+     * needed until now.
+     */
+    public function tv(int $eventId)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        $selectedScope = $this->operationalEvents->directScope($event);
+        $isPublished = (bool) $selectedScope['results_published'];
+        $categories = $this->scoreboards->categories($event, $selectedScope);
+
+        $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
+            ->whereIn('position', [1, 2, 3])
+            ->with(['item', 'participant.registration.school'])
+            ->when(! $isPublished, fn ($query) => $query->whereRaw('1 = 0'))
+            ->get()
+            ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
+            ->unique(fn (FestMark $m) => $m->participant->registration_id ?? $m->id);
+
+        $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
+        $medalTallyFor = fn ($scopedMarks) => $scopedMarks
+            ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
+            ->map(fn ($group) => [
+                'gold' => $group->where('position', 1)->count(),
+                'silver' => $group->where('position', 2)->count(),
+                'bronze' => $group->where('position', 3)->count(),
+            ]);
+
+        $withMedals = fn (array $rows, $tally) => collect($rows)
+            ->map(fn (array $row) => $row + [
+                'gold' => $tally[$row['school_id']]['gold'] ?? 0,
+                'silver' => $tally[$row['school_id']]['silver'] ?? 0,
+                'bronze' => $tally[$row['school_id']]['bronze'] ?? 0,
+            ])
+            ->values()
+            ->all();
+
+        [$overallScoreboard] = $this->resolveScoreboard($event, $selectedScope, null, $isPublished);
+        $overallBoard = $withMedals($overallScoreboard, $medalTallyFor($marks));
+
+        $categoryBoards = collect($categories)
+            ->map(function (string $key) use ($event, $selectedScope, $isPublished, $marks, $categoryColumn, $withMedals, $medalTallyFor) {
+                [$scoreboard] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished);
+
+                return [
+                    'key' => $key,
+                    'label' => $this->scoreboards->categoryLabel($event, $key),
+                    'rows' => $withMedals(
+                        $scoreboard,
+                        $medalTallyFor($marks->filter(fn (FestMark $m) => ($m->item?->{$categoryColumn}) === $key))
+                    ),
+                ];
+            })
+            ->filter(fn (array $board) => count($board['rows']) > 0)
+            ->values()
+            ->all();
+
+        $dynamic = $this->scoreboardDynamicData($event, $selectedScope, null, $isPublished);
+
+        // Pre-chunked into fixed-size, non-scrolling pages server-side — nobody is at the
+        // TV to scroll a tall list, so "Page N of M" slides stand in for scroll the same
+        // way pagination would on a normal page. 1 item/page: with 2+ side by side, CSS
+        // grid's default row-stretch makes a short 1-position card match its taller
+        // 2-position row-mate, so a page's height was driven by whichever item happened
+        // to share its row — measured a page hit 1555px in a 1080px viewport this way.
+        // One item per page removes the row-mate entirely, so each slide is exactly its
+        // own item's height. A single item with 3+ awarded positions and a large roster
+        // can still exceed one screen on its own; left as a rare residual case rather
+        // than building full dynamic height-measured pagination for it.
+        $boardsPerPage = 12;
+        $winnersPerPage = 1;
+        $slides = [];
+
+        // Order: overall school ranking, then each category's ranking, then results —
+        // standings open the rotation so the "big picture" leads, results follow as the
+        // detail underneath it.
+        $overallPages = array_chunk($overallBoard, $boardsPerPage);
+        foreach ($overallPages as $i => $page) {
+            $slides[] = [
+                'type' => 'board',
+                'title' => 'Overall Standings',
+                'subtitle' => count($overallPages) > 1 ? 'Page '.($i + 1).' of '.count($overallPages) : 'All Categories',
+                'rows' => $page,
+            ];
+        }
+
+        foreach ($categoryBoards as $board) {
+            $categoryPages = array_chunk($board['rows'], $boardsPerPage);
+            foreach ($categoryPages as $i => $page) {
+                $slides[] = [
+                    'type' => 'board',
+                    'title' => $board['label'].' Standings',
+                    'subtitle' => count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : null,
+                    'rows' => $page,
+                ];
+            }
+        }
+
+        $winnerPages = array_chunk($dynamic['latestWinners'], $winnersPerPage);
+        foreach ($winnerPages as $i => $page) {
+            $slides[] = [
+                'type' => 'winners',
+                'title' => 'Latest Item Winners',
+                'subtitle' => count($winnerPages) > 1 ? 'Page '.($i + 1).' of '.count($winnerPages) : null,
+                'items' => $page,
+            ];
+        }
+
+        if (! $slides) {
+            $slides[] = ['type' => 'waiting'];
+        }
+
+        return $this->renderPublic('public.fest.tv', $tenant, [
+            'event' => $event,
+            'selectedScope' => $selectedScope,
+            'isPublished' => $isPublished,
+            'slides' => $slides,
+            'pageSeo' => ['title' => $event->title.' — Live Screen'],
+        ]);
+    }
+
     public function manual(int $eventId)
     {
         $tenant = $this->resolveTenant();
@@ -647,7 +782,15 @@ class FestPortalController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished): array
+    /**
+     * The official points standing for a scope/category — scoreboard() plus the
+     * cumulative-championship override when one applies. Shared by
+     * scoreboardDynamicData() and tv() so the TV's medal-tally boards can never show a
+     * different point total than the real Scoreboard page for the same category.
+     *
+     * @return array{0: array, 1: ?array}
+     */
+    private function resolveScoreboard(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished): array
     {
         $scoreboard = $isPublished
             ? $this->scoreboards->scoreboard($event, $selectedScope, $category)
@@ -659,30 +802,46 @@ class FestPortalController extends Controller
             $scoreboard = $cumulativeStanding['rows'];
         }
 
+        return [$scoreboard, $cumulativeStanding];
+    }
+
+    private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished): array
+    {
+        [$scoreboard, $cumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished);
+
         $winnerMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
             ->whereIn('position', [1, 2, 3])
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->latest('updated_at')
-            ->limit(60)
+            // Raw safety ceiling only, not a "recent teaser" cap — every published item's
+            // winners should show here (the widget already scrolls its own container).
+            ->limit(200)
             ->when(! $isPublished, fn ($query) => $query->whereRaw('1 = 0'))
             ->get();
         $roster = $this->rosterForMarks($winnerMarks);
         $latestWinners = $winnerMarks
             ->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id)
             ->groupBy('item_id')
-            // Order by item, most recently updated first, so a newly-published item's
-            // winners surface together as a group. Sorting the flat mark list alone (the
-            // old behavior) ordered every row by its own updated_at independently — one
-            // item's 2nd place could land ahead of that same item's 1st, or between two
-            // unrelated items, whenever marks were saved a moment apart.
+            // One card per ITEM (most recently updated item first), with every one of that
+            // item's winners nested inside — not a flat list of winner-rows. A flat list
+            // (even grouped-and-adjacent, the previous fix) still made a viewer visually
+            // stitch together which cards belonged to the same item; a single item card
+            // with its winners listed inside it doesn't require that at all.
             ->sortByDesc(fn ($marksForItem) => $marksForItem->max('updated_at'))
-            ->take(5)
-            ->flatMap(fn ($marksForItem) => $marksForItem->sortBy('position'))
-            ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $roster) + [
-                'item' => $mark->item?->title,
-                'head' => $mark->item?->head?->name,
-                'participant_type' => $mark->item?->participant_type,
-            ])
+            ->map(function ($marksForItem) use ($event, $roster) {
+                $first = $marksForItem->first();
+
+                return [
+                    'item_id' => $first->item_id,
+                    'item' => $first->item?->title,
+                    'head' => $first->item?->head?->name,
+                    'participant_type' => $first->item?->participant_type,
+                    'winners' => $marksForItem->sortBy('position')
+                        ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $roster))
+                        ->values()
+                        ->all(),
+                ];
+            })
             ->values()
             ->all();
 

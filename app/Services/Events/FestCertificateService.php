@@ -399,6 +399,11 @@ class FestCertificateService
 
         $overlayLayout = $template?->overlayLayout() ?? CertificateTemplate::defaultBackgroundLayout();
 
+        $participant = $payload['participant'] ?? null;
+        $photoUrl = ($overlayLayout['show_photo'] ?? false) && $participant
+            ? $this->participantPhotoUrl($participant)
+            : null;
+
         $signatories = collect($template?->signatories ?? CertificateTemplate::defaultTrainingSignatories())
             ->map(fn ($s) => [
                 'name'          => $s['name'] ?? '',
@@ -425,9 +430,29 @@ class FestCertificateService
             'logoUrl'       => $logoUrl,
             'sealUrl'       => $sealUrl,
             'backgroundUrl' => $backgroundUrl,
+            'photoUrl'      => $photoUrl,
             'overlayLayout' => $overlayLayout,
             'signatories'   => $signatories,
         ]);
+    }
+
+    /**
+     * Reuses FestIdCardService's existing photo-resolution chain (public-disk URL, then
+     * a self-contained data URI, then a gender-appropriate placeholder avatar — never
+     * the auth-gated school-admin photo route, since certificates are public pages)
+     * instead of duplicating that logic here.
+     */
+    private function participantPhotoUrl(FestParticipant $participant): string
+    {
+        $rawGender = strtolower((string) ($participant->student?->gender ?? $participant->teacher?->gender ?? ''));
+        $gender = match (true) {
+            str_starts_with($rawGender, 'f') || $rawGender === 'girl' || $rawGender === 'female' => 'female',
+            str_starts_with($rawGender, 'm') || $rawGender === 'boy' || $rawGender === 'male' => 'male',
+            default => 'neutral',
+        };
+
+        return app(\App\Services\Events\FestIdCardService::class)
+            ->resolveParticipantPhotoSrc($participant, $gender, includeDataUris: false);
     }
 
     /** @return array<string, string> */
@@ -466,37 +491,44 @@ class FestCertificateService
             : '';
 
         // Participation certificates are aggregated per person (see
-        // generateParticipationForEvent()) — item_title/item_details become every item
-        // this person took part in, not just the one their anchor FestParticipant row
-        // belongs to.
-        $itemTitle = $item?->title ?? '';
-        $itemDetails = ($item && $event) ? $this->itemWithTaxonomy($item, $event) : '';
-        if ($certType === 'participation' && $participant && $event) {
-            $items = $this->participationItems($participant, $event, $eventParticipants);
-            $itemTitle = $this->humanJoin($items->pluck('title')->all());
-            $itemDetails = $this->humanJoin($items->map(fn (FestEventItem $i) => $this->itemWithTaxonomy($i, $event))->all());
-        }
+        // generateParticipationForEvent()) — these become every item this person took
+        // part in, not just the one their anchor FestParticipant row belongs to. Winner
+        // (and every other) cert type is always exactly the payload's single item.
+        $items = ($certType === 'participation' && $participant && $event)
+            ? $this->participationItems($participant, $event, $eventParticipants)
+            : collect($item ? [$item] : []);
+
+        $itemTitle = $this->humanJoin($items->pluck('title')->all());
+
+        // Category/type are deduped across items rather than repeated per item — a
+        // student whose items are all "Category 1" sees it once, not three times.
+        $taxonomies = $event ? $items->map(fn (FestEventItem $i) => $this->itemTaxonomyLabels($i, $event)) : collect();
+        $categoryName = $this->humanJoin($taxonomies->pluck('category')->unique()->values()->all());
+        $participationType = $this->humanJoin($taxonomies->pluck('type')->unique()->values()->all());
 
         return [
-            'recipient_name'   => $recipientName,
-            'school_name'      => $schoolName,
-            'event_title'      => $event?->title ?? '',
-            'item_title'       => $itemTitle,
-            // Same item_title, with each item's category/type/gender appended inline —
-            // the same taxonomy already shown on attendance sheets/exports (see
-            // FestPublicVisibilityService::formatReportRow()), now available on certificates.
-            'item_details'     => $itemDetails,
-            'event_dates'      => $eventDates,
-            'achievement_line' => $achievementLine,
-            'sahodaya_name'    => $sahodaya ? strtoupper($sahodaya->name) : '',
-            'certificate_date' => now()->format('j F Y'),
+            'recipient_name'      => $recipientName,
+            'school_name'         => $schoolName,
+            'event_title'         => $event?->title ?? '',
+            // Alias of event_title — some templates reference {event_name} instead.
+            'event_name'          => $event?->title ?? '',
+            'item_title'          => $itemTitle,
+            // Kept as an alias of item_title for templates already using {item_details}
+            // as the bold item-name line — category/type are now their own placeholders.
+            'item_details'        => $itemTitle,
+            'category_name'       => $categoryName,
+            'participation_type'  => $participationType,
+            'event_dates'         => $eventDates,
+            'achievement_line'    => $achievementLine,
+            'sahodaya_name'       => $sahodaya ? strtoupper($sahodaya->name) : '',
+            'certificate_date'    => now()->format('j F Y'),
         ];
     }
 
     /**
      * Distinct items a person entered for an event, in display order — the shared list
-     * behind item_title's aggregation and item_details' per-item taxonomy labels, so both
-     * build from one query instead of two.
+     * behind item_title/item_details' aggregation and category_name/participation_type's
+     * deduped taxonomy, so all four build from one query instead of several.
      *
      * @return \Illuminate\Support\Collection<int, FestEventItem>
      */
@@ -515,21 +547,15 @@ class FestCertificateService
             ->values();
     }
 
-    private function itemWithTaxonomy(FestEventItem $item, FestEvent $event): string
-    {
-        $t = $this->itemTaxonomyLabels($item, $event);
-
-        return "{$item->title} ({$t['category']} - {$t['type']} - {$t['gender']})";
-    }
-
     /**
-     * Human-readable category/type/gender labels for a fest item — the same taxonomy
-     * already used on attendance sheets/exports (see
+     * Human-readable category/type labels for a fest item — certificates show just these
+     * two (not gender), each in its own parenthetical: "Item Name (Category 1) (Group)".
+     * Same underlying taxonomy as attendance sheets/exports (see
      * FestPublicVisibilityService::formatReportRow(), which independently computes the
-     * identical values; kept as a separate copy here rather than a shared call because
-     * that service has unrelated in-flight changes at the time of writing).
+     * fuller category/type/gender set; kept as a separate copy here rather than a shared
+     * call because that service has unrelated in-flight changes at the time of writing).
      *
-     * @return array{category: string, type: string, gender: string}
+     * @return array{category: string, type: string}
      */
     private function itemTaxonomyLabels(?FestEventItem $item, FestEvent $event): array
     {
@@ -541,21 +567,23 @@ class FestCertificateService
             (bool) $item?->category && $item->category !== 'general' => ucwords(str_replace(['_', '-'], ' ', $item->category)),
             default => 'General Category',
         };
+        // Every scheme's label is "Short Name — longer elaboration" (e.g. "Category 1 —
+        // Classes 3 & 4"); certificates want just the short part, attendance exports want
+        // the full thing, hence trimming here rather than upstream in FestClassGroupScheme.
+        $category = trim(explode(' — ', $category)[0]);
 
+        // participant_type has 5 real values, not 3 (see FestTeamSquadRules::ALL_TYPES) —
+        // 'pair'/'trio' items were previously falling through to the 'individual' default
+        // and showing as "Individual" on the certificate, which is wrong.
         $type = match (strtolower((string) $item?->participant_type)) {
-            'group' => 'Group Item',
-            'team' => 'Team Item',
-            default => 'Individual Item',
+            'group' => 'Group',
+            'team' => 'Team',
+            'pair' => 'Pair',
+            'trio' => 'Trio',
+            default => 'Individual',
         };
 
-        $gender = match (strtolower((string) $item?->gender)) {
-            'boys', 'male' => 'Boys',
-            'girls', 'female' => 'Girls',
-            'mixed' => 'Mixed',
-            default => 'General (Boys & Girls)',
-        };
-
-        return ['category' => $category, 'type' => $type, 'gender' => $gender];
+        return ['category' => $category, 'type' => $type];
     }
 
     /** @param  list<string>  $items */

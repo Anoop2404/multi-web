@@ -51,28 +51,32 @@
                     {{-- Individual/pair: ONE structure at every width — medal, photo(s) with the
                          name captioned directly under each, school once under the whole group —
                          just scaled up at sm+. No separate mobile/desktop markup to drift apart. --}}
-                    <div class="flex flex-col items-center p-4 sm:p-5">
-                        @if($pos && $pos <= 6)
-                            <span class="sm:hidden">@include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 44])</span>
-                            <span class="hidden sm:inline-block">@include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 64])</span>
-                        @else
-                            <div class="w-11 h-11 sm:w-16 sm:h-16 rounded-full bg-slate-700 flex items-center justify-center text-white font-black">{{ $pos ? '#' . $pos : '—' }}</div>
-                        @endif
-                        <div class="w-full flex justify-center gap-3 sm:gap-4 mt-3">
-                            @foreach($roster as $member)
-                            <div class="flex flex-col items-center gap-1.5 flex-1 min-w-0 max-w-[7rem] sm:max-w-[9rem]">
-                                @if($member['photo'] ?? null)
-                                <img src="{{ $member['photo'] }}" alt="" class="w-full h-24 sm:h-32 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
-                                @else
-                                <span class="w-full h-24 sm:h-32 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-xl sm:text-2xl border-2 border-slate-700/60 shadow-md shadow-black/30">
-                                    {{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}
-                                </span>
-                                @endif
-                                <span class="text-xs sm:text-sm font-bold leading-snug text-white text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
-                            </div>
-                            @endforeach
+                    <div class="flex items-center gap-3 sm:gap-4 p-4 sm:p-5">
+                        <div class="shrink-0">
+                            @if($pos && $pos <= 6)
+                                <span class="sm:hidden">@include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 56])</span>
+                                <span class="hidden sm:inline-block">@include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 80])</span>
+                            @else
+                                <div class="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-slate-700 flex items-center justify-center text-white font-black">{{ $pos ? '#' . $pos : '—' }}</div>
+                            @endif
                         </div>
-                        <p class="text-xs text-white/40 text-center mt-3 truncate w-full">{{ $row['school'] }}</p>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex gap-3 sm:gap-4">
+                                @foreach($roster as $member)
+                                <div class="flex flex-col items-center gap-1.5 flex-1 min-w-0 max-w-[7rem] sm:max-w-[9rem]">
+                                    @if($member['photo'] ?? null)
+                                    <img src="{{ $member['photo'] }}" alt="" class="w-full h-24 sm:h-32 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
+                                    @else
+                                    <span class="w-full h-24 sm:h-32 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-xl sm:text-2xl border-2 border-slate-700/60 shadow-md shadow-black/30">
+                                        {{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}
+                                    </span>
+                                    @endif
+                                    <span class="text-xs sm:text-sm font-bold leading-snug text-white text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
+                                </div>
+                                @endforeach
+                            </div>
+                            <p class="text-xs text-white/40 mt-3 truncate">{{ $row['school'] }}</p>
+                        </div>
                     </div>
                 @else
                     {{-- Team/group (3+): header line (rank, school, member count) then a wrapping
@@ -81,9 +85,9 @@
                     <div class="p-4 sm:p-5">
                         <div class="flex items-center gap-3">
                             @if($pos && $pos <= 6)
-                                @include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 48])
+                                @include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 64])
                             @else
-                                <div class="shrink-0 w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xs text-white font-black">{{ $pos ? '#' . $pos : '—' }}</div>
+                                <div class="shrink-0 w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-sm text-white font-black">{{ $pos ? '#' . $pos : '—' }}</div>
                             @endif
                             <div class="flex-1 min-w-0">
                                 <p class="font-bold text-sm text-white truncate">{{ $row['school'] }}</p>

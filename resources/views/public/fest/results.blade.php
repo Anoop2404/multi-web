@@ -15,7 +15,7 @@
 <section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
     <div class="max-w-6xl mx-auto">
         @php
-            $heroBadges = array_values(array_filter([$eventContext['phase'], $eventContext['region'], $event->venue]));
+            $heroBadges = array_values(array_filter([$eventContext['phase'], $eventContext['region'], $event->resolvedVenueName()]));
         @endphp
         @include('public.fest.partials.page-hero', [
             'eyebrow' => 'Published Results',
@@ -244,7 +244,7 @@
                 $participantTypeLabels = ['pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
                 $rankTint = [1 => 'bg-amber-500/10', 2 => 'bg-white/5', 3 => 'bg-orange-500/5'];
             @endphp
-            <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-3 sm:p-4 grid md:grid-cols-[1fr_auto_auto_auto] gap-3 mb-6 sticky top-32 z-10 shadow-xl">
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/95 backdrop-blur p-3 sm:p-4 grid md:grid-cols-[1fr_auto_auto_auto] gap-3 mb-6 sticky top-32 z-10 shadow-xl">
                 <label><span class="sr-only">Search item results</span><input id="result-item-search" type="search" placeholder="Search event item" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white placeholder:text-white/30 text-sm focus:border-amber-500 focus:ring-amber-500"></label>
                 <label><span class="sr-only">Filter result category</span><select id="result-item-category" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500"><option value="">All categories</option>@foreach($itemResultsByCategory as $group)<option value="{{ Str::slug($group['key'] ?? 'other') }}">{{ $group['label'] }}</option>@endforeach</select></label>
                 <label><span class="sr-only">Filter participant type</span><select id="result-item-mode" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500"><option value="">Individual & group</option>@foreach(collect($itemResultsByCategory)->pluck('items')->flatten(1)->pluck('participant_type')->filter()->unique() as $mode)<option value="{{ $mode }}">{{ ucfirst($mode) }}</option>@endforeach</select></label>
@@ -267,34 +267,36 @@
                                         <span class="ml-auto shrink-0 text-[11px] font-semibold text-white/60 bg-white/5 border border-slate-700 px-2 py-0.5 rounded-full">{{ $typeLabel }}</span>
                                         @endif
                                     </div>
-                                    <div class="divide-y divide-slate-800">
+                                    <div class="flex flex-wrap">
                                         @foreach($item['winners'] as $winner)
                                         @php
                                             $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]];
                                         @endphp
-                                        <div class="p-4 {{ $rankTint[$winner['position']] ?? '' }}">
-                                            <div class="flex items-center justify-between gap-3">
+                                        <div class="flex gap-3 p-4 flex-1 min-w-[18rem] border-l border-slate-800 first:border-l-0 {{ $rankTint[$winner['position']] ?? '' }}">
+                                            <div class="shrink-0 flex flex-col items-center gap-1.5">
                                                 @if($winner['position'] <= 3)
-                                                <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-8 h-8">
+                                                <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-14 h-14">
                                                 @else
-                                                <span class="text-lg font-mono font-bold text-white/50">#{{ $winner['position'] }}</span>
+                                                <span class="w-14 h-14 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center text-lg font-extrabold">#{{ $winner['position'] }}</span>
                                                 @endif
                                                 @if(!empty($winner['grade']))
-                                                <span class="text-xs font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">Grade {{ $winner['grade'] }}</span>
+                                                <span class="text-[11px] font-semibold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30 whitespace-nowrap">Grade {{ $winner['grade'] }}</span>
                                                 @endif
                                             </div>
-                                            <p class="text-xs text-white/40 mt-2">{{ $winner['school'] }}</p>
-                                            <div class="mt-3 grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2.5 justify-items-center">
-                                                @foreach($roster as $member)
-                                                <div class="flex flex-col items-center gap-1 w-16">
-                                                    @if($member['photo'] ?? null)
-                                                    <img src="{{ $member['photo'] }}" alt="" class="w-16 h-16 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
-                                                    @else
-                                                    <span class="w-16 h-16 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center text-base font-bold border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
-                                                    @endif
-                                                    <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
+                                            <div class="min-w-0 flex-1">
+                                                <div class="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2.5">
+                                                    @foreach($roster as $member)
+                                                    <div class="flex flex-col items-center gap-1 w-20">
+                                                        @if($member['photo'] ?? null)
+                                                        <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
+                                                        @else
+                                                        <span class="w-20 h-20 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center text-lg font-bold border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
+                                                        @endif
+                                                        <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
+                                                    </div>
+                                                    @endforeach
                                                 </div>
-                                                @endforeach
+                                                <p class="text-xs text-white/40 mt-3 truncate">{{ $winner['school'] }}</p>
                                             </div>
                                         </div>
                                         @endforeach

@@ -499,6 +499,79 @@ class FestRegistrationReviewController extends SahodayaAdminController
         return back()->with('success', 'Participant substituted.');
     }
 
+    /**
+     * The school's students eligible to be added to this registration's item — used by the
+     * "Manage participants" add-student picker. Unlike the on-behalf registration picker
+     * (which only does a rough client-side eligibility approximation), this runs the real
+     * FestRegistrationEligibilityService check server-side.
+     */
+    public function eligibleStudents(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
+
+        $registration->loadMissing('item', 'participants');
+        $item = $registration->item;
+        abort_if(! $item, 422, 'This registration has no item.');
+
+        $existingStudentIds = $registration->participants->pluck('student_id')->filter()->all();
+
+        $search = trim((string) $request->query('search', ''));
+        $studentQuery = Student::where('tenant_id', $registration->school_id)->active()->with('schoolClass')->orderBy('name');
+        if ($existingStudentIds) {
+            $studentQuery->whereNotIn('id', $existingStudentIds);
+        }
+        if ($search !== '') {
+            $term = strtolower($search);
+            $studentQuery->where(function ($q) use ($term) {
+                $q->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
+                  ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"]);
+            });
+        }
+
+        $students = $studentQuery->limit(500)->get();
+
+        $eligibilityService = app(FestRegistrationEligibilityService::class);
+        $annotated = $eligibilityService->annotateStudents($students, $event, $registration->school_id)->values();
+        $eligibleIds = $eligibilityService->filterEligibleForItem($annotated, $event, $item)->pluck('id')->all();
+
+        $rows = $annotated->map(function (array $row) use ($eligibleIds) {
+            $row['eligible'] = in_array($row['id'], $eligibleIds, true);
+
+            return $row;
+        })->values();
+
+        return response()->json(['students' => $rows]);
+    }
+
+    public function addParticipant(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
+
+        $data = $request->validate([
+            'student_id' => 'required|integer|exists:students,id',
+            'role'       => 'required|in:performer,standby',
+        ]);
+
+        $student = Student::where('id', $data['student_id'])->where('tenant_id', $registration->school_id)->firstOrFail();
+
+        app(FestRegistrationService::class)->addParticipant($registration, $event, $student, $data['role']);
+
+        return back()->with('success', "Added {$student->name} to the registration.");
+    }
+
+    public function removeParticipant(string $tenantId, FestEvent $event, FestRegistration $registration, FestParticipant $participant)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
+        abort_if($participant->registration_id !== $registration->id, 403);
+
+        app(FestRegistrationService::class)->removeParticipant($participant, $event);
+
+        return back()->with('success', 'Participant removed.');
+    }
+
     public function bulkApprove(Request $request, string $tenantId, FestEvent $event, FestRegistrationBulkService $bulk, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

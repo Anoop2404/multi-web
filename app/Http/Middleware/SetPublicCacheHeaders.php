@@ -15,7 +15,7 @@ class SetPublicCacheHeaders
         if ($request->isMethod('GET') && $response->isSuccessful()) {
             if ($request->is('fest/*/live/data') || $request->is('fest/*/scoreboard/data')) {
                 $response->headers->set('Cache-Control', 'no-store');
-            } elseif ($request->is('fest/*/live') || $request->is('fest/*/scoreboard')) {
+            } elseif ($request->is('fest/*/live') || $request->is('fest/*/scoreboard') || $request->is('fest/*/tv')) {
                 $response->headers->set('Cache-Control', 'no-cache, max-age=0, must-revalidate');
             } elseif ($request->is('fest/*/results') || $request->is('fest/*/items/*/results')) {
                 $response->headers->set('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');

@@ -330,6 +330,31 @@ class FestEvent extends Model
     }
 
     /**
+     * Venue display resolution for public-facing pages. `venue` is a plain text column
+     * on the event itself, but region-wise preliminary venues are assigned separately
+     * (Sahodaya Admin's Venues tab → FestVenue, scoped by the hub event_id + region_id)
+     * — a venue assigned there never wrote back to this event's own `venue` column, so
+     * every page that only ever read `$event->venue` directly showed nothing for a
+     * region event even after its venue was assigned. Falls back to the plain column so
+     * non-regional events and events with no FestVenue match behave exactly as before.
+     */
+    public function resolvedVenueName(): ?string
+    {
+        if ($this->region_id) {
+            $hubEventId = $this->parent_event_id ?? $this->id;
+            $regionVenue = FestVenue::where('event_id', $hubEventId)
+                ->where('region_id', $this->region_id)
+                ->where('is_active', true)
+                ->first();
+            if ($regionVenue?->name) {
+                return $regionVenue->name;
+            }
+        }
+
+        return $this->venue;
+    }
+
+    /**
      * Breadcrumb-style facts about this event's place in a hub/region/phase hierarchy —
      * built for pages (food menu/billing/coupons/catering first) that previously gave no
      * indication whether the admin or school was looking at a hub, a specific region, or a

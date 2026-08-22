@@ -1185,6 +1185,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/registrations/{registration}/cancel', [FestRegistrationReviewController::class, 'cancel'])->name('registrations.cancel');
             Route::post('/{event}/registrations/{registration}/cancel-with-refund', [FestRegistrationReviewController::class, 'cancelWithRefund'])->name('registrations.cancel-with-refund');
             Route::post('/{event}/registrations/{registration}/substitute/{performer}/{standby}', [FestRegistrationReviewController::class, 'substitute'])->name('registrations.substitute');
+            Route::get('/{event}/registrations/{registration}/eligible-students', [FestRegistrationReviewController::class, 'eligibleStudents'])->name('registrations.eligible-students');
+            Route::post('/{event}/registrations/{registration}/participants', [FestRegistrationReviewController::class, 'addParticipant'])->name('registrations.participants.store');
+            Route::delete('/{event}/registrations/{registration}/participants/{participant}', [FestRegistrationReviewController::class, 'removeParticipant'])->name('registrations.participants.destroy');
             Route::get('/{event}/substitution-requests', [\App\Http\Controllers\SahodayaAdmin\FestSubstitutionReviewController::class, 'index'])->name('substitution-requests.index');
             Route::post('/{event}/substitution-requests/{substitutionRequest}/approve', [\App\Http\Controllers\SahodayaAdmin\FestSubstitutionReviewController::class, 'approve'])->name('substitution-requests.approve');
             Route::post('/{event}/substitution-requests/{substitutionRequest}/reject', [\App\Http\Controllers\SahodayaAdmin\FestSubstitutionReviewController::class, 'reject'])->name('substitution-requests.reject');
@@ -1218,6 +1221,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/marks', [FestMarkEntryController::class, 'index'])->name('marks.index');
             Route::post('/{event}/marks', [FestMarkEntryController::class, 'store'])->name('marks.store');
             Route::get('/{event}/mark-settings', [FestMarkEntryController::class, 'markSettings'])->name('mark-settings.index');
+            Route::get('/{event}/mark-settings/bulk', [FestMarkEntryController::class, 'markSettingsBulk'])->name('mark-settings.bulk');
+            Route::post('/{event}/mark-settings/bulk', [FestMarkEntryController::class, 'bulkUpdateMarkSettings'])->name('mark-settings.bulk-update');
             Route::post('/{event}/items/{item}/mark-criteria', [FestMarkEntryController::class, 'saveCriteria'])->name('items.mark-criteria.save');
             Route::post('/{event}/items/{item}/mark-criteria/copy', [FestMarkEntryController::class, 'copyCriteria'])->name('items.mark-criteria.copy');
             Route::post('/{event}/items/{item}/mark-criteria/apply-template', [FestMarkEntryController::class, 'applyTemplate'])->name('items.mark-criteria.apply-template');
@@ -1228,6 +1233,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/mark-sheet-uploads/{upload}', [FestMarkEntryController::class, 'destroySheetUpload'])->name('mark-sheet-uploads.destroy');
             Route::post('/{event}/items/{item}/auto-rank', [FestMarkEntryController::class, 'autoRankItem'])->name('items.auto-rank');
             Route::get('/{event}/results', [FestResultsController::class, 'show'])->name('results.show');
+            Route::get('/{event}/results/items/{item}/download', [FestResultsController::class, 'downloadItemResults'])->name('results.items.download');
             Route::post('/{event}/results/publish', [FestResultsController::class, 'publish'])->name('results.publish');
             Route::post('/{event}/results/unpublish', [FestResultsController::class, 'unpublish'])->name('results.unpublish');
             Route::post('/{event}/results/items/bulk-publish', [FestResultsController::class, 'bulkPublishItems'])->name('results.items.bulk-publish');

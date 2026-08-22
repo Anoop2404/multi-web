@@ -233,18 +233,93 @@ class FestCertificateServiceTallyTest extends TestCase
 
         $context = $service->renderContext($multiCert);
         $this->assertSame('Elocution and Quiz', $context['fieldValues']['item_title'], 'Body text lists every item the student entered.');
+        $this->assertSame('Elocution and Quiz', $context['fieldValues']['item_details'], 'item_details is an alias of item_title — bare item name(s) only.');
         $this->assertSame(
-            'Elocution (Literary - Individual Item - General (Boys & Girls)) and Quiz (Literary - Individual Item - General (Boys & Girls))',
-            $context['fieldValues']['item_details'],
-            'item_details appends category/type/gender to each item, same taxonomy as attendance reports.',
+            'Literary',
+            $context['fieldValues']['category_name'],
+            'Both items share the same category — deduped to one mention, not repeated per item.',
         );
+        $this->assertSame('Individual', $context['fieldValues']['participation_type'], 'Both items share the same type — deduped to one mention.');
 
         $soloCert = Certificate::where('entity_type', FestParticipant::class)->where('entity_id', $solo->id)->first();
         $soloContext = $service->renderContext($soloCert);
         $this->assertSame('Elocution', $soloContext['fieldValues']['item_title'], 'A single-item student sees just that item, no dangling "and".');
-        $this->assertSame('Elocution (Literary - Individual Item - General (Boys & Girls))', $soloContext['fieldValues']['item_details']);
+        $this->assertSame('Elocution', $soloContext['fieldValues']['item_details']);
+        $this->assertSame('Literary', $soloContext['fieldValues']['category_name']);
 
         $tally = $service->certificateTally($event);
         $this->assertSame(2, $tally['totals']['participation_certs'], 'Tally total matches generation: 2 distinct students, not 3 item entries.');
+    }
+
+    /**
+     * FestEventItem::participant_type has 5 real values (see FestTeamSquadRules::ALL_TYPES:
+     * individual, team, group, pair, trio), not just 3 — a match statement that only
+     * special-cased 'group'/'team' once silently mislabeled pair/trio items as
+     * "Individual" in participation_type.
+     */
+    public function test_participation_type_labels_pair_and_trio_items_correctly(): void
+    {
+        $event = $this->makeEvent();
+        $school = $this->makeSchool($event->tenant_id);
+
+        $pairItem = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Conversation', 'participant_type' => 'pair',
+            'category' => 'general', 'is_enabled' => true,
+        ]);
+        $trioItem = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Skit', 'participant_type' => 'trio',
+            'category' => 'general', 'is_enabled' => true,
+        ]);
+
+        $pairParticipant = $this->individualParticipant($event, $pairItem, $school->id, position: 1);
+        $trioParticipant = $this->individualParticipant($event, $trioItem, $school->id, position: 1);
+
+        $service = app(FestCertificateService::class);
+        $service->generateForEvent($event);
+
+        $pairCert = Certificate::where('entity_type', FestParticipant::class)->where('entity_id', $pairParticipant->id)->where('cert_type', 'winner')->first();
+        $trioCert = Certificate::where('entity_type', FestParticipant::class)->where('entity_id', $trioParticipant->id)->where('cert_type', 'winner')->first();
+
+        $this->assertSame('Pair', $service->renderContext($pairCert)['fieldValues']['participation_type']);
+        $this->assertSame('Trio', $service->renderContext($trioCert)['fieldValues']['participation_type']);
+    }
+
+    /**
+     * Companion to the "same category/type across items" aggregation case — when a
+     * person's items genuinely differ in category or type, both must survive the dedup
+     * (unique() drops exact repeats, not everything).
+     */
+    public function test_category_and_type_are_joined_not_deduped_away_when_items_differ(): void
+    {
+        $event = $this->makeEvent();
+        $school = $this->makeSchool($event->tenant_id);
+
+        $soloItem = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Elocution', 'participant_type' => 'individual',
+            'category' => 'literary', 'is_enabled' => true, 'display_order' => 1,
+        ]);
+        $groupItem = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Choral Reading', 'participant_type' => 'group',
+            'category' => 'music', 'is_enabled' => true, 'display_order' => 2,
+        ]);
+
+        $anchor = $this->individualParticipant($event, $soloItem, $school->id);
+        $registrationB = FestRegistration::create([
+            'event_id' => $event->id, 'item_id' => $groupItem->id, 'school_id' => $school->id,
+            'status' => 'approved', 'submitted_at' => now(),
+        ]);
+        FestParticipant::create([
+            'registration_id' => $registrationB->id, 'event_id' => $event->id,
+            'student_id' => $anchor->student_id, 'participant_type' => 'student', 'participant_role' => 'performer',
+        ]);
+
+        $service = app(FestCertificateService::class);
+        $service->generateParticipationForEvent($event);
+
+        $cert = Certificate::where('entity_type', FestParticipant::class)->where('entity_id', $anchor->id)->where('cert_type', 'participation')->first();
+        $fieldValues = $service->renderContext($cert)['fieldValues'];
+
+        $this->assertSame('Literary and Music', $fieldValues['category_name']);
+        $this->assertSame('Individual and Group', $fieldValues['participation_type']);
     }
 }

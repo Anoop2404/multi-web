@@ -169,8 +169,9 @@
                                             {{ p.participant_role || 'performer' }}
                                         </span>
                                     </div>
-                                    <div v-if="reg.status === 'approved' && standbyCount(reg)" class="mt-1">
-                                        <button type="button" class="text-indigo-600 font-semibold" @click="openSubstitute(reg)">Substitute</button>
+                                    <div v-if="reg.status === 'approved'" class="mt-1 flex flex-wrap gap-2">
+                                        <button v-if="standbyCount(reg)" type="button" class="text-indigo-600 font-semibold" @click="openSubstitute(reg)">Substitute</button>
+                                        <button type="button" class="text-slate-600 font-semibold" @click="openManageParticipants(reg)">Manage participants</button>
                                     </div>
                                 </td>
                         <td class="p-3 text-right space-x-2">
@@ -232,6 +233,57 @@
                 </div>
             </div>
         </div>
+
+        <div v-if="manageReg" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="closeManageParticipants">
+            <div class="card max-w-lg w-full max-h-[85vh] flex flex-col">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <h3 class="font-semibold">Manage participants</h3>
+                        <p class="text-xs text-gray-500 truncate">{{ manageReg.item?.title }} · {{ (schools[manageReg.school_id] ?? '').toString().toUpperCase() }}</p>
+                    </div>
+                    <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl leading-none shrink-0" @click="closeManageParticipants">&times;</button>
+                </div>
+                <div class="flex-1 overflow-y-auto space-y-2 mt-3">
+                    <div v-for="p in manageReg.participants" :key="p.id"
+                         class="flex items-center justify-between gap-2 border border-slate-100 rounded-lg px-3 py-2">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-slate-800 truncate">{{ p.student?.name ?? p.teacher?.name ?? '—' }}</p>
+                            <p class="text-[11px] text-slate-500">
+                                {{ p.participant_role || 'performer' }}<span v-if="p.student?.reg_no"> · {{ p.student.reg_no }}</span>
+                            </p>
+                        </div>
+                        <button type="button" class="text-red-600 text-xs font-semibold shrink-0 disabled:opacity-40"
+                                :disabled="removingParticipantId === p.id" @click="removeParticipant(p)">
+                            {{ removingParticipantId === p.id ? 'Removing…' : 'Remove' }}
+                        </button>
+                    </div>
+                    <p v-if="!manageReg.participants?.length" class="text-xs text-slate-400 text-center py-4">No participants left.</p>
+                </div>
+                <div class="border-t border-gray-100 mt-3 pt-3">
+                    <label class="text-xs font-semibold text-gray-600">Add participant as</label>
+                    <div class="flex items-center gap-3 mt-1">
+                        <select v-model="addParticipantRole" class="field text-sm w-36">
+                            <option value="performer">Performer</option>
+                            <option value="standby">Standby</option>
+                        </select>
+                        <button type="button" class="btn-secondary text-xs" @click="openAddParticipantPicker">Pick student</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <FestStudentPickerModal
+            v-model="addParticipantPickerOpen"
+            title="Add participant"
+            :subtitle="manageReg?.item?.title"
+            :entries="addParticipantEntries"
+            v-model:selected-ids="addParticipantSelectedIds"
+            :max-selected="1"
+            confirm-label="Add"
+            :show-add-student="false"
+            @confirm="submitAddParticipant"
+            @search="searchAddParticipantStudents"
+        />
 
         <div v-if="onBehalfOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40" @click="onBehalfOpen = false"></div>
@@ -451,6 +503,13 @@ const filterWideMode = ref(false);
 const overrideLifecycle = ref(false);
 const substituteReg = ref(null);
 const substituteForm = ref({ performer_id: '', standby_id: '' });
+
+const manageReg = ref(null);
+const addParticipantRole = ref('performer');
+const addParticipantPickerOpen = ref(false);
+const addParticipantEntries = ref([]);
+const addParticipantSelectedIds = ref([]);
+const removingParticipantId = ref(null);
 const onBehalfOpen = ref(false);
 const performerPickerOpen = ref(false);
 const standbyPickerOpen = ref(false);
@@ -665,6 +724,98 @@ function submitSubstitute() {
         `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${reg.id}/substitute/${substituteForm.value.performer_id}/${substituteForm.value.standby_id}`,
         {},
         { preserveScroll: true, onSuccess: () => { substituteReg.value = null; } },
+    );
+}
+
+function openManageParticipants(reg) {
+    manageReg.value = reg;
+}
+
+function closeManageParticipants() {
+    manageReg.value = null;
+}
+
+// Re-point manageReg at the freshly-reloaded copy in registrationsList after an add/remove —
+// Inertia replaces the whole `registrations` prop rather than mutating the snapshot the modal
+// already holds, so without this the modal would keep showing the pre-mutation roster.
+function refreshManageReg(regId) {
+    const updated = registrationsList.value.find(r => r.id === regId);
+    if (updated) manageReg.value = updated;
+}
+
+function eligibleStudentsUrl(reg, search) {
+    const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${reg.id}/eligible-students`;
+    return search ? `${base}?search=${encodeURIComponent(search)}` : base;
+}
+
+function studentRowToEntry(row) {
+    return {
+        id: row.id,
+        name: row.name,
+        regNo: row.reg_no || '',
+        admissionNo: row.admission_number || '',
+        meta: [row.class_name, row.reg_no].filter(Boolean).join(' · '),
+        eligible: !!row.eligible,
+        reason: row.eligible ? null : 'Not eligible for this item',
+    };
+}
+
+async function fetchEligibleStudents(reg, search = '') {
+    try {
+        const res = await fetch(eligibleStudentsUrl(reg, search), {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data.students ?? []).map(studentRowToEntry);
+    } catch {
+        return [];
+    }
+}
+
+async function openAddParticipantPicker() {
+    if (!manageReg.value) return;
+    addParticipantSelectedIds.value = [];
+    addParticipantEntries.value = await fetchEligibleStudents(manageReg.value);
+    addParticipantPickerOpen.value = true;
+}
+
+// Mirrors FestRegistrationController::eligibleStudents()'s consumer in Registration.vue
+// (searchStudentsForEvent) — merge by id so results already shown/selected don't disappear
+// when a search narrows the list.
+async function searchAddParticipantStudents(query) {
+    if (!manageReg.value) return;
+    const term = String(query ?? '').trim();
+    if (!term) return;
+    const results = await fetchEligibleStudents(manageReg.value, term);
+    const byId = new Map(addParticipantEntries.value.map(e => [e.id, e]));
+    for (const entry of results) byId.set(entry.id, entry);
+    addParticipantEntries.value = Array.from(byId.values());
+}
+
+function submitAddParticipant() {
+    const reg = manageReg.value;
+    const studentId = addParticipantSelectedIds.value[0];
+    if (!reg || !studentId) return;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${reg.id}/participants`,
+        { student_id: studentId, role: addParticipantRole.value },
+        { preserveScroll: true, onSuccess: () => refreshManageReg(reg.id) },
+    );
+}
+
+function removeParticipant(participant) {
+    const reg = manageReg.value;
+    if (!reg) return;
+    removingParticipantId.value = participant.id;
+    router.delete(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${reg.id}/participants/${participant.id}`,
+        {
+            preserveScroll: true,
+            onSuccess: () => refreshManageReg(reg.id),
+            onFinish: () => { removingParticipantId.value = null; },
+        },
     );
 }
 

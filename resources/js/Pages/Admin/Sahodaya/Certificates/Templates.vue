@@ -456,7 +456,7 @@ const placeholderTokens = computed(() => {
         return ['{recipient_name}', '{school_name}', '{sahodaya_name}', '{academic_year}', '{class}', '{percentage}', '{rank}'];
     }
     if (form.event_type === 'fest') {
-        return ['{recipient_name}', '{school_name}', '{event_title}', '{item_title}', '{item_details}', '{event_dates}', '{achievement_line}', '{sahodaya_name}', '{certificate_date}'];
+        return ['{recipient_name}', '{school_name}', '{event_title}', '{event_name}', '{item_title}', '{item_details}', '{category_name}', '{participation_type}', '{event_dates}', '{achievement_line}', '{sahodaya_name}', '{certificate_date}'];
     }
     return ['{salutation}', '{recipient_name}', '{designation}', '{school_name}', '{program_title}', '{sahodaya_name}', '{venue}', '{conducted_on}', '{certificate_date}'];
 });

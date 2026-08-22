@@ -78,6 +78,7 @@ Route::middleware([
         Route::get('/{event}/items/{item}/winners/{mark}/poster.svg', [FestPortalController::class, 'winnerPoster'])->name('winner-poster');
         Route::get('/{event}/scoreboard', [FestPortalController::class, 'scoreboard'])->name('scoreboard');
         Route::get('/{event}/scoreboard/data', [FestPortalController::class, 'scoreboardData'])->name('scoreboard.data');
+        Route::get('/{event}/tv', [FestPortalController::class, 'tv'])->name('tv');
         Route::get('/{event}/manual', [FestPortalController::class, 'manual'])->name('manual');
         Route::get('/{event}/live', [FestPortalController::class, 'live'])->name('live');
         Route::get('/{event}/live/data', [FestPortalController::class, 'liveData'])->name('live.data');

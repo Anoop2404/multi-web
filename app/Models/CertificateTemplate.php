@@ -40,6 +40,8 @@ class CertificateTemplate extends Model
      *     bold_variables: bool,
      *     show_logo_overlay: bool,
      *     show_qr: bool,
+     *     show_photo: bool,
+     *     photo: array{top: float, left: float, size: float},
      *     participation_label_cover: array{top: float, left: float, width: float, height: float},
      *     recipient_name: array{top: float, left: float, width: float, font_size: int},
      *     body: array{top: float, left: float, width: float, font_size: int},
@@ -57,6 +59,14 @@ class CertificateTemplate extends Model
             'show_certificate_date' => true,
             'show_logo_overlay' => true,
             'show_qr' => true,
+            // Off by default — no existing template has ever reserved space for a photo,
+            // so a freshly-added element shouldn't suddenly appear on any of them.
+            'show_photo' => false,
+            'photo' => [
+                'top' => 31,
+                'left' => 50,
+                'size' => 118,
+            ],
             'participation_label_cover' => [
                 'top' => 28,
                 'left' => 18,
@@ -178,7 +188,7 @@ class CertificateTemplate extends Model
         $defaults = self::defaultBackgroundLayout();
         $custom = is_array($this->layout_json) ? $this->layout_json : [];
 
-        foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date', 'show_logo_overlay', 'show_qr'] as $flag) {
+        foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date', 'show_logo_overlay', 'show_qr', 'show_photo'] as $flag) {
             if (array_key_exists($flag, $custom)) {
                 $defaults[$flag] = filter_var($custom[$flag], FILTER_VALIDATE_BOOLEAN);
             }
@@ -190,12 +200,13 @@ class CertificateTemplate extends Model
 
         $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style', 'align'];
 
-        foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover'] as $key) {
+        foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover', 'photo'] as $key) {
             if (! isset($custom[$key]) || ! is_array($custom[$key])) {
                 continue;
             }
             $allowed = match ($key) {
                 'participation_label_cover' => ['top', 'left', 'width', 'height'],
+                'photo' => ['top', 'left', 'size'],
                 default => $textKeys,
             };
             $defaults[$key] = array_merge(

@@ -71,31 +71,8 @@
     <section class="space-y-4" aria-labelledby="latest-winners-title">
         <div class="flex items-center justify-between"><h2 id="latest-winners-title" class="text-lg font-extrabold text-white">Latest Item Winners</h2><span class="text-xs text-amber-400 font-semibold">Recent results</span></div>
         <div class="space-y-3 max-h-[44rem] overflow-y-auto pr-1">
-            @forelse($latestWinners ?? [] as $winner)
-            @php $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]]; @endphp
-            <article class="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-md">
-                <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs text-amber-400 font-semibold truncate">{{ $winner['item'] }}</p>
-                    @if($winner['position'] <= 3)
-                    <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Position {{ $winner['position'] }}" class="shrink-0 w-7 h-7">
-                    @else
-                    <span class="shrink-0 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-2 py-0.5" aria-label="Position {{ $winner['position'] }}">#{{ $winner['position'] }}</span>
-                    @endif
-                </div>
-                <div class="mt-3 grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-2.5 justify-items-center">
-                    @foreach($roster as $member)
-                    <div class="flex flex-col items-center gap-1 w-14">
-                        @if($member['photo'] ?? null)
-                        <img src="{{ $member['photo'] }}" alt="" class="w-12 h-12 rounded-xl object-cover border-2 border-slate-800 shadow-sm">
-                        @else
-                        <span class="w-12 h-12 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-sm border-2 border-slate-800 shadow-sm">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
-                        @endif
-                        <span class="text-[10px] font-semibold leading-tight text-white/90 text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
-                    </div>
-                    @endforeach
-                </div>
-                <p class="text-xs text-slate-400 mt-3 truncate">{{ $winner['school'] }}</p>
-            </article>
+            @forelse($latestWinners ?? [] as $itemGroup)
+                @include('public.fest.partials.fest-winner-item-card')
             @empty
             <div class="rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 text-center py-12">No winners announced yet.</div>
             @endforelse

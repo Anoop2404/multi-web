@@ -6,7 +6,7 @@
         @include('public.fest.partials.page-hero', [
             'eyebrow' => 'Schedule',
             'title' => $event->title,
-            'subtitle' => $event->venue ? '📍 '.$event->venue : null,
+            'subtitle' => $event->resolvedVenueName() ? '📍 '.$event->resolvedVenueName() : null,
         ])
 
         <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto mt-6">

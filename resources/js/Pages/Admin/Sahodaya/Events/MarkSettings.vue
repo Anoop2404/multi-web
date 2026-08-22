@@ -4,13 +4,30 @@
         <PageHeader :title="`${event.title} — Mark Settings`" eyebrow="Mark settings"
                     description="Configure how each item gets marked — number of judges, scoring criteria columns, and total marks.">
             <template #actions>
-                <Link :href="marksUrl" class="btn-secondary text-xs">← Back to Mark Entry</Link>
+                <div class="flex items-center gap-2">
+                    <Link :href="bulkSettingsUrl" class="btn-secondary text-xs flex items-center gap-1.5">
+                        <span>⚡ Bulk Total Marks & Judges</span>
+                    </Link>
+                    <Link :href="marksUrl" class="btn-secondary text-xs">← Back to Mark Entry</Link>
+                </div>
             </template>
         </PageHeader>
 
         <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
                            :event="event" active="mark-settings" class="mb-4" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="mark-settings" class="mb-4" />
+
+        <!-- Sub Tab Bar to switch between per-item settings & the Bulk editor -->
+        <div class="flex items-center gap-2 mb-5 border-b border-slate-200 pb-3">
+            <Link :href="settingsBaseUrl"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm">
+                <span>⚙️ Per-Item Settings & Criteria</span>
+            </Link>
+            <Link :href="bulkSettingsUrl"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200">
+                <span>⚡ Bulk Total Marks & Judges</span>
+            </Link>
+        </div>
 
         <div class="card !p-4 space-y-3 mb-5">
             <div v-if="childEvents.length" class="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
@@ -175,6 +192,7 @@ const marksUrl = computed(() => {
     return url;
 });
 const settingsBaseUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/mark-settings`);
+const bulkSettingsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/mark-settings/bulk`);
 
 const flatItems = computed(() => (props.headItemGroups ?? []).flatMap((h) => h.items ?? []));
 

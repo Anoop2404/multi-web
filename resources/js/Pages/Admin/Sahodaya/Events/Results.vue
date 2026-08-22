@@ -71,6 +71,7 @@
 
                     <div class="flex flex-wrap gap-2">
                         <Link :href="marksUrl(selectedItem ?? item)" class="btn-secondary text-sm">Edit marks</Link>
+                        <a v-if="selectedItem" :href="downloadResultsUrl(selectedItem)" target="_blank" class="btn-secondary text-sm">⬇️ Download results (rank order)</a>
                         <button v-if="selectedItem && !selectedItem.results_published && selectedItem.marks_ready"
                                 type="button"
                                 class="btn-primary text-sm"
@@ -459,6 +460,11 @@ function marksUrl(row) {
     else q.set('head_id', 'other');
     q.set('item_id', String(itemId));
     return `${props.marksBaseUrl}?${q.toString()}`;
+}
+
+function downloadResultsUrl(row) {
+    const itemId = row?.item_id ?? row?.id;
+    return `${props.resultsBaseUrl}/items/${itemId}/download`;
 }
 
 function formatWindow(row) {

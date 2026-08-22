@@ -3,6 +3,12 @@
 <head>
     <meta charset="utf-8">
     <title>Certificate — {{ $student?->name ?? 'Participant' }}</title>
+    {{-- Admin-authored template body text may reference decorative webfonts (e.g.
+         Cinzel) by name in its own inline styles; loaded here so those actually render
+         instead of silently falling back to the next font in the stack. --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&display=swap" rel="stylesheet">
     @php
         // Computed ahead of the stylesheet (rather than only inside the has-background
         // branch further down) because the static @page rule needs it too, and this view
@@ -74,6 +80,10 @@
         }
         .logo-overlay img { height: 40px; width: auto; max-width: 40px; object-fit: contain; }
         .logo-overlay span { font-size: 9px; font-weight: 700; color: #1e293b; max-width: 120px; line-height: 1.2; }
+        .overlay-photo {
+            position: absolute; border-radius: 50%; object-fit: cover;
+            border: 3px solid #fdfaf0; box-shadow: 0 2px 10px rgba(0,0,0,0.25); background: #fff;
+        }
 
         /* Legacy fixed design (used when no template is configured) */
         .cert-legacy {
@@ -138,6 +148,12 @@
                     @endif
                     <span>{{ $fieldValues['sahodaya_name'] ?? ($sahodaya->name ?? '') }}</span>
                 </div>
+            @endif
+
+            @if(($layout['show_photo'] ?? false) && !empty($photoUrl))
+                @php $ph = $layout['photo'] ?? []; @endphp
+                <img class="overlay-photo" src="{{ $photoUrl }}" alt=""
+                     style="top:{{ $ph['top'] ?? 31 }}%;left:{{ $ph['left'] ?? 50 }}%;width:{{ $ph['size'] ?? 118 }}px;height:{{ $ph['size'] ?? 118 }}px;transform:translateX(-50%);">
             @endif
 
             @if(! $showParticipationLabel)

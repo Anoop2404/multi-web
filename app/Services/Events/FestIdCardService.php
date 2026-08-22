@@ -911,7 +911,13 @@ class FestIdCardService
         return null;
     }
 
-    private function resolveParticipantPhotoSrc(FestParticipant $p, string $gender, bool $includeDataUris): string
+    /**
+     * Resolve a usable <img> src for a participant's photo, falling back to a
+     * gender-appropriate placeholder avatar when none is on file. Public so other
+     * fest-facing renderers (e.g. FestCertificateService) can reuse the same
+     * public-disk/data-URI resolution instead of duplicating it.
+     */
+    public function resolveParticipantPhotoSrc(FestParticipant $p, string $gender, bool $includeDataUris): string
     {
         if ($includeDataUris) {
             return $this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender);

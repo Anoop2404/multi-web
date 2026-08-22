@@ -23,7 +23,7 @@
                             <span class="text-amber-300 font-semibold">{{ $scoreboardTitle }}</span>
                             @if($eventContext['phase'])<span class="rounded-full border border-white/10 px-2.5 py-1">{{ $eventContext['phase'] }}</span>@endif
                             @if($eventContext['region'])<span class="rounded-full border border-white/10 px-2.5 py-1">{{ $eventContext['region'] }}</span>@endif
-                            @if($event->venue)<span class="rounded-full border border-white/10 px-2.5 py-1">{{ $event->venue }}</span>@endif
+                            @if($event->resolvedVenueName())<span class="rounded-full border border-white/10 px-2.5 py-1">{{ $event->resolvedVenueName() }}</span>@endif
                             @if($event->event_start)<span class="rounded-full border border-white/10 px-2.5 py-1">{{ $event->event_start->format('d M Y') }}</span>@endif
                         </div>
                     </div>

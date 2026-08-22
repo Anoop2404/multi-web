@@ -18,7 +18,7 @@
                     LIVE
                 </span>
                 <h1 class="text-2xl sm:text-3xl font-extrabold font-heading mt-3 text-white">{{ $event->title }}</h1>
-                @if($event->venue)<p class="text-sm text-white/50 mt-2">📍 {{ $event->venue }}</p>@endif
+                @if($event->resolvedVenueName())<p class="text-sm text-white/50 mt-2">📍 {{ $event->resolvedVenueName() }}</p>@endif
                 <p id="live-refresh-badge" class="text-[11px] text-white/30 mt-3" aria-live="polite">Auto-refreshing every 30 seconds</p>
             </div>
         </header>

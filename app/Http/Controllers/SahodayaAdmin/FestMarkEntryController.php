@@ -24,6 +24,7 @@ use App\Support\FestPageActivity;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class FestMarkEntryController extends SahodayaAdminController
 {
@@ -179,6 +180,7 @@ class FestMarkEntryController extends SahodayaAdminController
             'childEvents'      => $childEvents,
             'judgeCount'       => $judgeCount,
             'judgeScores'      => $judgeScores,
+            'selectedItemTotalMarks' => $selectedItemModel?->total_marks,
             'sheetUploads'     => $sheetUploads,
             'missingChestCount' => $missingChestCount,
             'cumulativeSheetUrl' => $itemId
@@ -191,6 +193,11 @@ class FestMarkEntryController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        // Resolved before validate() so a judge's own subtotal can be capped at the item's
+        // Total Marks — the one scoring path that previously had no ceiling at all (unlike
+        // per-criterion scores, which are already clamped to each criterion's own max_score).
+        $item = $request->filled('item_id') ? FestEventItem::find($request->input('item_id')) : null;
+
         $data = $request->validate([
             'participant_id'    => 'required|exists:fest_participants,id',
             'item_id'           => 'required|exists:fest_event_items,id',
@@ -200,10 +207,13 @@ class FestMarkEntryController extends SahodayaAdminController
             'measurement_value' => 'nullable|string|max:50',
             'measurement_unit'  => 'nullable|string|max:20',
             'judge_scores'      => 'nullable|array',
-            'judge_scores.*'    => 'nullable|numeric|min:0',
+            'judge_scores.*'    => array_filter([
+                'nullable',
+                'numeric',
+                'min:0',
+                $item?->total_marks !== null ? 'max:'.$item->total_marks : null,
+            ]),
         ]);
-
-        $item = FestEventItem::find($data['item_id']);
 
         // Now phase-aware — no-op while phase_mode_enabled is off (see EventLifecycleGate). Reordered validate() before the gate so a malformed item_id 422s on validation, not the business-rule check.
         EventLifecycleGate::allowMarkEntryForItem($event, $item);
@@ -378,6 +388,65 @@ class FestMarkEntryController extends SahodayaAdminController
             'judgeCount'     => $judgeCount,
             'childEvents'    => $event->sportEventDropdownOptions(),
         ]));
+    }
+
+    /** Bulk Total Marks / Judge Count editor — scoped to this event only (region-aware, matches markSettings()). */
+    public function markSettingsBulk(Request $request, string $tenantId, FestEvent $event, FestMarkCriteriaService $criteriaService)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event = $this->regionAwareTargetEvent($request, $event);
+        $event->load('items');
+
+        $items = $event->items
+            ->sortBy('title')
+            ->map(fn (FestEventItem $item) => [
+                'id'          => $item->id,
+                'title'       => $item->title,
+                'item_code'   => $item->item_code,
+                'total_marks' => $item->total_marks,
+                'judge_count' => $criteriaService->judgeCountForItem($item),
+            ])
+            ->values();
+
+        return $this->inertia('Sahodaya/Events/MarkSettingsBulk', $this->withEventActivity($event, FestPageActivity::MARK_SETTINGS, [
+            'event'       => $event,
+            'items'       => $items,
+            'childEvents' => $event->sportEventDropdownOptions(),
+        ]));
+    }
+
+    public function bulkUpdateMarkSettings(Request $request, string $tenantId, FestEvent $event, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'items'                => 'required|array',
+            'items.*.id'           => 'required|integer|exists:fest_event_items,id',
+            'items.*.total_marks'  => 'nullable|numeric|min:0',
+            'items.*.judge_count'  => 'nullable|integer|min:1|max:20',
+        ]);
+
+        $updatedCount = 0;
+
+        DB::transaction(function () use ($data, $event, $criteriaService, &$updatedCount) {
+            foreach ($data['items'] as $itemData) {
+                $item = FestEventItem::where('event_id', $event->id)->find($itemData['id']);
+                if (! $item) {
+                    continue;
+                }
+
+                $item->update(['total_marks' => $itemData['total_marks'] ?? null]);
+                $criteriaService->setJudgeCount($item, $itemData['judge_count'] ?? 1);
+                $updatedCount++;
+            }
+        });
+
+        $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.settings.bulk_updated', "Total Marks / Judge Count bulk-updated for {$updatedCount} item(s)", [
+            'updated_count' => $updatedCount,
+        ]);
+
+        return back()->with('success', "Total Marks / Judge Count saved for {$updatedCount} item(s).");
     }
 
     /**

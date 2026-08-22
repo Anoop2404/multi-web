@@ -8,7 +8,9 @@ use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
+use App\Models\Student;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Support\Facades\DB;
 
 class FestRegistrationService
@@ -300,5 +302,103 @@ class FestRegistrationService
 
         $performer->update(['participant_role' => 'standby']);
         $standby->update(['participant_role' => 'performer']);
+    }
+
+    /**
+     * Admin-direct roster edit: add a student who isn't currently on the registration at all
+     * (unlike substitutePerformer(), which only swaps between two rows that already exist).
+     * Deliberately does NOT check canSchoolEditRoster()/schedule_published — this is an
+     * admin-only override for the exact case that lock exists to prevent schools from doing
+     * themselves (day-of emergencies: sick student, no-show right before their item). Still
+     * blocked once results are published, same as every other admin override in this file —
+     * reversing a published result is out of scope everywhere else too.
+     */
+    public function addParticipant(FestRegistration $registration, FestEvent $event, Student $student, string $role): FestParticipant
+    {
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 422);
+        abort_if($event->results_published, 422, 'Results have already been published for this event.');
+        abort_unless(in_array($role, ['performer', 'standby'], true), 422, 'Invalid role.');
+        abort_if((string) $student->tenant_id !== (string) $registration->school_id, 422, "The student's school does not match this registration.");
+
+        $registration->loadMissing('participants', 'item');
+        abort_if($registration->participants->contains('student_id', $student->id), 422, 'This student is already on the registration.');
+
+        $item = $registration->item;
+        if ($item && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
+            $error = $item->validateSquadCount($registration->participants->count() + 1);
+            abort_if($error, 422, $error);
+        } else {
+            // Individual items carry no FestTeamSquadRules (validateSquadCount() is always a
+            // no-op for them) — cap manually at 1 performer + 2 standbys, matching the existing
+            // "Standbys (optional, max 2)" convention already enforced client-side in the
+            // Register-on-behalf form (Registrations.vue).
+            if ($role === 'performer') {
+                abort_if($registration->participants->where('participant_role', '!=', 'standby')->isNotEmpty(), 422,
+                    'This item only allows one performer — remove the current performer first, or add this student as a standby.');
+            } else {
+                abort_if($registration->participants->where('participant_role', 'standby')->count() >= 2, 422, 'At most 2 standbys are allowed.');
+            }
+        }
+
+        $participant = DB::transaction(function () use ($registration, $event, $student, $role) {
+            $participant = FestParticipant::create([
+                'registration_id'  => $registration->id,
+                'event_id'         => $event->id,
+                'student_id'       => $student->id,
+                'participant_type' => 'student',
+                'participant_role' => $role,
+            ]);
+
+            app(FestNumberingService::class)->assignParticipantNumbers($participant);
+            app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
+
+            return $participant;
+        });
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            'registrations',
+            'fest.registration.participant_added',
+            "Added {$student->name} ({$role}) to registration #{$registration->id}",
+            ['registration_id' => $registration->id, 'student_id' => $student->id, 'role' => $role],
+        );
+
+        return $participant;
+    }
+
+    /**
+     * Admin-direct roster edit: remove a participant outright. Hard-deletes the row — this
+     * codebase has no soft-delete convention for participants (disqualified_at is a distinct
+     * misconduct concept, not roster removal); FestRegistrationCreateService::updateForSchool()
+     * already hard-deletes as part of a full roster replace. Same admin-override posture as
+     * addParticipant() above re: schedule_published vs results_published.
+     */
+    public function removeParticipant(FestParticipant $participant, FestEvent $event): void
+    {
+        $registration = $participant->registration;
+        abort_unless($registration && in_array($registration->event_id, $event->reportableEventIds(), true), 422);
+        abort_if($event->results_published, 422, 'Results have already been published for this event.');
+
+        $registration->loadMissing('participants');
+        abort_if($registration->participants->count() <= 1, 422, 'Cannot remove the last participant on a registration — cancel the registration instead.');
+
+        $schoolId = $registration->school_id;
+        $registrationId = $registration->id;
+        $participantId = $participant->id;
+        $label = $participant->student?->name ?? $participant->teacher?->name ?? "participant #{$participantId}";
+
+        DB::transaction(function () use ($participant, $event, $schoolId) {
+            FestMark::where('participant_id', $participant->id)->delete();
+            $participant->delete();
+            app(FestSchoolEventFeeService::class)->recalculate($event, $schoolId);
+        });
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            'registrations',
+            'fest.registration.participant_removed',
+            "Removed {$label} from registration #{$registrationId}",
+            ['registration_id' => $registrationId, 'participant_id' => $participantId],
+        );
     }
 }

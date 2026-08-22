@@ -68,7 +68,7 @@
                             @foreach($series['events'] as $listedEvent)
                             @php
                                 $searchText = collect([
-                                    $listedEvent->title, $listedEvent->venue, $listedEvent->parentEvent?->title,
+                                    $listedEvent->title, $listedEvent->resolvedVenueName(), $listedEvent->parentEvent?->title,
                                     $listedEvent->sourcePhase?->name, $listedEvent->region?->name,
                                     str_replace('_', ' ', $listedEvent->event_type),
                                 ])->filter()->implode(' ');
@@ -94,7 +94,7 @@
 
                                 <dl class="mt-5 grid gap-2 text-sm text-white/60">
                                     <div class="flex gap-2.5"><dt class="sr-only">Date</dt><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="w-4 h-4 mt-0.5 shrink-0"><rect x="3" y="5" width="18" height="16" rx="2" stroke-width="2"/><path d="M8 3v4M16 3v4M3 10h18" stroke-width="2"/></svg><dd>{{ $listedEvent->event_start?->format('d M Y') ?? 'Date to be announced' }}@if($listedEvent->event_start && $listedEvent->event_end && !$listedEvent->event_end->isSameDay($listedEvent->event_start)) – {{ $listedEvent->event_end->format('d M Y') }}@endif</dd></div>
-                                    @if($listedEvent->venue)<div class="flex gap-2.5"><dt class="sr-only">Venue</dt><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="w-4 h-4 mt-0.5 shrink-0"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" stroke-width="2"/><circle cx="12" cy="10" r="2.5" stroke-width="2"/></svg><dd>{{ $listedEvent->venue }}</dd></div>@endif
+                                    @if($listedEvent->resolvedVenueName())<div class="flex gap-2.5"><dt class="sr-only">Venue</dt><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="w-4 h-4 mt-0.5 shrink-0"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" stroke-width="2"/><circle cx="12" cy="10" r="2.5" stroke-width="2"/></svg><dd>{{ $listedEvent->resolvedVenueName() }}</dd></div>@endif
                                     @if($listedEvent->sourcePhase || $listedEvent->region)
                                     <div class="flex gap-2.5"><dt class="sr-only">Event context</dt><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="w-4 h-4 mt-0.5 shrink-0"><path d="M5 4v16M5 7h11l-2.5 4L16 15H5" stroke-width="2" stroke-linejoin="round"/></svg><dd>{{ collect([$listedEvent->sourcePhase?->name, $listedEvent->region?->name])->filter()->implode(' · ') }}</dd></div>
                                     @endif

@@ -72,8 +72,11 @@ class CertificateTemplateController extends SahodayaAdminController
                     'recipient_name'   => 'Sample Student Name',
                     'school_name'      => 'Sample Model School',
                     'event_title'      => 'Annual Kalotsav 2026',
+                    'event_name'       => 'Annual Kalotsav 2026',
                     'item_title'       => 'Classical Music (Solo)',
-                    'item_details'     => 'Classical Music (Solo) (CATEGORY I - Individual Item - Boys)',
+                    'item_details'     => 'Classical Music (Solo)',
+                    'category_name'    => 'Category I',
+                    'participation_type' => 'Individual',
                     'event_dates'      => '12-14 October 2026',
                     'achievement_line' => 'First Prize with A Grade',
                     'sahodaya_name'    => strtoupper($this->sahodaya->name),
@@ -82,6 +85,7 @@ class CertificateTemplateController extends SahodayaAdminController
                 'logoUrl'       => $template->logo_path ? TenantStorage::logoUrl($this->sahodaya, $template->logo_path) : TenantBranding::logoUrl($this->sahodaya),
                 'sealUrl'       => $template->seal_path ? TenantStorage::logoUrl($this->sahodaya, $template->seal_path) : null,
                 'backgroundUrl' => $template->background_path ? TenantStorage::logoUrl($this->sahodaya, $template->background_path) : null,
+                'photoUrl'      => app(\App\Services\Events\FestIdCardService::class)->defaultAvatarDataUri('neutral'),
                 'overlayLayout' => $template->overlayLayout(),
                 'signatories'   => collect($template->signatories ?? CertificateTemplate::defaultTrainingSignatories())
                     ->map(fn ($s) => [
@@ -157,6 +161,10 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.show_certificate_date' => 'nullable|boolean',
             'layout_json.show_logo_overlay' => 'nullable|boolean',
             'layout_json.show_qr' => 'nullable|boolean',
+            'layout_json.show_photo' => 'nullable|boolean',
+            'layout_json.photo.top' => 'nullable|numeric|min:0|max:100',
+            'layout_json.photo.left' => 'nullable|numeric|min:0|max:100',
+            'layout_json.photo.size' => 'nullable|numeric|min:24|max:400',
             'layout_json.recipient_name.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.recipient_name.left' => 'nullable|numeric|min:0|max:100',
             'layout_json.recipient_name.width' => 'nullable|numeric|min:0|max:100',
@@ -295,6 +303,10 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.show_certificate_date' => 'nullable|boolean',
             'layout_json.show_logo_overlay' => 'nullable|boolean',
             'layout_json.show_qr' => 'nullable|boolean',
+            'layout_json.show_photo' => 'nullable|boolean',
+            'layout_json.photo.top' => 'nullable|numeric|min:0|max:100',
+            'layout_json.photo.left' => 'nullable|numeric|min:0|max:100',
+            'layout_json.photo.size' => 'nullable|numeric|min:24|max:400',
             'layout_json.recipient_name.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.recipient_name.left' => 'nullable|numeric|min:0|max:100',
             'layout_json.recipient_name.width' => 'nullable|numeric|min:0|max:100',
@@ -446,7 +458,7 @@ class CertificateTemplateController extends SahodayaAdminController
             return $layout;
         }
 
-        foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date', 'show_logo_overlay', 'show_qr'] as $flag) {
+        foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date', 'show_logo_overlay', 'show_qr', 'show_photo'] as $flag) {
             if (array_key_exists($flag, $input)) {
                 $layout[$flag] = filter_var($input[$flag], FILTER_VALIDATE_BOOLEAN);
             }
@@ -456,13 +468,14 @@ class CertificateTemplateController extends SahodayaAdminController
             $layout['orientation'] = $input['orientation'];
         }
 
-        foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover'] as $key) {
+        foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover', 'photo'] as $key) {
             if (! isset($input[$key]) || ! is_array($input[$key])) {
                 continue;
             }
             $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style', 'align'];
             $allowed = match ($key) {
                 'participation_label_cover' => ['top', 'left', 'width', 'height'],
+                'photo' => ['top', 'left', 'size'],
                 default => $textKeys,
             };
             $layout[$key] = array_merge($layout[$key] ?? [], array_intersect_key(
@@ -500,7 +513,9 @@ class CertificateTemplateController extends SahodayaAdminController
             ['key' => 'school_name', 'source' => 'school_name', 'label' => 'School name'],
             ['key' => 'event_title', 'source' => 'event_title', 'label' => 'Event title'],
             ['key' => 'item_title', 'source' => 'item_title', 'label' => 'Item title'],
-            ['key' => 'item_details', 'source' => 'item_details', 'label' => 'Item with category/type/gender'],
+            ['key' => 'item_details', 'source' => 'item_details', 'label' => 'Item title (alias of item_title)'],
+            ['key' => 'category_name', 'source' => 'category_name', 'label' => 'Category (deduped across items)'],
+            ['key' => 'participation_type', 'source' => 'participation_type', 'label' => 'Item type (deduped across items)'],
             ['key' => 'event_dates', 'source' => 'event_dates', 'label' => 'Event dates'],
             ['key' => 'achievement_line', 'source' => 'achievement_line', 'label' => 'Achievement line'],
             ['key' => 'sahodaya_name', 'source' => 'sahodaya_name', 'label' => 'Sahodaya name'],

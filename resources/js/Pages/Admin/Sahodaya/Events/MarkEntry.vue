@@ -158,7 +158,10 @@
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
                                 <th class="p-3.5 w-44">Rank</th>
                                 <template v-if="hasJudgePanel">
-                                    <th v-for="j in judgeNumbers" :key="j" class="p-3.5 w-20">Judge {{ j }}</th>
+                                    <th v-for="j in judgeNumbers" :key="j" class="p-3.5 w-20">
+                                        Judge {{ j }}
+                                        <span v-if="props.selectedItemTotalMarks" class="block font-normal text-slate-400 normal-case">/ {{ props.selectedItemTotalMarks }}</span>
+                                    </th>
                                     <th class="p-3.5 w-24">Grand Total</th>
                                 </template>
                                 <th v-else class="p-3.5 w-28">Marks / Score</th>
@@ -234,6 +237,7 @@
                                 <template v-if="hasJudgePanel">
                                     <td v-for="j in judgeNumbers" :key="j" class="p-3.5">
                                         <input v-model.number="judgeForms[participant.id][j]" type="number" min="0" step="0.5"
+                                               :max="props.selectedItemTotalMarks ?? undefined"
                                                class="field text-xs tabular-nums w-16" placeholder="0"
                                                :disabled="isAbsent(participant, item)">
                                     </td>
@@ -308,6 +312,7 @@ const props = defineProps({
     gradeOptions: { type: Array, default: () => ['A+', 'A', 'B', 'C'] },
     judgeCount: { type: Number, default: 1 },
     judgeScores: { type: Object, default: () => ({}) },
+    selectedItemTotalMarks: { type: Number, default: null },
     cumulativeSheetUrl: { type: String, default: null },
     sheetUploads: { type: Array, default: () => [] },
     missingChestCount: { type: Number, default: 0 },
