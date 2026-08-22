@@ -683,18 +683,16 @@ class FestCertificateService
         $participantEntityIds = $certificates->where('entity_type', FestParticipant::class)->pluck('entity_id');
         $recordBreakEntityIds = $certificates->where('entity_type', FestRecordBreak::class)->pluck('entity_id');
 
-        $participants = FestParticipant::with(['student', 'registration.item', 'registration.event'])
+        $participants = FestParticipant::with(['student', 'registration.item', 'registration.event', 'registration.school'])
             ->whereIn('id', $participantEntityIds)
             ->get()
             ->keyBy('id');
 
         // Same "one mark per participant" semantics as payloadFor()'s per-participant
         // FestMark::where('participant_id', ...)->first() call — ordered by id so the
-        // batched result is deterministic. payloadFor()'s original query had no explicit
-        // order, so this doesn't change which mark is picked in practice for the common
-        // case (a participant with zero or one mark row), only makes it well-defined for
-        // the rare case of more than one.
+        // batched result is deterministic.
         $marksByParticipant = FestMark::whereIn('participant_id', $participants->keys())
+            ->with(['item'])
             ->orderBy('id')
             ->get()
             ->groupBy('participant_id')
@@ -714,26 +712,31 @@ class FestCertificateService
                 $break = $recordBreaks->get($certificate->entity_id);
 
                 return [$certificate->id => [
-                    'certificate' => $certificate,
-                    'participant' => $break?->participant,
-                    'student'     => $break?->participant?->student,
-                    'event'       => $break?->event,
-                    'item'        => $break?->item,
-                    'mark'        => null,
-                    'recordBreak' => $break,
+                    'certificate'  => $certificate,
+                    'participant'  => $break?->participant,
+                    'student'      => $break?->participant?->student,
+                    'event'        => $break?->event,
+                    'item'         => $break?->item,
+                    'mark'         => null,
+                    'recordBreak'  => $break,
+                    'registration' => $break?->participant?->registration,
                 ]];
             }
 
             $participant = $participants->get($certificate->entity_id);
+            $mark = $participant ? $marksByParticipant->get($participant->id) : null;
+            $item = $participant?->registration?->item ?? $mark?->item;
+            $event = $participant?->registration?->event ?? $mark?->event;
 
             return [$certificate->id => [
-                'certificate' => $certificate,
-                'participant' => $participant,
-                'student'     => $participant?->student,
-                'event'       => $participant?->registration?->event,
-                'item'        => $participant?->registration?->item,
-                'mark'        => $participant ? $marksByParticipant->get($participant->id) : null,
-                'recordBreak' => null,
+                'certificate'  => $certificate,
+                'participant'  => $participant,
+                'student'      => $participant?->student,
+                'event'        => $event,
+                'item'         => $item,
+                'mark'         => $mark,
+                'recordBreak'  => null,
+                'registration' => $participant?->registration,
             ]];
         });
     }

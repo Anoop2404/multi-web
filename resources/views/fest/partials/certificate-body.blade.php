@@ -38,7 +38,7 @@
     @endif
 
     @if($hasBackground)
-        <div class="page has-background {{ !empty($plainMode) ? 'hide-background' : '' }} {{ $__orientation === 'portrait' ? 'portrait' : '' }}" style="{{ empty($plainMode) && !empty($backgroundUrl) ? "background-image:url('{$backgroundUrl}');" : 'background-image:none !important;' }}">
+        <div class="page {{ !empty($plainMode) ? 'hide-background' : 'has-background' }} {{ $__orientation === 'portrait' ? 'portrait' : '' }}" style="{{ empty($plainMode) && !empty($backgroundUrl) ? "background-image:url('{$backgroundUrl}');" : 'background-image:none !important;' }}">
             @if(($layout['show_photo'] ?? false) && !empty($photoUrl))
                 @php $ph = $layout['photo'] ?? []; @endphp
                 <img class="overlay-photo" src="{{ $photoUrl }}" alt=""
@@ -68,6 +68,12 @@
                 @php $d = $layout['certificate_date'] ?? []; $dateValue = $fieldValues['certificate_date'] ?? now()->format('j F Y'); @endphp
                 <div class="overlay-field" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($d, ['top' => 72, 'left' => 8, 'width' => 42, 'font_size' => 12, 'font_family' => 'Montserrat', 'align' => 'left']) }}">
                     @if($boldVariables)<strong>Date :</strong> <strong>{{ $dateValue }}</strong>@else Date : {{ $dateValue }}@endif
+                </div>
+            @endif
+
+            @if(!empty($certificate?->verification_uuid))
+                <div class="overlay-field uuid" style="bottom:12px;right:12px;font-size:9px;">
+                    {{ $certificate->verification_uuid }}
                 </div>
             @endif
         </div>
@@ -172,8 +178,15 @@
             <p class="detail">has participated and achieved this distinction.</p>
             @endif
         </div>
+        @php
+            $certUuid = is_array($certificate) ? ($certificate['verification_uuid'] ?? $certificate['uuid'] ?? null) : ($certificate?->verification_uuid ?? null);
+            $certDate = is_array($certificate) ? ($certificate['generated_at'] ?? now()->format('d M Y')) : ($certificate?->generated_at?->format('d M Y') ?? now()->format('d M Y'));
+        @endphp
         <div class="meta">
-            <span>{{ $certificate->generated_at?->format('d M Y') ?? now()->format('d M Y') }}</span>
+            <span>{{ $certDate }}</span>
+            @if(!empty($certUuid))
+                <span>{{ $certUuid }}</span>
+            @endif
         </div>
     </div>
 @endif

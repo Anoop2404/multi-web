@@ -143,6 +143,9 @@
     </style>
 </head>
 <body>
+    <div class="toolbar no-print">
+        <button onclick="window.print()">Print / Save as PDF</button>
+    </div>
     <script>
         if (new URLSearchParams(window.location.search).get('hide_bg') === '1' || new URLSearchParams(window.location.search).get('plain') === '1') {
             document.body.classList.add('hide-background');

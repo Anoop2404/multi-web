@@ -44,18 +44,22 @@ class FestCertificateController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event'           => $event,
             'certificates'    => $certificates,
-            'winnersByItem'   => $this->winnersByItem($certificates),
-            'winnersBySchool' => $this->winnersBySchool($certificates),
+            'winnersByItem'   => $this->winnersByItem($certificates, $event),
+            'winnersBySchool' => $this->winnersBySchool($certificates, $event),
         ]));
     }
 
-    private function winnersByItem(\Illuminate\Support\Collection $certificates): \Illuminate\Support\Collection
+    private function winnersByItem(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
     {
         $itemResults = app(FestItemResultsService::class);
 
         return $certificates
-            ->filter(fn ($c) => $c['cert_type'] === 'winner' && ($c['item'] ?? null) && ($c['event'] ?? null))
-            ->filter(fn ($c) => $itemResults->isItemVisible($c['item'], $c['event']))
+            ->filter(fn ($c) => ($c['cert_type'] ?? null) === 'winner' && ! empty($c['item']))
+            ->filter(function ($c) use ($itemResults, $currentEvent) {
+                $item = $c['item'];
+                $event = $c['event'] ?? $currentEvent;
+                return $itemResults->isItemVisible($item, $event) || (bool) $currentEvent->results_published;
+            })
             ->groupBy(fn ($c) => $c['item']->id)
             ->map(function ($group) {
                 $first = $group->first();
@@ -63,12 +67,12 @@ class FestCertificateController extends SahodayaAdminController
                 return [
                     'item_id'    => $first['item']->id,
                     'item_title' => $first['item']->title,
-                    'winners'    => $group->sortBy(fn ($c) => $c['mark']->position ?? 99)
+                    'winners'    => $group->sortBy(fn ($c) => $c['mark']?->position ?? $c['position'] ?? 99)
                         ->map(fn ($c) => [
                             'id'       => $c['id'],
                             'uuid'     => $c['uuid'],
-                            'name'     => $c['student']?->name ?? 'Participant',
-                            'position' => $c['mark']->position ?? null,
+                            'name'     => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
+                            'position' => $c['mark']?->position ?? $c['position'] ?? null,
                         ])
                         ->values(),
                 ];
@@ -77,28 +81,32 @@ class FestCertificateController extends SahodayaAdminController
             ->values();
     }
 
-    private function winnersBySchool(\Illuminate\Support\Collection $certificates): \Illuminate\Support\Collection
+    private function winnersBySchool(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
     {
         $itemResults = app(FestItemResultsService::class);
 
         return $certificates
-            ->filter(fn ($c) => $c['cert_type'] === 'winner' && ($c['item'] ?? null) && ($c['event'] ?? null) && ($c['registration'] ?? null))
-            ->filter(fn ($c) => $itemResults->isItemVisible($c['item'], $c['event']))
-            ->groupBy(fn ($c) => $c['registration']->school_id ?? 0)
+            ->filter(fn ($c) => ($c['cert_type'] ?? null) === 'winner' && ! empty($c['item']))
+            ->filter(function ($c) use ($itemResults, $currentEvent) {
+                $item = $c['item'];
+                $event = $c['event'] ?? $currentEvent;
+                return $itemResults->isItemVisible($item, $event) || (bool) $currentEvent->results_published;
+            })
+            ->groupBy(fn ($c) => $c['registration']?->school_id ?? $c['participant']?->registration?->school_id ?? 0)
             ->map(function ($group) {
                 $first = $group->first();
-                $school = $first['registration']?->school;
+                $school = $first['registration']?->school ?? $first['participant']?->registration?->school;
 
                 return [
                     'school_id'   => $school?->id ?? 0,
                     'school_name' => $school?->name ?? 'Unknown School',
-                    'winners'     => $group->sortBy(fn ($c) => $c['mark']->position ?? 99)
+                    'winners'     => $group->sortBy(fn ($c) => $c['mark']?->position ?? $c['position'] ?? 99)
                         ->map(fn ($c) => [
                             'id'         => $c['id'],
                             'uuid'       => $c['uuid'],
-                            'name'       => $c['student']?->name ?? 'Participant',
+                            'name'       => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
                             'item_title' => $c['item']?->title ?? '',
-                            'position'   => $c['mark']->position ?? null,
+                            'position'   => $c['mark']?->position ?? $c['position'] ?? null,
                         ])
                         ->values(),
                 ];
