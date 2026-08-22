@@ -191,9 +191,9 @@
                             {{-- <th class="p-3">Rank</th> --}}
                             <th class="p-3">School</th>
                             <th class="p-3 text-right">Points</th>
-                            <th class="p-3 text-center" title="Gold — 1st place finishes"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold" class="w-5 h-5 inline-block"></th>
-                            <th class="p-3 text-center" title="Silver — 2nd place finishes"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Silver" class="w-5 h-5 inline-block"></th>
-                            <th class="p-3 text-center" title="Bronze — 3rd place finishes"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Bronze" class="w-5 h-5 inline-block"></th>
+                            {{-- <th class="p-3 text-center" title="Gold — 1st place finishes"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold" class="w-5 h-5 inline-block"></th> --}}
+                            {{-- <th class="p-3 text-center" title="Silver — 2nd place finishes"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Silver" class="w-5 h-5 inline-block"></th> --}}
+                            {{-- <th class="p-3 text-center" title="Bronze — 3rd place finishes"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Bronze" class="w-5 h-5 inline-block"></th> --}}
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
@@ -202,12 +202,12 @@
                                 {{-- <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td> --}}
                                 <td class="p-3 font-semibold text-white uppercase">{{ $row['school_name'] }}</td>
                                 <td class="p-3 text-right font-mono font-bold text-base text-white">{{ $row['total_points'] }}</td>
-                                <td class="p-3 text-center font-mono {{ $row['gold'] ? 'font-bold text-amber-400' : 'text-white/20' }}">{{ $row['gold'] }}</td>
-                                <td class="p-3 text-center font-mono {{ $row['silver'] ? 'font-bold text-slate-300' : 'text-white/20' }}">{{ $row['silver'] }}</td>
-                                <td class="p-3 text-center font-mono {{ $row['bronze'] ? 'font-bold text-orange-400' : 'text-white/20' }}">{{ $row['bronze'] }}</td>
+                                {{-- <td class="p-3 text-center font-mono {{ $row['gold'] ? 'font-bold text-amber-400' : 'text-white/20' }}">{{ $row['gold'] }}</td> --}}
+                                {{-- <td class="p-3 text-center font-mono {{ $row['silver'] ? 'font-bold text-slate-300' : 'text-white/20' }}">{{ $row['silver'] }}</td> --}}
+                                {{-- <td class="p-3 text-center font-mono {{ $row['bronze'] ? 'font-bold text-orange-400' : 'text-white/20' }}">{{ $row['bronze'] }}</td> --}}
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="p-8 text-center text-white/30">No school points published yet.</td></tr>
+                            <tr><td colspan="2" class="p-8 text-center text-white/30">No school points published yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
