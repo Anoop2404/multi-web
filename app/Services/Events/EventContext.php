@@ -329,10 +329,15 @@ class EventContext
     public function recalculateSchoolPoints(): void
     {
         $gradePointService = app(FestGradePointService::class);
+        $isOverallPublished = (bool) $this->event->results_published_at;
 
         // Same dedupe as scoreboardByCategory()/scoreboardByPhase() above.
+        // Only published items (or all items if event overall results are published) contribute to school total points.
         $marks = FestMark::where('event_id', $this->event->id)
-            ->with(['participant.registration'])
+            ->when(! $isOverallPublished, function ($query) {
+                $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at'));
+            })
+            ->with(['participant.registration.item', 'item'])
             ->get()
             ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
@@ -353,9 +358,17 @@ class EventContext
                 + $gradePointService->pointsForMark($this->event, $mark);
         }
 
+        if (empty($pointsBySchool)) {
+            FestResult::where('event_id', $this->event->id)->whereNull('item_id')->delete();
+            return;
+        }
+
         $rank = 1;
         $previousTotal = null;
         $position = 0;
+
+        $existingSchoolIds = FestResult::where('event_id', $this->event->id)->whereNull('item_id')->pluck('school_id')->all();
+        $updatedSchoolIds = [];
 
         foreach (collect($pointsBySchool)->sortDesc() as $schoolId => $total) {
             $position++;
@@ -363,11 +376,17 @@ class EventContext
                 $rank = $position;
             }
             $previousTotal = (int) $total;
+            $updatedSchoolIds[] = $schoolId;
 
             FestResult::updateOrCreate(
                 ['event_id' => $this->event->id, 'item_id' => null, 'school_id' => $schoolId],
                 ['total_points' => (int) $total, 'rank' => $rank]
             );
+        }
+
+        $staleSchoolIds = array_diff($existingSchoolIds, $updatedSchoolIds);
+        if (! empty($staleSchoolIds)) {
+            FestResult::where('event_id', $this->event->id)->whereNull('item_id')->whereIn('school_id', $staleSchoolIds)->delete();
         }
     }
 }
