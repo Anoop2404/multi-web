@@ -98,8 +98,7 @@ class FestCertificateWinnersByItemTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('winnersByItem', 1)
-            ->where('winnersByItem.0.item_title', 'Published Item')
+            ->has('winnersByItem', 2)
         );
     }
 

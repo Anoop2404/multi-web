@@ -75,15 +75,8 @@ class FestCertificateController extends SahodayaAdminController
 
     private function winnersByItem(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
     {
-        $itemResults = app(FestItemResultsService::class);
-
         return $certificates
             ->filter(fn ($c) => ($c['cert_type'] ?? null) === 'winner' && ! empty($c['item']))
-            ->filter(function ($c) use ($itemResults, $currentEvent) {
-                $item = $c['item'];
-                $event = $c['event'] ?? $currentEvent;
-                return $itemResults->isItemVisible($item, $event) || (bool) $currentEvent->results_published;
-            })
             ->groupBy(fn ($c) => $c['item']->id)
             ->map(function ($group) {
                 $first = $group->first();
@@ -107,15 +100,8 @@ class FestCertificateController extends SahodayaAdminController
 
     private function winnersBySchool(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
     {
-        $itemResults = app(FestItemResultsService::class);
-
         return $certificates
             ->filter(fn ($c) => ($c['cert_type'] ?? null) === 'winner' && ! empty($c['item']))
-            ->filter(function ($c) use ($itemResults, $currentEvent) {
-                $item = $c['item'];
-                $event = $c['event'] ?? $currentEvent;
-                return $itemResults->isItemVisible($item, $event) || (bool) $currentEvent->results_published;
-            })
             ->groupBy(fn ($c) => $c['registration']?->school_id ?? $c['participant']?->registration?->school_id ?? 0)
             ->map(function ($group) {
                 $first = $group->first();
