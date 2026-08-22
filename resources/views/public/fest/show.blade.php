@@ -21,12 +21,23 @@
                     <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Date</dt><dd class="font-bold mt-1">{{ $event->event_start?->format('d M Y') ?? 'To be announced' }}@if($event->event_start && $event->event_end && !$event->event_end->isSameDay($event->event_start)) – {{ $event->event_end->format('d M Y') }}@endif</dd></div>
                     <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Venue</dt><dd class="font-bold mt-1">{{ $event->resolvedVenueName() ?: 'To be announced' }}</dd></div>
                     @if($eventContext['series'])<div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Festival series</dt><dd class="font-bold mt-1">{{ $eventContext['series'] }}</dd></div>@endif
-                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Results</dt><dd class="font-bold mt-1 {{ ($scopeResultsPublished || ($publishedItemCount ?? 0) > 0) ? 'text-amber-300' : '' }}">@if($scopeResultsPublished)Official results published@elseif(($publishedItemCount ?? 0) > 0){{ $publishedItemCount }} item results published@else Awaiting publication @endif</dd></div>
+                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <dt class="text-white/40 text-xs">Results</dt>
+                        <dd class="font-bold mt-1 {{ ($scopeResultsPublished || ($publishedItemCount ?? 0) > 0) ? 'text-amber-300' : '' }}">
+                            @if($scopeResultsPublished)
+                                Official results published
+                            @elseif(($publishedItemCount ?? 0) > 0)
+                                {{ $publishedItemCount }} item results published
+                            @else
+                                Awaiting publication
+                            @endif
+                        </dd>
+                    </div>
                 </dl>
             </div>
         </header>
 
-        @unless($event->results_published)
+        @unless($scopeResultsPublished || ($publishedItemCount ?? 0) > 0)
         <p class="rounded-xl border border-amber-500/30 bg-amber-500/10 text-sm text-amber-200 px-4 py-3 mt-5">Participant names remain protected during live competition and appear after official publication or item result release.</p>
         @endunless
 
@@ -44,6 +55,7 @@
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'toppers']) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Topper Highlights <span class="float-right text-amber-400">→</span></a>
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Detailed Results <span class="float-right text-amber-400">→</span></a>
                 @elseif(($publishedItemCount ?? 0) > 0)
+                <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Event Scoreboard <span class="float-right text-amber-400">→</span></a>
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'item']) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Item Results <span class="float-right text-amber-400">→</span></a>
                 @else
                 <div class="p-4 bg-slate-900/30 border border-slate-800/60 rounded-2xl text-sm text-white/40">Scoreboard not published</div>
@@ -64,7 +76,7 @@
                 @foreach($recentResults as $itemGroup)
                 <a href="{{ route('tenant.fest.item-results', [$event->id, $itemGroup['item_id']]) }}" class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden hover:border-amber-500/50 hover:bg-slate-900 transition">
                     <div class="px-4 py-3 border-b border-slate-800/60">
-                        <h3 class="font-bold text-white truncate">{{ $itemGroup['item'] }}</h3>
+                        <h3 class="font-bold text-white truncate uppercase">{{ $itemGroup['item'] }}</h3>
                     </div>
                     <div class="flex flex-wrap">
                         @foreach($itemGroup['winners'] as $winner)
@@ -82,15 +94,15 @@
                                     @foreach($roster as $member)
                                     <div class="flex flex-col items-center gap-1 w-20">
                                         @if($member['photo'] ?? null)
-                                        <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
+                                        <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
                                         @else
                                         <span class="w-20 h-20 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-lg border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                                         @endif
-                                        <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
+                                        <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2 uppercase">{{ $member['name'] ?? '—' }}</span>
                                     </div>
                                     @endforeach
                                 </div>
-                                <p class="text-xs text-white/40 mt-3 truncate">{{ $winner['school'] }}</p>
+                                <p class="text-xs text-white/40 mt-3 truncate uppercase">{{ $winner['school'] }}</p>
                             </div>
                         </div>
                         @endforeach
@@ -124,7 +136,7 @@
                 @endphp
                 <article data-event-item data-search="{{ Str::lower(collect([$item->title, $item->head?->name])->filter()->implode(' ')) }}" data-category="{{ Str::lower($itemCategory ?? '') }}" data-mode="{{ Str::lower($item->participant_type ?? 'individual') }}" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 flex flex-col hover:border-amber-500/40 hover:bg-slate-900 transition">
                     <div class="flex items-start justify-between gap-3">
-                        <h3 class="font-bold leading-snug text-white">{{ $item->title }}</h3>
+                        <h3 class="font-bold leading-snug text-white uppercase">{{ $item->title }}</h3>
                         <span class="shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase {{ $isTeam ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30' : 'bg-white/5 text-white/50 border border-slate-700' }}">{{ $item->participant_type ?: 'individual' }}</span>
                     </div>
                     @if($item->head)<p class="text-xs text-white/40 mt-1">{{ $item->head->name }}</p>@endif

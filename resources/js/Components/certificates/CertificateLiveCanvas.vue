@@ -1,20 +1,29 @@
 <template>
     <div class="certificate-live-canvas relative w-full overflow-hidden rounded-xl border border-slate-300 bg-slate-950 shadow-lg select-none" ref="wrapperRef">
-        <!-- Aspect ratio container (1123 x 794 A4 Landscape = ~70.703%) -->
-        <div class="relative w-full pb-[70.703%] bg-slate-900">
-            <!-- Scaled Inner 1123x794 Canvas Container matching Blade certificate.blade.php -->
-            <div class="absolute top-0 left-0 w-[1123px] h-[794px] origin-top-left bg-white transition-all overflow-hidden"
-                 :style="{ transform: `scale(${scaleFactor})` }">
-                
-                <!-- Background Image Backdrop -->
-                <div v-if="bgUrl" class="w-full h-full bg-cover bg-center bg-no-repeat"
-                     :style="{ backgroundImage: `url('${bgUrl}')` }">
+        <!-- Aspect ratio container — landscape (1123x794, ~70.703%) or portrait (794x1123, ~141.435%) to match layout.orientation -->
+        <div class="relative w-full bg-slate-900" :style="{ paddingBottom: `${aspectRatioPct}%` }">
+            <!-- Scaled Inner Canvas Container matching Blade certificate-print.blade.php's own dimensions -->
+            <div class="absolute top-0 left-0 origin-top-left bg-white transition-all overflow-hidden"
+                 :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px`, transform: `scale(${scaleFactor})` }">
+
+                <!-- Background Image Backdrop — background-size:100% 100% (stretch), matching the
+                     blade's own background-size exactly rather than bg-cover's crop-to-fill, so
+                     what you see here matches the real print output pixel-for-pixel. -->
+                <div v-if="bgUrl" class="w-full h-full bg-no-repeat"
+                     :style="{ backgroundImage: `url('${bgUrl}')`, backgroundSize: '100% 100%', backgroundPosition: 'center' }">
                 </div>
 
                 <div v-else class="w-full h-full flex flex-col items-center justify-center p-12 text-center bg-slate-100 text-slate-400 border-8 border-double border-indigo-900">
                     <span class="text-6xl mb-4">📜</span>
                     <p class="text-xl font-bold text-slate-700">Default Certificate Backdrop</p>
                     <p class="text-sm text-slate-500 mt-1">Upload a PDF or image background to view custom artwork</p>
+                </div>
+
+                <!-- Sahodaya Logo Badge Overlay (top-left) -->
+                <div v-if="showLogoOverlay"
+                     class="absolute flex items-center gap-1.5 bg-white/70 rounded shadow-sm"
+                     style="top: 16px; left: 16px; padding: 4px 8px;">
+                    <span class="text-[9px] font-bold text-slate-800 max-w-[120px] leading-tight">{{ sampleData.sahodaya_name }}</span>
                 </div>
 
                 <!-- Participation Label Cover (if disabled) -->
@@ -83,7 +92,7 @@
         <div class="bg-slate-950 px-4 py-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800">
             <span class="flex items-center gap-1.5 text-emerald-400 font-semibold">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                100% Pixel-Match Canvas (1123 × 794 A4)
+                100% Pixel-Match Canvas ({{ canvasWidth }} × {{ canvasHeight }} A4 {{ isPortrait ? 'Portrait' : 'Landscape' }})
             </span>
             <span class="font-mono text-slate-500">Scale: {{ (scaleFactor * 100).toFixed(0) }}%</span>
         </div>
@@ -123,7 +132,14 @@ onUnmounted(() => {
     window.removeEventListener('resize', updateWidth);
 });
 
-const scaleFactor = computed(() => Math.max(0.2, wrapperWidth.value / 1123));
+// Mirrors certificate-print.blade.php's own $__orientation logic: portrait swaps the
+// canvas to 794x1123 instead of the default 1123x794 landscape.
+const isPortrait = computed(() => props.layout?.orientation === 'portrait');
+const canvasWidth = computed(() => (isPortrait.value ? 794 : 1123));
+const canvasHeight = computed(() => (isPortrait.value ? 1123 : 794));
+const aspectRatioPct = computed(() => (canvasHeight.value / canvasWidth.value) * 100);
+
+const scaleFactor = computed(() => Math.max(0.2, wrapperWidth.value / canvasWidth.value));
 
 const bgUrl = computed(() => props.localFileUrl || props.backgroundUrl);
 
@@ -131,6 +147,7 @@ const showRecipientName = computed(() => props.layout?.show_recipient_name !== f
 const showParticipationLabel = computed(() => props.layout?.show_participation_label !== false);
 const boldVariables = computed(() => props.layout?.bold_variables !== false);
 const showCertificateDate = computed(() => props.layout?.show_certificate_date !== false);
+const showLogoOverlay = computed(() => props.layout?.show_logo_overlay !== false);
 
 const showPhoto = computed(() => props.layout?.show_photo === true);
 const photoLayout = computed(() => props.layout?.photo ?? {});

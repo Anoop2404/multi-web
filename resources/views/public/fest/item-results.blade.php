@@ -16,7 +16,7 @@
     <div class="max-w-6xl mx-auto">
         @include('public.fest.partials.page-hero', [
             'eyebrow' => 'Results',
-            'title' => $item->title,
+            'title' => Str::upper($item->title),
             'subtitle' => $event->title,
             'badges' => [$typeLabels[$item->participant_type] ?? ucfirst($item->participant_type ?: 'individual')],
         ])
@@ -65,17 +65,17 @@
                                 @foreach($roster as $member)
                                 <div class="flex flex-col items-center gap-1.5 flex-1 min-w-0 max-w-[7rem] sm:max-w-[9rem]">
                                     @if($member['photo'] ?? null)
-                                    <img src="{{ $member['photo'] }}" alt="" class="w-full h-24 sm:h-32 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
+                                    <img src="{{ $member['photo'] }}" alt="" class="w-full h-24 sm:h-32 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
                                     @else
                                     <span class="w-full h-24 sm:h-32 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-xl sm:text-2xl border-2 border-slate-700/60 shadow-md shadow-black/30">
                                         {{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}
                                     </span>
                                     @endif
-                                    <span class="text-xs sm:text-sm font-bold leading-snug text-white text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
+                                    <span class="text-xs sm:text-sm font-bold leading-snug text-white text-center line-clamp-2 uppercase">{{ $member['name'] ?? '—' }}</span>
                                 </div>
                                 @endforeach
                             </div>
-                            <p class="text-xs text-white/40 mt-3 truncate">{{ $row['school'] }}</p>
+                            <p class="text-xs text-white/40 mt-3 truncate uppercase">{{ $row['school'] }}</p>
                         </div>
                     </div>
                 @else
@@ -90,7 +90,7 @@
                                 <div class="shrink-0 w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-sm text-white font-black">{{ $pos ? '#' . $pos : '—' }}</div>
                             @endif
                             <div class="flex-1 min-w-0">
-                                <p class="font-bold text-sm text-white truncate">{{ $row['school'] }}</p>
+                                <p class="font-bold text-sm text-white truncate uppercase">{{ $row['school'] }}</p>
                                 <p class="text-[11px] text-white/40">{{ count($roster) }} Team Members</p>
                             </div>
                         </div>
@@ -98,13 +98,13 @@
                             @foreach($roster as $member)
                             <div class="flex flex-col items-center gap-1.5 w-20">
                                 @if($member['photo'] ?? null)
-                                <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
+                                <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
                                 @else
                                 <span class="w-20 h-20 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-lg border-2 border-slate-700/60 shadow-md shadow-black/30">
                                     {{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}
                                 </span>
                                 @endif
-                                <span class="text-[11px] font-semibold leading-tight text-white/80 text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
+                                <span class="text-[11px] font-semibold leading-tight text-white/80 text-center line-clamp-2 uppercase">{{ $member['name'] ?? '—' }}</span>
                             </div>
                             @endforeach
                         </div>

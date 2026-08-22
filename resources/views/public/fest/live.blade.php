@@ -33,7 +33,10 @@
             @endif
         </div>
 
-        <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Event School Standings</h2>
+        <div class="flex items-center justify-between gap-3 mt-10 mb-3">
+            <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400">Event School Standings</h2>
+            <span id="school-scoreboard-provisional-badge" class="text-[10px] font-bold uppercase tracking-wider text-amber-300 border border-amber-500/30 bg-amber-500/10 rounded-full px-2 py-0.5 @unless($standingsProvisional ?? false) hidden @endunless">Provisional</span>
+        </div>
         <ol id="school-scoreboard" class="space-y-2">
             @forelse($scoreboard as $row)
             <li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
@@ -41,7 +44,7 @@
                 <span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span>
             </li>
             @empty
-            <li class="text-white/30 text-center py-6">{{ $standingsPublished ? 'No scores yet' : 'Official standings are not published yet' }}</li>
+            <li class="text-white/30 text-center py-6">{{ $standingsPublished ? 'No scores yet' : 'Standings appear here once at least one item is published' }}</li>
             @endforelse
         </ol>
 
@@ -107,11 +110,13 @@
         ? `<img src="/images/fest/medals/rank-${rank}.webp" alt="Rank ${rank}" class="inline-block w-5 h-5 align-middle">`
         : `<span class="font-mono">#${rank}</span>`;
 
-    function renderSchool(rows, published) {
+    function renderSchool(rows, published, provisional) {
         const el = document.getElementById('school-scoreboard');
+        const badge = document.getElementById('school-scoreboard-provisional-badge');
+        if (badge) badge.classList.toggle('hidden', !provisional);
         if (!el) return;
         if (!rows.length) {
-            el.innerHTML = `<li class="text-white/30 text-center py-6">${published ? 'No scores yet' : 'Official standings are not published yet'}</li>`;
+            el.innerHTML = `<li class="text-white/30 text-center py-6">${published ? 'No scores yet' : 'Standings appear here once at least one item is published'}</li>`;
             return;
         }
         el.innerHTML = rows.map(r => `<li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
@@ -142,7 +147,7 @@
             const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
             if (!res.ok) return;
             const data = await res.json();
-            renderSchool(data.scoreboard || [], Boolean(data.standingsPublished));
+            renderSchool(data.scoreboard || [], Boolean(data.standingsPublished), Boolean(data.standingsProvisional));
             renderHouse(data.houseScoreboard || []);
             renderNow(data.nowPerforming);
             const badge = document.getElementById('live-refresh-badge');

@@ -9,13 +9,19 @@
 </div>
 @endif
 
-@unless($isPublished)
+@unless($isPublished || !empty($scoreboard) || !empty($latestWinners))
 <div class="rounded-3xl bg-slate-900 border border-slate-800 p-10 sm:p-12 text-center shadow-xl">
     <span class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto mb-4 flex items-center justify-center text-sm font-extrabold text-amber-300" aria-hidden="true">WAIT</span>
     <h2 class="text-xl font-bold text-white">Official Standings Not Published Yet</h2>
     <p class="text-sm text-slate-400 mt-2 max-w-md mx-auto">The official event scoreboard will appear after the event committee certifies and publishes the results.</p>
 </div>
 @else
+@if($isProvisional ?? false)
+<div class="mb-6 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+    <div><p class="text-sm font-extrabold text-amber-200">Provisional standing</p><p class="text-xs text-amber-100/70 mt-0.5">Computed from items published so far — the official standing appears once the event committee publishes final results.</p></div>
+    <span class="shrink-0 text-[11px] font-bold uppercase tracking-wider text-amber-200 border border-amber-300/20 rounded-full px-3 py-1">Not yet official</span>
+</div>
+@endif
 <div class="grid lg:grid-cols-[1.2fr_.8fr] gap-6">
     <section class="space-y-4" aria-labelledby="leading-schools-title">
         <div class="flex items-center justify-between gap-3"><h2 id="leading-schools-title" class="text-lg font-extrabold text-white">Leading Schools</h2><span class="text-xs text-slate-400 font-semibold">{{ ($cumulativeStanding ?? null) ? 'Cumulative Points' : 'Total Points' }}</span></div>

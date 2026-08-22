@@ -1,6 +1,6 @@
 <article class="rounded-2xl bg-slate-900 border border-slate-800 shadow-md overflow-hidden">
     <div class="px-4 py-2.5 bg-white/5 border-b border-slate-800">
-        <p class="font-bold text-white text-sm truncate">{{ $itemGroup['item'] }}</p>
+        <p class="font-bold text-white text-sm truncate uppercase">{{ $itemGroup['item'] }}</p>
         @if($itemGroup['head'])<p class="text-[11px] text-white/40 truncate">{{ $itemGroup['head'] }}</p>@endif
     </div>
     {{-- flex-wrap, not divide-y: multiple awarded positions for the same item sit side by
@@ -30,11 +30,11 @@
                     @foreach($visibleRoster as $member)
                     <div class="flex flex-col items-center gap-1 w-20">
                         @if($member['photo'] ?? null)
-                        <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
+                        <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
                         @else
                         <span class="w-20 h-20 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-lg border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                         @endif
-                        <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
+                        <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2 uppercase">{{ $member['name'] ?? '—' }}</span>
                     </div>
                     @endforeach
                     @if($hiddenCount)
@@ -44,7 +44,7 @@
                     </div>
                     @endif
                 </div>
-                <p class="text-xs text-slate-400 mt-3 truncate">{{ $winner['school'] }}</p>
+                <p class="text-xs text-slate-400 mt-3 truncate uppercase">{{ $winner['school'] }}</p>
             </div>
         </div>
         @endforeach

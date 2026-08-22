@@ -115,6 +115,15 @@
                                     <input v-model="form.layout_json.show_photo" type="checkbox" class="rounded" :true-value="true" :false-value="false">
                                     Show participant/student photo
                                 </label>
+                                <label class="flex items-center gap-2 text-sm text-slate-700 font-medium">
+                                    <input v-model="form.layout_json.show_logo_overlay" type="checkbox" class="rounded" :true-value="true" :false-value="false">
+                                    Show small Sahodaya logo badge (top-left)
+                                </label>
+                                <p class="text-xs text-slate-500 -mt-1">Turn this off if your background image already has the logo/branding built in — otherwise it prints twice.</p>
+                                <label class="flex items-center gap-2 text-sm text-slate-700 font-medium">
+                                    <input v-model="form.layout_json.show_qr" type="checkbox" class="rounded" :true-value="true" :false-value="false">
+                                    Show verification QR code
+                                </label>
                             </div>
 
                             <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
@@ -554,10 +563,13 @@ function layoutDefaults(from = null) {
     const d = props.defaultLayout || {};
     const src = from || {};
     return {
+        orientation: src.orientation ?? d.orientation ?? 'landscape',
         show_recipient_name: src.show_recipient_name ?? d.show_recipient_name ?? false,
         show_participation_label: src.show_participation_label ?? d.show_participation_label ?? true,
         bold_variables: src.bold_variables ?? d.bold_variables ?? true,
         show_certificate_date: src.show_certificate_date ?? d.show_certificate_date ?? true,
+        show_logo_overlay: src.show_logo_overlay ?? d.show_logo_overlay ?? true,
+        show_qr: src.show_qr ?? d.show_qr ?? true,
         show_photo: src.show_photo ?? d.show_photo ?? false,
         photo: {
             top: src.photo?.top ?? d.photo?.top ?? 31,

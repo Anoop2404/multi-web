@@ -15,7 +15,7 @@
         @if($public['show_name'] && ($public['photo'] || $public['school']))
         <div class="mt-4 flex items-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
             @if($public['photo'])
-            <img src="{{ $public['photo'] }}" alt="" class="w-16 h-16 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30 shrink-0">
+            <img src="{{ $public['photo'] }}" alt="" class="w-16 h-16 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30 shrink-0">
             @else
             <span class="w-16 h-16 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-xl border-2 border-slate-700/60 shadow-md shadow-black/30 shrink-0">
                 {{ strtoupper(substr($public['name'] ?? '?', 0, 1)) }}

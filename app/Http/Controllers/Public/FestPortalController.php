@@ -416,6 +416,7 @@ class FestPortalController extends Controller
 
         $marks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
+            ->where('position', '<=', 3)
             ->with(['participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('position')
             ->orderByDesc('score')
@@ -570,7 +571,11 @@ class FestPortalController extends Controller
         $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
             ->whereIn('position', [1, 2, 3])
             ->with(['item', 'participant.registration.school'])
-            ->when(! $isPublished, fn ($query) => $query->whereRaw('1 = 0'))
+            // Same fallback as resolveScoreboard()/scoreboardDynamicData(): before the
+            // whole event is published, only count marks whose own item has published —
+            // so the medal columns line up with the provisional points column instead of
+            // sitting at 0 while points already show real numbers.
+            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
             ->get()
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
             ->unique(fn (FestMark $m) => $m->participant->registration_id ?? $m->id);
@@ -632,12 +637,14 @@ class FestPortalController extends Controller
         // Order: overall school ranking, then each category's ranking, then results —
         // standings open the rotation so the "big picture" leads, results follow as the
         // detail underneath it.
+        $provisionalSuffix = $isPublished ? '' : ' · Provisional';
+
         $overallPages = array_chunk($overallBoard, $boardsPerPage);
         foreach ($overallPages as $i => $page) {
             $slides[] = [
                 'type' => 'board',
                 'title' => 'Overall Standings',
-                'subtitle' => count($overallPages) > 1 ? 'Page '.($i + 1).' of '.count($overallPages) : 'All Categories',
+                'subtitle' => (count($overallPages) > 1 ? 'Page '.($i + 1).' of '.count($overallPages) : 'All Categories').$provisionalSuffix,
                 'rows' => $page,
             ];
         }
@@ -648,7 +655,7 @@ class FestPortalController extends Controller
                 $slides[] = [
                     'type' => 'board',
                     'title' => $board['label'].' Standings',
-                    'subtitle' => count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : null,
+                    'subtitle' => trim((count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : '').$provisionalSuffix, ' ·') ?: null,
                     'rows' => $page,
                 ];
             }
@@ -664,10 +671,12 @@ class FestPortalController extends Controller
             ];
         }
 
-        // Before results are published there's nothing to rank yet — show who's actually
-        // competing instead of a bare "check back later" card. Registrations, not marks,
-        // so this has real content from the moment schools sign up.
-        if (! $isPublished) {
+        // Only fall back to a schools-only roster when there's truly nothing published
+        // yet (overallBoard/categoryBoards are already real provisional data — built
+        // above via resolveScoreboard() — the moment even one item is published).
+        // Registrations, not marks, so this still has real content from the moment
+        // schools sign up, before any item is scored at all.
+        if (! $isPublished && empty($overallBoard) && empty($categoryBoards)) {
             $registrations = FestRegistration::whereIn('event_id', $selectedScope['event_ids'])
                 ->active()
                 ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
@@ -798,14 +807,20 @@ class FestPortalController extends Controller
             $nowPerforming['item_title'] = $nowSlot->item?->title;
         }
 
+        // Official (whole-event-published) standings use the same resolution as the
+        // Scoreboard page; before that, a live provisional standing from whatever
+        // items have individually published so far — not a blank "not published"
+        // state, matching the item-level results already visible elsewhere on the
+        // public portal at this point.
+        $scoreboard = $selectedScope['results_published']
+            ? ($this->cumulativeChampionship->publicStanding($event)['rows']
+                ?? $this->scoreboards->scoreboard($event, $selectedScope))
+            : $this->scoreboards->provisionalScoreboard($event, $selectedScope);
+
         return [
-            // Live operations remain available before publish, but official school
-            // standings do not leak through this alternate public endpoint.
-            'scoreboard' => $selectedScope['results_published']
-                ? ($this->cumulativeChampionship->publicStanding($event)['rows']
-                    ?? $this->scoreboards->scoreboard($event, $selectedScope))
-                : [],
+            'scoreboard' => $scoreboard,
             'standingsPublished' => (bool) $selectedScope['results_published'],
+            'standingsProvisional' => ! $selectedScope['results_published'] && ! empty($scoreboard),
             'categoryLinks' => $categoryLinks,
             'houseScoreboard' => $selectedScope['results_published']
                 ? $ctx->scoreboardByHouse()
@@ -864,12 +879,16 @@ class FestPortalController extends Controller
      */
     private function resolveScoreboard(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished): array
     {
-        $scoreboard = $isPublished
-            ? $this->scoreboards->scoreboard($event, $selectedScope, $category)
-            : [];
-        $cumulativeStanding = $isPublished
-            ? $this->cumulativeChampionship->publicStanding($event, $category)
-            : null;
+        if (! $isPublished) {
+            // Whole-event publish hasn't run yet, but individual items may already be
+            // published — a live-computed provisional standing from just those, rather
+            // than a blank "not published" state, matches the item-level results that
+            // are already visible elsewhere on the public portal at this point.
+            return [$this->scoreboards->provisionalScoreboard($event, $selectedScope, $category), null];
+        }
+
+        $scoreboard = $this->scoreboards->scoreboard($event, $selectedScope, $category);
+        $cumulativeStanding = $this->cumulativeChampionship->publicStanding($event, $category);
         if ($cumulativeStanding !== null) {
             $scoreboard = $cumulativeStanding['rows'];
         }
@@ -888,7 +907,10 @@ class FestPortalController extends Controller
             // Raw safety ceiling only, not a "recent teaser" cap — every published item's
             // winners should show here (the widget already scrolls its own container).
             ->limit(200)
-            ->when(! $isPublished, fn ($query) => $query->whereRaw('1 = 0'))
+            // Whole-event publish gates nothing here — matches show()'s $recentResults:
+            // fall back to each item's own results_published_at so items published ahead
+            // of the official whole-event publish still show their winners.
+            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
             ->get();
         $roster = $this->rosterForMarks($winnerMarks);
         $latestWinners = $winnerMarks
@@ -921,6 +943,7 @@ class FestPortalController extends Controller
             'scoreboard' => $scoreboard,
             'latestWinners' => $latestWinners,
             'cumulativeStanding' => $cumulativeStanding,
+            'isProvisional' => ! $isPublished,
             'showPhasePoints' => collect($scoreboard)->contains(
                 fn (array $row) => (int) ($row['event_points'] ?? 0) !== (int) ($row['phase_points'] ?? 0)
             ),

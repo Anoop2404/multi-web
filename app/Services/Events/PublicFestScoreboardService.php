@@ -336,6 +336,50 @@ class PublicFestScoreboardService
     }
 
     /**
+     * Live standings computed only from items that have individually published their
+     * results (item.results_published_at set) — for use before the whole-event
+     * official publish action has run. scoreboard()'s overall branch reads a
+     * FestResult snapshot that's only written AT that publish action, so there's
+     * nothing to read yet; this recomputes from FestMark every call instead,
+     * deliberately not cached, since which items are published keeps changing
+     * during a live event. Category and overall share one implementation here
+     * (scoreboard() needs two, since the official overall path is snapshot-based
+     * but its category path already computes live).
+     *
+     * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
+     */
+    public function provisionalScoreboard(FestEvent $event, array $scope, ?string $category = null): array
+    {
+        $root = $this->rootEvent($event);
+        $categoryColumn = $root->event_type === 'sports' ? 'age_group' : 'class_group';
+
+        $marks = FestMark::whereIn('event_id', $scope['event_ids'])
+            ->whereHas('item', function ($query) use ($category, $categoryColumn) {
+                $query->whereNotNull('results_published_at');
+                if ($category) {
+                    $query->where($categoryColumn, $category);
+                }
+            })
+            ->with(['participant.registration', 'item'])
+            ->get()
+            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
+
+        $totals = [];
+        foreach ($marks as $mark) {
+            $participant = $mark->participant;
+            $schoolId = $participant?->registration?->school_id;
+
+            if (! $schoolId || $participant->disqualified_at) {
+                continue;
+            }
+
+            $totals[$schoolId] = ($totals[$schoolId] ?? 0) + $this->gradePoints->pointsForMark($event, $mark);
+        }
+
+        return $this->rankTotals($totals);
+    }
+
+    /**
      * @param  array<string, int|float>  $totals
      * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
      */

@@ -90,8 +90,8 @@
                             <ol class="divide-y divide-slate-800">
                                 @foreach($group['rows'] as $row)
                                 <li class="flex items-center gap-3 px-4 py-3">
-                                    @if($row['photo'] ?? null)<img src="{{ $row['photo'] }}" alt="" class="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0">@else<span class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-sm font-extrabold text-amber-400 shrink-0">{{ strtoupper(substr($row['student'] ?? '?', 0, 1)) }}</span>@endif
-                                    <div class="min-w-0 flex-1"><p class="font-bold text-sm truncate text-white"><span class="text-amber-400 mr-1">#{{ $row['category_rank'] }}</span>{{ $row['student'] }}</p><p class="text-xs text-white/40 truncate mt-0.5">{{ $row['school'] }}</p></div><span class="font-mono font-bold text-white">{{ $row['points'] }}</span>
+                                    @if($row['photo'] ?? null)<img src="{{ $row['photo'] }}" alt="" class="w-10 h-10 rounded-xl object-cover object-top border border-slate-700 shrink-0">@else<span class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-sm font-extrabold text-amber-400 shrink-0">{{ strtoupper(substr($row['student'] ?? '?', 0, 1)) }}</span>@endif
+                                    <div class="min-w-0 flex-1"><p class="font-bold text-sm truncate text-white uppercase"><span class="text-amber-400 mr-1">#{{ $row['category_rank'] }}</span>{{ $row['student'] }}</p><p class="text-xs text-white/40 truncate mt-0.5 uppercase">{{ $row['school'] }}</p></div><span class="font-mono font-bold text-white">{{ $row['points'] }}</span>
                                 </li>
                                 @endforeach
                             </ol>
@@ -260,7 +260,7 @@
                                 <div class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden" data-result-item data-search="{{ Str::lower(collect([$item['item'], $item['head']])->filter()->implode(' ')) }}" data-mode="{{ $item['participant_type'] ?? 'individual' }}" data-stage="{{ $item['stage_type'] ?? '' }}">
                                     <div class="px-4 py-3 bg-white/5 border-b border-slate-800 flex items-start gap-3">
                                         <div class="min-w-0">
-                                            <h3 class="font-bold text-white">{{ $item['item'] }}</h3>
+                                            <h3 class="font-bold text-white uppercase">{{ $item['item'] }}</h3>
                                             @if($item['head'])<p class="text-xs text-white/40">{{ $item['head'] }}</p>@endif
                                         </div>
                                         @if($typeLabel = $participantTypeLabels[$item['participant_type'] ?? ''] ?? null)
@@ -288,15 +288,15 @@
                                                     @foreach($roster as $member)
                                                     <div class="flex flex-col items-center gap-1 w-20">
                                                         @if($member['photo'] ?? null)
-                                                        <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover border-2 border-slate-700/60 shadow-md shadow-black/30">
+                                                        <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
                                                         @else
                                                         <span class="w-20 h-20 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center text-lg font-bold border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                                                         @endif
-                                                        <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2">{{ $member['name'] ?? '—' }}</span>
+                                                        <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2 uppercase">{{ $member['name'] ?? '—' }}</span>
                                                     </div>
                                                     @endforeach
                                                 </div>
-                                                <p class="text-xs text-white/40 mt-3 truncate">{{ $winner['school'] }}</p>
+                                                <p class="text-xs text-white/40 mt-3 truncate uppercase">{{ $winner['school'] }}</p>
                                             </div>
                                         </div>
                                         @endforeach
@@ -322,15 +322,15 @@
                                 <td class="p-3 font-semibold text-white">
                                     <div class="flex items-center gap-2">
                                         @if($row['photo'] ?? null)
-                                        <img src="{{ $row['photo'] }}" alt="" class="w-7 h-7 rounded-full object-cover border border-slate-700 shrink-0">
+                                        <img src="{{ $row['photo'] }}" alt="" class="w-7 h-7 rounded-full object-cover object-top border border-slate-700 shrink-0">
                                         @else
                                         <span class="w-7 h-7 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-[10px] font-bold shrink-0">{{ strtoupper(substr($row['participant'] ?? '?', 0, 1)) }}</span>
                                         @endif
-                                        {{ $row['participant'] }}
+                                        <span class="uppercase">{{ $row['participant'] }}</span>
                                     </div>
                                 </td>
-                                <td class="p-3 text-white/70">{{ $row['school'] }}</td>
-                                <td class="p-3 text-white/70">{{ $row['item'] }}</td>
+                                <td class="p-3 text-white/70 uppercase">{{ $row['school'] }}</td>
+                                <td class="p-3 text-white/70 uppercase">{{ $row['item'] }}</td>
                                 <td class="p-3 font-bold text-white">#{{ $row['position'] }}</td>
                                 <td class="p-3 font-semibold text-amber-400">{{ !empty($row['grade']) ? 'Grade '.$row['grade'] : '—' }}</td>
                             </tr>
@@ -354,8 +354,8 @@
                         @forelse($championship as $row)
                             <tr>
                                 <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
-                                <td class="p-3 font-semibold text-white">{{ $row['student'] }}</td>
-                                <td class="p-3 text-white/70">{{ $row['school'] }}</td>
+                                <td class="p-3 font-semibold text-white uppercase">{{ $row['student'] }}</td>
+                                <td class="p-3 text-white/70 uppercase">{{ $row['school'] }}</td>
                                 <td class="p-3 text-white/70">{{ $row['category'] }}</td>
                                 <td class="p-3 text-white/70">{{ $row['gender'] }}</td>
                                 <td class="p-3 text-right font-mono text-white">{{ $row['points'] }}</td>
