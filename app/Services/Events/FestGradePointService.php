@@ -90,10 +90,11 @@ class FestGradePointService
             })
             ->get();
 
+        $hasCustomConfigs = $configs->isNotEmpty();
         $resolved = $this->highestMatchingGradeConfig($configs->where('item_id', $itemId), $score, $maxPossibleMarks)
             ?? $this->highestMatchingGradeConfig($configs->whereNull('item_id'), $score, $maxPossibleMarks);
 
-        if ($resolved !== null) {
+        if ($resolved !== null || $hasCustomConfigs) {
             return $resolved;
         }
 
@@ -122,12 +123,21 @@ class FestGradePointService
 
         $percent = $maxPossibleMarks > 0 ? ($score / $maxPossibleMarks) * 100 : $score;
 
-        $sorted = $configs->sortByDesc(fn (FestGradeConfig $c) => (float) ($c->min_percent ?? $c->min_score ?? 0));
+        $sorted = $configs->sortByDesc(fn (FestGradeConfig $c) => (float) ($c->min_percent ?? $c->min_score ?? 0))->values();
 
-        foreach ($sorted as $cfg) {
+        $count = $sorted->count();
+        for ($i = 0; $i < $count; $i++) {
+            $cfg = $sorted[$i];
             $min = (float) ($cfg->min_percent ?? $cfg->min_score ?? 0);
-            $max = (float) ($cfg->max_percent ?? $cfg->max_score ?? 100);
-            if ($percent >= $min && $percent <= $max) {
+            $max = $i === 0
+                ? (float) ($cfg->max_percent ?? $cfg->max_score ?? 100)
+                : (float) ($sorted[$i - 1]->min_percent ?? $sorted[$i - 1]->min_score ?? 100);
+
+            $matched = $i === 0
+                ? ($percent >= $min && $percent <= $max)
+                : ($percent >= $min && $percent < $max);
+
+            if ($matched) {
                 return str_replace('_plus', '+', $cfg->grade);
             }
         }

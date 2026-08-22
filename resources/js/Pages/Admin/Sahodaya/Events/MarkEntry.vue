@@ -437,14 +437,23 @@ function computeAutoGrade(score, item) {
             return minB - minA;
         });
 
-        for (const rule of sorted) {
+        for (let i = 0; i < sorted.length; i++) {
+            const rule = sorted[i];
             const gradeLabel = (rule.grade || '').replace('_plus', '+');
             const min = Number(rule.min_percent ?? rule.min_score ?? 0);
-            const max = Number(rule.max_percent ?? rule.max_score ?? 100);
-            if (percent >= min && percent <= max) {
+            const max = i === 0
+                ? Number(rule.max_percent ?? rule.max_score ?? 100)
+                : Number(sorted[i - 1].min_percent ?? sorted[i - 1].min_score ?? 100);
+
+            const matched = i === 0
+                ? (percent >= min && percent <= max)
+                : (percent >= min && percent < max);
+
+            if (matched) {
                 return gradeLabel;
             }
         }
+        return '';
     }
 
     if (percent !== null) {
