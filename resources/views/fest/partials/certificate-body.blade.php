@@ -38,7 +38,7 @@
     @endif
 
     @if($hasBackground)
-        <div class="page {{ !empty($plainMode) ? 'hide-background' : 'has-background' }} {{ $__orientation === 'portrait' ? 'portrait' : '' }}" style="{{ empty($plainMode) && !empty($backgroundUrl) ? "background-image:url('{$backgroundUrl}');" : 'background-image:none !important;' }}">
+        <div class="page {{ !empty($plainMode) ? 'hide-background ' : '' }}has-background{{ $__orientation === 'portrait' ? ' portrait' : '' }}" style="{{ empty($plainMode) && !empty($backgroundUrl) ? "background-image:url('{$backgroundUrl}');" : 'background-image:none !important;' }}">
             @if(($layout['show_photo'] ?? false) && !empty($photoUrl))
                 @php $ph = $layout['photo'] ?? []; @endphp
                 <img class="overlay-photo" src="{{ $photoUrl }}" alt=""
