@@ -6,15 +6,28 @@
         @include('public.fest.partials.page-hero', [
             'eyebrow' => $event->title,
             'title' => $school->name,
-            'subtitle' => 'Full results roster — every item entered, with rank, grade, and points.',
+            'subtitle' => $activeCategoryLabel
+                ? $activeCategoryLabel.' results only — every item entered in this category, with rank, grade, and points.'
+                : 'Full results roster — every item entered, with rank, grade, and points.',
             'badges' => [],
             'meta' => null,
         ])
 
         <div class="flex flex-wrap items-center justify-between gap-3 mt-4 mb-8">
-            <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'school']) }}" class="text-sm font-semibold text-amber-400 hover:underline">← Back to all schools</a>
+            @if($activeCategory)
+                <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id, 'category' => $activeCategory]) }}" class="text-sm font-semibold text-amber-400 hover:underline">← Back to {{ $activeCategoryLabel }}</a>
+            @else
+                <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'school']) }}" class="text-sm font-semibold text-amber-400 hover:underline">← Back to all schools</a>
+            @endif
             <span class="text-2xl font-mono font-extrabold text-amber-400">{{ $schoolRow['total_points'] }} <small class="text-xs text-white/40 font-sans font-bold uppercase tracking-wide">pts total</small></span>
         </div>
+
+        @if($activeCategory)
+        <div class="mb-8 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs text-amber-200">Showing <strong>{{ $activeCategoryLabel }}</strong> items only.</p>
+            <a href="{{ route('tenant.fest.results.school', ['event' => $event->id, 'school' => $school->id]) }}" class="text-xs font-bold text-amber-400 hover:underline shrink-0">View full roster (all categories) →</a>
+        </div>
+        @endif
 
         @php $grouped = collect($roster)->groupBy('category'); @endphp
         <div class="space-y-10">

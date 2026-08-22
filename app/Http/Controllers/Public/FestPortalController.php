@@ -402,8 +402,13 @@ class FestPortalController extends Controller
      * One school's full results roster on its own page — the compact card on the main
      * results page truncates names and keeps photos small to fit many schools on
      * screen at once; this gives one school room for full names and larger photos.
+     * Reached from the scoreboard's eye icon, which carries along whichever category tab
+     * was active there (?category=) — when present, the roster/total below narrow to
+     * that one category instead of the school's full cross-category report. Reached from
+     * the plain results-page ranking table (no category concept), ?category is absent and
+     * behaviour is unchanged: full roster, overall total.
      */
-    public function schoolResults(int $eventId, string $schoolId)
+    public function schoolResults(Request $request, int $eventId, string $schoolId)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
@@ -415,13 +420,19 @@ class FestPortalController extends Controller
             ->exists();
         abort_unless($event->results_published || $hasPublishedItems, 404);
 
+        $categories = $this->scoreboards->categories($event, $selectedScope);
+        $category = $this->stringQuery($request, 'category');
+        if ($category !== null) {
+            abort_unless(in_array($category, $categories, true), 404);
+        }
+
         $school = Tenant::findOrFail($schoolId);
 
-        [$overallRows] = $this->resolveScoreboard($event, $selectedScope, null, $isPublished);
+        [$overallRows] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished);
         $schoolRow = collect($overallRows)->firstWhere('school_id', $schoolId);
         abort_unless($schoolRow, 404);
 
-        $roster = $this->schoolResultsRoster($event, $selectedScope, $isPublished)->get($schoolId, []);
+        $roster = $this->schoolResultsRoster($event, $selectedScope, $isPublished, $category)->get($schoolId, []);
         abort_if($roster === [], 404, 'No results recorded for this school yet.');
 
         return $this->renderPublic('public.fest.school-results', $tenant, [
@@ -430,6 +441,11 @@ class FestPortalController extends Controller
             'school' => $school,
             'schoolRow' => $schoolRow,
             'roster' => $roster,
+            // Named activeCategory*, not category* — the view's own @foreach groups the
+            // roster by each row's category LABEL using a loop variable also called
+            // $category, which would silently shadow a same-named top-level variable.
+            'activeCategory' => $category,
+            'activeCategoryLabel' => $category ? $this->scoreboards->categoryLabel($event, $category) : null,
             'scopes' => [$selectedScope],
             'selectedScope' => $selectedScope,
             'pageSeo' => ['title' => $event->title.' — '.$school->name.' — Results'],
@@ -439,7 +455,7 @@ class FestPortalController extends Controller
     /**
      * @return \Illuminate\Support\Collection<string, array<int, array<string, mixed>>> roster keyed by school_id
      */
-    private function schoolResultsRoster(FestEvent $event, array $selectedScope, bool $isPublished): \Illuminate\Support\Collection
+    private function schoolResultsRoster(FestEvent $event, array $selectedScope, bool $isPublished, ?string $category = null): \Illuminate\Support\Collection
     {
         $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
         $participantTypeLabels = ['pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
@@ -449,6 +465,10 @@ class FestPortalController extends Controller
         // "winners only" is the correct scope), not a reuse of it.
         $allSchoolMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
             ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+            // Only set when schoolResults() was reached from a category-filtered
+            // scoreboard — narrows the roster to that one category instead of the
+            // school's full cross-category report.
+            ->when($category, fn ($query) => $query->whereHas('item', fn ($q) => $q->where($categoryColumn, $category)))
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->get();
 
@@ -678,7 +698,7 @@ class FestPortalController extends Controller
 
         return response()->json([
             'standingsPublished' => $isPublished,
-            'contentHtml' => view('public.fest.partials.scoreboard-content', $dynamic + compact('event', 'isPublished'))->render(),
+            'contentHtml' => view('public.fest.partials.scoreboard-content', $dynamic + compact('event', 'isPublished', 'category'))->render(),
             'refreshedAt' => now()->toIso8601String(),
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     }
