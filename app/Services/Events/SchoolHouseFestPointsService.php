@@ -30,7 +30,8 @@ class SchoolHouseFestPointsService
                 ->where('tenant_id', $schoolId)
                 ->whereNotNull('school_house_id')))
             ->with(['participant.student', 'participant.registration.item'])
-            ->get();
+            ->get()
+            ->unique(fn (FestMark $mark) => $mark->deduplicationKey());
 
         // One query for every distinct event these marks belong to, instead of
         // FestEvent::find() per mark — when $eventId is given (the common case),

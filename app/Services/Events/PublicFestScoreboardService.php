@@ -316,7 +316,7 @@ class PublicFestScoreboardService
                 $query->where($column, $category);
             })
             ->get()
-            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
+            ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
         $totals = [];
         foreach ($marks as $mark) {
@@ -362,7 +362,7 @@ class PublicFestScoreboardService
             })
             ->with(['participant.registration', 'item'])
             ->get()
-            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
+            ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
         $totals = [];
         foreach ($marks as $mark) {

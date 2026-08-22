@@ -28,4 +28,32 @@ class FestMark extends Model
     {
         return $this->belongsTo(FestEventItem::class, 'item_id');
     }
+
+    /**
+     * Unique key for aggregating school/championship points from FestMark rows.
+     * Prevents multi-member team/group/pair entries from duplicating points for the school.
+     */
+    public function deduplicationKey(): string
+    {
+        $p = $this->participant;
+        $item = $this->item ?? $p?->registration?->item;
+        $participantType = strtolower((string) ($item?->participant_type ?? 'individual'));
+        $isNonIndividual = $participantType !== 'individual';
+
+        if ($p?->group_id) {
+            return 'grp:' . $p->group_id;
+        }
+
+        $schoolId = $p?->registration?->school_id ?? $p?->school_id;
+        if ($isNonIndividual && $schoolId && $this->item_id) {
+            $chest = $p?->group?->chest_no ?? $p?->chest_no ?? '1';
+            return 'team:' . $this->item_id . ':' . $schoolId . ':' . $chest;
+        }
+
+        if ($p?->registration_id && ! $isNonIndividual) {
+            return 'reg:' . $p->registration_id;
+        }
+
+        return 'mark:' . $this->id;
+    }
 }

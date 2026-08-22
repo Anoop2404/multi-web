@@ -183,7 +183,7 @@ class FestCumulativeChampionshipService
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
         $marks = FestMark::where('event_id', $event->id)
             ->with(['item', 'participant.registration.item'])
-            ->get()->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id);
+            ->get()->unique(fn (FestMark $mark) => $mark->deduplicationKey());
         foreach ($marks as $mark) {
             $schoolId = $mark->participant?->registration?->school_id;
             $sourceCategory = (string) ($mark->item?->{$column} ?? 'open');

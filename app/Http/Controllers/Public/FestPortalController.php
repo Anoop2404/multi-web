@@ -101,7 +101,7 @@ class FestPortalController extends Controller
             ->get();
         $recentRoster = $this->rosterForMarks($recentMarks);
         $recentResults = $recentMarks
-            ->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id)
+            ->unique(fn (FestMark $mark) => $mark->deduplicationKey())
             ->groupBy('item_id')
             ->sortByDesc(fn ($marksForItem) => $marksForItem->max('updated_at'))
             ->map(function ($marksForItem) use ($event, $recentRoster) {
@@ -278,7 +278,7 @@ class FestPortalController extends Controller
                     // position/score — see the roster batch-fetch above), so without this
                     // the same team would render as N identical winner cards.
                     'winners' => $group
-                        ->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id)
+                        ->unique(fn (FestMark $mark) => $mark->deduplicationKey())
                         ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $rosterByRegistration))
                         ->values()
                         ->all(),
@@ -327,7 +327,7 @@ class FestPortalController extends Controller
         // school (same root cause as the scoring-dedup note on EventContext).
         $medalTally = $marks
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
-            ->unique(fn (FestMark $m) => $m->participant->registration_id ?? $m->id)
+            ->unique(fn (FestMark $m) => $m->deduplicationKey())
             ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
             ->map(fn ($group) => [
                 'gold' => $group->where('position', 1)->count(),
@@ -352,7 +352,7 @@ class FestPortalController extends Controller
         // scoring) are simply omitted rather than shown with an empty roster.
         $winnersBySchool = $marks
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
-            ->unique(fn (FestMark $m) => $m->participant->registration_id ?? $m->id)
+            ->unique(fn (FestMark $m) => $m->deduplicationKey())
             ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
             ->map(fn ($group) => $group
                 ->sortBy('position')
@@ -457,7 +457,7 @@ class FestPortalController extends Controller
             // Pair/group/team/trio items save one FestMark row PER TEAMMATE (same
             // position/score, see the scoring-dedup note on EventContext) — without this,
             // an 11-person choir would render its own result card 11 times over.
-            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
+            ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
         // Pair/group/team/trio items: the mark is only ever attached to one performer
         // on the registration (see the same note in results() above) — resolve the rest
@@ -611,7 +611,7 @@ class FestPortalController extends Controller
             ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
             ->get()
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
-            ->unique(fn (FestMark $m) => $m->participant->registration_id ?? $m->id);
+            ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
         $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
         $medalTallyFor = fn ($scopedMarks) => $scopedMarks
@@ -935,7 +935,7 @@ class FestPortalController extends Controller
             ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
             ->get()
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
-            ->unique(fn (FestMark $m) => $m->participant->registration_id ?? $m->id)
+            ->unique(fn (FestMark $m) => $m->deduplicationKey())
             ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
             ->map(fn ($group) => [
                 'gold' => $group->where('position', 1)->count(),
@@ -981,7 +981,7 @@ class FestPortalController extends Controller
             ->get();
         $roster = $this->rosterForMarks($winnerMarks);
         $latestWinners = $winnerMarks
-            ->unique(fn (FestMark $mark) => $mark->participant?->registration_id ?? $mark->id)
+            ->unique(fn (FestMark $mark) => $mark->deduplicationKey())
             ->groupBy('item_id')
             // One card per ITEM (most recently updated item first), with every one of that
             // item's winners nested inside — not a flat list of winner-rows. A flat list

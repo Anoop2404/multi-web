@@ -146,7 +146,7 @@ class EventContext
         // registration_id and the same position/score) — sum each registration once,
         // not once per teammate, or a team's points scale with its squad size.
         $marks = $marksQuery->get()
-            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
+            ->unique(fn (FestMark $m) => $m->deduplicationKey());
         $pointsBySchool = [];
 
         foreach ($marks as $mark) {
@@ -199,7 +199,7 @@ class EventContext
             ->whereHas('item', fn ($q) => $q->where('phase_id', $phaseId))
             ->with(['participant.registration', 'item'])
             ->get()
-            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
+            ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
         $pointsBySchool = [];
 
@@ -334,7 +334,7 @@ class EventContext
         $marks = FestMark::where('event_id', $this->event->id)
             ->with(['participant.registration'])
             ->get()
-            ->unique(fn (FestMark $m) => $m->participant?->registration_id ?? $m->id);
+            ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
         $pointsBySchool = [];
 

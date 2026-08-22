@@ -23,7 +23,9 @@ class FestGradePointService
 
     public function pointsForMark(FestEvent $event, FestMark $mark): int
     {
-        $isGroup = in_array($mark->participant?->registration?->item?->participant_type, ['group', 'team'], true);
+        $item = $mark->item ?? $mark->participant?->registration?->item;
+        $participantType = strtolower((string) ($item?->participant_type ?? 'individual'));
+        $isGroup = $participantType !== 'individual';
 
         if ($event->scoring_preset === 'mcs_kalotsav') {
             return $this->mcsPointsForMark($mark, $isGroup);
@@ -34,8 +36,6 @@ class FestGradePointService
         }
 
         if ($event->event_type === 'sports' && $mark->position) {
-            $participantType = $mark->participant?->registration?->item?->participant_type ?? 'individual';
-
             return app(FestRankPointService::class)->pointsForRank($event, (int) $mark->position, $participantType);
         }
 
