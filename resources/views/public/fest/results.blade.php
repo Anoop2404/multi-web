@@ -177,7 +177,7 @@
                                     <td class="p-3 text-right font-mono font-bold text-white">{{ $row['total_points'] }}</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="{{ 3 + collect($phaseBreakdown ?? [])->where('results_published', true)->count() }}" class="p-8 text-center text-white/30">No phase results published yet.</td></tr>
+                                <tr><td colspan="{{ 2 + collect($phaseBreakdown ?? [])->where('results_published', true)->count() }}" class="p-8 text-center text-white/30">No phase results published yet.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -188,7 +188,7 @@
                 <table class="w-full text-sm">
                     <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
                         <tr>
-                            <th class="p-3">Rank</th>
+                            {{-- <th class="p-3">Rank</th> --}}
                             <th class="p-3">School</th>
                             <th class="p-3 text-right">Points</th>
                             <th class="p-3 text-center" title="Gold — 1st place finishes"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold" class="w-5 h-5 inline-block"></th>
@@ -199,7 +199,7 @@
                     <tbody class="divide-y divide-slate-800">
                         @forelse($schoolBoard as $row)
                             <tr>
-                                <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
+                                {{-- <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td> --}}
                                 <td class="p-3 font-semibold text-white uppercase">{{ $row['school_name'] }}</td>
                                 <td class="p-3 text-right font-mono font-bold text-base text-white">{{ $row['total_points'] }}</td>
                                 <td class="p-3 text-center font-mono {{ $row['gold'] ? 'font-bold text-amber-400' : 'text-white/20' }}">{{ $row['gold'] }}</td>
@@ -207,7 +207,7 @@
                                 <td class="p-3 text-center font-mono {{ $row['bronze'] ? 'font-bold text-orange-400' : 'text-white/20' }}">{{ $row['bronze'] }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="p-8 text-center text-white/30">No school points published yet.</td></tr>
+                            <tr><td colspan="5" class="p-8 text-center text-white/30">No school points published yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -237,7 +237,7 @@
                     <article class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden" data-school-winner-card data-school-id="{{ $row['school_id'] }}">
                         <div class="flex items-center justify-between gap-3 px-4 py-3 bg-white/5 border-b border-slate-800">
                             <h3 class="font-bold text-white uppercase truncate">{{ $row['school_name'] }}</h3>
-                            <span class="text-xs font-bold text-amber-400 shrink-0">#{{ $row['rank'] }} · {{ $row['total_points'] }} pts</span>
+                            <span class="text-xs font-bold text-amber-400 shrink-0">{{ $row['total_points'] }} pts</span>
                         </div>
                         <ol class="divide-y divide-slate-800">
                             @foreach($row['winners'] as $winner)
