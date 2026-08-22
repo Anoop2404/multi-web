@@ -272,7 +272,7 @@ class FestCertificateController extends SahodayaAdminController
             // existing no-background branch, just without the ink-heavy backdrop, for
             // admins printing physical copies in bulk.
             if ($plain) {
-                $payload['backgroundUrl'] = null;
+                $payload['plainMode'] = true;
             }
 
             return $payload;

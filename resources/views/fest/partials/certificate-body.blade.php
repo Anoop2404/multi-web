@@ -28,7 +28,7 @@
             $body = str_replace('{'.$key.'}', $safe, $body);
         }
         $paragraphs = array_filter(array_map('trim', preg_split('/\n\s*\n/', $body)));
-        $hasBackground = ! empty($backgroundUrl);
+        $hasBackground = ! empty($backgroundUrl) || ! empty($template);
     @endphp
 
     @if(empty($isSample))
@@ -38,7 +38,7 @@
     @endif
 
     @if($hasBackground)
-        <div class="page has-background {{ $__orientation === 'portrait' ? 'portrait' : '' }}" style="background-image:url('{{ $backgroundUrl }}');">
+        <div class="page has-background {{ !empty($plainMode) ? 'hide-background' : '' }} {{ $__orientation === 'portrait' ? 'portrait' : '' }}" style="{{ empty($plainMode) && !empty($backgroundUrl) ? "background-image:url('{$backgroundUrl}');" : 'background-image:none !important;' }}">
             @if(($layout['show_photo'] ?? false) && !empty($photoUrl))
                 @php $ph = $layout['photo'] ?? []; @endphp
                 <img class="overlay-photo" src="{{ $photoUrl }}" alt=""
