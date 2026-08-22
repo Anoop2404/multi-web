@@ -147,6 +147,9 @@
         if (new URLSearchParams(window.location.search).get('hide_bg') === '1' || new URLSearchParams(window.location.search).get('plain') === '1') {
             document.body.classList.add('hide-background');
         }
+        window.addEventListener('load', function() {
+            setTimeout(function() { window.print(); }, 400);
+        });
     </script>
 
     @forelse($certificates as $payload)

@@ -42,26 +42,13 @@ class FestCertificateController extends SahodayaAdminController
         ));
 
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
-            'event'         => $event,
-            'certificates'  => $certificates,
-            'winnersByItem' => $this->winnersByItem($certificates),
+            'event'           => $event,
+            'certificates'    => $certificates,
+            'winnersByItem'   => $this->winnersByItem($certificates),
+            'winnersBySchool' => $this->winnersBySchool($certificates),
         ]));
     }
 
-    /**
-     * Winner certificates grouped by item, rank 1-3, restricted to items whose results
-     * are actually published — a winner Certificate row can exist (generateForEvent()
-     * doesn't itself check the publish flag) before its item's results go live, so
-     * presence of a certificate alone isn't a safe "published" signal. Mirrors the same
-     * item.results_published_at-or-event.results_published predicate the public results
-     * page uses (FestItemResultsService::isItemVisible(), also FestPortalController::
-     * results()'s "item" tab), applied per-certificate's own item/event rather than the
-     * page's top-level $event — a hub page's certificates can belong to a child region
-     * event with its own independent publish state.
-     *
-     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $certificates  already payload-merged, as built in index()
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
-     */
     private function winnersByItem(\Illuminate\Support\Collection $certificates): \Illuminate\Support\Collection
     {
         $itemResults = app(FestItemResultsService::class);
@@ -87,6 +74,36 @@ class FestCertificateController extends SahodayaAdminController
                 ];
             })
             ->sortBy('item_title')
+            ->values();
+    }
+
+    private function winnersBySchool(\Illuminate\Support\Collection $certificates): \Illuminate\Support\Collection
+    {
+        $itemResults = app(FestItemResultsService::class);
+
+        return $certificates
+            ->filter(fn ($c) => $c['cert_type'] === 'winner' && ($c['item'] ?? null) && ($c['event'] ?? null) && ($c['registration'] ?? null))
+            ->filter(fn ($c) => $itemResults->isItemVisible($c['item'], $c['event']))
+            ->groupBy(fn ($c) => $c['registration']->school_id ?? 0)
+            ->map(function ($group) {
+                $first = $group->first();
+                $school = $first['registration']?->school;
+
+                return [
+                    'school_id'   => $school?->id ?? 0,
+                    'school_name' => $school?->name ?? 'Unknown School',
+                    'winners'     => $group->sortBy(fn ($c) => $c['mark']->position ?? 99)
+                        ->map(fn ($c) => [
+                            'id'         => $c['id'],
+                            'uuid'       => $c['uuid'],
+                            'name'       => $c['student']?->name ?? 'Participant',
+                            'item_title' => $c['item']?->title ?? '',
+                            'position'   => $c['mark']->position ?? null,
+                        ])
+                        ->values(),
+                ];
+            })
+            ->sortBy('school_name')
             ->values();
     }
 
@@ -125,20 +142,25 @@ class FestCertificateController extends SahodayaAdminController
 
     public function downloadZip(Request $request, string $tenantId, FestEvent $event)
     {
-        // Same override the single-item ID-card export already applies (see
-        // FestIdCardController::pdf()) — this loop can run to hundreds/thousands of
-        // certificates and previously had no headroom above container defaults.
         @ini_set('memory_limit', '1024M');
         @set_time_limit(600);
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $publishedOnly = $request->boolean('published_only');
+        $itemId = $request->query('item_id') ? (int) $request->query('item_id') : null;
+        $schoolId = $request->query('school_id') ? (int) $request->query('school_id') : null;
+        $certType = $request->query('cert_type');
 
-        // embedAssets: true — the zip is extracted and opened outside the site's own
-        // browser origin, so logo/seal/background/signature/photo images must be
-        // self-contained data URIs, not site-relative URLs (see renderContext()).
-        $payloads = $this->exportPayloadsForEvent($event, embedAssets: true, plain: $request->boolean('plain'), publishedOnly: $publishedOnly);
+        $payloads = $this->exportPayloadsForEvent(
+            $event,
+            embedAssets: true,
+            plain: $request->boolean('plain'),
+            publishedOnly: $publishedOnly,
+            itemId: $itemId,
+            schoolId: $schoolId,
+            certType: $certType
+        );
 
         abort_if($payloads->isEmpty(), 404, $publishedOnly ? 'No published winner certificates to download.' : 'No certificates to download.');
 
@@ -165,11 +187,6 @@ class FestCertificateController extends SahodayaAdminController
         return response()->download($zipPath, $filename)->deleteFileAfterSend();
     }
 
-    /**
-     * Every certificate for an event, rendered on one page so the browser's own print
-     * dialog can save them all as a single multi-page PDF — an alternative to
-     * downloadZip() for admins who'd rather not extract a zip of individual files.
-     */
     public function printAll(Request $request, string $tenantId, FestEvent $event)
     {
         @ini_set('memory_limit', '1024M');
@@ -177,11 +194,20 @@ class FestCertificateController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        // embedAssets: true here too — some browsers apply the same origin/session
-        // requirements to images inside a print/"save as PDF" flow as a fresh
-        // navigation would, so embedding avoids any dependence on the viewer still
-        // being logged in with cookies that can load /storage/... URLs.
-        $payloads = $this->exportPayloadsForEvent($event, embedAssets: true, plain: $request->boolean('plain'));
+        $publishedOnly = $request->boolean('published_only');
+        $itemId = $request->query('item_id') ? (int) $request->query('item_id') : null;
+        $schoolId = $request->query('school_id') ? (int) $request->query('school_id') : null;
+        $certType = $request->query('cert_type');
+
+        $payloads = $this->exportPayloadsForEvent(
+            $event,
+            embedAssets: true,
+            plain: $request->boolean('plain'),
+            publishedOnly: $publishedOnly,
+            itemId: $itemId,
+            schoolId: $schoolId,
+            certType: $certType
+        );
 
         abort_if($payloads->isEmpty(), 404, 'No certificates to print.');
 
@@ -191,17 +217,24 @@ class FestCertificateController extends SahodayaAdminController
         ]);
     }
 
-    /**
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>> renderContext()-shaped payloads, one per certificate
-     */
-    private function exportPayloadsForEvent(FestEvent $event, bool $embedAssets, bool $plain, bool $publishedOnly = false): \Illuminate\Support\Collection
-    {
+    private function exportPayloadsForEvent(
+        FestEvent $event,
+        bool $embedAssets,
+        bool $plain,
+        bool $publishedOnly = false,
+        ?int $itemId = null,
+        ?int $schoolId = null,
+        ?string $certType = null
+    ): \Illuminate\Support\Collection {
         $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->whereIn('event_id', $event->reportableEventIds()))
+            ->whereIn('event_id', $event->reportableEventIds())
+            ->when($itemId, fn ($sq) => $sq->where('item_id', $itemId))
+            ->when($schoolId, fn ($sq) => $sq->where('school_id', $schoolId)))
             ->pluck('id');
 
         $certificates = Certificate::where('entity_type', FestParticipant::class)
             ->whereIn('entity_id', $participantIds)
+            ->when($certType, fn ($q) => $q->where('cert_type', $certType))
             ->get();
 
         $service = app(FestCertificateService::class);
