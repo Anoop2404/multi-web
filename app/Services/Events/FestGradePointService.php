@@ -101,10 +101,17 @@ class FestGradePointService
         // Standard Kalotsavam percentage grade scale fallback
         $percent = $maxPossibleMarks > 0 ? ($score / $maxPossibleMarks) * 100 : ($score <= 100 ? $score : null);
         if ($percent !== null) {
-            if ($percent >= 70.0) return 'A+';
-            if ($percent >= 60.0) return 'A';
-            if ($percent >= 50.0) return 'B';
-            if ($percent >= 40.0) return 'C';
+            $validGrades = $this->validGradesForEvent($event);
+            if (in_array('A+', $validGrades, true)) {
+                if ($percent >= 70.0) return 'A+';
+                if ($percent >= 60.0) return 'A';
+                if ($percent >= 50.0) return 'B';
+                if ($percent >= 40.0) return 'C';
+            } else {
+                if ($percent >= 70.0) return 'A';
+                if ($percent >= 60.0) return 'B';
+                if ($percent >= 50.0) return 'C';
+            }
         }
 
         return null;

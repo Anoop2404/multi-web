@@ -460,10 +460,17 @@ function computeAutoGrade(score, item) {
 
     if (percent !== null) {
         const opts = props.gradeOptions ?? ['A+', 'A', 'B', 'C'];
-        if (percent >= 70.0) return opts.includes('A+') ? 'A+' : (opts.includes('A') ? 'A' : (opts[0] || 'A'));
-        if (percent >= 60.0) return opts.includes('A') ? 'A' : (opts.includes('B') ? 'B' : (opts[0] || 'A'));
-        if (percent >= 50.0) return opts.includes('B') ? 'B' : (opts.includes('C') ? 'C' : (opts[1] || 'B'));
-        if (percent >= 40.0) return opts.includes('C') ? 'C' : (opts[opts.length - 1] || 'C');
+        const hasAPlus = opts.includes('A+');
+        if (hasAPlus) {
+            if (percent >= 70.0) return opts.includes('A+') ? 'A+' : opts[0];
+            if (percent >= 60.0) return opts.includes('A') ? 'A' : (opts[1] || opts[0]);
+            if (percent >= 50.0) return opts.includes('B') ? 'B' : (opts[2] || opts[1]);
+            if (percent >= 40.0) return opts.includes('C') ? 'C' : (opts[opts.length - 1] || 'C');
+        } else {
+            if (percent >= 70.0) return opts.includes('A') ? 'A' : opts[0];
+            if (percent >= 60.0) return opts.includes('B') ? 'B' : (opts[1] || opts[0]);
+            if (percent >= 50.0) return opts.includes('C') ? 'C' : (opts[opts.length - 1] || 'C');
+        }
     }
     return '';
 }
@@ -489,8 +496,9 @@ for (const reg of props.registrations ?? []) {
             score = judgeSum;
         }
 
+        const scoreHasValue = score !== null && score !== '' && score !== undefined;
         const autoG = computeAutoGrade(score, reg.item);
-        const grade = autoG || (existing.grade ?? '');
+        const grade = scoreHasValue ? autoG : (existing.grade ?? '');
 
         markForms[p.id] = {
             position: existing.position ?? null,
@@ -535,10 +543,7 @@ function participantGrandTotal(participantId, item = null) {
         }
     }
     if (any && markForms[participantId] && !markForms[participantId]._user_edited_grade) {
-        const autoG = computeAutoGrade(total, item);
-        if (autoG) {
-            markForms[participantId].grade = autoG;
-        }
+        markForms[participantId].grade = computeAutoGrade(total, item);
     }
     return any ? total : '—';
 }
@@ -546,10 +551,7 @@ function participantGrandTotal(participantId, item = null) {
 function onScoreInput(participantId, item) {
     const form = markForms[participantId];
     if (form && !form._user_edited_grade) {
-        const autoG = computeAutoGrade(form.score, item);
-        if (autoG) {
-            form.grade = autoG;
-        }
+        form.grade = computeAutoGrade(form.score, item);
     }
 }
 
@@ -568,11 +570,8 @@ function autoGrade(section) {
         }
 
         if (scoreToUse !== null && scoreToUse !== undefined && scoreToUse !== '') {
-            const autoG = computeAutoGrade(scoreToUse, item);
-            if (autoG) {
-                form.grade = autoG;
-                form._user_edited_grade = false;
-            }
+            form.grade = computeAutoGrade(scoreToUse, item);
+            form._user_edited_grade = false;
         }
     }
 }
