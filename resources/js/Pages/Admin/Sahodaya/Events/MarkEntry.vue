@@ -236,7 +236,7 @@
                                             :disabled="isAbsent(participant, item)"
                                             @change="setRank(participant.id, item, markForms, $event.target.value)">
                                         <option value="">— Select Rank —</option>
-                                        <option v-for="opt in rankOptions" :key="opt.rank" :value="opt.rank">
+                                        <option v-for="opt in rankOptionsFor(section)" :key="opt.rank" :value="opt.rank">
                                             {{ opt.label }}
                                         </option>
                                     </select>
