@@ -931,7 +931,7 @@ class FestPortalController extends Controller
     {
         return FestMark::whereIn('event_id', $eventIds)
             ->whereIn('position', [1, 2, 3])
-            ->with('participant.registration')
+            ->with(['participant.registration.item', 'item'])
             ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
             ->get()
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)

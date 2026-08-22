@@ -360,7 +360,7 @@ class PublicFestScoreboardService
                     $query->where($categoryColumn, $category);
                 }
             })
-            ->with(['participant.registration', 'item'])
+            ->with(['participant.registration.item', 'item'])
             ->get()
             ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
