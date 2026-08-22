@@ -7,6 +7,7 @@
             <button @click="generate" class="btn-primary">Generate for top 3</button>
             <button @click="generateParticipation" class="btn-secondary">Generate participation certificates</button>
             <a v-if="certificates.length" :href="downloadZipUrl" class="btn-secondary">Download all (ZIP)</a>
+            <a v-if="winnersByItem.length" :href="downloadPublishedZipUrl" class="btn-secondary">Download published winners (ZIP)</a>
             <a v-if="certificates.length" :href="printAllUrl" target="_blank" class="btn-secondary">Print all ↗</a>
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/tally`" class="btn-secondary">
                 How many do I need to print?
@@ -16,6 +17,31 @@
                 Plain (no background — saves ink)
             </label>
         </div>
+
+        <div v-if="winnersByItem.length" class="mb-6">
+            <h3 class="text-sm font-semibold text-gray-800 mb-2">Winners by item</h3>
+            <p class="text-xs text-gray-500 mb-3">Items whose results have been published, rank 1–3.</p>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div v-for="group in winnersByItem" :key="group.item_id" class="card p-3">
+                    <p class="font-medium text-sm mb-2">{{ group.item_title }}</p>
+                    <ul class="space-y-1.5">
+                        <li v-for="w in group.winners" :key="w.id" class="flex items-center justify-between gap-2 text-xs">
+                            <span class="flex items-center gap-1.5 min-w-0">
+                                <span class="shrink-0 rounded-full bg-amber-100 text-amber-800 font-semibold w-5 h-5 flex items-center justify-center text-[10px]">
+                                    {{ w.position ?? '—' }}
+                                </span>
+                                <span class="truncate">{{ w.name }}</span>
+                            </span>
+                            <span class="flex items-center gap-2 shrink-0">
+                                <a :href="`/certificates/verify/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium">Verify ↗</a>
+                                <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-gray-600 font-medium">Print ↗</a>
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
         <ul class="card-list">
             <li v-for="c in certificates" :key="c.id" class="p-4 flex flex-wrap gap-2 justify-between items-center text-sm">
                 <div class="min-w-0">
@@ -52,6 +78,7 @@ import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, certificates: Array,
+    winnersByItem: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
 });
 
@@ -59,6 +86,11 @@ const plainMode = ref(false);
 
 const downloadZipUrl = computed(() =>
     `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip${plainMode.value ? '?plain=1' : ''}`);
+const downloadPublishedZipUrl = computed(() => {
+    const params = new URLSearchParams({ published_only: '1' });
+    if (plainMode.value) params.set('plain', '1');
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip?${params}`;
+});
 const printAllUrl = computed(() =>
     `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/print-all${plainMode.value ? '?plain=1' : ''}`);
 

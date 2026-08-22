@@ -1256,6 +1256,8 @@ class FestEventSettingsController extends SahodayaAdminController
             'is_group'  => $data['is_group'] ?? false,
         ]));
 
+        EventContext::for($event)->recalculateSchoolPoints();
+
         app(PlatformAuditLogger::class)->festEvent(
             $event,
             FestPageActivity::settingsTab('points'),
@@ -1299,6 +1301,8 @@ class FestEventSettingsController extends SahodayaAdminController
                 }
             }
         }
+
+        EventContext::for($event)->recalculateSchoolPoints();
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,
@@ -1365,6 +1369,8 @@ class FestEventSettingsController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($pointRule->event_id !== $event->id, 404);
         $pointRule->delete();
+
+        EventContext::for($event)->recalculateSchoolPoints();
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,
