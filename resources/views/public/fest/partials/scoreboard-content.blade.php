@@ -37,7 +37,17 @@
                 <div class="absolute inset-y-0 left-0 bg-slate-800/40 pointer-events-none" style="width: {{ $pct }}%" aria-hidden="true"></div>
                 <div class="relative flex items-center justify-between gap-4">
                     <div class="flex items-center gap-3 min-w-0"><span class="shrink-0 w-10 h-10 rounded-xl {{ $podium ? 'bg-amber-400/20' : 'bg-slate-800 text-slate-300 border border-slate-700' }} flex items-center justify-center font-extrabold">@if($podium)<img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-8 h-8">@else{{ $row['rank'] }}@endif</span><span class="font-bold text-white text-sm sm:text-base truncate">{{ $row['school_name'] }}</span></div>
-                    <div class="text-right shrink-0"><span class="font-mono font-extrabold text-xl text-amber-400">{{ $row['total_points'] }}</span><span class="text-[10px] text-slate-400 uppercase block font-bold">PTS</span></div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <div class="text-right"><span class="font-mono font-extrabold text-xl text-amber-400">{{ $row['total_points'] }}</span><span class="text-[10px] text-slate-400 uppercase block font-bold">PTS</span></div>
+                        <a href="{{ route('tenant.fest.results.school', ['event' => $event->id, 'school' => $row['school_id']]) }}"
+                           title="View {{ $row['school_name'] }}'s full roster" aria-label="View {{ $row['school_name'] }}'s full roster"
+                           class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white/40 hover:text-amber-400 hover:bg-white/5 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </a>
+                    </div>
                 </div>
                 @if($cumulativeStanding ?? null)
                 <dl class="relative grid {{ $showPhasePoints ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3' }} gap-2 mt-4 pt-3 border-t border-slate-700/60 text-center">
@@ -49,9 +59,9 @@
                 @endif
             </li>
             @else
-            <li class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
+            <li class="relative rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
                 <details class="group">
-                    <summary class="list-none cursor-pointer flex items-center gap-3 px-4 py-3 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400">
+                    <summary class="list-none cursor-pointer flex items-center gap-3 px-4 py-3 pr-11 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400">
                         <span class="shrink-0 w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span>
                         <span class="font-semibold text-sm text-white truncate flex-1">{{ $row['school_name'] }}</span>
                         <span class="font-mono font-extrabold text-amber-400">{{ $row['total_points'] }}</span>
@@ -66,6 +76,16 @@
                     </dl>
                     @endif
                 </details>
+                {{-- Sibling of <details>, not nested in <summary> — keeps this click from
+                     also toggling the details open/closed. --}}
+                <a href="{{ route('tenant.fest.results.school', ['event' => $event->id, 'school' => $row['school_id']]) }}"
+                   title="View {{ $row['school_name'] }}'s full roster" aria-label="View {{ $row['school_name'] }}'s full roster"
+                   class="absolute top-2 right-2 inline-flex items-center justify-center w-8 h-8 rounded-lg text-white/40 hover:text-amber-400 hover:bg-white/5 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </a>
             </li>
             @endif
             @empty

@@ -198,6 +198,57 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertDontSee('South HS Winner');
     }
 
+    public function test_scoreboard_category_filter_also_scopes_the_latest_item_winners_widget(): void
+    {
+        // Leading Schools was already category-scoped server-side (PublicFestScoreboardService::
+        // scoreboard() takes $category), but Latest Item Winners' own query in
+        // scoreboardDynamicData() had no category filter at all — selecting a category tab
+        // narrowed one panel and left the other showing every category's winners, which read
+        // as broken/inconsistent on the same page.
+        $this->markCategoryWinner($this->north, $this->northSchool, 'HS Category Winner');
+
+        $lpItem = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'LP Category Winner', 'category' => 'literary',
+            'class_group' => 'lp', 'participant_type' => 'individual', 'is_enabled' => true,
+        ]);
+        $registration = FestRegistration::create([
+            'event_id' => $this->north->id, 'item_id' => $lpItem->id,
+            'school_id' => $this->northSchool->id, 'status' => 'approved',
+        ]);
+        $participant = FestParticipant::create([
+            'registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student',
+        ]);
+        FestMark::create([
+            'event_id' => $this->north->id, 'item_id' => $lpItem->id, 'participant_id' => $participant->id,
+            'grade' => 'A', 'position' => 1, 'score' => 80,
+        ]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard?category=hs");
+
+        $response->assertOk();
+        // The winner-item-card's title is CSS uppercase (`class="... uppercase"`), not
+        // server-side uppercased like some other headings in this app — raw HTML keeps
+        // the mixed case as stored.
+        $response->assertSee('HS Category Winner');
+        $response->assertDontSee('LP Category Winner');
+    }
+
+    public function test_scoreboard_leading_schools_has_an_eye_link_to_the_school_detail_page(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
+
+        $response->assertOk();
+        // Explicit string URL, not the route() helper — route() resolves against
+        // APP_URL/localhost outside an active tenancy-initialized request, not this
+        // test's tenant domain (same reasoning as every other URL in this file).
+        $response->assertSee(
+            'href="http://public-scoreboard.test/fest/'.$this->north->id.'/results/schools/'.$this->northSchool->id.'"',
+            false
+        );
+    }
+
     public function test_school_wise_results_show_points_before_medal_counts(): void
     {
         $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
@@ -340,6 +391,41 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertSee('10', false);
     }
 
+    public function test_school_results_roster_shows_points_for_a_grade_only_mark_with_no_position(): void
+    {
+        // Many items only grade every entrant (A/B/C) without ranking each one — the
+        // school roster must still show a points value for those, not just for the
+        // top-3 who also got a numeric position. Regression test for a bug where
+        // publicWinnerRow() only fills 'points'/'grade_points' when position is set
+        // (correct for the Individual/winners-only tab), and schoolResultsRoster()'s
+        // `publicWinnerRow(...) + [...]` merge let that null clobber its own correctly
+        // computed value — PHP's `+` keeps the left side on key collisions.
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'North Group Song', 'category' => 'music',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+        ]);
+        $registration = FestRegistration::create([
+            'event_id' => $this->north->id, 'item_id' => $item->id,
+            'school_id' => $this->northSchool->id, 'status' => 'approved',
+        ]);
+        $participant = FestParticipant::create([
+            'registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student',
+        ]);
+        FestMark::create([
+            'event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $participant->id,
+            'grade' => 'A', 'position' => null,
+        ]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
+
+        $response->assertOk();
+        $response->assertSee('North Group Song');
+        // No FestPointRule configured, no scoring preset — falls back to
+        // FestGradePointService::pointsForMark()'s $defaultGradeOnly['A'] for an
+        // individual item (3), not the blank/missing value the bug produced.
+        $response->assertSeeInOrder(['North Group Song', 'Grade A', '3', 'PTS'], false);
+    }
+
     public function test_school_ranking_row_links_to_its_roster_card(): void
     {
         $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
@@ -451,6 +537,38 @@ class FestPublicScoreboardTest extends TestCase
 
         $this->get("http://public-scoreboard.test/fest/{$this->north->id}/items/{$southItem->id}/results")
             ->assertNotFound();
+    }
+
+    public function test_item_full_results_table_shows_points_for_a_non_placing_grade_only_entrant(): void
+    {
+        // Same root cause as test_school_results_roster_shows_points_for_a_grade_only_mark_with_no_position:
+        // publicWinnerRow() used to null out 'points'/'grade_points' whenever a mark had no
+        // position, but itemResults()'s "Full Results" table intentionally lists every
+        // entrant, not just the top-3 winners — so a grade-only, non-placing participant's
+        // "Total" column silently rendered "0" (the blade's `?? 0` fallback) instead of the
+        // real points their grade earns.
+        $item = $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        $registration = FestRegistration::create([
+            'event_id' => $this->north->id, 'item_id' => $item->id,
+            'school_id' => $this->northSchool->id, 'status' => 'approved',
+        ]);
+        $participant = FestParticipant::create([
+            'registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student',
+        ]);
+        FestMark::create([
+            'event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $participant->id,
+            'grade' => 'B', 'position' => null,
+        ]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/items/{$item->id}/results");
+
+        $response->assertOk();
+        // No FestPointRule configured, no scoring preset — $defaultGradeOnly['B'] for an
+        // individual item is 2, not the "0" the bug produced. Matched against the Total
+        // column's exact class combo (font-bold + text-white, unique among that table's
+        // columns) so this doesn't false-match "2" appearing anywhere else on the page.
+        $response->assertSee('font-mono font-bold text-white">2</td>', false);
     }
 
     public function test_direct_partition_page_is_the_canonical_standalone_event(): void

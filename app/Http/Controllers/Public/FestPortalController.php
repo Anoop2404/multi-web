@@ -480,15 +480,21 @@ class FestPortalController extends Controller
                     // participant/photo/team come from the same publicWinnerRow() helper
                     // every other tab on this page already uses — one team member's photo
                     // for an individual item, every co-performer's for a group/team one.
-                    return $this->publicWinnerRow($m, $event, $allSchoolRosterByRegistration) + [
+                    // Own array goes FIRST: publicWinnerRow() only fills points/grade_points
+                    // when the mark has a position (correct for the Individual tab, which is
+                    // winners-only), but this roster lists every item a school entered,
+                    // including grade-only ones with no numeric rank — and PHP's `+` keeps
+                    // the left side on key collisions, so ours must win or its null does.
+                    return [
                         'item' => $m->item?->title,
                         'category' => $m->item?->{$categoryColumn}
                             ? $this->scoreboards->categoryLabel($event, $m->item->{$categoryColumn})
                             : 'Uncategorized',
                         'participant_type' => $participantTypeLabels[$m->item?->participant_type] ?? 'Individual',
+                        'rank_points' => $breakdown['rank_points'],
                         'grade_points' => $breakdown['grade_points'],
                         'points' => $breakdown['total'],
-                    ];
+                    ] + $this->publicWinnerRow($m, $event, $allSchoolRosterByRegistration);
                 })
                 // Category first so items naturally cluster together on screen, then
                 // position/item within each category — mirrors the Item-wise tab's own
@@ -977,16 +983,20 @@ class FestPortalController extends Controller
         // rank_points/grade_points split out from the combined total per the official
         // Kalolsavam Manual formula — null for both when this mark's actual points don't
         // match that formula (a custom/Any-Position rule), so the public page can show
-        // just the total in that case instead of an invented split.
-        $breakdown = $mark->position ? $this->gradePoints->pointsBreakdown($event, $mark) : null;
+        // just the total in that case instead of an invented split. Computed unconditionally
+        // (not gated on $mark->position): a grade-only mark with no numeric rank still earns
+        // points via pointsForMark()'s "Any Position"/default-grade-only fallback, and
+        // callers that list every entrant — not just top-3 winners — need that real value,
+        // not a null that renders as a blank/zero points column.
+        $breakdown = $this->gradePoints->pointsBreakdown($event, $mark);
 
         $row = [
             'position' => $mark->position,
             'grade' => $mark->grade,
             'score' => $mark->score,
-            'points' => $breakdown['total'] ?? null,
-            'rank_points' => $breakdown['rank_points'] ?? null,
-            'grade_points' => $breakdown['grade_points'] ?? null,
+            'points' => $breakdown['total'],
+            'rank_points' => $breakdown['rank_points'],
+            'grade_points' => $breakdown['grade_points'],
             'measurement' => trim(($mark->measurement_value ?? '').' '.($mark->measurement_unit ?? '')),
             'participant' => $person?->name,
             'photo' => $person?->photoDataUri(),
@@ -1068,6 +1078,7 @@ class FestPortalController extends Controller
     {
         [$scoreboard, $cumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished);
 
+        $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
         $winnerMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
             ->whereIn('position', [1, 2, 3])
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
@@ -1079,6 +1090,10 @@ class FestPortalController extends Controller
             // fall back to each item's own results_published_at so items published ahead
             // of the official whole-event publish still show their winners.
             ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+            // Selecting a category tab must scope BOTH panels — without this, Leading
+            // Schools filtered to the chosen category while Latest Item Winners kept
+            // showing every category's winners, which read as broken/inconsistent.
+            ->when($category, fn ($query) => $query->whereHas('item', fn ($q) => $q->where($categoryColumn, $category)))
             ->get();
         $roster = $this->rosterForMarks($winnerMarks);
         $latestWinners = $winnerMarks
