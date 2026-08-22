@@ -49,11 +49,11 @@ class FestPointRuleRecalculationTest extends TestCase
         $admin->assignRole('sahodaya_admin');
 
         $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Point Rule Event', 'event_type' => 'kalotsav']);
-        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'SS1', 'participant_type' => 'individual']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'SS1', 'participant_type' => 'individual', 'results_published_at' => now()]);
 
         $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
         $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $event->id, 'participant_type' => 'student']);
-        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 65]);
 
         return compact('sahodaya', 'school', 'admin', 'event');
     }

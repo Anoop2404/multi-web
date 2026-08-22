@@ -47,38 +47,64 @@ class FestGradePointService
             return app(FestRankPointService::class)->pointsForRank($event, (int) $mark->position, $participantType);
         }
 
-        // Points are only ever awarded to a placed rank (1st/2nd/3rd) — a graded but
-        // unranked mark earns nothing. No "grade only" consolation points.
-        if (! $mark->position) {
+        // Nothing to go on at all — no rank and no grade to award anything from.
+        if (! $mark->position && ! $mark->grade) {
             return 0;
         }
 
-        // Exact match required on both grade and position — this is what stops an
-        // unranked mark matching whichever positioned rule sorts first (it can't get
-        // here at all now), and stops a gradeless mark matching any grade's rule for
-        // that position.
-        $rule = FestPointRule::where('event_id', $event->id)
+        $gradeMatch = function ($q) use ($event, $mark) {
+            $mark->grade
+                ? $q->where('grade', $this->normalizeGrade($event, $mark->grade))
+                : $q->whereNull('grade');
+        };
+
+        // Exact match on this grade at this exact position — e.g. "Grade A, 1st place".
+        if ($mark->position) {
+            $rule = FestPointRule::where('event_id', $event->id)
+                ->where('is_group', $isGroup)
+                ->where('position', $mark->position)
+                ->where($gradeMatch)
+                ->first();
+
+            if ($rule) {
+                if (($rule->points_table ?? 'custom') === 'athletics_standard') {
+                    return (int) (self::ATHLETICS_STANDARD[(int) $mark->position] ?? 0);
+                }
+
+                return (int) $rule->points;
+            }
+        }
+
+        // No rank, or a rank with no specific rule for it (e.g. 4th place when only
+        // 1st-3rd are configured) — a grade still earns something: prefer whatever
+        // "Any Position" rule the admin configured for this grade on the Grade Points
+        // Master page, and only fall back to the generic default table if they haven't.
+        $anyPositionRule = FestPointRule::where('event_id', $event->id)
             ->where('is_group', $isGroup)
-            ->where('position', $mark->position)
-            ->where(function ($q) use ($event, $mark) {
-                $mark->grade
-                    ? $q->where('grade', $this->normalizeGrade($event, $mark->grade))
-                    : $q->whereNull('grade');
-            })
+            ->whereNull('position')
+            ->where($gradeMatch)
             ->first();
 
-        if ($rule) {
-            if (($rule->points_table ?? 'custom') === 'athletics_standard') {
-                return (int) (self::ATHLETICS_STANDARD[(int) $mark->position] ?? 0);
-            }
-
-            return (int) $rule->points;
+        if ($anyPositionRule) {
+            return (int) $anyPositionRule->points;
         }
 
         $grade = $this->normalizeGrade($event, $mark->grade);
-        $pts = (int) (self::DEFAULT_POINTS[$grade][(string) $mark->position] ?? 0);
 
-        return $isGroup ? $pts * 2 : $pts;
+        if ($mark->position && isset(self::DEFAULT_POINTS[$grade][(string) $mark->position])) {
+            $pts = (int) self::DEFAULT_POINTS[$grade][(string) $mark->position];
+
+            return $isGroup ? $pts * 2 : $pts;
+        }
+
+        $defaultGradeOnly = [
+            'A_plus' => $isGroup ? 10 : 5,
+            'A'      => $isGroup ? 6 : 3,
+            'B'      => $isGroup ? 4 : 2,
+            'C'      => $isGroup ? 2 : 1,
+        ];
+
+        return (int) ($defaultGradeOnly[$grade] ?? 0);
     }
 
     /**

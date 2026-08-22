@@ -135,7 +135,7 @@
                             <span class="text-slate-500 font-medium text-[11px]">Same rank for all:</span>
                             <select v-model="bulkRank[section.bulkKey]" class="field text-xs !py-1 min-w-[9rem]">
                                 <option :value="null">—</option>
-                                <option v-for="opt in rankOptions" :key="opt.rank" :value="opt.rank">
+                                <option v-for="opt in rankOptionsFor(section)" :key="opt.rank" :value="opt.rank">
                                     {{ opt.label }}
                                 </option>
                             </select>
@@ -414,14 +414,20 @@ const {
     iterSaveRows,
 } = displayCtx;
 
-const rankOptions = computed(() => [
-    { rank: 1, label: '1st Place' },
-    { rank: 2, label: '2nd Place' },
-    { rank: 3, label: '3rd Place' },
-    { rank: 4, label: '4th Place' },
-    { rank: 5, label: '5th Place' },
-    { rank: 6, label: '6th Place' },
-]);
+function ordinalRankLabel(n) {
+    const suffixes = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return `${n}${suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]} Place`;
+}
+
+// A hardcoded 1st-6th list left anyone auto-ranked (or manually placed) past 6th
+// showing as blank "— Select Rank —" — indistinguishable from truly unranked, and
+// impossible to set by hand. Scale to the section's real size instead, so every
+// participant has a selectable option regardless of how large the field is.
+function rankOptionsFor(section) {
+    const count = Math.max(section?.rows?.length ?? 0, 6);
+    return Array.from({ length: count }, (_, i) => ({ rank: i + 1, label: ordinalRankLabel(i + 1) }));
+}
 
 function computeAutoGrade(score, item) {
     if (score === null || score === undefined || score === '' || isNaN(score)) return '';
