@@ -28,6 +28,24 @@
                      }">
                 </div>
 
+                <!-- Participant Photo Overlay -->
+                <div v-if="showPhoto"
+                     class="absolute rounded-full overflow-hidden bg-white shadow-lg"
+                     :style="{
+                         top: `${photoLayout.top ?? 31}%`,
+                         left: `${photoLayout.left ?? 50}%`,
+                         width: `${photoLayout.size ?? 118}px`,
+                         height: `${photoLayout.size ?? 118}px`,
+                         transform: 'translateX(-50%)',
+                         border: '3px solid #fdfaf0',
+                     }">
+                    <svg viewBox="0 0 100 100" class="w-full h-full">
+                        <rect width="100" height="100" fill="#f1f5f9" />
+                        <circle cx="50" cy="38" r="20" fill="#94a3b8" />
+                        <path fill="#94a3b8" d="M50 63c-22 0-38 12-38 27v10h76V90c0-15-16-27-38-27z" />
+                    </svg>
+                </div>
+
                 <!-- Recipient Name Overlay -->
                 <div v-if="showRecipientName && recipientNameLayout"
                      class="absolute text-center text-slate-900 leading-snug whitespace-nowrap overflow-hidden text-ellipsis"
@@ -114,6 +132,9 @@ const showParticipationLabel = computed(() => props.layout?.show_participation_l
 const boldVariables = computed(() => props.layout?.bold_variables !== false);
 const showCertificateDate = computed(() => props.layout?.show_certificate_date !== false);
 
+const showPhoto = computed(() => props.layout?.show_photo === true);
+const photoLayout = computed(() => props.layout?.photo ?? {});
+
 const participationLabelCover = computed(() => props.layout?.participation_label_cover);
 const recipientNameLayout = computed(() => props.layout?.recipient_name);
 const bodyLayout = computed(() => props.layout?.body);
@@ -172,6 +193,10 @@ const sampleData = computed(() => {
         program_title: props.title || 'Sahodaya Teacher Leadership Training',
         event_title: props.title || 'Annual Sports Meet 2026',
         item_title: '100m Sprint Boys (U17)',
+        item_details: '100m Sprint Boys (U17)',
+        event_name: props.title || 'Annual Sports Meet 2026',
+        category_name: 'Category I',
+        participation_type: 'Individual',
         event_dates: '21st - 23rd July 2026',
         conducted_on: '22nd July 2026',
         certificate_date: '22nd July 2026',

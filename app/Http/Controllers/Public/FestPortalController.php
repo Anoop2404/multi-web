@@ -11,6 +11,7 @@ use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRecordBreak;
+use App\Models\FestRegistration;
 use App\Models\FestResult;
 use App\Models\FestSchedule;
 use App\Models\Tenant;
@@ -654,6 +655,54 @@ class FestPortalController extends Controller
                 'subtitle' => count($winnerPages) > 1 ? 'Page '.($i + 1).' of '.count($winnerPages) : null,
                 'items' => $page,
             ];
+        }
+
+        // Before results are published there's nothing to rank yet — show who's actually
+        // competing instead of a bare "check back later" card. Registrations, not marks,
+        // so this has real content from the moment schools sign up.
+        if (! $isPublished) {
+            $registrations = FestRegistration::whereIn('event_id', $selectedScope['event_ids'])
+                ->active()
+                ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
+                ->with('item:id,'.$categoryColumn)
+                ->get(['id', 'item_id', 'school_id']);
+
+            $schoolNames = Tenant::whereIn('id', $registrations->pluck('school_id')->unique())
+                ->orderBy('name')
+                ->pluck('name', 'id');
+
+            $namesFor = fn ($regs) => $regs->pluck('school_id')->unique()
+                ->map(fn ($id) => $schoolNames[$id] ?? null)
+                ->filter()
+                ->sort()
+                ->values()
+                ->all();
+
+            $schoolPages = array_chunk($namesFor($registrations), $boardsPerPage, true);
+            foreach ($schoolPages as $i => $page) {
+                $slides[] = [
+                    'type' => 'schools',
+                    'title' => 'Participating Schools',
+                    'subtitle' => count($schoolPages) > 1 ? 'Page '.($i + 1).' of '.count($schoolPages) : 'All Categories',
+                    'schools' => $page,
+                ];
+            }
+
+            foreach ($categories as $key) {
+                $categoryNames = $namesFor($registrations->filter(fn ($r) => $r->item?->{$categoryColumn} === $key));
+                if (! $categoryNames) {
+                    continue;
+                }
+                $categoryPages = array_chunk($categoryNames, $boardsPerPage, true);
+                foreach ($categoryPages as $i => $page) {
+                    $slides[] = [
+                        'type' => 'schools',
+                        'title' => $this->scoreboards->categoryLabel($event, $key).' — Participating Schools',
+                        'subtitle' => count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : null,
+                        'schools' => $page,
+                    ];
+                }
+            }
         }
 
         if (! $slides) {

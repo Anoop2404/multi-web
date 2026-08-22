@@ -169,9 +169,8 @@
                                             {{ p.participant_role || 'performer' }}
                                         </span>
                                     </div>
-                                    <div v-if="reg.status === 'approved'" class="mt-1 flex flex-wrap gap-2">
-                                        <button v-if="standbyCount(reg)" type="button" class="text-indigo-600 font-semibold" @click="openSubstitute(reg)">Substitute</button>
-                                        <button type="button" class="text-slate-600 font-semibold" @click="openManageParticipants(reg)">Manage participants</button>
+                                    <div v-if="reg.status === 'approved' && standbyCount(reg)" class="mt-1">
+                                        <button type="button" class="text-indigo-600 font-semibold" @click="openSubstitute(reg)">Substitute</button>
                                     </div>
                                 </td>
                         <td class="p-3 text-right space-x-2">
@@ -179,6 +178,11 @@
                                 <button @click="approve(reg.id)" class="text-green-600 text-xs font-semibold">Approve</button>
                                 <button @click="reject(reg.id)" class="text-red-600 text-xs font-semibold">Reject</button>
                             </template>
+                            <button v-if="reg.status === 'approved'"
+                                    @click="openManageParticipants(reg)"
+                                    class="text-indigo-700 text-xs font-semibold">
+                                Manage participants
+                            </button>
                             <button v-if="canCancel(reg)"
                                     @click="cancel(reg.id)"
                                     class="text-gray-600 text-xs font-semibold">

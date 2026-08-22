@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestFeeCredit;
+use App\Models\FestGroup;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
@@ -324,9 +325,19 @@ class FestRegistrationService
         abort_if($registration->participants->contains('student_id', $student->id), 422, 'This student is already on the registration.');
 
         $item = $registration->item;
+        $groupId = null;
         if ($item && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
             $error = $item->validateSquadCount($registration->participants->count() + 1);
             abort_if($error, 422, $error);
+
+            // Team/group rows are grouped by group_id everywhere they're displayed (e.g.
+            // FestChestNumberController::teamRows()) — without this, a newly-added member
+            // has group_id null and renders as its own orphaned "team of one" instead of
+            // joining the existing squad. Mirrors FestRegistrationCreateService::createForSchool(),
+            // which assigns every performer/standby the same FestGroup on creation.
+            $groupId = FestGroup::where('registration_id', $registration->id)->value('id')
+                ?? $registration->participants->first()?->group_id
+                ?? FestGroup::create(['registration_id' => $registration->id])->id;
         } else {
             // Individual items carry no FestTeamSquadRules (validateSquadCount() is always a
             // no-op for them) — cap manually at 1 performer + 2 standbys, matching the existing
@@ -340,9 +351,10 @@ class FestRegistrationService
             }
         }
 
-        $participant = DB::transaction(function () use ($registration, $event, $student, $role) {
+        $participant = DB::transaction(function () use ($registration, $event, $student, $role, $groupId) {
             $participant = FestParticipant::create([
                 'registration_id'  => $registration->id,
+                'group_id'         => $groupId,
                 'event_id'         => $event->id,
                 'student_id'       => $student->id,
                 'participant_type' => 'student',

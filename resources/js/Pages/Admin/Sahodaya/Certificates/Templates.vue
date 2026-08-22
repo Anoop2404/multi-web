@@ -111,6 +111,10 @@
                                     <input v-model="form.layout_json.show_certificate_date" type="checkbox" class="rounded" :true-value="true" :false-value="false">
                                     Show certificate date
                                 </label>
+                                <label class="flex items-center gap-2 text-sm text-slate-700 font-medium">
+                                    <input v-model="form.layout_json.show_photo" type="checkbox" class="rounded" :true-value="true" :false-value="false">
+                                    Show participant/student photo
+                                </label>
                             </div>
 
                             <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
@@ -245,6 +249,25 @@
                                             <option value="center">Center</option>
                                             <option value="right">Right</option>
                                         </select>
+                                    </template>
+                                </FormField>
+                            </div>
+
+                            <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                                <p class="sm:col-span-2 md:col-span-4 font-bold text-slate-800 text-xs uppercase tracking-wider">Photo Position &amp; Size</p>
+                                <FormField label="Top %" hint="Distance from the top of the canvas.">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.photo.top" type="number" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_photo)">
+                                    </template>
+                                </FormField>
+                                <FormField label="Left %" hint="50 = horizontally centered.">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.photo.left" type="number" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_photo)">
+                                    </template>
+                                </FormField>
+                                <FormField label="Size (px)" hint="Circle diameter.">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.photo.size" type="number" min="24" max="400" class="field" :disabled="!isTruthy(form.layout_json.show_photo)">
                                     </template>
                                 </FormField>
                             </div>
@@ -535,6 +558,12 @@ function layoutDefaults(from = null) {
         show_participation_label: src.show_participation_label ?? d.show_participation_label ?? true,
         bold_variables: src.bold_variables ?? d.bold_variables ?? true,
         show_certificate_date: src.show_certificate_date ?? d.show_certificate_date ?? true,
+        show_photo: src.show_photo ?? d.show_photo ?? false,
+        photo: {
+            top: src.photo?.top ?? d.photo?.top ?? 31,
+            left: src.photo?.left ?? d.photo?.left ?? 50,
+            size: src.photo?.size ?? d.photo?.size ?? 118,
+        },
         recipient_name: textFieldDefaults(src.recipient_name, d.recipient_name, {
             top: 38, left: 10, width: 80, font_size: 24, font_family: 'Montserrat', font_weight: 'bold', align: 'center',
         }),
