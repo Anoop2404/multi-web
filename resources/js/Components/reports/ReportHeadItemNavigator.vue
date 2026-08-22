@@ -26,7 +26,7 @@
                 <Link v-for="item in flatItems" :key="item.id"
                       :href="itemUrl(null, item.id)"
                       class="reports-head-card group block hover:no-underline">
-                    <span v-if="item.participant_count" class="reports-head-card__count">{{ item.participant_count }}</span>
+                    <span v-if="item.registration_count || item.participant_count" class="reports-head-card__count">{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.participant_count) : (item.participant_count ?? item.registration_count) }}</span>
                     <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-navy)]">{{ item.title }}</p>
                     <p v-if="item.item_code" class="text-xs font-mono text-slate-500 mt-0.5">{{ item.item_code }}</p>
                     <p v-if="item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.age_group }}</p>
@@ -34,7 +34,7 @@
                         <div v-if="showResultStats">
                             <dt class="text-slate-400">Marks</dt>
                             <dd :class="item.marks_ready ? 'text-emerald-700 font-semibold' : 'text-amber-700'">
-                                {{ item.marks_entered ?? 0 }}/{{ item.performers ?? item.participant_count ?? 0 }}
+                                {{ (item.participant_type && item.participant_type !== 'individual') ? (item.marks_ready ? (item.registration_count ?? item.performers) : Math.floor((item.marks_entered ?? 0) / Math.max(1, Math.round((item.performers ?? 1) / Math.max(1, item.registration_count ?? 1))))) : (item.marks_entered ?? 0) }}/{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.performers) : (item.performers ?? item.participant_count ?? 0) }}
                             </dd>
                         </div>
                         <div v-if="showResultStats">
@@ -89,7 +89,7 @@
                 <Link v-for="item in selectedHead.items" :key="item.id"
                       :href="itemUrl(selectedHead.head_id, item.id)"
                       class="reports-head-card group block hover:no-underline">
-                    <span v-if="item.participant_count" class="reports-head-card__count">{{ item.participant_count }}</span>
+                    <span v-if="item.registration_count || item.participant_count" class="reports-head-card__count">{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.participant_count) : (item.participant_count ?? item.registration_count) }}</span>
                     <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-navy)]">{{ item.title }}</p>
                     <p v-if="item.item_code" class="text-xs font-mono text-slate-500 mt-0.5">{{ item.item_code }}</p>
                     <p v-if="item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.age_group }}</p>
@@ -97,7 +97,7 @@
                         <div v-if="showResultStats">
                             <dt class="text-slate-400">Marks</dt>
                             <dd :class="item.marks_ready ? 'text-emerald-700 font-semibold' : 'text-amber-700'">
-                                {{ item.marks_entered ?? 0 }}/{{ item.performers ?? item.participant_count ?? 0 }}
+                                {{ (item.participant_type && item.participant_type !== 'individual') ? (item.marks_ready ? (item.registration_count ?? item.performers) : Math.floor((item.marks_entered ?? 0) / Math.max(1, Math.round((item.performers ?? 1) / Math.max(1, item.registration_count ?? 1))))) : (item.marks_entered ?? 0) }}/{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.performers) : (item.performers ?? item.participant_count ?? 0) }}
                             </dd>
                         </div>
                         <div v-if="showResultStats">

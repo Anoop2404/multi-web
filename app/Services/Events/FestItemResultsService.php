@@ -95,6 +95,8 @@ class FestItemResultsService
                 'gender'                => $primary->gender,
                 'sport_discipline'      => $primary->sport_discipline,
                 'stage_type'            => $primary->stage_type,
+                'participant_type'      => $primary->participant_type,
+                'participant_count'     => strtolower((string) ($primary->participant_type ?? 'individual')) !== 'individual' ? $registrationCount : $performers,
                 'performers'            => $performers,
                 'registration_count'    => $registrationCount,
                 'marks_entered'         => $marksEntered,
@@ -125,6 +127,8 @@ class FestItemResultsService
     public function resultRowsForItem(FestEvent $event, int $itemId): array
     {
         $itemIds = $event->reportableItemIds([$itemId]);
+        $targetItem = FestEventItem::find($itemId);
+        $isNonIndividual = $targetItem && strtolower((string) $targetItem->participant_type) !== 'individual';
 
         $participants = FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
@@ -140,20 +144,55 @@ class FestItemResultsService
             ])
             ->get();
 
-        $rows = $participants->map(fn (FestParticipant $p) => [
-            'participant_id' => $p->id,
-            'school'         => $p->registration?->school?->name,
-            'name'           => $p->student?->name ?? $p->teacher?->name,
-            'reg_no'         => $p->student?->reg_no ?? $p->teacher?->reg_no,
-            'chest_no'       => $p->group?->chest_no ?? $p->chest_no,
-            'grade'          => $p->mark?->grade,
-            'position'       => $p->mark?->position,
-            'score'          => $p->mark?->score,
-            'measurement'    => $p->mark?->measurement_value,
-            'measurement_unit' => $p->mark?->measurement_unit,
-        ]);
+        if ($isNonIndividual) {
+            $grouped = $participants->groupBy(function (FestParticipant $p) {
+                if ($p->group_id) {
+                    return 'grp:' . $p->group_id;
+                }
+                if ($p->registration_id) {
+                    return 'reg:' . $p->registration_id;
+                }
+                $schoolId = $p->registration?->school_id ?? 0;
+                $chest = $p->group?->chest_no ?? $p->chest_no ?? '1';
+                return 'team:' . $schoolId . ':' . $chest;
+            });
+
+            $rows = $grouped->map(function ($teamParticipants) {
+                $first = $teamParticipants->first();
+                $names = $teamParticipants->map(fn ($p) => $p->student?->name ?? $p->teacher?->name)->filter()->unique()->join(' & ');
+                $regNos = $teamParticipants->map(fn ($p) => $p->student?->reg_no ?? $p->teacher?->reg_no)->filter()->unique()->join(', ');
+                $mark = $teamParticipants->pluck('mark')->filter()->first();
+
+                return [
+                    'participant_id'   => $first->id,
+                    'school'           => $first->registration?->school?->name,
+                    'name'             => $names ?: 'Team Entry',
+                    'reg_no'           => $regNos ?: null,
+                    'chest_no'         => $first->group?->chest_no ?? $first->chest_no,
+                    'grade'            => $mark?->grade,
+                    'position'         => $mark?->position,
+                    'score'            => $mark?->score,
+                    'measurement'      => $mark?->measurement_value,
+                    'measurement_unit' => $mark?->measurement_unit,
+                ];
+            })->values();
+        } else {
+            $rows = $participants->map(fn (FestParticipant $p) => [
+                'participant_id'   => $p->id,
+                'school'           => $p->registration?->school?->name,
+                'name'             => $p->student?->name ?? $p->teacher?->name,
+                'reg_no'           => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                'chest_no'         => $p->group?->chest_no ?? $p->chest_no,
+                'grade'            => $p->mark?->grade,
+                'position'         => $p->mark?->position,
+                'score'            => $p->mark?->score,
+                'measurement'      => $p->mark?->measurement_value,
+                'measurement_unit' => $p->mark?->measurement_unit,
+            ]);
+        }
 
         return $rows->sortBy([
+            fn ($a, $b) => ($a['position'] ?? 999) <=> ($b['position'] ?? 999),
             fn ($a, $b) => ((int) preg_replace('/[^0-9]/', '', (string) ($a['chest_no'] ?? 999999)))
                 <=> ((int) preg_replace('/[^0-9]/', '', (string) ($b['chest_no'] ?? 999999))),
             fn ($a, $b) => ($a['participant_id'] ?? 0) <=> ($b['participant_id'] ?? 0),
