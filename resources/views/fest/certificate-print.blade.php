@@ -149,24 +149,7 @@
     </style>
 </head>
 <body>
-    <div class="no-print actions-bar" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 99999; display: flex; align-items: center; gap: 12px; background: rgba(15, 23, 42, 0.92); color: #fff; padding: 8px 18px; border-radius: 9999px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); backdrop-filter: blur(8px); font-family: system-ui, -apple-system, sans-serif;">
-        <button type="button" onclick="window.print()" style="background: #eab308; color: #0f172a; font-weight: 700; border: none; padding: 7px 18px; border-radius: 9999px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
-            <span>🖨️</span> Print / Save PDF
-        </button>
-        <button type="button" id="toggleBgBtn" onclick="toggleBackground()" style="background: rgba(255,255,255,0.15); color: #fff; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); padding: 7px 18px; border-radius: 9999px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
-            <span>🖼️</span> <span id="bgBtnText">Hide Background Image (Print on Paper)</span>
-        </button>
-    </div>
-
     <script>
-        function toggleBackground() {
-            document.body.classList.toggle('hide-background');
-            var isHidden = document.body.classList.contains('hide-background');
-            var btnText = document.getElementById('bgBtnText');
-            if (btnText) {
-                btnText.innerText = isHidden ? 'Show Background Image' : 'Hide Background Image (Print on Paper)';
-            }
-        }
         if (new URLSearchParams(window.location.search).get('hide_bg') === '1' || new URLSearchParams(window.location.search).get('plain') === '1') {
             document.body.classList.add('hide-background');
         }

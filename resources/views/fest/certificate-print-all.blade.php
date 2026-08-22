@@ -143,21 +143,7 @@
     </style>
 </head>
 <body>
-    <div class="toolbar no-print flex-wrap">
-        <button type="button" onclick="window.print()">🖨️ Print / Save all as PDF ({{ count($certificates) }} certificate{{ count($certificates) === 1 ? '' : 's' }})</button>
-        <button type="button" id="toggleBgBtn" class="btn-secondary" onclick="toggleBackground()">🖼️ <span id="bgBtnText">Hide Background Images (Print on Paper)</span></button>
-        <p>Each certificate prints on its own page — use "Save as PDF" in the print dialog to download them all as one file.</p>
-    </div>
-
     <script>
-        function toggleBackground() {
-            document.body.classList.toggle('hide-background');
-            var isHidden = document.body.classList.contains('hide-background');
-            var btnText = document.getElementById('bgBtnText');
-            if (btnText) {
-                btnText.innerText = isHidden ? 'Show Background Images' : 'Hide Background Images (Print on Paper)';
-            }
-        }
         if (new URLSearchParams(window.location.search).get('hide_bg') === '1' || new URLSearchParams(window.location.search).get('plain') === '1') {
             document.body.classList.add('hide-background');
         }
