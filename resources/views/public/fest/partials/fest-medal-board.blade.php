@@ -8,18 +8,22 @@
         <span class="text-right">Points</span>
     </div>
     <div class="divide-y divide-slate-800/80">
+        @php $showMedalRank = $showMedalRank ?? true; @endphp
         @forelse($rows as $row)
         @php
-            $rankClass = match((int) $row['rank']) {
+            $rankClass = $showMedalRank ? match((int) $row['rank']) {
                 1 => 'bg-gradient-to-r from-amber-500/10 to-transparent',
                 2 => 'bg-gradient-to-r from-slate-400/10 to-transparent',
                 3 => 'bg-gradient-to-r from-amber-700/10 to-transparent',
                 default => '',
-            };
+            } : '';
         @endphp
         <div class="grid grid-cols-[3.5rem_1fr_repeat(3,4rem)_6rem] gap-2 items-center px-5 py-3 {{ $rankClass }}">
             <span class="flex items-center">
-                @if($row['rank'] <= 3)
+                {{-- Medal icons imply an actual result — only show them once there's a real
+                     ranking. A pre-results roster (everyone at 0) uses plain numbers even
+                     for rows 1-3, so it can't be misread as "already won something." --}}
+                @if($showMedalRank && $row['rank'] <= 3)
                 <img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-8 h-8">
                 @else
                 <span class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center text-sm font-extrabold">{{ $row['rank'] }}</span>

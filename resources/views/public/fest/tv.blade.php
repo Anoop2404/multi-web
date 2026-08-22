@@ -37,7 +37,7 @@
             @if($slide['type'] === 'board')
                 @include('public.fest.partials.fest-medal-board', ['rows' => $slide['rows']])
             @elseif($slide['type'] === 'schools')
-                @include('public.fest.partials.fest-school-list', ['schools' => $slide['schools']])
+                @include('public.fest.partials.fest-medal-board', ['rows' => $slide['rows'], 'showMedalRank' => false])
             @elseif($slide['type'] === 'winners')
             <div class="grid grid-cols-1 gap-4">
                 @foreach($slide['items'] as $itemGroup)

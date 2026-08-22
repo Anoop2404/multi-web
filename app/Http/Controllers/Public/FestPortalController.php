@@ -671,35 +671,51 @@ class FestPortalController extends Controller
                 ->orderBy('name')
                 ->pluck('name', 'id');
 
-            $namesFor = fn ($regs) => $regs->pluck('school_id')->unique()
+            // Same table shape as the real standings board (rank/school/medal columns/
+            // points), just every value at 0 — so the TV looks consistent across the
+            // event's whole lifecycle instead of switching to a differently-styled list
+            // the moment scoring starts. fest-medal-board's showMedalRank=false keeps rows
+            // 1-3 from showing medal icons here, since nobody's actually won anything yet.
+            $rowsFor = fn ($regs) => $regs->pluck('school_id')->unique()
                 ->map(fn ($id) => $schoolNames[$id] ?? null)
                 ->filter()
                 ->sort()
                 ->values()
+                ->map(fn ($name, $i) => [
+                    'rank' => $i + 1,
+                    'school_name' => $name,
+                    'gold' => 0,
+                    'silver' => 0,
+                    'bronze' => 0,
+                    // String, matching the "27.00"-style formatting a real decimal points
+                    // total renders as — keeps the pre- and post-results table visually
+                    // identical apart from the numbers themselves.
+                    'total_points' => '0.00',
+                ])
                 ->all();
 
-            $schoolPages = array_chunk($namesFor($registrations), $boardsPerPage, true);
+            $schoolPages = array_chunk($rowsFor($registrations), $boardsPerPage);
             foreach ($schoolPages as $i => $page) {
                 $slides[] = [
                     'type' => 'schools',
                     'title' => 'Participating Schools',
                     'subtitle' => count($schoolPages) > 1 ? 'Page '.($i + 1).' of '.count($schoolPages) : 'All Categories',
-                    'schools' => $page,
+                    'rows' => $page,
                 ];
             }
 
             foreach ($categories as $key) {
-                $categoryNames = $namesFor($registrations->filter(fn ($r) => $r->item?->{$categoryColumn} === $key));
-                if (! $categoryNames) {
+                $categoryRows = $rowsFor($registrations->filter(fn ($r) => $r->item?->{$categoryColumn} === $key));
+                if (! $categoryRows) {
                     continue;
                 }
-                $categoryPages = array_chunk($categoryNames, $boardsPerPage, true);
+                $categoryPages = array_chunk($categoryRows, $boardsPerPage);
                 foreach ($categoryPages as $i => $page) {
                     $slides[] = [
                         'type' => 'schools',
                         'title' => $this->scoreboards->categoryLabel($event, $key).' — Participating Schools',
                         'subtitle' => count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : null,
-                        'schools' => $page,
+                        'rows' => $page,
                     ];
                 }
             }
