@@ -228,7 +228,7 @@ class FestCertificateController extends SahodayaAdminController
 
         $payloads = $this->exportPayloadsForEvent(
             $event,
-            embedAssets: true,
+            embedAssets: false,
             plain: $request->boolean('plain'),
             publishedOnly: $publishedOnly,
             itemId: $itemId,
