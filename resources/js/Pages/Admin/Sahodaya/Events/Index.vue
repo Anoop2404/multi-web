@@ -168,6 +168,10 @@
                                         <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}`" class="link-brand font-bold">
                                             Manage →
                                         </Link>
+                                        <a v-if="publicUrl" :href="tvUrl(event.id)" target="_blank" rel="noopener"
+                                           class="ml-3 text-xs font-semibold text-amber-600 hover:text-amber-800">
+                                            TV screen ↗
+                                        </a>
                                         <button v-if="!event.registrations_count && !event.state_program_id"
                                                 type="button"
                                                 class="ml-3 text-xs font-semibold text-rose-600 hover:text-rose-800"
@@ -204,6 +208,10 @@
                                         <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${child.id}`" class="text-xs font-bold text-indigo-700 hover:underline">
                                             Manage Region →
                                         </Link>
+                                        <a v-if="publicUrl" :href="tvUrl(child.id)" target="_blank" rel="noopener"
+                                           class="ml-3 text-xs font-semibold text-amber-600 hover:text-amber-800">
+                                            TV screen ↗
+                                        </a>
                                         <button v-if="!child.registrations_count && !child.state_program_id"
                                                 type="button"
                                                 class="ml-3 text-xs font-semibold text-rose-600 hover:text-rose-800"
@@ -308,6 +316,10 @@ const form = useForm({
     food_payee_type: 'sahodaya',
     food_host_school_id: '',
 });
+
+function tvUrl(eventId) {
+    return `${props.publicUrl.replace(/\/$/, '')}/fest/${eventId}/tv`;
+}
 
 function statusClass(status) {
     return {

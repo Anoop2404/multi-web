@@ -21,13 +21,13 @@
                     <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Date</dt><dd class="font-bold mt-1">{{ $event->event_start?->format('d M Y') ?? 'To be announced' }}@if($event->event_start && $event->event_end && !$event->event_end->isSameDay($event->event_start)) – {{ $event->event_end->format('d M Y') }}@endif</dd></div>
                     <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Venue</dt><dd class="font-bold mt-1">{{ $event->resolvedVenueName() ?: 'To be announced' }}</dd></div>
                     @if($eventContext['series'])<div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Festival series</dt><dd class="font-bold mt-1">{{ $eventContext['series'] }}</dd></div>@endif
-                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Results</dt><dd class="font-bold mt-1 {{ $scopeResultsPublished ? 'text-amber-300' : '' }}">{{ $scopeResultsPublished ? 'Official results published' : 'Awaiting publication' }}</dd></div>
+                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-white/40 text-xs">Results</dt><dd class="font-bold mt-1 {{ ($scopeResultsPublished || ($publishedItemCount ?? 0) > 0) ? 'text-amber-300' : '' }}">@if($scopeResultsPublished)Official results published@elseif(($publishedItemCount ?? 0) > 0){{ $publishedItemCount }} item results published@else Awaiting publication @endif</dd></div>
                 </dl>
             </div>
         </header>
 
         @unless($event->results_published)
-        <p class="rounded-xl border border-amber-500/30 bg-amber-500/10 text-sm text-amber-200 px-4 py-3 mt-5">Participant names remain protected during live competition and appear after official publication.</p>
+        <p class="rounded-xl border border-amber-500/30 bg-amber-500/10 text-sm text-amber-200 px-4 py-3 mt-5">Participant names remain protected during live competition and appear after official publication or item result release.</p>
         @endunless
 
         <section class="mt-10" aria-labelledby="event-actions-title">
@@ -43,6 +43,8 @@
                 <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Event Scoreboard <span class="float-right text-amber-400">→</span></a>
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'toppers']) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Topper Highlights <span class="float-right text-amber-400">→</span></a>
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Detailed Results <span class="float-right text-amber-400">→</span></a>
+                @elseif(($publishedItemCount ?? 0) > 0)
+                <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'item']) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Item Results <span class="float-right text-amber-400">→</span></a>
                 @else
                 <div class="p-4 bg-slate-900/30 border border-slate-800/60 rounded-2xl text-sm text-white/40">Scoreboard not published</div>
                 @endif
@@ -52,7 +54,7 @@
             </div>
         </section>
 
-        @if($scopeResultsPublished && $recentResults->isNotEmpty())
+        @if(($scopeResultsPublished || ($publishedItemCount ?? 0) > 0) && $recentResults->isNotEmpty())
         <section class="mt-10" aria-labelledby="recent-results-title">
             <div class="flex items-end justify-between gap-4 mb-4">
                 <div><p class="text-xs font-bold uppercase tracking-widest text-amber-400">Recently published</p><h2 id="recent-results-title" class="text-2xl font-bold mt-1 text-white">Latest results</h2></div>
@@ -132,9 +134,9 @@
                     </div>
                     <div class="mt-auto pt-4 flex gap-2">
                         @if($scopeSchedulePublished && $scheduledItemIds->contains($item->id))<a href="{{ route('tenant.fest.item-schedule', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold text-white hover:bg-white/15">Schedule</a>@endif
-                        @if($scopeResultsPublished && $item->results_published_at)<a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>@endif
-                        @if(!($scopeSchedulePublished && $scheduledItemIds->contains($item->id)) && !($scopeResultsPublished && $item->results_published_at))
-                        <span class="flex-1 rounded-xl border border-dashed border-slate-700 px-3 py-2 text-center text-xs font-semibold text-white/30">Not yet scheduled</span>
+                        @if($item->results_published_at || $scopeResultsPublished)<a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>@endif
+                        @if(!($scopeSchedulePublished && $scheduledItemIds->contains($item->id)) && !($item->results_published_at || $scopeResultsPublished))
+                        <span class="flex-1 rounded-xl border border-dashed border-slate-700 px-3 py-2 text-center text-xs font-semibold text-white/30">Not yet published</span>
                         @endif
                     </div>
                 </article>
