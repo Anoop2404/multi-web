@@ -473,18 +473,32 @@ const markForms = reactive({});
 for (const reg of props.registrations ?? []) {
     for (const p of reg.participants ?? []) {
         const existing = props.marks?.[p.id] ?? {};
-        const score = existing.score ?? null;
-        let grade = existing.grade ?? '';
-        if (!grade && score !== null && score !== undefined && score !== '') {
-            grade = computeAutoGrade(score, reg.item);
+        let score = existing.score ?? null;
+
+        const jScores = props.judgeScores?.[p.id] ?? {};
+        let judgeSum = 0;
+        let hasAnyJudge = false;
+        for (let j = 1; j <= (props.judgeCount ?? 1); j++) {
+            const v = jScores[j];
+            if (v !== null && v !== '' && v !== undefined) {
+                judgeSum += Number(v);
+                hasAnyJudge = true;
+            }
         }
+        if (hasAnyJudge) {
+            score = judgeSum;
+        }
+
+        const autoG = computeAutoGrade(score, reg.item);
+        const grade = autoG || (existing.grade ?? '');
+
         markForms[p.id] = {
             position: existing.position ?? null,
             grade: grade,
             score: score,
             measurement_value: existing.measurement_value ?? '',
             measurement_unit: existing.measurement_unit ?? '',
-            _user_edited_grade: Boolean(existing.grade),
+            _user_edited_grade: false,
         };
     }
 }
@@ -623,6 +637,19 @@ const savingIds = ref(new Set());
 const bulkSaving = ref(false);
 
 function payloadFor(participant, item) {
+    const form = markForms[participant.id];
+    if (form) {
+        let scoreToUse = form.score;
+        if (hasJudgePanel.value) {
+            const grandTotal = participantGrandTotal(participant.id, item);
+            if (grandTotal !== '—' && grandTotal !== null && grandTotal !== undefined) {
+                scoreToUse = grandTotal;
+            }
+        }
+        if (!form._user_edited_grade) {
+            form.grade = computeAutoGrade(scoreToUse, item);
+        }
+    }
     const payload = buildMarkPayload(participant, item, markForms);
     if (hasJudgePanel.value) {
         payload.judge_scores = judgeScoresPayload(participant.id);
