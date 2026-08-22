@@ -82,26 +82,22 @@ class FestGradePointService
         }
 
         $totalMarks = $itemId ? FestEventItem::find($itemId)?->total_marks : null;
-        $usePercentage = $totalMarks !== null && (float) $totalMarks > 0;
-        $value = $usePercentage ? ($score / (float) $totalMarks) * 100 : $score;
-
         $configs = FestGradeConfig::where('event_id', $event->id)
             ->where(function ($q) use ($itemId) {
                 $q->where('item_id', $itemId)->orWhereNull('item_id');
             })
-            ->when($usePercentage, fn ($q) => $q->whereNotNull('min_percent'))
-            ->when(! $usePercentage, fn ($q) => $q->whereNull('min_percent'))
             ->get();
 
-        $resolved = $this->highestMatchingGradeConfig($configs->where('item_id', $itemId), $value, $usePercentage)
-            ?? $this->highestMatchingGradeConfig($configs->whereNull('item_id'), $value, $usePercentage);
+        $resolved = $this->highestMatchingGradeConfig($configs->where('item_id', $itemId), $score, $totalMarks)
+            ?? $this->highestMatchingGradeConfig($configs->whereNull('item_id'), $score, $totalMarks);
 
         if ($resolved !== null) {
             return $resolved;
         }
 
         // Standard Kalotsavam percentage grade scale fallback
-        $percent = $usePercentage ? $value : ($score <= 100 ? $score : null);
+        $usePercentage = $totalMarks !== null && (float) $totalMarks > 0;
+        $percent = $usePercentage ? ($score / (float) $totalMarks) * 100 : ($score <= 100 ? $score : null);
         if ($percent !== null) {
             if ($percent >= 70.0) return 'A+';
             if ($percent >= 60.0) return 'A';
@@ -113,23 +109,34 @@ class FestGradePointService
     }
 
     /**
-     * Same "highest matching band wins regardless of storage order" fix as
-     * highestMatchingBand() below, generalized for FestGradeConfig rows — which store an
-     * explicit closed [min, max] range rather than a bare threshold. Previously this path
-     * matched on first-row-in-query-order with no sort, so a score could resolve to a lower
-     * grade than it actually earned whenever bands weren't already stored high-to-low.
+     * Match highest configured grade band (checking min_percent or min_score).
      *
      * @param  Collection<int, FestGradeConfig>  $configs
      */
-    private function highestMatchingGradeConfig(Collection $configs, float $value, bool $usePercentage): ?string
+    private function highestMatchingGradeConfig(Collection $configs, float $score, ?float $totalMarks): ?string
     {
-        $sorted = $configs->sortByDesc(fn (FestGradeConfig $c) => (float) ($usePercentage ? $c->min_percent : $c->min_score));
+        if ($configs->isEmpty()) {
+            return null;
+        }
+
+        $usePercentage = $totalMarks !== null && (float) $totalMarks > 0;
+        $percent = $usePercentage ? ($score / (float) $totalMarks) * 100 : $score;
+
+        $sorted = $configs->sortByDesc(fn (FestGradeConfig $c) => (float) ($c->min_percent ?? $c->min_score ?? 0));
 
         foreach ($sorted as $cfg) {
-            $min = (float) ($usePercentage ? $cfg->min_percent : $cfg->min_score);
-            $max = (float) ($usePercentage ? ($cfg->max_percent ?? 100) : ($cfg->max_score ?? 100));
-            if ($value >= $min && $value <= $max) {
-                return str_replace('_plus', '+', $cfg->grade);
+            if ($cfg->min_percent !== null) {
+                $min = (float) $cfg->min_percent;
+                $max = (float) ($cfg->max_percent ?? 100);
+                if ($percent >= $min && $percent <= $max) {
+                    return str_replace('_plus', '+', $cfg->grade);
+                }
+            } elseif ($cfg->min_score !== null) {
+                $min = (float) $cfg->min_score;
+                $max = (float) ($cfg->max_score ?? 999999);
+                if ($score >= $min && $score <= $max) {
+                    return str_replace('_plus', '+', $cfg->grade);
+                }
             }
         }
 

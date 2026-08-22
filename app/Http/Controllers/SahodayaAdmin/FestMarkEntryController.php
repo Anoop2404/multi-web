@@ -176,6 +176,11 @@ class FestMarkEntryController extends SahodayaAdminController
             'headItemGroups' => $nav['headItemGroups'],
             'configuredItemIds' => $configuredItemIds,
             'gradeOptions' => $gradeOptions,
+            'gradeRules'   => \App\Models\FestGradeConfig::where('event_id', $event->id)
+                ->where(function ($q) use ($itemId) {
+                    $q->where('item_id', $itemId)->orWhereNull('item_id');
+                })
+                ->get(['grade', 'item_id', 'min_score', 'max_score', 'min_percent', 'max_percent']),
             'rankPointsByType' => app(FestRankPointService::class)->rowsForAllTypes($event),
             'childEvents'      => $childEvents,
             'judgeCount'       => $judgeCount,

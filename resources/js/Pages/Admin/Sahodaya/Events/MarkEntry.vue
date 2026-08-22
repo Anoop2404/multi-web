@@ -426,7 +426,34 @@ function computeAutoGrade(score, item) {
     if (score === null || score === undefined || score === '' || isNaN(score)) return '';
     const num = Number(score);
     const maxMarks = item?.total_marks ? Number(item.total_marks) : null;
-    const percent = maxMarks && maxMarks > 0 ? (num / maxMarks) * 100 : (num <= 100 ? num : null);
+    const percent = maxMarks && maxMarks > 0 ? (num / maxMarks) * 100 : num;
+
+    const rules = props.gradeRules ?? [];
+    if (rules.length > 0) {
+        const sorted = [...rules].sort((a, b) => {
+            const minA = Number(a.min_percent ?? a.min_score ?? 0);
+            const minB = Number(b.min_percent ?? b.min_score ?? 0);
+            return minB - minA;
+        });
+
+        for (const rule of sorted) {
+            const gradeLabel = (rule.grade || '').replace('_plus', '+');
+            if (rule.min_percent !== null && rule.min_percent !== undefined) {
+                const min = Number(rule.min_percent);
+                const max = Number(rule.max_percent ?? 100);
+                if (percent >= min && percent <= max) {
+                    return gradeLabel;
+                }
+            } else if (rule.min_score !== null && rule.min_score !== undefined) {
+                const min = Number(rule.min_score);
+                const max = Number(rule.max_score ?? 999999);
+                if (num >= min && num <= max) {
+                    return gradeLabel;
+                }
+            }
+        }
+    }
+
     if (percent !== null) {
         if (percent >= 70.0) return 'A+';
         if (percent >= 60.0) return 'A';
