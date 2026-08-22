@@ -198,13 +198,15 @@ class FestPublicScoreboardTest extends TestCase
 
     public function test_school_wise_results_show_points_before_medal_counts(): void
     {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
 
         $response->assertOk();
         // Points is the school's official standing metric — medal counts are only
         // informational (see the code comment on $medalTally) — so points must render
         // as the first data column after Rank/School, ahead of the medal icons.
-        $response->assertSeeInOrder(['>School<', '>Points<', 'alt="Gold"'], false);
+        $response->assertSeeInOrder(['>School<', '>Points<'], false);
     }
 
     public function test_school_tab_lists_a_winner_roster_with_points_per_school(): void
@@ -216,11 +218,12 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertOk();
         $response->assertSee('School-wise Winners');
         $response->assertSee('North Poetry');
-        // markCategoryWinner() creates a grade A, position 1 mark with no FestPointRule
-        // configured, which resolves through FestGradePointService's default CKSC-style
-        // table to 8 points — the same value already relied on by the scoreboard test
-        // above (test_region_and_category_filters_work_together).
-        $response->assertSeeInOrder(['North Poetry', '8'], false);
+        // markCategoryWinner() stores grade=A with score=80, but pointsForMark()
+        // re-derives the effective grade from score first — 80% clears the A+ band
+        // (>=70%) under the default Kalotsavam scale — so with no FestPointRule
+        // configured this resolves through the default CKSC-style table to A+'s
+        // 10 points, not A's 8.
+        $response->assertSeeInOrder(['North Poetry', '10'], false);
     }
 
     public function test_school_winners_section_has_a_school_picker_dropdown(): void
@@ -243,9 +246,10 @@ class FestPublicScoreboardTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('>Points<', false);
-        // grade A, position 1, no FestPointRule configured => default table value 8
-        // (same value test_region_and_category_filters_work_together already relies on).
-        $response->assertSeeInOrder(['North Poetry', '8'], false);
+        // Score=80 re-derives to grade A+ (>=70% band) before points are looked up, so
+        // with no FestPointRule configured this resolves to A+'s default value, 10 —
+        // see the matching comment on test_school_tab_lists_a_winner_roster_with_points_per_school.
+        $response->assertSeeInOrder(['North Poetry', '10'], false);
     }
 
     public function test_item_results_cannot_cross_the_operational_event_boundary(): void

@@ -21,9 +21,10 @@
             'badges' => [$typeLabels[$item->participant_type] ?? ucfirst($item->participant_type ?: 'individual')],
         ])
 
-        @if($marks->isEmpty())
+        @if($allMarks->isEmpty())
         <div class="rounded-2xl border border-dashed border-slate-700 p-10 text-center text-white/30 mt-6">No published results for this item.</div>
         @else
+        @if($marks->isNotEmpty())
         <div class="mt-6 flex items-center gap-2 text-amber-300/90">
             <span class="text-lg">🏆</span>
             <h2 class="text-xs font-bold uppercase tracking-wider">Winner Roster</h2>
@@ -112,6 +113,45 @@
                 @endif
             </div>
             @endforeach
+        </div>
+        @endif
+
+        <div class="mt-10 flex items-center gap-2 text-amber-300/90">
+            <span class="text-lg">📋</span>
+            <h2 class="text-xs font-bold uppercase tracking-wider">Full Results</h2>
+        </div>
+        <div class="mt-3 h-px bg-gradient-to-r from-amber-500/40 via-slate-700 to-transparent"></div>
+
+        <div class="mt-4 rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-white/5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="p-3 w-12 text-center">Rank</th>
+                            <th class="p-3">Participant</th>
+                            <th class="p-3">School</th>
+                            <th class="p-3 text-center w-20">Grade</th>
+                            <th class="p-3 text-right w-24">Score</th>
+                            <th class="p-3 text-right w-24">Points</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        @foreach($allMarks as $row)
+                        @php
+                            $names = !empty($row['team']) ? collect($row['team'])->pluck('name')->filter()->implode(', ') : $row['participant'];
+                        @endphp
+                        <tr class="hover:bg-white/5 transition">
+                            <td class="p-3 text-center font-mono text-slate-400">{{ $row['position'] ?? '—' }}</td>
+                            <td class="p-3 font-semibold text-white uppercase">{{ $names ?: '—' }}</td>
+                            <td class="p-3 text-white/50 uppercase">{{ $row['school'] ?? '—' }}</td>
+                            <td class="p-3 text-center font-bold text-amber-300">{{ $row['grade'] ?? '—' }}</td>
+                            <td class="p-3 text-right font-mono text-white/70">{{ $row['score'] !== null ? number_format((float) $row['score'], 2) : '—' }}</td>
+                            <td class="p-3 text-right font-mono font-bold text-white">{{ $row['points'] ?? 0 }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
         </div>
         @endif
 

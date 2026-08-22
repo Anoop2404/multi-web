@@ -447,9 +447,8 @@ class FestPortalController extends Controller
         abort_unless((int) $item->event_id === (int) $event->id, 404);
         abort_unless($event->results_published || $item->results_published_at, 404);
 
-        $marks = FestMark::where('event_id', $item->event_id)
+        $allMarks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
-            ->where('position', '<=', 3)
             ->with(['participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('position')
             ->orderByDesc('score')
@@ -466,7 +465,7 @@ class FestPortalController extends Controller
         $rosterByRegistration = $item->isTeamItem()
             ? FestParticipant::whereIn(
                 'registration_id',
-                $marks->pluck('participant.registration_id')->filter()->unique()->values()
+                $allMarks->pluck('participant.registration_id')->filter()->unique()->values()
             )
                 ->where('participant_role', 'performer')
                 ->with(['student', 'teacher'])
@@ -474,14 +473,19 @@ class FestPortalController extends Controller
                 ->groupBy('registration_id')
             : null;
 
-        $marks = $marks->map(fn (FestMark $m) => $this->publicWinnerRow($m, $event, $rosterByRegistration) + [
+        // Winner Roster (photo podium) stays capped to the top 3; the Full Results table
+        // below it lists everyone, including non-placing participants — one query/roster
+        // resolution feeds both instead of running this twice.
+        $allMarks = $allMarks->map(fn (FestMark $m) => $this->publicWinnerRow($m, $event, $rosterByRegistration) + [
             'mark_id' => $m->id,
             'poster_url' => in_array((int) $m->position, [1, 2, 3], true)
                 ? route('tenant.fest.winner-poster', [$event->id, $item->id, $m->id])
                 : null,
-        ]);
+        ])->values();
 
-        return $this->renderPublic('public.fest.item-results', $tenant, compact('event', 'item', 'marks'));
+        $marks = $allMarks->filter(fn (array $row) => in_array((int) ($row['position'] ?? 0), [1, 2, 3], true))->values();
+
+        return $this->renderPublic('public.fest.item-results', $tenant, compact('event', 'item', 'marks', 'allMarks'));
     }
 
     public function winnerPoster(int $eventId, FestEventItem $item, FestMark $mark, FestWinnerPosterService $posters)
