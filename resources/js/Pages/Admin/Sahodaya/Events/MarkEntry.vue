@@ -91,6 +91,9 @@
                     <span class="text-[11px] text-slate-400">
                         ✓ {{ configuredCountInView }}/{{ itemOptions.length }} items configured
                     </span>
+                    <button v-if="sections.length && showGradeColumn" type="button" class="btn-secondary text-xs !py-1.5 !px-3" @click="autoGradeAll">
+                        Auto-grade All
+                    </button>
                     <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4"
                             :disabled="bulkSaving" @click="saveAll">
                         {{ bulkSaving ? 'Saving all…' : 'Save All Marks ✓' }}
@@ -142,6 +145,9 @@
 
                         <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5" @click="autoRank(section.item)">
                             Auto-rank
+                        </button>
+                        <button v-if="section.item?.id && showGradeColumn" type="button" class="btn-secondary text-xs !py-1 !px-2.5" @click="autoGrade(section)">
+                            Auto-grade
                         </button>
                     </div>
                 </div>
@@ -495,6 +501,36 @@ function onScoreInput(participantId, item) {
         if (autoG) {
             form.grade = autoG;
         }
+    }
+}
+
+function autoGrade(section) {
+    for (const { participant, item } of section.rows) {
+        if (isAbsent(participant, item)) continue;
+        const form = markForms[participant.id];
+        if (!form) continue;
+
+        let scoreToUse = form.score;
+        if (hasJudgePanel.value) {
+            const grandTotal = participantGrandTotal(participant.id, item);
+            if (grandTotal !== '—' && grandTotal !== null && grandTotal !== undefined) {
+                scoreToUse = grandTotal;
+            }
+        }
+
+        if (scoreToUse !== null && scoreToUse !== undefined && scoreToUse !== '') {
+            const autoG = computeAutoGrade(scoreToUse, item);
+            if (autoG) {
+                form.grade = autoG;
+                form._user_edited_grade = false;
+            }
+        }
+    }
+}
+
+function autoGradeAll() {
+    for (const section of sections.value) {
+        autoGrade(section);
     }
 }
 
