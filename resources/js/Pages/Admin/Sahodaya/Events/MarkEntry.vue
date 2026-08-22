@@ -242,7 +242,7 @@
                                                :disabled="isAbsent(participant, item)">
                                     </td>
                                     <td class="p-3.5 font-mono font-bold text-slate-900 tabular-nums">
-                                        {{ participantGrandTotal(participant.id) }}
+                                        {{ participantGrandTotal(participant.id, item) }}
                                     </td>
                                 </template>
 
@@ -250,12 +250,13 @@
                                 <td v-else class="p-3.5">
                                     <input v-model.number="markForms[participant.id].score" type="number" min="0" step="0.5"
                                            class="field text-xs font-bold tabular-nums" placeholder="Pts (Optional)"
-                                           :disabled="isAbsent(participant, item)">
+                                           :disabled="isAbsent(participant, item)"
+                                           @input="onScoreInput(participant.id, item)">
                                 </td>
 
                                 <!-- Grade (Optional for Kalolsavam / Fest) -->
                                 <td v-if="showGradeColumn" class="p-3.5">
-                                    <select v-model="markForms[participant.id].grade" class="field text-xs" :disabled="isAbsent(participant, item)">
+                                    <select v-model="markForms[participant.id].grade" class="field text-xs" :disabled="isAbsent(participant, item)" @change="markForms[participant.id]._user_edited_grade = true">
                                         <option value="">—</option>
                                         <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
                                     </select>
@@ -412,17 +413,37 @@ const rankOptions = computed(() => [
     { rank: 6, label: '6th Place' },
 ]);
 
+function computeAutoGrade(score, item) {
+    if (score === null || score === undefined || score === '' || isNaN(score)) return '';
+    const num = Number(score);
+    const maxMarks = item?.total_marks ? Number(item.total_marks) : null;
+    const percent = maxMarks && maxMarks > 0 ? (num / maxMarks) * 100 : (num <= 100 ? num : null);
+    if (percent !== null) {
+        if (percent >= 70.0) return 'A+';
+        if (percent >= 60.0) return 'A';
+        if (percent >= 50.0) return 'B';
+        if (percent >= 40.0) return 'C';
+    }
+    return '';
+}
+
 // Form state per participant
 const markForms = reactive({});
 for (const reg of props.registrations ?? []) {
     for (const p of reg.participants ?? []) {
         const existing = props.marks?.[p.id] ?? {};
+        const score = existing.score ?? null;
+        let grade = existing.grade ?? '';
+        if (!grade && score !== null && score !== undefined && score !== '') {
+            grade = computeAutoGrade(score, reg.item);
+        }
         markForms[p.id] = {
             position: existing.position ?? null,
-            grade: existing.grade ?? '',
-            score: existing.score ?? null,
+            grade: grade,
+            score: score,
             measurement_value: existing.measurement_value ?? '',
             measurement_unit: existing.measurement_unit ?? '',
+            _user_edited_grade: Boolean(existing.grade),
         };
     }
 }
@@ -447,7 +468,7 @@ for (const reg of props.registrations ?? []) {
     }
 }
 
-function participantGrandTotal(participantId) {
+function participantGrandTotal(participantId, item = null) {
     const row = judgeForms[participantId] ?? {};
     let total = 0;
     let any = false;
@@ -458,7 +479,23 @@ function participantGrandTotal(participantId) {
             any = true;
         }
     }
+    if (any && markForms[participantId] && !markForms[participantId]._user_edited_grade) {
+        const autoG = computeAutoGrade(total, item);
+        if (autoG) {
+            markForms[participantId].grade = autoG;
+        }
+    }
     return any ? total : '—';
+}
+
+function onScoreInput(participantId, item) {
+    const form = markForms[participantId];
+    if (form && !form._user_edited_grade) {
+        const autoG = computeAutoGrade(form.score, item);
+        if (autoG) {
+            form.grade = autoG;
+        }
+    }
 }
 
 function judgeScoresPayload(participantId) {

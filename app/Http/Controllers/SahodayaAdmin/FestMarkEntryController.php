@@ -229,7 +229,14 @@ class FestMarkEntryController extends SahodayaAdminController
 
             if ($item && $judgeScores !== null && $criteriaService->hasJudgePanel($item)) {
                 $rowData['score'] = $criteriaService->saveParticipantJudgeScores($item, $participantId, $judgeScores);
-                $rowData['grade'] = null;
+            }
+
+            if (empty($rowData['grade']) && isset($rowData['score']) && $rowData['score'] !== null && $rowData['score'] !== '') {
+                $rowData['grade'] = app(\App\Services\Events\FestGradePointService::class)->resolveGradeFromScore(
+                    $event,
+                    (int) $data['item_id'],
+                    (float) $rowData['score']
+                );
             }
 
             $result = $markSave->save($event, [...$rowData, 'participant_id' => $participantId], $request->user()->id);

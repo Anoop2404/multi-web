@@ -93,11 +93,23 @@ class FestGradePointService
             ->when(! $usePercentage, fn ($q) => $q->whereNull('min_percent'))
             ->get();
 
-        // Item-specific bands take priority over event-wide (item_id null) ones — checked as
-        // two separate sorted passes, not one mixed query, so the priority ordering can't
-        // interfere with the highest-band-wins sort within each tier.
-        return $this->highestMatchingGradeConfig($configs->where('item_id', $itemId), $value, $usePercentage)
+        $resolved = $this->highestMatchingGradeConfig($configs->where('item_id', $itemId), $value, $usePercentage)
             ?? $this->highestMatchingGradeConfig($configs->whereNull('item_id'), $value, $usePercentage);
+
+        if ($resolved !== null) {
+            return $resolved;
+        }
+
+        // Standard Kalotsavam percentage grade scale fallback
+        $percent = $usePercentage ? $value : ($score <= 100 ? $score : null);
+        if ($percent !== null) {
+            if ($percent >= 70.0) return 'A+';
+            if ($percent >= 60.0) return 'A';
+            if ($percent >= 50.0) return 'B';
+            if ($percent >= 40.0) return 'C';
+        }
+
+        return null;
     }
 
     /**
