@@ -47,29 +47,28 @@ class FestGradePointService
             return app(FestRankPointService::class)->pointsForRank($event, (int) $mark->position, $participantType);
         }
 
-        // Exact match required on both grade and position — a mark with no position
-        // (didn't place top-3) must only match an explicit "Any Position" rule
-        // (position IS NULL), never silently fall through to whichever positioned rule
-        // sorts first. The previous ->when($mark->position, ...) skipped the position
-        // constraint entirely whenever a mark had no position, so an unranked
-        // grade-A participant could match the *1st place* rule outright — inflating
-        // points for every mark that simply didn't rank. Same fix applied to grade.
+        // Points are only ever awarded to a placed rank (1st/2nd/3rd) — a graded but
+        // unranked mark earns nothing. No "grade only" consolation points.
+        if (! $mark->position) {
+            return 0;
+        }
+
+        // Exact match required on both grade and position — this is what stops an
+        // unranked mark matching whichever positioned rule sorts first (it can't get
+        // here at all now), and stops a gradeless mark matching any grade's rule for
+        // that position.
         $rule = FestPointRule::where('event_id', $event->id)
             ->where('is_group', $isGroup)
+            ->where('position', $mark->position)
             ->where(function ($q) use ($event, $mark) {
                 $mark->grade
                     ? $q->where('grade', $this->normalizeGrade($event, $mark->grade))
                     : $q->whereNull('grade');
             })
-            ->where(function ($q) use ($mark) {
-                $mark->position
-                    ? $q->where('position', $mark->position)
-                    : $q->whereNull('position');
-            })
             ->first();
 
         if ($rule) {
-            if (($rule->points_table ?? 'custom') === 'athletics_standard' && $mark->position) {
+            if (($rule->points_table ?? 'custom') === 'athletics_standard') {
                 return (int) (self::ATHLETICS_STANDARD[(int) $mark->position] ?? 0);
             }
 
@@ -77,21 +76,9 @@ class FestGradePointService
         }
 
         $grade = $this->normalizeGrade($event, $mark->grade);
-        $pos = (string) ($mark->position ?? '');
+        $pts = (int) (self::DEFAULT_POINTS[$grade][(string) $mark->position] ?? 0);
 
-        if ($pos !== '' && isset(self::DEFAULT_POINTS[$grade][$pos])) {
-            $pts = (int) self::DEFAULT_POINTS[$grade][$pos];
-            return $isGroup ? $pts * 2 : $pts;
-        }
-
-        $defaultGradeOnly = [
-            'A_plus' => $isGroup ? 10 : 5,
-            'A'      => $isGroup ? 6 : 3,
-            'B'      => $isGroup ? 4 : 2,
-            'C'      => $isGroup ? 2 : 1,
-        ];
-
-        return (int) ($defaultGradeOnly[$grade] ?? 0);
+        return $isGroup ? $pts * 2 : $pts;
     }
 
     /**
@@ -185,24 +172,17 @@ class FestGradePointService
 
     private function mcsPointsForMark(FestMark $mark, bool $isGroup): int
     {
+        if (! $mark->position) {
+            return 0;
+        }
+
         $table = $isGroup
             ? config('fest_mcs_scoring.group_points', [])
             : config('fest_mcs_scoring.individual_points', []);
 
         $grade = $this->normalizeMcsGrade($mark->grade);
-        $pos = (string) ($mark->position ?? '');
 
-        if ($pos !== '' && isset($table[$grade][$pos])) {
-            return (int) $table[$grade][$pos];
-        }
-
-        $gradeOnly = [
-            'A' => $isGroup ? 10 : 5,
-            'B' => $isGroup ? 6 : 3,
-            'C' => $isGroup ? 2 : 1,
-        ];
-
-        return (int) ($gradeOnly[$grade] ?? 0);
+        return (int) ($table[$grade][(string) $mark->position] ?? 0);
     }
 
     public function resolveMcsGradeFromScore(float $score): ?string
@@ -213,24 +193,17 @@ class FestGradePointService
     /** Official Confederation State Kalolsavam Manual table — see config/fest_confed_kalotsav_scoring.php. */
     private function confedPointsForMark(FestMark $mark, bool $isGroup): int
     {
+        if (! $mark->position) {
+            return 0;
+        }
+
         $table = $isGroup
             ? config('fest_confed_kalotsav_scoring.group_points', [])
             : config('fest_confed_kalotsav_scoring.individual_points', []);
 
         $grade = $this->normalizeMcsGrade($mark->grade); // same A/B/C-only normalization the manual uses
-        $pos = (string) ($mark->position ?? '');
 
-        if ($pos !== '' && isset($table[$grade][$pos])) {
-            return (int) $table[$grade][$pos];
-        }
-
-        $gradeOnly = [
-            'A' => $isGroup ? 10 : 5,
-            'B' => $isGroup ? 6 : 3,
-            'C' => $isGroup ? 2 : 1,
-        ];
-
-        return (int) ($gradeOnly[$grade] ?? 0);
+        return (int) ($table[$grade][(string) $mark->position] ?? 0);
     }
 
     public function resolveConfedGradeFromScore(float $score): ?string
