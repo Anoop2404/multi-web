@@ -91,6 +91,9 @@
                     <span class="text-[11px] text-slate-400">
                         ✓ {{ configuredCountInView }}/{{ itemOptions.length }} items configured
                     </span>
+                    <button v-if="sections.length" type="button" class="btn-secondary text-xs !py-1.5 !px-3" @click="autoRankAll">
+                        Auto-rank All
+                    </button>
                     <button v-if="sections.length && showGradeColumn" type="button" class="btn-secondary text-xs !py-1.5 !px-3" @click="autoGradeAll">
                         Auto-grade All
                     </button>
@@ -143,7 +146,7 @@
                             </button>
                         </div>
 
-                        <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5" @click="autoRank(section.item)">
+                        <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5" @click="autoRankSection(section)">
                             Auto-rank
                         </button>
                         <button v-if="section.item?.id && showGradeColumn" type="button" class="btn-secondary text-xs !py-1 !px-2.5" @click="autoGrade(section)">
@@ -634,6 +637,52 @@ async function saveAll() {
         });
     }
     bulkSaving.value = false;
+}
+
+function autoRankSection(section) {
+    const scoredRows = [];
+    for (const { participant, item } of section.rows) {
+        if (isAbsent(participant, item)) continue;
+        let scoreVal = markForms[participant.id]?.score;
+        if (hasJudgePanel.value) {
+            const grandTotal = participantGrandTotal(participant.id, item);
+            if (grandTotal !== '—' && grandTotal !== null && grandTotal !== undefined) {
+                scoreVal = grandTotal;
+            }
+        }
+        if (scoreVal !== null && scoreVal !== undefined && scoreVal !== '' && !isNaN(scoreVal)) {
+            scoredRows.push({
+                participantId: participant.id,
+                item,
+                score: Number(scoreVal),
+            });
+        }
+    }
+
+    if (!scoredRows.length) {
+        if (section.item?.id) {
+            router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${section.item.id}/auto-rank`, {}, { preserveScroll: true });
+        }
+        return;
+    }
+
+    scoredRows.sort((a, b) => b.score - a.score);
+
+    let currentRank = 1;
+    for (let i = 0; i < scoredRows.length; i++) {
+        if (i > 0 && scoredRows[i].score < scoredRows[i - 1].score) {
+            currentRank = i + 1;
+        }
+        if (currentRank <= 6) {
+            setRank(scoredRows[i].participantId, scoredRows[i].item, markForms, currentRank);
+        }
+    }
+}
+
+function autoRankAll() {
+    for (const section of sections.value) {
+        autoRankSection(section);
+    }
 }
 
 function autoRank(item) {
