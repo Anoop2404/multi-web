@@ -54,10 +54,20 @@ class FestCertificateController extends SahodayaAdminController
             ])
             ->values();
 
+        $schools = $certificates->map(fn ($c) => [
+            'id'   => $c['registration']?->school?->id ?? $c['participant']?->registration?->school?->id,
+            'name' => $c['registration']?->school?->name ?? $c['participant']?->registration?->school?->name ?? 'Unknown School',
+        ])
+        ->filter(fn ($s) => ! empty($s['id']))
+        ->unique('id')
+        ->sortBy('name')
+        ->values();
+
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event'           => $event,
             'certificates'    => $certificates,
             'publishedItems'  => $publishedItems,
+            'schools'         => $schools,
             'winnersByItem'   => $this->winnersByItem($certificates, $event),
             'winnersBySchool' => $this->winnersBySchool($certificates, $event),
         ]));
@@ -175,6 +185,9 @@ class FestCertificateController extends SahodayaAdminController
         $itemId = $request->query('item_id') ? (int) $request->query('item_id') : null;
         $schoolId = $request->query('school_id') ? (int) $request->query('school_id') : null;
         $certType = $request->query('cert_type');
+        $certIds = $request->query('certificate_ids')
+            ? array_filter(array_map('intval', explode(',', (string) $request->query('certificate_ids'))))
+            : null;
 
         $payloads = $this->exportPayloadsForEvent(
             $event,
@@ -183,7 +196,8 @@ class FestCertificateController extends SahodayaAdminController
             publishedOnly: $publishedOnly,
             itemId: $itemId,
             schoolId: $schoolId,
-            certType: $certType
+            certType: $certType,
+            certIds: $certIds
         );
 
         abort_if($payloads->isEmpty(), 404, $publishedOnly ? 'No published winner certificates to download.' : 'No certificates to download.');
@@ -222,6 +236,9 @@ class FestCertificateController extends SahodayaAdminController
         $itemId = $request->query('item_id') ? (int) $request->query('item_id') : null;
         $schoolId = $request->query('school_id') ? (int) $request->query('school_id') : null;
         $certType = $request->query('cert_type');
+        $certIds = $request->query('certificate_ids')
+            ? array_filter(array_map('intval', explode(',', (string) $request->query('certificate_ids'))))
+            : null;
 
         $payloads = $this->exportPayloadsForEvent(
             $event,
@@ -230,7 +247,8 @@ class FestCertificateController extends SahodayaAdminController
             publishedOnly: $publishedOnly,
             itemId: $itemId,
             schoolId: $schoolId,
-            certType: $certType
+            certType: $certType,
+            certIds: $certIds
         );
 
         abort_if($payloads->isEmpty(), 404, 'No certificates to print.');
@@ -248,23 +266,28 @@ class FestCertificateController extends SahodayaAdminController
         bool $publishedOnly = false,
         ?int $itemId = null,
         ?int $schoolId = null,
-        ?string $certType = null
+        ?string $certType = null,
+        ?array $certIds = null
     ): \Illuminate\Support\Collection {
-        $participantIds = FestParticipant::where(function ($q) use ($event) {
-            $q->whereIn('event_id', $event->reportableEventIds())
-              ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
-        })
-        ->when($itemId, fn ($q) => $q->where(function ($iq) use ($itemId) {
-            $iq->whereHas('registration', fn ($rq) => $rq->where('item_id', $itemId))
-               ->orWhereHas('mark', fn ($mq) => $mq->where('item_id', $itemId));
-        }))
-        ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
-        ->pluck('id');
+        if (! empty($certIds)) {
+            $certificates = Certificate::whereIn('id', $certIds)->get();
+        } else {
+            $participantIds = FestParticipant::where(function ($q) use ($event) {
+                $q->whereIn('event_id', $event->reportableEventIds())
+                  ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+            })
+            ->when($itemId, fn ($q) => $q->where(function ($iq) use ($itemId) {
+                $iq->whereHas('registration', fn ($rq) => $rq->where('item_id', $itemId))
+                   ->orWhereHas('mark', fn ($mq) => $mq->where('item_id', $itemId));
+            }))
+            ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
+            ->pluck('id');
 
-        $certificates = Certificate::where('entity_type', FestParticipant::class)
-            ->whereIn('entity_id', $participantIds)
-            ->when($certType, fn ($q) => $q->where('cert_type', $certType))
-            ->get();
+            $certificates = Certificate::where('entity_type', FestParticipant::class)
+                ->whereIn('entity_id', $participantIds)
+                ->when($certType, fn ($q) => $q->where('cert_type', $certType))
+                ->get();
+        }
 
         $service = app(FestCertificateService::class);
 

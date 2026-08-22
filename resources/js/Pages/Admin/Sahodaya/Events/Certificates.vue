@@ -176,32 +176,130 @@
             </div>
         </div>
 
-        <!-- TAB 3: All Certificates -->
-        <div v-if="activeTab === 'all'" class="card p-4">
-            <div v-if="certificates.length" class="divide-y divide-gray-100">
-                <div v-for="c in certificates" :key="c.id" class="py-3 flex items-center justify-between gap-4">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="font-semibold text-sm text-gray-900">{{ c.student?.name ?? c.participant?.student?.name ?? 'Participant' }}</span>
-                            <span class="text-[11px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider"
-                                  :class="c.cert_type === 'winner' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'">
-                                {{ certificateTypeLabel(c.cert_type) }}
-                            </span>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-0.5">
-                            {{ c.item?.title ?? 'Event Participant' }}
-                        </p>
+        <!-- TAB 3: All Certificates with School Filter, Search, Pagination, & Bulk Actions -->
+        <div v-if="activeTab === 'all'" class="space-y-4">
+            <!-- Filter & Search Controls Bar -->
+            <div class="card p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                    <!-- Search Input -->
+                    <div class="relative min-w-[200px] flex-1">
+                        <input v-model="searchQuery" type="text" placeholder="Search student or item..."
+                               class="w-full text-xs py-2 pl-8 pr-3 rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        <span class="absolute left-2.5 top-2 text-gray-400 text-xs">🔍</span>
                     </div>
-                    <div class="flex items-center gap-3 text-xs">
-                        <a :href="`/certificates/verify/${c.uuid}`" target="_blank" class="text-gray-500 hover:text-gray-700">Verify ↗</a>
-                        <a :href="`/certificates/print/${c.uuid}?preview=1`" target="_blank" class="text-gray-500 hover:text-gray-700">Preview ↗</a>
-                        <a :href="`/certificates/print/${c.uuid}`" target="_blank" class="font-semibold text-indigo-600 hover:underline">Print (With BG) ↗</a>
-                        <a :href="`/certificates/print/${c.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Print Plain ↗</a>
+
+                    <!-- School Filter -->
+                    <select v-model="selectedSchoolId" class="text-xs py-2 px-3 rounded border-gray-300 shadow-sm focus:ring-indigo-500 max-w-[240px] truncate">
+                        <option :value="null">All Schools ({{ schools.length }})</option>
+                        <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
+                    </select>
+
+                    <!-- Certificate Type Filter -->
+                    <select v-model="selectedCertType" class="text-xs py-2 px-3 rounded border-gray-300 shadow-sm focus:ring-indigo-500">
+                        <option :value="null">All Types</option>
+                        <option value="winner">Merit Winners</option>
+                        <option value="participation">Participation</option>
+                    </select>
+                </div>
+
+                <!-- Page Size & Download School ZIP -->
+                <div class="flex items-center gap-3 text-xs text-gray-600 shrink-0">
+                    <a v-if="selectedSchoolId"
+                       :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip?school_id=${selectedSchoolId}`"
+                       class="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1">
+                        📦 Download School ZIP
+                    </a>
+                    <div class="flex items-center gap-1.5">
+                        <span>Show:</span>
+                        <select v-model="perPage" class="text-xs py-1.5 px-2 rounded border-gray-300">
+                            <option :value="25">25</option>
+                            <option :value="50">50</option>
+                            <option :value="100">100</option>
+                            <option value="all">All</option>
+                        </select>
                     </div>
                 </div>
             </div>
-            <div v-else class="text-center text-gray-500 text-sm py-8">
-                No certificates generated yet. Click "Generate Merit Certificates" or "Generate participation certificates" above.
+
+            <!-- Bulk Action Toolbar (when checkboxes are selected) -->
+            <div v-if="selectedCertIds.length" class="bg-indigo-50 border border-indigo-200 rounded p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <span class="font-semibold text-indigo-900">
+                    Selected {{ selectedCertIds.length }} certificate{{ selectedCertIds.length === 1 ? '' : 's' }}
+                </span>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button @click="bulkPrint(false)" class="btn-primary py-1 px-3 text-xs">
+                        🖨️ Bulk Print (With BG)
+                    </button>
+                    <button @click="bulkPrint(true)" class="btn-secondary py-1 px-3 text-xs">
+                        📄 Bulk Print Plain (No BG)
+                    </button>
+                    <button @click="bulkDownload" class="btn-secondary py-1 px-3 text-xs">
+                        📦 Bulk Download ZIP
+                    </button>
+                    <button @click="selectedCertIds = []" class="text-gray-500 hover:text-gray-700 ml-2">
+                        Clear Selection
+                    </button>
+                </div>
+            </div>
+
+            <!-- Certificate Table / List -->
+            <div class="card p-4">
+                <div v-if="paginatedCertificates.length" class="divide-y divide-gray-100">
+                    <div class="py-2 px-1 flex items-center justify-between text-xs font-semibold text-gray-500 border-b border-gray-100">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" :checked="isAllSelectedOnPage" @change="toggleSelectAllPage" class="rounded border-gray-300">
+                            <span>Student / Item / School</span>
+                        </div>
+                        <span>Actions</span>
+                    </div>
+
+                    <div v-for="c in paginatedCertificates" :key="c.id" class="py-3 flex items-center justify-between gap-4">
+                        <div class="flex items-start gap-3 min-w-0">
+                            <input type="checkbox" :value="c.id" v-model="selectedCertIds" class="mt-1 rounded border-gray-300">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-semibold text-sm text-gray-900">{{ c.student?.name ?? c.participant?.student?.name ?? 'Participant' }}</span>
+                                    <span class="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider"
+                                          :class="c.cert_type === 'winner' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'">
+                                        {{ certificateTypeLabel(c.cert_type) }}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-gray-600 mt-0.5 truncate">
+                                    {{ c.item?.title ?? 'Event Participant' }}
+                                    <span v-if="c.registration?.school?.name || c.participant?.registration?.school?.name" class="text-gray-400"> · </span>
+                                    <span class="text-gray-500 font-medium">{{ c.registration?.school?.name ?? c.participant?.registration?.school?.name }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs shrink-0">
+                            <a :href="`/certificates/verify/${c.uuid}`" target="_blank" class="text-gray-500 hover:text-gray-700">Verify ↗</a>
+                            <a :href="`/certificates/print/${c.uuid}?preview=1`" target="_blank" class="text-gray-500 hover:text-gray-700">Preview ↗</a>
+                            <a :href="`/certificates/print/${c.uuid}`" target="_blank" class="font-semibold text-indigo-600 hover:underline">Print (With BG) ↗</a>
+                            <a :href="`/certificates/print/${c.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Print Plain ↗</a>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="text-center text-gray-500 text-sm py-8">
+                    No matching certificates found.
+                </div>
+
+                <!-- Pagination Footer -->
+                <div v-if="totalPages > 1" class="mt-4 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600">
+                    <span>
+                        Showing {{ ((currentPage - 1) * perPageNum) + 1 }} to {{ Math.min(currentPage * perPageNum, filteredCertificates.length) }} of {{ filteredCertificates.length }} certificates
+                    </span>
+                    <div class="flex items-center gap-1">
+                        <button @click="currentPage = Math.max(1, currentPage - 1)" :disabled="currentPage === 1"
+                                class="px-2.5 py-1 rounded border border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50">
+                            Previous
+                        </button>
+                        <span class="px-2 font-medium">Page {{ currentPage }} of {{ totalPages }}</span>
+                        <button @click="currentPage = Math.min(totalPages, currentPage + 1)" :disabled="currentPage === totalPages"
+                                class="px-2.5 py-1 rounded border border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50">
+                            Next
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -210,7 +308,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
@@ -219,6 +317,7 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, certificates: Array,
     publishedItems: { type: Array, default: () => [] },
+    schools: { type: Array, default: () => [] },
     winnersByItem: { type: Array, default: () => [] },
     winnersBySchool: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
@@ -227,6 +326,79 @@ const props = defineProps({
 const activeTab = ref('winners_item');
 const plainMode = ref(false);
 const selectedItemId = ref(null);
+
+// Search, Filter, & Pagination state
+const searchQuery = ref('');
+const selectedSchoolId = ref(null);
+const selectedCertType = ref(null);
+const perPage = ref(25);
+const currentPage = ref(1);
+const selectedCertIds = ref([]);
+
+const filteredCertificates = computed(() => {
+    return props.certificates.filter(c => {
+        if (selectedCertType.value && c.cert_type !== selectedCertType.value) {
+            return false;
+        }
+        if (selectedSchoolId.value) {
+            const schoolId = c.registration?.school?.id ?? c.participant?.registration?.school?.id;
+            if (schoolId !== selectedSchoolId.value) return false;
+        }
+        if (searchQuery.value.trim()) {
+            const q = searchQuery.value.toLowerCase().trim();
+            const studentName = (c.student?.name ?? c.participant?.student?.name ?? '').toLowerCase();
+            const itemTitle = (c.item?.title ?? '').toLowerCase();
+            const schoolName = (c.registration?.school?.name ?? c.participant?.registration?.school?.name ?? '').toLowerCase();
+            if (!studentName.includes(q) && !itemTitle.includes(q) && !schoolName.includes(q)) {
+                return false;
+            }
+        }
+        return true;
+    });
+});
+
+const perPageNum = computed(() => perPage.value === 'all' ? filteredCertificates.value.length || 1 : Number(perPage.value));
+
+const totalPages = computed(() => Math.ceil(filteredCertificates.value.length / perPageNum.value) || 1);
+
+const paginatedCertificates = computed(() => {
+    if (perPage.value === 'all') return filteredCertificates.value;
+    const start = (currentPage.value - 1) * perPageNum.value;
+    return filteredCertificates.value.slice(start, start + perPageNum.value);
+});
+
+watch([searchQuery, selectedSchoolId, selectedCertType, perPage], () => {
+    currentPage.value = 1;
+});
+
+const isAllSelectedOnPage = computed(() => {
+    if (!paginatedCertificates.value.length) return false;
+    return paginatedCertificates.value.every(c => selectedCertIds.value.includes(c.id));
+});
+
+function toggleSelectAllPage() {
+    if (isAllSelectedOnPage.value) {
+        const pageIds = new Set(paginatedCertificates.value.map(c => c.id));
+        selectedCertIds.value = selectedCertIds.value.filter(id => !pageIds.has(id));
+    } else {
+        const set = new Set(selectedCertIds.value);
+        paginatedCertificates.value.forEach(c => set.add(c.id));
+        selectedCertIds.value = Array.from(set);
+    }
+}
+
+function bulkPrint(plain = false) {
+    if (!selectedCertIds.value.length) return;
+    const ids = selectedCertIds.value.join(',');
+    const url = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/print-all?certificate_ids=${ids}${plain ? '&plain=1' : ''}`;
+    window.open(url, '_blank');
+}
+
+function bulkDownload() {
+    if (!selectedCertIds.value.length) return;
+    const ids = selectedCertIds.value.join(',');
+    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip?certificate_ids=${ids}`;
+}
 
 const downloadZipUrl = computed(() =>
     `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip${plainMode.value ? '?plain=1' : ''}`);
