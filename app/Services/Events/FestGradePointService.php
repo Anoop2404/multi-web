@@ -81,23 +81,26 @@ class FestGradePointService
             return $this->resolveConfedGradeFromScore($score);
         }
 
-        $totalMarks = $itemId ? FestEventItem::find($itemId)?->total_marks : null;
+        $itemModel = $itemId ? FestEventItem::find($itemId) : null;
+        $judgeCount = $itemModel ? app(FestMarkCriteriaService::class)->judgeCountForItem($itemModel) : 1;
+        $totalMarksPerJudge = (float) ($itemModel?->total_marks ?? 100.0);
+        $maxPossibleMarks = $totalMarksPerJudge * max(1, $judgeCount);
+
         $configs = FestGradeConfig::where('event_id', $event->id)
             ->where(function ($q) use ($itemId) {
                 $q->where('item_id', $itemId)->orWhereNull('item_id');
             })
             ->get();
 
-        $resolved = $this->highestMatchingGradeConfig($configs->where('item_id', $itemId), $score, $totalMarks)
-            ?? $this->highestMatchingGradeConfig($configs->whereNull('item_id'), $score, $totalMarks);
+        $resolved = $this->highestMatchingGradeConfig($configs->where('item_id', $itemId), $score, $maxPossibleMarks)
+            ?? $this->highestMatchingGradeConfig($configs->whereNull('item_id'), $score, $maxPossibleMarks);
 
         if ($resolved !== null) {
             return $resolved;
         }
 
         // Standard Kalotsavam percentage grade scale fallback
-        $usePercentage = $totalMarks !== null && (float) $totalMarks > 0;
-        $percent = $usePercentage ? ($score / (float) $totalMarks) * 100 : ($score <= 100 ? $score : null);
+        $percent = $maxPossibleMarks > 0 ? ($score / $maxPossibleMarks) * 100 : ($score <= 100 ? $score : null);
         if ($percent !== null) {
             if ($percent >= 70.0) return 'A+';
             if ($percent >= 60.0) return 'A';
@@ -109,34 +112,25 @@ class FestGradePointService
     }
 
     /**
-     * Match highest configured grade band (checking min_percent or min_score).
+     * Match highest configured grade band against percentage calculated from maxPossibleMarks.
      *
      * @param  Collection<int, FestGradeConfig>  $configs
      */
-    private function highestMatchingGradeConfig(Collection $configs, float $score, ?float $totalMarks): ?string
+    private function highestMatchingGradeConfig(Collection $configs, float $score, float $maxPossibleMarks): ?string
     {
         if ($configs->isEmpty()) {
             return null;
         }
 
-        $usePercentage = $totalMarks !== null && (float) $totalMarks > 0;
-        $percent = $usePercentage ? ($score / (float) $totalMarks) * 100 : $score;
+        $percent = $maxPossibleMarks > 0 ? ($score / $maxPossibleMarks) * 100 : $score;
 
         $sorted = $configs->sortByDesc(fn (FestGradeConfig $c) => (float) ($c->min_percent ?? $c->min_score ?? 0));
 
         foreach ($sorted as $cfg) {
-            if ($cfg->min_percent !== null) {
-                $min = (float) $cfg->min_percent;
-                $max = (float) ($cfg->max_percent ?? 100);
-                if ($percent >= $min && $percent <= $max) {
-                    return str_replace('_plus', '+', $cfg->grade);
-                }
-            } elseif ($cfg->min_score !== null) {
-                $min = (float) $cfg->min_score;
-                $max = (float) ($cfg->max_score ?? 999999);
-                if ($score >= $min && $score <= $max) {
-                    return str_replace('_plus', '+', $cfg->grade);
-                }
+            $min = (float) ($cfg->min_percent ?? $cfg->min_score ?? 0);
+            $max = (float) ($cfg->max_percent ?? $cfg->max_score ?? 100);
+            if ($percent >= $min && $percent <= $max) {
+                return str_replace('_plus', '+', $cfg->grade);
             }
         }
 
