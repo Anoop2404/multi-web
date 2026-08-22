@@ -50,7 +50,23 @@ class FestMarkSaveService
             }
         }
 
-        if (isset($data['score']) && $data['score'] !== null && $data['score'] !== '') {
+        $existingMark = FestMark::where('item_id', $data['item_id'])
+            ->where('participant_id', $data['participant_id'])
+            ->first();
+
+        // Only auto-derive grade from score when the caller isn't explicitly asserting
+        // a grade of its own — comparing against what's already stored (rather than
+        // just checking "is the incoming value blank") is what lets an admin clear a
+        // grade back to null, or override it to something the score wouldn't produce,
+        // even while a score is still on the row. Without this, a lingering score
+        // silently re-derived the old grade on every save, so an explicit revert to
+        // null never actually stuck.
+        $gradeExplicitlyChanged = $existingMark && array_key_exists('grade', $data) && $data['grade'] !== $existingMark->grade;
+
+        if (
+            ! $gradeExplicitlyChanged
+            && isset($data['score']) && $data['score'] !== null && $data['score'] !== ''
+        ) {
             $data['grade'] = $this->gradePointService->resolveGradeFromScore(
                 $event,
                 (int) $data['item_id'],
