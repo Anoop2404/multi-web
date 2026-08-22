@@ -308,7 +308,7 @@ class FestCertificateService
         $eventIds = array_values(array_filter([$event->id, $event->parent_event_id]));
 
         if ($itemId) {
-            $template = $this->templateQuery($tenantId, $certType)
+            $template = $this->templateQuery($tenantId, $certType, $event)
                 ->whereIn('event_id', $eventIds)
                 ->where('item_id', $itemId)
                 ->first();
@@ -317,7 +317,7 @@ class FestCertificateService
             }
         }
 
-        $template = $this->templateQuery($tenantId, $certType)
+        $template = $this->templateQuery($tenantId, $certType, $event)
             ->whereIn('event_id', $eventIds)
             ->whereNull('item_id')
             ->first();
@@ -325,7 +325,7 @@ class FestCertificateService
             return $template;
         }
 
-        $template = $this->templateQuery($tenantId, $certType)
+        $template = $this->templateQuery($tenantId, $certType, $event)
             ->whereNull('event_id')
             ->whereNull('item_id')
             ->first();
@@ -340,10 +340,15 @@ class FestCertificateService
         return null;
     }
 
-    private function templateQuery(string $tenantId, string $certType)
+    private function templateQuery(string $tenantId, string $certType, ?FestEvent $event = null)
     {
+        $eventTypes = array_values(array_filter(array_unique([
+            'fest',
+            $event?->event_type,
+        ])));
+
         return CertificateTemplate::where('tenant_id', $tenantId)
-            ->where('event_type', 'fest')
+            ->whereIn('event_type', $eventTypes)
             ->where('certificate_type', $certType)
             ->where('is_active', true)
             ->latest();
@@ -403,13 +408,10 @@ class FestCertificateService
         if ($templateCacheKey !== null && array_key_exists($templateCacheKey, $templateCache)) {
             $template = $templateCache[$templateCacheKey];
         } else {
-            $template = $certificate->template_id
+            $template = $event ? $this->resolveTemplate($event, $itemId, $certificate->cert_type) : null;
+            $template ??= $certificate->template_id
                 ? CertificateTemplate::where('tenant_id', $sahodaya?->id)->find($certificate->template_id)
                 : null;
-
-            if (! $template && $event) {
-                $template = $this->resolveTemplate($event, $itemId, $certificate->cert_type);
-            }
 
             if ($templateCacheKey !== null) {
                 $templateCache[$templateCacheKey] = $template;
