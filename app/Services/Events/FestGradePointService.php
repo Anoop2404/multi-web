@@ -47,10 +47,25 @@ class FestGradePointService
             return app(FestRankPointService::class)->pointsForRank($event, (int) $mark->position, $participantType);
         }
 
+        // Exact match required on both grade and position — a mark with no position
+        // (didn't place top-3) must only match an explicit "Any Position" rule
+        // (position IS NULL), never silently fall through to whichever positioned rule
+        // sorts first. The previous ->when($mark->position, ...) skipped the position
+        // constraint entirely whenever a mark had no position, so an unranked
+        // grade-A participant could match the *1st place* rule outright — inflating
+        // points for every mark that simply didn't rank. Same fix applied to grade.
         $rule = FestPointRule::where('event_id', $event->id)
             ->where('is_group', $isGroup)
-            ->when($mark->grade, fn ($q) => $q->where('grade', $this->normalizeGrade($event, $mark->grade)))
-            ->when($mark->position, fn ($q) => $q->where('position', $mark->position))
+            ->where(function ($q) use ($event, $mark) {
+                $mark->grade
+                    ? $q->where('grade', $this->normalizeGrade($event, $mark->grade))
+                    : $q->whereNull('grade');
+            })
+            ->where(function ($q) use ($mark) {
+                $mark->position
+                    ? $q->where('position', $mark->position)
+                    : $q->whereNull('position');
+            })
             ->first();
 
         if ($rule) {
