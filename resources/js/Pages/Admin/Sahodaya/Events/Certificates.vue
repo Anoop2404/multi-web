@@ -3,15 +3,18 @@
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Certificates`" eyebrow="Operations"
                     description="Generate and manage participant certificates." />
-        <div class="mb-4 flex flex-wrap gap-2">
+        <div class="mb-4 flex flex-wrap items-center gap-2">
             <button @click="generate" class="btn-primary">Generate for top 3</button>
             <button @click="generateParticipation" class="btn-secondary">Generate participation certificates</button>
-            <a v-if="certificates.length"
-               :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip`"
-               class="btn-secondary">Download all (ZIP)</a>
+            <a v-if="certificates.length" :href="downloadZipUrl" class="btn-secondary">Download all (ZIP)</a>
+            <a v-if="certificates.length" :href="printAllUrl" target="_blank" class="btn-secondary">Print all ↗</a>
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/tally`" class="btn-secondary">
                 How many do I need to print?
             </Link>
+            <label v-if="certificates.length" class="flex items-center gap-1.5 text-xs text-gray-600 ml-1">
+                <input type="checkbox" v-model="plainMode" class="rounded border-gray-300">
+                Plain (no background — saves ink)
+            </label>
         </div>
         <ul class="card-list">
             <li v-for="c in certificates" :key="c.id" class="p-4 flex flex-wrap gap-2 justify-between items-center text-sm">
@@ -31,6 +34,7 @@
                     </p>
                 </div>
                 <a :href="`/certificates/verify/${c.uuid}`" target="_blank" class="text-indigo-600 text-xs font-medium mr-3">Verify ↗</a>
+                <a :href="`/certificates/print/${c.uuid}?preview=1`" target="_blank" class="text-gray-600 text-xs font-medium mr-3">Preview ↗</a>
                 <a :href="`/certificates/print/${c.uuid}`" target="_blank" class="text-gray-600 text-xs font-medium">Print ↗</a>
             </li>
             <li v-if="!certificates.length" class="p-4 text-gray-400 text-sm">No certificates yet. Publish results or click Generate.</li>
@@ -40,6 +44,7 @@
 </template>
 
 <script setup>
+import { ref, computed } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
@@ -49,6 +54,13 @@ const props = defineProps({
     event: Object, certificates: Array,
     activityLogs: { type: Array, default: () => [] },
 });
+
+const plainMode = ref(false);
+
+const downloadZipUrl = computed(() =>
+    `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip${plainMode.value ? '?plain=1' : ''}`);
+const printAllUrl = computed(() =>
+    `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/print-all${plainMode.value ? '?plain=1' : ''}`);
 
 function generate() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/generate`, {}, { preserveScroll: true });

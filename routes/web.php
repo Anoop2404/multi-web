@@ -1369,6 +1369,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/rank-points', [FestEventSettingsController::class, 'rankPoints'])->name('rank-points.index');
             Route::post('/{event}/point-rules', [FestEventSettingsController::class, 'storePointRule'])->name('point-rules.store');
             Route::delete('/{event}/point-rules/{pointRule}', [FestEventSettingsController::class, 'destroyPointRule'])->name('point-rules.destroy');
+            Route::post('/{event}/point-rules/seed-confed-kalotsav', [FestEventSettingsController::class, 'seedConfedKalotsavPoints'])->name('point-rules.seed-confed-kalotsav');
+            Route::post('/{event}/point-rules/sync-to-regions', [FestEventSettingsController::class, 'syncPointRulesToRegions'])->name('point-rules.sync-to-regions');
             Route::post('/{event}/rank-point-templates', [FestEventSettingsController::class, 'storeRankTemplate'])->name('rank-point-templates.store');
             Route::put('/{event}/rank-point-templates/{template}', [FestEventSettingsController::class, 'updateRankTemplate'])->name('rank-point-templates.update');
             Route::delete('/{event}/rank-point-templates/{template}', [FestEventSettingsController::class, 'destroyRankTemplate'])->name('rank-point-templates.destroy');
@@ -1391,6 +1393,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/certificates/tally', [FestCertificateController::class, 'tally'])->name('certificates.tally');
             Route::post('/{event}/certificates/generate', [FestCertificateController::class, 'generate'])->name('certificates.generate');
             Route::get('/{event}/certificates/download-zip', [FestCertificateController::class, 'downloadZip'])->name('certificates.download-zip');
+            Route::get('/{event}/certificates/print-all', [FestCertificateController::class, 'printAll'])->name('certificates.print-all');
             Route::get('/{event}/houses', [FestHouseController::class, 'index'])->name('houses.index');
             Route::post('/{event}/houses', [FestHouseController::class, 'storeHouse'])->name('houses.store');
             Route::post('/{event}/houses/{house}/assign', [FestHouseController::class, 'assignSchool'])->name('houses.assign');

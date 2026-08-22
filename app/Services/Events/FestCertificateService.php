@@ -361,7 +361,17 @@ class FestCertificateService
      *                                           participation certificate.
      * @return array<string, mixed>
      */
-    public function renderContext(Certificate $certificate, ?array $payload = null, array &$templateCache = [], array &$participantsCache = []): array
+    /**
+     * @param  bool  $embedAssets  When true, logo/seal/background/signature/photo images
+     *                             are embedded as self-contained base64 data URIs instead
+     *                             of site-relative URLs. Needed for output that's read
+     *                             outside the site's own browser origin (e.g. HTML/PDF
+     *                             extracted from a downloaded ZIP) — a plain `/storage/...`
+     *                             URL only resolves while viewed on-site. Left off by
+     *                             default since the normal print/verify pages are always
+     *                             viewed on-site, where a lighter URL is cheaper to render.
+     */
+    public function renderContext(Certificate $certificate, ?array $payload = null, array &$templateCache = [], array &$participantsCache = [], bool $embedAssets = false): array
     {
         $payload ??= $this->payloadFor($certificate);
 
@@ -385,23 +395,41 @@ class FestCertificateService
             }
         }
 
-        $logoUrl = $template?->logo_path && $sahodaya
-            ? TenantStorage::logoUrl($sahodaya, $template->logo_path)
-            : ($sahodaya ? TenantBranding::logoUrl($sahodaya) : null);
+        // Small header/footer assets (logo, seal, signatures) are never shown above a
+        // few dozen px, so a modest cap keeps the export light even at retina density.
+        // The background spans the full certificate canvas (1123×794 CSS px), so it
+        // gets a much larger cap to stay print-quality.
+        if ($embedAssets) {
+            $logoUrl = $template?->logo_path && $sahodaya
+                ? TenantStorage::photoBase64DataUri($sahodaya, $template->logo_path, 400)
+                : ($sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null);
 
-        $sealUrl = $template?->seal_path && $sahodaya
-            ? TenantStorage::logoUrl($sahodaya, $template->seal_path)
-            : null;
+            $sealUrl = $template?->seal_path && $sahodaya
+                ? TenantStorage::photoBase64DataUri($sahodaya, $template->seal_path, 400)
+                : null;
 
-        $backgroundUrl = $template?->background_path && $sahodaya
-            ? TenantStorage::logoUrl($sahodaya, $template->background_path)
-            : null;
+            $backgroundUrl = $template?->background_path && $sahodaya
+                ? TenantStorage::photoBase64DataUri($sahodaya, $template->background_path, 1600)
+                : null;
+        } else {
+            $logoUrl = $template?->logo_path && $sahodaya
+                ? TenantStorage::logoUrl($sahodaya, $template->logo_path)
+                : ($sahodaya ? TenantBranding::logoUrl($sahodaya) : null);
+
+            $sealUrl = $template?->seal_path && $sahodaya
+                ? TenantStorage::logoUrl($sahodaya, $template->seal_path)
+                : null;
+
+            $backgroundUrl = $template?->background_path && $sahodaya
+                ? TenantStorage::logoUrl($sahodaya, $template->background_path)
+                : null;
+        }
 
         $overlayLayout = $template?->overlayLayout() ?? CertificateTemplate::defaultBackgroundLayout();
 
         $participant = $payload['participant'] ?? null;
         $photoUrl = ($overlayLayout['show_photo'] ?? false) && $participant
-            ? $this->participantPhotoUrl($participant)
+            ? $this->participantPhotoUrl($participant, $embedAssets)
             : null;
 
         $signatories = collect($template?->signatories ?? CertificateTemplate::defaultTrainingSignatories())
@@ -409,7 +437,9 @@ class FestCertificateService
                 'name'          => $s['name'] ?? '',
                 'designation'   => $s['designation'] ?? '',
                 'signature_url' => (! empty($s['signature_path']) && $sahodaya)
-                    ? TenantStorage::logoUrl($sahodaya, $s['signature_path'])
+                    ? ($embedAssets
+                        ? TenantStorage::photoBase64DataUri($sahodaya, $s['signature_path'], 400)
+                        : TenantStorage::logoUrl($sahodaya, $s['signature_path']))
                     : null,
             ])->values()->all();
 
@@ -442,7 +472,7 @@ class FestCertificateService
      * the auth-gated school-admin photo route, since certificates are public pages)
      * instead of duplicating that logic here.
      */
-    private function participantPhotoUrl(FestParticipant $participant): string
+    private function participantPhotoUrl(FestParticipant $participant, bool $includeDataUris = false): string
     {
         $rawGender = strtolower((string) ($participant->student?->gender ?? $participant->teacher?->gender ?? ''));
         $gender = match (true) {
@@ -452,7 +482,7 @@ class FestCertificateService
         };
 
         return app(\App\Services\Events\FestIdCardService::class)
-            ->resolveParticipantPhotoSrc($participant, $gender, includeDataUris: false);
+            ->resolveParticipantPhotoSrc($participant, $gender, includeDataUris: $includeDataUris);
     }
 
     /** @return array<string, string> */

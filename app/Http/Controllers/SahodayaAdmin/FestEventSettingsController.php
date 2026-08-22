@@ -1267,6 +1267,99 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', 'Point rule saved.');
     }
 
+    /**
+     * One-click fill for the "Grade Points Master" table with the Confederation of Kerala
+     * Sahodaya Complexes' State Kalolsavam Manual's official grade+place points (config/
+     * fest_confed_kalotsav_scoring.php — the same numbers scoring_preset='confed_kalotsav'
+     * uses directly, kept here so an event that isn't on that preset can still adopt the
+     * identical table as ordinary, per-event-editable FestPointRule rows). updateOrCreate
+     * so re-clicking after a manual tweak resets cleanly back to the standard instead of
+     * erroring on duplicate (grade, position, is_group) rows.
+     */
+    public function seedConfedKalotsavPoints(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $gradePointService = app(\App\Services\Events\FestGradePointService::class);
+        $tables = [
+            false => config('fest_confed_kalotsav_scoring.individual_points', []),
+            true => config('fest_confed_kalotsav_scoring.group_points', []),
+        ];
+
+        $count = 0;
+        foreach ($tables as $isGroup => $grades) {
+            foreach ($grades as $grade => $positions) {
+                $normalizedGrade = $gradePointService->normalizeGrade($event, $grade);
+                foreach ($positions as $position => $points) {
+                    FestPointRule::updateOrCreate(
+                        ['event_id' => $event->id, 'grade' => $normalizedGrade, 'position' => (int) $position, 'is_group' => $isGroup],
+                        ['points' => $points],
+                    );
+                    $count++;
+                }
+            }
+        }
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('points'),
+            'fest.settings.point_rules_seeded',
+            'Loaded Kalolsavam Manual standard point rules',
+            ['count' => $count],
+        );
+
+        return back()->with('success', 'Kalolsavam Manual standard point rules loaded.');
+    }
+
+    /**
+     * Copies this event's current Grade Points Master rows down to every region-child
+     * event under the same hub. FestPointRule is scoped by event_id, so a region child
+     * (its own separate event) never inherits rules edited on the hub — marks entered
+     * under a region keep using stale or default points until explicitly synced here.
+     * updateOrCreate so re-running after further hub edits stays a clean re-sync.
+     */
+    public function syncPointRulesToRegions(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $regionChildren = $event->rootEvent()->childrenForRoles(['region'])
+            ->reject(fn (FestEvent $child) => $child->id === $event->id)
+            ->values();
+
+        abort_if($regionChildren->isEmpty(), 422, 'No regions are linked to this event to sync to.');
+
+        $rules = FestPointRule::where('event_id', $event->id)->get();
+
+        foreach ($regionChildren as $child) {
+            foreach ($rules as $rule) {
+                FestPointRule::updateOrCreate(
+                    [
+                        'event_id' => $child->id,
+                        'grade'    => $rule->grade,
+                        'position' => $rule->position,
+                        'is_group' => $rule->is_group,
+                    ],
+                    [
+                        'points'       => $rule->points,
+                        'points_table' => $rule->points_table,
+                    ],
+                );
+            }
+        }
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('points'),
+            'fest.settings.point_rules_synced_to_regions',
+            'Synced grade points master to all regions',
+            ['regions' => $regionChildren->count(), 'rules' => $rules->count()],
+        );
+
+        $regionCount = $regionChildren->count();
+
+        return back()->with('success', "Grade points synced to {$regionCount} region".($regionCount === 1 ? '' : 's').'.');
+    }
+
     public function destroyPointRule(string $tenantId, FestEvent $event, FestPointRule $pointRule)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

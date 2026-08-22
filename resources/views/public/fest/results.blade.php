@@ -190,10 +190,10 @@
                         <tr>
                             <th class="p-3">Rank</th>
                             <th class="p-3">School</th>
+                            <th class="p-3 text-right">Points</th>
                             <th class="p-3 text-center" title="Gold — 1st place finishes"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold" class="w-5 h-5 inline-block"></th>
                             <th class="p-3 text-center" title="Silver — 2nd place finishes"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Silver" class="w-5 h-5 inline-block"></th>
                             <th class="p-3 text-center" title="Bronze — 3rd place finishes"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Bronze" class="w-5 h-5 inline-block"></th>
-                            <th class="p-3 text-right">Points</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
@@ -201,10 +201,10 @@
                             <tr>
                                 <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
                                 <td class="p-3 font-semibold text-white uppercase">{{ $row['school_name'] }}</td>
+                                <td class="p-3 text-right font-mono font-bold text-base text-white">{{ $row['total_points'] }}</td>
                                 <td class="p-3 text-center font-mono {{ $row['gold'] ? 'font-bold text-amber-400' : 'text-white/20' }}">{{ $row['gold'] }}</td>
                                 <td class="p-3 text-center font-mono {{ $row['silver'] ? 'font-bold text-slate-300' : 'text-white/20' }}">{{ $row['silver'] }}</td>
                                 <td class="p-3 text-center font-mono {{ $row['bronze'] ? 'font-bold text-orange-400' : 'text-white/20' }}">{{ $row['bronze'] }}</td>
-                                <td class="p-3 text-right font-mono text-white">{{ $row['total_points'] }}</td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="p-8 text-center text-white/30">No school points published yet.</td></tr>
@@ -213,6 +213,34 @@
                 </table>
                 </div>
             </div>
+            @endif
+
+            @if(!empty($schoolWinnersBoard))
+            <section class="mt-10" aria-labelledby="school-winners">
+                <div class="mb-4">
+                    <p class="text-xs font-bold uppercase tracking-widest text-amber-400">Winner roster</p>
+                    <h2 id="school-winners" class="text-2xl font-bold mt-1 text-white">School-wise Winners</h2>
+                </div>
+                <div class="grid lg:grid-cols-2 gap-4">
+                    @foreach($schoolWinnersBoard as $row)
+                    <article class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+                        <div class="flex items-center justify-between gap-3 px-4 py-3 bg-white/5 border-b border-slate-800">
+                            <h3 class="font-bold text-white uppercase truncate">{{ $row['school_name'] }}</h3>
+                            <span class="text-xs font-bold text-amber-400 shrink-0">#{{ $row['rank'] }} · {{ $row['total_points'] }} pts</span>
+                        </div>
+                        <ol class="divide-y divide-slate-800">
+                            @foreach($row['winners'] as $winner)
+                            <li class="flex items-center gap-3 px-4 py-2.5">
+                                <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-6 h-6 shrink-0">
+                                <span class="text-sm text-white flex-1 min-w-0 truncate">{{ $winner['item'] }}</span>
+                                <span class="font-mono font-bold text-sm text-white shrink-0">{{ $winner['points'] }} <small class="text-[10px] text-white/40">PTS</small></span>
+                            </li>
+                            @endforeach
+                        </ol>
+                    </article>
+                    @endforeach
+                </div>
+            </section>
             @endif
         @elseif($tab === 'category')
             <div class="grid lg:grid-cols-2 gap-5">

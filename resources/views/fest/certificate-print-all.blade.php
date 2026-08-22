@@ -2,21 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Certificate — {{ $student?->name ?? 'Participant' }}</title>
+    <title>Certificates — {{ $event->title ?? 'Event' }}</title>
     {{-- Admin-authored template body text may reference decorative webfonts (e.g.
          Cinzel) by name in its own inline styles; loaded here so those actually render
          instead of silently falling back to the next font in the stack. --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&display=swap" rel="stylesheet">
-    @php
-        // Computed ahead of the stylesheet (rather than only inside the has-background
-        // branch further down) because the static @page rule needs it too, and this view
-        // is rendered for the legacy/no-background branches as well, where $overlayLayout
-        // may not be set — fall back the same way renderContext() does.
-        $__layout = $overlayLayout ?? (!empty($template) ? $template->overlayLayout() : \App\Models\CertificateTemplate::defaultBackgroundLayout());
-        $__orientation = ($__layout['orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape';
-    @endphp
     <style>
         * { box-sizing: border-box; }
         body { font-family: "Times New Roman", Times, serif; background: #fff; color: #1e293b; margin: 0; }
@@ -101,43 +93,37 @@
         .cert-legacy .meta { position: absolute; bottom: 2rem; left: 3rem; right: 3rem; display: flex; justify-content: space-between; font-size: .75rem; color: #94a3b8; }
 
         .actions { text-align: center; padding: 1rem; }
+        .cert-sheet { padding-top: 24px; page-break-after: always; break-after: page; }
+        .cert-sheet:last-child { page-break-after: auto; break-after: auto; }
+        .toolbar {
+            position: sticky; top: 0; z-index: 10; text-align: center; padding: 14px;
+            background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+        }
+        .toolbar button {
+            padding: .6rem 1.5rem; font-size: 1rem; cursor: pointer; border-radius: 6px;
+            border: 1px solid #b45309; background: #b45309; color: #fff; font-weight: 600;
+        }
+        .toolbar p { margin: 8px 0 0; font-size: 12px; color: #64748b; }
         @media print {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .no-print, .actions { display: none; }
+            .no-print { display: none; }
+            .cert-sheet { padding-top: 0; }
             .page.has-background, .page.has-background.portrait { width: 100%; height: 100vh; min-height: 100vh; }
         }
-        @page { size: {{ $__orientation }}; margin: 0; }
+        @page { size: landscape; margin: 0; }
     </style>
 </head>
 <body>
-@include('fest.partials.certificate-body')
-@if(!empty($isSample))
-    {{-- Admin template preview only: the certificate itself is a fixed A4 pixel size
-         (for accurate printing on the real print/download path), which doesn't fit most
-         screens at 100%. Scale it down to fit the viewport here so the whole design is
-         visible without scrolling — real certificates never run this, so print output
-         is unaffected. --}}
-    <script>
-        (function () {
-            function fitToScreen() {
-                var page = document.querySelector('.page');
-                if (!page) return;
-                page.style.transform = 'none';
-                page.style.marginBottom = '0px';
-                var rect = page.getBoundingClientRect();
-                var scale = Math.min(
-                    (window.innerWidth - 32) / rect.width,
-                    (window.innerHeight - 32) / rect.height,
-                    1
-                );
-                page.style.transformOrigin = 'top center';
-                page.style.transform = 'scale(' + scale + ')';
-                page.style.marginBottom = (-(rect.height * (1 - scale))) + 'px';
-            }
-            window.addEventListener('load', fitToScreen);
-            window.addEventListener('resize', fitToScreen);
-        })();
-    </script>
-@endif
+    <div class="toolbar no-print">
+        <button onclick="window.print()">Print / Save all as PDF ({{ count($certificates) }} certificate{{ count($certificates) === 1 ? '' : 's' }})</button>
+        <p>Each certificate prints on its own page — use "Save as PDF" in the print dialog to download them all as one file.</p>
+    </div>
+    @forelse($certificates as $payload)
+        <div class="cert-sheet">
+            @include('fest.partials.certificate-body', array_merge($payload, ['isSample' => true]))
+        </div>
+    @empty
+        <p class="no-print" style="text-align:center;padding:2rem;color:#64748b;">No certificates to show.</p>
+    @endforelse
 </body>
 </html>

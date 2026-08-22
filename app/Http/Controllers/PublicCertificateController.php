@@ -13,6 +13,7 @@ use App\Services\Events\FestIdCardQrService;
 use App\Services\Mcq\McqCertificateService;
 use App\Services\Training\TrainingCertificateService;
 use App\Support\TenancyDatabase;
+use Illuminate\Http\Request;
 
 class PublicCertificateController extends Controller
 {
@@ -59,7 +60,7 @@ class PublicCertificateController extends Controller
         return view('fest.certificate-verify', $payload);
     }
 
-    public function print(string $uuid)
+    public function print(string $uuid, Request $request)
     {
         if ($found = $this->findMcqCertificate($uuid)) {
             return $this->printMcq($found);
@@ -99,6 +100,11 @@ class PublicCertificateController extends Controller
 
         $payload = app(FestCertificateService::class)->renderContext($certificate);
         $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
+        // ?preview=1 (from the Sahodaya admin's own Certificates page) reuses this same
+        // public print view but hides the Print/Save button and auto-fits the page to
+        // the viewport — the same isSample behavior the template-preview screens use,
+        // just applied to a real generated certificate instead of mock data.
+        $payload['isSample'] = $request->boolean('preview');
 
         return view('fest.certificate-print', $payload);
     }

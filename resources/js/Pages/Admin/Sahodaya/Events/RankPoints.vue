@@ -109,11 +109,23 @@
             </p>
 
             <section v-if="!isSports" class="card !p-5 space-y-4 border border-slate-200">
-                <div class="border-b border-slate-100 pb-3">
-                    <h3 class="section-title !mb-0 flex items-center gap-2 text-base">
-                        <span>🏆</span> Grade Points Master
-                    </h3>
-                    <p class="section-desc mt-0.5">Points awarded by grade and position for leaderboard calculations — set separate rules for group/team items vs. individual items.</p>
+                <div class="border-b border-slate-100 pb-3 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 class="section-title !mb-0 flex items-center gap-2 text-base">
+                            <span>🏆</span> Grade Points Master
+                        </h3>
+                        <p class="section-desc mt-0.5">Points awarded by grade and position for leaderboard calculations — set separate rules for group/team items vs. individual items.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 shrink-0">
+                        <button type="button" class="btn-secondary text-xs !py-1.5 !px-3" :disabled="seedingConfed" @click="seedConfedKalotsav">
+                            {{ seedingConfed ? 'Loading…' : '⚡ Load Kalolsavam Manual Standard' }}
+                        </button>
+                        <button v-if="isHubWithRegions" type="button" class="btn-secondary text-xs !py-1.5 !px-3"
+                                :disabled="syncingToRegions || !props.pointRules.length" :title="!props.pointRules.length ? 'Add or load points here first' : ''"
+                                @click="syncToRegions">
+                            {{ syncingToRegions ? 'Syncing…' : `🔄 Sync to All Regions (${regionCount})` }}
+                        </button>
+                    </div>
                 </div>
 
                 <form @submit.prevent="addPointRule" class="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3">
@@ -229,6 +241,32 @@ function addPointRule() {
 
 function removePointRule(id) {
     router.delete(`${base.value}/point-rules/${id}`, { preserveScroll: true });
+}
+
+const seedingConfed = ref(false);
+
+function seedConfedKalotsav() {
+    seedingConfed.value = true;
+    router.post(`${base.value}/point-rules/seed-confed-kalotsav`, {}, {
+        preserveScroll: true,
+        onFinish: () => { seedingConfed.value = false; },
+    });
+}
+
+// childEvents[0] is always the hub ("All Regions") when regions exist — see
+// FestEvent::regionDropdownOptions(). Only offer the sync action from the hub itself,
+// since it's the one screen meant to hold the shared/canonical rule set.
+const isHubWithRegions = computed(() => props.childEvents.length > 1 && String(props.event.id) === String(props.childEvents[0]?.id));
+const regionCount = computed(() => Math.max(props.childEvents.length - 1, 0));
+
+const syncingToRegions = ref(false);
+
+function syncToRegions() {
+    syncingToRegions.value = true;
+    router.post(`${base.value}/point-rules/sync-to-regions`, {}, {
+        preserveScroll: true,
+        onFinish: () => { syncingToRegions.value = false; },
+    });
 }
 
 function rankLabel(r) {

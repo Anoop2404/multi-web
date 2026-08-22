@@ -80,7 +80,11 @@ class TenantBranding
         );
 
         if ($stored) {
-            $embedded = TenantStorage::photoDataUri($tenant, $stored);
+            // photoBase64DataUri(), not photoDataUri() — the latter hands back a bare
+            // local filesystem path when it finds one on disk, which dompdf's chroot
+            // check often rejects (see photoBase64DataUri()'s own docblock) and which a
+            // browser opening exported HTML standalone can't resolve at all.
+            $embedded = TenantStorage::photoBase64DataUri($tenant, $stored, 400);
             if ($embedded) {
                 return $embedded;
             }

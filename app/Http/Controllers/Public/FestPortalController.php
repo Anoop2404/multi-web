@@ -18,6 +18,7 @@ use App\Models\Tenant;
 use App\Services\Events\EventContext;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestCumulativeChampionshipService;
+use App\Services\Events\FestGradePointService;
 use App\Services\Events\FestNumberingService;
 use App\Services\Events\FestPhaseScoreboardService;
 use App\Services\Events\FestPublicVisibilityService;
@@ -40,6 +41,7 @@ class FestPortalController extends Controller
         private FestPhaseScoreboardService $phaseScoreboards,
         private PublicOperationalEventService $operationalEvents,
         private FestCumulativeChampionshipService $cumulativeChampionship,
+        private FestGradePointService $gradePoints,
     ) {}
 
     public function index()
@@ -152,6 +154,7 @@ class FestPortalController extends Controller
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         $selectedScope = $this->operationalEvents->directScope($event);
+        $isPublished = (bool) $selectedScope['results_published'];
 
         $hasPublishedItems = FestEventItem::whereIn('event_id', $selectedScope['event_ids'] ?? [$event->id])
             ->whereNotNull('results_published_at')
@@ -169,13 +172,21 @@ class FestPortalController extends Controller
             ->whereNull('item_id')
             ->max('published_at');
 
+        // FestIndividualChampionshipPoint is a stored aggregate across every item in the
+        // event (recalculated on demand by an admin action), not a live per-item query —
+        // unlike the school scoreboard there's no "provisional, published-items-only"
+        // variant to fall back to, so the whole tab stays empty until the event's
+        // official publish has actually run (matches how $overallBoard/$categoryBoards
+        // being empty pre-publish is already handled further down).
         $championshipEventId = $selectedScope['event_id'] ?: $event->id;
-        $championshipRows = FestIndividualChampionshipPoint::where('event_id', $championshipEventId)
-            ->with(['student'])
-            ->orderByDesc('points')
-            ->orderByDesc('group_points')
-            ->orderBy('student_id')
-            ->get();
+        $championshipRows = $isPublished
+            ? FestIndividualChampionshipPoint::where('event_id', $championshipEventId)
+                ->with(['student'])
+                ->orderByDesc('points')
+                ->orderByDesc('group_points')
+                ->orderBy('student_id')
+                ->get()
+            : collect();
         $championshipSchools = Tenant::whereIn('id', $championshipRows->pluck('student.tenant_id')->filter()->unique())
             ->pluck('name', 'id');
         $championship = $championshipRows
@@ -197,12 +208,15 @@ class FestPortalController extends Controller
 
         $categories = $this->scoreboards->categories($event, $selectedScope);
         $categoryBoards = collect($categories)
-            ->map(fn (string $key) => [
-                'key' => $key,
-                'label' => $this->scoreboards->categoryLabel($event, $key),
-                'rows' => $this->cumulativeChampionship->publicStanding($event, $key)['rows']
-                    ?? $this->scoreboards->scoreboard($event, $selectedScope, $key),
-            ])
+            ->map(function (string $key) use ($event, $selectedScope, $isPublished) {
+                [$rows] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished);
+
+                return [
+                    'key' => $key,
+                    'label' => $this->scoreboards->categoryLabel($event, $key),
+                    'rows' => $rows,
+                ];
+            })
             ->all();
 
         // §7.3a (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): a phased event's
@@ -226,6 +240,7 @@ class FestPortalController extends Controller
         // showed zero item results even after results_published was cascaded true.
         $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
             ->whereIn('position', [1, 2, 3])
+            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('item_id')
             ->orderBy('position')
@@ -320,22 +335,39 @@ class FestPortalController extends Controller
                 'bronze' => $group->where('position', 3)->count(),
             ]);
 
-        $schoolBoard = collect($this->scoreboards->scoreboard($event, $selectedScope))
+        [$overallRows, $lockedCumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, null, $isPublished);
+        $schoolBoard = collect($overallRows)
             ->map(fn (array $row) => $row + [
                 'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
                 'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
                 'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
             ])
             ->all();
-        $lockedCumulativeStanding = $this->cumulativeChampionship->publicStanding($event);
-        if ($lockedCumulativeStanding !== null) {
-            $schoolBoard = collect($lockedCumulativeStanding['rows'])
-                ->map(fn (array $row) => $row + [
-                    'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
-                    'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
-                    'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
-                ])->all();
-        }
+
+        // Per-school winner roster (item, position, points earned) — layered onto
+        // $schoolBoard's existing rank/points rather than a separate ranking, so the
+        // per-winner points shown here can never disagree with the official school
+        // total above. Built from the same already-publish-filtered $marks as the
+        // medal tally; schools with no top-3 marks (e.g. group/participation-only
+        // scoring) are simply omitted rather than shown with an empty roster.
+        $winnersBySchool = $marks
+            ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
+            ->unique(fn (FestMark $m) => $m->participant->registration_id ?? $m->id)
+            ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
+            ->map(fn ($group) => $group
+                ->sortBy('position')
+                ->map(fn (FestMark $m) => [
+                    'item' => $m->item?->title,
+                    'position' => $m->position,
+                    'points' => $this->gradePoints->pointsForMark($event, $m),
+                ])
+                ->values()
+                ->all());
+        $schoolWinnersBoard = collect($schoolBoard)
+            ->map(fn (array $row) => $row + ['winners' => $winnersBySchool[$row['school_id']] ?? []])
+            ->filter(fn (array $row) => $row['winners'] !== [])
+            ->values()
+            ->all();
 
         $showPhasePoints = collect($schoolBoard)->contains(
             fn (array $row) => (int) ($row['event_points'] ?? 0) !== (int) ($row['phase_points'] ?? 0)
@@ -360,6 +392,7 @@ class FestPortalController extends Controller
             'eventContext' => $this->operationalEvents->publicContext($event),
             'tab' => $tab,
             'schoolBoard' => $schoolBoard,
+            'schoolWinnersBoard' => $schoolWinnersBoard,
             'usesPhases' => $usesPhases,
             'phaseCumulativeBoard' => $phaseCumulativeBoard,
             'phaseBreakdown' => $phaseBreakdown,

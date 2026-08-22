@@ -196,6 +196,33 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertDontSee('South HS Winner');
     }
 
+    public function test_school_wise_results_show_points_before_medal_counts(): void
+    {
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
+
+        $response->assertOk();
+        // Points is the school's official standing metric — medal counts are only
+        // informational (see the code comment on $medalTally) — so points must render
+        // as the first data column after Rank/School, ahead of the medal icons.
+        $response->assertSeeInOrder(['>School<', '>Points<', 'alt="Gold"'], false);
+    }
+
+    public function test_school_tab_lists_a_winner_roster_with_points_per_school(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
+
+        $response->assertOk();
+        $response->assertSee('School-wise Winners');
+        $response->assertSee('North Poetry');
+        // markCategoryWinner() creates a grade A, position 1 mark with no FestPointRule
+        // configured, which resolves through FestGradePointService's default CKSC-style
+        // table to 8 points — the same value already relied on by the scoreboard test
+        // above (test_region_and_category_filters_work_together).
+        $response->assertSeeInOrder(['North Poetry', '8'], false);
+    }
+
     public function test_item_results_cannot_cross_the_operational_event_boundary(): void
     {
         $northItem = $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
@@ -208,7 +235,9 @@ class FestPublicScoreboardTest extends TestCase
 
         $this->get("http://public-scoreboard.test/fest/{$this->north->id}/items/{$northItem->id}/results")
             ->assertOk()
-            ->assertSee('North Poetry')
+            // The item-results page's heading renders the title server-side uppercased
+            // (not just CSS text-transform), matching the school-name assertion below.
+            ->assertSee('NORTH POETRY')
             ->assertSee('NORTH STAR SCHOOL')
             ->assertDontSee('South Valley School');
 
@@ -331,6 +360,85 @@ class FestPublicScoreboardTest extends TestCase
             ->assertSee('All categories')
             ->assertSee('All stages')
             ->assertSee('data-result-item', false);
+    }
+
+    /**
+     * Regression test for a real production gap: once ANY item in an event publishes
+     * its results, the whole /results page's tabs (item/category/school/individual)
+     * previously showed marks from EVERY item in the event, published or not — because
+     * only the top-level "at least one item published" check gated the page at all;
+     * the per-tab queries never re-checked which specific item each mark belonged to.
+     */
+    public function test_results_page_hides_marks_from_unpublished_items_even_after_another_item_publishes(): void
+    {
+        $event = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id,
+            'title' => 'Mixed Publish Fest',
+            'event_type' => 'kalotsav',
+            'conduct_mode' => 'standard',
+            'status' => 'ongoing',
+            'results_published' => false,
+        ]);
+
+        $publishedItem = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Published Poetry', 'category' => 'literary',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $unpublishedItem = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Secret Debate', 'category' => 'literary',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => null,
+        ]);
+
+        $this->markItemWinner($event, $publishedItem, $this->northSchool);
+        $this->markItemWinner($event, $unpublishedItem, $this->southSchool);
+
+        // Default results page (no ?tab=) and the explicit item tab both pull from the
+        // same $marks query — only the still-unpublished item's data should be absent.
+        $itemTab = $this->get("http://public-scoreboard.test/fest/{$event->id}/results?tab=item");
+        $itemTab->assertOk();
+        $itemTab->assertSee('Published Poetry');
+        $itemTab->assertSee('NORTH STAR SCHOOL');
+        $itemTab->assertDontSee('Secret Debate');
+        $itemTab->assertDontSee('SOUTH VALLEY SCHOOL');
+
+        $individualTab = $this->get("http://public-scoreboard.test/fest/{$event->id}/results?tab=individual");
+        $individualTab->assertOk();
+        $individualTab->assertDontSee('SOUTH VALLEY SCHOOL');
+
+        // The school-wise board's points/medal tally must also exclude the unpublished
+        // item's mark, not just the item-tab listing.
+        $schoolTab = $this->get("http://public-scoreboard.test/fest/{$event->id}/results?tab=school");
+        $schoolTab->assertOk();
+        $schoolTab->assertDontSee('South Valley School');
+    }
+
+    private function markItemWinner(FestEvent $event, FestEventItem $item, Tenant $school): FestParticipant
+    {
+        $registration = FestRegistration::create([
+            'event_id' => $event->id,
+            'item_id' => $item->id,
+            'school_id' => $school->id,
+            'status' => 'approved',
+        ]);
+
+        $participant = FestParticipant::create([
+            'registration_id' => $registration->id,
+            'event_id' => $event->id,
+            'participant_type' => 'student',
+        ]);
+
+        FestMark::create([
+            'event_id' => $event->id,
+            'item_id' => $item->id,
+            'participant_id' => $participant->id,
+            'grade' => 'A',
+            'position' => 1,
+            'score' => 80,
+        ]);
+
+        return $participant;
     }
 
     public function test_scoreboard_refreshes_a_partial_without_reloading_the_page(): void
