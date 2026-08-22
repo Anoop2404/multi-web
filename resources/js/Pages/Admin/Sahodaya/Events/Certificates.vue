@@ -12,20 +12,18 @@
                     </option>
                 </select>
                 <button @click="generate(selectedItemId)" class="btn-primary py-1.5 px-3 text-xs shrink-0">
-                    🏆 Generate top 3 {{ selectedItemId ? 'for selected item' : '' }}
+                    🏆 Generate Merit Certificates {{ selectedItemId ? 'for item' : '' }}
                 </button>
             </div>
+
             <button @click="generateParticipation" class="btn-secondary">Generate participation certificates</button>
             <a v-if="certificates.length" :href="downloadZipUrl" class="btn-secondary">Download all (ZIP)</a>
-            <a v-if="winnersByItem.length" :href="downloadPublishedZipUrl" class="btn-secondary">Download published winners (ZIP)</a>
-            <a v-if="certificates.length" :href="printAllUrl" target="_blank" class="btn-secondary">Print all ↗</a>
+            <a v-if="winnersByItem.length" :href="downloadPublishedZipUrl" class="btn-secondary">Download merit winners (ZIP)</a>
+            <a v-if="certificates.length" :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all`" target="_blank" class="btn-secondary">Print all (With BG) ↗</a>
+            <a v-if="certificates.length" :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?plain=1`" target="_blank" class="btn-secondary">Print all plain (No BG) ↗</a>
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/tally`" class="btn-secondary">
                 How many do I need to print?
             </Link>
-            <label v-if="certificates.length" class="flex items-center gap-1.5 text-xs text-gray-600 ml-1">
-                <input type="checkbox" v-model="plainMode" class="rounded border-gray-300">
-                Plain (no background — saves ink)
-            </label>
         </div>
 
         <!-- View mode tabs -->
@@ -36,14 +34,14 @@
                         :class="activeTab === 'winners_item'
                             ? 'border-indigo-600 text-indigo-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
-                    🏆 Winners (Grouped by Item)
+                    🏆 Merit Winners (Grouped by Item)
                 </button>
                 <button @click="activeTab = 'winners_school'"
                         class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
                         :class="activeTab === 'winners_school'
                             ? 'border-indigo-600 text-indigo-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
-                    🏫 Winners (Grouped by School)
+                    🏫 Merit Winners (Grouped by School)
                 </button>
                 <button @click="activeTab = 'all'"
                         class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
@@ -55,12 +53,12 @@
             </nav>
         </div>
 
-        <!-- TAB 1: Winners Grouped by Item -->
+        <!-- TAB 1: Merit Winners Grouped by Item -->
         <div v-if="activeTab === 'winners_item'" class="mb-6">
             <div class="flex items-center justify-between gap-4 mb-3">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-800">Winners Grouped by Item</h3>
-                    <p class="text-xs text-gray-500">Items whose results have been published (Ranks 1–3).</p>
+                    <h3 class="text-sm font-semibold text-gray-800">Merit Winners Grouped by Item</h3>
+                    <p class="text-xs text-gray-500">Items whose results have been published (Merit Ranks 1–3).</p>
                 </div>
             </div>
 
@@ -70,7 +68,7 @@
                         <div class="flex items-start justify-between gap-2 mb-3">
                             <p class="font-semibold text-sm text-gray-900 leading-tight">{{ group.item_title }}</p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
-                                {{ group.winners.length }} winner{{ group.winners.length === 1 ? '' : 's' }}
+                                {{ group.winners.length }} merit winner{{ group.winners.length === 1 ? '' : 's' }}
                             </span>
                         </div>
                         <ul class="space-y-2 mb-4">
@@ -81,41 +79,49 @@
                                     </span>
                                     <span class="truncate font-medium text-gray-800">{{ w.name }}</span>
                                 </span>
-                                <span class="flex items-center gap-1.5 shrink-0">
-                                    <a :href="`/certificates/print/${w.uuid}${plainMode ? '?plain=1' : ''}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print ↗</a>
+                                <span class="flex items-center gap-2 shrink-0 text-[11px]">
+                                    <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
+                                    <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
                                 </span>
                             </li>
                         </ul>
                     </div>
 
-                    <div class="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                    <div class="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs">
                         <button @click="generate(group.item_id)"
-                                class="text-xs font-semibold text-amber-700 hover:text-amber-900 flex items-center gap-1">
-                            ⚡ Generate Certs
+                                class="font-semibold text-amber-700 hover:text-amber-900 flex items-center gap-1">
+                            ⚡ Generate Merit
                         </button>
-                        <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?item_id=${group.item_id}&cert_type=winner${plainMode ? '&plain=1' : ''}`"
-                           target="_blank"
-                           class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                            🖨️ Print ↗
-                        </a>
-                        <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip?item_id=${group.item_id}&cert_type=winner${plainMode ? '&plain=1' : ''}`"
-                           class="text-xs font-semibold text-gray-600 hover:text-gray-800 flex items-center gap-1">
-                            📦 ZIP
-                        </a>
+                        <div class="flex items-center gap-2">
+                            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?item_id=${group.item_id}&cert_type=winner`"
+                               target="_blank"
+                               class="font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                                🖨️ Print Item ↗
+                            </a>
+                            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?item_id=${group.item_id}&cert_type=winner&plain=1`"
+                               target="_blank"
+                               class="font-medium text-gray-500 hover:text-gray-800">
+                                Plain (No BG) ↗
+                            </a>
+                            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip?item_id=${group.item_id}&cert_type=winner`"
+                               class="font-semibold text-gray-600 hover:text-gray-800 flex items-center gap-1">
+                                📦 ZIP
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
             <div v-else class="card p-6 text-center text-gray-500 text-sm">
-                No published winners by item yet. Publish item results to generate winner certificates.
+                No published merit winners by item yet. Publish item results to generate merit certificates.
             </div>
         </div>
 
-        <!-- TAB 2: Winners Grouped by School -->
+        <!-- TAB 2: Merit Winners Grouped by School -->
         <div v-if="activeTab === 'winners_school'" class="mb-6">
             <div class="flex items-center justify-between gap-4 mb-3">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-800">Winners Grouped by School</h3>
-                    <p class="text-xs text-gray-500">Winners organized by school for distribution.</p>
+                    <h3 class="text-sm font-semibold text-gray-800">Merit Winners Grouped by School</h3>
+                    <p class="text-xs text-gray-500">Merit winners organized by school for distribution.</p>
                 </div>
             </div>
 
@@ -125,7 +131,7 @@
                         <div class="flex items-start justify-between gap-2 mb-3">
                             <p class="font-semibold text-sm text-gray-900 leading-tight">{{ group.school_name }}</p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-medium">
-                                {{ group.winners.length }} winner{{ group.winners.length === 1 ? '' : 's' }}
+                                {{ group.winners.length }} merit winner{{ group.winners.length === 1 ? '' : 's' }}
                             </span>
                         </div>
                         <ul class="space-y-2 mb-4">
@@ -139,26 +145,34 @@
                                     </p>
                                     <p class="text-[11px] text-gray-500 truncate">{{ w.item_title }}</p>
                                 </div>
-                                <a :href="`/certificates/print/${w.uuid}${plainMode ? '?plain=1' : ''}`" target="_blank" class="text-indigo-600 font-medium shrink-0 hover:underline">Print ↗</a>
+                                <div class="flex items-center gap-2 shrink-0 text-[11px]">
+                                    <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
+                                    <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
+                                </div>
                             </li>
                         </ul>
                     </div>
 
-                    <div class="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
-                        <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?school_id=${group.school_id}&cert_type=winner${plainMode ? '&plain=1' : ''}`"
+                    <div class="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?school_id=${group.school_id}&cert_type=winner`"
                            target="_blank"
-                           class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                            🖨️ Print School ↗
+                           class="font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                            🖨️ Print School (With BG) ↗
                         </a>
-                        <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip?school_id=${group.school_id}&cert_type=winner${plainMode ? '&plain=1' : ''}`"
-                           class="text-xs font-semibold text-gray-600 hover:text-gray-800 flex items-center gap-1">
-                            📦 Download ZIP
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?school_id=${group.school_id}&cert_type=winner&plain=1`"
+                           target="_blank"
+                           class="font-medium text-gray-500 hover:text-gray-800">
+                            Print Plain (No BG) ↗
+                        </a>
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip?school_id=${group.school_id}&cert_type=winner`"
+                           class="font-semibold text-gray-600 hover:text-gray-800 flex items-center gap-1">
+                            📦 ZIP
                         </a>
                     </div>
                 </div>
             </div>
             <div v-else class="card p-6 text-center text-gray-500 text-sm">
-                No winners grouped by school available yet.
+                No merit winners grouped by school available yet.
             </div>
         </div>
 
@@ -181,12 +195,13 @@
                     <div class="flex items-center gap-3 text-xs">
                         <a :href="`/certificates/verify/${c.uuid}`" target="_blank" class="text-gray-500 hover:text-gray-700">Verify ↗</a>
                         <a :href="`/certificates/print/${c.uuid}?preview=1`" target="_blank" class="text-gray-500 hover:text-gray-700">Preview ↗</a>
-                        <a :href="`/certificates/print/${c.uuid}${plainMode ? '?plain=1' : ''}`" target="_blank" class="font-semibold text-indigo-600 hover:underline">Print ↗</a>
+                        <a :href="`/certificates/print/${c.uuid}`" target="_blank" class="font-semibold text-indigo-600 hover:underline">Print (With BG) ↗</a>
+                        <a :href="`/certificates/print/${c.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Print Plain ↗</a>
                     </div>
                 </div>
             </div>
             <div v-else class="text-center text-gray-500 text-sm py-8">
-                No certificates generated yet. Click "Generate for top 3" or "Generate participation certificates" above.
+                No certificates generated yet. Click "Generate Merit Certificates" or "Generate participation certificates" above.
             </div>
         </div>
 
