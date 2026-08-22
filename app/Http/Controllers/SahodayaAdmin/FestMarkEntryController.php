@@ -549,7 +549,7 @@ class FestMarkEntryController extends SahodayaAdminController
             ];
         }
 
-        usort($rows, fn ($a, $b) => ($a['chest_no'] ?? PHP_INT_MAX) <=> ($b['chest_no'] ?? PHP_INT_MAX));
+        usort($rows, fn ($a, $b) => ((int) preg_replace('/[^0-9]/', '', (string) ($a['chest_no'] ?? 999999))) <=> ((int) preg_replace('/[^0-9]/', '', (string) ($b['chest_no'] ?? 999999))));
 
         $sheetTitle = 'Digital Sum Sheet';
         $categoryLabel = $this->itemCategoryLabel($item, \App\Support\FestClassGroupScheme::labels(null, $event));

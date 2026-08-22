@@ -108,7 +108,11 @@ class FestExportService
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->with(['student', 'teacher', 'registration.item', 'registration.event', 'registration.school', 'group'])
             ->get()
-            ->sortBy(fn (FestParticipant $p) => $p->registration?->item?->title)
+            ->sortBy([
+                fn (FestParticipant $p) => $p->registration?->item?->title ?? '',
+                fn (FestParticipant $p) => (int) preg_replace('/[^0-9]/', '', (string) ($p->group?->chest_no ?? $p->chest_no ?? 999999)),
+                fn (FestParticipant $p) => $p->id,
+            ])
             ->values()
             ->map(function (FestParticipant $p, int $index) use ($attendance, $schools, $numbering, $classGroupLabels) {
                 $a = $attendance->get($p->registration?->item_id.'-'.$p->id);

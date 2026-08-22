@@ -869,13 +869,12 @@ class FestReportService
         // Group by item
         $rowsByItem = collect($rows)->groupBy(fn ($r) => $r['item'] ?? 'Item')->sortKeys();
 
-        // Sort participants: group_id (team), school, then chest_no.
-        // This keeps all members of the same team together under one divider.
+        // Sort participants primarily by chest number (reference) numerically.
         $rowsByItem = $rowsByItem->map(fn ($itemRows) => $itemRows->sortBy([
+            fn ($a, $b) => ((int) preg_replace('/[^0-9]/', '', (string) ($a['reference'] ?? '999999')))
+                <=> ((int) preg_replace('/[^0-9]/', '', (string) ($b['reference'] ?? '999999'))),
             fn ($a, $b) => ($a['group_id'] ?? 0) <=> ($b['group_id'] ?? 0),
             fn ($a, $b) => ($a['school'] ?? '') <=> ($b['school'] ?? ''),
-            fn ($a, $b) => ((int) preg_replace('/[^0-9]/', '', $a['reference'] ?? '0'))
-                <=> ((int) preg_replace('/[^0-9]/', '', $b['reference'] ?? '0')),
         ])->values()->all());
 
         $sahodaya = Tenant::find($this->event->tenant_id);

@@ -66,7 +66,24 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
             }
         }
 
-        return [...byItem.values()];
+        const sectionList = [...byItem.values()];
+        for (const sec of sectionList) {
+            sec.rows.sort((a, b) => {
+                const chestAStr = String(a.participant?.group?.chest_no ?? a.participant?.chest_no ?? '');
+                const chestBStr = String(b.participant?.group?.chest_no ?? b.participant?.chest_no ?? '');
+                const numA = parseInt(chestAStr.replace(/\D/g, ''), 10);
+                const numB = parseInt(chestBStr.replace(/\D/g, ''), 10);
+                const validA = !isNaN(numA);
+                const validB = !isNaN(numB);
+
+                if (validA && validB) return numA - numB;
+                if (validA) return -1;
+                if (validB) return 1;
+                return (a.participant?.id ?? 0) - (b.participant?.id ?? 0);
+            });
+        }
+
+        return sectionList;
     });
 
     function attendanceKey(participant, item) {
