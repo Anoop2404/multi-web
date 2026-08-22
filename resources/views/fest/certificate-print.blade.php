@@ -130,9 +130,11 @@
         $hasBackground = ! empty($backgroundUrl);
     @endphp
 
-    <div class="actions no-print">
-        <button onclick="window.print()" style="padding:.5rem 1.25rem;font-size:1rem;cursor:pointer">Print / Save as PDF</button>
-    </div>
+    @if(empty($isSample))
+        <div class="actions no-print">
+            <button onclick="window.print()" style="padding:.5rem 1.25rem;font-size:1rem;cursor:pointer">Print / Save as PDF</button>
+        </div>
+    @endif
 
     @if($hasBackground)
         <div class="page has-background {{ $__orientation === 'portrait' ? 'portrait' : '' }}" style="background-image:url('{{ $backgroundUrl }}');">
@@ -267,9 +269,11 @@
     @endif
 @else
     {{-- No template configured for this event/item — fall back to the fixed design --}}
-    <div class="actions no-print">
-        <button onclick="window.print()" style="padding:.5rem 1.25rem;font-size:1rem;cursor:pointer">Print / Save as PDF</button>
-    </div>
+    @if(empty($isSample))
+        <div class="actions no-print">
+            <button onclick="window.print()" style="padding:.5rem 1.25rem;font-size:1rem;cursor:pointer">Print / Save as PDF</button>
+        </div>
+    @endif
     <div class="cert-legacy">
         <div class="inner">
             <p class="org">{{ ($recordBreak ?? null) ? 'Record Break Achievement' : 'Certificate of Achievement' }}</p>
@@ -302,6 +306,34 @@
             <span>{{ $certificate->generated_at?->format('d M Y') ?? now()->format('d M Y') }}</span>
         </div>
     </div>
+@endif
+@if(!empty($isSample))
+    {{-- Admin template preview only: the certificate itself is a fixed A4 pixel size
+         (for accurate printing on the real print/download path), which doesn't fit most
+         screens at 100%. Scale it down to fit the viewport here so the whole design is
+         visible without scrolling — real certificates never run this, so print output
+         is unaffected. --}}
+    <script>
+        (function () {
+            function fitToScreen() {
+                var page = document.querySelector('.page');
+                if (!page) return;
+                page.style.transform = 'none';
+                page.style.marginBottom = '0px';
+                var rect = page.getBoundingClientRect();
+                var scale = Math.min(
+                    (window.innerWidth - 32) / rect.width,
+                    (window.innerHeight - 32) / rect.height,
+                    1
+                );
+                page.style.transformOrigin = 'top center';
+                page.style.transform = 'scale(' + scale + ')';
+                page.style.marginBottom = (-(rect.height * (1 - scale))) + 'px';
+            }
+            window.addEventListener('load', fitToScreen);
+            window.addEventListener('resize', fitToScreen);
+        })();
+    </script>
 @endif
 </body>
 </html>

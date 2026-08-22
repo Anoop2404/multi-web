@@ -22,7 +22,7 @@
                 @if($p['link_ref'])
                 <a href="{{ route('tenant.fest.participant', [$event->id, $p['link_ref']]) }}" class="font-medium text-amber-300 hover:underline">
                     @if($p['show_name'] && $p['name'])
-                    {{ $p['name'] }}
+                    <span class="uppercase">{{ $p['name'] }}</span>
                     @else
                     <span class="text-white/40 font-normal">(name hidden until results)</span>
                     @endif

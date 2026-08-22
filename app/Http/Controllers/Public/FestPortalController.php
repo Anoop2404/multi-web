@@ -817,6 +817,16 @@ class FestPortalController extends Controller
                 ?? $this->scoreboards->scoreboard($event, $selectedScope))
             : $this->scoreboards->provisionalScoreboard($event, $selectedScope);
 
+        $medalTally = $this->schoolMedalTally($selectedScope['event_ids'], (bool) $selectedScope['results_published']);
+        $scoreboard = collect($scoreboard)
+            ->map(fn (array $row) => $row + [
+                'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
+                'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
+                'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
+            ])
+            ->values()
+            ->all();
+
         return [
             'scoreboard' => $scoreboard,
             'standingsPublished' => (bool) $selectedScope['results_published'],
@@ -877,6 +887,29 @@ class FestPortalController extends Controller
      *
      * @return array{0: array, 1: ?array}
      */
+    /**
+     * Gold/silver/bronze win-counts per school, keyed by school_id — same source marks
+     * tv() uses for its medal columns (top-3 marks, scoped to published items when the
+     * whole event isn't published yet), pulled out here so livePayload() can show the
+     * same breakdown without duplicating the query inline a second time.
+     */
+    private function schoolMedalTally(array $eventIds, bool $isPublished): Collection
+    {
+        return FestMark::whereIn('event_id', $eventIds)
+            ->whereIn('position', [1, 2, 3])
+            ->with('participant.registration')
+            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+            ->get()
+            ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
+            ->unique(fn (FestMark $m) => $m->participant->registration_id ?? $m->id)
+            ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
+            ->map(fn ($group) => [
+                'gold' => $group->where('position', 1)->count(),
+                'silver' => $group->where('position', 2)->count(),
+                'bronze' => $group->where('position', 3)->count(),
+            ]);
+    }
+
     private function resolveScoreboard(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished): array
     {
         if (! $isPublished) {

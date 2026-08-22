@@ -26,7 +26,7 @@
         <div id="now-performing" class="mt-5 p-5 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 text-center shadow-[0_0_30px_-5px_rgba(245,158,11,0.35)] @if(!$nowPerforming) hidden @endif">
             @if($nowPerforming)
             <span class="text-xs font-bold uppercase tracking-widest text-amber-400 block mb-2">● Now performing</span>
-            <strong class="text-2xl font-extrabold text-white block leading-tight">{{ $nowPerforming['item_title'] ?? '—' }}</strong>
+            <strong class="text-2xl font-extrabold text-white block leading-tight uppercase">{{ $nowPerforming['item_title'] ?? '—' }}</strong>
             @if(!empty($nowPerforming['show_name']) && !empty($nowPerforming['name']))
             <span class="text-amber-200 text-lg font-semibold mt-1 block">{{ $nowPerforming['name'] }}</span>
             @endif
@@ -37,16 +37,30 @@
             <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400">Event School Standings</h2>
             <span id="school-scoreboard-provisional-badge" class="text-[10px] font-bold uppercase tracking-wider text-amber-300 border border-amber-500/30 bg-amber-500/10 rounded-full px-2 py-0.5 @unless($standingsProvisional ?? false) hidden @endunless">Provisional</span>
         </div>
-        <ol id="school-scoreboard" class="space-y-2">
-            @forelse($scoreboard as $row)
-            <li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
-                <span class="text-white flex items-center gap-2">{!! $medalImg($row['rank']) !!}{{ $row['school_name'] }}</span>
-                <span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span>
-            </li>
-            @empty
-            <li class="text-white/30 text-center py-6">{{ $standingsPublished ? 'No scores yet' : 'Standings appear here once at least one item is published' }}</li>
-            @endforelse
-        </ol>
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+            <div class="grid grid-cols-[2rem_1fr_repeat(3,2.25rem)_3.5rem] gap-1.5 px-3 py-2 bg-white/5 border-b border-slate-800 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                <span>#</span>
+                <span>School</span>
+                <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold" class="w-4 h-4"></span>
+                <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Silver" class="w-4 h-4"></span>
+                <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Bronze" class="w-4 h-4"></span>
+                <span class="text-right">Pts</span>
+            </div>
+            <ol id="school-scoreboard" class="divide-y divide-slate-800">
+                @forelse($scoreboard as $row)
+                <li class="grid grid-cols-[2rem_1fr_repeat(3,2.25rem)_3.5rem] gap-1.5 items-center px-3 py-2.5">
+                    <span class="flex items-center">{!! $medalImg($row['rank']) !!}</span>
+                    <span class="text-white font-semibold text-sm truncate uppercase">{{ $row['school_name'] }}</span>
+                    <span class="text-center font-mono font-bold text-amber-300 text-sm">{{ $row['gold'] ?? 0 }}</span>
+                    <span class="text-center font-mono font-bold text-slate-300 text-sm">{{ $row['silver'] ?? 0 }}</span>
+                    <span class="text-center font-mono font-bold text-amber-600 text-sm">{{ $row['bronze'] ?? 0 }}</span>
+                    <span class="text-right font-mono font-extrabold text-white text-sm">{{ $row['total_points'] }}</span>
+                </li>
+                @empty
+                <li class="text-white/30 text-center py-6">{{ $standingsPublished ? 'No scores yet' : 'Standings appear here once at least one item is published' }}</li>
+                @endforelse
+            </ol>
+        </div>
 
         @if(count($houseScoreboard))
         <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">House Standings</h2>
@@ -119,9 +133,13 @@
             el.innerHTML = `<li class="text-white/30 text-center py-6">${published ? 'No scores yet' : 'Standings appear here once at least one item is published'}</li>`;
             return;
         }
-        el.innerHTML = rows.map(r => `<li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
-            <span class="text-white flex items-center gap-2">${medalFor(r.rank)}${esc(r.school_name)}</span>
-            <span class="font-mono font-bold text-white">${esc(r.total_points)}</span></li>`).join('');
+        el.innerHTML = rows.map(r => `<li class="grid grid-cols-[2rem_1fr_repeat(3,2.25rem)_3.5rem] gap-1.5 items-center px-3 py-2.5">
+            <span class="flex items-center">${medalFor(r.rank)}</span>
+            <span class="text-white font-semibold text-sm truncate uppercase">${esc(r.school_name)}</span>
+            <span class="text-center font-mono font-bold text-amber-300 text-sm">${esc(r.gold || 0)}</span>
+            <span class="text-center font-mono font-bold text-slate-300 text-sm">${esc(r.silver || 0)}</span>
+            <span class="text-center font-mono font-bold text-amber-600 text-sm">${esc(r.bronze || 0)}</span>
+            <span class="text-right font-mono font-extrabold text-white text-sm">${esc(r.total_points)}</span></li>`).join('');
     }
 
     function renderHouse(rows) {
@@ -137,7 +155,7 @@
         if (!el) return;
         if (!p) { el.classList.add('hidden'); return; }
         el.classList.remove('hidden');
-        let html = `<span class="text-xs font-bold uppercase tracking-widest text-amber-400 block mb-2">● Now performing</span><strong class="text-2xl font-extrabold text-white block leading-tight">${esc(p.item_title || '—')}</strong>`;
+        let html = `<span class="text-xs font-bold uppercase tracking-widest text-amber-400 block mb-2">● Now performing</span><strong class="text-2xl font-extrabold text-white block leading-tight uppercase">${esc(p.item_title || '—')}</strong>`;
         if (p.show_name && p.name) html += `<span class="text-amber-200 text-lg font-semibold mt-1 block">${esc(p.name)}</span>`;
         el.innerHTML = html;
     }

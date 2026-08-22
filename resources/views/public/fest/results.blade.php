@@ -47,7 +47,7 @@
                         @forelse($overallSchoolToppers as $row)
                         <article class="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-5 {{ $row['rank'] == 1 ? 'border-amber-500/40 bg-gradient-to-br from-amber-500/10 to-slate-900/60' : '' }}">
                             <div class="flex items-start justify-between gap-3"><span class="text-xs font-extrabold uppercase tracking-widest text-amber-400">{{ $podium[$row['rank']] ?? '#'.$row['rank'] }}</span><span class="font-mono text-2xl font-extrabold text-white">{{ $row['total_points'] }} <small class="text-[10px] text-white/40">PTS</small></span></div>
-                            <h3 class="font-bold text-lg leading-snug mt-5 text-white">{{ $row['school_name'] }}</h3>
+                            <h3 class="font-bold text-lg leading-snug mt-5 text-white uppercase">{{ $row['school_name'] }}</h3>
                             @if($lockedCumulativeStanding ?? null)
                             <dl class="grid {{ $showPhasePoints ? 'grid-cols-4' : 'grid-cols-3' }} gap-1 mt-4 pt-3 border-t border-slate-800 text-center">
                                 <div><dt class="text-[9px] uppercase text-white/30">Opening</dt><dd class="font-mono text-sm font-bold text-white">{{ $row['opening_points'] }}</dd></div>
@@ -71,7 +71,7 @@
                             <h3 class="font-bold px-4 py-3 bg-white/5 border-b border-slate-800 text-white">{{ $board['label'] }}</h3>
                             <ol class="divide-y divide-slate-800">
                                 @foreach($board['rows'] as $row)
-                                <li class="flex items-center gap-3 px-4 py-3"><span class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span><span class="font-semibold text-sm flex-1 min-w-0 truncate text-white">{{ $row['school_name'] }}</span><span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span></li>
+                                <li class="flex items-center gap-3 px-4 py-3"><span class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span><span class="font-semibold text-sm flex-1 min-w-0 truncate text-white uppercase">{{ $row['school_name'] }}</span><span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span></li>
                                 @endforeach
                             </ol>
                         </article>
@@ -124,7 +124,7 @@
                             @forelse($schoolBoard as $row)
                                 <tr>
                                     <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
-                                    <td class="p-3 font-semibold text-white">{{ $row['school_name'] }}</td>
+                                    <td class="p-3 font-semibold text-white uppercase">{{ $row['school_name'] }}</td>
                                     <td class="p-3 text-right font-mono text-white/70">{{ $row['opening_points'] }}</td>
                                     <td class="p-3 text-right font-mono text-sky-400">+{{ $row['event_points'] }}</td>
                                     @if($showPhasePoints)<td class="p-3 text-right font-mono text-indigo-400">+{{ $row['phase_points'] }}</td>@endif
@@ -170,7 +170,7 @@
                             @forelse($phaseCumulativeBoard as $row)
                                 <tr>
                                     <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
-                                    <td class="p-3 font-semibold text-white">{{ $row['school_name'] }}</td>
+                                    <td class="p-3 font-semibold text-white uppercase">{{ $row['school_name'] }}</td>
                                     @foreach(collect($phaseBreakdown ?? [])->where('results_published', true) as $phase)
                                         <td class="p-3 text-right font-mono text-white/70">{{ $row['phase_points'][$phase['phase_id']] ?? 0 }}</td>
                                     @endforeach
@@ -200,7 +200,7 @@
                         @forelse($schoolBoard as $row)
                             <tr>
                                 <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
-                                <td class="p-3 font-semibold text-white">{{ $row['school_name'] }}</td>
+                                <td class="p-3 font-semibold text-white uppercase">{{ $row['school_name'] }}</td>
                                 <td class="p-3 text-center font-mono {{ $row['gold'] ? 'font-bold text-amber-400' : 'text-white/20' }}">{{ $row['gold'] }}</td>
                                 <td class="p-3 text-center font-mono {{ $row['silver'] ? 'font-bold text-slate-300' : 'text-white/20' }}">{{ $row['silver'] }}</td>
                                 <td class="p-3 text-center font-mono {{ $row['bronze'] ? 'font-bold text-orange-400' : 'text-white/20' }}">{{ $row['bronze'] }}</td>
@@ -226,7 +226,7 @@
                                 @forelse($board['rows'] as $row)
                                     <tr>
                                         <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
-                                        <td class="p-3 text-white">{{ $row['school_name'] }}</td>
+                                        <td class="p-3 text-white uppercase">{{ $row['school_name'] }}</td>
                                         <td class="p-3 text-right font-mono text-white">{{ $row['total_points'] }}</td>
                                     </tr>
                                 @empty

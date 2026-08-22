@@ -8,7 +8,7 @@
     <div class="max-w-2xl mx-auto">
         @include('public.fest.partials.page-hero', [
             'eyebrow' => 'Participant',
-            'title' => ($public['show_name'] && $public['name']) ? $public['name'] : 'Participant (identity hidden until results)',
+            'title' => ($public['show_name'] && $public['name']) ? Str::upper($public['name']) : 'Participant (identity hidden until results)',
             'subtitle' => $event->title,
         ])
 
@@ -24,7 +24,7 @@
             @if($public['school'])
             <div class="min-w-0">
                 <p class="text-[11px] uppercase tracking-wide text-white/40 font-bold">School</p>
-                <p class="font-bold text-white truncate">{{ $public['school'] }}</p>
+                <p class="font-bold text-white truncate uppercase">{{ $public['school'] }}</p>
             </div>
             @endif
         </div>
@@ -50,7 +50,7 @@
                 @forelse($items as $row)
                 <li class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
                     <div class="flex items-start justify-between gap-3">
-                        <h2 class="font-bold text-white leading-snug">{{ $row['item_title'] }}</h2>
+                        <h2 class="font-bold text-white leading-snug uppercase">{{ $row['item_title'] }}</h2>
                         <span class="shrink-0 text-[11px] font-bold uppercase tracking-wide px-2 py-1 rounded-full {{ $row['is_team_item'] ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30' : 'bg-white/5 text-white/50 border border-slate-700' }}">
                             {{ $typeLabels[$row['participant_type']] ?? ucfirst($row['participant_type']) }}
                         </span>
