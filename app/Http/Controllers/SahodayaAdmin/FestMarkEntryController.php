@@ -201,7 +201,14 @@ class FestMarkEntryController extends SahodayaAdminController
         // Resolved before validate() so a judge's own subtotal can be capped at the item's
         // Total Marks — the one scoring path that previously had no ceiling at all (unlike
         // per-criterion scores, which are already clamped to each criterion's own max_score).
+        // Total Marks is the item's overall ceiling across every judge (e.g. 200), not each
+        // judge's own scale, so each judge is capped at that split evenly across the panel —
+        // otherwise every judge could independently reach the full total and their sum would
+        // blow past it.
         $item = $request->filled('item_id') ? FestEventItem::find($request->input('item_id')) : null;
+        $perJudgeMax = $item?->total_marks !== null
+            ? $item->total_marks / $criteriaService->judgeCountForItem($item)
+            : null;
 
         $data = $request->validate([
             'participant_id'    => 'required|exists:fest_participants,id',
@@ -216,7 +223,7 @@ class FestMarkEntryController extends SahodayaAdminController
                 'nullable',
                 'numeric',
                 'min:0',
-                $item?->total_marks !== null ? 'max:'.$item->total_marks : null,
+                $perJudgeMax !== null ? 'max:'.$perJudgeMax : null,
             ]),
         ]);
 

@@ -169,7 +169,7 @@
                                 <template v-if="hasJudgePanel">
                                     <th v-for="j in judgeNumbers" :key="j" class="p-3.5 w-20">
                                         Judge {{ j }}
-                                        <span v-if="props.selectedItemTotalMarks" class="block font-normal text-slate-400 normal-case">/ {{ props.selectedItemTotalMarks }}</span>
+                                        <span v-if="perJudgeMax" class="block font-normal text-slate-400 normal-case">/ {{ perJudgeMax }}</span>
                                     </th>
                                     <th class="p-3.5 w-24">Grand Total</th>
                                 </template>
@@ -246,7 +246,7 @@
                                 <template v-if="hasJudgePanel">
                                     <td v-for="j in judgeNumbers" :key="j" class="p-3.5">
                                         <input v-model.number="judgeForms[participant.id][j]" type="number" min="0" step="0.5"
-                                               :max="props.selectedItemTotalMarks ?? undefined"
+                                               :max="perJudgeMax"
                                                class="field text-xs tabular-nums w-16" placeholder="0"
                                                :disabled="isAbsent(participant, item)">
                                     </td>
@@ -432,9 +432,10 @@ function rankOptionsFor(section) {
 function computeAutoGrade(score, item) {
     if (score === null || score === undefined || score === '' || isNaN(score)) return '';
     const num = Number(score);
-    const jCount = props.judgeCount && props.judgeCount > 0 ? props.judgeCount : 1;
-    const marksPerJudge = item?.total_marks ? Number(item.total_marks) : 100;
-    const maxPossibleMarks = marksPerJudge * jCount;
+    // total_marks is the item's overall ceiling (e.g. 200), not each judge's own scale —
+    // judge inputs are already capped at total_marks / judgeCount each (see the max on the
+    // judge score field below), so their sum tops out at total_marks directly.
+    const maxPossibleMarks = item?.total_marks ? Number(item.total_marks) : 100;
     const percent = maxPossibleMarks > 0 ? (num / maxPossibleMarks) * 100 : num;
 
     const rules = props.gradeRules ?? [];
@@ -523,6 +524,16 @@ const hasJudgePanel = computed(() => (props.judgeCount ?? 1) > 1);
 const judgeNumbers = computed(() => {
     const n = props.judgeCount ?? 1;
     return Array.from({ length: n }, (_, i) => i + 1);
+});
+
+// selectedItemTotalMarks is the item's overall ceiling (e.g. 200 across all judges),
+// not each judge's own scale — divide across judges so their sum tops out there,
+// instead of letting each judge independently score up to the full total.
+const perJudgeMax = computed(() => {
+    const total = props.selectedItemTotalMarks;
+    if (!total) return undefined;
+    const n = props.judgeCount && props.judgeCount > 0 ? props.judgeCount : 1;
+    return total / n;
 });
 
 const judgeForms = reactive({});

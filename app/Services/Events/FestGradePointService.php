@@ -124,9 +124,12 @@ class FestGradePointService
             return $this->resolveConfedGradeFromScore($score);
         }
 
+        // total_marks is the item's overall ceiling across every judge (e.g. 200), not each
+        // judge's own scale — each judge's input is already capped at total_marks / judgeCount
+        // (see FestMarkEntryController::store() and MarkEntry.vue's perJudgeMax), so their sum
+        // tops out at total_marks directly with no further multiplication needed here.
         $itemModel = $itemId ? FestEventItem::find($itemId) : null;
-        $judgeCount = $itemModel ? app(\App\Services\Events\FestMarkCriteriaService::class)->judgeCountForItem($itemModel) : 1;
-        $maxPossibleMarks = (float) (($itemModel?->total_marks ?? 100.0) * $judgeCount);
+        $maxPossibleMarks = (float) ($itemModel?->total_marks ?? 100.0);
 
         $configs = FestGradeConfig::where('event_id', $event->id)
             ->where(function ($q) use ($itemId) {

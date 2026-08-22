@@ -92,7 +92,7 @@ class FestJudgeScoreCapTest extends TestCase
         ]), [
             'participant_id' => $participant->id,
             'item_id' => $item->id,
-            'judge_scores' => ['1' => 95, '2' => 500],
+            'judge_scores' => ['1' => 45, '2' => 500],
         ]);
 
         $response->assertSessionHasErrors('judge_scores.2');
@@ -109,14 +109,14 @@ class FestJudgeScoreCapTest extends TestCase
         ]), [
             'participant_id' => $participant->id,
             'item_id' => $item->id,
-            'judge_scores' => ['1' => 95, '2' => 88],
+            'judge_scores' => ['1' => 45, '2' => 48],
         ]);
 
         $response->assertSessionDoesntHaveErrors();
         $this->assertDatabaseHas('fest_marks', [
             'participant_id' => $participant->id,
             'item_id' => $item->id,
-            'score' => 183,
+            'score' => 93,
         ]);
     }
 
