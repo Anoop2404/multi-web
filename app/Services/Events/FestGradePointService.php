@@ -56,12 +56,19 @@ class FestGradePointService
         $grade = $this->normalizeGrade($event, $mark->grade);
         $pos = (string) ($mark->position ?? '');
 
-        // A position with no configured table entry (e.g. 4th place, when only the top 3
-        // score) earns zero championship points — never the raw judged score. Falling back
-        // to $mark->score here used to silently add raw marks into the awarded-points total,
-        // which the platform's own scoring rules forbid (see mcsPointsForMark()/
-        // confedPointsForMark() above, which both already return 0 in the equivalent case).
-        return (int) (self::DEFAULT_POINTS[$grade][$pos] ?? 0);
+        if ($pos !== '' && isset(self::DEFAULT_POINTS[$grade][$pos])) {
+            $pts = (int) self::DEFAULT_POINTS[$grade][$pos];
+            return $isGroup ? $pts * 2 : $pts;
+        }
+
+        $defaultGradeOnly = [
+            'A_plus' => $isGroup ? 10 : 5,
+            'A'      => $isGroup ? 6 : 3,
+            'B'      => $isGroup ? 4 : 2,
+            'C'      => $isGroup ? 2 : 1,
+        ];
+
+        return (int) ($defaultGradeOnly[$grade] ?? 0);
     }
 
     /**
@@ -162,7 +169,17 @@ class FestGradePointService
         $grade = $this->normalizeMcsGrade($mark->grade);
         $pos = (string) ($mark->position ?? '');
 
-        return (int) ($table[$grade][$pos] ?? 0);
+        if ($pos !== '' && isset($table[$grade][$pos])) {
+            return (int) $table[$grade][$pos];
+        }
+
+        $gradeOnly = [
+            'A' => $isGroup ? 10 : 5,
+            'B' => $isGroup ? 6 : 3,
+            'C' => $isGroup ? 2 : 1,
+        ];
+
+        return (int) ($gradeOnly[$grade] ?? 0);
     }
 
     public function resolveMcsGradeFromScore(float $score): ?string
@@ -180,7 +197,17 @@ class FestGradePointService
         $grade = $this->normalizeMcsGrade($mark->grade); // same A/B/C-only normalization the manual uses
         $pos = (string) ($mark->position ?? '');
 
-        return (int) ($table[$grade][$pos] ?? 0);
+        if ($pos !== '' && isset($table[$grade][$pos])) {
+            return (int) $table[$grade][$pos];
+        }
+
+        $gradeOnly = [
+            'A' => $isGroup ? 10 : 5,
+            'B' => $isGroup ? 6 : 3,
+            'C' => $isGroup ? 2 : 1,
+        ];
+
+        return (int) ($gradeOnly[$grade] ?? 0);
     }
 
     public function resolveConfedGradeFromScore(float $score): ?string
