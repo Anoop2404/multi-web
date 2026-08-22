@@ -320,6 +320,7 @@ const props = defineProps({
     headItemGroups: { type: Array, default: () => [] },
     configuredItemIds: { type: Array, default: () => [] },
     gradeOptions: { type: Array, default: () => ['A+', 'A', 'B', 'C'] },
+    gradeRules: { type: Array, default: () => [] },
     judgeCount: { type: Number, default: 1 },
     judgeScores: { type: Object, default: () => ({}) },
     selectedItemTotalMarks: { type: Number, default: null },
@@ -455,10 +456,11 @@ function computeAutoGrade(score, item) {
     }
 
     if (percent !== null) {
-        if (percent >= 70.0) return 'A+';
-        if (percent >= 60.0) return 'A';
-        if (percent >= 50.0) return 'B';
-        if (percent >= 40.0) return 'C';
+        const opts = props.gradeOptions ?? ['A+', 'A', 'B', 'C'];
+        if (percent >= 70.0) return opts.includes('A+') ? 'A+' : (opts.includes('A') ? 'A' : (opts[0] || 'A'));
+        if (percent >= 60.0) return opts.includes('A') ? 'A' : (opts.includes('B') ? 'B' : (opts[0] || 'A'));
+        if (percent >= 50.0) return opts.includes('B') ? 'B' : (opts.includes('C') ? 'C' : (opts[1] || 'B'));
+        if (percent >= 40.0) return opts.includes('C') ? 'C' : (opts[opts.length - 1] || 'C');
     }
     return '';
 }
