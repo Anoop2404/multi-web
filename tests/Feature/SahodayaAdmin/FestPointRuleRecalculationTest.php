@@ -75,6 +75,46 @@ class FestPointRuleRecalculationTest extends TestCase
         ]);
     }
 
+    /**
+     * Regression test for a real production bug: storePointRule() used create(), so
+     * submitting the same (grade, position, type) combination twice — a re-submitted
+     * form, or an admin not realizing a rule already existed for it — silently saved
+     * TWO rules with different points values instead of updating the one that already
+     * existed. FestGradePointService::pointsForMark()'s lookup has no tiebreaker for
+     * which duplicate it reads, so which points value actually applied became
+     * effectively arbitrary. Confirmed against a real event where this had already
+     * happened: "A, 2nd place, Individual" had both an 8-point and a 16-point rule.
+     */
+    public function test_adding_the_same_rule_twice_updates_it_instead_of_duplicating(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'admin' => $admin, 'event' => $event] = $this->makeFixture();
+
+        // Matches makeFixture()'s own mark (grade A, position 1) so the scoreboard
+        // assertion below is meaningful, not just the rule-row count.
+        $payload = ['grade' => 'A', 'position' => 1, 'points' => 8, 'is_group' => false];
+        $this->actingAs($admin)->post(route('sahodaya.events.point-rules.store', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]), $payload)->assertRedirect();
+
+        // Same grade/position/type again, but with a different (wrong/corrected) points
+        // value — exactly what re-submitting the "Add rule" form produces.
+        $this->actingAs($admin)->post(route('sahodaya.events.point-rules.store', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]), [...$payload, 'points' => 16])->assertRedirect();
+
+        $this->assertSame(1, FestPointRule::where([
+            'event_id' => $event->id, 'grade' => 'A', 'position' => 1, 'is_group' => false,
+        ])->count());
+        $this->assertDatabaseHas('fest_point_rules', [
+            'event_id' => $event->id, 'grade' => 'A', 'position' => 1, 'is_group' => false, 'points' => 16,
+        ]);
+        // The scoreboard snapshot must reflect the single, updated rule too — not be
+        // stuck on whichever duplicate happened to be recalculated first.
+        $this->assertDatabaseHas('fest_results', [
+            'event_id' => $event->id, 'school_id' => $school->id, 'item_id' => null, 'total_points' => 16,
+        ]);
+    }
+
     public function test_removing_a_point_rule_recalculates_back_to_the_default_table(): void
     {
         ['sahodaya' => $sahodaya, 'school' => $school, 'admin' => $admin, 'event' => $event] = $this->makeFixture();

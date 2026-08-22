@@ -8,6 +8,8 @@ use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestResult;
+use App\Models\SchoolClass;
+use App\Models\Student;
 use App\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -293,6 +295,41 @@ class FestPublicScoreboardTest extends TestCase
         // place_points.individual.1 = 5, individual_points.A.1 = 10 (5 + 5).
         $response->assertSee('Grade A · 5 pts', false);
         $response->assertSee('10', false);
+    }
+
+    public function test_school_ranking_row_links_to_its_roster_card(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
+
+        $response->assertOk();
+        $response->assertSee('data-jump-to-school="'.$this->northSchool->id.'"', false);
+        $response->assertSee('data-jump-to-school', false);
+        $response->assertSee('jumpToSchool', false);
+    }
+
+    public function test_school_results_roster_shows_participant_name_and_photo(): void
+    {
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'North Poetry', 'category' => 'literary',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+        ]);
+        $registration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+        $schoolClass = SchoolClass::create(['tenant_id' => $this->northSchool->id, 'name' => '8']);
+        $student = Student::create(['tenant_id' => $this->northSchool->id, 'school_class_id' => $schoolClass->id, 'name' => 'Anjali Menon']);
+        $participant = FestParticipant::create([
+            'registration_id' => $registration->id, 'event_id' => $this->north->id,
+            'participant_type' => 'student', 'student_id' => $student->id,
+        ]);
+        FestMark::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 80]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
+
+        $response->assertOk();
+        // Rendered raw text is mixed-case — the roster's uppercase display is CSS
+        // text-transform on this element, not server-side casing.
+        $response->assertSee('Anjali Menon');
     }
 
     public function test_school_results_roster_includes_non_winning_items_too(): void

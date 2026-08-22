@@ -1251,10 +1251,21 @@ class FestEventSettingsController extends SahodayaAdminController
             $data['grade'] = $gradePointService->normalizeGrade($event, $data['grade']);
         }
 
-        FestPointRule::create(array_merge($data, [
-            'event_id'  => $event->id,
-            'is_group'  => $data['is_group'] ?? false,
-        ]));
+        // updateOrCreate(), not create() — (event_id, grade, position, is_group) is this
+        // rule's real identity. create() let the same combination be saved twice (e.g. by
+        // re-submitting the form, or adding a rule that already existed) with two
+        // different points values and no error; FestGradePointService::pointsForMark()'s
+        // lookup has no tiebreaker for which duplicate it reads, so a duplicate silently
+        // made scoring for that grade/position non-deterministic instead of failing loudly.
+        FestPointRule::updateOrCreate(
+            [
+                'event_id' => $event->id,
+                'grade'    => $data['grade'] ?? null,
+                'position' => $data['position'] ?? null,
+                'is_group' => $data['is_group'] ?? false,
+            ],
+            ['points' => $data['points']],
+        );
 
         EventContext::for($event)->recalculateSchoolPoints();
 

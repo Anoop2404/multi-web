@@ -59,11 +59,18 @@ class FestGradePointService
         };
 
         // Exact match on this grade at this exact position — e.g. "Grade A, 1st place".
+        // latest('id') is a defensive tiebreaker, not the real fix: storePointRule() now
+        // upserts on (event_id, grade, position, is_group) so this combination can't be
+        // saved twice going forward, but existing duplicate rows from before that fix (or
+        // any other future write path) would otherwise make ->first() pick an effectively
+        // arbitrary row — this at least keeps that pick consistent across requests instead
+        // of drifting between whichever row the database happens to return first.
         if ($mark->position) {
             $rule = FestPointRule::where('event_id', $event->id)
                 ->where('is_group', $isGroup)
                 ->where('position', $mark->position)
                 ->where($gradeMatch)
+                ->latest('id')
                 ->first();
 
             if ($rule) {
@@ -83,6 +90,7 @@ class FestGradePointService
             ->where('is_group', $isGroup)
             ->whereNull('position')
             ->where($gradeMatch)
+            ->latest('id')
             ->first();
 
         if ($anyPositionRule) {

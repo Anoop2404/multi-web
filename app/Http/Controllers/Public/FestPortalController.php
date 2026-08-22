@@ -352,8 +352,22 @@ class FestPortalController extends Controller
         // where "winners only" is the correct scope), not a reuse of it.
         $allSchoolMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
             ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
-            ->with(['item', 'participant.registration.school'])
+            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->get();
+
+        // Same team-roster batch-fetch as $rosterByRegistration above (for the item tab),
+        // scoped to this broader mark set — a group/team item's mark is attached to
+        // whichever performer a judge happened to enter it against, so publicWinnerRow()
+        // needs every co-performer on that registration to list the whole team, not just
+        // that one row.
+        $allSchoolRosterByRegistration = FestParticipant::whereIn(
+            'registration_id',
+            $allSchoolMarks->pluck('participant.registration_id')->filter()->unique()->values()
+        )
+            ->where('participant_role', 'performer')
+            ->with(['student', 'teacher'])
+            ->get()
+            ->groupBy('registration_id');
 
         $participantTypeLabels = ['pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
 
@@ -362,21 +376,22 @@ class FestPortalController extends Controller
             ->unique(fn (FestMark $m) => $m->deduplicationKey())
             ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
             ->map(fn ($group) => $group
-                ->map(function (FestMark $m) use ($event, $categoryColumn, $participantTypeLabels) {
+                ->map(function (FestMark $m) use ($event, $categoryColumn, $participantTypeLabels, $allSchoolRosterByRegistration) {
                     // Splits into (grade points, rank points) per the Kalolsavam Manual's
                     // formula only when those two components actually sum to this mark's
                     // real total — null/null otherwise (a custom rule with no defined
                     // split), in which case only the combined total is shown below.
                     $breakdown = $this->gradePoints->pointsBreakdown($event, $m);
 
-                    return [
+                    // participant/photo/team come from the same publicWinnerRow() helper
+                    // every other tab on this page already uses — one team member's photo
+                    // for an individual item, every co-performer's for a group/team one.
+                    return $this->publicWinnerRow($m, $event, $allSchoolRosterByRegistration) + [
                         'item' => $m->item?->title,
                         'category' => $m->item?->{$categoryColumn}
                             ? $this->scoreboards->categoryLabel($event, $m->item->{$categoryColumn})
                             : 'Uncategorized',
                         'participant_type' => $participantTypeLabels[$m->item?->participant_type] ?? 'Individual',
-                        'position' => $m->position,
-                        'grade' => $m->grade,
                         'grade_points' => $breakdown['grade_points'],
                         'points' => $breakdown['total'],
                     ];

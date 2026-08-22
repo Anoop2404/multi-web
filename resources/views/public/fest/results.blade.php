@@ -200,7 +200,9 @@
                         @forelse($schoolBoard as $row)
                             <tr>
                                 {{-- <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td> --}}
-                                <td class="p-3 font-semibold text-white uppercase">{{ $row['school_name'] }}</td>
+                                <td class="p-3 font-semibold text-white uppercase">
+                                    <button type="button" data-jump-to-school="{{ $row['school_id'] }}" class="hover:text-amber-400 hover:underline text-left">{{ $row['school_name'] }}</button>
+                                </td>
                                 <td class="p-3 text-right font-mono font-bold text-base text-white">{{ $row['total_points'] }}</td>
                                 {{-- <td class="p-3 text-center font-mono {{ $row['gold'] ? 'font-bold text-amber-400' : 'text-white/20' }}">{{ $row['gold'] }}</td> --}}
                                 {{-- <td class="p-3 text-center font-mono {{ $row['silver'] ? 'font-bold text-slate-300' : 'text-white/20' }}">{{ $row['silver'] }}</td> --}}
@@ -242,15 +244,34 @@
                         </div>
                         <ol class="divide-y divide-slate-800">
                             @foreach($row['winners'] as $winner)
+                            @php
+                                // Same roster fallback the Item-wise tab above uses: the
+                                // full team for a group/team item, or a one-person "team"
+                                // built from participant/photo for an individual item.
+                                $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]];
+                                $rosterNames = collect($roster)->pluck('name')->filter()->values();
+                            @endphp
                             <li class="flex items-start gap-3 px-4 py-2.5">
                                 @if($winner['position'] && $winner['position'] <= 3)
                                     <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-6 h-6 shrink-0 mt-0.5">
                                 @else
                                     <span class="w-6 h-6 rounded-full bg-white/5 text-white/40 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">{{ $winner['position'] ? '#'.$winner['position'] : '—' }}</span>
                                 @endif
+                                <div class="flex -space-x-2 shrink-0 mt-0.5">
+                                    @foreach(collect($roster)->take(3) as $member)
+                                        @if($member['photo'] ?? null)
+                                            <img src="{{ $member['photo'] }}" alt="" class="w-6 h-6 rounded-full object-cover object-top border border-slate-900">
+                                        @else
+                                            <span class="w-6 h-6 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-[9px] font-bold border border-slate-900">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
+                                        @endif
+                                    @endforeach
+                                </div>
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm text-white truncate">{{ $winner['item'] }}</p>
                                     <p class="text-[11px] text-white/40 truncate mt-0.5">{{ $winner['category'] }} · {{ $winner['participant_type'] }}</p>
+                                    @if($rosterNames->isNotEmpty())
+                                        <p class="text-[11px] text-white/60 truncate mt-0.5 uppercase">{{ $rosterNames->take(3)->implode(', ') }}{{ $rosterNames->count() > 3 ? ' +'.($rosterNames->count() - 3) : '' }}</p>
+                                    @endif
                                 </div>
                                 @if(!empty($winner['grade']))
                                     <span class="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0 mt-0.5">
@@ -275,8 +296,9 @@
                 const picker = document.getElementById('school-winner-picker');
                 const cards = [...document.querySelectorAll('[data-school-winner-card]')];
                 const empty = document.getElementById('school-winner-empty');
-                picker.addEventListener('change', () => {
-                    const schoolId = picker.value;
+                const section = document.getElementById('school-winners');
+
+                const applyFilter = (schoolId) => {
                     let visible = 0;
                     cards.forEach(card => {
                         const match = !schoolId || card.dataset.schoolId === schoolId;
@@ -284,6 +306,19 @@
                         if (match) visible++;
                     });
                     empty.classList.toggle('hidden', visible !== 0);
+                };
+
+                picker.addEventListener('change', () => applyFilter(picker.value));
+
+                // School names in the ranking table above jump straight to that school's
+                // roster below, instead of making the visitor find it again in the picker.
+                document.querySelectorAll('[data-jump-to-school]').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const schoolId = button.dataset.jumpToSchool;
+                        picker.value = schoolId;
+                        applyFilter(schoolId);
+                        section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
                 });
             })();
             </script>
