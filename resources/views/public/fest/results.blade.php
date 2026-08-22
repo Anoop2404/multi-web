@@ -282,12 +282,12 @@
                             <tbody class="divide-y divide-slate-800">
                                 @forelse($board['rows'] as $row)
                                     <tr>
-                                        <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
+                                        {{-- <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td> --}}
                                         <td class="p-3 text-white uppercase">{{ $row['school_name'] }}</td>
                                         <td class="p-3 text-right font-mono text-white">{{ $row['total_points'] }}</td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="3" class="p-6 text-center text-white/30">No scores yet.</td></tr>
+                                    <tr><td colspan="2" class="p-6 text-center text-white/30">No scores yet.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
