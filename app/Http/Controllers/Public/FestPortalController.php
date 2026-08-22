@@ -346,65 +346,9 @@ class FestPortalController extends Controller
 
         // Per-school results roster — every item that school entered (not just the ones
         // it won), each with its position, grade, and points, so the sum of the listed
-        // rows always agrees with $schoolBoard's official total above rather than only
-        // accounting for the top-3 marks. Deliberately a SEPARATE query from $marks
-        // (which stays top-3-only — it also feeds the item/individual/medal-tally tabs,
-        // where "winners only" is the correct scope), not a reuse of it.
-        $allSchoolMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
-            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
-            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
-            ->get();
-
-        // Same team-roster batch-fetch as $rosterByRegistration above (for the item tab),
-        // scoped to this broader mark set — a group/team item's mark is attached to
-        // whichever performer a judge happened to enter it against, so publicWinnerRow()
-        // needs every co-performer on that registration to list the whole team, not just
-        // that one row.
-        $allSchoolRosterByRegistration = FestParticipant::whereIn(
-            'registration_id',
-            $allSchoolMarks->pluck('participant.registration_id')->filter()->unique()->values()
-        )
-            ->where('participant_role', 'performer')
-            ->with(['student', 'teacher'])
-            ->get()
-            ->groupBy('registration_id');
-
-        $participantTypeLabels = ['pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
-
-        $resultsBySchool = $allSchoolMarks
-            ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
-            ->unique(fn (FestMark $m) => $m->deduplicationKey())
-            ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
-            ->map(fn ($group) => $group
-                ->map(function (FestMark $m) use ($event, $categoryColumn, $participantTypeLabels, $allSchoolRosterByRegistration) {
-                    // Splits into (grade points, rank points) per the Kalolsavam Manual's
-                    // formula only when those two components actually sum to this mark's
-                    // real total — null/null otherwise (a custom rule with no defined
-                    // split), in which case only the combined total is shown below.
-                    $breakdown = $this->gradePoints->pointsBreakdown($event, $m);
-
-                    // participant/photo/team come from the same publicWinnerRow() helper
-                    // every other tab on this page already uses — one team member's photo
-                    // for an individual item, every co-performer's for a group/team one.
-                    return $this->publicWinnerRow($m, $event, $allSchoolRosterByRegistration) + [
-                        'item' => $m->item?->title,
-                        'category' => $m->item?->{$categoryColumn}
-                            ? $this->scoreboards->categoryLabel($event, $m->item->{$categoryColumn})
-                            : 'Uncategorized',
-                        'participant_type' => $participantTypeLabels[$m->item?->participant_type] ?? 'Individual',
-                        'grade_points' => $breakdown['grade_points'],
-                        'points' => $breakdown['total'],
-                    ];
-                })
-                // Category first so items naturally cluster together on screen, then
-                // position/item within each category — mirrors the Item-wise tab's own
-                // category grouping/order above. Sorted on the mapped array (string keys)
-                // rather than the raw FestMark collection — Collection::sortBy()'s
-                // multi-criteria array form only accepts string/dot keys per criterion,
-                // not a closure paired with a direction.
-                ->sortBy([['category', 'asc'], ['position', 'asc'], ['item', 'asc']])
-                ->values()
-                ->all());
+        // rows always agrees with $schoolBoard's official total above. Shared with
+        // schoolResults()'s own dedicated per-school page.
+        $resultsBySchool = $this->schoolResultsRoster($event, $selectedScope, $isPublished);
         $schoolWinnersBoard = collect($schoolBoard)
             ->map(fn (array $row) => $row + ['winners' => $resultsBySchool[$row['school_id']] ?? []])
             ->filter(fn (array $row) => $row['winners'] !== [])
@@ -452,6 +396,109 @@ class FestPortalController extends Controller
             'studentCategoryToppers' => $studentCategoryToppers,
             'pageSeo' => ['title' => $event->title.' — Results'],
         ]);
+    }
+
+    /**
+     * One school's full results roster on its own page — the compact card on the main
+     * results page truncates names and keeps photos small to fit many schools on
+     * screen at once; this gives one school room for full names and larger photos.
+     */
+    public function schoolResults(int $eventId, string $schoolId)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        $selectedScope = $this->operationalEvents->directScope($event);
+        $isPublished = (bool) $selectedScope['results_published'];
+
+        $hasPublishedItems = FestEventItem::whereIn('event_id', $selectedScope['event_ids'] ?? [$event->id])
+            ->whereNotNull('results_published_at')
+            ->exists();
+        abort_unless($event->results_published || $hasPublishedItems, 404);
+
+        $school = Tenant::findOrFail($schoolId);
+
+        [$overallRows] = $this->resolveScoreboard($event, $selectedScope, null, $isPublished);
+        $schoolRow = collect($overallRows)->firstWhere('school_id', $schoolId);
+        abort_unless($schoolRow, 404);
+
+        $roster = $this->schoolResultsRoster($event, $selectedScope, $isPublished)->get($schoolId, []);
+        abort_if($roster === [], 404, 'No results recorded for this school yet.');
+
+        return $this->renderPublic('public.fest.school-results', $tenant, [
+            'event' => $event,
+            'eventContext' => $this->operationalEvents->publicContext($event),
+            'school' => $school,
+            'schoolRow' => $schoolRow,
+            'roster' => $roster,
+            'scopes' => [$selectedScope],
+            'selectedScope' => $selectedScope,
+            'pageSeo' => ['title' => $event->title.' — '.$school->name.' — Results'],
+        ]);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<string, array<int, array<string, mixed>>> roster keyed by school_id
+     */
+    private function schoolResultsRoster(FestEvent $event, array $selectedScope, bool $isPublished): \Illuminate\Support\Collection
+    {
+        $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
+        $participantTypeLabels = ['pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
+
+        // Deliberately a separate query from results()'s own $marks (which stays
+        // top-3-only — it also feeds the item/individual/medal-tally tabs, where
+        // "winners only" is the correct scope), not a reuse of it.
+        $allSchoolMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
+            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->get();
+
+        // Same team-roster batch-fetch as the item tab's own $rosterByRegistration — a
+        // group/team item's mark is attached to whichever performer a judge happened to
+        // enter it against, so publicWinnerRow() needs every co-performer on that
+        // registration to list the whole team, not just that one row.
+        $allSchoolRosterByRegistration = FestParticipant::whereIn(
+            'registration_id',
+            $allSchoolMarks->pluck('participant.registration_id')->filter()->unique()->values()
+        )
+            ->where('participant_role', 'performer')
+            ->with(['student', 'teacher'])
+            ->get()
+            ->groupBy('registration_id');
+
+        return $allSchoolMarks
+            ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
+            ->unique(fn (FestMark $m) => $m->deduplicationKey())
+            ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
+            ->map(fn ($group) => $group
+                ->map(function (FestMark $m) use ($event, $categoryColumn, $participantTypeLabels, $allSchoolRosterByRegistration) {
+                    // Splits into (grade points, rank points) per the Kalolsavam Manual's
+                    // formula only when those two components actually sum to this mark's
+                    // real total — null/null otherwise (a custom rule with no defined
+                    // split), in which case only the combined total is shown below.
+                    $breakdown = $this->gradePoints->pointsBreakdown($event, $m);
+
+                    // participant/photo/team come from the same publicWinnerRow() helper
+                    // every other tab on this page already uses — one team member's photo
+                    // for an individual item, every co-performer's for a group/team one.
+                    return $this->publicWinnerRow($m, $event, $allSchoolRosterByRegistration) + [
+                        'item' => $m->item?->title,
+                        'category' => $m->item?->{$categoryColumn}
+                            ? $this->scoreboards->categoryLabel($event, $m->item->{$categoryColumn})
+                            : 'Uncategorized',
+                        'participant_type' => $participantTypeLabels[$m->item?->participant_type] ?? 'Individual',
+                        'grade_points' => $breakdown['grade_points'],
+                        'points' => $breakdown['total'],
+                    ];
+                })
+                // Category first so items naturally cluster together on screen, then
+                // position/item within each category — mirrors the Item-wise tab's own
+                // category grouping/order above. Sorted on the mapped array (string keys)
+                // rather than the raw FestMark collection — Collection::sortBy()'s
+                // multi-criteria array form only accepts string/dot keys per criterion,
+                // not a closure paired with a direction.
+                ->sortBy([['category', 'asc'], ['position', 'asc'], ['item', 'asc']])
+                ->values()
+                ->all());
     }
 
     public function schedule(Request $request, int $eventId)

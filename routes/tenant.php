@@ -72,6 +72,7 @@ Route::middleware([
         Route::get('/{event}', [FestPortalController::class, 'show'])->name('show');
         Route::get('/{event}/schedule', [FestPortalController::class, 'schedule'])->name('schedule');
         Route::get('/{event}/results', [FestPortalController::class, 'results'])->name('results');
+        Route::get('/{event}/results/schools/{school}', [FestPortalController::class, 'schoolResults'])->name('results.school');
         Route::get('/{event}/items/{item}', [FestPortalController::class, 'itemSchedule'])->name('item-schedule');
         Route::get('/{event}/items/{item}/results', [FestPortalController::class, 'itemResults'])->name('item-results');
         Route::get('/{event}/items/{item}/results.pdf', [FestPortalController::class, 'itemResultsPdf'])->name('item-results.pdf');

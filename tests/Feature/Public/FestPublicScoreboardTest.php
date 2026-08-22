@@ -228,6 +228,49 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertSeeInOrder(['North Poetry', '10'], false);
     }
 
+    public function test_ranking_table_has_an_eye_link_to_the_school_detail_page(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
+
+        $response->assertOk();
+        $response->assertSee("/fest/{$this->north->id}/results/schools/{$this->northSchool->id}", false);
+    }
+
+    public function test_school_detail_page_shows_the_full_roster_with_larger_photos(): void
+    {
+        $schoolClass = SchoolClass::create(['tenant_id' => $this->northSchool->id, 'name' => '8']);
+        $student = Student::create(['tenant_id' => $this->northSchool->id, 'school_class_id' => $schoolClass->id, 'name' => 'Anjali Menon']);
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'North Poetry', 'category' => 'literary',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+        ]);
+        $registration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+        $participant = FestParticipant::create([
+            'registration_id' => $registration->id, 'event_id' => $this->north->id,
+            'participant_type' => 'student', 'student_id' => $student->id,
+        ]);
+        FestMark::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 80]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results/schools/{$this->northSchool->id}");
+
+        $response->assertOk();
+        // page-hero's <h1> renders the title server-side uppercased, like the rest of
+        // this page's headings.
+        $response->assertSee('NORTH STAR SCHOOL');
+        $response->assertSee('North Poetry');
+        $response->assertSee('Anjali Menon');
+        $response->assertSee('← Back to all schools', false);
+    }
+
+    public function test_school_detail_page_404s_for_a_school_with_no_results(): void
+    {
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results/schools/{$this->southSchool->id}");
+
+        $response->assertNotFound();
+    }
+
     public function test_school_results_roster_shows_category_and_type_ordered_by_category(): void
     {
         // Position 1 but in a category that sorts AFTER the other item's category —

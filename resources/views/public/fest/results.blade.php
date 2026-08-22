@@ -191,6 +191,7 @@
                             {{-- <th class="p-3">Rank</th> --}}
                             <th class="p-3">School</th>
                             <th class="p-3 text-right">Points</th>
+                            <th class="p-3 w-10"><span class="sr-only">View full roster</span></th>
                             {{-- <th class="p-3 text-center" title="Gold — 1st place finishes"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold" class="w-5 h-5 inline-block"></th> --}}
                             {{-- <th class="p-3 text-center" title="Silver — 2nd place finishes"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Silver" class="w-5 h-5 inline-block"></th> --}}
                             {{-- <th class="p-3 text-center" title="Bronze — 3rd place finishes"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Bronze" class="w-5 h-5 inline-block"></th> --}}
@@ -204,12 +205,22 @@
                                     <button type="button" data-jump-to-school="{{ $row['school_id'] }}" class="hover:text-amber-400 hover:underline text-left">{{ $row['school_name'] }}</button>
                                 </td>
                                 <td class="p-3 text-right font-mono font-bold text-base text-white">{{ $row['total_points'] }}</td>
+                                <td class="p-3 text-right">
+                                    <a href="{{ route('tenant.fest.results.school', ['event' => $event->id, 'school' => $row['school_id']]) }}"
+                                       title="View {{ $row['school_name'] }}'s full roster" aria-label="View {{ $row['school_name'] }}'s full roster"
+                                       class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white/40 hover:text-amber-400 hover:bg-white/5 transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                    </a>
+                                </td>
                                 {{-- <td class="p-3 text-center font-mono {{ $row['gold'] ? 'font-bold text-amber-400' : 'text-white/20' }}">{{ $row['gold'] }}</td> --}}
                                 {{-- <td class="p-3 text-center font-mono {{ $row['silver'] ? 'font-bold text-slate-300' : 'text-white/20' }}">{{ $row['silver'] }}</td> --}}
                                 {{-- <td class="p-3 text-center font-mono {{ $row['bronze'] ? 'font-bold text-orange-400' : 'text-white/20' }}">{{ $row['bronze'] }}</td> --}}
                             </tr>
                         @empty
-                            <tr><td colspan="2" class="p-8 text-center text-white/30">No school points published yet.</td></tr>
+                            <tr><td colspan="3" class="p-8 text-center text-white/30">No school points published yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
