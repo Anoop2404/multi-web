@@ -19,9 +19,10 @@ class FestCertificateController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->whereIn('event_id', $event->reportableEventIds()))
-            ->pluck('id');
+        $participantIds = FestParticipant::where(function ($q) use ($event) {
+            $q->whereIn('event_id', $event->reportableEventIds())
+              ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+        })->pluck('id');
 
         $service = app(FestCertificateService::class);
         $certificates = Certificate::where('entity_type', FestParticipant::class)
@@ -234,11 +235,16 @@ class FestCertificateController extends SahodayaAdminController
         ?int $schoolId = null,
         ?string $certType = null
     ): \Illuminate\Support\Collection {
-        $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->whereIn('event_id', $event->reportableEventIds())
-            ->when($itemId, fn ($sq) => $sq->where('item_id', $itemId))
-            ->when($schoolId, fn ($sq) => $sq->where('school_id', $schoolId)))
-            ->pluck('id');
+        $participantIds = FestParticipant::where(function ($q) use ($event) {
+            $q->whereIn('event_id', $event->reportableEventIds())
+              ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+        })
+        ->when($itemId, fn ($q) => $q->where(function ($iq) use ($itemId) {
+            $iq->whereHas('registration', fn ($rq) => $rq->where('item_id', $itemId))
+               ->orWhereHas('mark', fn ($mq) => $mq->where('item_id', $itemId));
+        }))
+        ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
+        ->pluck('id');
 
         $certificates = Certificate::where('entity_type', FestParticipant::class)
             ->whereIn('entity_id', $participantIds)
