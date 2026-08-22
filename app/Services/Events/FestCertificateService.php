@@ -56,6 +56,10 @@ class FestCertificateService
                 ]
             );
 
+            if ($template && $cert->template_id !== $template->id) {
+                $cert->update(['template_id' => $template->id]);
+            }
+
             $created[] = $cert;
         }
 
@@ -385,11 +389,21 @@ class FestCertificateService
 
         $sahodaya = $event ? Tenant::find($event->tenant_id) : null;
 
-        $templateCacheKey = $event ? $event->id.':'.($itemId ?? '0').':'.$certificate->cert_type : null;
+        $templateCacheKey = $certificate->template_id
+            ? 'id:'.$certificate->template_id
+            : ($event ? $event->id.':'.($itemId ?? '0').':'.$certificate->cert_type : null);
+
         if ($templateCacheKey !== null && array_key_exists($templateCacheKey, $templateCache)) {
             $template = $templateCache[$templateCacheKey];
         } else {
-            $template = $event ? $this->resolveTemplate($event, $itemId, $certificate->cert_type) : null;
+            $template = $certificate->template_id
+                ? CertificateTemplate::where('tenant_id', $sahodaya?->id)->find($certificate->template_id)
+                : null;
+
+            if (! $template && $event) {
+                $template = $this->resolveTemplate($event, $itemId, $certificate->cert_type);
+            }
+
             if ($templateCacheKey !== null) {
                 $templateCache[$templateCacheKey] = $template;
             }
