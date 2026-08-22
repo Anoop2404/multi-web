@@ -782,6 +782,18 @@ class FestEventReportAnalyticsService
             ->whereIn('fest_registrations.item_id', $itemIds)
             ->where('fest_registrations.status', 'approved')
             ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+            // A participant marked absent for this specific item isn't expected to
+            // perform — excluded from the denominator the same way disqualified/standby
+            // already are above. Without this, an item with any absent participant can
+            // never reach 100% marks-entered (there's nothing to score for someone who
+            // didn't show up), permanently blocking that item's publish.
+            ->whereNotExists(function ($query) {
+                $query->select('id')
+                    ->from('fest_attendance')
+                    ->whereColumn('fest_attendance.item_id', 'fest_registrations.item_id')
+                    ->whereColumn('fest_attendance.participant_id', 'fest_participants.id')
+                    ->where('fest_attendance.status', 'absent');
+            })
             ->selectRaw('
                 fest_registrations.item_id as item_id,
                 count(*) as performers,
