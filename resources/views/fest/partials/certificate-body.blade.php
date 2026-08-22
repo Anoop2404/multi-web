@@ -70,15 +70,6 @@
                     @if($boldVariables)<strong>Date :</strong> <strong>{{ $dateValue }}</strong>@else Date : {{ $dateValue }}@endif
                 </div>
             @endif
-
-            @php $u = $layout['uuid'] ?? []; @endphp
-            <div class="overlay-field uuid" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($u, ['top' => 92, 'left' => 5, 'width' => 90, 'font_size' => 8, 'font_family' => 'Arial']) }}">
-                Verification: {{ $certificate->verification_uuid ?? 'Not yet issued' }}
-            </div>
-
-            @if(($layout['show_qr'] ?? true) && !empty($qr_src))
-                <div class="qr-box"><img src="{{ $qr_src }}" alt="Verify QR" width="70" height="70"></div>
-            @endif
         </div>
     @else
         @php
@@ -146,12 +137,6 @@
                     </div>
                 @endforeach
             </div>
-
-            @if(($layout['show_qr'] ?? true) && !empty($qr_src))
-                <div class="qr-box"><img src="{{ $qr_src }}" alt="Verify QR" width="70" height="70"></div>
-            @endif
-
-            <p class="uuid">Verification: {{ $certificate->verification_uuid ?? 'Not yet issued' }}</p>
         </div>
     @endif
 @else
@@ -187,9 +172,7 @@
             <p class="detail">has participated and achieved this distinction.</p>
             @endif
         </div>
-        @if(!empty($qr_src))<div style="position:absolute;bottom:2rem;right:3rem;"><img src="{{ $qr_src }}" alt="Verify QR" width="80" height="80"></div>@endif
         <div class="meta">
-            <span>ID: {{ $certificate->verification_uuid }}</span>
             <span>{{ $certificate->generated_at?->format('d M Y') ?? now()->format('d M Y') }}</span>
         </div>
     </div>
