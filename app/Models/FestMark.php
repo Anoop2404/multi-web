@@ -44,14 +44,14 @@ class FestMark extends Model
             return 'grp:' . $p->group_id;
         }
 
-        $schoolId = $p?->registration?->school_id ?? $p?->school_id;
-        if ($isNonIndividual && $schoolId && $this->item_id) {
-            $chest = $p?->group?->chest_no ?? $p?->chest_no ?? '1';
-            return 'team:' . $this->item_id . ':' . $schoolId . ':' . $chest;
+        if ($p?->registration_id) {
+            return 'reg:' . $p->registration_id;
         }
 
-        if ($p?->registration_id && ! $isNonIndividual) {
-            return 'reg:' . $p->registration_id;
+        $schoolId = $p?->registration?->school_id ?? $p?->school_id;
+        if ($isNonIndividual && $schoolId && $this->item_id) {
+            $chest = $p?->group?->chest_no ?? $p?->chest_no ?? '';
+            return 'team:' . $this->item_id . ':' . $schoolId . ($chest !== '' ? (':' . $chest) : '');
         }
 
         return 'mark:' . $this->id;
