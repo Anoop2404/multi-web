@@ -20,16 +20,22 @@ use Illuminate\Support\Str;
 class FestCertificateService
 {
     /** @return list<Certificate> */
-    public function generateForEvent(FestEvent $event): array
+    public function generateForEvent(FestEvent $event, ?int $itemId = null): array
     {
         if ($event->usesPhasedRegionalBilling()) {
             abort_if(! $event->parent_event_id || ! $event->source_phase_id, 422, 'Generate certificates from a published operational phase/region event.');
-            abort_unless($event->results_published, 422, 'Publish this phase/region before generating certificates.');
+            if (! $event->results_published && ! $itemId) {
+                $hasPublishedItems = FestEventItem::whereIn('event_id', $event->reportableEventIds())
+                    ->whereNotNull('results_published_at')
+                    ->exists();
+                abort_unless($hasPublishedItems, 422, 'Publish item results or release phase/region results before generating certificates.');
+            }
         }
 
         $created = [];
 
         $marks = FestMark::whereIn('event_id', $event->reportableEventIds())
+            ->when($itemId, fn ($q) => $q->where('item_id', $itemId))
             ->whereNotNull('position')
             ->where('position', '<=', 3)
             ->with(['participant.student', 'participant.registration.item'])
@@ -50,7 +56,7 @@ class FestCertificateService
                     'cert_type'   => 'winner',
                 ],
                 [
-                    'template_id'        => $template?->id,
+                    'template_id'       => $template?->id,
                     'verification_uuid' => (string) Str::uuid(),
                     'generated_at'      => now(),
                 ]

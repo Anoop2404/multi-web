@@ -6,6 +6,7 @@ use App\Support\FestPageActivity;
 use App\Support\PdfGenerator;
 use App\Models\Certificate;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestCertificateService;
@@ -42,9 +43,21 @@ class FestCertificateController extends SahodayaAdminController
             $payloads->get($c->id) ?? []
         ));
 
+        $publishedItems = FestEventItem::whereIn('event_id', $event->reportableEventIds())
+            ->whereNotNull('results_published_at')
+            ->orderBy('title')
+            ->get(['id', 'title', 'item_code'])
+            ->map(fn ($item) => [
+                'id'        => $item->id,
+                'title'     => $item->title,
+                'item_code' => $item->item_code,
+            ])
+            ->values();
+
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event'           => $event,
             'certificates'    => $certificates,
+            'publishedItems'  => $publishedItems,
             'winnersByItem'   => $this->winnersByItem($certificates, $event),
             'winnersBySchool' => $this->winnersBySchool($certificates, $event),
         ]));
@@ -130,14 +143,16 @@ class FestCertificateController extends SahodayaAdminController
         ]));
     }
 
-    public function generate(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    public function generate(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $created = app(FestCertificateService::class)->generateForEvent($event);
+        $itemId = $request->input('item_id') ? (int) $request->input('item_id') : null;
+        $created = app(FestCertificateService::class)->generateForEvent($event, $itemId);
 
         $audit->festEvent($event, FestPageActivity::CERTIFICATES, 'fest.certificates.generated', count($created).' certificate(s) generated', [
-            'count' => count($created),
+            'count'   => count($created),
+            'item_id' => $itemId,
         ]);
 
         try {

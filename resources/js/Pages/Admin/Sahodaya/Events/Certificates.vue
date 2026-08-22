@@ -4,7 +4,17 @@
         <PageHeader :title="`${event.title} — Certificates`" eyebrow="Operations"
                     description="Generate and manage participant certificates." />
         <div class="mb-4 flex flex-wrap items-center gap-2">
-            <button @click="generate" class="btn-primary">Generate for top 3</button>
+            <div class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded p-1">
+                <select v-if="publishedItems.length" v-model="selectedItemId" class="text-xs py-1.5 px-2.5 rounded border-gray-300 bg-white shadow-sm focus:ring-1 focus:ring-indigo-500 max-w-[240px] truncate">
+                    <option :value="null">All items</option>
+                    <option v-for="item in publishedItems" :key="item.id" :value="item.id">
+                        {{ item.item_code ? `[${item.item_code}] ` : '' }}{{ item.title }}
+                    </option>
+                </select>
+                <button @click="generate(selectedItemId)" class="btn-primary py-1.5 px-3 text-xs shrink-0">
+                    🏆 Generate top 3 {{ selectedItemId ? 'for selected item' : '' }}
+                </button>
+            </div>
             <button @click="generateParticipation" class="btn-secondary">Generate participation certificates</button>
             <a v-if="certificates.length" :href="downloadZipUrl" class="btn-secondary">Download all (ZIP)</a>
             <a v-if="winnersByItem.length" :href="downloadPublishedZipUrl" class="btn-secondary">Download published winners (ZIP)</a>
@@ -79,14 +89,18 @@
                     </div>
 
                     <div class="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                        <button @click="generate(group.item_id)"
+                                class="text-xs font-semibold text-amber-700 hover:text-amber-900 flex items-center gap-1">
+                            ⚡ Generate Certs
+                        </button>
                         <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?item_id=${group.item_id}&cert_type=winner${plainMode ? '&plain=1' : ''}`"
                            target="_blank"
                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                            🖨️ Print Item ↗
+                            🖨️ Print ↗
                         </a>
                         <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip?item_id=${group.item_id}&cert_type=winner${plainMode ? '&plain=1' : ''}`"
                            class="text-xs font-semibold text-gray-600 hover:text-gray-800 flex items-center gap-1">
-                            📦 Download ZIP
+                            📦 ZIP
                         </a>
                     </div>
                 </div>
@@ -148,33 +162,32 @@
             </div>
         </div>
 
-        <!-- TAB 3: All Certificates List -->
-        <div v-if="activeTab === 'all'">
-            <ul class="card-list">
-                <li v-for="c in certificates" :key="c.id" class="p-4 flex flex-wrap gap-2 justify-between items-center text-sm">
-                    <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <p class="font-medium text-gray-900">{{ c.student?.name ?? 'Participant' }}</p>
-                            <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                                  :class="c.cert_type === 'winner'
-                                      ? 'bg-amber-100 text-amber-800'
-                                      : 'bg-sky-100 text-sky-800'">
+        <!-- TAB 3: All Certificates -->
+        <div v-if="activeTab === 'all'" class="card p-4">
+            <div v-if="certificates.length" class="divide-y divide-gray-100">
+                <div v-for="c in certificates" :key="c.id" class="py-3 flex items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-sm text-gray-900">{{ c.student?.name ?? c.participant?.student?.name ?? 'Participant' }}</span>
+                            <span class="text-[11px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider"
+                                  :class="c.cert_type === 'winner' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'">
                                 {{ certificateTypeLabel(c.cert_type) }}
                             </span>
                         </div>
-                        <p class="text-gray-500 text-xs">
-                            {{ c.item?.title }}
-                            <template v-if="c.cert_type === 'winner'"> · Position {{ c.mark?.position ?? '—' }}</template>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            {{ c.item?.title ?? 'Event Participant' }}
                         </p>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <a :href="`/certificates/verify/${c.uuid}`" target="_blank" class="text-indigo-600 text-xs font-medium">Verify ↗</a>
-                        <a :href="`/certificates/print/${c.uuid}?preview=1${plainMode ? '&plain=1' : ''}`" target="_blank" class="text-gray-600 text-xs font-medium">Preview ↗</a>
-                        <a :href="`/certificates/print/${c.uuid}${plainMode ? '?plain=1' : ''}`" target="_blank" class="text-gray-600 text-xs font-medium">Print ↗</a>
+                    <div class="flex items-center gap-3 text-xs">
+                        <a :href="`/certificates/verify/${c.uuid}`" target="_blank" class="text-gray-500 hover:text-gray-700">Verify ↗</a>
+                        <a :href="`/certificates/print/${c.uuid}?preview=1`" target="_blank" class="text-gray-500 hover:text-gray-700">Preview ↗</a>
+                        <a :href="`/certificates/print/${c.uuid}${plainMode ? '?plain=1' : ''}`" target="_blank" class="font-semibold text-indigo-600 hover:underline">Print ↗</a>
                     </div>
-                </li>
-                <li v-if="!certificates.length" class="p-4 text-gray-400 text-sm">No certificates yet. Publish results or click Generate.</li>
-            </ul>
+                </div>
+            </div>
+            <div v-else class="text-center text-gray-500 text-sm py-8">
+                No certificates generated yet. Click "Generate for top 3" or "Generate participation certificates" above.
+            </div>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
@@ -190,6 +203,7 @@ import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, certificates: Array,
+    publishedItems: { type: Array, default: () => [] },
     winnersByItem: { type: Array, default: () => [] },
     winnersBySchool: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
@@ -197,6 +211,7 @@ const props = defineProps({
 
 const activeTab = ref('winners_item');
 const plainMode = ref(false);
+const selectedItemId = ref(null);
 
 const downloadZipUrl = computed(() =>
     `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip${plainMode.value ? '?plain=1' : ''}`);
@@ -208,8 +223,10 @@ const downloadPublishedZipUrl = computed(() => {
 const printAllUrl = computed(() =>
     `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/print-all${plainMode.value ? '?plain=1' : ''}`);
 
-function generate() {
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/generate`, {}, { preserveScroll: true });
+function generate(itemId = null) {
+    const targetId = itemId || selectedItemId.value;
+    const payload = targetId ? { item_id: targetId } : {};
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/generate`, payload, { preserveScroll: true });
 }
 
 function generateParticipation() {
