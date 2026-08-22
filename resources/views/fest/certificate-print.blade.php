@@ -119,14 +119,20 @@
             }
             .no-print, .actions-bar { display: none !important; }
             .cert-viewport { padding: 0 !important; margin: 0 !important; display: block !important; }
+            .page,
+            .page.has-background,
+            .page.has-background.portrait {
+                transform: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
             .page.has-background {
                 width: 297mm !important;
                 height: 210mm !important;
                 min-height: 210mm !important;
                 max-width: 297mm !important;
                 max-height: 210mm !important;
-                margin: 0 !important;
-                box-shadow: none !important;
                 page-break-after: always;
                 break-after: page;
             }
@@ -136,8 +142,6 @@
                 min-height: 297mm !important;
                 max-width: 210mm !important;
                 max-height: 297mm !important;
-                margin: 0 !important;
-                box-shadow: none !important;
                 page-break-after: always;
                 break-after: page;
             }
@@ -172,7 +176,6 @@
         @include('fest.partials.certificate-body')
     </div>
 
-@if(!empty($isSample))
     <script>
         (function () {
             function fitToScreen() {
@@ -192,8 +195,15 @@
             }
             window.addEventListener('load', fitToScreen);
             window.addEventListener('resize', fitToScreen);
+            window.addEventListener('beforeprint', function () {
+                var page = document.querySelector('.page');
+                if (page) {
+                    page.style.transform = 'none';
+                    page.style.marginBottom = '0px';
+                }
+            });
+            window.addEventListener('afterprint', fitToScreen);
         })();
     </script>
-@endif
 </body>
 </html>

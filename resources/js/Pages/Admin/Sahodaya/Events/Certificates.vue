@@ -34,7 +34,7 @@
                             </span>
                             <span class="flex items-center gap-2 shrink-0">
                                 <a :href="`/certificates/verify/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium">Verify ↗</a>
-                                <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-gray-600 font-medium">Print ↗</a>
+                                <a :href="`/certificates/print/${w.uuid}${plainMode ? '?plain=1' : ''}`" target="_blank" class="text-gray-600 font-medium">Print ↗</a>
                             </span>
                         </li>
                     </ul>
@@ -60,8 +60,8 @@
                     </p>
                 </div>
                 <a :href="`/certificates/verify/${c.uuid}`" target="_blank" class="text-indigo-600 text-xs font-medium mr-3">Verify ↗</a>
-                <a :href="`/certificates/print/${c.uuid}?preview=1`" target="_blank" class="text-gray-600 text-xs font-medium mr-3">Preview ↗</a>
-                <a :href="`/certificates/print/${c.uuid}`" target="_blank" class="text-gray-600 text-xs font-medium">Print ↗</a>
+                <a :href="`/certificates/print/${c.uuid}?preview=1${plainMode ? '&plain=1' : ''}`" target="_blank" class="text-gray-600 text-xs font-medium mr-3">Preview ↗</a>
+                <a :href="`/certificates/print/${c.uuid}${plainMode ? '?plain=1' : ''}`" target="_blank" class="text-gray-600 text-xs font-medium">Print ↗</a>
             </li>
             <li v-if="!certificates.length" class="p-4 text-gray-400 text-sm">No certificates yet. Publish results or click Generate.</li>
         </ul>

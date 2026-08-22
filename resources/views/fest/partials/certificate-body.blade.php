@@ -39,20 +39,6 @@
 
     @if($hasBackground)
         <div class="page has-background {{ $__orientation === 'portrait' ? 'portrait' : '' }}" style="background-image:url('{{ $backgroundUrl }}');">
-            {{-- Sahodaya branding is otherwise entirely dependent on the uploaded
-                 background image, which may not carry any logo/name of its own.
-                 Keep a small, unobtrusive overlay so branding is always present —
-                 unless the template's own background already has real branding baked
-                 in (show_logo_overlay:false), where this would just duplicate it. --}}
-            @if(($layout['show_logo_overlay'] ?? true) && (!empty($logoUrl) || !empty($sahodaya?->name)))
-                <div class="logo-overlay">
-                    @if(!empty($logoUrl))
-                        <img src="{{ $logoUrl }}" alt="">
-                    @endif
-                    <span>{{ $fieldValues['sahodaya_name'] ?? ($sahodaya->name ?? '') }}</span>
-                </div>
-            @endif
-
             @if(($layout['show_photo'] ?? false) && !empty($photoUrl))
                 @php $ph = $layout['photo'] ?? []; @endphp
                 <img class="overlay-photo" src="{{ $photoUrl }}" alt=""
