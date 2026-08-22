@@ -426,9 +426,7 @@ const rankOptions = computed(() => [
 function computeAutoGrade(score, item) {
     if (score === null || score === undefined || score === '' || isNaN(score)) return '';
     const num = Number(score);
-    const jCount = props.judgeCount && props.judgeCount > 0 ? props.judgeCount : 1;
-    const maxMarksPerJudge = item?.total_marks ? Number(item.total_marks) : 100;
-    const maxPossibleMarks = maxMarksPerJudge * jCount;
+    const maxPossibleMarks = item?.total_marks ? Number(item.total_marks) : 100;
     const percent = maxPossibleMarks > 0 ? (num / maxPossibleMarks) * 100 : num;
 
     const rules = props.gradeRules ?? [];

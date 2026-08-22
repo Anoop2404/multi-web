@@ -82,9 +82,7 @@ class FestGradePointService
         }
 
         $itemModel = $itemId ? FestEventItem::find($itemId) : null;
-        $judgeCount = $itemModel ? app(FestMarkCriteriaService::class)->judgeCountForItem($itemModel) : 1;
-        $totalMarksPerJudge = (float) ($itemModel?->total_marks ?? 100.0);
-        $maxPossibleMarks = $totalMarksPerJudge * max(1, $judgeCount);
+        $maxPossibleMarks = (float) ($itemModel?->total_marks ?? 100.0);
 
         $configs = FestGradeConfig::where('event_id', $event->id)
             ->where(function ($q) use ($itemId) {
