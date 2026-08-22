@@ -50,10 +50,10 @@ class FestMarkSaveService
             }
         }
 
-        if (! empty($data['score']) && empty($data['grade'])) {
+        if (isset($data['score']) && $data['score'] !== null && $data['score'] !== '') {
             $data['grade'] = $this->gradePointService->resolveGradeFromScore(
                 $event,
-                $data['item_id'],
+                (int) $data['item_id'],
                 (float) $data['score']
             );
         }
