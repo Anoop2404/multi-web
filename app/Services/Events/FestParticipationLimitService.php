@@ -8,6 +8,7 @@ use App\Models\FestItemHead;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\Student;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Support\Collection;
 
 class FestParticipationLimitService
@@ -43,7 +44,7 @@ class FestParticipationLimitService
             return ['on_stage' => false, 'off_stage' => false, 'group' => false];
         }
 
-        $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+        $isGroup = $item->isTeamItem();
 
         return [
             'on_stage' => ! $isGroup && ($item->stage_type ?? '') === 'on_stage',
@@ -184,7 +185,7 @@ class FestParticipationLimitService
                 ->whereIn('status', $statuses)
                 ->whereHas('item', fn ($q) => $q
                     ->where('head_id', $head->id)
-                    ->whereIn('participant_type', ['team', 'group']))
+                    ->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES))
                 ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
                 ->count();
 
@@ -206,7 +207,7 @@ class FestParticipationLimitService
                 ->where('head_id', $head->id)
                 ->where(function ($q) {
                     $q->whereNull('participant_type')
-                        ->orWhereNotIn('participant_type', ['team', 'group']);
+                        ->orWhereNotIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES);
                 }))
             ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
             ->count();
@@ -297,7 +298,7 @@ class FestParticipationLimitService
                 ->whereIn('status', $statuses)
                 ->whereHas('item', fn ($q) => $q
                     ->where('head_id', $head->id)
-                    ->whereIn('participant_type', ['team', 'group']))
+                    ->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES))
                 ->count();
 
             return $teamCount >= $maxTeams;
@@ -314,7 +315,7 @@ class FestParticipationLimitService
                 ->where('head_id', $head->id)
                 ->where(function ($q) {
                     $q->whereNull('participant_type')
-                        ->orWhereNotIn('participant_type', ['team', 'group']);
+                        ->orWhereNotIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES);
                 }))
             ->count();
 

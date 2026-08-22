@@ -7,6 +7,7 @@ use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Support\FestSportsAgeGroup;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Support\Collection;
 
 class FestItemFeeResolver
@@ -75,7 +76,7 @@ class FestItemFeeResolver
         // fee_amount override and before the area/head/participant-type-fee fallbacks below
         // — see groupItemSurchargeAmount() doc comment.
         $earlyParticipantType = $item?->participant_type ?? 'individual';
-        if (in_array($earlyParticipantType, ['group', 'team'], true)) {
+        if (FestTeamSquadRules::isMultiPerson($earlyParticipantType)) {
             $groupFee = $this->groupItemSurchargeAmount($item, $schedule, $registration);
             if ($groupFee !== null) {
                 return $groupFee;
@@ -110,7 +111,7 @@ class FestItemFeeResolver
         }
 
         $participantType = $item?->participant_type ?? 'individual';
-        if (in_array($participantType, ['group', 'team'], true)) {
+        if (FestTeamSquadRules::isMultiPerson($participantType)) {
             $typeFees = $schedule['participant_type_fees'] ?? [];
             if (isset($typeFees[$participantType]) && $typeFees[$participantType] !== '') {
                 return (float) $typeFees[$participantType];

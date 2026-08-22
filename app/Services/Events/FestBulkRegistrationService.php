@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestRegistration;
 use App\Models\Tenant;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Validation\ValidationException;
 
 class FestBulkRegistrationService
@@ -70,7 +71,7 @@ class FestBulkRegistrationService
 
             $standbys = array_values(array_unique($standbysByItem[$itemId] ?? []));
 
-            if (in_array($item->participant_type, ['group', 'team'], true)) {
+            if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
                 try {
                     $this->createService->createForSchool(
                         $event,

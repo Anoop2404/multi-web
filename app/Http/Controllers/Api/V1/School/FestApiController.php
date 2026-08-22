@@ -15,6 +15,7 @@ use App\Services\Events\FestRegistrationEligibilityService;
 use App\Services\Events\FestRegistrationImportService;
 use App\Services\Events\FestRegistrationService;
 use App\Services\Events\FestSchoolEventFeeService;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Http\Request;
 
 class FestApiController extends SchoolApiController
@@ -131,7 +132,7 @@ class FestApiController extends SchoolApiController
     private function storeTeacherRegistration(FestEvent $event, FestEventItem $item, array $data)
     {
         $teacherIds = array_values(array_unique($data['teacher_ids'] ?? []));
-        if (count($teacherIds) > 1 && ! in_array($item->participant_type, ['group', 'team'], true)) {
+        if (count($teacherIds) > 1 && ! FestTeamSquadRules::isMultiPerson($item->participant_type)) {
             abort(422, 'This item allows only one teacher.');
         }
 

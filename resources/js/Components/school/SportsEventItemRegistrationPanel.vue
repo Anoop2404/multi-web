@@ -595,7 +595,7 @@ function updateItem(item) {
     const form = itemForms[key];
     delete itemErrors[key];
 
-    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
+    if (!['team', 'group', 'pair', 'trio'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
         itemErrors[key] = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
         return;
     }
@@ -631,7 +631,7 @@ function submitItem(item) {
         itemErrors[key] = itemBlockReason(item);
         return;
     }
-    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
+    if (!['team', 'group', 'pair', 'trio'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
         itemErrors[key] = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
         return;
     }

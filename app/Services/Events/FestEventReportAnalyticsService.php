@@ -19,6 +19,7 @@ use App\Models\Tenant;
 use App\Support\ExcelExport;
 use App\Support\FestIdCardTemplates;
 use App\Services\Events\FestIdCardService;
+use App\Support\FestTeamSquadRules;
 use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -1218,7 +1219,7 @@ class FestEventReportAnalyticsService
     public function teamSquadRows(?string $schoolId = null): array
     {
         $teamItems = FestEventItem::whereIn('event_id', $this->eventIds())
-            ->whereIn('participant_type', ['team', 'group'])
+            ->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)
             ->orderBy('title')
             ->get();
 
@@ -1810,6 +1811,71 @@ class FestEventReportAnalyticsService
                 'score'       => $p->mark?->score,
                 'status'      => $p->registration?->status,
             ])
+            ->all();
+    }
+
+    /**
+     * Enabled items grouped by category (class_group for non-sports events, age_group
+     * for sports) — same column PublicFestScoreboardService::categories() groups by, so
+     * this report's category tabs line up with what the public scoreboard shows.
+     *
+     * @return array<string, list<array<string, mixed>>> category key => items
+     */
+    public function categoryWiseItemRows(): array
+    {
+        $root = $this->event->rootEvent();
+        $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
+
+        $items = FestEventItem::whereIn('event_id', $this->eventIds())
+            ->where('is_enabled', true)
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->get(['id', 'title', 'item_code', 'participant_type', $column]);
+
+        return $items
+            ->groupBy(fn (FestEventItem $item) => $item->{$column} ?: 'open')
+            ->map(fn ($group) => $group->map(fn (FestEventItem $item) => [
+                'id'               => $item->id,
+                'title'            => $item->title,
+                'item_code'        => $item->item_code,
+                'participant_type' => $item->participant_type,
+            ])->values()->all())
+            ->all();
+    }
+
+    /**
+     * Per-participant rank/grade points breakdown for one item — powers the
+     * Category-wise Points report's eye-icon detail view.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function itemPointsBreakdownRows(int $itemId): array
+    {
+        $gradePoints = app(FestGradePointService::class);
+
+        return FestMark::whereIn('event_id', $this->eventIds())
+            ->where('item_id', $itemId)
+            ->with(['participant.student', 'participant.teacher', 'participant.registration.school', 'item'])
+            ->orderBy('position')
+            ->orderByDesc('score')
+            ->get()
+            ->unique(fn (FestMark $m) => $m->deduplicationKey())
+            ->map(function (FestMark $mark) use ($gradePoints) {
+                $breakdown = $gradePoints->pointsBreakdown($this->event, $mark);
+                $participant = $mark->participant;
+                $person = $participant?->student ?? $participant?->teacher;
+
+                return [
+                    'participant'  => $person?->name,
+                    'school'       => $participant?->registration?->school?->name,
+                    'position'     => $mark->position,
+                    'grade'        => $mark->grade,
+                    'rank_points'  => $breakdown['rank_points'],
+                    'grade_points' => $breakdown['grade_points'],
+                    'total'        => $breakdown['total'],
+                ];
+            })
+            ->values()
             ->all();
     }
 }

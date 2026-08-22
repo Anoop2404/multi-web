@@ -108,6 +108,38 @@ class FestGradePointService
     }
 
     /**
+     * Splits a mark's points into (rank points, grade points) per the official
+     * Kalolsavam Manual's grade+place formula (config/fest_confed_kalotsav_scoring.php's
+     * grade_points/place_points) — but ONLY when those two components actually sum to
+     * this mark's real, authoritative total from pointsForMark(). A custom rule (an
+     * "Any Position" wildcard, a hand-edited value) has no defined rank/grade split, so
+     * forcing one would show numbers the admin never configured; both come back null in
+     * that case and the caller should fall back to showing just the total.
+     *
+     * @return array{rank_points: ?int, grade_points: ?int, total: int}
+     */
+    public function pointsBreakdown(FestEvent $event, FestMark $mark): array
+    {
+        $total = $this->pointsForMark($event, $mark);
+
+        $item = $mark->item ?? $mark->participant?->registration?->item;
+        $isGroup = strtolower((string) ($item?->participant_type ?? 'individual')) !== 'individual';
+        $scale = $isGroup ? 'group' : 'individual';
+
+        $grade = $this->normalizeMcsGrade($mark->grade);
+        $gradePoints = config("fest_confed_kalotsav_scoring.grade_points.{$scale}.{$grade}");
+        $placePoints = $mark->position
+            ? config("fest_confed_kalotsav_scoring.place_points.{$scale}.{$mark->position}")
+            : null;
+
+        if ($gradePoints !== null && $placePoints !== null && ($gradePoints + $placePoints) === $total) {
+            return ['rank_points' => $placePoints, 'grade_points' => $gradePoints, 'total' => $total];
+        }
+
+        return ['rank_points' => null, 'grade_points' => null, 'total' => $total];
+    }
+
+    /**
      * $itemId's own `total_marks` (when set) switches this to percentage-based matching —
      * score/total_marks*100 against FestGradeConfig rows that have min_percent/max_percent
      * set — so one set of bands (e.g. "70%+ = A") applies consistently across items with

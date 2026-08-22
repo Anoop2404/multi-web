@@ -35,6 +35,7 @@ use App\Services\Events\FestEventNotifier;
 use App\Http\Controllers\SchoolAdmin\Concerns\BuildsSchoolFestEventContext;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestSportsAgeGroup;
+use App\Support\FestTeamSquadRules;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
 use App\Services\Students\StudentEditLockService;
@@ -1506,8 +1507,8 @@ class FestRegistrationController extends SchoolAdminController
         $grouped = [
             'on_stage'  => $enabledItems->where('stage_type', 'on_stage')->values(),
             'off_stage' => $enabledItems->where('stage_type', 'off_stage')->values(),
-            'group'     => $enabledItems->filter(fn ($i) => in_array($i['participant_type'] ?? null, ['group', 'team'], true))->values(),
-            'other'     => $enabledItems->filter(fn ($i) => empty($i['stage_type']) && ! in_array($i['participant_type'] ?? null, ['group', 'team'], true))->values(),
+            'group'     => $enabledItems->filter(fn ($i) => FestTeamSquadRules::isMultiPerson($i['participant_type'] ?? null))->values(),
+            'other'     => $enabledItems->filter(fn ($i) => empty($i['stage_type']) && ! FestTeamSquadRules::isMultiPerson($i['participant_type'] ?? null))->values(),
         ];
 
         // "on_stage"/"off_stage" are real stage_type taxonomy entries, so their labels

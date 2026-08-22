@@ -258,6 +258,7 @@ class FestReportCatalog
             ['id' => 'fee-collection', 'label' => 'Fee Collection', 'href' => "{$base}/fee-collection"],
             ['id' => 'student-wise', 'label' => 'Student-wise browser', 'href' => "{$base}/student-wise"],
             ['id' => 'item-wise', 'label' => 'Item-wise browser', 'href' => "{$base}/item-wise"],
+            ['id' => 'category-wise-points', 'label' => 'Category-wise Points', 'href' => "{$base}/category-wise-points"],
             ['id' => 'attendance', 'label' => 'Attendance Register', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/attendance"],
             ['id' => 'id-cards', 'label' => 'Participant ID Cards', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/id-cards"],
             ['id' => 'games-entry-form', 'label' => 'Entry Form', 'href' => "/school-admin/{$tenantId}/sports/events/{$eventId}/games-entry-form"],

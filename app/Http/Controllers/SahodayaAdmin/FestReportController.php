@@ -12,6 +12,7 @@ use App\Services\Events\Reports\FestReportScopeResolver;
 use App\Support\FestPageActivity;
 use App\Support\FestReportCatalog;
 use App\Support\FestEventMeta;
+use App\Support\FestTeamSquadRules;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
 use App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
@@ -376,7 +377,7 @@ class FestReportController extends SahodayaAdminController
             'on_stage'   => $regs->filter(fn ($r) => ($r->item?->stage_type ?? '') === 'on_stage')->count(),
             'off_stage'  => $regs->filter(fn ($r) => ($r->item?->stage_type ?? '') === 'off_stage')->count(),
             'individual' => $regs->filter(fn ($r) => $r->item?->participant_type === 'individual')->count(),
-            'group'      => $regs->filter(fn ($r) => in_array($r->item?->participant_type, ['group', 'team'], true))->count(),
+            'group'      => $regs->filter(fn ($r) => FestTeamSquadRules::isMultiPerson($r->item?->participant_type))->count(),
         ];
 
         return $this->inertia('Sahodaya/Events/Reports/ParticipationCounts', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
@@ -844,6 +845,47 @@ class FestReportController extends SahodayaAdminController
             'xlsUrl'         => $itemId ? '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/item-participants?'.http_build_query(['item_id' => $itemId]) : null,
             'childEvents'    => $event->sportEventDropdownOptions(),
         ])));
+    }
+
+    public function categoryWisePoints(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        $itemsByCategory = $analytics->categoryWiseItemRows();
+
+        $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
+        $categories = collect($itemsByCategory)
+            ->map(fn (array $items, string $key) => [
+                'key'   => $key,
+                'label' => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $key),
+                'items' => $items,
+            ])
+            ->sortBy('label')
+            ->values()
+            ->all();
+
+        return $this->inertia('Sahodaya/Events/Reports/CategoryWisePoints', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'categories'  => $categories,
+            'childEvents' => $event->sportEventDropdownOptions(),
+        ])));
+    }
+
+    /** JSON endpoint the Category-wise Points report's eye-icon modal fetches directly. */
+    public function categoryWisePointsParticipants(Request $request, string $tenantId, FestEvent $event, int $itemId)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $item = \App\Models\FestEventItem::find($itemId);
+        abort_if(! $item || $item->event_id !== $event->id, 404);
+
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
+
+        return response()->json([
+            'item_title'   => $item->title,
+            'participants' => $analytics->itemPointsBreakdownRows($itemId),
+        ]);
     }
 
     public function export(Request $request, string $tenantId, FestEvent $event, string $exportType, PlatformAuditLogger $audit)

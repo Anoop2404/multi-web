@@ -244,10 +244,15 @@ class FestEventPortalController extends SchoolAdminController
         $zip = new \ZipArchive;
         $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
 
+        $basePayloads = $service->payloadsFor($certificates);
+        $templateCache = [];
+        $participantsCache = [];
+
         foreach ($certificates as $certificate) {
-            $payload = $service->payloadFor($certificate);
-            $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.html';
+            $payload = $service->renderContext($certificate, $basePayloads->get($certificate->id), $templateCache, $participantsCache, embedAssets: true);
             $html = view('fest.certificate-print', $payload)->render();
+
+            $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.html';
             $zip->addFromString($name, $html);
         }
 

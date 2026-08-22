@@ -7,6 +7,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestRegistration;
 use App\Models\Student;
+use App\Support\FestTeamSquadRules;
 
 class FestComboRuleService
 {
@@ -63,8 +64,8 @@ class FestComboRuleService
             }
         }
 
-        if ($rule->max_group && in_array($item->participant_type, ['group', 'team'], true)) {
-            $count = $regs->filter(fn ($r) => in_array($r->item?->participant_type, ['group', 'team'], true))->count() + 1;
+        if ($rule->max_group && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
+            $count = $regs->filter(fn ($r) => FestTeamSquadRules::isMultiPerson($r->item?->participant_type))->count() + 1;
             if ($count > $rule->max_group) {
                 $errors[] = "School exceeds max {$rule->max_group} group entries.";
             }

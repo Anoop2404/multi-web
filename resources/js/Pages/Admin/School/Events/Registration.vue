@@ -1218,7 +1218,7 @@ function clearItemFilters(eventId) {
 }
 
 function itemCompetitionType(item) {
-    const isGrp = ['group', 'team'].includes(item.participant_type);
+    const isGrp = ['team', 'group', 'pair', 'trio'].includes(item.participant_type);
     if (item.stage_type === 'off_stage') return 'off_stage';
     return isGrp ? 'on_stage_group' : 'on_stage_single';
 }
@@ -1283,7 +1283,7 @@ function filteredAllItems(event) {
             }
 
             if (groupFilter) {
-                const isGrp = ['group', 'team'].includes(item.participant_type);
+                const isGrp = ['team', 'group', 'pair', 'trio'].includes(item.participant_type);
                 if (groupFilter === 'group' && !isGrp) return false;
                 if (groupFilter === 'single' && isGrp) return false;
             }
@@ -1392,7 +1392,7 @@ function registeredNames(reg) {
 }
 
 function isGroupItemRow(item) {
-    return item && ['group', 'team'].includes(item.participant_type);
+    return item && ['team', 'group', 'pair', 'trio'].includes(item.participant_type);
 }
 
 function studentsForEvent(eventId) {
@@ -1769,7 +1769,7 @@ function updateItem(event, item) {
     const standby = (form.standby_ids ?? []).slice(0, 2);
     delete itemErrors[key];
 
-    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
+    if (!['team', 'group', 'pair', 'trio'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
         const msg = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
         itemErrors[key] = msg;
         showWarning(msg, 'Limit Exceeded');
@@ -1810,7 +1810,7 @@ function itemRegistrationCount(eventId, itemId) {
     const regs = registrationsForItem(eventId, itemId);
     if (!regs.length) return 0;
     const firstItem = regs[0]?.item;
-    const isGroup = firstItem && ['group', 'team'].includes(firstItem.participant_type);
+    const isGroup = firstItem && ['team', 'group', 'pair', 'trio'].includes(firstItem.participant_type);
     if (isGroup) {
         return regs.length;
     }
@@ -1867,7 +1867,7 @@ function itemBlockReason(event, item) {
         && quotas.used.off_stage >= limits.max_offstage_per_school) {
         return `School off-stage participation limit reached (max ${limits.max_offstage_per_school}).`;
     }
-    if (['group', 'team'].includes(item.participant_type) && limits.max_group_per_school != null
+    if (['team', 'group', 'pair', 'trio'].includes(item.participant_type) && limits.max_group_per_school != null
         && quotas.used.group >= limits.max_group_per_school) {
         return `School group/team participation limit reached (max ${limits.max_group_per_school}).`;
     }
@@ -1911,7 +1911,7 @@ function itemNoEligibleHint(event, item) {
     }
 
     const teamMin = Number(item.min_group_size ?? item.criteria_json?.min_playing ?? 0);
-    if (teamMin > 1 && ['group', 'team'].includes(item.participant_type)) {
+    if (teamMin > 1 && ['team', 'group', 'pair', 'trio'].includes(item.participant_type)) {
         const matching = pool.filter((s) => studentMatchesItem(s, event, item, { skipVerification: true })).length;
         if (matching > 0 && matching < teamMin) {
             return `This team item needs ${teamMin} students — only ${matching} eligible on record.`;
@@ -2043,7 +2043,7 @@ function submitItem(event, item) {
         return;
     }
 
-    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
+    if (!['team', 'group', 'pair', 'trio'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
         const msg = `Maximum ${itemMaxPerSchool(item)} participants allowed for this item.`;
         itemErrors[key] = msg;
         showWarning(msg, 'Limit Exceeded');
@@ -2236,7 +2236,7 @@ const incompleteSquads = computed(() => {
             return id === regItemId || (inhId !== null && inhId === regItemId);
         });
         if (!item) continue;
-        const isGroup = ['group', 'team'].includes(item.participant_type);
+        const isGroup = ['team', 'group', 'pair', 'trio'].includes(item.participant_type);
         if (!isGroup) continue;
         const count = (reg.participants ?? []).filter(p => p.participant_role !== 'standby' && p.student_id).length;
         const min = item.min_group_size || 1;

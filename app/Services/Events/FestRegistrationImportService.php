@@ -8,6 +8,7 @@ use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\Tenant;
 use App\Support\ExcelImport;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -45,7 +46,7 @@ class FestRegistrationImportService
 
             $teamName = $row['team_name'] ?? '';
             $role = strtolower($row['role'] ?? 'performer') === 'standby' ? 'standby' : 'performer';
-            $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+            $isGroup = FestTeamSquadRules::isMultiPerson($item->participant_type);
 
             if ($isGroup) {
                 $key = $item->id.'|'.($teamName !== '' ? $teamName : 'group-'.$row['reg_no']);
@@ -117,7 +118,7 @@ class FestRegistrationImportService
                     $teacherIds[] = $teacher->id;
                 }
 
-                if (count($teacherIds) > 1 && ! in_array($item->participant_type, ['group', 'team'], true)) {
+                if (count($teacherIds) > 1 && ! FestTeamSquadRules::isMultiPerson($item->participant_type)) {
                     $errors[] = "Item {$item->title} allows only one teacher.";
                     $skipped++;
 
@@ -163,7 +164,7 @@ class FestRegistrationImportService
                 $standbyIds[] = $student->id;
             }
 
-            $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+            $isGroup = FestTeamSquadRules::isMultiPerson($item->participant_type);
             if ($isGroup) {
                 $teamName = $group['team_name'] ?? '';
                 if ($teamName === '') {

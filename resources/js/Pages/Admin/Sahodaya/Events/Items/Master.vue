@@ -443,7 +443,7 @@
                             <input v-model.number="editForm.max_per_school" type="number" min="1" class="field" placeholder="e.g. 2">
                         </FormField>
 
-                        <template v-if="['group', 'team'].includes(editForm.participant_type)">
+                        <template v-if="['team', 'group', 'pair', 'trio'].includes(editForm.participant_type)">
                             <FormField label="Min Team Size">
                                 <input v-model.number="editForm.min_group_size" type="number" min="1" class="field" placeholder="e.g. 2">
                             </FormField>

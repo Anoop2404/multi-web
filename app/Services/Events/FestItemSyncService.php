@@ -9,6 +9,7 @@ use App\Models\FestItemHead;
 use App\Models\FestStateProgram;
 use App\Models\FestStateProgramPropagation;
 use App\Models\Tenant;
+use App\Support\FestTeamSquadRules;
 use App\Support\TenancyDatabase;
 use Illuminate\Support\Str;
 
@@ -310,7 +311,7 @@ class FestItemSyncService
 
         return match ($partitionRole) {
             'finale' => ($item->stage_type ?? '') === 'on_stage'
-                || in_array($item->participant_type, ['group', 'team'], true),
+                || FestTeamSquadRules::isMultiPerson($item->participant_type),
             default => true,
         };
     }

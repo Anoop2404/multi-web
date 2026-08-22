@@ -31,5 +31,18 @@ return [
         'C' => ['1' => 12, '2' => 8, '3' => 4],
     ],
 
+    // The two components individual_points/group_points are already summed from —
+    // exposed separately so a report can show "grade points" and "rank/place points"
+    // as their own columns instead of just the combined total.
+    'grade_points' => [
+        'individual' => ['A' => 5, 'B' => 3, 'C' => 1],
+        'group' => ['A' => 10, 'B' => 6, 'C' => 2],
+    ],
+
+    'place_points' => [
+        'individual' => ['1' => 5, '2' => 3, '3' => 1],
+        'group' => ['1' => 10, '2' => 6, '3' => 2],
+    ],
+
     'appeal_fee' => 3000,
 ];

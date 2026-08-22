@@ -28,6 +28,7 @@ use App\Support\SchoolFestProgram;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use App\Support\FestEventMeta;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Http\Request;
 
 class FestSchoolReportController extends SchoolAdminController
@@ -1586,7 +1587,7 @@ class FestSchoolReportController extends SchoolAdminController
                 $q->where(function ($query) {
                     $query->whereNotNull('sport_discipline')
                           ->orWhere('category', 'sports')
-                          ->orWhereIn('participant_type', ['team', 'group']);
+                          ->orWhereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES);
                 });
             })
             ->with([

@@ -216,7 +216,7 @@ class FestPublicScoreboardTest extends TestCase
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
 
         $response->assertOk();
-        $response->assertSee('School-wise Winners');
+        $response->assertSee('School-wise Results');
         $response->assertSee('North Poetry');
         // markCategoryWinner() stores grade=A with score=80, but pointsForMark()
         // re-derives the effective grade from score first — 80% clears the A+ band
@@ -224,6 +224,105 @@ class FestPublicScoreboardTest extends TestCase
         // configured this resolves through the default CKSC-style table to A+'s
         // 10 points, not A's 8.
         $response->assertSeeInOrder(['North Poetry', '10'], false);
+    }
+
+    public function test_school_results_roster_shows_category_and_type_ordered_by_category(): void
+    {
+        // Position 1 but in a category that sorts AFTER the other item's category —
+        // category must win as the primary sort key even though this item ranks better.
+        $laterCategoryItem = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Zzz Late Item', 'category' => 'literary',
+            'class_group' => 'zzz_category', 'participant_type' => 'group', 'is_enabled' => true,
+        ]);
+        $reg1 = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $laterCategoryItem->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+        $p1 = FestParticipant::create(['registration_id' => $reg1->id, 'event_id' => $this->north->id, 'participant_type' => 'student']);
+        FestMark::create(['event_id' => $this->north->id, 'item_id' => $laterCategoryItem->id, 'participant_id' => $p1->id, 'grade' => 'A', 'position' => 1, 'score' => 80]);
+
+        // Position 3 but in a category that sorts BEFORE — should still appear first.
+        $earlierCategoryItem = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Aaa Early Item', 'category' => 'literary',
+            'class_group' => 'aaa_category', 'participant_type' => 'individual', 'is_enabled' => true,
+        ]);
+        $reg2 = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $earlierCategoryItem->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+        $p2 = FestParticipant::create(['registration_id' => $reg2->id, 'event_id' => $this->north->id, 'participant_type' => 'student']);
+        FestMark::create(['event_id' => $this->north->id, 'item_id' => $earlierCategoryItem->id, 'participant_id' => $p2->id, 'grade' => 'A', 'position' => 3, 'score' => 60]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
+
+        $response->assertOk();
+        $response->assertSee('Aaa Category');
+        $response->assertSee('Zzz Category');
+        $response->assertSee('Group');
+        $response->assertSee('Individual');
+        // Category is the primary sort key, so the "Aaa" category's item must render
+        // before the "Zzz" category's item despite its worse (3rd place) position.
+        $response->assertSeeInOrder(['Aaa Early Item', 'Zzz Late Item']);
+    }
+
+    public function test_school_results_roster_shows_grade_points_breakdown_when_applicable(): void
+    {
+        // pointsBreakdown() only reveals a grade/rank split when the Kalolsavam Manual's
+        // grade_points + place_points actually sum to the mark's real total — guaranteed
+        // for a confed_kalotsav-preset event, unlike the default table my other fixtures
+        // use (see FestGradePointService::pointsBreakdown()'s docblock).
+        $confedEvent = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Confed Preset Fest', 'event_type' => 'kalotsav',
+            'scoring_preset' => 'confed_kalotsav', 'status' => 'completed',
+            'results_published' => true, 'schedule_published' => true,
+        ]);
+        $item = FestEventItem::create([
+            'event_id' => $confedEvent->id, 'title' => 'Confed Poetry', 'category' => 'literary',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+        ]);
+        $registration = FestRegistration::create(['event_id' => $confedEvent->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+        $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $confedEvent->id, 'participant_type' => 'student']);
+        FestMark::create(['event_id' => $confedEvent->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+
+        // $confedEvent->results_published is set directly above (bypassing the normal
+        // "official publish" admin action) — seed the FestResult snapshot the school-wise
+        // board reads from once published directly, matching setUp()'s own north/south
+        // fixtures, rather than EventContext::recalculateSchoolPoints() (which depends on
+        // tenancy context normally provided by the admin HTTP request/middleware that
+        // triggers it for real, not available when called directly in a test like this).
+        FestResult::create(['event_id' => $confedEvent->id, 'school_id' => $this->northSchool->id, 'total_points' => 10, 'rank' => 1]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$confedEvent->id}/results?tab=school");
+
+        $response->assertOk();
+        // config/fest_confed_kalotsav_scoring.php: grade_points.individual.A = 5,
+        // place_points.individual.1 = 5, individual_points.A.1 = 10 (5 + 5).
+        $response->assertSee('Grade A · 5 pts', false);
+        $response->assertSee('10', false);
+    }
+
+    public function test_school_results_roster_includes_non_winning_items_too(): void
+    {
+        $winningItem = $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        // A second item where the same school entered but did NOT place top-3 — the
+        // roster is meant to be the school's full report, not just its medal wins.
+        $nonWinningItem = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'North Elocution', 'category' => 'literary',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+        ]);
+        $registration = FestRegistration::create([
+            'event_id' => $this->north->id, 'item_id' => $nonWinningItem->id,
+            'school_id' => $this->northSchool->id, 'status' => 'approved',
+        ]);
+        $participant = FestParticipant::create([
+            'registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student',
+        ]);
+        FestMark::create([
+            'event_id' => $this->north->id, 'item_id' => $nonWinningItem->id, 'participant_id' => $participant->id,
+            'grade' => 'B', 'position' => 4, 'score' => 55,
+        ]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
+
+        $response->assertOk();
+        $response->assertSee('North Poetry');
+        $response->assertSee('North Elocution');
+        $response->assertSee('Grade B', false);
     }
 
     public function test_school_winners_section_has_a_school_picker_dropdown(): void

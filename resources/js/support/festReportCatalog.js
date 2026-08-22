@@ -70,6 +70,7 @@ export const INTERACTIVE_CATEGORY_MAP = {
     'fee-collection': 'finance',
     'student-wise': 'competition',
     'item-wise': 'competition',
+    'category-wise-points': 'competition',
     'attendance': 'schedule',
     'id-cards': 'ops',
 };
@@ -235,6 +236,7 @@ export const INTERACTIVE_REPORT_META = {
     'fee-collection': { icon: '💳', hint: 'Fee payment status by school' },
     'student-wise': { icon: '🎓', hint: 'Browse each student\'s items and marks' },
     'item-wise': { icon: '📝', hint: 'Pick an item to view all participants' },
+    'category-wise-points': { icon: '🏆', hint: 'Items by category — rank points, grade points, and totals per participant' },
     'attendance': { icon: '✅', hint: 'Students with photos — filter by head/item, print attendance sheet' },
     'id-cards': { icon: '🪪', hint: 'Print student & teacher ID cards by head or item' },
 };

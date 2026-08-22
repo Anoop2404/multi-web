@@ -1443,6 +1443,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/pending-approvals/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportPendingApprovals'])->name('reports.pending-approvals.export');
                 Route::get('/{event}/reports/student-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'studentWise'])->name('reports.student-wise');
                 Route::get('/{event}/reports/item-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemWise'])->name('reports.item-wise');
+                Route::get('/{event}/reports/category-wise-points', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePoints'])->name('reports.category-wise-points');
+                Route::get('/{event}/reports/category-wise-points/{itemId}/participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePointsParticipants'])->name('reports.category-wise-points.participants');
                 Route::get('/{event}/reports/export/{exportType}', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'export'])->name('reports.export');
             });
         });

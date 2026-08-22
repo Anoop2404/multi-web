@@ -296,10 +296,10 @@ const displayTitle = computed(() => {
     return String(raw).replace(/_/g, ' ');
 });
 
-const isGroup = computed(() => ['group', 'team'].includes(props.item.participant_type));
+const isGroup = computed(() => ['team', 'group', 'pair', 'trio'].includes(props.item.participant_type));
 
 const competitionTypeBadge = computed(() => {
-    const isGrp = ['group', 'team'].includes(props.item.participant_type);
+    const isGrp = ['team', 'group', 'pair', 'trio'].includes(props.item.participant_type);
     const isOff = props.item.stage_type === 'off_stage';
 
     if (isOff) {

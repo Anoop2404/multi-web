@@ -344,27 +344,54 @@ class FestPortalController extends Controller
             ])
             ->all();
 
-        // Per-school winner roster (item, position, points earned) — layered onto
-        // $schoolBoard's existing rank/points rather than a separate ranking, so the
-        // per-winner points shown here can never disagree with the official school
-        // total above. Built from the same already-publish-filtered $marks as the
-        // medal tally; schools with no top-3 marks (e.g. group/participation-only
-        // scoring) are simply omitted rather than shown with an empty roster.
-        $winnersBySchool = $marks
+        // Per-school results roster — every item that school entered (not just the ones
+        // it won), each with its position, grade, and points, so the sum of the listed
+        // rows always agrees with $schoolBoard's official total above rather than only
+        // accounting for the top-3 marks. Deliberately a SEPARATE query from $marks
+        // (which stays top-3-only — it also feeds the item/individual/medal-tally tabs,
+        // where "winners only" is the correct scope), not a reuse of it.
+        $allSchoolMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
+            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+            ->with(['item', 'participant.registration.school'])
+            ->get();
+
+        $participantTypeLabels = ['pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
+
+        $resultsBySchool = $allSchoolMarks
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
             ->unique(fn (FestMark $m) => $m->deduplicationKey())
             ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
             ->map(fn ($group) => $group
-                ->sortBy('position')
-                ->map(fn (FestMark $m) => [
-                    'item' => $m->item?->title,
-                    'position' => $m->position,
-                    'points' => $this->gradePoints->pointsForMark($event, $m),
-                ])
+                ->map(function (FestMark $m) use ($event, $categoryColumn, $participantTypeLabels) {
+                    // Splits into (grade points, rank points) per the Kalolsavam Manual's
+                    // formula only when those two components actually sum to this mark's
+                    // real total — null/null otherwise (a custom rule with no defined
+                    // split), in which case only the combined total is shown below.
+                    $breakdown = $this->gradePoints->pointsBreakdown($event, $m);
+
+                    return [
+                        'item' => $m->item?->title,
+                        'category' => $m->item?->{$categoryColumn}
+                            ? $this->scoreboards->categoryLabel($event, $m->item->{$categoryColumn})
+                            : 'Uncategorized',
+                        'participant_type' => $participantTypeLabels[$m->item?->participant_type] ?? 'Individual',
+                        'position' => $m->position,
+                        'grade' => $m->grade,
+                        'grade_points' => $breakdown['grade_points'],
+                        'points' => $breakdown['total'],
+                    ];
+                })
+                // Category first so items naturally cluster together on screen, then
+                // position/item within each category — mirrors the Item-wise tab's own
+                // category grouping/order above. Sorted on the mapped array (string keys)
+                // rather than the raw FestMark collection — Collection::sortBy()'s
+                // multi-criteria array form only accepts string/dot keys per criterion,
+                // not a closure paired with a direction.
+                ->sortBy([['category', 'asc'], ['position', 'asc'], ['item', 'asc']])
                 ->values()
                 ->all());
         $schoolWinnersBoard = collect($schoolBoard)
-            ->map(fn (array $row) => $row + ['winners' => $winnersBySchool[$row['school_id']] ?? []])
+            ->map(fn (array $row) => $row + ['winners' => $resultsBySchool[$row['school_id']] ?? []])
             ->filter(fn (array $row) => $row['winners'] !== [])
             ->values()
             ->all();
@@ -885,11 +912,19 @@ class FestPortalController extends Controller
         $participant = $mark->participant;
         $person = $participant?->student ?? $participant?->teacher;
 
+        // rank_points/grade_points split out from the combined total per the official
+        // Kalolsavam Manual formula — null for both when this mark's actual points don't
+        // match that formula (a custom/Any-Position rule), so the public page can show
+        // just the total in that case instead of an invented split.
+        $breakdown = $mark->position ? $this->gradePoints->pointsBreakdown($event, $mark) : null;
+
         $row = [
             'position' => $mark->position,
             'grade' => $mark->grade,
             'score' => $mark->score,
-            'points' => $mark->position ? $this->gradePoints->pointsForMark($event, $mark) : null,
+            'points' => $breakdown['total'] ?? null,
+            'rank_points' => $breakdown['rank_points'] ?? null,
+            'grade_points' => $breakdown['grade_points'] ?? null,
             'measurement' => trim(($mark->measurement_value ?? '').' '.($mark->measurement_unit ?? '')),
             'participant' => $person?->name,
             'photo' => $person?->photoDataUri(),

@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Support\FestTeamSquadRules;
 
 class FestRegistrationRouterService
 {
@@ -167,7 +168,7 @@ class FestRegistrationRouterService
             return 'finale';
         }
 
-        if (in_array($item->participant_type, ['group', 'team'], true)) {
+        if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
             return 'finale';
         }
 

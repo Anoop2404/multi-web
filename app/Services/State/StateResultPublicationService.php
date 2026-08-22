@@ -4,6 +4,7 @@ namespace App\Services\State;
 
 use App\Models\State\StateFestEvent;
 use App\Models\State\StateFestMark;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -59,7 +60,7 @@ class StateResultPublicationService
                             $lockedEvent,
                             $grade,
                             $position,
-                            in_array($mark->registration?->meta['participant_type'] ?? null, ['group', 'team'], true)
+                            FestTeamSquadRules::isMultiPerson($mark->registration?->meta['participant_type'] ?? null)
                                 || $mark->registration?->participants()->count() > 1,
                         ),
                         'status' => 'published',

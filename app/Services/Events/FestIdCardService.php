@@ -13,6 +13,7 @@ use App\Models\FestVolunteer;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\FestSportsAgeGroup;
+use App\Support\FestTeamSquadRules;
 use App\Support\TenantStorage;
 
 class FestIdCardService
@@ -90,7 +91,7 @@ class FestIdCardService
                 'scope'   => 'item',
             ]);
 
-            if ($layout === 'team' && in_array($item->participant_type, ['group', 'team'], true)) {
+            if ($layout === 'team' && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
                 $cards = $this->teamCards($event, $itemFilters);
             } else {
                 $cards = $this->individualStudentCards($event, $itemFilters);
@@ -564,7 +565,7 @@ class FestIdCardService
                 'participants',
                 fn ($p) => $p->where('student_id', (int) $filters['student_id'])->where('participant_role', '!=', 'standby'),
             ))
-            ->whereHas('item', fn ($q) => $q->whereIn('participant_type', ['group', 'team']))
+            ->whereHas('item', fn ($q) => $q->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES))
             ->with([
                 'event',
                 'item:id,title,participant_type',

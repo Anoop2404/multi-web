@@ -9,6 +9,7 @@ use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestPhaseAdvancement;
 use App\Models\FestRegistration;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -184,7 +185,7 @@ class FestPhaseAdvancementService
 
     private function createTargetRegistration(FestEvent $targetLeaf, FestEventItem $targetItem, FestRegistration $source): FestRegistration
     {
-        $isGroup = in_array($targetItem->participant_type, ['group', 'team'], true) || $source->groups->isNotEmpty();
+        $isGroup = FestTeamSquadRules::isMultiPerson($targetItem->participant_type) || $source->groups->isNotEmpty();
 
         $existing = FestRegistration::where('event_id', $targetLeaf->id)
             ->where('item_id', $targetItem->id)

@@ -219,8 +219,9 @@
             <section class="mt-10" aria-labelledby="school-winners">
                 <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
                     <div>
-                        <p class="text-xs font-bold uppercase tracking-widest text-amber-400">Winner roster</p>
-                        <h2 id="school-winners" class="text-2xl font-bold mt-1 text-white">School-wise Winners</h2>
+                        <p class="text-xs font-bold uppercase tracking-widest text-amber-400">Full roster</p>
+                        <h2 id="school-winners" class="text-2xl font-bold mt-1 text-white">School-wise Results</h2>
+                        <p class="text-xs text-white/40 mt-1">Choose a school to see every item it entered, with rank, grade, and points.</p>
                     </div>
                     <label class="w-full sm:w-64">
                         <span class="sr-only">Choose a school</span>
@@ -241,17 +242,33 @@
                         </div>
                         <ol class="divide-y divide-slate-800">
                             @foreach($row['winners'] as $winner)
-                            <li class="flex items-center gap-3 px-4 py-2.5">
-                                <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-6 h-6 shrink-0">
-                                <span class="text-sm text-white flex-1 min-w-0 truncate">{{ $winner['item'] }}</span>
-                                <span class="font-mono font-bold text-sm text-white shrink-0">{{ $winner['points'] }} <small class="text-[10px] text-white/40">PTS</small></span>
+                            <li class="flex items-start gap-3 px-4 py-2.5">
+                                @if($winner['position'] && $winner['position'] <= 3)
+                                    <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-6 h-6 shrink-0 mt-0.5">
+                                @else
+                                    <span class="w-6 h-6 rounded-full bg-white/5 text-white/40 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">{{ $winner['position'] ? '#'.$winner['position'] : '—' }}</span>
+                                @endif
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm text-white truncate">{{ $winner['item'] }}</p>
+                                    <p class="text-[11px] text-white/40 truncate mt-0.5">{{ $winner['category'] }} · {{ $winner['participant_type'] }}</p>
+                                </div>
+                                @if(!empty($winner['grade']))
+                                    <span class="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0 mt-0.5">
+                                        Grade {{ $winner['grade'] }}{{ $winner['grade_points'] !== null ? ' · '.$winner['grade_points'].' pts' : '' }}
+                                    </span>
+                                @endif
+                                <span class="font-mono font-bold text-sm text-white shrink-0 mt-0.5">{{ $winner['points'] }} <small class="text-[10px] text-white/40">PTS</small></span>
                             </li>
                             @endforeach
+                            <li class="flex items-center justify-between gap-3 px-4 py-2.5 bg-white/5">
+                                <span class="text-xs font-bold uppercase tracking-wide text-white/50">Total</span>
+                                <span class="font-mono font-extrabold text-base text-amber-400">{{ $row['total_points'] }} <small class="text-[10px] text-white/40">PTS</small></span>
+                            </li>
                         </ol>
                     </article>
                     @endforeach
                 </div>
-                <p id="school-winner-empty" class="hidden rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">No winners recorded for that school yet.</p>
+                <p id="school-winner-empty" class="hidden rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">No results recorded for that school yet.</p>
             </section>
             <script>
             (() => {
@@ -321,8 +338,16 @@
                                             @if($item['head'])<p class="text-xs text-white/40">{{ $item['head'] }}</p>@endif
                                         </div>
                                         @if($typeLabel = $participantTypeLabels[$item['participant_type'] ?? ''] ?? null)
-                                        <span class="ml-auto shrink-0 text-[11px] font-semibold text-white/60 bg-white/5 border border-slate-700 px-2 py-0.5 rounded-full">{{ $typeLabel }}</span>
+                                        <span class="shrink-0 text-[11px] font-semibold text-white/60 bg-white/5 border border-slate-700 px-2 py-0.5 rounded-full">{{ $typeLabel }}</span>
                                         @endif
+                                        <a href="{{ route('tenant.fest.item-results', [$event->id, $item['item_id']]) }}"
+                                           class="ml-auto shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-700 text-white/50 hover:text-white hover:border-slate-500 transition"
+                                           title="View full results and points breakdown">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                            </svg>
+                                        </a>
                                     </div>
                                     <div class="flex flex-wrap">
                                         @foreach($item['winners'] as $winner)

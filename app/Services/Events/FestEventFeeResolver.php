@@ -7,6 +7,7 @@ use App\Models\FestRegistration;
 use App\Models\FestStateProgram;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestSportsAgeGroup;
+use App\Support\FestTeamSquadRules;
 
 class FestEventFeeResolver
 {
@@ -286,7 +287,7 @@ class FestEventFeeResolver
     {
         $normalized = [];
 
-        foreach (['group', 'team'] as $type) {
+        foreach (FestTeamSquadRules::MULTI_PERSON_TYPES as $type) {
             if (isset($input[$type]) && $input[$type] !== '') {
                 $normalized[$type] = (float) $input[$type];
             }

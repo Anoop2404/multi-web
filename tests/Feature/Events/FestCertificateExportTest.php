@@ -188,7 +188,7 @@ class FestCertificateExportTest extends TestCase
         $response->assertOk();
         $response->assertSee($certA->verification_uuid);
         $response->assertSee($certB->verification_uuid);
-        $this->assertSame(2, substr_count($response->getContent(), 'class="cert-sheet"'));
+        $this->assertSame(2, preg_match_all('/class="cert-sheet\b/', $response->getContent()));
         // No per-certificate print buttons inside a combined print-all page — only the
         // one toolbar button at the top (isSample:true suppresses the partial's own).
         $this->assertSame(1, substr_count($response->getContent(), 'Print / Save'));

@@ -130,9 +130,11 @@
                             <th class="p-3 w-12 text-center">Rank</th>
                             <th class="p-3">Participant</th>
                             <th class="p-3">School</th>
+                            <th class="p-3 text-right w-20">Rank Pts</th>
                             <th class="p-3 text-center w-20">Grade</th>
+                            <th class="p-3 text-right w-20">Grade Pts</th>
                             <th class="p-3 text-right w-24">Score</th>
-                            <th class="p-3 text-right w-24">Points</th>
+                            <th class="p-3 text-right w-24">Total</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
@@ -144,7 +146,9 @@
                             <td class="p-3 text-center font-mono text-slate-400">{{ $row['position'] ?? '—' }}</td>
                             <td class="p-3 font-semibold text-white uppercase">{{ $names ?: '—' }}</td>
                             <td class="p-3 text-white/50 uppercase">{{ $row['school'] ?? '—' }}</td>
+                            <td class="p-3 text-right font-mono text-white/70">{{ $row['rank_points'] ?? '—' }}</td>
                             <td class="p-3 text-center font-bold text-amber-300">{{ $row['grade'] ?? '—' }}</td>
+                            <td class="p-3 text-right font-mono text-white/70">{{ $row['grade_points'] ?? '—' }}</td>
                             <td class="p-3 text-right font-mono text-white/70">{{ $row['score'] !== null ? number_format((float) $row['score'], 2) : '—' }}</td>
                             <td class="p-3 text-right font-mono font-bold text-white">{{ $row['points'] ?? 0 }}</td>
                         </tr>

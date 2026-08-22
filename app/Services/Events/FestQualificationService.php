@@ -362,7 +362,7 @@ class FestQualificationService
       return;
     }
 
-    $isGroup = in_array($item->participant_type, ['group', 'team'], true)
+    $isGroup = $item->isTeamItem()
       || $source->groups()->exists()
       || $source->participants()->where('participant_role', '!=', 'standby')->count() > 1;
 

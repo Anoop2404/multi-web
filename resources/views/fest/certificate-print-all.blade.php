@@ -9,6 +9,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&display=swap" rel="stylesheet">
+    @php
+        // Fallback page size for the rare browser without CSS named-page support — based
+        // on the first certificate's orientation, since a batch is normally one uniform
+        // template. Browsers that DO support named pages (all modern Chromium/Firefox)
+        // get the correct size per certificate via the .cert-page-* classes below,
+        // matching the same per-item orientation certificate-body.blade.php already uses
+        // for the .has-background.portrait class — so the physical page and the visible
+        // card agree instead of a portrait card being forced onto a landscape sheet.
+        $__firstPayload = $certificates->first();
+        $__firstLayout = $__firstPayload
+            ? ($__firstPayload['overlayLayout'] ?? (!empty($__firstPayload['template']) ? $__firstPayload['template']->overlayLayout() : \App\Models\CertificateTemplate::defaultBackgroundLayout()))
+            : [];
+        $__defaultOrientation = ($__firstLayout['orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape';
+    @endphp
     <style>
         * { box-sizing: border-box; }
         body { font-family: "Times New Roman", Times, serif; background: #fff; color: #1e293b; margin: 0; }
@@ -139,7 +153,11 @@
                 break-after: page;
             }
         }
-        @page { size: A4 landscape; margin: 0; }
+        @page { size: A4 {{ $__defaultOrientation }}; margin: 0; }
+        @page cert-landscape { size: A4 landscape; margin: 0; }
+        @page cert-portrait { size: A4 portrait; margin: 0; }
+        .cert-sheet.cert-page-landscape { page: cert-landscape; }
+        .cert-sheet.cert-page-portrait { page: cert-portrait; }
     </style>
 </head>
 <body>
@@ -156,7 +174,11 @@
     </script>
 
     @forelse($certificates as $payload)
-        <div class="cert-sheet">
+        @php
+            $__layout = $payload['overlayLayout'] ?? (!empty($payload['template']) ? $payload['template']->overlayLayout() : \App\Models\CertificateTemplate::defaultBackgroundLayout());
+            $__orientation = ($__layout['orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape';
+        @endphp
+        <div class="cert-sheet cert-page-{{ $__orientation }}">
             @include('fest.partials.certificate-body', array_merge($payload, ['isSample' => true]))
         </div>
     @empty

@@ -100,7 +100,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['student_ids' => 'Select at least one participant.']);
         }
 
-        $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+        $isGroup = FestTeamSquadRules::isMultiPerson($item->participant_type);
         if ($isGroup) {
             if (! filled($teamName)) {
                 $teamName = $this->nextDefaultTeamName($event, $item, $school);
@@ -358,7 +358,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['student_ids' => 'Select at least one participant.']);
         }
 
-        $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+        $isGroup = FestTeamSquadRules::isMultiPerson($item->participant_type);
         if ($isGroup) {
             if (! filled($teamName)) {
                 $teamName = $this->nextDefaultTeamName($event, $item, $school, $registration->id);
@@ -538,7 +538,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['teacher_ids' => 'Select at least one teacher.']);
         }
 
-        if (count($teacherIds) > 1 && ! in_array($item->participant_type, ['group', 'team'], true)) {
+        if (count($teacherIds) > 1 && ! FestTeamSquadRules::isMultiPerson($item->participant_type)) {
             throw ValidationException::withMessages(['teacher_ids' => 'This item allows only one teacher.']);
         }
 
@@ -590,7 +590,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['teacher_ids' => 'Select at least one teacher.']);
         }
 
-        if (count($teacherIds) > 1 && ! in_array($item->participant_type, ['group', 'team'], true)) {
+        if (count($teacherIds) > 1 && ! FestTeamSquadRules::isMultiPerson($item->participant_type)) {
             throw ValidationException::withMessages(['teacher_ids' => 'This item allows only one teacher.']);
         }
 

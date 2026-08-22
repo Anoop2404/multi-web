@@ -210,7 +210,7 @@ const selectedItem = computed(() =>
     props.items.find((item) => String(item.id) === String(itemId.value)) ?? null,
 );
 const selectedItemSupportsTeam = computed(() =>
-    !isAllItems.value && ['group', 'team'].includes(selectedItem.value?.participant_type),
+    !isAllItems.value && ['team', 'group', 'pair', 'trio'].includes(selectedItem.value?.participant_type),
 );
 const canGenerate = computed(() => {
     if (cardScope.value === 'event') return true;
@@ -256,7 +256,7 @@ const pdfAllHeadsUrl = computed(() => {
 });
 
 function itemCountLabel(item) {
-    if (layout.value === 'team' && ['group', 'team'].includes(item.participant_type)) {
+    if (layout.value === 'team' && ['team', 'group', 'pair', 'trio'].includes(item.participant_type)) {
         return `${item.registration_count ?? 0} teams`;
     }
     return `${item.count ?? 0} cards`;

@@ -233,13 +233,23 @@ class FestMarkEntryController extends SahodayaAdminController
         $judgeScores = $data['judge_scores'] ?? null;
         unset($data['judge_scores']);
 
+        // The judge panel always sends every judge's current box, even when the admin
+        // only meant to change something else on the row (rank, attendance) — if those
+        // boxes happen to be empty (e.g. this participant's judge breakdown was never
+        // entered through this screen), that's NOT "the judges scored zero," it's "there's
+        // nothing here to save." Only recompute/overwrite the combined score when at
+        // least one judge box actually has a value, so an empty panel can never silently
+        // wipe an already-saved score.
+        $hasRealJudgeScore = is_array($judgeScores)
+            && collect($judgeScores)->contains(fn ($v) => $v !== null && $v !== '');
+
         $teamParticipantIds = $this->expandToTeam($event, (int) $data['item_id'], (int) $data['participant_id']);
 
         $result = null;
         foreach ($teamParticipantIds as $participantId) {
             $rowData = $data;
 
-            if ($item && $judgeScores !== null && $criteriaService->hasJudgePanel($item)) {
+            if ($item && $hasRealJudgeScore && $criteriaService->hasJudgePanel($item)) {
                 $rowData['score'] = $criteriaService->saveParticipantJudgeScores($item, $participantId, $judgeScores);
             }
 
