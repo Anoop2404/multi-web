@@ -299,10 +299,11 @@ class FestCertificateService
     public function resolveTemplate(FestEvent $event, ?int $itemId, string $certType): ?CertificateTemplate
     {
         $tenantId = $event->tenant_id;
+        $eventIds = array_values(array_filter([$event->id, $event->parent_event_id]));
 
         if ($itemId) {
             $template = $this->templateQuery($tenantId, $certType)
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $eventIds)
                 ->where('item_id', $itemId)
                 ->first();
             if ($template) {
@@ -311,7 +312,7 @@ class FestCertificateService
         }
 
         $template = $this->templateQuery($tenantId, $certType)
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $eventIds)
             ->whereNull('item_id')
             ->first();
         if ($template) {
