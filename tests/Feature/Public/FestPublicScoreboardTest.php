@@ -223,6 +223,31 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertSeeInOrder(['North Poetry', '8'], false);
     }
 
+    public function test_school_winners_section_has_a_school_picker_dropdown(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
+
+        $response->assertOk();
+        $response->assertSee('id="school-winner-picker"', false);
+        $response->assertSee('<option value="'.$this->northSchool->id.'">North Star School</option>', false);
+        $response->assertSee('data-school-id="'.$this->northSchool->id.'"', false);
+    }
+
+    public function test_individual_tab_shows_points_alongside_position(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=individual");
+
+        $response->assertOk();
+        $response->assertSee('>Points<', false);
+        // grade A, position 1, no FestPointRule configured => default table value 8
+        // (same value test_region_and_category_filters_work_together already relies on).
+        $response->assertSeeInOrder(['North Poetry', '8'], false);
+    }
+
     public function test_item_results_cannot_cross_the_operational_event_boundary(): void
     {
         $northItem = $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');

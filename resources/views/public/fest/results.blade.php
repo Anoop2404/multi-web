@@ -217,13 +217,24 @@
 
             @if(!empty($schoolWinnersBoard))
             <section class="mt-10" aria-labelledby="school-winners">
-                <div class="mb-4">
-                    <p class="text-xs font-bold uppercase tracking-widest text-amber-400">Winner roster</p>
-                    <h2 id="school-winners" class="text-2xl font-bold mt-1 text-white">School-wise Winners</h2>
+                <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-widest text-amber-400">Winner roster</p>
+                        <h2 id="school-winners" class="text-2xl font-bold mt-1 text-white">School-wise Winners</h2>
+                    </div>
+                    <label class="w-full sm:w-64">
+                        <span class="sr-only">Choose a school</span>
+                        <select id="school-winner-picker" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500">
+                            <option value="">All schools</option>
+                            @foreach($schoolWinnersBoard as $row)
+                                <option value="{{ $row['school_id'] }}">{{ $row['school_name'] }}</option>
+                            @endforeach
+                        </select>
+                    </label>
                 </div>
-                <div class="grid lg:grid-cols-2 gap-4">
+                <div class="grid lg:grid-cols-2 gap-4" id="school-winner-cards">
                     @foreach($schoolWinnersBoard as $row)
-                    <article class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+                    <article class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden" data-school-winner-card data-school-id="{{ $row['school_id'] }}">
                         <div class="flex items-center justify-between gap-3 px-4 py-3 bg-white/5 border-b border-slate-800">
                             <h3 class="font-bold text-white uppercase truncate">{{ $row['school_name'] }}</h3>
                             <span class="text-xs font-bold text-amber-400 shrink-0">#{{ $row['rank'] }} · {{ $row['total_points'] }} pts</span>
@@ -240,7 +251,25 @@
                     </article>
                     @endforeach
                 </div>
+                <p id="school-winner-empty" class="hidden rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">No winners recorded for that school yet.</p>
             </section>
+            <script>
+            (() => {
+                const picker = document.getElementById('school-winner-picker');
+                const cards = [...document.querySelectorAll('[data-school-winner-card]')];
+                const empty = document.getElementById('school-winner-empty');
+                picker.addEventListener('change', () => {
+                    const schoolId = picker.value;
+                    let visible = 0;
+                    cards.forEach(card => {
+                        const match = !schoolId || card.dataset.schoolId === schoolId;
+                        card.hidden = !match;
+                        if (match) visible++;
+                    });
+                    empty.classList.toggle('hidden', visible !== 0);
+                });
+            })();
+            </script>
             @endif
         @elseif($tab === 'category')
             <div class="grid lg:grid-cols-2 gap-5">
@@ -342,7 +371,7 @@
             <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
-                        <tr><th class="p-3">Participant</th><th class="p-3">School</th><th class="p-3">Item</th><th class="p-3">Position</th><th class="p-3">Grade</th></tr>
+                        <tr><th class="p-3">Participant</th><th class="p-3">School</th><th class="p-3">Item</th><th class="p-3 text-right">Points</th><th class="p-3">Position</th><th class="p-3">Grade</th></tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
                         @forelse($individualResults as $row)
@@ -359,11 +388,12 @@
                                 </td>
                                 <td class="p-3 text-white/70 uppercase">{{ $row['school'] }}</td>
                                 <td class="p-3 text-white/70 uppercase">{{ $row['item'] }}</td>
+                                <td class="p-3 text-right font-mono font-bold text-white">{{ $row['points'] ?? '—' }}</td>
                                 <td class="p-3 font-bold text-white">#{{ $row['position'] }}</td>
                                 <td class="p-3 font-semibold text-amber-400">{{ !empty($row['grade']) ? 'Grade '.$row['grade'] : '—' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="p-8 text-center text-white/30">No individual results published yet.</td></tr>
+                            <tr><td colspan="6" class="p-8 text-center text-white/30">No individual results published yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

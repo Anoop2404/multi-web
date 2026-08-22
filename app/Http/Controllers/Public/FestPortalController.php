@@ -885,6 +885,7 @@ class FestPortalController extends Controller
             'position' => $mark->position,
             'grade' => $mark->grade,
             'score' => $mark->score,
+            'points' => $mark->position ? $this->gradePoints->pointsForMark($event, $mark) : null,
             'measurement' => trim(($mark->measurement_value ?? '').' '.($mark->measurement_unit ?? '')),
             'participant' => $person?->name,
             'photo' => $person?->photoDataUri(),

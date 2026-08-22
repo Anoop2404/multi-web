@@ -1349,6 +1349,8 @@ class FestEventSettingsController extends SahodayaAdminController
                     ],
                 );
             }
+
+            EventContext::for($child)->recalculateSchoolPoints();
         }
 
         app(PlatformAuditLogger::class)->festEvent(

@@ -10,16 +10,27 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&display=swap" rel="stylesheet">
     @php
-        // Computed ahead of the stylesheet (rather than only inside the has-background
-        // branch further down) because the static @page rule needs it too, and this view
-        // is rendered for the legacy/no-background branches as well, where $overlayLayout
-        // may not be set — fall back the same way renderContext() does.
+        // Computed ahead of the stylesheet because the static @page rule needs it too.
         $__layout = $overlayLayout ?? (!empty($template) ? $template->overlayLayout() : \App\Models\CertificateTemplate::defaultBackgroundLayout());
         $__orientation = ($__layout['orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape';
     @endphp
     <style>
         * { box-sizing: border-box; }
-        body { font-family: "Times New Roman", Times, serif; background: #fff; color: #1e293b; margin: 0; }
+        html, body { margin: 0; padding: 0; background: #e2e8f0; color: #1e293b; font-family: "Times New Roman", Times, serif; }
+
+        @page {
+            size: A4 {{ $__orientation }};
+            margin: 0;
+        }
+
+        .cert-viewport {
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
         .page {
             width: 842px;
             min-height: 595px;
@@ -27,7 +38,10 @@
             position: relative;
             border: 10px double #b45309;
             padding: 40px 52px 56px;
+            background: #fff;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         }
+
         .page.has-background {
             border: none;
             padding: 0;
@@ -38,12 +52,21 @@
             background-position: center;
             background-repeat: no-repeat;
             overflow: hidden;
+            background-color: #ffffff;
         }
+
         .page.has-background.portrait {
             width: 794px;
             height: 1123px;
             min-height: 1123px;
         }
+
+        body.hide-background .page.has-background,
+        .page.hide-background {
+            background-image: none !important;
+            background-color: #ffffff !important;
+        }
+
         .overlay-field { position: absolute; text-align: center; color: #1e293b; line-height: 1.45; word-wrap: break-word; }
         .overlay-field.recipient { color: #0f172a; }
         .overlay-field.body { line-height: 1.7; color: #334155; }
@@ -85,38 +108,71 @@
             border: 3px solid #fdfaf0; box-shadow: 0 2px 10px rgba(0,0,0,0.25); background: #fff;
         }
 
-        /* Legacy fixed design (used when no template is configured) */
-        .cert-legacy {
-            width: 297mm; min-height: 210mm; margin: 0 auto; background: #fff;
-            border: 12px double #b45309; box-sizing: border-box; padding: 2.5rem 3rem;
-            position: relative; font-family: Georgia, 'Times New Roman', serif;
-        }
-        .cert-legacy .inner { border: 2px solid #d97706; padding: 2rem 2.5rem; text-align: center; min-height: 160mm; }
-        .cert-legacy .org { font-size: .85rem; letter-spacing: .2em; text-transform: uppercase; color: #92400e; }
-        .cert-legacy h1 { font-size: 2.4rem; margin: .75rem 0 .25rem; color: #0f172a; font-weight: normal; }
-        .cert-legacy .subtitle { color: #64748b; font-size: 1rem; margin-bottom: 2rem; }
-        .cert-legacy .name { font-size: 2rem; font-weight: bold; color: #1e3a5f; margin: 1rem 0; border-bottom: 1px solid #e2e8f0; display: inline-block; padding: 0 2rem .5rem; }
-        .cert-legacy .detail { font-size: 1.1rem; color: #334155; line-height: 1.8; margin: 1.5rem 0; }
-        .cert-legacy .position { font-size: 1.5rem; color: #b45309; font-weight: bold; }
-        .cert-legacy .meta { position: absolute; bottom: 2rem; left: 3rem; right: 3rem; display: flex; justify-content: space-between; font-size: .75rem; color: #94a3b8; }
-
-        .actions { text-align: center; padding: 1rem; }
+        .actions { display: none; }
         @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .no-print, .actions { display: none; }
-            .page.has-background, .page.has-background.portrait { width: 100%; height: 100vh; min-height: 100vh; }
+            body {
+                background: #ffffff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .no-print, .actions-bar { display: none !important; }
+            .cert-viewport { padding: 0 !important; margin: 0 !important; display: block !important; }
+            .page.has-background {
+                width: 297mm !important;
+                height: 210mm !important;
+                min-height: 210mm !important;
+                max-width: 297mm !important;
+                max-height: 210mm !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                page-break-after: always;
+                break-after: page;
+            }
+            .page.has-background.portrait {
+                width: 210mm !important;
+                height: 297mm !important;
+                min-height: 297mm !important;
+                max-width: 210mm !important;
+                max-height: 297mm !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                page-break-after: always;
+                break-after: page;
+            }
         }
-        @page { size: {{ $__orientation }}; margin: 0; }
     </style>
 </head>
 <body>
-@include('fest.partials.certificate-body')
+    <div class="no-print actions-bar" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 99999; display: flex; align-items: center; gap: 12px; background: rgba(15, 23, 42, 0.92); color: #fff; padding: 8px 18px; border-radius: 9999px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); backdrop-filter: blur(8px); font-family: system-ui, -apple-system, sans-serif;">
+        <button type="button" onclick="window.print()" style="background: #eab308; color: #0f172a; font-weight: 700; border: none; padding: 7px 18px; border-radius: 9999px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+            <span>🖨️</span> Print / Save PDF
+        </button>
+        <button type="button" id="toggleBgBtn" onclick="toggleBackground()" style="background: rgba(255,255,255,0.15); color: #fff; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); padding: 7px 18px; border-radius: 9999px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+            <span>🖼️</span> <span id="bgBtnText">Hide Background Image (Print on Paper)</span>
+        </button>
+    </div>
+
+    <script>
+        function toggleBackground() {
+            document.body.classList.toggle('hide-background');
+            var isHidden = document.body.classList.contains('hide-background');
+            var btnText = document.getElementById('bgBtnText');
+            if (btnText) {
+                btnText.innerText = isHidden ? 'Show Background Image' : 'Hide Background Image (Print on Paper)';
+            }
+        }
+        if (new URLSearchParams(window.location.search).get('hide_bg') === '1' || new URLSearchParams(window.location.search).get('plain') === '1') {
+            document.body.classList.add('hide-background');
+        }
+    </script>
+
+    <div class="cert-viewport">
+        @include('fest.partials.certificate-body')
+    </div>
+
 @if(!empty($isSample))
-    {{-- Admin template preview only: the certificate itself is a fixed A4 pixel size
-         (for accurate printing on the real print/download path), which doesn't fit most
-         screens at 100%. Scale it down to fit the viewport here so the whole design is
-         visible without scrolling — real certificates never run this, so print output
-         is unaffected. --}}
     <script>
         (function () {
             function fitToScreen() {

@@ -92,32 +92,77 @@
         .cert-legacy .position { font-size: 1.5rem; color: #b45309; font-weight: bold; }
         .cert-legacy .meta { position: absolute; bottom: 2rem; left: 3rem; right: 3rem; display: flex; justify-content: space-between; font-size: .75rem; color: #94a3b8; }
 
-        .actions { text-align: center; padding: 1rem; }
+        body.hide-background .page.has-background,
+        .page.hide-background {
+            background-image: none !important;
+            background-color: #ffffff !important;
+        }
+        .actions { display: none; }
         .cert-sheet { padding-top: 24px; page-break-after: always; break-after: page; }
         .cert-sheet:last-child { page-break-after: auto; break-after: auto; }
         .toolbar {
-            position: sticky; top: 0; z-index: 10; text-align: center; padding: 14px;
-            background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+            position: sticky; top: 0; z-index: 9999; text-align: center; padding: 14px;
+            background: #0f172a; color: #fff; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: center; gap: 12px;
         }
         .toolbar button {
-            padding: .6rem 1.5rem; font-size: 1rem; cursor: pointer; border-radius: 6px;
-            border: 1px solid #b45309; background: #b45309; color: #fff; font-weight: 600;
+            padding: .6rem 1.5rem; font-size: 0.9rem; cursor: pointer; border-radius: 9999px;
+            border: none; background: #eab308; color: #0f172a; font-weight: 700;
         }
-        .toolbar p { margin: 8px 0 0; font-size: 12px; color: #64748b; }
+        .toolbar button.btn-secondary {
+            background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); font-weight: 600;
+        }
+        .toolbar p { margin: 8px 0 0; font-size: 12px; color: #94a3b8; width: 100%; }
         @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .no-print { display: none; }
-            .cert-sheet { padding-top: 0; }
-            .page.has-background, .page.has-background.portrait { width: 100%; height: 100vh; min-height: 100vh; }
+            body { background: #ffffff !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .no-print, .toolbar { display: none !important; }
+            .cert-sheet { padding-top: 0 !important; }
+            .page.has-background {
+                width: 297mm !important;
+                height: 210mm !important;
+                min-height: 210mm !important;
+                max-width: 297mm !important;
+                max-height: 210mm !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                page-break-after: always;
+                break-after: page;
+            }
+            .page.has-background.portrait {
+                width: 210mm !important;
+                height: 297mm !important;
+                min-height: 297mm !important;
+                max-width: 210mm !important;
+                max-height: 297mm !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                page-break-after: always;
+                break-after: page;
+            }
         }
-        @page { size: landscape; margin: 0; }
+        @page { size: A4 landscape; margin: 0; }
     </style>
 </head>
 <body>
-    <div class="toolbar no-print">
-        <button onclick="window.print()">Print / Save all as PDF ({{ count($certificates) }} certificate{{ count($certificates) === 1 ? '' : 's' }})</button>
+    <div class="toolbar no-print flex-wrap">
+        <button type="button" onclick="window.print()">🖨️ Print / Save all as PDF ({{ count($certificates) }} certificate{{ count($certificates) === 1 ? '' : 's' }})</button>
+        <button type="button" id="toggleBgBtn" class="btn-secondary" onclick="toggleBackground()">🖼️ <span id="bgBtnText">Hide Background Images (Print on Paper)</span></button>
         <p>Each certificate prints on its own page — use "Save as PDF" in the print dialog to download them all as one file.</p>
     </div>
+
+    <script>
+        function toggleBackground() {
+            document.body.classList.toggle('hide-background');
+            var isHidden = document.body.classList.contains('hide-background');
+            var btnText = document.getElementById('bgBtnText');
+            if (btnText) {
+                btnText.innerText = isHidden ? 'Show Background Images' : 'Hide Background Images (Print on Paper)';
+            }
+        }
+        if (new URLSearchParams(window.location.search).get('hide_bg') === '1' || new URLSearchParams(window.location.search).get('plain') === '1') {
+            document.body.classList.add('hide-background');
+        }
+    </script>
+
     @forelse($certificates as $payload)
         <div class="cert-sheet">
             @include('fest.partials.certificate-body', array_merge($payload, ['isSample' => true]))
