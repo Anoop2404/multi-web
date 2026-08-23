@@ -9,11 +9,11 @@
 </div>
 @endif
 
-@unless($isPublished || !empty($scoreboard) || !empty($latestWinners))
+@unless($isPublished)
 <div class="rounded-3xl bg-slate-900 border border-slate-800 p-10 sm:p-12 text-center shadow-xl">
-    <span class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto mb-4 flex items-center justify-center text-sm font-extrabold text-amber-300" aria-hidden="true">WAIT</span>
-    <h2 class="text-xl font-bold text-white">Official Standings Not Published Yet</h2>
-    <p class="text-sm text-slate-400 mt-2 max-w-md mx-auto">The official event scoreboard will appear after the event committee certifies and publishes the results.</p>
+    <span class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto mb-4 flex items-center justify-center text-xl font-extrabold text-amber-300" aria-hidden="true">🔒</span>
+    <h2 class="text-xl font-bold text-white">Public Scoreboard & Standings Disabled</h2>
+    <p class="text-sm text-slate-400 mt-2 max-w-md mx-auto">Public scoreboard and results visibility has been disabled for this event by the event committee.</p>
 </div>
 @else
 @if($isProvisional ?? false)

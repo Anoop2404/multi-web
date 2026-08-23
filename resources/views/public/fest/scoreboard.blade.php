@@ -30,8 +30,8 @@
                 </div>
 
                 <div class="flex flex-col items-start lg:items-end gap-3 shrink-0 border-t lg:border-t-0 lg:border-l border-slate-800 pt-4 lg:pt-0 lg:pl-8">
-                    <span id="scoreboard-publication-badge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold {{ $isPublished ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-800 text-slate-400 border border-slate-700' }}">
-                        @if($isPublished)<span class="relative flex h-2 w-2" aria-hidden="true"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span></span> LIVE STANDINGS @else PROVISIONAL STANDINGS @endif
+                    <span id="scoreboard-publication-badge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold {{ $isPublished ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30' }}">
+                        @if($isPublished)<span class="relative flex h-2 w-2" aria-hidden="true"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span></span> LIVE STANDINGS @else 🔒 SCOREBOARD DISABLED @endif
                     </span>
                     <div class="text-left lg:text-right">
                         <div id="scoreboard-live-clock" class="text-3xl md:text-4xl font-mono font-extrabold text-amber-400 tracking-wider">--:--:--</div>

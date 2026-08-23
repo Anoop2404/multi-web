@@ -58,7 +58,7 @@
                 <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Event Scoreboard <span class="float-right text-amber-400">→</span></a>
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'item']) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Item Results <span class="float-right text-amber-400">→</span></a>
                 @else
-                <div class="p-4 bg-slate-900/30 border border-slate-800/60 rounded-2xl text-sm text-white/40">Scoreboard not published</div>
+                <div class="p-4 bg-slate-900/30 border border-slate-800/60 rounded-2xl text-sm text-white/40">🔒 Scoreboard disabled</div>
                 @endif
                 <a href="{{ route('tenant.fest.search', $event->id) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Search Participant <span class="float-right text-amber-400">→</span></a>
                 @if($event->manual_pdf_path)<a href="{{ route('tenant.fest.manual', $event->id) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Event Manual <span class="float-right text-amber-400">PDF</span></a>@endif

@@ -1078,11 +1078,9 @@ class FestPortalController extends Controller
     private function resolveScoreboard(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished): array
     {
         if (! $isPublished) {
-            // Whole-event publish hasn't run yet, but individual items may already be
-            // published — a live-computed provisional standing from just those, rather
-            // than a blank "not published" state, matches the item-level results that
-            // are already visible elsewhere on the public portal at this point.
-            return [$this->scoreboards->provisionalScoreboard($event, $selectedScope, $category), null];
+            // When public results visibility is disabled for this event, do not compute
+            // or reveal provisional standings/scores on the public portal.
+            return [[], null];
         }
 
         $scoreboard = $this->scoreboards->scoreboard($event, $selectedScope, $category);
