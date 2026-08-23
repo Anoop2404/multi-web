@@ -88,40 +88,40 @@ class FestPortalController extends Controller
             ->distinct()
             ->pluck('item_id');
 
-        $recentMarks = FestMark::where('event_id', $event->id)
-            ->whereIn('position', [1, 2, 3])
-            ->whereHas('item', function ($query) use ($selectedScope) {
-                if (! $selectedScope['results_published']) {
-                    $query->whereNotNull('results_published_at');
-                }
-            })
-            ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school'])
-            ->latest('updated_at')
-            ->limit(200)
-            ->get();
-        $recentRoster = $this->rosterForMarks($recentMarks);
-        $recentResults = $recentMarks
-            ->unique(fn (FestMark $mark) => $mark->deduplicationKey())
-            ->groupBy('item_id')
-            ->sortByDesc(fn ($marksForItem) => $marksForItem->max('updated_at'))
-            ->map(function ($marksForItem) use ($event, $recentRoster) {
-                $first = $marksForItem->first();
+        $recentResults = collect();
+        $publishedItemCount = 0;
 
-                return [
-                    'item_id' => $first->item_id,
-                    'item' => $first->item?->title,
-                    'participant_type' => $first->item?->participant_type,
-                    'winners' => $marksForItem->sortBy('position')
-                        ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $recentRoster))
-                        ->values()
-                        ->all(),
-                ];
-            })
-            ->values();
+        if ($selectedScope['results_published']) {
+            $recentMarks = FestMark::where('event_id', $event->id)
+                ->whereIn('position', [1, 2, 3])
+                ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+                ->latest('updated_at')
+                ->limit(200)
+                ->get();
+            $recentRoster = $this->rosterForMarks($recentMarks);
+            $recentResults = $recentMarks
+                ->unique(fn (FestMark $mark) => $mark->deduplicationKey())
+                ->groupBy('item_id')
+                ->sortByDesc(fn ($marksForItem) => $marksForItem->max('updated_at'))
+                ->map(function ($marksForItem) use ($event, $recentRoster) {
+                    $first = $marksForItem->first();
 
-        $publishedItemCount = FestEventItem::where('event_id', $event->id)
-            ->whereNotNull('results_published_at')
-            ->count();
+                    return [
+                        'item_id' => $first->item_id,
+                        'item' => $first->item?->title,
+                        'participant_type' => $first->item?->participant_type,
+                        'winners' => $marksForItem->sortBy('position')
+                            ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $recentRoster))
+                            ->values()
+                            ->all(),
+                    ];
+                })
+                ->values();
+
+            $publishedItemCount = FestEventItem::where('event_id', $event->id)
+                ->whereNotNull('results_published_at')
+                ->count();
+        }
 
         // The item finder groups by class_group/age_group/category — resolve each raw
         // key (e.g. "category_1") through the same scheme-aware lookup the scoreboard and
@@ -156,11 +156,7 @@ class FestPortalController extends Controller
         $selectedScope = $this->operationalEvents->directScope($event);
         $isPublished = (bool) $selectedScope['results_published'];
 
-        $hasPublishedItems = FestEventItem::whereIn('event_id', $selectedScope['event_ids'] ?? [$event->id])
-            ->whereNotNull('results_published_at')
-            ->exists();
-
-        abort_unless($event->results_published || $hasPublishedItems, 404);
+        abort_unless($isPublished, 403, 'Public scoreboard & results are disabled for this event.');
 
         $scopes = [$selectedScope];
         $tab = $request->query('tab', $selectedScope['results_published'] ? 'school' : 'item');
@@ -560,7 +556,7 @@ class FestPortalController extends Controller
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless((int) $item->event_id === (int) $event->id, 404);
-        abort_unless($event->results_published || $item->results_published_at, 404);
+        abort_unless($event->results_published, 403, 'Public results are disabled for this event.');
 
         $allMarks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
@@ -609,7 +605,7 @@ class FestPortalController extends Controller
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless((int) $item->event_id === (int) $event->id, 404);
         abort_if($mark->event_id !== $item->event_id || $mark->item_id !== $item->id, 404);
-        abort_unless($event->results_published || $item->results_published_at, 404);
+        abort_unless($event->results_published, 403, 'Public results are disabled for this event.');
         abort_if(! in_array((int) $mark->position, [1, 2, 3], true), 404);
 
         $rendered = $posters->render($event, $item, $mark, $tenant);
@@ -625,7 +621,7 @@ class FestPortalController extends Controller
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless((int) $item->event_id === (int) $event->id, 404);
-        abort_unless($event->results_published || $item->results_published_at, 404);
+        abort_unless($event->results_published, 403, 'Public results are disabled for this event.');
 
         $marks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
