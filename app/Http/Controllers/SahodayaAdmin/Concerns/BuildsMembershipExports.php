@@ -255,20 +255,32 @@ trait BuildsMembershipExports
 
         if ($status === 'no_proof' || $status === 'payment_not_done') {
             // Schools with NO submitted or verified membership payment for this academic year
-            $query->whereDoesntHave('payments', function ($q) use ($academicYear) {
-                $q->where('academic_year', $academicYear)
-                  ->whereIn('status', ['submitted', 'verified']);
-            });
+            $excludedSchoolIds = MembershipPayment::query()
+                ->where('academic_year', $academicYear)
+                ->whereIn('status', ['submitted', 'verified'])
+                ->pluck('school_id')
+                ->unique()
+                ->all();
+
+            $query->whereNotIn('id', $excludedSchoolIds);
         } elseif ($status === 'payment_pending') {
-            $query->whereHas('payments', function ($q) use ($academicYear) {
-                $q->where('academic_year', $academicYear)
-                  ->where('status', 'submitted');
-            });
+            $pendingSchoolIds = MembershipPayment::query()
+                ->where('academic_year', $academicYear)
+                ->where('status', 'submitted')
+                ->pluck('school_id')
+                ->unique()
+                ->all();
+
+            $query->whereIn('id', $pendingSchoolIds);
         } elseif ($status === 'payment_verified') {
-            $query->whereHas('payments', function ($q) use ($academicYear) {
-                $q->where('academic_year', $academicYear)
-                  ->where('status', 'verified');
-            });
+            $verifiedSchoolIds = MembershipPayment::query()
+                ->where('academic_year', $academicYear)
+                ->where('status', 'verified')
+                ->pluck('school_id')
+                ->unique()
+                ->all();
+
+            $query->whereIn('id', $verifiedSchoolIds);
         }
     }
 }

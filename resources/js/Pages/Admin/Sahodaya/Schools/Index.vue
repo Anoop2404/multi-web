@@ -40,7 +40,10 @@
             <!-- Bulk credential actions -->
             <div v-if="selectedIds.length" class="flex flex-wrap items-center gap-2 rounded-xl border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3">
                 <span class="text-sm font-semibold text-[#0f3d7a]">{{ selectedIds.length }} selected</span>
-                <button type="button" class="btn-primary text-sm" :disabled="bulkForm.processing" @click="bulkResetPassword">
+                <button type="button" class="btn-primary text-sm" :disabled="bulkForm.processing" @click="bulkCreateLogin">
+                    🔑 Create login & send credentials
+                </button>
+                <button type="button" class="btn-secondary text-sm" :disabled="bulkForm.processing" @click="bulkResetPassword">
                     Reset password
                 </button>
                 <button type="button" class="btn-secondary text-sm" :disabled="bulkForm.processing" @click="bulkSendCredentials">
@@ -145,6 +148,10 @@
                                     <span v-else
                                           class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
                                         Affiliated
+                                    </span>
+                                    <span v-if="!school.has_login"
+                                          class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-900 ring-1 ring-amber-300">
+                                        🔑 No login
                                     </span>
                                     <span v-if="school.payment_status === 'payment_verified'"
                                           class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700 ring-1 ring-emerald-200">
@@ -252,6 +259,16 @@ function toggleSelectAll(event) {
 
 function clearSelection() {
     selectedIds.value = [];
+}
+
+async function bulkCreateLogin() {
+    if (!selectedIds.value.length) return;
+    if (!(await confirm({ message: `Create portal logins and email login details for ${selectedIds.value.length} selected school(s)?`, destructive: false }))) return;
+    bulkForm.school_ids = [...selectedIds.value];
+    bulkForm.post(`/sahodaya-admin/${props.sahodaya.id}/schools/bulk-create-login`, {
+        preserveScroll: true,
+        onSuccess: () => { selectedIds.value = []; bulkForm.reset(); },
+    });
 }
 
 async function bulkResetPassword() {

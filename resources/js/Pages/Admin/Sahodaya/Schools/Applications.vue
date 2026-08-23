@@ -19,6 +19,9 @@
             <button type="button" class="btn-primary text-sm" :disabled="bulkForm.processing" @click="bulkApprove">
                 Approve selected
             </button>
+            <button type="button" class="btn-secondary text-sm text-emerald-800 border-emerald-300 bg-emerald-50 hover:bg-emerald-100" :disabled="bulkForm.processing" @click="bulkCreateLogin">
+                🔑 Create login & send credentials
+            </button>
             <button type="button" class="btn-secondary text-sm text-red-700 border-red-200" :disabled="bulkForm.processing" @click="bulkReject">
                 Reject selected
             </button>
@@ -71,6 +74,12 @@
                     </div>
                 </Link>
                 <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    <button v-if="!school.has_login"
+                            type="button"
+                            class="btn-secondary text-xs py-1.5 px-3 text-amber-800 border-amber-300 bg-amber-50 hover:bg-amber-100"
+                            @click="createLoginOne(school)">
+                        🔑 Create Login
+                    </button>
                     <button type="button" 
                             class="btn-primary text-xs py-1.5 px-3" 
                             :class="!school.has_payment ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''"
@@ -141,6 +150,14 @@ function clearSelection() {
     selectedIds.value = [];
 }
 
+async function createLoginOne(school) {
+    const email = school.contact_email || '';
+    if (!(await confirm({ message: `Create portal login for "${school.name}" (${email || 'registered email'}) and send login details?`, destructive: false }))) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${school.id}/create-login`, {
+        email: email,
+    }, { preserveScroll: true });
+}
+
 async function approveOne(schoolId) {
     if (!(await confirm({ message: 'Approve this school application?', destructive: false }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${schoolId}/approve`, {}, { preserveScroll: true });
@@ -150,6 +167,16 @@ async function rejectOne(schoolId) {
     const reason = await prompt({ message: 'Rejection reason:', inputMultiline: true });
     if (!reason?.trim()) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${schoolId}/reject`, { reason }, { preserveScroll: true });
+}
+
+async function bulkCreateLogin() {
+    if (!selectedIds.value.length) return;
+    if (!(await confirm({ message: `Create portal logins and email login details for ${selectedIds.value.length} selected school(s)?`, destructive: false }))) return;
+    bulkForm.school_ids = [...selectedIds.value];
+    bulkForm.post(`/sahodaya-admin/${props.sahodaya.id}/schools/bulk-create-login`, {
+        preserveScroll: true,
+        onSuccess: () => { selectedIds.value = []; bulkForm.reset(); },
+    });
 }
 
 async function bulkApprove() {

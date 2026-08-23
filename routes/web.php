@@ -879,9 +879,11 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/schools/bulk-cancel-membership', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkCancelMembership'])->name('schools.bulk-cancel-membership');
         Route::post('/schools/bulk-reset-password', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkResetPassword'])->name('schools.bulk-reset-password');
         Route::post('/schools/bulk-send-credentials', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkSendCredentials'])->name('schools.bulk-send-credentials');
+        Route::post('/schools/bulk-create-login', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkCreateLogin'])->name('schools.bulk-create-login');
         Route::get('/schools/export', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'export'])->name('schools.export');
         Route::get('/schools/{school}/students', [\App\Http\Controllers\SahodayaAdmin\SchoolStudentsController::class, 'show'])->name('schools.students');
         Route::get('/schools/{school}', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'show'])->name('schools.show');
+        Route::post('/schools/{school}/create-login', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'createSchoolLogin'])->name('schools.create-login');
         Route::get('/schools/{school}/lock-overrides', [\App\Http\Controllers\SahodayaAdmin\SchoolLockOverrideController::class, 'index'])->name('schools.lock-overrides');
         Route::post('/schools/{school}/lock-overrides', [\App\Http\Controllers\SahodayaAdmin\SchoolLockOverrideController::class, 'store'])->name('schools.lock-overrides.store');
         Route::post('/schools/{school}/approve', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'approve'])->name('schools.approve');

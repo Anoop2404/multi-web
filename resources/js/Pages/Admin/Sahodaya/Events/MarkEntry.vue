@@ -6,17 +6,21 @@
         <PageHeader :title="`${event.title} — Mark entry`" eyebrow="Mark entry"
                     :description="filterDescription">
             <template #actions>
-                <div class="flex flex-wrap items-center gap-2">
-                    <Link :href="markSettingsUrl" class="btn-secondary text-xs">
+                <!-- Nowrap + horizontal scroll on mobile: flex-wrap here let long labels
+                     ("Print Blank Judge Sheets (Paper)") shrink narrower than their own
+                     text, wrapping mid-word inside the button instead of onto a new line.
+                     Desktop keeps the original wrap-freely behavior (sm: and up). -->
+                <div class="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 -mb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:mb-0">
+                    <Link :href="markSettingsUrl" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
                         🎚️ Mark Settings
                     </Link>
-                    <a :href="markEntrySheetUrl" target="_blank" class="btn-secondary text-xs !bg-indigo-50 !text-indigo-800 hover:!bg-indigo-100 font-bold border-indigo-200">
+                    <a :href="markEntrySheetUrl" target="_blank" class="btn-secondary text-xs shrink-0 whitespace-nowrap !bg-indigo-50 !text-indigo-800 hover:!bg-indigo-100 font-bold border-indigo-200">
                         🖨️ Print Blank Judge Sheets (Paper)
                     </a>
-                    <a v-if="cumulativeSheetUrl" :href="cumulativeSheetUrl" target="_blank" class="btn-secondary text-xs">
+                    <a v-if="cumulativeSheetUrl" :href="cumulativeSheetUrl" target="_blank" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
                         📊 Digital Sum Sheet (Online Tabulation)
                     </a>
-                    <Link :href="importUrl" class="btn-primary text-xs">
+                    <Link :href="importUrl" class="btn-primary text-xs shrink-0 whitespace-nowrap">
                         Import Marks
                     </Link>
                 </div>
@@ -87,17 +91,20 @@
                                         :status-for="itemConfiguredMark"
                                         @select="onItemSelect" />
 
-                <div class="flex items-center justify-end gap-3">
-                    <span class="text-[11px] text-slate-400">
+                <!-- Nowrap + horizontal scroll on mobile — without this, flex's default
+                     shrink let buttons squeeze narrower than "Auto-rank All"'s own text,
+                     wrapping it mid-word inside the button (e.g. "Auto-\nrank\nAll"). -->
+                <div class="flex flex-nowrap items-center justify-end gap-3 overflow-x-auto pb-1 -mb-1 sm:pb-0 sm:mb-0">
+                    <span class="text-[11px] text-slate-400 shrink-0 whitespace-nowrap">
                         ✓ {{ configuredCountInView }}/{{ itemOptions.length }} items configured
                     </span>
-                    <button v-if="sections.length" type="button" class="btn-secondary text-xs !py-1.5 !px-3" @click="autoRankAll">
+                    <button v-if="sections.length" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" @click="autoRankAll">
                         Auto-rank All
                     </button>
-                    <button v-if="sections.length && showGradeColumn" type="button" class="btn-secondary text-xs !py-1.5 !px-3" @click="autoGradeAll">
+                    <button v-if="sections.length && showGradeColumn" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" @click="autoGradeAll">
                         Auto-grade All
                     </button>
-                    <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4"
+                    <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4 shrink-0 whitespace-nowrap"
                             :disabled="bulkSaving" @click="saveAll">
                         {{ bulkSaving ? 'Saving all…' : 'Save All Marks ✓' }}
                     </button>
@@ -130,26 +137,26 @@
                         </span>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-2 text-xs">
-                        <div v-if="section.rows.length > 1" class="flex items-center gap-1.5">
-                            <span class="text-slate-500 font-medium text-[11px]">Same rank for all:</span>
+                    <div class="flex flex-nowrap items-center gap-2 text-xs overflow-x-auto pb-1 -mb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:mb-0">
+                        <div v-if="section.rows.length > 1" class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-slate-500 font-medium text-[11px] whitespace-nowrap">Same rank for all:</span>
                             <select v-model="bulkRank[section.bulkKey]" class="field text-xs !py-1 min-w-[9rem]">
                                 <option :value="null">—</option>
                                 <option v-for="opt in rankOptionsFor(section)" :key="opt.rank" :value="opt.rank">
                                     {{ opt.label }}
                                 </option>
                             </select>
-                            <button type="button" class="btn-secondary text-xs !py-1 !px-2.5"
+                            <button type="button" class="btn-secondary text-xs !py-1 !px-2.5 whitespace-nowrap"
                                     :disabled="!bulkRank[section.bulkKey]"
                                     @click="applyBulkRank(section, markForms)">
                                 Apply
                             </button>
                         </div>
 
-                        <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5" @click="autoRankSection(section)">
+                        <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" @click="autoRankSection(section)">
                             Auto-rank
                         </button>
-                        <button v-if="section.item?.id && showGradeColumn" type="button" class="btn-secondary text-xs !py-1 !px-2.5" @click="autoGrade(section)">
+                        <button v-if="section.item?.id && showGradeColumn" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" @click="autoGrade(section)">
                             Auto-grade
                         </button>
                     </div>
@@ -160,7 +167,13 @@
                     <table class="w-full text-xs text-left">
                         <thead class="bg-slate-50/80 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold">
                             <tr>
-                                <th class="p-3.5 w-10 text-center">#</th>
+                                <!-- Sticky on both scroll edges: this table has up to 10
+                                     columns (sports items add Time/Distance; judge-panel
+                                     items add one column per judge) and routinely overflows
+                                     narrow screens — without these, scrolling right to reach
+                                     Rank/Score/Grade loses track of which row you're on, and
+                                     reaching Save requires scrolling all the way back. -->
+                                <th class="p-3.5 w-10 text-center sticky left-0 z-20 bg-slate-50 border-r border-slate-200">#</th>
                                 <th class="p-3.5 w-32">Chest No.</th>
                                 <th class="p-3.5 w-36">Reg No.</th>
                                 <th class="p-3.5 w-32">Attendance</th>
@@ -175,7 +188,7 @@
                                 </template>
                                 <th v-else class="p-3.5 w-28">Marks / Score</th>
                                 <th v-if="showGradeColumn" class="p-3.5 w-24">Grade</th>
-                                <th class="p-3.5 text-right w-24">Actions</th>
+                                <th class="p-3.5 text-right w-24 sticky right-0 z-20 bg-slate-50 border-l border-slate-200">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -183,7 +196,8 @@
                                 :class="isAbsent(participant, item) ? 'bg-rose-50/30' : 'hover:bg-slate-50/70 transition'">
                                 
                                 <!-- Serial No -->
-                                <td class="p-3.5 text-slate-400 text-center font-mono font-medium">{{ pIdx + 1 }}</td>
+                                <td class="p-3.5 text-slate-400 text-center font-mono font-medium sticky left-0 z-10 border-r border-slate-200"
+                                    :class="isAbsent(participant, item) ? 'bg-rose-50' : 'bg-white'">{{ pIdx + 1 }}</td>
 
                                 <!-- Chest No. -->
                                 <td class="p-3.5 font-mono font-bold text-slate-900">
@@ -272,7 +286,8 @@
                                 </td>
 
                                 <!-- Action Button -->
-                                <td class="p-3.5 text-right">
+                                <td class="p-3.5 text-right sticky right-0 z-10 border-l border-slate-200"
+                                    :class="isAbsent(participant, item) ? 'bg-rose-50' : 'bg-white'">
                                     <div class="flex items-center justify-end gap-2">
                                         <span v-if="savedIds.has(participant.id)" class="text-xs font-bold text-emerald-600">Saved ✓</span>
                                         <button type="button" class="btn-primary text-xs !py-1 !px-3"
@@ -743,14 +758,19 @@ function autoRankSection(section) {
 
     scoredRows.sort((a, b) => b.score - a.score);
 
-    let currentRank = 1;
+    // Dense ranking, matching FestSportsAutoRankService::assignDenseRanks() exactly: a
+    // tie shares one rank and the next distinct score continues right after it (1,1,2,3
+    // — never 1,1,3). Previously this incremented rank by sorted INDEX on any score drop
+    // (competition/skip-style: 1,1,3,4) and stopped assigning past rank 6 entirely,
+    // silently leaving every participant ranked 7th or lower unranked.
+    let currentRank = 0;
+    let lastScore = null;
     for (let i = 0; i < scoredRows.length; i++) {
-        if (i > 0 && scoredRows[i].score < scoredRows[i - 1].score) {
-            currentRank = i + 1;
+        if (lastScore === null || Math.abs(scoredRows[i].score - lastScore) > 0.000001) {
+            currentRank++;
+            lastScore = scoredRows[i].score;
         }
-        if (currentRank <= 6) {
-            setRank(scoredRows[i].participantId, scoredRows[i].item, markForms, currentRank);
-        }
+        setRank(scoredRows[i].participantId, scoredRows[i].item, markForms, currentRank);
     }
 }
 

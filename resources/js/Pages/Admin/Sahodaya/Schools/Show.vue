@@ -196,16 +196,40 @@
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap gap-2">
+                    <div v-if="!school.has_login" class="space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                        <div class="flex items-start gap-3">
+                            <span class="text-xl">🔑</span>
+                            <div>
+                                <p class="text-sm font-semibold text-amber-900">No portal login created for this school</p>
+                                <p class="text-xs text-amber-700 mt-0.5">
+                                    Create a login using the email address below. Temporary login credentials will be generated and emailed to the school.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <div class="flex-1">
+                                <label class="text-xs font-semibold uppercase tracking-wide text-amber-800">Target Email Address</label>
+                                <input v-model="createLoginEmail" type="email" class="field mt-1 bg-white" placeholder="school@example.com">
+                            </div>
+                            <button type="button"
+                                    class="btn-primary text-sm bg-amber-700 hover:bg-amber-800 border-amber-700"
+                                    :disabled="creatingLogin || !createLoginEmail.trim()"
+                                    @click="createSchoolLogin">
+                                {{ creatingLogin ? 'Creating login…' : '🔑 Create Login & Send Credentials' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-else class="flex flex-wrap gap-2">
                         <button type="button"
                                 class="btn-secondary text-sm"
-                                :disabled="credentialProcessing || !school.has_login"
+                                :disabled="credentialProcessing"
                                 @click="resendSchoolCredentials">
                             Resend credentials
                         </button>
                         <button type="button"
                                 class="btn-secondary text-sm text-red-700 border-red-200"
-                                :disabled="credentialProcessing || !school.has_login"
+                                :disabled="credentialProcessing"
                                 @click="resetSchoolPassword">
                             Reset password
                         </button>
@@ -381,6 +405,23 @@ const deleteProcessing = ref(false);
 const schoolEmail = ref(props.school.contact_email || props.school.login_email || '');
 const emailProcessing = ref(false);
 const credentialProcessing = ref(false);
+
+const createLoginEmail = ref(props.school.contact_email || props.school.login_email || '');
+const creatingLogin = ref(false);
+
+async function createSchoolLogin() {
+    const email = createLoginEmail.value.trim();
+    if (!email) return;
+    if (!(await confirm({ message: `Create portal login for ${props.school.name} (${email}) and send login details?`, destructive: false }))) return;
+
+    creatingLogin.value = true;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/create-login`, {
+        email: email,
+    }, {
+        preserveScroll: true,
+        onFinish: () => { creatingLogin.value = false; },
+    });
+}
 
 const adminNoteText = ref(props.school.admin_note || '');
 const savingAdminNote = ref(false);

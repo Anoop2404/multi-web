@@ -90,7 +90,10 @@ class MemberSchoolsController extends SahodayaAdminController
 
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
 
-        $schools->getCollection()->transform(function (Tenant $school) use ($year) {
+        $pageIds = $schools->getCollection()->pluck('id');
+        $schoolIdsWithUser = User::whereIn('tenant_id', $pageIds)->pluck('tenant_id')->unique()->all();
+
+        $schools->getCollection()->transform(function (Tenant $school) use ($year, $schoolIdsWithUser) {
             $payload = $school->application_payload ?? [];
             $school->setAttribute('contact_email', $payload['school_email'] ?? $payload['contact_email'] ?? null);
             $school->setAttribute('contact_phone', $payload['phone'] ?? $payload['contact_phone'] ?? null);
@@ -107,6 +110,7 @@ class MemberSchoolsController extends SahodayaAdminController
             $school->setAttribute('payment_status', $payment?->status);
             $school->setAttribute('payment_amount', $payment?->amount);
             $school->setAttribute('payment_proof_url', $payment?->proof_url);
+            $school->setAttribute('has_login', in_array($school->id, $schoolIdsWithUser, true));
 
             return $school;
         });
@@ -585,6 +589,186 @@ class MemberSchoolsController extends SahodayaAdminController
         $message = "Credentials resent to {$sentCount} school(s).";
         if ($skipped > 0) {
             $message .= " {$skipped} skipped (no login or no stored password).";
+        }
+
+        return back()->with('success', $message);
+    }
+
+    public function createSchoolLogin(
+        Request $request,
+        string $tenantId,
+        Tenant $school,
+        MembershipNotifier $notifier,
+        PlatformAuditLogger $audit,
+    ) {
+        abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+
+        return TenantAuth::withTenantUsers($school, function () use ($request, $school, $notifier, $audit) {
+            $existingLogin = $this->schoolLoginUser($school);
+            if ($existingLogin !== null) {
+                return back()->with('error', "A login already exists for {$school->name} ({$existingLogin->email}).");
+            }
+
+            $data = $request->validate([
+                'email' => 'nullable|email|max:255',
+            ]);
+
+            $payload = $school->application_payload ?? [];
+            $email = isset($data['email']) && trim($data['email']) !== ''
+                ? strtolower(trim($data['email']))
+                : strtolower(trim((string) ($payload['school_email'] ?? $payload['contact_email'] ?? '')));
+
+            if ($email === '') {
+                return back()->with('error', "No email address found for {$school->name}. Please specify an email address.");
+            }
+
+            if (User::where('email', $email)->exists()) {
+                return back()->with('error', "The email address {$email} is already in use by another user account.");
+            }
+
+            if (($payload['school_email'] ?? null) !== $email) {
+                $payload['school_email'] = $email;
+                $payload['contact_email'] = $email;
+                $school->update(['application_payload' => $payload]);
+            }
+
+            $plainPassword = \Illuminate\Support\Str::password(12);
+
+            $user = User::create([
+                'tenant_id'            => $school->id,
+                'name'                 => $payload['school_name'] ?? $school->name,
+                'email'                => $email,
+                'email_verified_at'    => now(),
+                'password'             => \Illuminate\Support\Facades\Hash::make($plainPassword),
+                'plain_password'       => $plainPassword,
+                'must_change_password' => true,
+            ]);
+            $user->assignRole('school_admin');
+
+            $emailSent = true;
+            try {
+                SahodayaMailer::for($school->parent_id)->sendVerification($user);
+            } catch (\Throwable $e) {
+                $emailSent = false;
+                \Illuminate\Support\Facades\Log::error('Failed to send verification email during school login creation', [
+                    'school_id' => $school->id,
+                    'email'     => $email,
+                    'error'     => $e->getMessage(),
+                ]);
+            }
+
+            try {
+                $notifier->schoolCredentialsIssued($user, $plainPassword, $school);
+            } catch (\Throwable $e) {
+                $emailSent = false;
+                \Illuminate\Support\Facades\Log::error('Failed to send credentials email during school login creation', [
+                    'school_id' => $school->id,
+                    'email'     => $email,
+                    'error'     => $e->getMessage(),
+                ]);
+            }
+
+            $audit->log(
+                'membership.school.login.created',
+                "School login created for {$school->name} ({$email})",
+                $school,
+                ['updated_by_user_id' => $request->user()?->id, 'user_id' => $user->id, 'email' => $email],
+            );
+
+            $message = $emailSent
+                ? "Login created for {$school->name} ({$email}) and login details emailed."
+                : "Login created for {$school->name} ({$email}) (Note: Verification/credentials email delivery failed — check mail settings).";
+
+            return back()->with('success', $message);
+        });
+    }
+
+    public function bulkCreateLogin(
+        Request $request,
+        MembershipNotifier $notifier,
+        PlatformAuditLogger $audit,
+    ) {
+        $data = $request->validate([
+            'school_ids'   => 'required|array|min:1|max:50',
+            'school_ids.*' => 'uuid',
+        ]);
+
+        $schools = Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->whereIn('id', $data['school_ids'])
+            ->get();
+
+        $createdCount = 0;
+        $skippedReasons = [];
+
+        foreach ($schools as $school) {
+            $didCreate = TenantAuth::withTenantUsers($school, function () use ($school, $notifier, $audit, $request, &$skippedReasons) {
+                if ($this->schoolLoginUser($school) !== null) {
+                    $skippedReasons[] = "{$school->name} (already has login)";
+                    return false;
+                }
+
+                $payload = $school->application_payload ?? [];
+                $email = strtolower(trim((string) ($payload['school_email'] ?? $payload['contact_email'] ?? '')));
+
+                if ($email === '') {
+                    $skippedReasons[] = "{$school->name} (no email address)";
+                    return false;
+                }
+
+                if (User::where('email', $email)->exists()) {
+                    $skippedReasons[] = "{$school->name} (email {$email} already in use)";
+                    return false;
+                }
+
+                $plainPassword = \Illuminate\Support\Str::password(12);
+
+                $user = User::create([
+                    'tenant_id'            => $school->id,
+                    'name'                 => $payload['school_name'] ?? $school->name,
+                    'email'                => $email,
+                    'email_verified_at'    => now(),
+                    'password'             => \Illuminate\Support\Facades\Hash::make($plainPassword),
+                    'plain_password'       => $plainPassword,
+                    'must_change_password' => true,
+                ]);
+                $user->assignRole('school_admin');
+
+                try {
+                    SahodayaMailer::for($school->parent_id)->sendVerification($user);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+
+                try {
+                    $notifier->schoolCredentialsIssued($user, $plainPassword, $school);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+
+                $audit->log(
+                    'membership.school.login.created',
+                    "School login created for {$school->name} ({$email})",
+                    $school,
+                    ['updated_by_user_id' => $request->user()?->id, 'user_id' => $user->id, 'bulk' => true],
+                );
+
+                return true;
+            });
+
+            if ($didCreate) {
+                $createdCount++;
+            }
+        }
+
+        if ($createdCount === 0) {
+            return back()->with('error', 'No school logins could be created. ' . implode(', ', array_slice($skippedReasons, 0, 3)));
+        }
+
+        $message = "{$createdCount} school login(s) created and credentials emailed.";
+        if (count($skippedReasons) > 0) {
+            $message .= " " . count($skippedReasons) . " skipped.";
         }
 
         return back()->with('success', $message);
