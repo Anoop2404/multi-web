@@ -494,6 +494,10 @@ class FestMarkEntryController extends SahodayaAdminController
 
         return FestParticipant::where('group_id', $participant->group_id)
             ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('item_id', $itemId))
+            ->where(function ($q) {
+                $q->whereNull('participant_role')
+                    ->orWhere('participant_role', '!=', 'standby');
+            })
             ->pluck('id')
             ->all();
     }

@@ -140,6 +140,10 @@ class FestAttendanceController extends SahodayaAdminController
 
         return FestParticipant::where('group_id', $participant->group_id)
             ->whereHas('registration', fn ($q) => $q->whereIn('event_id', $event->reportableEventIds())->where('item_id', $itemId))
+            ->where(function ($q) {
+                $q->whereNull('participant_role')
+                    ->orWhere('participant_role', '!=', 'standby');
+            })
             ->pluck('id')
             ->all();
     }
