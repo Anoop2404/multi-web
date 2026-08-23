@@ -157,52 +157,61 @@
 
             <!-- Login -->
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <h3 class="font-bold text-gray-900 mb-3">Portal Access</h3>
-                <div class="space-y-4">
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <div class="rounded-xl bg-slate-50 px-4 py-3">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Contact email</p>
-                            <p class="mt-1 text-sm font-medium text-slate-900">
-                                {{ school.contact_email || 'Not set' }}
-                            </p>
-                        </div>
-                        <div class="rounded-xl bg-slate-50 px-4 py-3">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Login email</p>
-                            <p class="mt-1 text-sm font-medium text-slate-900">
-                                {{ school.has_login ? (school.login_email || 'Set') : 'Not created' }}
-                            </p>
-                        </div>
-                    </div>
+                <div class="flex items-center justify-between gap-3 mb-4">
+                    <h3 class="font-bold text-gray-900">Portal Access & Credentials</h3>
+                    <span :class="school.has_login ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200'"
+                          class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                        {{ school.has_login ? '✓ Active Login Account' : '⚠️ No Login Created' }}
+                    </span>
+                </div>
 
-                    <div class="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                        <div>
-                            <p class="text-sm font-semibold text-slate-900">Update school email</p>
-                            <p class="text-xs text-slate-600">
-                                This updates the school contact email and the portal login email together.
-                                A verification email is sent to the new address when a login exists.
-                            </p>
-                        </div>
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                            <div class="flex-1">
-                                <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Email</label>
-                                <input v-model="schoolEmail" type="email" class="field mt-1" placeholder="school@example.com">
+                <div class="space-y-4">
+                    <!-- When school HAS a login -->
+                    <div v-if="school.has_login" class="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-3">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">School Admin Login</p>
+                                <p class="text-base font-bold text-slate-900 mt-0.5">{{ school.login_user?.name || school.name }}</p>
+                                <p class="text-xs font-mono text-slate-600 mt-0.5">
+                                    Username: <span class="font-semibold text-slate-900 select-all">{{ school.login_user?.username || school.login_email }}</span>
+                                </p>
                             </div>
+                            <div class="flex items-center gap-2">
+                                <span v-if="school.login_user?.email_verified"
+                                      class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                                    ✓ Email Verified
+                                </span>
+                                <span v-else
+                                      class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                                    ⏳ Pre-verified / Temporary
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 pt-1">
                             <button type="button"
-                                    class="btn-primary text-sm"
-                                    :disabled="emailProcessing || !schoolEmail.trim()"
-                                    @click="saveSchoolEmail">
-                                {{ emailProcessing ? 'Saving…' : 'Save email' }}
+                                    class="btn-secondary text-xs"
+                                    :disabled="credentialProcessing"
+                                    @click="resendSchoolCredentials">
+                                ✉ Resend credentials email
+                            </button>
+                            <button type="button"
+                                    class="btn-secondary text-xs text-red-700 border-red-200 hover:bg-red-50"
+                                    :disabled="credentialProcessing"
+                                    @click="resetSchoolPassword">
+                                🔑 Reset password & email new temporary key
                             </button>
                         </div>
                     </div>
 
-                    <div v-if="!school.has_login" class="space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                    <!-- When school DOES NOT HAVE a login -->
+                    <div v-else class="space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4">
                         <div class="flex items-start gap-3">
                             <span class="text-xl">🔑</span>
                             <div>
                                 <p class="text-sm font-semibold text-amber-900">No portal login created for this school</p>
                                 <p class="text-xs text-amber-700 mt-0.5">
-                                    Create a login using the email address below. Temporary login credentials will be generated and emailed to the school.
+                                    Create a portal login using the target email address below. A temporary password will be generated and emailed directly to the school.
                                 </p>
                             </div>
                         </div>
@@ -220,19 +229,26 @@
                         </div>
                     </div>
 
-                    <div v-else class="flex flex-wrap gap-2">
-                        <button type="button"
-                                class="btn-secondary text-sm"
-                                :disabled="credentialProcessing"
-                                @click="resendSchoolCredentials">
-                            Resend credentials
-                        </button>
-                        <button type="button"
-                                class="btn-secondary text-sm text-red-700 border-red-200"
-                                :disabled="credentialProcessing"
-                                @click="resetSchoolPassword">
-                            Reset password
-                        </button>
+                    <!-- Update School Email Form -->
+                    <div class="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">Update school email address</p>
+                            <p class="text-xs text-slate-600">
+                                Updates the school's contact email and portal login email together.
+                            </p>
+                        </div>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <div class="flex-1">
+                                <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Email Address</label>
+                                <input v-model="schoolEmail" type="email" class="field mt-1 bg-white" placeholder="school@example.com">
+                            </div>
+                            <button type="button"
+                                    class="btn-primary text-sm"
+                                    :disabled="emailProcessing || !schoolEmail.trim()"
+                                    @click="saveSchoolEmail">
+                                {{ emailProcessing ? 'Saving…' : 'Save email' }}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

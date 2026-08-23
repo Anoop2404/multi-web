@@ -91,7 +91,9 @@ class MemberSchoolsController extends SahodayaAdminController
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
 
         $pageIds = $schools->getCollection()->pluck('id');
-        $schoolIdsWithUser = User::whereIn('tenant_id', $pageIds)->pluck('tenant_id')->unique()->all();
+        $schoolIdsWithUser = TenantAuth::withTenantUsers($this->sahodaya, function () use ($pageIds) {
+            return User::whereIn('tenant_id', $pageIds)->pluck('tenant_id')->unique()->all();
+        }) ?? [];
 
         $schools->getCollection()->transform(function (Tenant $school) use ($year, $schoolIdsWithUser) {
             $payload = $school->application_payload ?? [];
@@ -177,6 +179,8 @@ class MemberSchoolsController extends SahodayaAdminController
             ->latest()
             ->first();
 
+        $loginUser = $this->schoolLoginUser($school);
+
         return $this->inertia('Sahodaya/Schools/Show', [
             'school' => array_merge($school->only(
                 'id', 'name', 'school_prefix', 'membership_status', 'is_non_affiliated', 'is_active',
@@ -186,8 +190,17 @@ class MemberSchoolsController extends SahodayaAdminController
                 'admin_note'     => $payload['admin_note'] ?? null,
                 'student_count'  => Student::where('tenant_id', $school->id)->where('status', 'active')->count(),
                 'classes_count'  => SchoolClass::where('tenant_id', $school->id)->where('is_active', true)->count(),
-                'has_login'      => $this->schoolLoginUser($school) !== null,
-                'login_email'    => $this->schoolLoginUser($school)?->email,
+                'has_login'      => $loginUser !== null,
+                'login_email'    => $loginUser?->email,
+                'login_user'     => $loginUser ? [
+                    'id'                => $loginUser->id,
+                    'name'              => $loginUser->name,
+                    'email'             => $loginUser->email,
+                    'username'          => $loginUser->username ?: $loginUser->email,
+                    'email_verified'    => $loginUser->hasVerifiedEmail(),
+                    'email_verified_at' => $loginUser->email_verified_at?->toIso8601String(),
+                    'created_at'        => $loginUser->created_at?->toIso8601String(),
+                ] : null,
                 'can_cancel_membership' => $cancellation->canCancel($school),
                 'can_cancel_with_settlement' => $school->membership_status === 'approved' && !$cancellation->canCancel($school),
                 'has_payment'    => $payment !== null,
@@ -969,7 +982,11 @@ class MemberSchoolsController extends SahodayaAdminController
         $classCounts = $this->classCountsFor($pageIds);
         $studentCounts = $this->studentCountsFor($pageIds);
 
-        $schools->transform(function (Tenant $school) use ($classCounts, $studentCounts) {
+        $schoolIdsWithUser = TenantAuth::withTenantUsers($this->sahodaya, function () use ($pageIds) {
+            return User::whereIn('tenant_id', $pageIds)->pluck('tenant_id')->unique()->all();
+        }) ?? [];
+
+        $schools->transform(function (Tenant $school) use ($classCounts, $studentCounts, $schoolIdsWithUser) {
             $payload = $school->application_payload ?? [];
             $school->setAttribute('student_count', (int) ($studentCounts[$school->id] ?? 0));
             $school->setAttribute('classes_count', (int) ($classCounts[$school->id] ?? 0));
@@ -977,6 +994,7 @@ class MemberSchoolsController extends SahodayaAdminController
             $school->setAttribute('contact_phone', $payload['phone'] ?? $payload['contact_phone'] ?? null);
             $school->setAttribute('affiliation', $payload['cbse_affiliation'] ?? $payload['affiliation_number'] ?? null);
             $school->setAttribute('fest_registration_closed', (bool) $school->fest_registration_closed);
+            $school->setAttribute('has_login', in_array($school->id, $schoolIdsWithUser, true));
 
             return $school;
         });
