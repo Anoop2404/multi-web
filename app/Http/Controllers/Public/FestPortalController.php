@@ -411,10 +411,7 @@ class FestPortalController extends Controller
         $selectedScope = $this->operationalEvents->directScope($event);
         $isPublished = (bool) $selectedScope['results_published'];
 
-        $hasPublishedItems = FestEventItem::whereIn('event_id', $selectedScope['event_ids'] ?? [$event->id])
-            ->whereNotNull('results_published_at')
-            ->exists();
-        abort_unless($event->results_published || $hasPublishedItems, 404);
+        abort_unless($isPublished, 403, 'Public scoreboard & results are disabled for this event.');
 
         $categories = $this->scoreboards->categories($event, $selectedScope);
         $category = $this->stringQuery($request, 'category');
@@ -714,6 +711,7 @@ class FestPortalController extends Controller
         $event = $this->findEvent($tenant->id, $eventId);
         $selectedScope = $this->operationalEvents->directScope($event);
         $isPublished = (bool) $selectedScope['results_published'];
+        abort_unless($isPublished, 403, 'Public scoreboard is disabled for this event.');
         $categories = $this->scoreboards->categories($event, $selectedScope);
 
         $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
