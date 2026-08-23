@@ -960,25 +960,26 @@ class FestPortalController extends Controller
         // items have individually published so far — not a blank "not published"
         // state, matching the item-level results already visible elsewhere on the
         // public portal at this point.
-        $scoreboard = $selectedScope['results_published']
-            ? ($this->cumulativeChampionship->publicStanding($event)['rows']
-                ?? $this->scoreboards->scoreboard($event, $selectedScope))
-            : $this->scoreboards->provisionalScoreboard($event, $selectedScope);
+        $scoreboard = [];
+        if ($selectedScope['results_published']) {
+            $rawScoreboard = $this->cumulativeChampionship->publicStanding($event)['rows']
+                ?? $this->scoreboards->scoreboard($event, $selectedScope);
 
-        $medalTally = $this->schoolMedalTally($selectedScope['event_ids'], (bool) $selectedScope['results_published']);
-        $scoreboard = collect($scoreboard)
-            ->map(fn (array $row) => $row + [
-                'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
-                'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
-                'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
-            ])
-            ->values()
-            ->all();
+            $medalTally = $this->schoolMedalTally($selectedScope['event_ids'], true);
+            $scoreboard = collect($rawScoreboard)
+                ->map(fn (array $row) => $row + [
+                    'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
+                    'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
+                    'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
+                ])
+                ->values()
+                ->all();
+        }
 
         return [
             'scoreboard' => $scoreboard,
             'standingsPublished' => (bool) $selectedScope['results_published'],
-            'standingsProvisional' => ! $selectedScope['results_published'] && ! empty($scoreboard),
+            'standingsProvisional' => false,
             'categoryLinks' => $categoryLinks,
             'houseScoreboard' => $selectedScope['results_published']
                 ? $ctx->scoreboardByHouse()

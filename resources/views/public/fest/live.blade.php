@@ -57,7 +57,7 @@
                     <span class="text-right font-mono font-extrabold text-white text-sm">{{ $row['total_points'] }}</span>
                 </li>
                 @empty
-                <li class="text-white/30 text-center py-6">{{ $standingsPublished ? 'No scores yet' : 'Standings appear here once at least one item is published' }}</li>
+                <li class="text-white/40 text-center py-6 font-semibold">{{ $standingsPublished ? 'No scores published yet' : '🔒 Public scoreboard & standings are disabled for this event.' }}</li>
                 @endforelse
             </ol>
         </div>
