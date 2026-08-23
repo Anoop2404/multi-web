@@ -13,7 +13,7 @@ class StatusTransitionGuard
         'published'         => ['registration_open', 'draft', 'cancelled'],
         'registration_open' => ['ongoing', 'published', 'cancelled'],
         'ongoing'           => ['completed', 'cancelled'],
-        'completed'         => [], // Completed events cannot be transitioned back
+        'completed'         => ['ongoing'], // Admin re-opening to ongoing
         'cancelled'         => ['draft'], // Admin re-opening
     ];
 

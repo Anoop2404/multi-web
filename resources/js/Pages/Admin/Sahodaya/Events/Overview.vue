@@ -443,7 +443,7 @@ const FEST_EVENT_TRANSITIONS = {
     published: ['registration_open', 'draft', 'cancelled'],
     registration_open: ['ongoing', 'published', 'cancelled'],
     ongoing: ['completed', 'cancelled'],
-    completed: [],
+    completed: ['ongoing'],
     cancelled: ['draft'],
 };
 
