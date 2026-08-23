@@ -74,6 +74,11 @@
                                  filterForm.payment_status === 'payment_verified' ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100']">
                     <span>✓ Fee Verified</span>
                 </button>
+                <button type="button" @click="setLoginStatusFilter(filterForm.login_status === 'no_login' ? 'all' : 'no_login')"
+                        :class="['px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5',
+                                 filterForm.login_status === 'no_login' ? 'bg-amber-700 text-white shadow-xs' : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100']">
+                    <span>🔑 Schools Without Login</span>
+                </button>
             </div>
 
             <!-- Filters -->
@@ -170,10 +175,20 @@
                         </div>
 
                         <div class="mt-3 space-y-1 text-xs text-slate-500">
-                            <p v-if="school.contact_email" class="truncate">✉ {{ school.contact_email }}</p>
+                            <p v-if="school.contact_email" class="truncate font-medium text-slate-700">✉ {{ school.contact_email }}</p>
+                            <p v-else class="text-amber-700 italic">No email entered</p>
                             <p v-if="school.contact_phone">📞 {{ school.contact_phone }}</p>
                             <p v-if="school.affiliation" class="font-mono">Aff. {{ school.affiliation }}</p>
                             <p v-else-if="school.is_non_affiliated" class="text-amber-700">No CBSE affiliation no.</p>
+                        </div>
+
+                        <div v-if="!school.has_login" class="mt-2.5 pt-2.5 border-t border-amber-100/80 flex items-center justify-between gap-2">
+                            <span class="text-[11px] font-semibold text-amber-900">No login assigned</span>
+                            <button type="button"
+                                    class="btn-primary text-xs !py-1 !px-2.5 bg-amber-700 hover:bg-amber-800 border-amber-700 shrink-0 cursor-pointer relative z-20"
+                                    @click.prevent.stop="createLoginForSchool(school)">
+                                🔑 Assign Login
+                            </button>
                         </div>
 
                         <div class="school-card-metrics">
@@ -261,6 +276,21 @@ function clearSelection() {
     selectedIds.value = [];
 }
 
+async function createLoginForSchool(school) {
+    let email = (school.contact_email || '').trim();
+    if (!email) {
+        email = await prompt({ message: `Enter portal login email address for "${school.name}":`, inputPlaceholder: 'school@example.com' });
+        if (!email?.trim()) return;
+        email = email.trim();
+    } else {
+        if (!(await confirm({ message: `Create portal login for "${school.name}" using email ${email}? Credentials will be sent by email.`, destructive: false }))) return;
+    }
+
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${school.id}/create-login`, {
+        email: email,
+    }, { preserveScroll: true });
+}
+
 async function bulkCreateLogin() {
     if (!selectedIds.value.length) return;
     if (!(await confirm({ message: `Create portal logins and email login details for ${selectedIds.value.length} selected school(s)?`, destructive: false }))) return;
@@ -296,6 +326,7 @@ const filterForm = reactive({
     date_from:      props.filters?.date_from ?? '',
     date_to:        props.filters?.date_to ?? '',
     payment_status: props.filters?.payment_status ?? 'all',
+    login_status:   props.filters?.login_status ?? 'all',
 });
 
 const sortSelection = computed({
@@ -311,7 +342,7 @@ function applySort(e) {
 }
 
 const hasActiveFilters = computed(() =>
-    filterForm.search || filterForm.date_from || filterForm.date_to || (filterForm.payment_status && filterForm.payment_status !== 'all')
+    filterForm.search || filterForm.date_from || filterForm.date_to || (filterForm.payment_status && filterForm.payment_status !== 'all') || (filterForm.login_status && filterForm.login_status !== 'all')
 );
 
 function listParams(overrides = {}) {
@@ -320,6 +351,7 @@ function listParams(overrides = {}) {
         date_from:      props.filters?.date_from ?? '',
         date_to:        props.filters?.date_to ?? '',
         payment_status: props.filters?.payment_status ?? 'all',
+        login_status:   props.filters?.login_status ?? 'all',
         sort:           props.filters?.sort ?? 'name',
         dir:            props.filters?.dir ?? 'asc',
         ...overrides,
@@ -328,7 +360,16 @@ function listParams(overrides = {}) {
 
 function setPaymentStatusFilter(status) {
     filterForm.payment_status = status;
-    applyFilters();
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/schools`, listParams({ payment_status: status }), {
+        preserveState: true, replace: true,
+    });
+}
+
+function setLoginStatusFilter(status) {
+    filterForm.login_status = status;
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/schools`, listParams({ login_status: status }), {
+        preserveState: true, replace: true,
+    });
 }
 
 function applyFilters() {
@@ -337,6 +378,7 @@ function applyFilters() {
         date_from:      filterForm.date_from,
         date_to:        filterForm.date_to,
         payment_status: filterForm.payment_status,
+        login_status:   filterForm.login_status,
     }), { preserveState: true, replace: true });
 }
 

@@ -18,6 +18,7 @@ trait BuildsMembershipExports
     protected function schoolListFilters(Request $request): array
     {
         $status = $request->query('payment_status', 'all');
+        $loginStatus = $request->query('login_status', 'all');
 
         return [
             'search'         => trim((string) $request->query('search', '')),
@@ -26,6 +27,7 @@ trait BuildsMembershipExports
             'sort'           => $request->query('sort', 'name'),
             'dir'            => $request->query('dir', 'asc') === 'desc' ? 'desc' : 'asc',
             'payment_status' => in_array($status, ['all', 'payment_verified', 'payment_pending', 'payment_not_done', 'no_proof'], true) ? $status : 'all',
+            'login_status'   => in_array($loginStatus, ['all', 'no_login', 'has_login'], true) ? $loginStatus : 'all',
         ];
     }
 
@@ -71,6 +73,7 @@ trait BuildsMembershipExports
         $this->applySchoolSearchAndDates($query, $filters);
         $this->applyMembershipRegionScope($query);
         $this->applyPaymentStatusFilter($query, $sahodayaId, $filters);
+        $this->applyLoginStatusFilter($query, $filters);
 
         return $query;
     }
@@ -281,6 +284,22 @@ trait BuildsMembershipExports
                 ->all();
 
             $query->whereIn('id', $verifiedSchoolIds);
+        }
+    }
+
+    private function applyLoginStatusFilter(Builder $query, array $filters): void
+    {
+        $status = $filters['login_status'] ?? 'all';
+        if ($status === 'all') {
+            return;
+        }
+
+        $schoolIdsWithUser = \App\Models\User::query()->pluck('tenant_id')->unique()->filter()->all();
+
+        if ($status === 'no_login') {
+            $query->whereNotIn('id', $schoolIdsWithUser);
+        } elseif ($status === 'has_login') {
+            $query->whereIn('id', $schoolIdsWithUser);
         }
     }
 }
