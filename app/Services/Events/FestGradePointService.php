@@ -82,10 +82,12 @@ class FestGradePointService
             }
         }
 
-        // No rank, or a rank with no specific rule for it (e.g. 4th place when only
-        // 1st-3rd are configured) — a grade still earns something: prefer whatever
-        // "Any Position" rule the admin configured for this grade on the Grade Points
-        // Master page, and only fall back to the generic default table if they haven't.
+        // If no rank-specific rule matched above and the mark has no grade awarded,
+        // do not award any fallback grade points (a null grade should not assume grade 'C').
+        if (! $mark->grade) {
+            return 0;
+        }
+
         $anyPositionRule = FestPointRule::where('event_id', $event->id)
             ->where('is_group', $isGroup)
             ->whereNull('position')
