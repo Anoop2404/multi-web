@@ -211,8 +211,11 @@ class FestResultsController extends SahodayaAdminController
         app(FestItemResultsService::class)->publishItem($item);
         EventContext::for($event)->recalculateSchoolPoints();
 
-        $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.item_published', "Results published for {$item->title}", [
-            'item_id' => $item->id,
+        $codeLabel = $item->item_code ? " ({$item->item_code})" : '';
+        $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.item_published', "Results published for {$item->title}{$codeLabel}", [
+            'item_id'   => $item->id,
+            'item_code' => $item->item_code,
+            'title'     => $item->title,
         ]);
 
         return back()->with('success', "Results published for {$item->title}.");
@@ -226,8 +229,11 @@ class FestResultsController extends SahodayaAdminController
         app(FestItemResultsService::class)->unpublishItem($item);
         EventContext::for($event)->recalculateSchoolPoints();
 
-        $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.item_unpublished', "Results unpublished for {$item->title}", [
-            'item_id' => $item->id,
+        $codeLabel = $item->item_code ? " ({$item->item_code})" : '';
+        $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.item_unpublished', "Results unpublished for {$item->title}{$codeLabel}", [
+            'item_id'   => $item->id,
+            'item_code' => $item->item_code,
+            'title'     => $item->title,
         ]);
 
         return back()->with('success', "Results unpublished for {$item->title}.");

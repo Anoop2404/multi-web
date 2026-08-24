@@ -308,9 +308,38 @@ class FestMarkEntryController extends SahodayaAdminController
             $result = $markSave->save($event, [...$rowData, 'participant_id' => $participantId], $request->user()->id);
         }
 
-        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.saved', "Mark saved for participant #{$data['participant_id']}", [
+        $participantModel = FestParticipant::with(['student', 'teacher', 'group', 'registration.school'])->find($data['participant_id']);
+        $participantName = $participantModel?->student?->name ?? $participantModel?->teacher?->name ?? $participantModel?->group?->name ?? "Participant #{$data['participant_id']}";
+        $chestNo = $participantModel?->group?->chest_no ?? $participantModel?->chest_no;
+        $chestLabel = $chestNo ? "Chest #{$chestNo}" : "Participant #{$data['participant_id']}";
+        $itemTitle = $item?->title ? " in {$item->title}" : '';
+        $schoolName = $participantModel?->registration?->school?->name;
+        $schoolLabel = $schoolName ? " ({$schoolName})" : '';
+
+        $details = [];
+        if (! empty($data['position'])) {
+            $details[] = "Rank #{$data['position']}";
+        }
+        if (isset($data['score']) && $data['score'] !== null && $data['score'] !== '') {
+            $details[] = "Score: {$data['score']}";
+        }
+        if (! empty($data['grade'])) {
+            $details[] = "Grade: {$data['grade']}";
+        }
+        $detailStr = $details !== [] ? ' [' . implode(', ', $details) . ']' : '';
+
+        $logDescription = "Mark saved for {$chestLabel} - {$participantName}{$schoolLabel}{$itemTitle}{$detailStr}";
+
+        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.saved', $logDescription, [
             'participant_id' => $data['participant_id'],
             'item_id'        => $data['item_id'],
+            'chest_no'       => $chestNo,
+            'participant'    => $participantName,
+            'school'         => $schoolName,
+            'item_title'     => $item?->title,
+            'position'       => $data['position'] ?? null,
+            'score'          => $data['score'] ?? null,
+            'grade'          => $data['grade'] ?? null,
             'team_size'      => count($teamParticipantIds),
         ]);
 

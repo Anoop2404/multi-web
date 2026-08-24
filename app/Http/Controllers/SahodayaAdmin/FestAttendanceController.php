@@ -121,11 +121,21 @@ class FestAttendanceController extends SahodayaAdminController
             );
         }
 
-        $audit->festEvent($event, FestPageActivity::ATTENDANCE, 'fest.attendance.saved', 'Attendance saved', [
+        $personName = $participant->student?->name ?? $participant->teacher?->name ?? $participant->group?->name ?? "Participant #{$data['participant_id']}";
+        $chestNo = $participant->group?->chest_no ?? $participant->chest_no;
+        $chestLabel = $chestNo ? "Chest #{$chestNo}" : "Participant #{$data['participant_id']}";
+        $itemModel = FestEventItem::find($data['item_id']);
+        $itemTitle = $itemModel?->title ? " in {$itemModel->title}" : '';
+        $statusLabel = ucfirst($data['status']);
+
+        $audit->festEvent($event, FestPageActivity::ATTENDANCE, 'fest.attendance.saved', "Attendance marked {$statusLabel} for {$chestLabel} - {$personName}{$itemTitle}", [
             'participant_id' => $data['participant_id'],
-            'item_id' => $data['item_id'],
-            'status' => $data['status'],
-            'team_size' => count($participantIds),
+            'chest_no'       => $chestNo,
+            'participant'    => $personName,
+            'item_id'        => $data['item_id'],
+            'item_title'     => $itemModel?->title,
+            'status'         => $data['status'],
+            'team_size'      => count($participantIds),
         ]);
 
         return back()->with('success', 'Attendance saved.');

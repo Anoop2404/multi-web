@@ -1135,11 +1135,27 @@ class FestEventSettingsController extends SahodayaAdminController
 
         FestGradeConfig::create(array_merge($data, ['event_id' => $event->id]));
 
+        $rangeParts = [];
+        if (isset($data['min_percent']) || isset($data['max_percent'])) {
+            $min = $data['min_percent'] ?? 0;
+            $max = $data['max_percent'] ?? 100;
+            $rangeParts[] = "{$min}% – {$max}%";
+        }
+        if (isset($data['min_score']) || isset($data['max_score'])) {
+            $min = $data['min_score'] ?? 0;
+            $max = $data['max_score'] ?? 'Max';
+            $rangeParts[] = "Score: {$min} – {$max}";
+        }
+        $rangeStr = $rangeParts !== [] ? ' (' . implode(', ', $rangeParts) . ')' : '';
+        $itemModel = ! empty($data['item_id']) ? FestEventItem::find($data['item_id']) : null;
+        $itemStr = $itemModel ? " for {$itemModel->title}" : '';
+
         app(PlatformAuditLogger::class)->festEvent(
             $event,
             FestPageActivity::settingsTab('grades'),
             'fest.settings.grade_band_created',
-            "Grade band saved: {$data['grade']}",
+            "Grade band saved: Grade {$data['grade']}{$rangeStr}{$itemStr}",
+            $data
         );
 
         return back()->with('success', 'Grade band saved.');
@@ -1154,11 +1170,27 @@ class FestEventSettingsController extends SahodayaAdminController
 
         $gradeConfig->update($data);
 
+        $rangeParts = [];
+        if (isset($data['min_percent']) || isset($data['max_percent'])) {
+            $min = $data['min_percent'] ?? 0;
+            $max = $data['max_percent'] ?? 100;
+            $rangeParts[] = "{$min}% – {$max}%";
+        }
+        if (isset($data['min_score']) || isset($data['max_score'])) {
+            $min = $data['min_score'] ?? 0;
+            $max = $data['max_score'] ?? 'Max';
+            $rangeParts[] = "Score: {$min} – {$max}";
+        }
+        $rangeStr = $rangeParts !== [] ? ' (' . implode(', ', $rangeParts) . ')' : '';
+        $itemModel = ! empty($data['item_id']) ? FestEventItem::find($data['item_id']) : null;
+        $itemStr = $itemModel ? " for {$itemModel->title}" : '';
+
         app(PlatformAuditLogger::class)->festEvent(
             $event,
             FestPageActivity::settingsTab('grades'),
             'fest.settings.grade_band_updated',
-            "Grade band updated: {$data['grade']}",
+            "Grade band updated: Grade {$data['grade']}{$rangeStr}{$itemStr}",
+            $data
         );
 
         return back()->with('success', 'Grade band updated.');
