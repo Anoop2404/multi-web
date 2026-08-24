@@ -204,10 +204,16 @@ class FestAttendanceController extends SahodayaAdminController
             );
         }
 
-        $audit->festEvent($event, FestPageActivity::ATTENDANCE, 'fest.attendance.bulk_saved', count($data['participant_ids']).' attendance record(s) saved', [
-            'count' => count($data['participant_ids']),
-            'item_id' => $data['item_id'],
-            'status' => $data['status'],
+        $itemModel = FestEventItem::find($data['item_id']);
+        $itemTitle = $itemModel?->title ? " in {$itemModel->title}" : '';
+        $statusLabel = ucfirst($data['status']);
+        $count = count($data['participant_ids']);
+
+        $audit->festEvent($event, FestPageActivity::ATTENDANCE, 'fest.attendance.bulk_saved', "Bulk attendance marked {$statusLabel} for {$count} participant(s){$itemTitle}", [
+            'count'      => $count,
+            'item_id'    => $data['item_id'],
+            'item_title' => $itemModel?->title,
+            'status'     => $data['status'],
         ]);
 
         return back()->with('success', count($data['participant_ids']).' attendance record(s) saved.');

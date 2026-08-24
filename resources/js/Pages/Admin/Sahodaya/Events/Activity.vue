@@ -83,6 +83,12 @@
                                     <span v-if="log.reg_no" class="rounded-md bg-slate-100 text-slate-700 px-2 py-0.5 font-semibold border border-slate-200 font-mono">
                                         🆔 {{ log.reg_no }}
                                     </span>
+                                    <span v-if="log.properties?.status === 'absent'" class="rounded-md bg-red-50 text-red-700 px-2 py-0.5 font-bold border border-red-200/60">
+                                        🔴 ABSENT
+                                    </span>
+                                    <span v-if="log.properties?.status === 'present'" class="rounded-md bg-emerald-50 text-emerald-700 px-2 py-0.5 font-bold border border-emerald-200/60">
+                                        🟢 PRESENT
+                                    </span>
                                 </div>
                             </td>
                             <td class="text-xs text-slate-600 font-medium whitespace-nowrap">
