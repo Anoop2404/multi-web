@@ -899,6 +899,31 @@ public function tv(Request $request, int $eventId)
             foreach ($categoryPages as $i => $page) {
                 $slides[] = [
                     'type' => 'schools',
+                    'title' => $this->scoreboards->categoryLabel($event, $key).' — Participating Schools',
+                    'subtitle' => count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : null,
+                    'rows' => $page,
+                ];
+            }
+        }
+    }
+
+        if (! $slides) {
+            $slides[] = ['type' => 'waiting'];
+        }
+
+        return $this->renderPublic('public.fest.tv', $tenant, [
+            'event' => $event,
+            'selectedScope' => $selectedScope,
+            'isPublished' => $isPublished,
+            'isAdminPreview' => $isAdminPreview,
+            'slides' => $slides,
+            'pageSeo' => ['title' => $event->title.' — Live Screen'],
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function publicWinnerRow(FestMark $mark, FestEvent $event, ?Collection $rosterByRegistration = null): array
+    {
         $participant = $mark->participant;
         $person = $participant?->student ?? $participant?->teacher;
 
