@@ -2,7 +2,7 @@
     <SahodayaEventsLayout :title="`${event.title} — Activity`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Activity log`" eyebrow="Activity log"
-                    description="All actions across this event, filterable by item, school, page, or search keyword." />
+                    description="All actions across this event, filterable by item, category, chest #, school, IP, or keywords." />
 
         <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="activity" :event="event" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="activity" />
@@ -12,14 +12,14 @@
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Search Keywords</label>
-                    <input v-model="searchQuery" @input="onSearchInput" type="search" placeholder="Search participant, chest #, item, school..." class="w-full rounded-xl border-slate-300 text-xs shadow-sm focus:border-amber-500 focus:ring-amber-500" />
+                    <input v-model="searchQuery" @input="onSearchInput" type="search" placeholder="Search chest #, reg ID, participant, school, IP..." class="w-full rounded-xl border-slate-300 text-xs shadow-sm focus:border-amber-500 focus:ring-amber-500" />
                 </div>
                 <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Filter by Item</label>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Filter by Item & Category</label>
                     <select v-model="selectedItem" @change="applyFilters" class="w-full rounded-xl border-slate-300 text-xs shadow-sm focus:border-amber-500 focus:ring-amber-500">
                         <option :value="null">All Items ({{ items.length }})</option>
                         <option v-for="it in items" :key="it.id" :value="it.id">
-                            {{ it.item_code ? `[${it.item_code}] ` : '' }}{{ it.title }}
+                            {{ it.item_code ? `[${it.item_code}] ` : '' }}{{ it.title }}{{ it.category ? ` — ${it.category}` : '' }}
                         </option>
                     </select>
                 </div>
@@ -47,12 +47,16 @@
                             <th class="w-36">When</th>
                             <th class="w-36">Page</th>
                             <th>Action & Details</th>
-                            <th class="w-36">User</th>
+                            <th class="w-36">User & IP</th>
+                            <th class="w-24 text-right">Payload</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="log in activityLogs" :key="log.id" class="hover:bg-slate-50/80 transition">
-                            <td class="text-xs text-slate-500 whitespace-nowrap">{{ formatTime(log.created_at) }}</td>
+                            <td class="text-xs text-slate-500 whitespace-nowrap">
+                                <div class="font-medium text-slate-700">{{ formatTime(log.created_at) }}</div>
+                                <div class="text-[10px] text-slate-400 font-mono">{{ formatExactTime(log.created_at) }}</div>
+                            </td>
                             <td>
                                 <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 border border-slate-200">
                                     {{ log.page_label }}
@@ -60,9 +64,12 @@
                             </td>
                             <td>
                                 <div class="text-sm font-medium text-slate-800">{{ log.description }}</div>
-                                <div v-if="log.item_title || log.school || log.participant || log.chest_no" class="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
+                                <div v-if="log.item_title || log.item_category || log.school || log.participant || log.chest_no || log.reg_no" class="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
                                     <span v-if="log.item_title" class="rounded-md bg-amber-50 text-amber-700 px-2 py-0.5 font-semibold border border-amber-200/60">
                                         📌 {{ log.item_title }}
+                                    </span>
+                                    <span v-if="log.item_category" class="rounded-md bg-indigo-50 text-indigo-700 px-2 py-0.5 font-semibold border border-indigo-200/60">
+                                        📂 {{ log.item_category }}
                                     </span>
                                     <span v-if="log.school" class="rounded-md bg-blue-50 text-blue-700 px-2 py-0.5 font-semibold border border-blue-200/60">
                                         🏫 {{ log.school }}
@@ -73,12 +80,75 @@
                                     <span v-if="log.participant" class="rounded-md bg-purple-50 text-purple-700 px-2 py-0.5 font-semibold border border-purple-200/60">
                                         👤 {{ log.participant }}
                                     </span>
+                                    <span v-if="log.reg_no" class="rounded-md bg-slate-100 text-slate-700 px-2 py-0.5 font-semibold border border-slate-200 font-mono">
+                                        🆔 {{ log.reg_no }}
+                                    </span>
                                 </div>
                             </td>
-                            <td class="text-xs text-slate-600 font-medium whitespace-nowrap">{{ log.user?.name ?? 'System' }}</td>
+                            <td class="text-xs text-slate-600 font-medium whitespace-nowrap">
+                                <div>{{ log.user?.name ?? 'System' }}</div>
+                                <div v-if="log.ip_address" class="text-[10px] text-slate-400 font-mono">🌐 {{ log.ip_address }}</div>
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <button @click="openPayloadModal(log)" type="button" class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition">
+                                    🔍 Data
+                                </button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Payload Modal -->
+        <div v-if="selectedLog" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+            <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800">Submitted Action Payload</h3>
+                        <p class="text-xs text-slate-500">{{ selectedLog.description }}</p>
+                    </div>
+                    <button @click="selectedLog = null" type="button" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="my-4 overflow-y-auto space-y-4 pr-1 text-xs">
+                    <!-- Core Metadata -->
+                    <div class="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 border border-slate-200">
+                        <div>
+                            <span class="text-slate-400 font-medium">Timestamp:</span>
+                            <div class="font-semibold text-slate-700 font-mono">{{ formatExactTime(selectedLog.created_at) }}</div>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 font-medium">IP Address:</span>
+                            <div class="font-semibold text-slate-700 font-mono">🌐 {{ selectedLog.ip_address ?? '—' }}</div>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 font-medium">User:</span>
+                            <div class="font-semibold text-slate-700">{{ selectedLog.user?.name ?? 'System' }} ({{ selectedLog.user?.email ?? '—' }})</div>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 font-medium">Action Key:</span>
+                            <div class="font-semibold text-slate-700 font-mono">{{ selectedLog.action }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Submitted Properties / Post Data -->
+                    <div>
+                        <h4 class="font-bold text-slate-700 mb-2 uppercase tracking-wider text-[10px]">Submitted Post Data & Properties</h4>
+                        <div v-if="selectedLog.properties && Object.keys(selectedLog.properties).length" class="rounded-xl border border-slate-200 bg-slate-900 p-4 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+                            <pre>{{ JSON.stringify(selectedLog.properties, null, 2) }}</pre>
+                        </div>
+                        <p v-else class="text-slate-400 italic">No extra post parameters were recorded for this action.</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-100 pt-4 flex justify-end">
+                    <button @click="selectedLog = null" type="button" class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white hover:bg-slate-700">
+                        Close
+                    </button>
+                </div>
             </div>
         </div>
     </SahodayaEventsLayout>
@@ -103,6 +173,8 @@ const props = defineProps({
 const searchQuery = ref(props.filters?.q ?? '');
 const selectedItem = ref(props.filters?.item_id ?? null);
 const selectedPage = ref(props.filters?.page ?? null);
+
+const selectedLog = ref(null);
 
 const hasActiveFilters = computed(() => !!searchQuery.value || selectedItem.value !== null || selectedPage.value !== null);
 
@@ -131,9 +203,19 @@ function clearFilters() {
     applyFilters();
 }
 
+function openPayloadModal(log) {
+    selectedLog.value = log;
+}
+
 function formatTime(iso) {
     if (!iso) return '';
-    const d = new Date(iso.replace(' ', 'T'));
+    const d = new Date(iso);
     return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function formatExactTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 </script>

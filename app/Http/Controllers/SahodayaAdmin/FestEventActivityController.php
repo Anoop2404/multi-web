@@ -26,10 +26,17 @@ class FestEventActivityController extends SahodayaAdminController
             ->values()
             ->all();
 
+        $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
         $items = FestEventItem::where('event_id', $event->id)
             ->orderBy('display_order')
             ->orderBy('title')
-            ->get(['id', 'title', 'item_code', 'class_group', 'age_group']);
+            ->get()
+            ->map(fn (FestEventItem $it) => [
+                'id'        => $it->id,
+                'title'     => $it->title,
+                'item_code' => $it->item_code,
+                'category'  => $it->class_group ? $scoreboards->categoryLabel($event, $it->class_group) : ($it->age_group ? $scoreboards->categoryLabel($event, $it->age_group) : null),
+            ]);
 
         $schoolIds = \App\Models\FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->pluck('school_id')
