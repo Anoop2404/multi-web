@@ -44,13 +44,13 @@
         <section class="mt-10" aria-labelledby="event-actions-title">
             <h2 id="event-actions-title" class="text-xs font-bold uppercase tracking-widest text-amber-400 mb-3">Event services</h2>
             <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                @if($scopeSchedulePublished)
+                @if($scopeSchedulePublished || ($isAdminPreview ?? false))
                 <a href="{{ route('tenant.fest.schedule', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Event Schedule <span class="float-right text-amber-400">→</span></a>
                 @else
                 <div class="p-4 bg-slate-900/30 border border-slate-800/60 rounded-2xl text-sm text-white/40">Schedule not published</div>
                 @endif
                 <a href="{{ route('tenant.fest.live', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Live Event <span class="float-right text-red-400">●</span></a>
-                @if($scopeResultsPublished)
+                @if($scopeResultsPublished || ($isAdminPreview ?? false))
                 <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Event Scoreboard <span class="float-right text-amber-400">→</span></a>
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'toppers']) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Topper Highlights <span class="float-right text-amber-400">→</span></a>
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Detailed Results <span class="float-right text-amber-400">→</span></a>
@@ -66,7 +66,7 @@
             </div>
         </section>
 
-        @if(($scopeResultsPublished || ($publishedItemCount ?? 0) > 0) && $recentResults->isNotEmpty())
+        @if(($scopeResultsPublished || ($publishedItemCount ?? 0) > 0 || ($isAdminPreview ?? false)) && $recentResults->isNotEmpty())
         <section class="mt-10" aria-labelledby="recent-results-title">
             <div class="flex items-end justify-between gap-4 mb-4">
                 <div><p class="text-xs font-bold uppercase tracking-widest text-amber-400">Recently published</p><h2 id="recent-results-title" class="text-2xl font-bold mt-1 text-white">Latest results</h2></div>
@@ -145,9 +145,9 @@
                         <span class="rounded-full border border-slate-700 px-2 py-1">{{ $item->stage_type === 'on_stage' ? '🎤 On stage' : ($item->stage_type === 'off_stage' ? '📝 Off stage' : 'Stage') }}</span>
                     </div>
                     <div class="mt-auto pt-4 flex gap-2">
-                        @if($scopeSchedulePublished && $scheduledItemIds->contains($item->id))<a href="{{ route('tenant.fest.item-schedule', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold text-white hover:bg-white/15">Schedule</a>@endif
-                        @if($item->results_published_at || $scopeResultsPublished)<a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>@endif
-                        @if(!($scopeSchedulePublished && $scheduledItemIds->contains($item->id)) && !($item->results_published_at || $scopeResultsPublished))
+                        @if(($scopeSchedulePublished || ($isAdminPreview ?? false)) && $scheduledItemIds->contains($item->id))<a href="{{ route('tenant.fest.item-schedule', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold text-white hover:bg-white/15">Schedule</a>@endif
+                        @if($item->results_published_at || $scopeResultsPublished || ($isAdminPreview ?? false))<a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>@endif
+                        @if(!($scopeSchedulePublished || ($isAdminPreview ?? false) && $scheduledItemIds->contains($item->id)) && !($item->results_published_at || $scopeResultsPublished || ($isAdminPreview ?? false)))
                         <span class="flex-1 rounded-xl border border-dashed border-slate-700 px-3 py-2 text-center text-xs font-semibold text-white/30">Not yet published</span>
                         @endif
                     </div>

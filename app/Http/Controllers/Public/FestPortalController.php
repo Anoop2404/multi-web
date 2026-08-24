@@ -532,26 +532,29 @@ class FestPortalController extends Controller
         $event = $this->findEvent($tenant->id, $eventId);
         EventLifecycleGate::allowPublicSchedule($event);
         $selectedScope = $this->operationalEvents->directScope($event);
-        abort_unless($selectedScope['schedule_published'], 404);
+
+        $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
+        abort_unless($selectedScope['schedule_published'] || $isAdminPreview, 404);
         $scopes = [$selectedScope];
 
-        $schedules = $this->mapScheduleRows($event, null, $selectedScope['event_ids']);
+        $schedules = $this->mapScheduleRows($event, null, $selectedScope['event_ids'], $isAdminPreview);
 
         return $this->renderPublic('public.fest.schedule', $tenant, compact(
             'event', 'schedules', 'scopes', 'selectedScope'
-        ));
+        ) + ['isAdminPreview' => $isAdminPreview]);
     }
 
-    public function itemSchedule(int $eventId, FestEventItem $item)
+    public function itemSchedule(Request $request, int $eventId, FestEventItem $item)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless((int) $item->event_id === (int) $event->id, 404);
         EventLifecycleGate::allowPublicSchedule($event);
 
-        $schedules = $this->mapScheduleRows($event, $item->id, [$event->id]);
+        $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
+        $schedules = $this->mapScheduleRows($event, $item->id, [$event->id], $isAdminPreview);
 
-        return $this->renderPublic('public.fest.item-schedule', $tenant, compact('event', 'item', 'schedules'));
+        return $this->renderPublic('public.fest.item-schedule', $tenant, compact('event', 'item', 'schedules') + ['isAdminPreview' => $isAdminPreview]);
     }
 
     public function itemResults(Request $request, int $eventId, FestEventItem $item)
@@ -1095,15 +1098,17 @@ public function tv(Request $request, int $eventId)
             ->groupBy('registration_id');
     }
 
-    public function records(int $eventId)
+    public function records(Request $request, int $eventId)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
+        $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
 
         return $this->renderPublic('public.fest.records', $tenant, [
             'event' => $event,
             'records' => $this->publicAthleticRecords($event),
             'breaks' => $this->recentRecordBreaks($event, 50),
+            'isAdminPreview' => $isAdminPreview,
         ]);
     }
 
@@ -1111,6 +1116,8 @@ public function tv(Request $request, int $eventId)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
+        $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
+
         // Cast: $request->query() returns whatever the client sends for this key, including an
         // array (e.g. ?q[]=x), which would fatally TypeError trim(). This is a public,
         // unauthenticated endpoint, so it must not trust the type of client input.
@@ -1137,7 +1144,7 @@ public function tv(Request $request, int $eventId)
                 }
             } elseif (preg_match('/^[A-Za-z]-\d+$/', $q)) {
                 $matches = $base->where('level_registration_number', strtoupper($q))->limit(30)->get();
-            } elseif ($this->visibility->allowNameSearch($event)) {
+            } elseif ($this->visibility->allowNameSearch($event, $isAdminPreview)) {
                 $matches = $base->where(function ($inner) use ($q) {
                     $inner->whereHas('student', fn ($s) => $s->where('name', 'like', "%{$q}%"))
                         ->orWhereHas('teacher', fn ($t) => $t->where('name', 'like', "%{$q}%"));
@@ -1146,8 +1153,8 @@ public function tv(Request $request, int $eventId)
                 $matches = collect();
             }
 
-            $showSchool = $this->visibility->showSchoolName($event);
-            $results = $matches->map(fn (FestParticipant $p) => $this->visibility->formatPublicParticipant($event, $p) + [
+            $showSchool = $this->visibility->showSchoolName($event, $isAdminPreview);
+            $results = $matches->map(fn (FestParticipant $p) => $this->visibility->formatPublicParticipant($event, $p, null, null, $isAdminPreview) + [
                 'school' => $showSchool ? $p->registration?->school?->name : null,
             ]);
         }
@@ -1156,15 +1163,17 @@ public function tv(Request $request, int $eventId)
             'event' => $event,
             'q' => $q,
             'results' => $results,
-            'searchHint' => $this->visibility->searchPlaceholder($event),
-            'nameSearch' => $this->visibility->allowNameSearch($event),
+            'searchHint' => $this->visibility->searchPlaceholder($event, $isAdminPreview),
+            'nameSearch' => $this->visibility->allowNameSearch($event, $isAdminPreview),
+            'isAdminPreview' => $isAdminPreview,
         ]);
     }
 
-    public function participant(int $eventId, string $ref)
+    public function participant(Request $request, int $eventId, string $ref)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
+        $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
 
         $participant = $this->visibility->findParticipantByRef($event, $ref);
         abort_unless($participant, 404);
@@ -1172,16 +1181,16 @@ public function tv(Request $request, int $eventId)
         $mark = FestMark::where('participant_id', $participant->id)->first();
         $schedule = FestSchedule::where('participant_id', $participant->id)->first();
 
-        $public = $this->visibility->formatPublicParticipant($event, $participant, $schedule, $mark);
-        $items = $this->visibility->publicParticipantItems($event, $participant);
+        $public = $this->visibility->formatPublicParticipant($event, $participant, $schedule, $mark, $isAdminPreview);
+        $items = $this->visibility->publicParticipantItems($event, $participant, $isAdminPreview);
 
         return $this->renderPublic('public.fest.participant', $tenant, compact(
             'event', 'public', 'participant', 'schedule', 'mark', 'items'
-        ));
+        ) + ['isAdminPreview' => $isAdminPreview]);
     }
 
     /** @return list<array<string, mixed>> */
-    private function mapScheduleRows(FestEvent $event, ?int $itemId = null, ?array $eventIds = null): array
+    private function mapScheduleRows(FestEvent $event, ?int $itemId = null, ?array $eventIds = null, bool $isAdminPreview = false): array
     {
         $query = FestSchedule::whereIn('event_id', $eventIds ?? [(int) $event->id])
             ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.item', 'participant.registration.event']);
@@ -1202,7 +1211,7 @@ public function tv(Request $request, int $eventId)
         // resolve rosters for the same reason.
         return $rows
             ->groupBy(fn (FestSchedule $row) => $row->participant?->registration_id ?? 'solo-'.$row->id)
-            ->map(function (Collection $group) use ($event) {
+            ->map(function (Collection $group) use ($event, $isAdminPreview) {
                 $first = $group->first();
                 // showParticipantName()'s $item param gates on THIS item's own publish
                 // state, not just the event-wide results_published flag — that flag flips
@@ -1213,7 +1222,7 @@ public function tv(Request $request, int $eventId)
                 // identity belongs on that item's own results page, after that item
                 // specifically has published.
                 $showName = $first->participant
-                    && $this->visibility->showParticipantName($event, $first->participant, $first->item);
+                    && $this->visibility->showParticipantName($event, $first->participant, $first->item, $isAdminPreview);
 
                 $roster = $group->pluck('participant')
                     ->filter()

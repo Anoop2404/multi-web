@@ -50,8 +50,12 @@ class FestPublicVisibilityService
         return in_array($level, ['cluster', 'subdistrict', 'district', 'state', 'sahodaya'], true);
     }
 
-    public function showParticipantName(FestEvent $event, FestParticipant $participant, ?FestEventItem $item = null): bool
+    public function showParticipantName(FestEvent $event, FestParticipant $participant, ?FestEventItem $item = null, bool $isAdminPreview = false): bool
     {
+        if ($isAdminPreview) {
+            return true;
+        }
+
         if ($this->isSportsEvent($event)) {
             return true;
         }
@@ -73,13 +77,21 @@ class FestPublicVisibilityService
         return (bool) $event->results_published;
     }
 
-    public function showSchoolName(FestEvent $event): bool
+    public function showSchoolName(FestEvent $event, bool $isAdminPreview = false): bool
     {
+        if ($isAdminPreview) {
+            return true;
+        }
+
         return (bool) $event->results_published;
     }
 
-    public function showIndividualMarks(FestEvent $event): bool
+    public function showIndividualMarks(FestEvent $event, bool $isAdminPreview = false): bool
     {
+        if ($isAdminPreview) {
+            return true;
+        }
+
         if ($event->results_published) {
             return true;
         }
@@ -87,8 +99,12 @@ class FestPublicVisibilityService
         return $this->isSportsEvent($event);
     }
 
-    public function allowNameSearch(FestEvent $event): bool
+    public function allowNameSearch(FestEvent $event, bool $isAdminPreview = false): bool
     {
+        if ($isAdminPreview) {
+            return true;
+        }
+
         if ($event->results_published) {
             return true;
         }
@@ -100,18 +116,18 @@ class FestPublicVisibilityService
         return ! $this->strictAnonymity($event);
     }
 
-    public function searchPlaceholder(FestEvent $event): string
+    public function searchPlaceholder(FestEvent $event, bool $isAdminPreview = false): string
     {
-        if ($this->allowNameSearch($event)) {
+        if ($this->allowNameSearch($event, $isAdminPreview)) {
             return 'Chest number, level reg no, or name';
         }
 
         return 'Chest number or level reg no (e.g. D-0042)';
     }
 
-    public function publicReference(FestEvent $event, FestParticipant $participant): string
+    public function publicReference(FestEvent $event, FestParticipant $participant, bool $isAdminPreview = false): string
     {
-        if (! $event->results_published) {
+        if (! $event->results_published && ! $isAdminPreview) {
             return '—';
         }
 
@@ -139,12 +155,13 @@ class FestPublicVisibilityService
         FestParticipant $participant,
         ?FestSchedule $schedule = null,
         ?FestMark $mark = null,
+        bool $isAdminPreview = false,
     ): array {
-        $showMarks = $this->showIndividualMarks($event);
-        $showName = $this->showParticipantName($event, $participant, $participant->registration?->item);
+        $showMarks = $this->showIndividualMarks($event, $isAdminPreview);
+        $showName = $this->showParticipantName($event, $participant, $participant->registration?->item, $isAdminPreview);
 
         return [
-            'reference'          => $this->publicReference($event, $participant),
+            'reference'          => $this->publicReference($event, $participant, $isAdminPreview),
             'link_ref'           => $this->participantLinkRef($participant),
             'name'               => $showName ? ($participant->student?->name ?? $participant->teacher?->name) : null,
             // Gated on the same $showName check as the name itself — a photo or school
@@ -175,9 +192,9 @@ class FestPublicVisibilityService
      *
      * @return list<array<string, mixed>>
      */
-    public function publicParticipantItems(FestEvent $event, FestParticipant $participant): array
+    public function publicParticipantItems(FestEvent $event, FestParticipant $participant, bool $isAdminPreview = false): array
     {
-        $showMarks = $this->showIndividualMarks($event);
+        $showMarks = $this->showIndividualMarks($event, $isAdminPreview);
 
         $entries = FestParticipant::where('event_id', $participant->event_id)
             ->where('participant_role', '!=', 'standby')
@@ -192,7 +209,7 @@ class FestPublicVisibilityService
             ->keyBy('participant_id');
 
         return $entries
-            ->map(function (FestParticipant $p) use ($event, $showMarks, $marksByParticipant) {
+            ->map(function (FestParticipant $p) use ($event, $showMarks, $marksByParticipant, $isAdminPreview) {
                 $item = $p->registration?->item;
                 if (! $item) {
                     return null;
@@ -209,7 +226,7 @@ class FestPublicVisibilityService
                     'grade'            => $showMarks ? $mark?->grade : null,
                     'result'           => $showMarks ? trim(($mark?->measurement_value ?? '').' '.($mark?->measurement_unit ?? '')) : null,
                     'disqualified'     => (bool) $p->disqualified_at,
-                    'results_url'      => $event->results_published ? route('tenant.fest.item-results', [$event->id, $item->id]) : null,
+                    'results_url'      => ($event->results_published || $isAdminPreview) ? route('tenant.fest.item-results', [$event->id, $item->id]) : null,
                 ];
             })
             ->filter()
