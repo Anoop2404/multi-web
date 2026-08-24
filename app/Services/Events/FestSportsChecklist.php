@@ -2,6 +2,7 @@
 
 namespace App\Services\Events;
 
+use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestItemHead;
@@ -81,6 +82,25 @@ class FestSportsChecklist
         $numberingSettings = is_array($event->numbering_settings) ? $event->numbering_settings : [];
         $numberingConfigured = $numberingSettings !== [];
 
+        // Distinct from "numbering configured" above (which only checks whether chest
+        // RANGES were saved) — this checks whether chest numbers were actually ASSIGNED
+        // to participants. Confirmed live-testable gap: an event can show 100% "Marks
+        // entry complete" while several participants still have no chest number and zero
+        // attendance was ever recorded, with nothing here to flag it before this fix.
+        // See Documents/Fest_Improvements_Proposal.md §7.4.
+        $eligibleParticipants = FestParticipant::whereHas('registration', fn ($q) => $q
+            ->where('event_id', $event->id)->where('status', 'approved'))
+            ->where('participant_role', '!=', 'standby')
+            ->whereNull('disqualified_at')
+            ->with('group')
+            ->get();
+        $numbering = app(FestNumberingService::class);
+        $chestAssignedCount = $eligibleParticipants->filter(fn (FestParticipant $p) => $numbering->effectiveChestNumber($p) !== null)->count();
+        $attendanceCount = FestAttendance::where('event_id', $event->id)
+            ->whereIn('participant_id', $eligibleParticipants->pluck('id'))
+            ->distinct('participant_id')
+            ->count('participant_id');
+
         return [
             [
                 'key'   => 'event',
@@ -137,7 +157,7 @@ class FestSportsChecklist
                 'key'   => 'rank_points',
                 'label' => 'Rank points set',
                 'hint'  => 'Fixed team points per rank (1st, 2nd…).',
-                'href'  => "{$base}/settings/points",
+                'href'  => "{$base}/rank-points",
                 'done'  => $rankPointCount > 0,
             ],
             [
@@ -181,6 +201,20 @@ class FestSportsChecklist
                 'hint'  => $scheduleRows === 0 ? 'Generate or enter schedule rows' : "{$scheduleRows} slots",
                 'href'  => "{$base}/schedule",
                 'done'  => $scheduleRows > 0 && (bool) $event->schedule_published,
+            ],
+            [
+                'key'   => 'chest_numbers_assigned',
+                'label' => 'Chest numbers assigned',
+                'hint'  => $eligibleParticipants->count() > 0 ? "{$chestAssignedCount}/{$eligibleParticipants->count()} assigned" : 'No participants yet',
+                'href'  => "{$base}/chest-numbers",
+                'done'  => $eligibleParticipants->count() > 0 && $chestAssignedCount >= $eligibleParticipants->count(),
+            ],
+            [
+                'key'   => 'attendance',
+                'label' => 'Attendance recorded',
+                'hint'  => $eligibleParticipants->count() > 0 ? "{$attendanceCount}/{$eligibleParticipants->count()} recorded" : 'No participants yet',
+                'href'  => "{$base}/attendance",
+                'done'  => $eligibleParticipants->count() > 0 && $attendanceCount >= $eligibleParticipants->count(),
             ],
             [
                 'key'   => 'marks',

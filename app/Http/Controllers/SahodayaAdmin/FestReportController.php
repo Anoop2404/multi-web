@@ -268,20 +268,6 @@ class FestReportController extends SahodayaAdminController
         ]));
     }
 
-    /**
-     * Deliberately excluded from the regionAwareTargetEvent() retrofit (plan §4.4/Phase
-     * 3, second pass): this reads no report data — it's a dead-end redirect to Event
-     * settings → Participation, keyed only by $event->id for the URL. Nothing here runs
-     * reportableEventIds()/reportableItemIds() or otherwise varies by region.
-     */
-    public function storeRule(Request $request, string $tenantId, FestEvent $event)
-    {
-        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-
-        return redirect("/sahodaya-admin/{$tenantId}/events/{$event->id}/settings/participation")
-            ->with('info', 'Participation limits are configured under Event settings → Participation.');
-    }
-
     public function schoolDetailed(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -888,6 +874,22 @@ class FestReportController extends SahodayaAdminController
         ]);
     }
 
+    /** Consolidated category-wise & item-wise report — school rows, item columns grouped by category, subtotal + overall columns. */
+    public function categoryItemMatrix(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        $matrix = $analytics->schoolItemPointsMatrix();
+
+        return $this->inertia('Sahodaya/Events/Reports/CategoryItemMatrix', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'categories'  => $matrix['categories'],
+            'schools'     => $matrix['schools'],
+            'childEvents' => $event->sportEventDropdownOptions(),
+        ])));
+    }
+
     public function export(Request $request, string $tenantId, FestEvent $event, string $exportType, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -896,8 +898,9 @@ class FestReportController extends SahodayaAdminController
         abort_unless(is_array($catalog), 404, 'Unknown report export.');
         $phase = $catalog['phase'] ?? 'before';
 
-        $this->enforceReportLifecyclePhase($event, $phase, $request);
-
+        // Staff/admin reports are no longer gated by event lifecycle phase — organizers
+        // need to be able to cross-verify data at any time, not just once the event
+        // reaches a certain stage. See Documents/Fest_Improvements_Proposal.md §3.8.
         // Phase 6 (partial — see final status report for what's NOT wired): an
         // 'after'-phase export additionally filtered to one named competition phase
         // (?competition_phase_id=) must respect that phase's own results_published flag,
@@ -930,30 +933,4 @@ class FestReportController extends SahodayaAdminController
         return $this->scopedReportService($request, $targetEvent)->export($exportType, $request);
     }
 
-    /**
-     * Phase 4 (plan §4.5, gap G6): the Downloads UI already filters exports to
-     * EventLifecycleGate::allowedReportPhases($event), but until this check every export
-     * endpoint served the file regardless — a direct URL to a Before/During/After export
-     * bypassed the UI's own gate entirely. Enforced here at the generic export()
-     * dispatcher (the ~50 FestReportCatalog exports) so it can't be bypassed by guessing
-     * the URL. Not applied to the small number of report-specific export methods
-     * (exportRegistrationRegister, exportAssignmentCompleteness, exportNumberingRegister,
-     * exportPendingApprovals) — every one of those is catalogued as phase='before', which
-     * is always in allowedReportPhases() regardless of event lifecycle, so the check
-     * would be a permanent no-op for them today. Revisit if any of those four ever gets a
-     * during/after catalog phase.
-     *
-     * fest.reports.lifecycle_override is a dedicated permission (not yet granted to any
-     * role by a seeder — this only wires the check, per plan §4.5: "do not treat ordinary
-     * staff access as an implicit override"). Granting it to specific roles/users is an
-     * operational decision, not something this change makes for you.
-     */
-    private function enforceReportLifecyclePhase(FestEvent $event, string $phase, Request $request): void
-    {
-        EventLifecycleGate::allowReportLifecyclePhase(
-            $event,
-            $phase,
-            (bool) $request->user()?->can('fest.reports.lifecycle_override'),
-        );
-    }
 }

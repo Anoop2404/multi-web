@@ -10,10 +10,13 @@ use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Services\Events\EventContext;
 use App\Services\Events\FestCertificateService;
+use App\Services\Events\FestIdCardQrService;
 use App\Services\Events\FestRegistrationRouterService;
 use App\Services\Events\FestSchoolPartitionService;
+use App\Support\PdfGenerator;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class FestEventPortalController extends SchoolAdminController
@@ -236,6 +239,9 @@ class FestEventPortalController extends SchoolAdminController
 
         abort_if($certificates->isEmpty(), 404, 'No certificates to download for your school.');
 
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
+
         $service = app(FestCertificateService::class);
         $uniqueId = $event->id.'-'.$this->school->id.'-'.bin2hex(random_bytes(4));
         $zipPath = storage_path('app/tmp/school-fest-certs-'.$uniqueId.'.zip');
@@ -248,12 +254,29 @@ class FestEventPortalController extends SchoolAdminController
         $templateCache = [];
         $participantsCache = [];
 
+        // Same real-PDF/QR/embedded-asset output as the Sahodaya-admin bulk ZIP
+        // (FestCertificateController::downloadZip()) — this endpoint used to zip raw
+        // .html with no QR and site-relative image URLs that only resolved on-site.
         foreach ($certificates as $certificate) {
-            $payload = $service->renderContext($certificate, $basePayloads->get($certificate->id), $templateCache, $participantsCache, embedAssets: true);
-            $html = view('fest.certificate-print', $payload)->render();
+            // Prefer the file RenderCertificateChunkJob already rendered and cached —
+            // a certificate predating that pipeline has no cached path yet and falls
+            // back to rendering on the spot, same as before this fix.
+            $pdf = ($certificate->file_path && ! $certificate->is_stale && TenantStorage::exists($certificate->file_path, $certificate->storage_disk))
+                ? TenantStorage::get($certificate->file_path, $certificate->storage_disk)
+                : null;
 
-            $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.html';
-            $zip->addFromString($name, $html);
+            $payload = $basePayloads->get($certificate->id);
+
+            if ($pdf === null) {
+                $payload = $service->renderContext($certificate, $payload, $templateCache, $participantsCache, embedAssets: true);
+                $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
+
+                $html = view('fest.certificate-print', $payload)->render();
+                $pdf = PdfGenerator::render($html);
+            }
+
+            $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.pdf';
+            $zip->addFromString($name, $pdf);
         }
 
         $zip->close();

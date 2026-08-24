@@ -404,6 +404,8 @@ class FestReportService
             'registration-list' => $this->registrationListPdf($request),
             'school-wise' => $this->schoolWisePdf($request),
             'overall-ranking' => $this->overallRankingPdf(),
+            'category-item-matrix-xls' => $this->categoryItemMatrixXls($analytics()),
+            'category-item-matrix-pdf' => $this->categoryItemMatrixPdf($analytics()),
             'house-wise' => $this->houseWisePdf(),
             'item-list' => $this->itemListPdf(),
             'item-wise' => $this->itemWisePdf($request),
@@ -411,7 +413,6 @@ class FestReportService
             'day-wise' => $this->dayWisePdf($request),
             'attendance-sheet' => $this->attendanceSheetPdf($request),
             'attendance-sheet-school' => $this->attendanceSheetSchoolPdf($request),
-            'mark-entered-summary' => $this->markEntryStatusCsv(),
             'mark-entry-status' => $this->markEntryStatusCsv(),
             'item-order-public' => $this->itemOrderPublicPdf($request),
             'green-room-list' => $this->greenRoomListPdf($request),
@@ -419,7 +420,7 @@ class FestReportService
             'clashes-school' => $this->clashesSchoolPdf($request),
             'promotions' => $this->promotionsCsv(),
             'promotions-pdf' => $this->promotionsPdf(),
-            'certificate-counts' => $this->certificateCountsCsv(),
+            'certificate-counts' => $this->certificateCountsCsv($request->input('school_id')),
             'catering' => $this->cateringCsv(),
             'students' => $this->studentsCsv(),
             'admit-cards' => $this->admitCardsPdf($request),
@@ -691,6 +692,51 @@ class FestReportService
             'schools' => $this->schoolRankingRows(),
             ...$this->brandingData(),
         ], $this->slug().'-overall-ranking.pdf');
+    }
+
+    private function categoryItemMatrixXls(FestEventReportAnalyticsService $analytics): StreamedResponse
+    {
+        $matrix = $analytics->schoolItemPointsMatrix();
+        $categories = $matrix['categories'];
+
+        // Flat single-row header ("CAT 1: Item Name") — a true two-tier merged header
+        // needs an ExcelExport extension; this ships the same data immediately and is
+        // still fully readable in Excel/Sheets. See Documents/Fest_Improvements_Proposal.md §6.
+        $headers = ['School'];
+        foreach ($categories as $category) {
+            foreach ($category['items'] as $item) {
+                $headers[] = $category['label'].': '.$item['title'];
+            }
+            $headers[] = $category['label'].' — Subtotal';
+        }
+        $headers[] = 'OVERALL';
+
+        $rows = collect($matrix['schools'])->map(function (array $school) use ($categories) {
+            $row = [strtoupper($school['school_name'])];
+            foreach ($categories as $category) {
+                foreach ($category['items'] as $item) {
+                    $row[] = $school['points_by_item'][$item['id']] ?? 0;
+                }
+                $row[] = $school['category_totals'][$category['key']] ?? 0;
+            }
+            $row[] = $school['overall'];
+
+            return $row;
+        });
+
+        return ExcelExport::download($this->slug().'-category-item-matrix', $headers, $rows);
+    }
+
+    private function categoryItemMatrixPdf(FestEventReportAnalyticsService $analytics): \Symfony\Component\HttpFoundation\Response
+    {
+        $matrix = $analytics->schoolItemPointsMatrix();
+
+        return $this->renderPdf('fest.reports.category-item-matrix', [
+            'event'      => $this->event,
+            'categories' => $matrix['categories'],
+            'schools'    => $matrix['schools'],
+            ...$this->brandingData(),
+        ], $this->slug().'-category-item-matrix.pdf', true);
     }
 
     private function houseWisePdf(): \Symfony\Component\HttpFoundation\Response
@@ -1248,9 +1294,9 @@ class FestReportService
         ], $this->slug().'-promotions.pdf');
     }
 
-    private function certificateCountsCsv(): StreamedResponse
+    private function certificateCountsCsv(?string $onlySchoolId = null): StreamedResponse
     {
-        $schoolIds = $this->schools()->pluck('id');
+        $schoolIds = $onlySchoolId ? collect([$onlySchoolId]) : $this->schools()->pluck('id');
         $rows = [];
 
         foreach ($schoolIds as $schoolId) {

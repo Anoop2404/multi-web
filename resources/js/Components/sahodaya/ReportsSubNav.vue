@@ -10,11 +10,7 @@
             <Link v-for="phase in phases" :key="phase.key"
                   :href="`${base}/reports/downloads/${phase.key}`"
                   class="reports-tab"
-                  :class="{
-                      'reports-tab--active': active === phase.key,
-                      'reports-tab--locked': !isPhaseAllowed(phase.key),
-                  }"
-                  @click="!isPhaseAllowed(phase.key) && $event.preventDefault()">
+                  :class="{ 'reports-tab--active': active === phase.key }">
                 <span aria-hidden="true">{{ phase.icon }}</span>
                 {{ phase.shortLabel }}
             </Link>
@@ -45,11 +41,6 @@ const props = defineProps({
 const page = usePage();
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}`);
 const eventMeta = computed(() => page.props.eventMeta ?? null);
-const allowedPhases = computed(() => page.props.allowedPhases ?? ['before']);
 const isSports = computed(() => page.props.event?.event_type === 'sports');
 const phases = REPORT_PHASES.map((p) => ({ ...p, shortLabel: p.label.replace(' event', '') }));
-
-function isPhaseAllowed(key) {
-    return allowedPhases.value.includes(key);
-}
 </script>

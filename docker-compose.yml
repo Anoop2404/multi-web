@@ -9,10 +9,13 @@ services:
       - /var/www/html/node_modules
     environment:
       - PHP_OPCACHE_ENABLE=0
+      - PDF_CONVERTER_URL=http://pdf-renderer:3000/render
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      pdf-renderer:
         condition: service_healthy
     networks:
       - sahodaya
@@ -82,9 +85,29 @@ services:
     command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
     volumes:
       - .:/var/www/html
+    environment:
+      - PDF_CONVERTER_URL=http://pdf-renderer:3000/render
     depends_on:
       - app
       - redis
+      - pdf-renderer
+    networks:
+      - sahodaya
+
+  pdf-renderer:
+    build:
+      context: .
+      dockerfile: docker/pdf-renderer/Dockerfile
+    # Certificate/ID-card batch jobs can hit this from several queue workers at once —
+    # bump PDF_RENDERER_CONCURRENCY here (server.js) if that's ever scaled beyond one.
+    environment:
+      - PDF_RENDERER_CONCURRENCY=4
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - sahodaya
 

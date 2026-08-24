@@ -38,7 +38,7 @@ class PdfGenerator
         ?string $footerTemplate = null,
         ?array $margin = null,
     ) {
-        $url = env('PDF_CONVERTER_URL');
+        $url = config('services.pdf_converter.url');
 
         if ($url) {
             $hasHeaderFooter = $headerTemplate !== null || $footerTemplate !== null;
@@ -62,7 +62,7 @@ class PdfGenerator
                 $payload['footerTemplate'] = $footerTemplate ?? '<span></span>';
             }
 
-            $response = Http::timeout(300)->post($url, $payload);
+            $response = Http::timeout((int) config('services.pdf_converter.timeout', 300))->post($url, $payload);
 
             if ($response->successful()) {
                 if ($inline) {
@@ -124,7 +124,7 @@ class PdfGenerator
         ?string $footerTemplate = null,
         ?array $margin = null,
     ): string {
-        $url = env('PDF_CONVERTER_URL');
+        $url = config('services.pdf_converter.url');
 
         if ($url) {
             $hasHeaderFooter = $headerTemplate !== null || $footerTemplate !== null;
@@ -148,7 +148,7 @@ class PdfGenerator
                 $payload['footerTemplate'] = $footerTemplate ?? '<span></span>';
             }
 
-            $response = Http::timeout(300)->post($url, $payload);
+            $response = Http::timeout((int) config('services.pdf_converter.timeout', 300))->post($url, $payload);
 
             if ($response->successful()) {
                 return $response->body();

@@ -39,4 +39,9 @@ return [
         'server_key' => env('FCM_SERVER_KEY'),
     ],
 
+    'pdf_converter' => [
+        'url' => env('PDF_CONVERTER_URL'),
+        'timeout' => env('PDF_CONVERTER_TIMEOUT', 300),
+    ],
+
 ];

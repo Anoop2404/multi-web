@@ -20,10 +20,25 @@
         $showParticipationLabel = (bool) ($layout['show_participation_label'] ?? true);
         $showCertificateDate = (bool) ($layout['show_certificate_date'] ?? true);
         $body = $template?->body ?? \App\Models\CertificateTemplate::defaultFestBody();
+        $itemTitlesList = $fieldValues['item_titles'] ?? [];
         foreach (($fieldValues ?? []) as $key => $value) {
+            // item_titles is the raw list behind item_title/item_details (see
+            // FestCertificateService::resolveFieldValues()) — read above for the
+            // cert-item-list span, never itself substituted as a {token}.
+            if (is_array($value)) {
+                continue;
+            }
             $safe = e((string) $value);
             if ($boldVariables && $safe !== '') {
                 $safe = '<strong>'.$safe.'</strong>';
+            }
+            // A multi-item participation certificate's item_title is a comma-joined
+            // sentence with no natural upper bound — wrap it in an addressable span the
+            // fit-text script (certificate-fit-text-script.blade.php) can shorten to
+            // "first 3 and N more" if the full list overflows its box. Left unwrapped
+            // below the 3-item threshold so the common case renders no extra markup.
+            if (($key === 'item_title' || $key === 'item_details') && count($itemTitlesList) > 3) {
+                $safe = '<span class="cert-item-list" data-items-json="'.e(json_encode($itemTitlesList)).'">'.$safe.'</span>';
             }
             $body = str_replace('{'.$key.'}', $safe, $body);
         }
@@ -66,7 +81,7 @@
 
             @if($showCertificateDate)
                 @php $d = $layout['certificate_date'] ?? []; $dateValue = $fieldValues['certificate_date'] ?? now()->format('j F Y'); @endphp
-                <div class="overlay-field" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($d, ['top' => 72, 'left' => 8, 'width' => 42, 'font_size' => 12, 'font_family' => 'Montserrat', 'align' => 'left']) }}">
+                <div class="overlay-field cert-date" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($d, ['top' => 72, 'left' => 8, 'width' => 42, 'font_size' => 12, 'font_family' => 'Montserrat', 'align' => 'left']) }}">
                     @if($boldVariables)<strong>Date :</strong> <strong>{{ $dateValue }}</strong>@else Date : {{ $dateValue }}@endif
                 </div>
             @endif

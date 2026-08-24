@@ -26,6 +26,7 @@ Schedule::command('erp:retry-failed-receipt-emails')->hourly()->withoutOverlappi
 Schedule::command('erp:school-document-expiry-reminders')->dailyAt('08:00')->withoutOverlapping();
 Schedule::command('erp:mark-school-documents-expired')->dailyAt('02:30')->withoutOverlapping();
 Schedule::command('platform:snapshot-dashboard')->dailyAt('02:45')->withoutOverlapping();
+Schedule::command('certificates:verify-staleness')->dailyAt('03:00')->withoutOverlapping();
 
 // State Kalolsavam qualifier submissions (docs/STATE_LEVEL_KALOTSAV_ROLLOUT_PLAN.md §5) — retries
 // pending/failed Sahodaya-to-State outbox rows. Was never scheduled; nothing sent these otherwise.

@@ -1,8 +1,14 @@
 <template>
-    <SahodayaEventsLayout :title="`${event.title} — Rank Points`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
+    <SahodayaEventsLayout :title="`${event.title} — ${isSports ? 'Rank Points' : 'Grade Points Master'}`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                           :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Rank Points`" eyebrow="Rank points"
-                    description="Championship points awarded per rank position or grade, used for the leaderboard." />
+        <PageHeader :title="`${event.title} — ${isSports ? 'Rank Points' : 'Grade Points Master'}`" :eyebrow="isSports ? 'Rank points' : 'Grade points master'"
+                    description="Championship points awarded per rank position or grade, used for the leaderboard.">
+            <template #actions>
+                <button type="button" class="btn-secondary text-sm" :disabled="recalculating" @click="recalculateMarks">
+                    {{ recalculating ? 'Recalculating…' : '🔄 Recalculate all marks' }}
+                </button>
+            </template>
+        </PageHeader>
 
         <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
                            :event="event" active="rank-points" class="mb-4" />
@@ -129,7 +135,12 @@
                 </div>
 
                 <form @submit.prevent="addPointRule" class="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3">
-                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">+ Add Championship Point Rule</h4>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        {{ editingRuleId ? '✎ Edit Championship Point Rule' : '+ Add Championship Point Rule' }}
+                    </h4>
+                    <p v-if="matchingExistingRule" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        ⚠️ A rule for this exact combination already awards <strong>{{ matchingExistingRule.points }} pts</strong> — saving will overwrite it.
+                    </p>
                     <div class="grid gap-3 sm:grid-cols-3">
                         <div>
                             <label class="form-label text-xs">Grade</label>
@@ -156,8 +167,9 @@
                         <input type="checkbox" v-model="pointForm.is_group">
                         Group / team item (unchecked = individual item)
                     </label>
-                    <div class="flex justify-end pt-1">
-                        <button type="submit" class="btn-primary text-xs !py-1.5 !px-4">Add Point Rule</button>
+                    <div class="flex justify-end gap-2 pt-1">
+                        <button v-if="editingRuleId" type="button" class="btn-secondary text-xs !py-1.5 !px-4" @click="cancelEditPointRule">Cancel</button>
+                        <button type="submit" class="btn-primary text-xs !py-1.5 !px-4">{{ editingRuleId ? 'Save changes' : 'Add Point Rule' }}</button>
                     </div>
                 </form>
 
@@ -178,7 +190,10 @@
                                 <td class="p-3.5 font-bold text-slate-800">{{ rule.position ? `${rule.position} Place` : 'Any Position' }}</td>
                                 <td class="p-3.5 text-slate-600">{{ rule.is_group ? 'Group / team' : 'Individual' }}</td>
                                 <td class="p-3.5 font-black text-slate-900 tabular-nums">{{ rule.points }} pts</td>
-                                <td class="p-3.5 text-right">
+                                <td class="p-3.5 text-right whitespace-nowrap">
+                                    <button type="button" @click="startEditPointRule(rule)" class="btn-secondary text-xs !py-1 !px-2.5 mr-1.5">
+                                        Edit
+                                    </button>
                                     <button type="button" @click="removePointRule(rule.id)" class="btn-secondary text-xs !text-rose-700 hover:!bg-rose-50 !py-1 !px-2.5">
                                         Remove
                                     </button>
@@ -204,6 +219,9 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -225,6 +243,19 @@ function switchSportEvent(evt) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/rank-points`);
 }
 
+const recalculating = ref(false);
+async function recalculateMarks() {
+    const ok = await confirm({
+        message: 'Refresh every mark\'s stored grade and score against the current Rank Points / Grade Points Master config? This updates marks already saved — it won\'t touch raw scores a judge entered, only the grade/points derived from them.',
+    });
+    if (!ok) return;
+    recalculating.value = true;
+    router.post(`${base.value}/recalculate-marks`, {}, {
+        preserveScroll: true,
+        onFinish: () => { recalculating.value = false; },
+    });
+}
+
 // Same "this event's actual grade set" derivation as Grade Master's datalist, just
 // rendered as a <select> here since point rules reference an existing grade rather than
 // defining a new one. Falls back to the legacy four when nothing's been customized.
@@ -234,12 +265,52 @@ const gradeOptions = computed(() => {
 });
 
 const pointForm = useForm({ grade: '', position: null, points: null, is_group: false });
+const editingRuleId = ref(null);
 
-function addPointRule() {
-    pointForm.post(`${base.value}/point-rules`, { preserveScroll: true, onSuccess: () => pointForm.reset() });
+// (grade, position, is_group) is a rule's real identity on the backend — saving the
+// same combination again silently overwrites the existing rule's points rather than
+// creating a second, ambiguous one. Surface that before it happens instead of letting
+// an admin accidentally overwrite a rule they didn't realize already existed.
+const matchingExistingRule = computed(() => (props.pointRules ?? []).find((r) =>
+    String(r.grade || '') === String(pointForm.grade || '')
+    && String(r.position || '') === String(pointForm.position || '')
+    && Boolean(r.is_group) === Boolean(pointForm.is_group)
+    && r.id !== editingRuleId.value
+));
+
+async function addPointRule() {
+    const existing = matchingExistingRule.value;
+    if (existing) {
+        const ok = await confirm({
+            message: `A rule for ${pointForm.grade || 'Any Grade'} / ${pointForm.position ? pointForm.position + ' Place' : 'Any Position'} / ${pointForm.is_group ? 'Group' : 'Individual'} already awards ${existing.points} pts. Save ${pointForm.points} pts instead?`,
+        });
+        if (!ok) return;
+    }
+    pointForm.post(`${base.value}/point-rules`, {
+        preserveScroll: true,
+        onSuccess: () => { pointForm.reset(); editingRuleId.value = null; },
+    });
 }
 
-function removePointRule(id) {
+function startEditPointRule(rule) {
+    editingRuleId.value = rule.id;
+    pointForm.grade = rule.grade || '';
+    pointForm.position = rule.position || '';
+    pointForm.points = rule.points;
+    pointForm.is_group = Boolean(rule.is_group);
+}
+
+function cancelEditPointRule() {
+    editingRuleId.value = null;
+    pointForm.reset();
+}
+
+async function removePointRule(id) {
+    const ok = await confirm({
+        message: 'Remove this point rule? Marks that relied on it will fall back to whatever the next-matching rule (or the default table) awards instead.',
+        destructive: true,
+    });
+    if (!ok) return;
     router.delete(`${base.value}/point-rules/${id}`, { preserveScroll: true });
 }
 
@@ -325,7 +396,12 @@ function saveTemplateMeta(draft) {
     });
 }
 
-function deleteTemplate(draft) {
+async function deleteTemplate(draft) {
+    const ok = await confirm({
+        message: `Delete the "${draft.name}" rank points template? This removes all its rank/points rows. Participant types assigned to it will fall back to the Individual template (or the default table) until reassigned.`,
+        destructive: true,
+    });
+    if (!ok) return;
     router.delete(`${base.value}/rank-point-templates/${draft.id}`, { preserveScroll: true });
 }
 

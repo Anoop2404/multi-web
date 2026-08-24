@@ -33,7 +33,7 @@ class FestReportCatalog
      *      the same for every viewer, so exposing them isn't the leak the audit found.
      *
      * Left OFF deliberately (audit-named unsafe, or unverified — see Milestone 1.2):
-     * green-room-list, judge-sheet, mark-entry-sheet, mark-entered-summary,
+     * green-room-list, judge-sheet, mark-entry-sheet,
      * mark-entry-status (schools have a dedicated, already-scoped
      * FestSchoolReportController::exportMarkEntryStatus() for this instead), clashes,
      * promotions, promotions-pdf, certificate-counts, catering, volunteer-roster,
@@ -74,6 +74,14 @@ class FestReportCatalog
         'item-order-public',
         'sahodaya-ranking',
         'medal-tally',
+        // Previously left off as unverified — now confirmed to filter to $schoolId when
+        // given, and wired to actually receive it from FestSchoolReportController::export()'s
+        // forced school_id (student-participation/age-group-matrix already did; a
+        // school-scoping branch was added to certificateCountsCsv() for this pass — see
+        // Documents/Fest_Improvements_Proposal.md §5.2).
+        'student-participation',
+        'certificate-counts',
+        'age-group-matrix',
     ];
 
     public static function isSchoolSafe(string $exportId): bool
@@ -104,6 +112,8 @@ class FestReportCatalog
             ['id' => 'results', 'label' => 'Results (spreadsheet)', 'format' => 'xls', 'params' => [], 'phase' => 'after', 'audience' => 'staff'],
             ['id' => 'school-wise', 'label' => 'School-wise Detailed Results', 'format' => 'pdf', 'params' => ['school_id', 'class_group'], 'phase' => 'after', 'audience' => 'staff'],
             ['id' => 'overall-ranking', 'label' => 'Overall School Ranking', 'format' => 'pdf', 'params' => [], 'phase' => 'after', 'audience' => 'public'],
+            ['id' => 'category-item-matrix-xls', 'label' => 'Category & Item-wise Consolidated Report (Excel)', 'format' => 'xls', 'params' => [], 'phase' => 'after', 'audience' => 'staff'],
+            ['id' => 'category-item-matrix-pdf', 'label' => 'Category & Item-wise Consolidated Report (PDF)', 'format' => 'pdf', 'params' => [], 'phase' => 'after', 'audience' => 'staff'],
             ['id' => 'house-wise', 'label' => 'House-wise Results', 'format' => 'pdf', 'params' => [], 'phase' => 'after', 'audience' => 'public'],
             ['id' => 'item-list', 'label' => 'Item List & Registration Counts', 'format' => 'pdf', 'params' => [], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'item-wise', 'label' => 'Item-wise Top Results', 'format' => 'pdf', 'params' => ['item_id', 'top_n'], 'phase' => 'after', 'audience' => 'public'],
@@ -115,7 +125,6 @@ class FestReportCatalog
             ['id' => 'green-room-list', 'label' => 'Green Room List (staff)', 'format' => 'pdf', 'params' => ['item_id'], 'phase' => 'during', 'audience' => 'staff'],
             ['id' => 'attendance-sheet', 'label' => 'Attendance Sheet (by item)', 'format' => 'pdf', 'params' => ['item_id', 'class_group', 'audience'], 'phase' => 'before', 'audience' => 'both'],
             ['id' => 'attendance-sheet-school', 'label' => 'Attendance Sheet (school pivot)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
-            ['id' => 'mark-entered-summary', 'label' => 'Mark-entered Summary', 'format' => 'xls', 'params' => [], 'phase' => 'during', 'audience' => 'staff'],
             ['id' => 'mark-entry-status', 'label' => 'Mark Entry Status', 'format' => 'csv', 'params' => [], 'phase' => 'during', 'audience' => 'staff'],
             ['id' => 'clashes', 'label' => 'Schedule Clash Report', 'format' => 'csv', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'clashes-school', 'label' => 'School Clash Report (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
@@ -124,7 +133,7 @@ class FestReportCatalog
             ['id' => 'fees', 'label' => 'Fee / Payment Report', 'format' => 'xls', 'params' => [], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'fee-breakdown', 'label' => 'Sports Fee Breakdown (school / student / extra items)', 'format' => 'xls', 'params' => [], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'student-event-registrations', 'label' => 'Student Event Registration Register', 'format' => 'xls', 'params' => [], 'phase' => 'before', 'audience' => 'staff'],
-            ['id' => 'certificate-counts', 'label' => 'Certificate Counts by School', 'format' => 'csv', 'params' => [], 'phase' => 'after', 'audience' => 'staff'],
+            ['id' => 'certificate-counts', 'label' => 'Certificate Counts by School', 'format' => 'csv', 'params' => ['school_id'], 'phase' => 'after', 'audience' => 'staff'],
             ['id' => 'catering', 'label' => 'Food / Catering Orders', 'format' => 'csv', 'params' => [], 'phase' => 'during', 'audience' => 'staff'],
             ['id' => 'catering-by-school', 'label' => 'Catering Summary by School', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'during', 'audience' => 'staff'],
             ['id' => 'volunteer-roster', 'label' => 'Volunteer Roster', 'format' => 'csv', 'params' => [], 'phase' => 'during', 'audience' => 'staff'],
@@ -191,6 +200,8 @@ class FestReportCatalog
         'results'                        => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'school-wise'                   => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'overall-ranking'               => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'category-item-matrix-xls'      => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'category-item-matrix-pdf'      => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
         'house-wise'                    => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
         'item-list'                      => ['dataset' => 'catalog', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'item-wise'                     => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
@@ -202,7 +213,6 @@ class FestReportCatalog
         'green-room-list'                => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => true],
         'attendance-sheet'               => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'attendance-sheet-school'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => true],
-        'mark-entered-summary'          => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'mark-entry-status'             => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'clashes'                        => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
         'clashes-school'                => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => false],
@@ -259,6 +269,7 @@ class FestReportCatalog
             ['id' => 'student-wise', 'label' => 'Student-wise browser', 'href' => "{$base}/student-wise"],
             ['id' => 'item-wise', 'label' => 'Item-wise browser', 'href' => "{$base}/item-wise"],
             ['id' => 'category-wise-points', 'label' => 'Category-wise Points', 'href' => "{$base}/category-wise-points"],
+            ['id' => 'category-item-matrix', 'label' => 'Category & Item-wise Consolidated Report', 'href' => "{$base}/category-item-matrix"],
             ['id' => 'attendance', 'label' => 'Attendance Register', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/attendance"],
             ['id' => 'id-cards', 'label' => 'Participant ID Cards', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/id-cards"],
             ['id' => 'games-entry-form', 'label' => 'Entry Form', 'href' => "/school-admin/{$tenantId}/sports/events/{$eventId}/games-entry-form"],
@@ -299,7 +310,7 @@ class FestReportCatalog
         'item-counts', 'item-list',
         'head-wise-participants',
         'discipline-registration',
-        'mark-entry-status', 'mark-entered-summary',
+        'mark-entry-status',
         'schedule-clashes', 'clashes', 'clashes-school',
         'assignment-completeness',
         // Payment/fee report — same reportableEventIds() resolution issue, found when
@@ -393,6 +404,7 @@ class FestReportCatalog
         return match ($exportId) {
             'school-wise' => 'school-detailed',
             'overall-ranking' => 'overall-ranking',
+            'category-item-matrix-xls', 'category-item-matrix-pdf' => 'category-item-matrix',
             'house-wise' => 'house-detailed',
             'item-list' => 'item-counts',
             'mark-entry-status' => 'mark-entry-status',

@@ -1368,6 +1368,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/grade-configs', [FestEventSettingsController::class, 'storeGradeConfig'])->name('grade-configs.store');
             Route::put('/{event}/grade-configs/{gradeConfig}', [FestEventSettingsController::class, 'updateGradeConfig'])->name('grade-configs.update');
             Route::delete('/{event}/grade-configs/{gradeConfig}', [FestEventSettingsController::class, 'destroyGradeConfig'])->name('grade-configs.destroy');
+            Route::post('/{event}/grade-configs/sync-to-regions', [FestEventSettingsController::class, 'syncGradeConfigsToRegions'])->name('grade-configs.sync-to-regions');
             Route::get('/{event}/rank-points', [FestEventSettingsController::class, 'rankPoints'])->name('rank-points.index');
             Route::post('/{event}/point-rules', [FestEventSettingsController::class, 'storePointRule'])->name('point-rules.store');
             Route::delete('/{event}/point-rules/{pointRule}', [FestEventSettingsController::class, 'destroyPointRule'])->name('point-rules.destroy');
@@ -1378,6 +1379,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/rank-point-templates/{template}', [FestEventSettingsController::class, 'destroyRankTemplate'])->name('rank-point-templates.destroy');
             Route::put('/{event}/rank-point-templates/{template}/points', [FestEventSettingsController::class, 'updateRankPoints'])->name('rank-point-templates.points');
             Route::post('/{event}/rank-point-templates/{template}/seed-athletics', [FestEventSettingsController::class, 'seedRankPoints'])->name('rank-point-templates.seed-athletics');
+            Route::post('/{event}/recalculate-marks', [FestEventSettingsController::class, 'recalculateMarks'])->name('recalculate-marks');
             Route::post('/{event}/volunteers', [FestEventSettingsController::class, 'storeVolunteer'])->name('volunteers.store');
             Route::delete('/{event}/volunteers/{volunteer}', [FestEventSettingsController::class, 'destroyVolunteer'])->name('volunteers.destroy');
             Route::post('/{event}/clone', [FestEventSettingsController::class, 'cloneEvent'])->name('clone');
@@ -1392,10 +1394,18 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/marks/import-template', [FestMarksImportController::class, 'importTemplate'])->name('marks.import-template');
             Route::post('/{event}/marks/import', [FestMarksImportController::class, 'importStore'])->name('marks.import.store');
             Route::get('/{event}/certificates', [FestCertificateController::class, 'index'])->name('certificates.index');
+            Route::get('/{event}/certificates/merit', [FestCertificateController::class, 'meritCertificates'])->name('certificates.merit');
+            Route::get('/{event}/certificates/participants', [FestCertificateController::class, 'participationCertificatesPage'])->name('certificates.participants');
             Route::get('/{event}/certificates/tally', [FestCertificateController::class, 'tally'])->name('certificates.tally');
             Route::post('/{event}/certificates/generate', [FestCertificateController::class, 'generate'])->name('certificates.generate');
             Route::get('/{event}/certificates/download-zip', [FestCertificateController::class, 'downloadZip'])->name('certificates.download-zip');
             Route::get('/{event}/certificates/print-all', [FestCertificateController::class, 'printAll'])->name('certificates.print-all');
+            Route::post('/{event}/certificates/batches', [FestCertificateController::class, 'generateAndRenderBatch'])->name('certificates.batches.store');
+            Route::get('/{event}/certificates/batches', [FestCertificateController::class, 'batches'])->name('certificates.batches.index');
+            Route::get('/{event}/certificates/batches/{batch}/progress', [FestCertificateController::class, 'batchProgress'])->name('certificates.batches.progress');
+            Route::post('/{event}/certificates/regenerate-stale', [FestCertificateController::class, 'regenerateStale'])->name('certificates.regenerate-stale');
+            Route::get('/{event}/certificates/preview-sample', [FestCertificateController::class, 'previewSample'])->name('certificates.preview-sample');
+            Route::get('/{event}/certificates/preview-sample-pdf', [FestCertificateController::class, 'previewSamplePdf'])->name('certificates.preview-sample-pdf');
             Route::get('/{event}/houses', [FestHouseController::class, 'index'])->name('houses.index');
             Route::post('/{event}/houses', [FestHouseController::class, 'storeHouse'])->name('houses.store');
             Route::post('/{event}/houses/{house}/assign', [FestHouseController::class, 'assignSchool'])->name('houses.assign');
@@ -1421,7 +1431,6 @@ Route::prefix('sahodaya-admin/{tenantId}')
                     ->name('reports.downloads');
                 Route::get('/{event}/reports', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'index'])->name('reports.index');
                 Route::get('/{event}/reports/by-head', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'byHead'])->name('reports.by-head');
-                Route::post('/{event}/reports/participation-rules', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'storeRule'])->name('reports.rules.store');
                 Route::get('/{event}/reports/school-detailed', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'schoolDetailed'])->name('reports.school-detailed');
                 Route::get('/{event}/reports/overall-ranking', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'overallRanking'])->name('reports.overall-ranking');
                 Route::get('/{event}/reports/house-detailed', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'houseDetailed'])->name('reports.house-detailed');
@@ -1447,6 +1456,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/item-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemWise'])->name('reports.item-wise');
                 Route::get('/{event}/reports/category-wise-points', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePoints'])->name('reports.category-wise-points');
                 Route::get('/{event}/reports/category-wise-points/{itemId}/participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePointsParticipants'])->name('reports.category-wise-points.participants');
+                Route::get('/{event}/reports/category-item-matrix', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryItemMatrix'])->name('reports.category-item-matrix');
                 Route::get('/{event}/reports/export/{exportType}', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'export'])->name('reports.export');
             });
         });

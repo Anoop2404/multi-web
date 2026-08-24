@@ -75,6 +75,7 @@ class SahodayaPublicData
             ->limit($limit)
             ->get()
             ->map(fn (FestEvent $event) => (object) [
+                'id' => $event->id,
                 'name' => $event->title,
                 'type' => $labels[$event->event_type] ?? \Illuminate\Support\Str::headline($event->event_type),
                 'event_date' => $event->event_start,

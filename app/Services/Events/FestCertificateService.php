@@ -147,6 +147,42 @@ class FestCertificateService
     }
 
     /**
+     * The real (not canned-dummy) participant whose certificate is most likely to expose
+     * an overflowing field — used by FestCertificateController's preview-before-batch
+     * actions so an admin can sanity-check actual layout before committing to a full
+     * render run. For a participation certificate that's the person with the most
+     * distinct items, since item_title is an unbounded comma-joined list of every item
+     * they entered (see resolveFieldValues()/participationItems()); for a winner
+     * certificate — always a single item — it's simply the longest recipient name.
+     */
+    public function worstCaseParticipantForPreview(FestEvent $event, string $certType, ?int $itemId = null): ?FestParticipant
+    {
+        if ($certType === 'participation') {
+            $groups = $this->participationGroupsForEvent($event);
+            if ($groups->isEmpty()) {
+                return null;
+            }
+
+            $widestGroup = $groups->sortByDesc(
+                fn (\Illuminate\Support\Collection $group) => $group->pluck('registration.item_id')->filter()->unique()->count()
+            )->first();
+
+            return $widestGroup->sortBy('id')->first();
+        }
+
+        $participants = $this->eligibleParticipantsForEvent($event)
+            ->when($itemId, fn (\Illuminate\Support\Collection $c) => $c->filter(
+                fn (FestParticipant $p) => $p->registration?->item_id === $itemId
+            ));
+
+        if ($participants->isEmpty()) {
+            return null;
+        }
+
+        return $participants->sortByDesc(fn (FestParticipant $p) => mb_strlen($p->student?->name ?? ''))->first();
+    }
+
+    /**
      * Project how many winner and participation certificates an event needs, per item,
      * without generating anything — for checking print-shop quantities before or after
      * actually running generateForEvent()/generateParticipationForEvent(). Mirrors those
@@ -386,8 +422,16 @@ class FestCertificateService
      *                             URL only resolves while viewed on-site. Left off by
      *                             default since the normal print/verify pages are always
      *                             viewed on-site, where a lighter URL is cheaper to render.
+     * @param  array<string, ?string>  $assetCache  Same idea as $templateCache — pass the
+     *                             same array by reference across many renderContext() calls
+     *                             in a bulk render loop, keyed by "{template_id}:logo" etc.,
+     *                             so ten certificates sharing one template don't each
+     *                             independently re-read-and-base64-encode the same shared
+     *                             logo/seal/background image. Only consulted when
+     *                             $embedAssets is true, since the cheap URL path has no
+     *                             equivalent repeated work to save.
      */
-    public function renderContext(Certificate $certificate, ?array $payload = null, array &$templateCache = [], array &$participantsCache = [], bool $embedAssets = false): array
+    public function renderContext(Certificate $certificate, ?array $payload = null, array &$templateCache = [], array &$participantsCache = [], bool $embedAssets = false, array &$assetCache = []): array
     {
         $payload ??= $this->payloadFor($certificate);
 
@@ -423,17 +467,19 @@ class FestCertificateService
         // The background spans the full certificate canvas (1123×794 CSS px), so it
         // gets a much larger cap to stay print-quality.
         if ($embedAssets) {
-            $logoUrl = $template?->logo_path && $sahodaya
+            $assetCacheKey = 'tpl:'.($template?->id ?? 'none').':'.($sahodaya?->id ?? 'none');
+
+            $logoUrl = $this->cachedAssetDataUri($assetCache, $assetCacheKey.':logo', fn () => $template?->logo_path && $sahodaya
                 ? TenantStorage::photoBase64DataUri($sahodaya, $template->logo_path, 400)
-                : ($sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null);
+                : ($sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null));
 
-            $sealUrl = $template?->seal_path && $sahodaya
+            $sealUrl = $this->cachedAssetDataUri($assetCache, $assetCacheKey.':seal', fn () => $template?->seal_path && $sahodaya
                 ? TenantStorage::photoBase64DataUri($sahodaya, $template->seal_path, 400)
-                : null;
+                : null);
 
-            $backgroundUrl = $template?->background_path && $sahodaya
+            $backgroundUrl = $this->cachedAssetDataUri($assetCache, $assetCacheKey.':background', fn () => $template?->background_path && $sahodaya
                 ? TenantStorage::photoBase64DataUri($sahodaya, $template->background_path, 1600)
-                : null;
+                : null);
         } else {
             $logoUrl = $template?->logo_path && $sahodaya
                 ? TenantStorage::logoUrl($sahodaya, $template->logo_path)
@@ -487,6 +533,43 @@ class FestCertificateService
             'overlayLayout' => $overlayLayout,
             'signatories'   => $signatories,
         ]);
+    }
+
+    /** @param  array<string, ?string>  $cache */
+    private function cachedAssetDataUri(array &$cache, string $key, \Closure $resolve): ?string
+    {
+        if (! array_key_exists($key, $cache)) {
+            $cache[$key] = $resolve();
+        }
+
+        return $cache[$key];
+    }
+
+    /**
+     * Fingerprint of what renderContext() actually resolved for this certificate — used
+     * by RenderCertificateChunkJob (written at render time) and
+     * VerifyCertificateStalenessCommand (recomputed later for comparison) to detect when
+     * a certificate's rendered output would now differ from what's cached, without having
+     * to enumerate every upstream row (participant, mark, registration, template) that
+     * could have changed — any real change to name/school/items/template necessarily
+     * changes this hash, since it's the same resolved fieldValues being hashed, not a
+     * proxy for them. certificate_date is deliberately excluded: it's `now()`-derived at
+     * render time, so including it would flag every certificate stale every single day.
+     *
+     * @param  array<string, mixed>  $context  A renderContext() return value.
+     */
+    public function contentHash(array $context): string
+    {
+        $fieldValues = $context['fieldValues'] ?? [];
+        unset($fieldValues['certificate_date']);
+
+        $template = $context['template'] ?? null;
+
+        return hash('sha256', json_encode([
+            'template_id'          => $template?->id,
+            'template_updated_at'  => $template?->updated_at?->toISOString(),
+            'fieldValues'          => $fieldValues,
+        ]));
     }
 
     /**
@@ -569,6 +652,11 @@ class FestCertificateService
             // Kept as an alias of item_title for templates already using {item_details}
             // as the bold item-name line — category/type are now their own placeholders.
             'item_details'        => $itemTitle,
+            // Raw (unjoined) titles behind item_title/item_details — never substituted as
+            // its own {token}, only read by certificate-body.blade.php to give the
+            // client-side fit-text script something to truncate ("first 3 and N more")
+            // when a multi-item participation certificate's joined sentence overflows.
+            'item_titles'         => $items->pluck('title')->all(),
             'category_name'       => $categoryName,
             'participation_type'  => $participationType,
             'event_dates'         => $eventDates,

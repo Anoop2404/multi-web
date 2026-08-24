@@ -35,7 +35,51 @@ class FestMarkEntryController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        // Must be read before regionAwareTargetEvent() reassigns $event below — it clones
+        // and detaches any resolved child (parent_event_id forced null on the clone, so
+        // reportableEventIds() treats it as its own root instead of re-aggregating back up
+        // through the real hub). Checking the resolved $event's parent afterwards can never
+        // tell "genuinely at the hub" apart from "a specific child was just selected."
+        $wasHubBeforeResolution = $event->parent_event_id === null;
+
         $event = $this->regionAwareTargetEvent($request, $event);
+
+        // A region-partitioned event's "All Regions" (unselected) view aggregates
+        // registrations from every child region for display, but a mark can only ever be
+        // saved against the specific event its registration actually belongs to
+        // (FestMarkSaveService::save() rejects any event_id mismatch) — so entering marks
+        // from this combined view silently fails to save for any participant registered on
+        // a child rather than the hub itself. Require picking a specific region first, the
+        // same way registration already does, instead of showing a roster that can't
+        // actually be saved against. See Documents/Path_breaks.md.
+        $regionOptions = $event->sportEventDropdownOptions();
+        $needsRegionSelection = $wasHubBeforeResolution && ! $request->filled('region_id') && count($regionOptions) > 1;
+
+        if ($needsRegionSelection) {
+            return $this->inertia('Sahodaya/Events/MarkEntry', $this->withEventActivity($event, FestPageActivity::MARKS, [
+                'event'          => $event,
+                'needsRegionSelection' => true,
+                'childEvents'    => $regionOptions,
+                'registrations'  => [],
+                'marks'          => [],
+                'attendance'     => [],
+                'selectedHeadId' => null,
+                'selectedItemId' => null,
+                'headItemGroups' => [],
+                'markProgressByItemId' => [],
+                'gradeOptions'   => [],
+                'gradeRules'     => [],
+                'rankPointsByType' => [],
+                'judgeCount'     => 1,
+                'judgeScores'    => [],
+                'selectedItemTotalMarks' => null,
+                'selectedItemPublishedAt' => null,
+                'sheetUploads'   => [],
+                'missingChestCount' => 0,
+                'cumulativeSheetUrl' => null,
+            ]));
+        }
+
         $event->load('items');
 
         // Head/item tabs for the picker — reuses the same navigation data ChestNumbers,
@@ -103,11 +147,14 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $childEvents = $event->sportEventDropdownOptions();
 
-        // Which items already have at least one scoring column configured, so the
-        // item picker can show progress across 140+ items without opening each one.
-        $configuredItemIds = FestMarkCriterion::whereIn('item_id', $event->items->pluck('id'))
-            ->distinct()
-            ->pluck('item_id')
+        // Real marks-entered progress per item, so the item picker can show it across
+        // 140+ items without opening each one. Previously this counted items with at
+        // least one FestMarkCriterion (scoring columns configured) instead — that only
+        // reflects setup, not whether any marks were actually entered, so "87/141 items
+        // configured" could be true with zero marks entered anywhere.
+        $markProgressByItemId = collect(app(\App\Services\Events\FestReportService::class, ['event' => $event])->markEntryStatusRows())
+            ->keyBy('item_id')
+            ->map(fn (array $row) => ['marked' => $row['marked'], 'participants' => $row['participants'], 'complete' => $row['complete']])
             ->all();
 
         $gradeOptions = app(\App\Services\Events\FestGradePointService::class)->validGradesForEvent($event);
@@ -174,7 +221,7 @@ class FestMarkEntryController extends SahodayaAdminController
             'selectedHeadId' => $selectedHeadId,
             'selectedItemId' => $itemId,
             'headItemGroups' => $nav['headItemGroups'],
-            'configuredItemIds' => $configuredItemIds,
+            'markProgressByItemId' => $markProgressByItemId,
             'gradeOptions' => $gradeOptions,
             'gradeRules'   => \App\Models\FestGradeConfig::where('event_id', $event->id)
                 ->where(function ($q) use ($itemId) {
@@ -186,6 +233,7 @@ class FestMarkEntryController extends SahodayaAdminController
             'judgeCount'       => $judgeCount,
             'judgeScores'      => $judgeScores,
             'selectedItemTotalMarks' => $selectedItemModel?->total_marks,
+            'selectedItemPublishedAt' => $selectedItemModel?->results_published_at?->toIso8601String(),
             'sheetUploads'     => $sheetUploads,
             'missingChestCount' => $missingChestCount,
             'cumulativeSheetUrl' => $itemId

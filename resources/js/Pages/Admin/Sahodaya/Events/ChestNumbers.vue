@@ -72,7 +72,8 @@
 
                     <div v-if="showGreen" class="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                         <h3 class="font-semibold text-sm mb-2 text-emerald-900">Green room</h3>
-                        <table class="w-full text-sm bg-white border rounded-lg overflow-hidden">
+                        <div class="overflow-x-auto">
+                        <table class="w-full text-sm bg-white border rounded-lg">
                             <thead class="bg-gray-50"><tr>
                                 <th class="p-2 text-left">Sl No</th><th class="p-2 text-left">Chest</th><th class="p-2 text-left">Fest ID</th><th class="p-2 text-left">Name</th><th class="p-2"></th>
                             </tr></thead>
@@ -89,9 +90,10 @@
                                 <tr v-if="!greenRoom.length"><td colspan="5" class="p-3 text-gray-400 text-center">None waiting</td></tr>
                             </tbody>
                         </table>
+                        </div>
                     </div>
 
-                    <div class="card card--flush">
+                    <div class="card card--flush overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                                 <tr>
@@ -122,7 +124,14 @@
                                     </td>
                                 </tr>
                                 <tr v-if="!participants.length">
-                                    <td colspan="9" class="p-8 text-center text-gray-400">No participants for this item.</td>
+                                    <td colspan="9" class="p-0">
+                                        <EmptyState title="No participants for this item"
+                                            description="Approve registrations for this item first, then chest numbers can be generated." icon="🔢" class="py-8">
+                                            <template #action>
+                                                <Link :href="registrationsUrl" class="btn-primary text-xs">Review Registrations</Link>
+                                            </template>
+                                        </EmptyState>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -162,6 +171,8 @@ const props = defineProps({
     view: String,
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
+    itemHasMarksOrAttendance: { type: Boolean, default: false },
+    eventHasMarksOrAttendance: { type: Boolean, default: false },
 });
 
 function switchSportEvent(evt) {
@@ -171,6 +182,7 @@ function switchSportEvent(evt) {
 const showGreen = ref(props.view === 'green-room');
 const hasTeamRows = computed(() => props.participants.some((p) => p.is_team));
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/chest-numbers`);
+const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
 const numberingUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/settings/numbering`);
 const pageTitle = computed(() => {
     if (props.selectedItem) return `${props.event.title} — ${props.selectedItem.title}`;
@@ -200,17 +212,29 @@ function postAction(path) {
 function generate() { postAction(`${base.value}/generate`); }
 function assignItemReg() { postAction(`${base.value}/assign-item-ids`); }
 async function clearEntireEventChests() {
-    if (!(await confirm({ message: `Are you sure you want to reset and clear ALL chest numbers across the ENTIRE event "${props.event.title}"?\n\nThis will wipe chest numbers for all items so numbering starts back at 100.` }))) return;
+    let message = `Are you sure you want to reset and clear ALL chest numbers across the ENTIRE event "${props.event.title}"?\n\nThis will wipe chest numbers for all items so numbering starts back at 100.`;
+    if (props.eventHasMarksOrAttendance) {
+        message += '\n\n⚠️ Marks or attendance already exist for this event. If judges have a printed sheet with the old chest numbers, it will no longer match.';
+    }
+    if (!(await confirm({ message, destructive: true }))) return;
 
     router.post(`${base.value}/clear-all`, {}, { preserveScroll: true });
 }
 async function clearAllChests() {
-    if (!(await confirm({ message: `Are you sure you want to clear chest numbers for item "${props.selectedItem?.title || ''}"?` }))) return;
+    let message = `Are you sure you want to clear chest numbers for item "${props.selectedItem?.title || ''}"?`;
+    if (props.itemHasMarksOrAttendance) {
+        message += '\n\n⚠️ Marks or attendance already exist for this item. If a judge has a printed sheet with the old chest numbers, it will no longer match.';
+    }
+    if (!(await confirm({ message, destructive: props.itemHasMarksOrAttendance }))) return;
 
     router.post(`${base.value}/clear-all`, { item_id: props.selectedItemId }, { preserveScroll: true });
 }
 async function clearChest(id) {
-    if (!(await confirm({ message: 'Clear chest number?' }))) return;
+    let message = 'Clear chest number?';
+    if (props.itemHasMarksOrAttendance) {
+        message += '\n\n⚠️ Marks or attendance already exist for this item. If a judge has a printed sheet with the old chest number, it will no longer match.';
+    }
+    if (!(await confirm({ message, destructive: props.itemHasMarksOrAttendance }))) return;
     router.post(`${base.value}/${id}/clear`, {}, { preserveScroll: true });
 }
 function reveal(id) {

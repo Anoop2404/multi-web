@@ -2,9 +2,28 @@
     <SahodayaEventsLayout :title="`${event.title} — Grade Master`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                           :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Grade Master`" eyebrow="Grade master"
-                    description="Map score ranges to grades, used for mark entry and results." />
+                    description="Map score ranges to grades, used for mark entry and results.">
+            <template #actions>
+                <button v-if="isHubWithRegions" type="button" class="btn-secondary text-sm"
+                        :disabled="syncingToRegions || !props.gradeConfigs.length" :title="!props.gradeConfigs.length ? 'Add bands here first' : ''"
+                        @click="syncToRegions">
+                    {{ syncingToRegions ? 'Syncing…' : `🔄 Sync to All Regions (${regionCount})` }}
+                </button>
+                <button type="button" class="btn-secondary text-sm" :disabled="recalculating" @click="recalculateMarks">
+                    {{ recalculating ? 'Recalculating…' : '🔄 Recalculate all marks' }}
+                </button>
+            </template>
+        </PageHeader>
 
         <EventSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="grade-master" class="mb-4" />
+
+        <div v-if="event.scoring_preset" class="card !p-4 mb-5 border border-indigo-200 bg-indigo-50/60 text-xs text-indigo-950 space-y-1">
+            <p class="font-bold flex items-center gap-1.5"><span>ℹ️</span> This event uses a fixed default scoring table</p>
+            <p class="text-indigo-900/80 leading-relaxed">
+                {{ event.scoring_preset === 'mcs_kalotsav' ? 'Malappuram Central Sahodaya (MCS) Kalotsav' : 'Confederation Kalotsav (Kalolsavam Manual)' }}
+                scoring is used by default when no bands are set below. Add bands here to override it for this event — once you save even one band, your bands take over completely and the fixed table is no longer consulted.
+            </p>
+        </div>
 
         <div v-if="childEvents.length" class="card !p-4 mb-5 flex flex-wrap items-center gap-2">
             <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Region:</label>
@@ -110,6 +129,9 @@ import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object,
@@ -125,6 +147,34 @@ const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props
 
 function switchSportEvent(evt) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/grade-master`);
+}
+
+// childEvents[0] is always the hub ("All Regions") when regions exist — see
+// FestEvent::regionDropdownOptions(). Only offer the sync action from the hub itself,
+// since it's the one screen meant to hold the shared/canonical band set.
+const isHubWithRegions = computed(() => props.childEvents.length > 1 && String(props.event.id) === String(props.childEvents[0]?.id));
+const regionCount = computed(() => Math.max(props.childEvents.length - 1, 0));
+
+const syncingToRegions = ref(false);
+function syncToRegions() {
+    syncingToRegions.value = true;
+    router.post(`${base.value}/grade-configs/sync-to-regions`, {}, {
+        preserveScroll: true,
+        onFinish: () => { syncingToRegions.value = false; },
+    });
+}
+
+const recalculating = ref(false);
+async function recalculateMarks() {
+    const ok = await confirm({
+        message: 'Refresh every mark\'s stored grade and score against the current Grade Master bands and Rank Points config? This updates marks already saved — it won\'t touch raw scores a judge entered, only the grade/points derived from them.',
+    });
+    if (!ok) return;
+    recalculating.value = true;
+    router.post(`${base.value}/recalculate-marks`, {}, {
+        preserveScroll: true,
+        onFinish: () => { recalculating.value = false; },
+    });
 }
 
 const gradeForm = useForm({ item_id: '', grade: 'A', min_score: null, max_score: null, min_percent: null, max_percent: null });
@@ -195,7 +245,12 @@ function saveGradeConfig() {
     });
 }
 
-function removeGradeConfig(id) {
+async function removeGradeConfig(id) {
+    const ok = await confirm({
+        message: 'Remove this grade band? Marks that currently resolve to it will fall back to whatever band (or the default table) covers the gap instead.',
+        destructive: true,
+    });
+    if (!ok) return;
     router.delete(`${base.value}/grade-configs/${id}`, { preserveScroll: true });
 }
 </script>

@@ -80,7 +80,7 @@
             </div>
 
             <!-- Table Registry -->
-            <div class="rounded-xl border border-slate-200 overflow-hidden bg-white">
+            <div class="rounded-xl border border-slate-200 overflow-x-auto bg-white">
                 <table class="w-full text-xs text-left">
                     <thead class="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold">
                         <tr>
@@ -159,8 +159,11 @@
                             </td>
                         </tr>
                         <tr v-if="!displayRows.length">
-                            <td colspan="7" class="p-12 text-center text-slate-400">
-                                <p class="text-sm font-medium">No participants match your filter or search.</p>
+                            <td colspan="7" class="p-0">
+                                <EmptyState v-if="!props.participants.length" title="No participants to mark yet"
+                                    description="Approve registrations for this item first, then attendance can be taken." icon="✅" class="py-10" />
+                                <EmptyState v-else title="No participants match your filter or search"
+                                    description="Try clearing the search box or the item filter above." icon="🔍" class="py-10" />
                             </td>
                         </tr>
                     </tbody>
@@ -213,12 +216,16 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, participants: Array, attendance: Object,
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
+    markedParticipantIds: { type: Array, default: () => [] },
 });
 
 function switchSportEvent(evt) {
@@ -409,7 +416,14 @@ function statusFor(p) {
     return props.attendance?.[attendanceKey(p)]?.status ?? null;
 }
 
-function mark(participant, status) {
+async function mark(participant, status) {
+    if (status === 'absent' && (props.markedParticipantIds ?? []).includes(participant.id)) {
+        const ok = await confirm({
+            message: `${participant.student?.name || participant.teacher?.name || 'This participant'} already has a score entered. Marking them absent won't remove or flag that score — it'll stay in the results as-is. Continue?`,
+            destructive: true,
+        });
+        if (!ok) return;
+    }
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/attendance`, {
         participant_id: participant.id,
         item_id: participant.registration.item_id,
@@ -417,8 +431,25 @@ function mark(participant, status) {
     }, { preserveScroll: true });
 }
 
-function bulkMark(status) {
+async function bulkMark(status) {
     const ids = filteredParticipants.value.map(p => p.id);
+
+    const baseOk = await confirm({
+        message: `Mark all ${ids.length} currently listed participant(s) as ${status}? This overwrites any existing attendance status for them.`,
+        destructive: status === 'absent',
+    });
+    if (!baseOk) return;
+
+    if (status === 'absent') {
+        const affected = ids.filter(id => (props.markedParticipantIds ?? []).includes(id)).length;
+        if (affected > 0) {
+            const ok = await confirm({
+                message: `${affected} of these participants already have a score entered. Marking them absent won't remove or flag those scores — they'll stay in the results as-is. Continue?`,
+                destructive: true,
+            });
+            if (!ok) return;
+        }
+    }
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/attendance`, {
         bulk: true,
         item_id: itemFilter.value,

@@ -79,8 +79,10 @@
                            class="field text-sm mt-1" @keyup.enter="applyFilters">
                 </div>
                 <button type="button" class="btn-secondary text-xs" @click="applyFilters">Search</button>
-                <label class="flex items-center gap-1 text-xs text-gray-600 ml-auto font-medium">
+                <label class="flex items-center gap-1 text-xs text-gray-600 ml-auto font-medium"
+                       title="When checked, Approve/Reject/Bulk actions below will go through even if registration is locked, closed, or past its deadline for this event. Leave unchecked for normal use — this is for late/exception entries only.">
                     <input type="checkbox" v-model="overrideLifecycle"> Override locked registration
+                    <span class="text-slate-400" aria-hidden="true">ⓘ</span>
                 </label>
             </div>
 
@@ -203,7 +205,10 @@
                         </td>
                     </tr>
                     <tr v-if="!registrationsList.length">
-                        <td colspan="6" class="p-8 text-center text-gray-400">No registrations match your filters.</td>
+                        <td colspan="6" class="p-0">
+                            <EmptyState title="No registrations match your filters"
+                                description="Try a different school, status, or item filter, or clear the search box above." icon="📋" class="py-8" />
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -798,10 +803,17 @@ async function searchAddParticipantStudents(query) {
     addParticipantEntries.value = Array.from(byId.values());
 }
 
-function submitAddParticipant() {
+async function submitAddParticipant() {
     const reg = manageReg.value;
     const studentId = addParticipantSelectedIds.value[0];
     if (!reg || !studentId) return;
+    if (reg.item?.results_published_at) {
+        const ok = await confirm({
+            message: `Results for "${reg.item?.title}" are already published. Adding a participant now won't automatically appear in the published results until you re-publish. Continue?`,
+            destructive: true,
+        });
+        if (!ok) return;
+    }
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${reg.id}/participants`,
         { student_id: studentId, role: addParticipantRole.value },
@@ -809,9 +821,16 @@ function submitAddParticipant() {
     );
 }
 
-function removeParticipant(participant) {
+async function removeParticipant(participant) {
     const reg = manageReg.value;
     if (!reg) return;
+    if (reg.item?.results_published_at) {
+        const ok = await confirm({
+            message: `Results for "${reg.item?.title}" are already published. Removing this participant now won't automatically update the published results until you re-publish. Continue?`,
+            destructive: true,
+        });
+        if (!ok) return;
+    }
     removingParticipantId.value = participant.id;
     router.delete(
         `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${reg.id}/participants/${participant.id}`,

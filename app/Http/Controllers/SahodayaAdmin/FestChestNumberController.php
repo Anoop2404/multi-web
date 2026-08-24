@@ -35,12 +35,22 @@ class FestChestNumberController extends SahodayaAdminController
         $greenRoom = [];
         $selectedItem = null;
 
+        $itemHasMarksOrAttendance = false;
         if ($itemId) {
             $selectedItem = $navService->findItemInGroups($nav['headItemGroups'], $itemId);
             abort_unless($selectedItem, 404);
             $participants = $this->participantRows($event, $itemId, $includePending);
             $greenRoom = $this->greenRoomRows($event, $itemId);
+
+            // So the page can warn before regenerating chest numbers a judge may already
+            // be using off a printed sheet — judging is chest-number-blind, so a
+            // regeneration after printing has no other way to be caught.
+            $itemHasMarksOrAttendance = \App\Models\FestMark::where('event_id', $event->id)->where('item_id', $itemId)->exists()
+                || \App\Models\FestAttendance::where('event_id', $event->id)->where('item_id', $itemId)->exists();
         }
+
+        $eventHasMarksOrAttendance = \App\Models\FestMark::where('event_id', $event->id)->exists()
+            || \App\Models\FestAttendance::where('event_id', $event->id)->exists();
 
         $selectedHeadId = match (true) {
             $headId === 0 => 'other',
@@ -58,6 +68,8 @@ class FestChestNumberController extends SahodayaAdminController
             'includePending' => $includePending,
             'view'           => $request->query('view') === 'green-room' ? 'green-room' : null,
             'childEvents'    => $event->sportEventDropdownOptions(),
+            'itemHasMarksOrAttendance'  => $itemHasMarksOrAttendance,
+            'eventHasMarksOrAttendance' => $eventHasMarksOrAttendance,
         ])));
     }
 

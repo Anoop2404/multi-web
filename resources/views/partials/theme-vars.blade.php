@@ -138,7 +138,12 @@
     .site-section-spacing-spacious > section { padding-top: 6.5rem !important; padding-bottom: 6.5rem !important; }
     .site-section-surface-canvas { background: #ffffff; }
     .site-section-surface-muted { background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
-    .site-section-surface-primary { background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%); color: white; }
+    {{-- Was `background: linear-gradient(...)` — rendered as fully transparent in practice
+         (verified live), leaving this variant's white text invisible against the page's own
+         white background. background-color as an explicit fallback plus the gradient as a
+         separate background-image (rather than the shorthand) guarantees a solid, visible
+         color even in whatever circumstance was dropping the gradient. See Documents/Path_breaks.md. --}}
+    .site-section-surface-primary { background-color: var(--color-primary); background-image: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%); color: white; }
     .site-section-surface-dark { background: var(--color-primary); color: white; }
     .site-section-heading-center h2 { text-align: center; }
     .site-section-heading-center p { margin-left: auto; margin-right: auto; text-align: center; }

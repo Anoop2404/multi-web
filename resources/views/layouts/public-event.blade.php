@@ -115,6 +115,17 @@
         </div>
     </div>
     @endif
+    @if($isAdminPreview ?? false)
+    <div class="bg-indigo-900/90 border-b border-indigo-500/40 text-white">
+        <div class="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
+            <div class="flex items-center gap-2">
+                <span class="bg-indigo-500/40 text-indigo-100 border border-indigo-400/40 px-2 py-0.5 rounded text-[10px] uppercase font-extrabold tracking-wider">👁️ Admin Preview Mode</span>
+                <span>Public results visibility is currently <strong>locked / disabled</strong> for regular visitors. You are viewing live standings because you are logged in as an Admin.</span>
+            </div>
+            <span class="text-[11px] text-indigo-300 font-mono">Admin Mode</span>
+        </div>
+    </div>
+    @endif
 
     <main>
         @yield('content')

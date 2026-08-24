@@ -11,8 +11,6 @@ use Illuminate\Support\Collection;
 
 class FestGradePointService
 {
-    private const ATHLETICS_STANDARD = [1 => 8, 2 => 7, 3 => 6, 4 => 5, 5 => 4, 6 => 3];
-
     /** Default CKSC-style point table when no rules configured. */
     private const DEFAULT_POINTS = [
         'A_plus' => ['1' => 10, '2' => 7, '3' => 5],
@@ -35,11 +33,19 @@ class FestGradePointService
             }
         }
 
-        if ($event->scoring_preset === 'mcs_kalotsav') {
+        // A scoring preset is only the DEFAULT table, not a hard override — if the admin
+        // has actually configured Grade Points Master rules for this event (e.g. via
+        // "Load Kalolsavam Manual Standard" and then edited them, or built their own from
+        // scratch), those custom rules take over. Previously this short-circuited
+        // unconditionally, so the preset tab looked fully editable but any custom rules
+        // saved there were silently never read — the fixed table always won regardless.
+        $hasCustomPointRules = FestPointRule::where('event_id', $event->id)->exists();
+
+        if (! $hasCustomPointRules && $event->scoring_preset === 'mcs_kalotsav') {
             return $this->mcsPointsForMark($mark, $isGroup);
         }
 
-        if ($event->scoring_preset === 'confed_kalotsav') {
+        if (! $hasCustomPointRules && $event->scoring_preset === 'confed_kalotsav') {
             return $this->confedPointsForMark($mark, $isGroup);
         }
 
@@ -75,7 +81,7 @@ class FestGradePointService
 
             if ($rule) {
                 if (($rule->points_table ?? 'custom') === 'athletics_standard') {
-                    return (int) (self::ATHLETICS_STANDARD[(int) $mark->position] ?? 0);
+                    return (int) (FestRankPointService::ATHLETICS_STANDARD[(int) $mark->position] ?? 0);
                 }
 
                 return (int) $rule->points;
@@ -158,14 +164,6 @@ class FestGradePointService
      */
     public function resolveGradeFromScore(FestEvent $event, ?int $itemId, float $score): ?string
     {
-        if ($event->scoring_preset === 'mcs_kalotsav') {
-            return $this->resolveMcsGradeFromScore($score);
-        }
-
-        if ($event->scoring_preset === 'confed_kalotsav') {
-            return $this->resolveConfedGradeFromScore($score);
-        }
-
         // total_marks is the item's overall ceiling across every judge (e.g. 200), not each
         // judge's own scale — each judge's input is already capped at total_marks / judgeCount
         // (see FestMarkEntryController::store() and MarkEntry.vue's perJudgeMax), so their sum
@@ -180,6 +178,22 @@ class FestGradePointService
             ->get();
 
         $hasCustomConfigs = $configs->isNotEmpty();
+
+        // A scoring preset is only the DEFAULT table, not a hard override — previously
+        // this short-circuited unconditionally, so events like a State Kalotsavam had a
+        // fully editable-looking Grade Master tab whose rows were silently never
+        // consulted. Only fall back to the preset's fixed table when nothing custom has
+        // been configured for this event; once an admin adds their own bands, those win.
+        if (! $hasCustomConfigs) {
+            if ($event->scoring_preset === 'mcs_kalotsav') {
+                return $this->resolveMcsGradeFromScore($score);
+            }
+
+            if ($event->scoring_preset === 'confed_kalotsav') {
+                return $this->resolveConfedGradeFromScore($score);
+            }
+        }
+
         $resolved = $this->highestMatchingGradeConfig($configs->where('item_id', $itemId), $score, $maxPossibleMarks)
             ?? $this->highestMatchingGradeConfig($configs->whereNull('item_id'), $score, $maxPossibleMarks);
 
@@ -225,13 +239,27 @@ class FestGradePointService
         for ($i = 0; $i < $count; $i++) {
             $cfg = $sorted[$i];
             $min = (float) ($cfg->min_percent ?? $cfg->min_score ?? 0);
-            $max = $i === 0
-                ? (float) ($cfg->max_percent ?? $cfg->max_score ?? 100)
-                : (float) ($sorted[$i - 1]->min_percent ?? $sorted[$i - 1]->min_score ?? 100);
 
-            $matched = $i === 0
-                ? ($percent >= $min && $percent <= $max)
-                : ($percent >= $min && $percent < $max);
+            // A band's own configured max always wins when the admin actually set one —
+            // previously every band except the top used the NEXT-higher band's min as an
+            // implicit ceiling instead, silently overriding even an explicitly lower max.
+            // That meant a deliberate gap between bands (e.g. B capped at 75%, A starting
+            // at 80%, intentionally excluding 76-79%) had no effect — a 77% score still
+            // resolved to B. Only fall back to the implicit "extend up to the next band"
+            // ceiling (or 100 for the top band) when max was left blank, matching how
+            // most existing configs are actually set up.
+            $ownMax = $cfg->max_percent ?? $cfg->max_score;
+            if ($ownMax !== null) {
+                $max = (float) $ownMax;
+                $matched = $percent >= $min && $percent <= $max;
+            } else {
+                $max = $i === 0
+                    ? 100.0
+                    : (float) ($sorted[$i - 1]->min_percent ?? $sorted[$i - 1]->min_score ?? 100);
+                $matched = $i === 0
+                    ? ($percent >= $min && $percent <= $max)
+                    : ($percent >= $min && $percent < $max);
+            }
 
             if ($matched) {
                 return str_replace('_plus', '+', $cfg->grade);

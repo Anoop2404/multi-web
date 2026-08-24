@@ -217,6 +217,24 @@ class FestEventSettingsController extends SahodayaAdminController
         ]));
     }
 
+    /** Refresh every mark's stored grade/score against the current Rank Points / Grade Master config — see FestMarkRecalculationService. */
+    public function recalculateMarks(string $tenantId, FestEvent $event, \App\Services\Events\FestMarkRecalculationService $recalc)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $result = $recalc->recalculateEvent($event);
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('points'),
+            'fest.marks.recalculated',
+            "Recalculated marks: {$result['marks_updated']} of {$result['marks_checked']} updated",
+            $result,
+        );
+
+        return back()->with('success', "Recalculated {$result['marks_checked']} mark(s) — {$result['marks_updated']} updated to match the current config.");
+    }
+
     /** @return list<array<string, mixed>> */
     private function schoolVerificationRows(FestEvent $event, $schools): array
     {
@@ -1251,21 +1269,29 @@ class FestEventSettingsController extends SahodayaAdminController
             $data['grade'] = $gradePointService->normalizeGrade($event, $data['grade']);
         }
 
-        // updateOrCreate(), not create() — (event_id, grade, position, is_group) is this
-        // rule's real identity. create() let the same combination be saved twice (e.g. by
-        // re-submitting the form, or adding a rule that already existed) with two
-        // different points values and no error; FestGradePointService::pointsForMark()'s
-        // lookup has no tiebreaker for which duplicate it reads, so a duplicate silently
-        // made scoring for that grade/position non-deterministic instead of failing loudly.
-        FestPointRule::updateOrCreate(
-            [
+        // (event_id, grade, position, is_group) is this rule's real identity — a plain
+        // create() let the same combination be saved twice (e.g. by re-submitting the
+        // form) with two different points values and no error, and FestGradePointService
+        // ::pointsForMark()'s lookup has no tiebreaker for which duplicate it reads, so a
+        // duplicate silently made scoring for that grade/position non-deterministic
+        // instead of failing loudly. updateOrCreate() alone isn't atomic (a firstOrNew()
+        // + save(), same race-condition shape already fixed for
+        // FestSchoolEventFee::syncRollup() this session) — lock the matching row inside a
+        // transaction so two concurrent submits of the same rule can't both pass the
+        // "does this exist" check and insert twice. A real DB-level unique index
+        // (fest_point_rules_identity_unique) backs this up either way.
+        \Illuminate\Support\Facades\DB::transaction(function () use ($event, $data) {
+            $identity = [
                 'event_id' => $event->id,
                 'grade'    => $data['grade'] ?? null,
                 'position' => $data['position'] ?? null,
                 'is_group' => $data['is_group'] ?? false,
-            ],
-            ['points' => $data['points']],
-        );
+            ];
+
+            $rule = FestPointRule::where($identity)->lockForUpdate()->first() ?? new FestPointRule($identity);
+            $rule->fill(['points' => $data['points']]);
+            $rule->save();
+        });
 
         EventContext::for($event)->recalculateSchoolPoints();
 
@@ -1375,6 +1401,54 @@ class FestEventSettingsController extends SahodayaAdminController
         $regionCount = $regionChildren->count();
 
         return back()->with('success', "Grade points synced to {$regionCount} region".($regionCount === 1 ? '' : 's').'.');
+    }
+
+    /** Same "set once on the hub, push to every region" pattern as syncPointRulesToRegions() — see FestGradePointService::resolveGradeFromScore(). */
+    public function syncGradeConfigsToRegions(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $regionChildren = $event->rootEvent()->childrenForRoles(['region'])
+            ->reject(fn (FestEvent $child) => $child->id === $event->id)
+            ->values();
+
+        abort_if($regionChildren->isEmpty(), 422, 'No regions are linked to this event to sync to.');
+
+        $configs = FestGradeConfig::where('event_id', $event->id)->get();
+
+        foreach ($regionChildren as $child) {
+            foreach ($configs as $config) {
+                FestGradeConfig::updateOrCreate(
+                    [
+                        'event_id' => $child->id,
+                        // item_id is intentionally not carried over — items are cloned
+                        // with new per-region ids, so a hub's item-specific override has
+                        // no matching item on the child. Only event-wide (item_id=null)
+                        // bands are shared; per-item overrides must be set per region.
+                        'item_id'  => null,
+                        'grade'    => $config->grade,
+                    ],
+                    [
+                        'min_score'   => $config->item_id ? null : $config->min_score,
+                        'max_score'   => $config->item_id ? null : $config->max_score,
+                        'min_percent' => $config->item_id ? null : $config->min_percent,
+                        'max_percent' => $config->item_id ? null : $config->max_percent,
+                    ],
+                );
+            }
+        }
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('grades'),
+            'fest.settings.grade_configs_synced_to_regions',
+            'Synced Grade Master bands to all regions',
+            ['regions' => $regionChildren->count(), 'configs' => $configs->count()],
+        );
+
+        $regionCount = $regionChildren->count();
+
+        return back()->with('success', "Grade bands synced to {$regionCount} region".($regionCount === 1 ? '' : 's').'.');
     }
 
     public function destroyPointRule(string $tenantId, FestEvent $event, FestPointRule $pointRule)
@@ -1741,29 +1815,20 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', "Saved {$updated} item registration window(s).");
     }
 
+    /**
+     * Same action as FestResultsController::publishItem() — this route exists because
+     * FestItemOpsPanel.vue (embedded in the item detail view) posts here, while
+     * Events/Results.vue posts to the other one. Rather than keep two independent copies
+     * of the publish/recalculate/audit logic to drift out of sync (see
+     * Documents/Path_breaks.md), this delegates to the one real implementation.
+     */
     public function publishItemResults(
         string $tenantId,
         FestEvent $event,
         FestEventItem $item,
-        FestItemResultsService $results,
         PlatformAuditLogger $audit,
-    )
-    {
-        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($item->event_id !== $event->id, 404);
-
-        $results->publishItem($item);
-        EventContext::for($event)->recalculateSchoolPoints();
-
-        $audit->festEvent(
-            $event,
-            FestPageActivity::settingsTab('lifecycle'),
-            'fest.item_results.published',
-            "Published results for {$item->title}",
-            ['item_id' => $item->id],
-        );
-
-        return back()->with('success', 'Item results published.');
+    ) {
+        return app(FestResultsController::class)->publishItem($tenantId, $event, $item, $audit);
     }
 
     public function backfillLevelRegistrations(string $tenantId, FestEvent $event, FestLevelRegistrationService $service)

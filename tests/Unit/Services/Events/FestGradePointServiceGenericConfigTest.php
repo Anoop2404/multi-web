@@ -106,6 +106,26 @@ class FestGradePointServiceGenericConfigTest extends TestCase
         $this->assertNull($service->resolveGradeFromScore($event, $item->id, 10));
     }
 
+    public function test_bands_own_max_is_respected_even_when_it_leaves_a_deliberate_gap(): void
+    {
+        $event = $this->makeEvent();
+
+        // A intentionally starts at 80, B intentionally stops at 75 — 76-79% is a
+        // deliberate, unassigned gap. Previously B's own max_percent (75) was ignored in
+        // favor of A's min (80) as an implicit ceiling, so a 77% score wrongly resolved
+        // to B instead of falling into the gap.
+        FestGradeConfig::create(['event_id' => $event->id, 'item_id' => null, 'grade' => 'A', 'min_percent' => 80, 'max_percent' => 100]);
+        FestGradeConfig::create(['event_id' => $event->id, 'item_id' => null, 'grade' => 'B', 'min_percent' => 60, 'max_percent' => 75]);
+        FestGradeConfig::create(['event_id' => $event->id, 'item_id' => null, 'grade' => 'C', 'min_percent' => 40, 'max_percent' => 59]);
+
+        $service = $this->service();
+
+        $this->assertSame('A', $service->resolveGradeFromScore($event, null, 80));
+        $this->assertSame('B', $service->resolveGradeFromScore($event, null, 75), 'B\'s own max of 75 must still match at its boundary.');
+        $this->assertNull($service->resolveGradeFromScore($event, null, 77), 'The deliberate 76-79 gap must not resolve to any grade.');
+        $this->assertSame('B', $service->resolveGradeFromScore($event, null, 60));
+    }
+
     public function test_item_without_total_marks_ignores_percentage_bands_and_uses_raw_score(): void
     {
         $event = $this->makeEvent();

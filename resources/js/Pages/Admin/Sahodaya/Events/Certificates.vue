@@ -3,27 +3,98 @@
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Certificates`" eyebrow="Operations"
                     description="Generate and manage participant certificates." />
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-            <div class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded p-1">
-                <select v-if="publishedItems.length" v-model="selectedItemId" class="text-xs py-1.5 px-2.5 rounded border-gray-300 bg-white shadow-sm focus:ring-1 focus:ring-indigo-500 max-w-[240px] truncate">
-                    <option :value="null">All items</option>
-                    <option v-for="item in publishedItems" :key="item.id" :value="item.id">
-                        {{ item.item_code ? `[${item.item_code}] ` : '' }}{{ item.title }}
-                    </option>
-                </select>
-                <button @click="generate(selectedItemId)" class="btn-primary py-1.5 px-3 text-xs shrink-0">
-                    🏆 Generate Merit Certificates {{ selectedItemId ? 'for item' : '' }}
-                </button>
+
+        <div class="mb-4 flex flex-wrap items-center gap-3 text-xs">
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/merit`" class="font-semibold text-amber-700 hover:text-amber-900">
+                🏆 Open Merit Certificates workspace →
+            </Link>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/participants`" class="font-semibold text-blue-700 hover:text-blue-900">
+                📜 Open Participation Certificates workspace →
+            </Link>
+        </div>
+
+        <!-- Certificate pipeline: generate rows, render & cache the files, then download.
+             Three explicit stages rather than one flat button row — rendering is now a
+             separate, deliberate step from both generation and download (see
+             FestCertificateController::generateAndRenderBatch()), so the layout says so. -->
+        <div class="card !p-4 mb-6">
+            <div class="grid gap-4 lg:grid-cols-[1fr_auto_1fr_auto_1fr] lg:items-start">
+                <div class="min-w-0">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-700 mb-2">Step 1 · Generate</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded p-1">
+                            <select v-if="publishedItems.length" v-model="selectedItemId" class="text-xs py-1.5 px-2 rounded border-gray-300 bg-white shadow-sm focus:ring-1 focus:ring-indigo-500 max-w-[160px] truncate">
+                                <option :value="null">All items</option>
+                                <option v-for="item in publishedItems" :key="item.id" :value="item.id">
+                                    {{ item.item_code ? `[${item.item_code}] ` : '' }}{{ item.title }}
+                                </option>
+                            </select>
+                            <button @click="generate(selectedItemId)" class="btn-primary py-1.5 px-3 text-xs shrink-0">
+                                🏆 Merit{{ selectedItemId ? ' (item)' : '' }}
+                            </button>
+                        </div>
+                        <button @click="generateParticipation" class="btn-secondary py-1.5 px-3 text-xs">Participation</button>
+                    </div>
+                </div>
+
+                <div class="hidden lg:flex items-center pt-6 text-gray-300 text-base" aria-hidden="true">→</div>
+
+                <div class="min-w-0">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-700 mb-2">Step 2 · Render &amp; cache</p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button v-if="certificates.length" @click="renderAndCache()" class="btn-primary py-1.5 px-3 text-xs" :disabled="isBatchRunning">
+                            ⚙️ Render &amp; cache files
+                        </button>
+                        <button v-if="staleCount" @click="regenerateStale" class="btn-secondary py-1.5 px-3 text-xs !text-amber-700 !border-amber-200" :disabled="isBatchRunning">
+                            🔁 {{ staleCount }} stale
+                        </button>
+                        <a v-if="certificates.length" :href="previewSampleUrl" target="_blank" class="text-xs font-semibold text-gray-500 hover:text-gray-800">
+                            👁️ Preview worst case ↗
+                        </a>
+                    </div>
+                </div>
+
+                <div class="hidden lg:flex items-center pt-6 text-gray-300 text-base" aria-hidden="true">→</div>
+
+                <div class="min-w-0">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-700 mb-2">Step 3 · Download</p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <details v-if="certificates.length" class="relative">
+                            <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                                📦 Download / print ▾
+                            </summary>
+                            <div class="absolute z-20 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1">
+                                <a :href="downloadZipUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 All certificates (ZIP)</a>
+                                <a v-if="winnersByItem.length" :href="downloadPublishedZipUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Merit winners only (ZIP)</a>
+                                <div class="border-t border-gray-100 my-1"></div>
+                                <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (with background) ↗</a>
+                                <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?plain=1`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (plain) ↗</a>
+                            </div>
+                        </details>
+                        <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/tally`" class="text-xs font-semibold text-gray-500 hover:text-gray-800">
+                            How many to print? →
+                        </Link>
+                    </div>
+                </div>
             </div>
 
-            <button @click="generateParticipation" class="btn-secondary">Generate participation certificates</button>
-            <a v-if="certificates.length" :href="downloadZipUrl" class="btn-secondary">Download all (ZIP)</a>
-            <a v-if="winnersByItem.length" :href="downloadPublishedZipUrl" class="btn-secondary">Download merit winners (ZIP)</a>
-            <a v-if="certificates.length" :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all`" target="_blank" class="btn-secondary">Print all (With BG) ↗</a>
-            <a v-if="certificates.length" :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?plain=1`" target="_blank" class="btn-secondary">Print all plain (No BG) ↗</a>
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/tally`" class="btn-secondary">
-                How many do I need to print?
-            </Link>
+            <!-- Render/cache batch progress -->
+            <div v-if="jobStatus" class="mt-4 pt-4 border-t border-gray-100 text-sm">
+                <div class="flex items-center justify-between gap-3 mb-2">
+                    <p class="font-semibold capitalize">
+                        {{ jobStatus.batch_type === 'regenerate_stale' ? 'Regenerating stale certificates' : 'Rendering certificates' }}: {{ jobStatus.status.replace('_', ' ') }}
+                    </p>
+                    <span class="text-xs text-gray-500 tabular-nums">{{ jobStatus.processed_count }} / {{ jobStatus.total_count }}</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div class="bg-indigo-600 h-2 rounded-full transition-all"
+                         :style="{ width: (jobStatus.total_count ? (jobStatus.processed_count / jobStatus.total_count * 100) : 0) + '%' }"></div>
+                </div>
+                <p v-if="['completed', 'completed_with_errors'].includes(jobStatus.status)" class="mt-2 text-xs text-gray-600">
+                    {{ jobStatus.succeeded_count }} succeeded<span v-if="jobStatus.failed_count"> · {{ jobStatus.failed_count }} failed</span>
+                </p>
+                <p v-if="jobStatus.error" class="mt-2 text-xs text-red-600">{{ jobStatus.error }}</p>
+            </div>
         </div>
 
         <!-- View mode tabs -->
@@ -87,27 +158,30 @@
                         </ul>
                     </div>
 
-                    <div class="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <button @click="generate(group.item_id)"
-                                class="font-semibold text-amber-700 hover:text-amber-900 flex items-center gap-1">
-                            ⚡ Generate Merit
-                        </button>
-                        <div class="flex items-center gap-2">
-                            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?item_id=${group.item_id}&cert_type=winner`"
-                               target="_blank"
-                               class="font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                                🖨️ Print Item ↗
-                            </a>
-                            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?item_id=${group.item_id}&cert_type=winner&plain=1`"
-                               target="_blank"
-                               class="font-medium text-gray-500 hover:text-gray-800">
-                                Plain (No BG) ↗
-                            </a>
-                            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip?item_id=${group.item_id}&cert_type=winner`"
-                               class="font-semibold text-gray-600 hover:text-gray-800 flex items-center gap-1">
-                                📦 ZIP
+                    <div class="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div class="flex items-center gap-3">
+                            <button @click="generate(group.item_id)" class="font-semibold text-amber-700 hover:text-amber-900">
+                                ⚡ Generate
+                            </button>
+                            <button @click="renderAndCache({ item_id: group.item_id, cert_type: 'winner' })"
+                                    class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    :disabled="isBatchRunning">
+                                ⚙️ Render
+                            </button>
+                            <a :href="`${base}/preview-sample?cert_type=winner&item_id=${group.item_id}`" target="_blank" class="text-gray-500 hover:text-gray-800" title="Preview worst case">
+                                👁️
                             </a>
                         </div>
+                        <details class="relative">
+                            <summary class="font-semibold text-gray-600 hover:text-gray-800 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                                📦 Download ▾
+                            </summary>
+                            <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                                <a :href="`${base}/download-zip?item_id=${group.item_id}&cert_type=winner`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
+                                <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=winner`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
+                                <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=winner&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
+                            </div>
+                        </details>
                     </div>
                 </div>
             </div>
@@ -153,21 +227,22 @@
                         </ul>
                     </div>
 
-                    <div class="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?school_id=${group.school_id}&cert_type=winner`"
-                           target="_blank"
-                           class="font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                            🖨️ Print School (With BG) ↗
-                        </a>
-                        <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?school_id=${group.school_id}&cert_type=winner&plain=1`"
-                           target="_blank"
-                           class="font-medium text-gray-500 hover:text-gray-800">
-                            Print Plain (No BG) ↗
-                        </a>
-                        <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip?school_id=${group.school_id}&cert_type=winner`"
-                           class="font-semibold text-gray-600 hover:text-gray-800 flex items-center gap-1">
-                            📦 ZIP
-                        </a>
+                    <div class="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <button @click="renderAndCache({ school_id: group.school_id, cert_type: 'winner' })"
+                                class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                                :disabled="isBatchRunning">
+                            ⚙️ Render
+                        </button>
+                        <details class="relative">
+                            <summary class="font-semibold text-gray-600 hover:text-gray-800 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                                📦 Download ▾
+                            </summary>
+                            <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                                <a :href="`${base}/download-zip?school_id=${group.school_id}&cert_type=winner`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
+                                <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=winner`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
+                                <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=winner&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
+                            </div>
+                        </details>
                     </div>
                 </div>
             </div>
@@ -205,7 +280,7 @@
                 <!-- Page Size & Download School ZIP -->
                 <div class="flex items-center gap-3 text-xs text-gray-600 shrink-0">
                     <a v-if="selectedSchoolId"
-                       :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip?school_id=${selectedSchoolId}`"
+                       :href="`${base}/download-zip?school_id=${selectedSchoolId}`"
                        class="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1">
                         📦 Download School ZIP
                     </a>
@@ -263,6 +338,12 @@
                                           :class="c.cert_type === 'winner' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'">
                                         {{ certificateTypeLabel(c.cert_type) }}
                                     </span>
+                                    <span v-if="c.is_stale" class="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider bg-amber-100 text-amber-800" title="Source data or template changed since this was last rendered">
+                                        ⚠️ Stale
+                                    </span>
+                                    <span v-else-if="!c.is_rendered" class="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider bg-gray-100 text-gray-500" title="Not yet rendered — use Render &amp; Cache Files">
+                                        Not rendered
+                                    </span>
                                 </div>
                                 <p class="text-xs text-gray-600 mt-0.5 truncate">
                                     {{ c.item?.title ?? 'Event Participant' }}
@@ -303,13 +384,38 @@
             </div>
         </div>
 
+        <!-- Recent render/regenerate runs -->
+        <div v-if="recentBatches.length" class="card p-4 mt-8">
+            <h3 class="text-sm font-semibold text-gray-800 mb-3">Recent render runs</h3>
+            <div class="divide-y divide-gray-100 text-xs">
+                <div v-for="b in recentBatches" :key="b.id" class="py-2 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <span class="font-medium text-gray-800">{{ b.batch_type === 'regenerate_stale' ? 'Regenerate stale' : 'Render' }}</span>
+                        <span class="text-gray-500"> · {{ b.scope_description ?? 'Whole event' }}</span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="text-gray-500">{{ b.succeeded_count }}/{{ b.total_count }}<span v-if="b.failed_count" class="text-red-600"> ({{ b.failed_count }} failed)</span></span>
+                        <span class="px-2 py-0.5 rounded font-semibold capitalize"
+                              :class="{
+                                  'bg-green-100 text-green-800': b.status === 'completed',
+                                  'bg-amber-100 text-amber-800': b.status === 'completed_with_errors',
+                                  'bg-red-100 text-red-800': b.status === 'failed',
+                                  'bg-gray-100 text-gray-600': !['completed', 'completed_with_errors', 'failed'].includes(b.status),
+                              }">
+                            {{ b.status.replace('_', ' ') }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
@@ -321,11 +427,61 @@ const props = defineProps({
     winnersByItem: { type: Array, default: () => [] },
     winnersBySchool: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
+    recentBatches: { type: Array, default: () => [] },
+    staleCount: { type: Number, default: 0 },
 });
+
+const page = usePage();
+const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates`;
 
 const activeTab = ref('winners_item');
 const plainMode = ref(false);
 const selectedItemId = ref(null);
+
+// Render/cache batch progress — same dispatch -> flash key -> poll /progress pattern as
+// Settings/StorageMigration.vue's async job UX.
+const jobStatus = ref(null);
+let pollTimer = null;
+
+function startPolling(batchId) {
+    if (!batchId) return;
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+        const res = await fetch(`${base}/batches/${batchId}/progress`, { headers: { Accept: 'application/json' } });
+        jobStatus.value = await res.json();
+        if (['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(jobStatus.value?.status)) {
+            clearInterval(pollTimer);
+            if (['completed', 'completed_with_errors'].includes(jobStatus.value.status)) {
+                router.reload({ only: ['certificates', 'recentBatches', 'staleCount'] });
+            }
+        }
+    }, 3000);
+}
+
+function renderAndCache(scope = {}) {
+    router.post(`${base}/batches`, scope, {
+        preserveScroll: true,
+        onSuccess: () => startPolling(page.props.flash?.certificate_batch_id),
+    });
+}
+
+function regenerateStale() {
+    router.post(`${base}/regenerate-stale`, {}, {
+        preserveScroll: true,
+        onSuccess: () => startPolling(page.props.flash?.certificate_batch_id),
+    });
+}
+
+const previewSampleUrl = computed(() => `${base}/preview-sample?cert_type=participation`);
+const isBatchRunning = computed(() => jobStatus.value && !['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(jobStatus.value.status));
+
+onMounted(() => {
+    const lastBatch = props.recentBatches?.[0];
+    if (lastBatch && !['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(lastBatch.status)) {
+        startPolling(lastBatch.id);
+    }
+});
+onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 
 // Search, Filter, & Pagination state
 const searchQuery = ref('');

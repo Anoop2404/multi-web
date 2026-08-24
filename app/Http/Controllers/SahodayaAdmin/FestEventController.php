@@ -82,6 +82,13 @@ class FestEventController extends SahodayaAdminController
         $catalogService = app(FestCatalogService::class);
         $catalogService->ensureSeeded($this->sahodaya->id, $eventType);
 
+        // Non-singleton programs (sports, kids-fest, ...) never redirect into a single
+        // {event}-parameterized route the way Kalotsav does, so without this check a scoped
+        // admin's containment check never gets a chance to run and the whole dashboard
+        // (stats, participation, catalog, activity log, "+ Create event") renders wide open
+        // for programs they hold zero assignment in. See Documents/Path_breaks.md.
+        $this->assertProgramAccess($eventType);
+
         // Sports: season hub lists discipline events (heads-as-events). Other singletons
         // still open the one yearly hub event directly.
         if (FestEvent::isSingletonType($eventType, $this->sahodaya->id) && $eventType !== 'sports' && ! $this->isStaff) {
@@ -307,6 +314,15 @@ class FestEventController extends SahodayaAdminController
             $stats['schools_count'] = $regs->pluck('school_id')->unique()->count();
             $stats['athletes_count'] = $regs->flatMap(fn($r) => $r->participants ?? [])->filter(fn($p) => $p->participant_role !== 'standby')->count();
         }
+
+        // The old 4-tile set (items/registrations/rounds/portal) never surfaced anything
+        // actionable — "X pending approval," "Y items with zero marks," "Z marked but not
+        // published" all existed only as free-text hints buried in the checklist or on
+        // separate report pages. See Documents/Fest_Improvements_Proposal.md §7.6.
+        $stats['pending_approvals'] = FestRegistration::where('event_id', $event->id)->where('status', 'submitted')->count();
+        $itemSummaries = app(\App\Services\Events\FestItemResultsService::class)->itemSummaries($event);
+        $stats['zero_marks_items'] = collect($itemSummaries)->filter(fn (array $row) => ($row['performers'] ?? 0) > 0 && ($row['marks_entered'] ?? 0) === 0)->count();
+        $stats['marked_unpublished_items'] = collect($itemSummaries)->filter(fn (array $row) => ($row['marks_ready'] ?? false) && ! ($row['results_published'] ?? false))->count();
 
         return $this->inertia('Sahodaya/Events/Overview', $ctx + [
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::OVERVIEW),

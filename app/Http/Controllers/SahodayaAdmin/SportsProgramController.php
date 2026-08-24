@@ -7,7 +7,6 @@ use App\Models\Certificate;
 use App\Models\FestEvent;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
-use App\Models\FestRankPoint;
 use App\Models\FestRegistration;
 use App\Models\Tenant;
 use App\Services\Events\FestRankPointService;
@@ -24,6 +23,8 @@ class SportsProgramController extends SahodayaAdminController
 
     public function championship(string $tenantId, ProgramHubDataService $hubData)
     {
+        $this->assertProgramAccess('sports');
+
         $events = FestEvent::forTenant($this->sahodaya->id)
             ->ofType('sports')
             ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])
@@ -38,6 +39,8 @@ class SportsProgramController extends SahodayaAdminController
 
     public function results(string $tenantId)
     {
+        $this->assertProgramAccess('sports');
+
         $events = FestEvent::forTenant($this->sahodaya->id)
             ->ofType('sports')
             ->where('results_published', true)
@@ -77,6 +80,8 @@ class SportsProgramController extends SahodayaAdminController
 
     public function rankings(string $tenantId)
     {
+        $this->assertProgramAccess('sports');
+
         $events = FestEvent::forTenant($this->sahodaya->id)
             ->ofType('sports')
             ->where('results_published', true)
@@ -91,11 +96,6 @@ class SportsProgramController extends SahodayaAdminController
 
         $schools = Tenant::whereIn('id', $schoolIds)->get(['id', 'name'])->keyBy('id');
         $eventsById = $events->keyBy('id');
-        $configuredEventIds = FestRankPoint::query()
-            ->whereIn('event_id', $events->pluck('id'))
-            ->distinct()
-            ->pluck('event_id')
-            ->flip();
         $rankPoints = app(FestRankPointService::class);
 
         $rows = FestMark::query()
@@ -107,29 +107,24 @@ class SportsProgramController extends SahodayaAdminController
             ])
             ->get()
             ->groupBy(fn (FestMark $mark) => $mark->participant?->registration?->school_id)
-            ->map(function ($marks, $schoolId) use ($schools, $eventsById, $configuredEventIds, $rankPoints) {
+            ->map(function ($marks, $schoolId) use ($schools, $eventsById, $rankPoints) {
                 $gold = $marks->where('position', 1)->count();
                 $silver = $marks->where('position', 2)->count();
                 $bronze = $marks->where('position', 3)->count();
 
-                $points = $marks->sum(function (FestMark $mark) use ($eventsById, $configuredEventIds, $rankPoints) {
+                // pointsForRank() already carries its own no-config fallback
+                // (FestRankPointService::ATHLETICS_STANDARD) — this used to duplicate
+                // that with a separate, lower 5/3/1 table whenever the event had zero
+                // configured FestRankPoint rows, disagreeing with every other consumer
+                // (Mark Entry, championship totals, cloning) that reads the same case.
+                $points = $marks->sum(function (FestMark $mark) use ($eventsById, $rankPoints) {
                     $position = (int) $mark->position;
                     $event = $eventsById->get($mark->event_id);
                     if (! $event || $position < 1) {
                         return 0;
                     }
 
-                    if ($configuredEventIds->has($mark->event_id)) {
-                        return $rankPoints->pointsForRank($event, $position, $mark->item?->participant_type ?? 'individual');
-                    }
-
-                    // Legacy fallback when the event has no FestRankPoint rows configured.
-                    return match ($position) {
-                        1 => 5,
-                        2 => 3,
-                        3 => 1,
-                        default => 0,
-                    };
+                    return $rankPoints->pointsForRank($event, $position, $mark->item?->participant_type ?? 'individual');
                 });
 
                 return [

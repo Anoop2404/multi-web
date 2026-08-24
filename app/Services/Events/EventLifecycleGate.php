@@ -7,7 +7,6 @@ use App\Models\FestEventItem;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Services\Events\FestPhaseLifecycleService;
-use App\Support\FestReportCatalog;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class EventLifecycleGate
@@ -106,16 +105,18 @@ class EventLifecycleGate
         return 'before';
     }
 
-    /** @return list<string> */
+    /**
+     * Staff/admin report access is no longer gated by event lifecycle phase — organizers
+     * need to be able to cross-verify data at any point (before, during, or after an
+     * event), not just once it reaches a certain stage. currentReportPhase() above is
+     * unaffected and still drives the informational "current phase" badge shown on
+     * report pages. See Documents/Fest_Improvements_Proposal.md §3.8.
+     *
+     * @return list<string>
+     */
     public static function allowedReportPhases(FestEvent $event): array
     {
-        $current = self::currentReportPhase($event);
-
-        return match ($current) {
-            'after'  => ['before', 'during', 'after'],
-            'during' => ['before', 'during'],
-            default  => ['before'],
-        };
+        return ['before', 'during', 'after'];
     }
 
     public static function allowReportLifecyclePhase(FestEvent $event, string $phase, bool $override = false): void
@@ -131,6 +132,14 @@ class EventLifecycleGate
     {
         if ($event->scoring_locked) {
             throw new HttpException(422, 'Scoring is locked for this event.');
+        }
+
+        // Explicit check, not just a side effect of publish() also flipping status to
+        // 'completed' (which the status check below would otherwise catch indirectly) —
+        // a future publish path that sets results_published without transitioning status
+        // must not leave mark entry silently open.
+        if ($event->results_published) {
+            throw new HttpException(422, 'Results have already been published for this event.');
         }
 
         if (! in_array($event->status, ['ongoing', 'registration_open', 'published'], true)) {
@@ -149,6 +158,15 @@ class EventLifecycleGate
     {
         if ($item && $item->event_id !== $event->id) {
             throw new HttpException(403, 'The item does not belong to this event.');
+        }
+
+        // Once an item's results are published, its marks are frozen — the item was
+        // previously just a visibility flag with no effect on Mark Entry, so an edit
+        // after publish would go straight to the public scoreboard with no gate, no
+        // warning, and no audit distinction from a pre-publish entry. Unpublish the
+        // item first (FestItemResultsService::unpublishItem()) to make corrections.
+        if ($item && $item->results_published_at) {
+            throw new HttpException(422, 'This item\'s results are already published. Unpublish it first to edit marks.');
         }
 
         if (! $event->phase_mode_enabled || ! $item) {
@@ -224,13 +242,18 @@ class EventLifecycleGate
         }
     }
 
+    /**
+     * Previously blocked staff/school-admin result-report downloads until
+     * event->results_published — this only ever gated the authenticated report-catalog
+     * exports (FestReportService, SahodayaAdmin/SchoolAdmin report controllers), a
+     * separate surface from the public portal (Public\FestPortalController), which
+     * enforces its own results_published checks independently and is unaffected by this.
+     * Organizers need to be able to cross-verify result data before it's published, not
+     * just after. See Documents/Fest_Improvements_Proposal.md §3.8.
+     */
     public static function allowResultReport(FestEvent $event, string $exportType): void
     {
-        $resultExports = FestReportCatalog::resultExportTypes();
-
-        if (in_array($exportType, $resultExports, true) && ! $event->results_published) {
-            throw new HttpException(422, 'Result reports are available only after results are published.');
-        }
+        //
     }
 
     public static function allowPublishResults(FestEvent $event): void

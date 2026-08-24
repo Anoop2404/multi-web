@@ -10,6 +10,7 @@ use App\Models\FestMarkCriterion;
 use App\Models\FestParticipationPolicy;
 use App\Models\FestPointRule;
 use App\Models\FestRankPoint;
+use App\Models\FestRankPointTemplate;
 use App\Models\FestVolunteer;
 use Illuminate\Support\Facades\DB;
 
@@ -65,9 +66,22 @@ class FestCloneService
                 $r->save();
             }
 
+            // Templates must be cloned first and re-pointed — fest_rank_points.template_id
+            // is NOT NULL, so a raw FestRankPoint clone that keeps the source event's
+            // template_id left the clone's Rank Points page showing "No templates yet"
+            // while scoring silently fell back to the generic default table.
+            $templateIdMap = [];
+            foreach (FestRankPointTemplate::where('event_id', $source->id)->get() as $template) {
+                $t = $template->replicate();
+                $t->event_id = $clone->id;
+                $t->save();
+                $templateIdMap[$template->id] = $t->id;
+            }
+
             foreach (FestRankPoint::where('event_id', $source->id)->get() as $rankPoint) {
                 $rp = $rankPoint->replicate();
                 $rp->event_id = $clone->id;
+                $rp->template_id = $templateIdMap[$rankPoint->template_id] ?? $rankPoint->template_id;
                 $rp->save();
             }
 

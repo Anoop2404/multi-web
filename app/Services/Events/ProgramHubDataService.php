@@ -542,6 +542,13 @@ class ProgramHubDataService
         $actions = [];
         $academicYear = \App\Support\AcademicYear::forSchool($school);
 
+        // Grouped by event: a school can legitimately have several pending FestSchoolEventFee
+        // rows for one event (one per registration batch/phase/head), but they're all the
+        // same underlying "go upload your fee proof for this event" action from the school's
+        // side — showing one row per DB record duplicated the same text on screen (worse,
+        // indistinguishably, whenever a stale/duplicate row existed — see
+        // Documents/Path_breaks.md). One action per event, regardless of how many fee rows
+        // back it, matches what the school actually needs to do.
         FestSchoolEventFee::query()
             ->where('school_id', $school->id)
             ->whereIn('event_id', $festEventIds)
@@ -549,18 +556,20 @@ class ProgramHubDataService
             ->where('total_due', '>', 0)
             ->with('event:id,title,event_type')
             ->get()
-            ->each(function ($fee) use (&$actions, $school) {
-                if (! $fee->event) {
+            ->groupBy('event_id')
+            ->each(function ($fees, $eventId) use (&$actions, $school) {
+                $event = $fees->first()->event;
+                if (! $event) {
                     return;
                 }
-                $slug = ProgramRouteMap::slugFromEventType($fee->event->event_type) ?? str_replace('_', '-', $fee->event->event_type);
+                $slug = ProgramRouteMap::slugFromEventType($event->event_type) ?? str_replace('_', '-', $event->event_type);
                 $prefix = ProgramRouteMap::prefixFromSlug($slug);
                 $actions[] = [
                     'type'     => 'fest_fee',
                     'priority' => 1,
                     'count'    => 1,
-                    'label'    => "{$fee->event->title} fees awaiting upload",
-                    'url'      => "/school-admin/{$school->id}/{$prefix}/events/{$fee->event_id}/registration?tab=fees",
+                    'label'    => "{$event->title} fees awaiting upload",
+                    'url'      => "/school-admin/{$school->id}/{$prefix}/events/{$eventId}/registration?tab=fees",
                 ];
             });
 

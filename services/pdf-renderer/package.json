@@ -1,0 +1,17 @@
+{
+  "name": "pdf-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Headless Chromium HTML-to-PDF rendering service (certificates, ID cards, bulk exports) for the Sahodaya platform.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "puppeteer-core": "^25.8.0"
+  }
+}

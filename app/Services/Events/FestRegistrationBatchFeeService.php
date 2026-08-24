@@ -331,23 +331,38 @@ class FestRegistrationBatchFeeService
     /** @param Collection<int, FestSchoolEventFee> $records */
     private function syncRollup(FestEvent $root, string $schoolId, Collection $records): void
     {
-        $rollup = FestSchoolEventFee::firstOrNew([
-            'event_id' => $root->id,
-            'school_id' => $schoolId,
-            'registration_batch_id' => null,
-            'phase_id' => null,
-            'head_id' => null,
-        ]);
-        $rollup->fill([
-            'school_registration_fee' => round((float) $records->sum('school_registration_fee'), 2),
-            'participation_item_count' => (int) $records->sum('participation_item_count'),
-            'participation_fee' => round((float) $records->sum('participation_fee'), 2),
-            'total_due' => round((float) $records->sum('total_due'), 2),
-            'amount_paid' => round((float) $records->sum('amount_paid'), 2),
-            'status' => $records->isNotEmpty() && $records->every(fn (FestSchoolEventFee $fee) => $fee->isFullyPaid())
-                ? 'approved'
-                : ((float) $records->sum('amount_paid') > 0 ? 'partial' : 'pending'),
-        ]);
-        $rollup->save();
+        // firstOrNew() + save() alone is a check-then-write race: two overlapping requests
+        // recalculating the same school at once (e.g. two admin actions moments apart, since
+        // this runs synchronously inline — QUEUE_CONNECTION=sync, no worker serializes these)
+        // can both miss the existing rollup row and both insert, leaving duplicate
+        // registration_batch_id=null rows that then double-count in every dashboard/report
+        // that sums this table. lockForUpdate() inside a transaction matches the pattern
+        // recalculateBatch() already uses for the same reason. See Documents/Path_breaks.md.
+        DB::transaction(function () use ($root, $schoolId, $records) {
+            $rollup = FestSchoolEventFee::where([
+                'event_id' => $root->id,
+                'school_id' => $schoolId,
+                'registration_batch_id' => null,
+                'phase_id' => null,
+                'head_id' => null,
+            ])->lockForUpdate()->first() ?? new FestSchoolEventFee([
+                'event_id' => $root->id,
+                'school_id' => $schoolId,
+                'registration_batch_id' => null,
+                'phase_id' => null,
+                'head_id' => null,
+            ]);
+            $rollup->fill([
+                'school_registration_fee' => round((float) $records->sum('school_registration_fee'), 2),
+                'participation_item_count' => (int) $records->sum('participation_item_count'),
+                'participation_fee' => round((float) $records->sum('participation_fee'), 2),
+                'total_due' => round((float) $records->sum('total_due'), 2),
+                'amount_paid' => round((float) $records->sum('amount_paid'), 2),
+                'status' => $records->isNotEmpty() && $records->every(fn (FestSchoolEventFee $fee) => $fee->isFullyPaid())
+                    ? 'approved'
+                    : ((float) $records->sum('amount_paid') > 0 ? 'partial' : 'pending'),
+            ]);
+            $rollup->save();
+        });
     }
 }

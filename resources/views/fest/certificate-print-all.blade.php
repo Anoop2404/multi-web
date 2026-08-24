@@ -169,9 +169,22 @@
             document.body.classList.add('hide-background');
         }
         window.addEventListener('load', function() {
-            setTimeout(function() { window.print(); }, 400);
+            // Wait for the fit-text pass (below) to finish shrinking/truncating overflowing
+            // fields before printing, rather than a blind fixed delay — otherwise a large
+            // batch could print mid-adjustment on slower machines. Capped so a print still
+            // fires even if something upstream prevents the completion flag from setting.
+            var maxWait = 8000;
+            var start = Date.now();
+            (function waitForFit() {
+                if (window.__certFitDone || (Date.now() - start) > maxWait) {
+                    window.print();
+                    return;
+                }
+                setTimeout(waitForFit, 100);
+            })();
         });
     </script>
+    @include('fest.partials.certificate-fit-text-script')
 
     @forelse($certificates as $payload)
         @php

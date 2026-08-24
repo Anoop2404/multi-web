@@ -93,6 +93,22 @@
                     <p class="font-medium text-xs leading-tight text-white">{{ step.label }}</p>
                 </div>
             </div>
+
+            <!-- Setup Progress — Sports gets a dedicated full-page checklist (Setup Hub)
+                 with this same progress bar; non-sports events use the identical
+                 FestLifecycleService::checklist() data but previously only showed it
+                 tucked into the sidebar card below, with no at-a-glance summary up here.
+                 See Documents/Fest_Improvements_Proposal.md §7.9. -->
+            <div v-if="!isSports && lifecycle.length" class="space-y-1.5 pt-3 mt-3 border-t border-white/10">
+                <div class="flex items-center justify-between text-xs text-slate-300">
+                    <span class="font-semibold text-white">Setup Progress</span>
+                    <span class="font-mono font-bold text-white">{{ checklistDone }}/{{ checklistRequiredTotal }} Complete ({{ checklistProgressPct }}%)</span>
+                </div>
+                <div class="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-indigo-400 to-emerald-400 rounded-full transition-all duration-300"
+                         :style="{ width: `${checklistProgressPct}%` }"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Metric KPI Cards -->
@@ -127,6 +143,30 @@
                 </p>
                 <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Public Portal Results</p>
             </div>
+        </div>
+
+        <!-- Actionable KPI row — previously none of this was visible without digging into
+             the checklist hints or a separate report page. See
+             Documents/Fest_Improvements_Proposal.md §7.6. -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <Link :href="`${base}/registrations?status=submitted`"
+                  class="card !py-3.5 text-center transition hover:border-amber-300"
+                  :class="stats.pending_approvals > 0 ? 'border-amber-200 bg-amber-50/60' : 'card--muted'">
+                <p class="text-2xl font-black" :class="stats.pending_approvals > 0 ? 'text-amber-600' : 'text-slate-400'">{{ stats.pending_approvals ?? 0 }}</p>
+                <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Registrations Pending Approval</p>
+            </Link>
+            <Link :href="`${base}/reports/mark-entry-status`"
+                  class="card !py-3.5 text-center transition hover:border-rose-300"
+                  :class="stats.zero_marks_items > 0 ? 'border-rose-200 bg-rose-50/60' : 'card--muted'">
+                <p class="text-2xl font-black" :class="stats.zero_marks_items > 0 ? 'text-rose-600' : 'text-slate-400'">{{ stats.zero_marks_items ?? 0 }}</p>
+                <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Items With Zero Marks</p>
+            </Link>
+            <Link :href="`${base}/results`"
+                  class="card !py-3.5 text-center transition hover:border-indigo-300"
+                  :class="stats.marked_unpublished_items > 0 ? 'border-indigo-200 bg-indigo-50/60' : 'card--muted'">
+                <p class="text-2xl font-black" :class="stats.marked_unpublished_items > 0 ? 'text-indigo-600' : 'text-slate-400'">{{ stats.marked_unpublished_items ?? 0 }}</p>
+                <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Marked but Not Published</p>
+            </Link>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -209,6 +249,15 @@
                         <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">3. Public Portal &amp; Eligibility Rules</h4>
                         <FormField label="Public Results Visibility" class-extra="sm:col-span-2">
                             <CheckboxField v-model="form.results_published" label="Publish results, scores &amp; rankings on public portal" />
+                            <div v-if="!form.results_published" class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                <span class="text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md font-medium">🔒 Public portal is locked for regular visitors.</span>
+                                <a :href="`/fest/${event.id}/scoreboard`" target="_blank" class="inline-flex items-center gap-1 font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md transition-colors">
+                                    👁️ Preview Scoreboard (Admin Mode) ↗
+                                </a>
+                                <a :href="`/fest/${event.id}/live`" target="_blank" class="inline-flex items-center gap-1 font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md transition-colors">
+                                    👁️ Preview Live Standings (Admin Mode) ↗
+                                </a>
+                            </div>
                         </FormField>
 
                         <div v-if="isSports" class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
@@ -406,6 +455,13 @@ function fixMistakenSeason() {
     });
 }
 const isSports = computed(() => props.event.event_type === 'sports');
+
+const checklistRequired = computed(() => props.lifecycle.filter((s) => !s.optional));
+const checklistDone = computed(() => checklistRequired.value.filter((s) => s.done).length);
+const checklistRequiredTotal = computed(() => checklistRequired.value.length);
+const checklistProgressPct = computed(() =>
+    checklistRequiredTotal.value ? Math.round((checklistDone.value / checklistRequiredTotal.value) * 100) : 0
+);
 
 const eventTypesLabel = computed(() => props.event.event_type?.replace(/_/g, ' ') ?? 'Event');
 const publicFestUrl = computed(() => {

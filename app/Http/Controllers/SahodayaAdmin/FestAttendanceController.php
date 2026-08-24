@@ -67,11 +67,21 @@ class FestAttendanceController extends SahodayaAdminController
             ->get()
             ->keyBy(fn ($a) => $a->item_id.'-'.$a->participant_id);
 
+        // So the page can warn before flipping someone to absent after they already
+        // have a score — the existing mark isn't retracted when attendance changes,
+        // it just silently stays in the results. See Documents/Fest_Improvements_Proposal.md.
+        $markedParticipantIds = \App\Models\FestMark::whereIn('event_id', $eventIds)
+            ->whereIn('participant_id', $participants->pluck('id'))
+            ->where(fn ($q) => $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position'))
+            ->pluck('participant_id')
+            ->all();
+
         return $this->inertia('Sahodaya/Events/Attendance', $this->withEventActivity($event, FestPageActivity::ATTENDANCE, [
             'event' => $event,
             'participants' => $participants,
             'attendance' => $attendance,
             'childEvents' => $event->sportEventDropdownOptions(),
+            'markedParticipantIds' => $markedParticipantIds,
         ]));
     }
 

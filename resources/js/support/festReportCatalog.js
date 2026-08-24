@@ -127,8 +127,8 @@ export const SCHOOL_EVENT_REPORTS = [
     { id: 'event-athletes-export', label: 'Event athletes register', category: 'registration', phase: 'before', hasPreview: false, hasExport: true, exportSuffix: 'export/student-event-registrations', exportLabel: 'Excel', icon: '🏃', hint: 'Fest event IDs for your athletes', program: 'sports-meet' },
     { id: 'registrations-export', label: 'All registrations (Excel)', category: 'registration', phase: 'before', hasPreview: false, hasExport: true, exportSuffix: 'export/registrations', exportLabel: 'Excel', icon: '📥', hint: 'Full item registration spreadsheet' },
     { id: 'item-participants-export', label: 'Item participants list', category: 'registration', phase: 'before', hasPreview: false, hasExport: true, exportSuffix: 'export/item-participants', exportLabel: 'Excel', icon: '📝', hint: 'Participants per competition item' },
-    { id: 'student-participation-export', label: 'Student participation', category: 'registration', phase: 'before', hasPreview: false, hasExport: false, icon: '👥', hint: 'Each student\'s items and roles' },
-    { id: 'age-group-matrix-export', label: 'Age group matrix', category: 'registration', phase: 'before', hasPreview: false, hasExport: false, icon: '🔢', hint: 'Athletes by age group', program: 'sports-meet' },
+    { id: 'student-participation-export', label: 'Student participation', category: 'registration', phase: 'before', hasPreview: false, hasExport: true, exportSuffix: 'export/student-participation', exportLabel: 'Excel', icon: '👥', hint: 'Each student\'s items and roles' },
+    { id: 'age-group-matrix-export', label: 'Age group matrix', category: 'registration', phase: 'before', hasPreview: false, hasExport: true, exportSuffix: 'export/age-group-matrix', exportLabel: 'Excel', icon: '🔢', hint: 'Athletes by age group', program: 'sports-meet' },
     // Schedule & slots
     { id: 'item-schedule', label: 'Slot allocation & schedule', category: 'schedule', phase: 'during', hasPreview: true, hasExport: true, pdfExportSuffix: 'export/item-schedule-pdf', exportSuffix: 'export/item-schedule', exportLabel: 'CSV', icon: '🗓️', hint: 'Venue, date and time slot for each item', featured: true },
     { id: 'schedule-clashes', label: 'Schedule clashes', category: 'schedule', phase: 'during', hasPreview: true, hasExport: false, icon: '⚠️', hint: 'Overlapping schedules for your students', featured: true },
@@ -148,7 +148,7 @@ export const SCHOOL_EVENT_REPORTS = [
     { id: 'id-cards', label: 'ID cards', category: 'ops', phase: 'before', hasPreview: true, hasExport: true, pdfExportSuffix: 'id-cards/pdf', icon: '🪪', hint: 'Print student ID cards by head or item', featured: true },
     { id: 'admit-cards', label: 'Admit cards (bulk PDF)', category: 'ops', phase: 'before', hasPreview: true, hasExport: false, icon: '🎫', hint: 'Bulk admit cards PDF' },
     { id: 'group-roster', label: 'Group / squad roster', category: 'ops', phase: 'before', hasPreview: true, hasExport: false, icon: '👥', hint: 'Team squad sheets' },
-    { id: 'certificate-counts-export', label: 'Certificate counts', category: 'ops', phase: 'after', hasPreview: false, hasExport: false, icon: '🎖️', hint: 'Certificates due by item' },
+    { id: 'certificate-counts-export', label: 'Certificate counts', category: 'ops', phase: 'after', hasPreview: false, hasExport: true, exportSuffix: 'export/certificate-counts', exportLabel: 'CSV', icon: '🎖️', hint: 'Certificates issued for your school so far' },
 ];
 
 export function schoolReportPdfHref(eventBase, report) {

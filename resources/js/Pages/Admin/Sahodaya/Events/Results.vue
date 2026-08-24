@@ -6,8 +6,16 @@
 
         <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
                            :event="event" active="results" class="mb-4" />
-        <FestEventWorkflowStepper v-else :sahodaya-id="sahodaya.id" :event-id="event.id"
-                                  :event-type="event.event_type" :current-step="'reports'" />
+        <template v-else>
+            <!-- Results previously replaced the standard tab bar with just this stepper —
+                 every other page in the flow (Grade Master, Rank Points, Chest Numbers...)
+                 keeps EventSubNav, so an admin who reached Results and needed to fix a
+                 grading issue had no in-app way back. The stepper stays as a progress
+                 indicator; EventSubNav restores the normal navigation underneath it. -->
+            <FestEventWorkflowStepper :sahodaya-id="sahodaya.id" :event-id="event.id"
+                                      :event-type="event.event_type" :current-step="'reports'" />
+            <EventSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" :event-type="event.event_type" active="results" class="mb-4 mt-4" />
+        </template>
 
         <div v-if="event.workflow_mode === 'phased_regional_billing'" class="mb-4">
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/results/advancement`" class="link-brand text-sm">
@@ -126,7 +134,14 @@
                                         </td>
                                     </tr>
                                     <tr v-if="!itemResultRows.length">
-                                        <td :colspan="isSports ? 7 : 6" class="p-6 text-center text-slate-400">No marks entered yet.</td>
+                                        <td :colspan="isSports ? 7 : 6" class="p-0">
+                                            <EmptyState title="No marks entered yet"
+                                                description="Enter marks for this item before results can show here." icon="✍️" class="py-8">
+                                                <template #action>
+                                                    <Link :href="marksUrl(selectedItem ?? item)" class="btn-primary text-xs">Go to Mark Entry</Link>
+                                                </template>
+                                            </EmptyState>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -234,7 +249,10 @@
                             </tr>
                         </template>
                         <tr v-if="!filteredSummaries.length">
-                            <td colspan="7" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
+                            <td colspan="7" class="p-0">
+                                <EmptyState title="No items match the selected filters"
+                                    description="Try a different status or head filter above." icon="🥇" class="py-8" />
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -342,6 +360,7 @@ import { router, useForm, Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
+import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
 import FestHeadItemInfoPanel from '@/Components/fest/FestHeadItemInfoPanel.vue';

@@ -88,10 +88,13 @@ class FestPortalController extends Controller
             ->distinct()
             ->pluck('item_id');
 
+        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+        $isResultsPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
+
         $recentResults = collect();
         $publishedItemCount = 0;
 
-        if ($selectedScope['results_published']) {
+        if ($isResultsPublished) {
             $recentMarks = FestMark::where('event_id', $event->id)
                 ->whereIn('position', [1, 2, 3])
                 ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school'])
@@ -141,7 +144,8 @@ class FestPortalController extends Controller
             'categoryLabels' => $categoryLabels,
             'scopes' => $scopes,
             'selectedScope' => $selectedScope,
-            'scopeResultsPublished' => (bool) $selectedScope['results_published'],
+            'scopeResultsPublished' => $isResultsPublished,
+            'isAdminPreview' => $isAdminPreview,
             'publishedItemCount' => $publishedItemCount,
             'scopeSchedulePublished' => (bool) $selectedScope['schedule_published'],
             'scheduledItemIds' => $scheduledItemIds,
@@ -154,7 +158,9 @@ class FestPortalController extends Controller
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         $selectedScope = $this->operationalEvents->directScope($event);
-        $isPublished = (bool) $selectedScope['results_published'];
+
+        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+        $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
         abort_unless($isPublished, 403, 'Public scoreboard & results are disabled for this event.');
 
@@ -548,12 +554,16 @@ class FestPortalController extends Controller
         return $this->renderPublic('public.fest.item-schedule', $tenant, compact('event', 'item', 'schedules'));
     }
 
-    public function itemResults(int $eventId, FestEventItem $item)
+    public function itemResults(Request $request, int $eventId, FestEventItem $item)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless((int) $item->event_id === (int) $event->id, 404);
-        abort_unless($event->results_published, 403, 'Public results are disabled for this event.');
+
+        $isAdminPreview = ! $event->results_published && $this->isAuthorizedAdminPreview($request, $event);
+        $isPublished = (bool) $event->results_published || $isAdminPreview;
+
+        abort_unless($isPublished, 403, 'Public results are disabled for this event.');
 
         $allMarks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
@@ -596,13 +606,17 @@ class FestPortalController extends Controller
         return $this->renderPublic('public.fest.item-results', $tenant, compact('event', 'item', 'marks', 'allMarks'));
     }
 
-    public function winnerPoster(int $eventId, FestEventItem $item, FestMark $mark, FestWinnerPosterService $posters)
+    public function winnerPoster(Request $request, int $eventId, FestEventItem $item, FestMark $mark, FestWinnerPosterService $posters)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless((int) $item->event_id === (int) $event->id, 404);
         abort_if($mark->event_id !== $item->event_id || $mark->item_id !== $item->id, 404);
-        abort_unless($event->results_published, 403, 'Public results are disabled for this event.');
+
+        $isAdminPreview = ! $event->results_published && $this->isAuthorizedAdminPreview($request, $event);
+        $isPublished = (bool) $event->results_published || $isAdminPreview;
+
+        abort_unless($isPublished, 403, 'Public results are disabled for this event.');
         abort_if(! in_array((int) $mark->position, [1, 2, 3], true), 404);
 
         $rendered = $posters->render($event, $item, $mark, $tenant);
@@ -613,12 +627,16 @@ class FestPortalController extends Controller
         ]);
     }
 
-    public function itemResultsPdf(int $eventId, FestEventItem $item)
+    public function itemResultsPdf(Request $request, int $eventId, FestEventItem $item)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless((int) $item->event_id === (int) $event->id, 404);
-        abort_unless($event->results_published, 403, 'Public results are disabled for this event.');
+
+        $isAdminPreview = ! $event->results_published && $this->isAuthorizedAdminPreview($request, $event);
+        $isPublished = (bool) $event->results_published || $isAdminPreview;
+
+        abort_unless($isPublished, 403, 'Public results are disabled for this event.');
 
         $marks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
@@ -630,368 +648,257 @@ class FestPortalController extends Controller
         $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($item->title)) ?: 'item';
 
         return Pdf::loadView('fest.reports.item-wise', [
-            'event' => $event,
-            'item' => $item,
-            'marks' => $marks,
-            'topN' => $marks->count(),
-            'orgName' => $tenant->name ?? 'Sahodaya',
-            'logoSrc' => TenantBranding::logoEmbedSrc($tenant),
-        ])->download("{$slug}-results.pdf");
+        'orgName' => $tenant->name ?? 'Sahodaya',
+        'logoSrc' => TenantBranding::logoEmbedSrc($tenant),
+    ])->download("{$slug}-results.pdf");
+}
+
+public function scoreboard(Request $request, int $eventId)
+{
+    $tenant = $this->resolveTenant();
+    $event = $this->findEvent($tenant->id, $eventId);
+    $selectedScope = $this->operationalEvents->directScope($event);
+
+    $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+    $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
+
+    $scopes = [$selectedScope];
+    $categories = $this->scoreboards->categories($event, $selectedScope);
+    $category = $this->stringQuery($request, 'category');
+    if ($category !== null) {
+        abort_unless(in_array($category, $categories, true), 404);
     }
 
-    public function scoreboard(Request $request, int $eventId)
-    {
-        $tenant = $this->resolveTenant();
-        $event = $this->findEvent($tenant->id, $eventId);
-        $selectedScope = $this->operationalEvents->directScope($event);
-        $isPublished = (bool) $selectedScope['results_published'];
-        $scopes = [$selectedScope];
-        $categories = $this->scoreboards->categories($event, $selectedScope);
-        $category = $this->stringQuery($request, 'category');
-        if ($category !== null) {
-            abort_unless(in_array($category, $categories, true), 404);
-        }
-
-        $categoryLabels = collect($categories)
-            ->mapWithKeys(fn (string $key) => [$key => $this->scoreboards->categoryLabel($event, $key)])
-            ->all();
-        $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished);
-        $scoreboardTitle = $selectedScope['label'];
-        if ($category) {
-            $scoreboardTitle .= ' · '.($categoryLabels[$category] ?? strtoupper($category));
-        }
-
-        return $this->renderPublic('public.fest.scoreboard', $tenant, [
-            'event' => $event,
-            'scopes' => $scopes,
-            'selectedScope' => $selectedScope,
-            'categories' => $categories,
-            'category' => $category,
-            'categoryLabels' => $categoryLabels,
-            'scoreboardTitle' => $scoreboardTitle,
-            'isPublished' => $isPublished,
-            'eventContext' => $this->operationalEvents->publicContext($event),
-            'pageSeo' => ['title' => $event->title.' — Scoreboard'],
-        ] + $dynamic);
+    $categoryLabels = collect($categories)
+        ->mapWithKeys(fn (string $key) => [$key => $this->scoreboards->categoryLabel($event, $key)])
+        ->all();
+    $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview);
+    $scoreboardTitle = $selectedScope['label'];
+    if ($category) {
+        $scoreboardTitle .= ' · '.($categoryLabels[$category] ?? strtoupper($category));
     }
 
-    public function scoreboardData(Request $request, int $eventId)
-    {
-        $tenant = $this->resolveTenant();
-        $event = $this->findEvent($tenant->id, $eventId);
-        $selectedScope = $this->operationalEvents->directScope($event);
-        $categories = $this->scoreboards->categories($event, $selectedScope);
-        $category = $this->stringQuery($request, 'category');
-        if ($category !== null) {
-            abort_unless(in_array($category, $categories, true), 404);
-        }
+    return $this->renderPublic('public.fest.scoreboard', $tenant, [
+        'event' => $event,
+        'scopes' => $scopes,
+        'selectedScope' => $selectedScope,
+        'categories' => $categories,
+        'category' => $category,
+        'categoryLabels' => $categoryLabels,
+        'scoreboardTitle' => $scoreboardTitle,
+        'isPublished' => $isPublished,
+        'isAdminPreview' => $isAdminPreview,
+        'eventContext' => $this->operationalEvents->publicContext($event),
+        'pageSeo' => ['title' => $event->title.' — Scoreboard'],
+    ] + $dynamic);
+}
 
-        $isPublished = (bool) $selectedScope['results_published'];
-        $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished);
-
-        return response()->json([
-            'standingsPublished' => $isPublished,
-            'contentHtml' => view('public.fest.partials.scoreboard-content', $dynamic + compact('event', 'isPublished', 'category'))->render(),
-            'refreshedAt' => now()->toIso8601String(),
-        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+public function scoreboardData(Request $request, int $eventId)
+{
+    $tenant = $this->resolveTenant();
+    $event = $this->findEvent($tenant->id, $eventId);
+    $selectedScope = $this->operationalEvents->directScope($event);
+    $categories = $this->scoreboards->categories($event, $selectedScope);
+    $category = $this->stringQuery($request, 'category');
+    if ($category !== null) {
+        abort_unless(in_array($category, $categories, true), 404);
     }
 
-    /**
-     * Big-format, no-chrome, unattended view meant for a projector/TV at the venue — not
-     * a phone or laptop, and nobody's there to click a category filter. Auto-rotates
-     * through a fixed sequence of slides (overall school medal tally + points, the same
-     * table per category, then latest item winners) instead of showing one static view.
-     * The medal tally here mirrors results()'s $schoolBoard computation (see the note
-     * there) but additionally scopes it per category, which nothing else in the portal
-     * needed until now.
-     */
-    public function tv(int $eventId)
-    {
-        $tenant = $this->resolveTenant();
-        $event = $this->findEvent($tenant->id, $eventId);
-        $selectedScope = $this->operationalEvents->directScope($event);
-        $isPublished = (bool) $selectedScope['results_published'];
-        abort_unless($isPublished, 403, 'Public scoreboard is disabled for this event.');
-        $categories = $this->scoreboards->categories($event, $selectedScope);
+    $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+    $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
-        $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
-            ->whereIn('position', [1, 2, 3])
-            ->with(['item', 'participant.registration.school'])
-            // Same fallback as resolveScoreboard()/scoreboardDynamicData(): before the
-            // whole event is published, only count marks whose own item has published —
-            // so the medal columns line up with the provisional points column instead of
-            // sitting at 0 while points already show real numbers.
-            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
-            ->get()
-            ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
-            ->unique(fn (FestMark $m) => $m->deduplicationKey());
+    $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview);
 
-        $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
-        $medalTallyFor = fn ($scopedMarks) => $scopedMarks
-            ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
-            ->map(fn ($group) => [
-                'gold' => $group->where('position', 1)->count(),
-                'silver' => $group->where('position', 2)->count(),
-                'bronze' => $group->where('position', 3)->count(),
-            ]);
+    return response()->json([
+        'standingsPublished' => $isPublished,
+        'isAdminPreview' => $isAdminPreview,
+        'contentHtml' => view('public.fest.partials.scoreboard-content', $dynamic + compact('event', 'isPublished', 'category', 'isAdminPreview'))->render(),
+        'refreshedAt' => now()->toIso8601String(),
+    ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+}
 
-        $withMedals = fn (array $rows, $tally) => collect($rows)
-            ->map(fn (array $row) => $row + [
-                'gold' => $tally[$row['school_id']]['gold'] ?? 0,
-                'silver' => $tally[$row['school_id']]['silver'] ?? 0,
-                'bronze' => $tally[$row['school_id']]['bronze'] ?? 0,
-            ])
-            ->values()
-            ->all();
+/**
+ * Big-format, no-chrome, unattended view meant for a projector/TV at the venue — not
+ * a phone or laptop, and nobody's there to click a category filter. Auto-rotates
+ * through a fixed sequence of slides (overall school medal tally + points, the same
+ * table per category, then latest item winners) instead of showing one static view.
+ * The medal tally here mirrors results()'s $schoolBoard computation (see the note
+ * there) but additionally scopes it per category, which nothing else in the portal
+ * needed until now.
+ */
+public function tv(Request $request, int $eventId)
+{
+    $tenant = $this->resolveTenant();
+    $event = $this->findEvent($tenant->id, $eventId);
+    $selectedScope = $this->operationalEvents->directScope($event);
 
-        [$overallScoreboard] = $this->resolveScoreboard($event, $selectedScope, null, $isPublished);
-        $overallBoard = $withMedals($overallScoreboard, $medalTallyFor($marks));
+    $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+    $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
-        $categoryBoards = collect($categories)
-            ->map(function (string $key) use ($event, $selectedScope, $isPublished, $marks, $categoryColumn, $withMedals, $medalTallyFor) {
-                [$scoreboard] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished);
+    abort_unless($isPublished, 403, 'Public scoreboard is disabled for this event.');
+    $categories = $this->scoreboards->categories($event, $selectedScope);
 
-                return [
-                    'key' => $key,
-                    'label' => $this->scoreboards->categoryLabel($event, $key),
-                    'rows' => $withMedals(
-                        $scoreboard,
-                        $medalTallyFor($marks->filter(fn (FestMark $m) => ($m->item?->{$categoryColumn}) === $key))
-                    ),
-                ];
-            })
-            ->filter(fn (array $board) => count($board['rows']) > 0)
-            ->values()
-            ->all();
+    $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
+        ->whereIn('position', [1, 2, 3])
+        ->with(['item', 'participant.registration.school'])
+        // Same fallback as resolveScoreboard()/scoreboardDynamicData(): before the
+        // whole event is published, only count marks whose own item has published —
+        // so the medal columns line up with the provisional points column instead of
+        // sitting at 0 while points already show real numbers.
+        ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+        ->get()
+        ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
+        ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
-        $dynamic = $this->scoreboardDynamicData($event, $selectedScope, null, $isPublished);
+    $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
+    $medalTallyFor = fn ($scopedMarks) => $scopedMarks
+        ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
+        ->map(fn ($group) => [
+            'gold' => $group->where('position', 1)->count(),
+            'silver' => $group->where('position', 2)->count(),
+            'bronze' => $group->where('position', 3)->count(),
+        ]);
 
-        // Pre-chunked into fixed-size, non-scrolling pages server-side — nobody is at the
-        // TV to scroll a tall list, so "Page N of M" slides stand in for scroll the same
-        // way pagination would on a normal page. 1 item/page: with 2+ side by side, CSS
-        // grid's default row-stretch makes a short 1-position card match its taller
-        // 2-position row-mate, so a page's height was driven by whichever item happened
-        // to share its row — measured a page hit 1555px in a 1080px viewport this way.
-        // One item per page removes the row-mate entirely, so each slide is exactly its
-        // own item's height. A single item with 3+ awarded positions and a large roster
-        // can still exceed one screen on its own; left as a rare residual case rather
-        // than building full dynamic height-measured pagination for it.
-        $boardsPerPage = 12;
-        $winnersPerPage = 1;
-        $slides = [];
+    $withMedals = fn (array $rows, $tally) => collect($rows)
+        ->map(fn (array $row) => $row + [
+            'gold' => $tally[$row['school_id']]['gold'] ?? 0,
+            'silver' => $tally[$row['school_id']]['silver'] ?? 0,
+            'bronze' => $tally[$row['school_id']]['bronze'] ?? 0,
+        ])
+        ->values()
+        ->all();
 
-        // Order: overall school ranking, then each category's ranking, then results —
-        // standings open the rotation so the "big picture" leads, results follow as the
-        // detail underneath it.
-        $provisionalSuffix = $isPublished ? '' : ' · Provisional';
+    [$overallScoreboard] = $this->resolveScoreboard($event, $selectedScope, null, $isPublished, $isAdminPreview);
+    $overallBoard = $withMedals($overallScoreboard, $medalTallyFor($marks));
 
-        $overallPages = array_chunk($overallBoard, $boardsPerPage);
-        foreach ($overallPages as $i => $page) {
+    $categoryBoards = collect($categories)
+        ->map(function (string $key) use ($event, $selectedScope, $isPublished, $isAdminPreview, $marks, $categoryColumn, $withMedals, $medalTallyFor) {
+            [$scoreboard] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished, $isAdminPreview);
+
+            return [
+                'key' => $key,
+                'label' => $this->scoreboards->categoryLabel($event, $key),
+                'rows' => $withMedals(
+                    $scoreboard,
+                    $medalTallyFor($marks->filter(fn (FestMark $m) => ($m->item?->{$categoryColumn}) === $key))
+                ),
+            ];
+        })
+        ->filter(fn (array $board) => count($board['rows']) > 0)
+        ->values()
+        ->all();
+
+    $dynamic = $this->scoreboardDynamicData($event, $selectedScope, null, $isPublished, $isAdminPreview);
+
+    // Pre-chunked into fixed-size, non-scrolling pages server-side — nobody is at the
+    // TV to scroll a tall list, so "Page N of M" slides stand in for scroll the same
+    // way pagination would on a normal page. 1 item/page: with 2+ side by side, CSS
+    // grid's default row-stretch makes a short 1-position card match its taller
+    // 2-position row-mate, so a page's height was driven by whichever item happened
+    // to share its row — measured a page hit 1555px in a 1080px viewport this way.
+    // One item per page removes the row-mate entirely, so each slide is exactly its
+    // own item's height. A single item with 3+ awarded positions and a large roster
+    // can still exceed one screen on its own; left as a rare residual case rather
+    // than building full dynamic height-measured pagination for it.
+    $boardsPerPage = 12;
+    $winnersPerPage = 1;
+    $slides = [];
+
+    // Order: overall school ranking, then each category's ranking, then results —
+    // standings open the rotation so the "big picture" leads, results follow as the
+    // detail underneath it.
+    $provisionalSuffix = $isPublished ? '' : ' · Provisional';
+
+    $overallPages = array_chunk($overallBoard, $boardsPerPage);
+    foreach ($overallPages as $i => $page) {
+        $slides[] = [
+            'type' => 'board',
+            'title' => 'Overall Standings',
+            'subtitle' => (count($overallPages) > 1 ? 'Page '.($i + 1).' of '.count($overallPages) : 'All Categories').$provisionalSuffix,
+            'rows' => $page,
+        ];
+    }
+
+    foreach ($categoryBoards as $board) {
+        $categoryPages = array_chunk($board['rows'], $boardsPerPage);
+        foreach ($categoryPages as $i => $page) {
             $slides[] = [
                 'type' => 'board',
-                'title' => 'Overall Standings',
-                'subtitle' => (count($overallPages) > 1 ? 'Page '.($i + 1).' of '.count($overallPages) : 'All Categories').$provisionalSuffix,
+                'title' => $board['label'].' Standings',
+                'subtitle' => trim((count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : '').$provisionalSuffix, ' ·') ?: null,
+                'rows' => $page,
+            ];
+        }
+    }
+
+    $winnerPages = array_chunk($dynamic['latestWinners'], $winnersPerPage);
+    foreach ($winnerPages as $i => $page) {
+        $slides[] = [
+            'type' => 'winners',
+            'title' => 'Latest Item Winners',
+            'subtitle' => count($winnerPages) > 1 ? 'Page '.($i + 1).' of '.count($winnerPages) : null,
+            'items' => $page,
+        ];
+    }
+
+    // Only fall back to a schools-only roster when there's truly nothing published
+    // yet (overallBoard/categoryBoards are already real provisional data — built
+    // above via resolveScoreboard() — the moment even one item is published).
+    // Registrations, not marks, so this still has real content from the moment
+    // schools sign up, before any item is scored at all.
+    if (! $isPublished && empty($overallBoard) && empty($categoryBoards)) {
+        $registrations = FestRegistration::whereIn('event_id', $selectedScope['event_ids'])
+            ->active()
+            ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
+            ->with('item:id,'.$categoryColumn)
+            ->get(['id', 'item_id', 'school_id']);
+
+        $schoolNames = Tenant::whereIn('id', $registrations->pluck('school_id')->unique())
+            ->orderBy('name')
+            ->pluck('name', 'id');
+
+        // Same table shape as the real standings board (rank/school/medal columns/
+        // points), just every value at 0 — so the TV looks consistent across the
+        // event's whole lifecycle instead of switching to a differently-styled list
+        // the moment scoring starts. fest-medal-board's showMedalRank=false keeps rows
+        // 1-3 from showing medal icons here, since nobody's actually won anything yet.
+        $rowsFor = fn ($regs) => $regs->pluck('school_id')->unique()
+            ->map(fn ($id) => $schoolNames[$id] ?? null)
+            ->filter()
+            ->sort()
+            ->values()
+            ->map(fn ($name, $i) => [
+                'rank' => $i + 1,
+                'school_name' => $name,
+                'gold' => 0,
+                'silver' => 0,
+                'bronze' => 0,
+                // String, matching the "27.00"-style formatting a real decimal points
+                // total renders as — keeps the pre- and post-results table visually
+                // identical apart from the numbers themselves.
+                'total_points' => '0.00',
+            ])
+            ->all();
+
+        $schoolPages = array_chunk($rowsFor($registrations), $boardsPerPage);
+        foreach ($schoolPages as $i => $page) {
+            $slides[] = [
+                'type' => 'schools',
+                'title' => 'Participating Schools',
+                'subtitle' => count($schoolPages) > 1 ? 'Page '.($i + 1).' of '.count($schoolPages) : 'All Categories',
                 'rows' => $page,
             ];
         }
 
-        foreach ($categoryBoards as $board) {
-            $categoryPages = array_chunk($board['rows'], $boardsPerPage);
+        foreach ($categories as $key) {
+            $categoryRows = $rowsFor($registrations->filter(fn ($r) => $r->item?->{$categoryColumn} === $key));
+            if (! $categoryRows) {
+                continue;
+            }
+            $categoryPages = array_chunk($categoryRows, $boardsPerPage);
             foreach ($categoryPages as $i => $page) {
                 $slides[] = [
-                    'type' => 'board',
-                    'title' => $board['label'].' Standings',
-                    'subtitle' => trim((count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : '').$provisionalSuffix, ' ·') ?: null,
-                    'rows' => $page,
-                ];
-            }
-        }
-
-        $winnerPages = array_chunk($dynamic['latestWinners'], $winnersPerPage);
-        foreach ($winnerPages as $i => $page) {
-            $slides[] = [
-                'type' => 'winners',
-                'title' => 'Latest Item Winners',
-                'subtitle' => count($winnerPages) > 1 ? 'Page '.($i + 1).' of '.count($winnerPages) : null,
-                'items' => $page,
-            ];
-        }
-
-        // Only fall back to a schools-only roster when there's truly nothing published
-        // yet (overallBoard/categoryBoards are already real provisional data — built
-        // above via resolveScoreboard() — the moment even one item is published).
-        // Registrations, not marks, so this still has real content from the moment
-        // schools sign up, before any item is scored at all.
-        if (! $isPublished && empty($overallBoard) && empty($categoryBoards)) {
-            $registrations = FestRegistration::whereIn('event_id', $selectedScope['event_ids'])
-                ->active()
-                ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
-                ->with('item:id,'.$categoryColumn)
-                ->get(['id', 'item_id', 'school_id']);
-
-            $schoolNames = Tenant::whereIn('id', $registrations->pluck('school_id')->unique())
-                ->orderBy('name')
-                ->pluck('name', 'id');
-
-            // Same table shape as the real standings board (rank/school/medal columns/
-            // points), just every value at 0 — so the TV looks consistent across the
-            // event's whole lifecycle instead of switching to a differently-styled list
-            // the moment scoring starts. fest-medal-board's showMedalRank=false keeps rows
-            // 1-3 from showing medal icons here, since nobody's actually won anything yet.
-            $rowsFor = fn ($regs) => $regs->pluck('school_id')->unique()
-                ->map(fn ($id) => $schoolNames[$id] ?? null)
-                ->filter()
-                ->sort()
-                ->values()
-                ->map(fn ($name, $i) => [
-                    'rank' => $i + 1,
-                    'school_name' => $name,
-                    'gold' => 0,
-                    'silver' => 0,
-                    'bronze' => 0,
-                    // String, matching the "27.00"-style formatting a real decimal points
-                    // total renders as — keeps the pre- and post-results table visually
-                    // identical apart from the numbers themselves.
-                    'total_points' => '0.00',
-                ])
-                ->all();
-
-            $schoolPages = array_chunk($rowsFor($registrations), $boardsPerPage);
-            foreach ($schoolPages as $i => $page) {
-                $slides[] = [
                     'type' => 'schools',
-                    'title' => 'Participating Schools',
-                    'subtitle' => count($schoolPages) > 1 ? 'Page '.($i + 1).' of '.count($schoolPages) : 'All Categories',
-                    'rows' => $page,
-                ];
-            }
-
-            foreach ($categories as $key) {
-                $categoryRows = $rowsFor($registrations->filter(fn ($r) => $r->item?->{$categoryColumn} === $key));
-                if (! $categoryRows) {
-                    continue;
-                }
-                $categoryPages = array_chunk($categoryRows, $boardsPerPage);
-                foreach ($categoryPages as $i => $page) {
-                    $slides[] = [
-                        'type' => 'schools',
-                        'title' => $this->scoreboards->categoryLabel($event, $key).' — Participating Schools',
-                        'subtitle' => count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : null,
-                        'rows' => $page,
-                    ];
-                }
-            }
-        }
-
-        if (! $slides) {
-            $slides[] = ['type' => 'waiting'];
-        }
-
-        return $this->renderPublic('public.fest.tv', $tenant, [
-            'event' => $event,
-            'selectedScope' => $selectedScope,
-            'isPublished' => $isPublished,
-            'slides' => $slides,
-            'pageSeo' => ['title' => $event->title.' — Live Screen'],
-        ]);
-    }
-
-    public function manual(int $eventId)
-    {
-        $tenant = $this->resolveTenant();
-        $event = $this->findEvent($tenant->id, $eventId);
-        abort_unless($event->manual_pdf_path, 404);
-
-        return TenantStorage::downloadResponse($tenant, $event->manual_pdf_path);
-    }
-
-    public function live(Request $request, int $eventId)
-    {
-        $tenant = $this->resolveTenant();
-        $event = $this->findEvent($tenant->id, $eventId);
-        $selectedScope = $this->operationalEvents->directScope($event);
-
-        return $this->renderPublic('public.fest.live', $tenant, array_merge(
-            ['event' => $event, 'selectedScope' => $selectedScope, 'scopes' => [$selectedScope]],
-            $this->livePayload($event, $selectedScope)
-        ));
-    }
-
-    public function liveData(Request $request, int $eventId)
-    {
-        $tenant = $this->resolveTenant();
-        $event = $this->findEvent($tenant->id, $eventId);
-        $selectedScope = $this->operationalEvents->directScope($event);
-
-        return response()->json($this->livePayload($event, $selectedScope));
-    }
-
-    /** @return array<string, mixed> */
-    private function livePayload(FestEvent $event, array $selectedScope): array
-    {
-        $ctx = EventContext::for($event);
-        $categories = $this->scoreboards->categories($event, $selectedScope);
-        $categoryLinks = collect($categories)->map(fn (string $key) => [
-            'key' => $key,
-            'label' => $this->scoreboards->categoryLabel($event, $key),
-            'url' => route('tenant.fest.scoreboard', [
-                'event' => $event->id,
-                'category' => $key,
-            ]),
-        ])->all();
-
-        $nowSlot = FestSchedule::whereIn('event_id', $selectedScope['event_ids'])
-            ->whereNotNull('scheduled_at')
-            ->where('scheduled_at', '<=', now())
-            ->orderByDesc('scheduled_at')
-            ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.event', 'participant.registration.item'])
-            ->first();
-
-        $nowPerforming = null;
-        if ($nowSlot?->participant) {
-            $nowPerforming = $this->visibility->formatPublicParticipant($event, $nowSlot->participant, $nowSlot);
-            $nowPerforming['item_title'] = $nowSlot->item?->title;
-        }
-
-        // Official (whole-event-published) standings use the same resolution as the
-        // Scoreboard page; before that, a live provisional standing from whatever
-        // items have individually published so far — not a blank "not published"
-        // state, matching the item-level results already visible elsewhere on the
-        // public portal at this point.
-        $scoreboard = [];
-        if ($selectedScope['results_published']) {
-            $rawScoreboard = $this->cumulativeChampionship->publicStanding($event)['rows']
-                ?? $this->scoreboards->scoreboard($event, $selectedScope);
-
-            $medalTally = $this->schoolMedalTally($selectedScope['event_ids'], true);
-            $scoreboard = collect($rawScoreboard)
-                ->map(fn (array $row) => $row + [
-                    'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
-                    'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
-                    'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
-                ])
-                ->values()
-                ->all();
-        }
-
-        return [
-            'scoreboard' => $scoreboard,
-            'standingsPublished' => (bool) $selectedScope['results_published'],
-            'standingsProvisional' => false,
-            'categoryLinks' => $categoryLinks,
-            'houseScoreboard' => $selectedScope['results_published']
-                ? $ctx->scoreboardByHouse()
-                : [],
-            'nowPerforming' => $nowPerforming,
-            'athleticRecords' => $this->publicAthleticRecords($event),
-            'recentBreaks' => $this->recentRecordBreaks($event),
-            'refreshedAt' => now()->toIso8601String(),
-        ];
-    }
-
-    /** @return array<string, mixed> */
-    private function publicWinnerRow(FestMark $mark, FestEvent $event, ?Collection $rosterByRegistration = null): array
-    {
         $participant = $mark->participant;
         $person = $participant?->student ?? $participant?->teacher;
 
@@ -1070,12 +977,16 @@ class FestPortalController extends Controller
             ]);
     }
 
-    private function resolveScoreboard(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished): array
+    private function resolveScoreboard(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false): array
     {
         if (! $isPublished) {
             // When public results visibility is disabled for this event, do not compute
             // or reveal provisional standings/scores on the public portal.
             return [[], null];
+        }
+
+        if ($isAdminPreview && ! $selectedScope['results_published']) {
+            return [$this->scoreboards->provisionalScoreboard($event, $selectedScope, $category), null];
         }
 
         $scoreboard = $this->scoreboards->scoreboard($event, $selectedScope, $category);
@@ -1087,9 +998,9 @@ class FestPortalController extends Controller
         return [$scoreboard, $cumulativeStanding];
     }
 
-    private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished): array
+    private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false): array
     {
-        [$scoreboard, $cumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished);
+        [$scoreboard, $cumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished, $isAdminPreview);
 
         $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
         $winnerMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
@@ -1365,5 +1276,34 @@ class FestPortalController extends Controller
                 'broken_at' => $b->broken_at?->format('d M Y H:i'),
             ])
             ->all();
+    }
+
+    private function isAuthorizedAdminPreview(Request $request, FestEvent $event): bool
+    {
+        $user = $request->user() ?? auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+            return true;
+        }
+
+        if (method_exists($user, 'isStateUser') && $user->isStateUser()) {
+            return true;
+        }
+
+        if (isset($user->tenant_id) && $user->tenant_id === $event->tenant_id) {
+            return true;
+        }
+
+        try {
+            if ($user->hasAnyRole(['sahodaya_admin', 'sahodaya_staff', 'event_admin', 'fest_ops', 'mark_entry_admin', 'exam_controller'])) {
+                return true;
+            }
+        } catch (\Throwable) {
+        }
+
+        return false;
     }
 }

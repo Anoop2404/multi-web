@@ -138,7 +138,11 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         { label: 'Mark entry', href: `${base}/marks`, icon: 'edit', permissions: FEST_MARKS },
         { label: 'Mark settings', href: `${base}/mark-settings`, icon: 'check-square', permissions: FEST_MARKS },
         { label: 'Grade master', href: `${base}/grade-master`, icon: 'tag', permissions: FEST_SETTINGS },
-        { label: 'Rank points', href: `${base}/rank-points`, icon: 'arrow-up-circle', permissions: FEST_SETTINGS },
+        // This block only ever renders for non-sports events (the sports branch returns
+        // early above via sportsEventSidebarNav/sportsSeasonSidebarNav) — the same URL
+        // is actually "Grade Points Master" for every one of these event types, not a
+        // rank table. Matches the label fix in EventSubNav.vue's top tab bar.
+        { label: 'Grade Points Master', href: `${base}/rank-points`, icon: 'arrow-up-circle', permissions: FEST_SETTINGS },
         { label: 'Results & publish', href: `${base}/results`, icon: 'award', permissions: FEST_RESULTS },
         { label: 'Leaderboard', href: `${base}/leaderboard`, icon: 'bar-chart', permissions: FEST_RESULTS },
     ];

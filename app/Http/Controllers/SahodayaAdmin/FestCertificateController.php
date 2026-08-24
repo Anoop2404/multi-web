@@ -4,15 +4,19 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Support\FestPageActivity;
 use App\Support\PdfGenerator;
+use App\Support\TenantStorage;
 use App\Models\Certificate;
+use App\Models\CertificateBatch;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
+use App\Jobs\RenderCertificateChunkJob;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestCertificateService;
 use App\Services\Events\FestIdCardQrService;
 use App\Services\Events\FestItemResultsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 
 class FestCertificateController extends SahodayaAdminController
 {
@@ -20,6 +24,61 @@ class FestCertificateController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $certificates = $this->certificatesForEvent($event);
+
+        return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
+            'event'           => $event,
+            'certificates'    => $certificates,
+            'publishedItems'  => $this->publishedItemsForEvent($event),
+            'schools'         => $this->schoolsFromCertificates($certificates),
+            'winnersByItem'   => $this->winnersByItem($certificates, $event),
+            'winnersBySchool' => $this->winnersBySchool($certificates, $event),
+            'recentBatches'   => $this->recentBatchesForEvent($event),
+            'staleCount'      => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
+        ]));
+    }
+
+    /**
+     * Dedicated Merit certificates workspace — same underlying data as index(), scoped
+     * to cert_type=winner, with its own item-wise/school-wise filtering and bulk actions
+     * on the frontend rather than sharing the combined page's tabs.
+     */
+    public function meritCertificates(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $certificates = $this->certificatesForEvent($event, 'winner');
+
+        return $this->inertia('Sahodaya/Events/MeritCertificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
+            'event'          => $event,
+            'certificates'   => $certificates,
+            'publishedItems' => $this->publishedItemsForEvent($event),
+            'schools'        => $this->schoolsFromCertificates($certificates),
+            'recentBatches'  => $this->recentBatchesForEvent($event, 'winner'),
+            'staleCount'     => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
+        ]));
+    }
+
+    /** Dedicated Participation certificates workspace — same idea as meritCertificates(). */
+    public function participationCertificatesPage(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $certificates = $this->certificatesForEvent($event, 'participation');
+
+        return $this->inertia('Sahodaya/Events/ParticipationCertificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
+            'event'          => $event,
+            'certificates'   => $certificates,
+            'publishedItems' => $this->publishedItemsForEvent($event),
+            'schools'        => $this->schoolsFromCertificates($certificates),
+            'recentBatches'  => $this->recentBatchesForEvent($event, 'participation'),
+            'staleCount'     => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
+        ]));
+    }
+
+    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
+    private function certificatesForEvent(FestEvent $event, ?string $certType = null): \Illuminate\Support\Collection
+    {
         $participantIds = FestParticipant::where(function ($q) use ($event) {
             $q->whereIn('event_id', $event->reportableEventIds())
               ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
@@ -28,22 +87,30 @@ class FestCertificateController extends SahodayaAdminController
         $service = app(FestCertificateService::class);
         $certificates = Certificate::where('entity_type', FestParticipant::class)
             ->whereIn('entity_id', $participantIds)
+            ->when($certType, fn ($q) => $q->where('cert_type', $certType))
             ->orderByDesc('generated_at')
             ->get();
 
         // Batched instead of one payloadFor() (2 queries each) per row — see
         // FestCertificateService::payloadsFor().
         $payloads = $service->payloadsFor($certificates);
-        $certificates = $certificates->map(fn ($c) => array_merge(
+
+        return $certificates->map(fn ($c) => array_merge(
             [
                 'id' => $c->id,
                 'uuid' => $c->verification_uuid,
                 'cert_type' => $c->cert_type,
+                'is_stale' => $c->is_stale,
+                'is_rendered' => $c->file_path !== null,
+                'rendered_at' => $c->rendered_at,
             ],
             $payloads->get($c->id) ?? []
         ));
+    }
 
-        $publishedItems = FestEventItem::whereIn('event_id', $event->reportableEventIds())
+    private function publishedItemsForEvent(FestEvent $event): \Illuminate\Support\Collection
+    {
+        return FestEventItem::whereIn('event_id', $event->reportableEventIds())
             ->whereNotNull('results_published_at')
             ->orderBy('title')
             ->get(['id', 'title', 'item_code'])
@@ -53,8 +120,12 @@ class FestCertificateController extends SahodayaAdminController
                 'item_code' => $item->item_code,
             ])
             ->values();
+    }
 
-        $schools = $certificates->map(fn ($c) => [
+    /** @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $certificates */
+    private function schoolsFromCertificates(\Illuminate\Support\Collection $certificates): \Illuminate\Support\Collection
+    {
+        return $certificates->map(fn ($c) => [
             'id'   => $c['registration']?->school?->id ?? $c['participant']?->registration?->school?->id,
             'name' => $c['registration']?->school?->name ?? $c['participant']?->registration?->school?->name ?? 'Unknown School',
         ])
@@ -62,15 +133,18 @@ class FestCertificateController extends SahodayaAdminController
         ->unique('id')
         ->sortBy('name')
         ->values();
+    }
 
-        return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
-            'event'           => $event,
-            'certificates'    => $certificates,
-            'publishedItems'  => $publishedItems,
-            'schools'         => $schools,
-            'winnersByItem'   => $this->winnersByItem($certificates, $event),
-            'winnersBySchool' => $this->winnersBySchool($certificates, $event),
-        ]));
+    private function recentBatchesForEvent(FestEvent $event, ?string $certType = null): \Illuminate\Support\Collection
+    {
+        return CertificateBatch::where('event_id', $event->id)
+            ->when($certType, fn ($q) => $q->where('cert_type', $certType))
+            ->latest()
+            ->limit(10)
+            ->get([
+                'id', 'batch_type', 'scope_description', 'status', 'total_count',
+                'processed_count', 'succeeded_count', 'failed_count', 'created_at', 'completed_at',
+            ]);
     }
 
     private function winnersByItem(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
@@ -194,11 +268,25 @@ class FestCertificateController extends SahodayaAdminController
         $zip = new \ZipArchive;
         $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
 
-        foreach ($payloads as $payload) {
-            $html = view('fest.certificate-print', $payload)->render();
-            $pdf = PdfGenerator::render($html);
+        $plain = $request->boolean('plain');
 
-            $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$payload['certificate']->verification_uuid.'.pdf';
+        foreach ($payloads as $payload) {
+            $certificate = $payload['certificate'];
+            $cachedPath = $plain ? $certificate->plain_file_path : $certificate->file_path;
+
+            // Prefer the already-rendered file from RenderCertificateChunkJob — a
+            // certificate predating that pipeline simply has no cached path yet and
+            // transparently falls back to the old render-on-request behavior below.
+            $pdf = ($cachedPath && ! $certificate->is_stale && TenantStorage::exists($cachedPath, $certificate->storage_disk))
+                ? TenantStorage::get($cachedPath, $certificate->storage_disk)
+                : null;
+
+            if ($pdf === null) {
+                $html = view('fest.certificate-print', $payload)->render();
+                $pdf = PdfGenerator::render($html);
+            }
+
+            $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.pdf';
             $zip->addFromString($name, $pdf);
         }
 
@@ -255,25 +343,7 @@ class FestCertificateController extends SahodayaAdminController
         ?string $certType = null,
         ?array $certIds = null
     ): \Illuminate\Support\Collection {
-        if (! empty($certIds)) {
-            $certificates = Certificate::whereIn('id', $certIds)->get();
-        } else {
-            $participantIds = FestParticipant::where(function ($q) use ($event) {
-                $q->whereIn('event_id', $event->reportableEventIds())
-                  ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
-            })
-            ->when($itemId, fn ($q) => $q->where(function ($iq) use ($itemId) {
-                $iq->whereHas('registration', fn ($rq) => $rq->where('item_id', $itemId))
-                   ->orWhereHas('mark', fn ($mq) => $mq->where('item_id', $itemId));
-            }))
-            ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
-            ->pluck('id');
-
-            $certificates = Certificate::where('entity_type', FestParticipant::class)
-                ->whereIn('entity_id', $participantIds)
-                ->when($certType, fn ($q) => $q->where('cert_type', $certType))
-                ->get();
-        }
+        $certificates = $this->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
 
         $service = app(FestCertificateService::class);
 
@@ -315,5 +385,250 @@ class FestCertificateController extends SahodayaAdminController
 
             return $payload;
         });
+    }
+
+    /**
+     * Shared certificate-set resolution behind exportPayloadsForEvent() (single/bulk
+     * print+download) and the batch-rendering actions below — item-wise, school-wise,
+     * whole-event, and ad-hoc-selection all resolve through the exact same scope logic,
+     * so "what a Generate/Render run covers" and "what a Download covers" never drift
+     * apart for the same filters.
+     */
+    private function resolveCertificateScope(
+        FestEvent $event,
+        ?int $itemId = null,
+        ?int $schoolId = null,
+        ?string $certType = null,
+        ?array $certIds = null,
+    ): \Illuminate\Support\Collection {
+        if (! empty($certIds)) {
+            return Certificate::whereIn('id', $certIds)->get();
+        }
+
+        $participantIds = FestParticipant::where(function ($q) use ($event) {
+            $q->whereIn('event_id', $event->reportableEventIds())
+              ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+        })
+        ->when($itemId, fn ($q) => $q->where(function ($iq) use ($itemId) {
+            $iq->whereHas('registration', fn ($rq) => $rq->where('item_id', $itemId))
+               ->orWhereHas('mark', fn ($mq) => $mq->where('item_id', $itemId));
+        }))
+        ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
+        ->pluck('id');
+
+        return Certificate::where('entity_type', FestParticipant::class)
+            ->whereIn('entity_id', $participantIds)
+            ->when($certType, fn ($q) => $q->where('cert_type', $certType))
+            ->get();
+    }
+
+    public function generateAndRenderBatch(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $itemId = $request->input('item_id') ? (int) $request->input('item_id') : null;
+        $schoolId = $request->input('school_id') ? (int) $request->input('school_id') : null;
+        $certType = $request->input('cert_type') ?: null;
+        $certIds = $request->input('certificate_ids')
+            ? array_values(array_filter(array_map('intval', explode(',', (string) $request->input('certificate_ids')))))
+            : null;
+
+        $certificates = $this->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
+
+        abort_if($certificates->isEmpty(), 404, 'No certificates match this scope — generate the certificate rows first.');
+
+        $batch = $this->dispatchRenderBatch($request, $event, $certificates, 'generate', $itemId, $schoolId, $certType, $certIds);
+
+        return back()
+            ->with('success', "Rendering {$certificates->count()} certificate(s) in the background.")
+            ->with('certificate_batch_id', $batch->id);
+    }
+
+    public function regenerateStale(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $participantIds = FestParticipant::where(function ($q) use ($event) {
+            $q->whereIn('event_id', $event->reportableEventIds())
+              ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+        })->pluck('id');
+
+        $certificates = Certificate::where('entity_type', FestParticipant::class)
+            ->whereIn('entity_id', $participantIds)
+            ->where('is_stale', true)
+            ->get();
+
+        abort_if($certificates->isEmpty(), 404, 'No stale certificates to regenerate.');
+
+        $batch = $this->dispatchRenderBatch($request, $event, $certificates, 'regenerate_stale', null, null, null, null);
+
+        return back()
+            ->with('success', "Regenerating {$certificates->count()} stale certificate(s) in the background.")
+            ->with('certificate_batch_id', $batch->id);
+    }
+
+    /**
+     * Creates the tracking row, chunks the certificate set into ~150-id slices (see
+     * RenderCertificateChunkJob), and dispatches them as one Bus::batch() run — per-chunk
+     * failure isolation and progress counters come from Laravel's own job_batches
+     * machinery rather than anything bespoke here.
+     */
+    private function dispatchRenderBatch(
+        Request $request,
+        FestEvent $event,
+        \Illuminate\Support\Collection $certificates,
+        string $batchType,
+        ?int $itemId,
+        ?int $schoolId,
+        ?string $certType,
+        ?array $certIds,
+    ): CertificateBatch {
+        $batchRow = CertificateBatch::create([
+            'tenant_id'            => $this->sahodaya->id,
+            'event_id'             => $event->id,
+            'batch_type'           => $batchType,
+            'cert_type'            => $certType,
+            'item_id'              => $itemId,
+            'school_id'            => $schoolId,
+            'certificate_ids_json' => $certIds,
+            'scope_description'    => $this->describeScope($event, $itemId, $schoolId, $certType, $certIds),
+            'total_count'          => $certificates->count(),
+            'status'               => CertificateBatch::STATUS_PROCESSING,
+            'created_by_user_id'   => $request->user()?->id,
+            'started_at'           => now(),
+        ]);
+
+        $tenantId = $this->sahodaya->id;
+        $jobs = $certificates->pluck('id')->chunk(150)
+            ->map(fn ($chunk) => new RenderCertificateChunkJob($batchRow->id, $chunk->values()->all(), $tenantId))
+            ->all();
+
+        $laravelBatch = Bus::batch($jobs)
+            ->allowFailures()
+            ->then(function () use ($batchRow) {
+                $batchRow->refresh();
+                $batchRow->update([
+                    'status'       => $batchRow->failed_count > 0
+                        ? CertificateBatch::STATUS_COMPLETED_WITH_ERRORS
+                        : CertificateBatch::STATUS_COMPLETED,
+                    'completed_at' => now(),
+                ]);
+            })
+            ->catch(function ($_, \Throwable $e) use ($batchRow) {
+                $batchRow->update([
+                    'status'       => CertificateBatch::STATUS_FAILED,
+                    'error'        => mb_substr($e->getMessage(), 0, 2000),
+                    'completed_at' => now(),
+                ]);
+            })
+            ->name('certificate-batch-'.$batchRow->id)
+            ->dispatch();
+
+        $batchRow->update(['queued_job_batch_id' => $laravelBatch->id]);
+
+        return $batchRow;
+    }
+
+    private function describeScope(FestEvent $event, ?int $itemId, ?int $schoolId, ?string $certType, ?array $certIds): string
+    {
+        if (! empty($certIds)) {
+            return count($certIds).' selected certificate(s)';
+        }
+        if ($itemId) {
+            $item = FestEventItem::find($itemId);
+
+            return 'Item: '.($item?->title ?? "#{$itemId}");
+        }
+        if ($schoolId) {
+            $school = \App\Models\Tenant::find($schoolId);
+
+            return 'School: '.($school?->name ?? $schoolId);
+        }
+        if ($certType) {
+            return ucfirst($certType).' certificates — whole event';
+        }
+
+        return 'Whole event';
+    }
+
+    public function batchProgress(string $tenantId, FestEvent $event, CertificateBatch $batch)
+    {
+        abort_if($batch->tenant_id !== $this->sahodaya->id || $batch->event_id !== $event->id, 403);
+
+        return response()->json([
+            'id'              => $batch->id,
+            'status'          => $batch->status,
+            'batch_type'      => $batch->batch_type,
+            'scope'           => $batch->scope_description,
+            'total_count'     => $batch->total_count,
+            'processed_count' => $batch->processed_count,
+            'succeeded_count' => $batch->succeeded_count,
+            'failed_count'    => $batch->failed_count,
+            'error'           => $batch->error,
+        ]);
+    }
+
+    public function batches(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        return response()->json(
+            CertificateBatch::where('event_id', $event->id)->latest()->limit(10)->get()
+        );
+    }
+
+    public function previewSample(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $context = $this->buildPreviewContext($request, $event);
+
+        return view('fest.certificate-print', $context);
+    }
+
+    public function previewSamplePdf(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $context = $this->buildPreviewContext($request, $event);
+        $isLandscape = ($context['overlayLayout']['orientation'] ?? 'landscape') !== 'portrait';
+        $html = view('fest.certificate-print', $context)->render();
+
+        return PdfGenerator::download($html, 'certificate-preview.pdf', true, $isLandscape);
+    }
+
+    /**
+     * Renders the real person most likely to expose an overflowing field — most distinct
+     * items for a participation certificate (the unbounded item_title list), longest name
+     * for a winner certificate — through the exact same renderContext() pipeline real
+     * certificates use, rather than CertificateTemplateController::preview()'s canned
+     * "Sample Student Name" values. Lets an admin catch a layout problem before
+     * committing to a full bulk render.
+     */
+    private function buildPreviewContext(Request $request, FestEvent $event): array
+    {
+        $certType = $request->query('cert_type', 'participation');
+        $itemId = $request->query('item_id') ? (int) $request->query('item_id') : null;
+
+        $service = app(FestCertificateService::class);
+        $participant = $service->worstCaseParticipantForPreview($event, $certType, $itemId);
+
+        abort_if(! $participant, 404, 'No eligible participants yet to preview — register participants for this event first.');
+
+        $template = $service->resolveTemplate($event, $certType === 'winner' ? $itemId : null, $certType);
+
+        $certificate = new Certificate([
+            'entity_type'       => FestParticipant::class,
+            'entity_id'         => $participant->id,
+            'cert_type'         => $certType,
+            'template_id'       => $template?->id,
+            'verification_uuid' => 'PREVIEW-'.$participant->id,
+        ]);
+
+        $context = $service->renderContext($certificate, null, $templateCache = [], $participantsCache = [], embedAssets: false);
+        $context['isSample'] = true;
+        $context['qr_src'] = null;
+
+        return $context;
     }
 }

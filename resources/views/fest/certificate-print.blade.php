@@ -188,5 +188,6 @@
             window.addEventListener('afterprint', fitToScreen);
         })();
     </script>
+    @include('fest.partials.certificate-fit-text-script')
 </body>
 </html>

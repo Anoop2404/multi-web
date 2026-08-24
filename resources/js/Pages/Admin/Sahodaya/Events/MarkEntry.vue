@@ -35,6 +35,14 @@
             <Link :href="chestNumbersUrl" class="btn-secondary text-xs !bg-white shrink-0">Generate chest numbers</Link>
         </div>
 
+        <!-- Item locked: results already published, marks are frozen -->
+        <div v-if="itemLocked" class="card !p-4 mb-5 border border-indigo-200 bg-indigo-50 flex flex-wrap items-center justify-between gap-3">
+            <p class="text-xs text-indigo-900">
+                🔒 <strong>This item's results are published</strong> — marks are locked and can't be edited here. Unpublish it first to make a correction.
+            </p>
+            <Link :href="resultsUrl" class="btn-secondary text-xs !bg-white shrink-0">Go to Results to unpublish</Link>
+        </div>
+
         <!-- Signed Mark Sheet Upload -->
         <div v-if="props.selectedItemId" class="card !p-4 mb-5 space-y-3 border border-slate-200">
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -96,25 +104,39 @@
                      wrapping it mid-word inside the button (e.g. "Auto-\nrank\nAll"). -->
                 <div class="flex flex-nowrap items-center justify-end gap-3 overflow-x-auto pb-1 -mb-1 sm:pb-0 sm:mb-0">
                     <span class="text-[11px] text-slate-400 shrink-0 whitespace-nowrap">
-                        ✓ {{ configuredCountInView }}/{{ itemOptions.length }} items configured
+                        ✓ {{ configuredCountInView }}/{{ itemOptions.length }} items fully marked
                     </span>
-                    <button v-if="sections.length" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" @click="autoRankAll">
+                    <Link :href="markEntryStatusReportUrl" class="text-[11px] text-indigo-600 hover:underline shrink-0 whitespace-nowrap">
+                        View full status report →
+                    </Link>
+                    <button v-if="sections.length" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankAll">
                         Auto-rank All
                     </button>
-                    <button v-if="sections.length && showGradeColumn" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" @click="autoGradeAll">
+                    <button v-if="sections.length && showGradeColumn" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoGradeAll">
                         Auto-grade All
                     </button>
                     <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4 shrink-0 whitespace-nowrap"
-                            :disabled="bulkSaving" @click="saveAll">
-                        {{ bulkSaving ? 'Saving all…' : 'Save All Marks ✓' }}
+                            :disabled="bulkSaving || itemLocked" @click="saveAll">
+                        {{ bulkSaving ? 'Saving all…' : (itemLocked ? 'Locked — unpublish to edit' : 'Save All Marks ✓') }}
                     </button>
                 </div>
             </div>
         </div>
 
+        <!-- Region required: this event has region children — marks can only be saved
+             against a specific region's own event, so entering marks from the combined
+             "All Regions" view above would silently fail. Pick a region first. -->
+        <EmptyState
+            v-if="needsRegionSelection"
+            title="Select your region to begin mark entry"
+            description="This event is split into regions. Choose your region from the dropdown above — marks can only be entered and saved one region at a time."
+            icon="📍"
+            class="py-12"
+        />
+
         <!-- Empty State -->
         <EmptyState
-            v-if="!sections.length"
+            v-else-if="!sections.length"
             title="No registrations to mark"
             description="Approve registrations first, then return here to enter marks."
             icon="📊"
@@ -147,16 +169,16 @@
                                 </option>
                             </select>
                             <button type="button" class="btn-secondary text-xs !py-1 !px-2.5 whitespace-nowrap"
-                                    :disabled="!bulkRank[section.bulkKey]"
+                                    :disabled="!bulkRank[section.bulkKey] || itemLocked"
                                     @click="applyBulkRank(section, markForms)">
                                 Apply
                             </button>
                         </div>
 
-                        <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" @click="autoRankSection(section)">
+                        <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankSection(section)">
                             Auto-rank
                         </button>
-                        <button v-if="section.item?.id && showGradeColumn" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" @click="autoGrade(section)">
+                        <button v-if="section.item?.id && showGradeColumn" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoGrade(section)">
                             Auto-grade
                         </button>
                     </div>
@@ -222,6 +244,7 @@
                                     <select :value="attendanceStatus(participant, item)"
                                             class="field text-xs !py-1 font-semibold"
                                             :class="isAbsent(participant, item) ? '!border-rose-300 !bg-rose-50 !text-rose-700' : ''"
+                                            :disabled="itemLocked"
                                             @change="markAttendance(participant, item, $event.target.value)">
                                         <option value="">Present ✓</option>
                                         <option value="present">Present ✓</option>
@@ -235,11 +258,11 @@
                                         <input v-model="markForms[participant.id].measurement_value"
                                                class="field text-xs"
                                                placeholder="7.45"
-                                               :disabled="isAbsent(participant, item)">
+                                               :disabled="isAbsent(participant, item) || itemLocked">
                                         <input v-model="markForms[participant.id].measurement_unit"
                                                class="field text-xs w-16"
                                                placeholder="s/m"
-                                               :disabled="isAbsent(participant, item)">
+                                               :disabled="isAbsent(participant, item) || itemLocked">
                                     </div>
                                 </td>
 
@@ -247,7 +270,7 @@
                                 <td class="p-3.5">
                                     <select :value="markForms[participant.id].position ?? ''"
                                             class="field text-xs !py-1 font-bold text-slate-900"
-                                            :disabled="isAbsent(participant, item)"
+                                            :disabled="isAbsent(participant, item) || itemLocked"
                                             @change="setRank(participant.id, item, markForms, $event.target.value)">
                                         <option value="">— Select Rank —</option>
                                         <option v-for="opt in rankOptionsFor(section)" :key="opt.rank" :value="opt.rank">
@@ -262,7 +285,7 @@
                                         <input v-model.number="judgeForms[participant.id][j]" type="number" min="0" step="0.5"
                                                :max="perJudgeMax"
                                                class="field text-xs tabular-nums w-16" placeholder="0"
-                                               :disabled="isAbsent(participant, item)">
+                                               :disabled="isAbsent(participant, item) || itemLocked">
                                     </td>
                                     <td class="p-3.5 font-mono font-bold text-slate-900 tabular-nums">
                                         {{ participantGrandTotal(participant.id, item) }}
@@ -273,13 +296,13 @@
                                 <td v-else class="p-3.5">
                                     <input v-model.number="markForms[participant.id].score" type="number" min="0" step="0.5"
                                            class="field text-xs font-bold tabular-nums" placeholder="Pts (Optional)"
-                                           :disabled="isAbsent(participant, item)"
+                                           :disabled="isAbsent(participant, item) || itemLocked"
                                            @input="onScoreInput(participant.id, item)">
                                 </td>
 
                                 <!-- Grade (Optional for Kalolsavam / Fest) -->
                                 <td v-if="showGradeColumn" class="p-3.5">
-                                    <select v-model="markForms[participant.id].grade" class="field text-xs" :disabled="isAbsent(participant, item)" @change="markForms[participant.id]._user_edited_grade = true">
+                                    <select v-model="markForms[participant.id].grade" class="field text-xs" :disabled="isAbsent(participant, item) || itemLocked" @change="markForms[participant.id]._user_edited_grade = true">
                                         <option value="">—</option>
                                         <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
                                     </select>
@@ -290,8 +313,9 @@
                                     :class="isAbsent(participant, item) ? 'bg-rose-50' : 'bg-white'">
                                     <div class="flex items-center justify-end gap-2">
                                         <span v-if="savedIds.has(participant.id)" class="text-xs font-bold text-emerald-600">Saved ✓</span>
+                                        <span v-else-if="failedIds.has(participant.id)" class="text-xs font-bold text-rose-600">Not saved — see message above</span>
                                         <button type="button" class="btn-primary text-xs !py-1 !px-3"
-                                                :disabled="savingIds.has(participant.id) || isAbsent(participant, item)"
+                                                :disabled="savingIds.has(participant.id) || isAbsent(participant, item) || itemLocked"
                                                 @click="saveMark(participant, item)">
                                             {{ savingIds.has(participant.id) ? 'Saving...' : 'Save' }}
                                         </button>
@@ -310,7 +334,7 @@
 
 <script setup>
 import { reactive, computed, ref } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
@@ -331,14 +355,16 @@ const props = defineProps({
     selectedItemId: { type: [Number, String], default: null },
     rankPointsByType: { type: Object, default: () => ({}) },
     childEvents: { type: Array, default: () => [] },
+    needsRegionSelection: { type: Boolean, default: false },
     itemHeads: { type: Array, default: () => [] },
     headItemGroups: { type: Array, default: () => [] },
-    configuredItemIds: { type: Array, default: () => [] },
+    markProgressByItemId: { type: Object, default: () => ({}) },
     gradeOptions: { type: Array, default: () => ['A+', 'A', 'B', 'C'] },
     gradeRules: { type: Array, default: () => [] },
     judgeCount: { type: Number, default: 1 },
     judgeScores: { type: Object, default: () => ({}) },
     selectedItemTotalMarks: { type: Number, default: null },
+    selectedItemPublishedAt: { type: String, default: null },
     cumulativeSheetUrl: { type: String, default: null },
     sheetUploads: { type: Array, default: () => [] },
     missingChestCount: { type: Number, default: 0 },
@@ -348,6 +374,16 @@ const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${
 const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
 const chestNumbersUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/chest-numbers?item_id=${props.selectedItemId}`);
 const isSports = computed(() => props.event?.event_type === 'sports');
+
+// Once an item's results are published, EventLifecycleGate rejects any further mark
+// save for it server-side — this mirrors that lock in the UI so the grid doesn't look
+// editable when it isn't, instead of only finding out after clicking Save.
+const itemLocked = computed(() => !!props.selectedItemPublishedAt);
+const resultsUrl = computed(() => {
+    let url = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results`;
+    if (props.selectedItemId) url += `?item_id=${props.selectedItemId}`;
+    return url;
+});
 
 // Grade is auto-computed from score (and stored) for any non-sports event, regardless of
 // event_type — previously this only showed for 'kalolsavam' (plus a dead 'fest' check that
@@ -401,13 +437,20 @@ function switchSportEvent(evt) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/marks`);
 }
 
+// Real marks-entered progress, not scoring-criteria setup — previously this checked
+// FestMarkCriterion existence, which only means the item's scoring columns were
+// configured, not that any marks were actually entered. "X/Y configured" could read
+// 100% with zero marks in the whole event.
 function itemConfiguredMark(item) {
-    return (props.configuredItemIds ?? []).includes(item.id) ? '✓' : null;
+    if (item.results_published_at) return '🔒';
+    return props.markProgressByItemId?.[item.id]?.complete ? '✓' : null;
 }
 
 const configuredCountInView = computed(() =>
-    itemOptions.value.filter((it) => (props.configuredItemIds ?? []).includes(it.id)).length
+    itemOptions.value.filter((it) => props.markProgressByItemId?.[it.id]?.complete).length
 );
+
+const markEntryStatusReportUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/mark-entry-status`);
 
 const markSettingsUrl = computed(() => {
     let url = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/mark-settings`;
@@ -665,6 +708,28 @@ function markAttendance(participant, item, status) {
 
 const savedIds = ref(new Set());
 const savingIds = ref(new Set());
+const failedIds = ref(new Set());
+
+// A rejected save (e.g. "Marks can only be entered for approved registrations.") is
+// rendered by the app-wide exception handler (bootstrap/app.php) as a normal redirect
+// back with the reason flashed to page.props.flash.error — not as an Inertia validation
+// error — so router.post()'s onSuccess fires exactly the same as it would for a genuine
+// save. Without checking the flash here, the row's own "Saved ✓" indicator contradicts
+// the error banner already shown at the top of the page. See Documents/Path_breaks.md.
+function markSaveOutcome(participantId) {
+    const page = usePage();
+    const nextSaved = new Set(savedIds.value);
+    const nextFailed = new Set(failedIds.value);
+    if (page.props.flash?.error) {
+        nextSaved.delete(participantId);
+        nextFailed.add(participantId);
+    } else {
+        nextFailed.delete(participantId);
+        nextSaved.add(participantId);
+    }
+    savedIds.value = nextSaved;
+    failedIds.value = nextFailed;
+}
 const bulkSaving = ref(false);
 
 function payloadFor(participant, item) {
@@ -695,7 +760,7 @@ function saveMark(participant, item) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, payloadFor(participant, item), {
         preserveScroll: true,
         onSuccess: () => {
-            savedIds.value = new Set([...savedIds.value, participant.id]);
+            markSaveOutcome(participant.id);
         },
         onFinish: () => {
             const next = new Set(savingIds.value);
@@ -715,7 +780,7 @@ async function saveAll() {
             router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, payloadFor(participant, item), {
                 preserveScroll: true,
                 onSuccess: () => {
-                    savedIds.value = new Set([...savedIds.value, participant.id]);
+                    markSaveOutcome(participant.id);
                 },
                 onFinish: () => {
                     const next = new Set(savingIds.value);

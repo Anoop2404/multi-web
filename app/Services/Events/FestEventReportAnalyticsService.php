@@ -1844,6 +1844,93 @@ class FestEventReportAnalyticsService
     }
 
     /**
+     * School × item pivot with category header bands and a per-school category subtotal
+     * plus overall grand total — the consolidated report matching the printed
+     * "OVERALL RESULT" sheet schools already produce by hand (school rows, item columns
+     * grouped under CAT1-4 headers, category subtotal columns, OVERALL column). Reuses
+     * categoryWiseItemRows() for the item/category grouping and the same points-per-mark
+     * + dedup pattern already proven in EventContext::scoreboardByCategory()/
+     * recalculateSchoolPoints() — cell values always agree with the championship
+     * leaderboard because they're the exact same computation.
+     *
+     * @return array{categories: list<array<string, mixed>>, schools: list<array<string, mixed>>}
+     */
+    public function schoolItemPointsMatrix(): array
+    {
+        $itemsByCategory = $this->categoryWiseItemRows();
+        $gradePointService = app(FestGradePointService::class);
+        $scoreboards = app(PublicFestScoreboardService::class);
+
+        // Same dedup as EventContext::scoreboardByCategory() — pair/group items save one
+        // FestMark per teammate, all sharing deduplicationKey(), so a team's points must
+        // only be counted once, not once per member.
+        $marks = FestMark::whereIn('event_id', $this->eventIds())
+            ->with(['participant.registration.school', 'item'])
+            ->get()
+            ->unique(fn (FestMark $m) => $m->deduplicationKey());
+
+        $cellPoints = [];
+        $schoolNames = [];
+
+        foreach ($marks as $mark) {
+            $participant = $mark->participant;
+            if (! $participant || $participant->disqualified_at) {
+                continue;
+            }
+
+            $school = $participant->registration?->school;
+            if (! $school || ! $mark->item_id) {
+                continue;
+            }
+
+            $schoolNames[$school->id] = $school->name;
+            $cellPoints[$school->id][$mark->item_id] =
+                ($cellPoints[$school->id][$mark->item_id] ?? 0) + $gradePointService->pointsForMark($this->event, $mark);
+        }
+
+        $categories = collect($itemsByCategory)
+            ->map(fn (array $items, string $key) => [
+                'key'   => $key,
+                'label' => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($this->event, $key),
+                'items' => $items,
+            ])
+            ->sortBy('label')
+            ->values();
+
+        $schools = collect($schoolNames)
+            ->map(function (string $name, string $schoolId) use ($categories, $cellPoints) {
+                $points = $cellPoints[$schoolId] ?? [];
+                $categoryTotals = [];
+                $overall = 0;
+
+                foreach ($categories as $category) {
+                    $subtotal = 0;
+                    foreach ($category['items'] as $item) {
+                        $subtotal += $points[$item['id']] ?? 0;
+                    }
+                    $categoryTotals[$category['key']] = $subtotal;
+                    $overall += $subtotal;
+                }
+
+                return [
+                    'school_id'       => $schoolId,
+                    'school_name'     => $name,
+                    'points_by_item'  => $points,
+                    'category_totals' => $categoryTotals,
+                    'overall'         => $overall,
+                ];
+            })
+            ->sortByDesc('overall')
+            ->values()
+            ->all();
+
+        return [
+            'categories' => $categories->all(),
+            'schools'    => $schools,
+        ];
+    }
+
+    /**
      * Per-participant rank/grade points breakdown for one item — powers the
      * Category-wise Points report's eye-icon detail view.
      *

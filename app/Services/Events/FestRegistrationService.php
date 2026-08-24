@@ -278,6 +278,13 @@ class FestRegistrationService
             return false;
         }
 
+        // "Block new registrations" is meant to freeze rosters too (e.g. before chest
+        // numbers/printing) — previously only allowRegistration() (new submissions)
+        // checked this, so an already-approved roster stayed editable regardless.
+        if ($event->registration_locked) {
+            return false;
+        }
+
         return $event->isRegistrationOpen();
     }
 

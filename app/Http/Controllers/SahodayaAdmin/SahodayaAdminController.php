@@ -179,6 +179,31 @@ abstract class SahodayaAdminController extends Controller
         return $eventIds->merge($childIds)->unique()->values()->all();
     }
 
+    /**
+     * Blocks a scoped admin (event_admin/region_admin/phase_admin) from a whole program
+     * (Sports Meet, Kids Fest, ...) when they hold zero assignments anywhere in it. A full
+     * admin (scopedFestEventIds() === null) is always allowed through unchanged.
+     *
+     * Program-overview and cross-event pages (dashboards, championship/rankings/results
+     * roll-ups) never carry a single {event} route parameter for EnsureSahodayaAdmin's own
+     * containment check to act on, so without this, a scoped admin can browse any program
+     * they have no assignment in at all — see Documents/Path_breaks.md.
+     */
+    protected function assertProgramAccess(string $eventType): void
+    {
+        $scopedEventIds = $this->scopedFestEventIds();
+        if ($scopedEventIds === null) {
+            return;
+        }
+
+        $hasAssignmentInProgram = FestEvent::forTenant($this->sahodaya->id)
+            ->ofType($eventType)
+            ->whereIn('id', $scopedEventIds)
+            ->exists();
+
+        abort_unless($hasAssignmentInProgram, 403, 'You are not assigned to any event in this program.');
+    }
+
     protected function sidebarEventScope(): ?array
     {
         $request = request();

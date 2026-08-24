@@ -2,6 +2,7 @@
 
 namespace App\Services\Events;
 
+use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
@@ -43,6 +44,22 @@ class FestLifecycleService
                 $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position');
             })
             ->count();
+
+        // Neither of these was checked at all before — a "marks 100% complete" event
+        // could still be missing chest numbers or have zero attendance recorded, with
+        // nothing on this checklist to flag it. See Documents/Fest_Improvements_Proposal.md §7.4.
+        $eligibleParticipants = FestParticipant::whereHas('registration', fn ($q) => $q
+            ->where('event_id', $e->id)->where('status', 'approved'))
+            ->where('participant_role', '!=', 'standby')
+            ->whereNull('disqualified_at')
+            ->with('group')
+            ->get();
+        $numbering = app(FestNumberingService::class);
+        $chestAssignedCount = $eligibleParticipants->filter(fn (FestParticipant $p) => $numbering->effectiveChestNumber($p) !== null)->count();
+        $attendanceCount = FestAttendance::where('event_id', $e->id)
+            ->whereIn('participant_id', $eligibleParticipants->pluck('id'))
+            ->distinct('participant_id')
+            ->count('participant_id');
 
         $feeService = app(FestSchoolEventFeeService::class);
         $feeRequired = $feeService->feeRequired($e);
@@ -94,6 +111,18 @@ class FestLifecycleService
                 'label' => 'Event status set to Ongoing',
                 'done'  => in_array($e->status, ['ongoing', 'completed'], true),
                 'hint'  => 'Set status when fest days begin',
+            ],
+            [
+                'key'   => 'chest_numbers',
+                'label' => 'Chest numbers assigned',
+                'done'  => $eligibleParticipants->count() > 0 && $chestAssignedCount >= $eligibleParticipants->count(),
+                'hint'  => $eligibleParticipants->count() > 0 ? "{$chestAssignedCount}/{$eligibleParticipants->count()} assigned" : 'No participants',
+            ],
+            [
+                'key'   => 'attendance',
+                'label' => 'Attendance recorded',
+                'done'  => $eligibleParticipants->count() > 0 && $attendanceCount >= $eligibleParticipants->count(),
+                'hint'  => $eligibleParticipants->count() > 0 ? "{$attendanceCount}/{$eligibleParticipants->count()} recorded" : 'No participants',
             ],
             [
                 'key'   => 'marks',
