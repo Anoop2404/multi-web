@@ -53,12 +53,15 @@ class ProvisionTeacherPortalUsersJob implements ShouldQueue
                 $teacherFresh->loadMissing('user');
                 $user = $teacherFresh->user;
                 $school = Tenant::find($teacherFresh->tenant_id);
+                $sahodayaId = $school?->parent_id ?: ($school?->id ?: $teacherFresh->tenant_id);
 
-                if ($user && $school && $school->parent_id) {
+                if ($user && $email && $sahodayaId) {
                     $username = $teacherFresh->login_code ?? $user->username ?? '';
-                    SahodayaMailer::for($school->parent_id)->sendView(
+                    $schoolName = $school?->name ?? 'Sahodaya';
+
+                    SahodayaMailer::for($sahodayaId)->sendView(
                         $email,
-                        "Your Teacher Portal Credentials - {$school->name}",
+                        "Your Teacher Portal Credentials - {$schoolName}",
                         'emails.teacher-credentials',
                         [
                             'teacher'       => $teacherFresh,

@@ -42,16 +42,18 @@ trait ManagesTeacherPortalCredentials
         }
 
         $school = $this->school ?? $teacher->tenant;
-        if (! $school || ! $school->parent_id) {
+        $sahodayaId = $school?->parent_id ?: ($school?->id ?: $teacher->tenant_id);
+        if (! $sahodayaId) {
             return false;
         }
 
         $plainPassword = $password ?? $user->plain_password ?? '—';
         $username = $teacher->login_code ?? $user->username ?? '';
+        $schoolName = $school?->name ?? 'Sahodaya';
 
-        SahodayaMailer::for($school->parent_id)->sendView(
+        SahodayaMailer::for($sahodayaId)->sendView(
             $teacher->email,
-            "Your Teacher Portal Credentials - {$school->name}",
+            "Your Teacher Portal Credentials - {$schoolName}",
             'emails.teacher-credentials',
             [
                 'teacher'       => $teacher,
