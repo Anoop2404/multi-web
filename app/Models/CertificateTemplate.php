@@ -169,6 +169,26 @@ class CertificateTemplate extends Model
             'width:'.(float) ($field['width'] ?? $fallback['width'] ?? 80).'%',
         ];
 
+        // Optional lower boundary of the background artwork's fillable zone (e.g. where a
+        // "Congratulations" graphic begins below the text). When set, top+bottom together
+        // define a fixed-height box instead of a top-anchored one that grows downward
+        // unboundedly: short content is centered inside it instead of leaving a visible
+        // gap above the artwork, and certificate-fit-text-script.blade.php reads this same
+        // box edge as the authoritative overflow boundary instead of guessing from
+        // unrelated sibling fields (see fitPage()/computeAllowedBottom() there).
+        // Deliberately NOT flex/justify-content:center here — content still flows from the
+        // box's top edge exactly as it does without `bottom` set. Centering short content
+        // within the zone is instead done as a post-pass in the fit-text script, after
+        // shrink/truncate settles on a final height: measuring overflow against a flex-
+        // centered box is unreliable (a flexbox can overflow symmetrically above *and*
+        // below when centered content exceeds its height, and scrollHeight's accounting
+        // for the above-the-box portion is inconsistent), whereas top-down flow keeps the
+        // existing offsetTop/scrollHeight overflow check exactly as simple as it is today.
+        $bottom = $field['bottom'] ?? $fallback['bottom'] ?? null;
+        if ($bottom !== null && $bottom !== '') {
+            $parts[] = 'bottom:'.(float) $bottom.'%';
+        }
+
         $align = $field['align'] ?? $fallback['align'] ?? null;
         if (in_array($align, ['left', 'right', 'center', 'justify'], true)) {
             $parts[] = 'text-align:'.$align;
@@ -207,6 +227,10 @@ class CertificateTemplate extends Model
             $allowed = match ($key) {
                 'participation_label_cover' => ['top', 'left', 'width', 'height'],
                 'photo' => ['top', 'left', 'size'],
+                // Only `body` grows with variable content (achievement text, the
+                // participation items box) — `bottom` marks the artwork's fillable-zone
+                // edge for that field alone (see overlayFieldStyle()).
+                'body' => array_merge($textKeys, ['bottom']),
                 default => $textKeys,
             };
             $defaults[$key] = array_merge(

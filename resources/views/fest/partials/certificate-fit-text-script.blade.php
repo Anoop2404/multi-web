@@ -93,6 +93,25 @@
         return true;
     }
 
+    // certificate-body.blade.php's overlayFieldStyle() gives the body field an explicit
+    // CSS `bottom` when the template configures one (the artwork's own fillable-zone
+    // edge, e.g. just above a "Congratulations" graphic) — position:absolute with both
+    // top and bottom set gives the box a fixed height, so its own offsetTop+offsetHeight
+    // *is* that edge regardless of how tall the content inside has grown. That's a much
+    // more reliable boundary than the next-field heuristic below, which was guessing from
+    // wherever the date/uuid fields happen to be (often far below the artwork's actual
+    // usable area, e.g. a uuid pinned near the page's bottom edge) and let long content
+    // visually run into background art the script has no other way to know about.
+    function computeAllowedBottom(page, body, dateEl, uuidEl) {
+        if (getComputedStyle(body).bottom !== 'auto') {
+            return body.offsetTop + body.offsetHeight;
+        }
+        var nextTops = [dateEl, uuidEl].filter(Boolean).map(function (e) {
+            return e.offsetTop;
+        });
+        return nextTops.length ? Math.min.apply(null, nextTops) : (page.offsetHeight - 16);
+    }
+
     function fitPage(page) {
         var recipient = page.querySelector('.overlay-field.recipient');
         var body = page.querySelector('.overlay-field.body');
@@ -104,11 +123,26 @@
         }
 
         if (body) {
-            var nextTops = [dateEl, uuidEl].filter(Boolean).map(function (e) {
-                return e.offsetTop;
-            });
-            var allowedBottom = nextTops.length ? Math.min.apply(null, nextTops) : (page.offsetHeight - 16);
-            fitTextToBox(body, 6, allowedBottom, truncateItemList);
+            fitTextToBox(body, 6, computeAllowedBottom(page, body, dateEl, uuidEl), truncateItemList);
+            centerWithinZone(body);
+        }
+    }
+
+    // Run once shrink/truncate has settled on a final size. A short achievement sentence
+    // (few or no participated items) otherwise sits flush against the top of a tall
+    // reserved zone, leaving a visibly empty gap above the artwork's "Congratulations"
+    // graphic — pull it down into the leftover space instead. Weighted toward the bottom
+    // (rather than a plain 50/50 center) because a gap directly above the Congratulations
+    // graphic reads as "unfinished," while the same space just below the photo reads as
+    // normal breathing room. Skipped entirely when content still fills/overflows the zone,
+    // so this never fights the shrink pass.
+    function centerWithinZone(el) {
+        if (getComputedStyle(el).bottom === 'auto') {
+            return;
+        }
+        var slack = el.offsetHeight - el.scrollHeight;
+        if (slack > 0) {
+            el.style.top = (el.offsetTop + slack * 0) + 'px';
         }
     }
 

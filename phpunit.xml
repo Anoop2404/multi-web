@@ -37,6 +37,12 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Force the deterministic DomPDF fallback regardless of a developer's local
+             .env — without this override, tests silently depend on whatever PDF-rendering
+             service (or lack of one) happens to be reachable at PDF_CONVERTER_URL on the
+             machine running them, which is exactly the kind of environment-dependent
+             flakiness a test suite should never have. -->
+        <env name="PDF_CONVERTER_URL" value=""/>
         <env name="UPLOAD_DISK" value="shared"/>
         <env name="AWS_ACCESS_KEY_ID" value=""/>
         <env name="AWS_SECRET_ACCESS_KEY" value=""/>

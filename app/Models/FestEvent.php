@@ -575,15 +575,32 @@ class FestEvent extends Model
      * consistent with the rest of the region-scoped reporting work — see
      * docs/REGION_PHASE_EVENT_REPORTING_REMEDIATION_PLAN.md.
      */
+    /**
+     * A phased_regional_billing hub's leaves are 'region' partitions ONLY for the phases
+     * that are actually regional (is_regional) — a non-regional phase (e.g. Digi Fest,
+     * District Kalotsav) still gets exactly one operational leaf, but it's tagged
+     * partition_role='phase', not 'region'. Only asking childrenForRoles(['region'])
+     * silently dropped those phases from this switcher entirely — there was no way to
+     * pick "Digi Fest" here at all, on any page that reuses this list (Registrations,
+     * Marks, Results, ...), even though it's a perfectly normal operational leaf. And
+     * because the label was just the bare region name with no phase context, two
+     * different phases reusing the same region (e.g. both "Off Stage" and "Sargadhara"
+     * having their own "Tirur Region" leaf) rendered as two identically-labelled
+     * "Tirur Region" options with no way to tell them apart. Pull in 'phase' leaves too
+     * and prefix every regional option with its phase name so both gaps close at once;
+     * a leaf's own sourcePhase relation is null for events with no phase mode enabled,
+     * so this is a no-op there — the label falls back to the bare region name exactly
+     * as before.
+     */
     private function regionDropdownOptions(): array
     {
         $root = $this->rootEvent();
-        $regionChildren = $root->childrenForRoles(['region'])
-            ->load('region:id,name,code')
-            ->sortBy('sort_order')
+        $children = $root->childrenForRoles(['region', 'phase'])
+            ->load(['region:id,name,code', 'sourcePhase:id,name,sort_order'])
+            ->sortBy(fn (self $child) => [$child->sourcePhase?->sort_order ?? 0, $child->sort_order])
             ->values();
 
-        if ($regionChildren->isEmpty()) {
+        if ($children->isEmpty()) {
             return [];
         }
 
@@ -595,8 +612,15 @@ class FestEvent extends Model
             'is_hub'          => true,
         ]];
 
-        foreach ($regionChildren as $child) {
-            $label = $child->region?->name ?? $child->title;
+        foreach ($children as $child) {
+            $phaseName = $child->sourcePhase?->name;
+            $regionName = $child->region?->name;
+            $label = match (true) {
+                $phaseName && $regionName => "{$phaseName} — {$regionName}",
+                (bool) $phaseName         => $phaseName,
+                (bool) $regionName        => $regionName,
+                default                   => $child->title,
+            };
 
             $options[] = [
                 'id'              => $child->id,

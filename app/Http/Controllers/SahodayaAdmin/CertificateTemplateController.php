@@ -247,8 +247,9 @@ class CertificateTemplateController extends SahodayaAdminController
             }
         }
 
+        $deactivatedCount = 0;
         if ($data['is_active'] ?? true) {
-            CertificateTemplate::where('tenant_id', $this->sahodaya->id)
+            $deactivatedCount = CertificateTemplate::where('tenant_id', $this->sahodaya->id)
                 ->where('event_type', $data['event_type'])
                 ->where('certificate_type', $data['certificate_type'])
                 ->when(! empty($data['event_id']), fn ($q) => $q->where('event_id', $data['event_id']), fn ($q) => $q->whereNull('event_id'))
@@ -274,7 +275,12 @@ class CertificateTemplateController extends SahodayaAdminController
             'is_active'           => $data['is_active'] ?? true,
         ]);
 
-        return back()->with('success', 'Template saved.');
+        $message = 'Template saved.';
+        if ($deactivatedCount > 0) {
+            $message .= " {$deactivatedCount} existing template(s) for this exact event/item/type were automatically deactivated so only one is active at a time.";
+        }
+
+        return back()->with('success', $message);
     }
 
     public function update(Request $request, string $tenantId, CertificateTemplate $template)
@@ -387,8 +393,9 @@ class CertificateTemplateController extends SahodayaAdminController
             );
         }
 
+        $deactivatedCount = 0;
         if (array_key_exists('is_active', $data) && $data['is_active']) {
-            CertificateTemplate::where('tenant_id', $this->sahodaya->id)
+            $deactivatedCount = CertificateTemplate::where('tenant_id', $this->sahodaya->id)
                 ->where('event_type', $template->event_type)
                 ->where('certificate_type', $template->certificate_type)
                 ->when($template->event_id, fn ($q) => $q->where('event_id', $template->event_id), fn ($q) => $q->whereNull('event_id'))
@@ -402,7 +409,12 @@ class CertificateTemplateController extends SahodayaAdminController
 
         $template->update($updates);
 
-        return back()->with('success', 'Template updated.');
+        $message = 'Template updated.';
+        if ($deactivatedCount > 0) {
+            $message .= " {$deactivatedCount} existing template(s) for this exact event/item/type were automatically deactivated so only one is active at a time.";
+        }
+
+        return back()->with('success', $message);
     }
 
     public function destroy(string $tenantId, CertificateTemplate $template)

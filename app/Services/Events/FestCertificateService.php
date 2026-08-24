@@ -664,6 +664,11 @@ class FestCertificateService
             'event_title'         => $event?->title ?? '',
             // Alias of event_title — some templates reference {event_name} instead.
             'event_name'          => $event?->title ?? '',
+            // Falls back to event_title when no venue is configured (resolvedVenueName()
+            // already handles the region-vs-hub venue-assignment split — see its own
+            // docblock) — a template using {venue} shouldn't render an empty gap just
+            // because this particular event never had one set.
+            'venue'               => $event?->resolvedVenueName() ?: ($event?->title ?? ''),
             'item_title'          => $itemTitle,
             // Kept as an alias of item_title for templates already using {item_details}
             // as the bold item-name line — category/type are now their own placeholders.
@@ -771,25 +776,49 @@ class FestCertificateService
             return '';
         }
 
-        $entries = $items->values()->map(function (FestEventItem $item, int $i) use ($taxonomies) {
+        // A person can enter well beyond a handful of items (the event's roster can run
+        // to ~140), but the background artwork only reserves a fixed-height zone for this
+        // box (see the `bottom` boundary certificate-fit-text-script.blade.php enforces
+        // via CertificateTemplate::overlayFieldStyle()) — font-shrinking alone runs out of
+        // headroom well before that. Cap what's individually listed and summarize the
+        // rest, so the box's own height stays bounded at 4 rows independent of how many
+        // items a participant actually has, rather than growing into whatever artwork
+        // (e.g. a "Congratulations" graphic) sits below the reserved zone.
+        $cap = 7;
+        $overflow = $items->count() > $cap + 1 ? $items->count() - $cap : 0;
+        $shown = $overflow > 0 ? $items->take($cap) : $items;
+
+        // font-size is em, not px, so this box shrinks along with the shrink-to-fit
+        // script's font-size reduction on the parent .overlay-field.body — a fixed px
+        // size here would otherwise be immune to that pass entirely (see
+        // certificate-fit-text-script.blade.php's fitTextToBox()).
+        $entries = $shown->values()->map(function (FestEventItem $item, int $i) use ($taxonomies) {
             $tax = $taxonomies->get($i, ['category' => '', 'type' => '']);
             $meta = trim(implode('  •  ', array_filter([$tax['category'] ?? '', $tax['type'] ?? ''])));
 
-            return '<span style="display:block;font-weight:700;font-size:11.5px;color:#172033;line-height:1.35;">&bull;&nbsp;'.e($item->title).'</span>'
-                .($meta !== '' ? '<span style="display:block;font-size:9.5px;color:#64748b;line-height:1.3;margin-left:12px;">'.e($meta).'</span>' : '');
+            return '<span style="display:block;font-weight:700;font-size:0.81em;color:#172033;line-height:1.2;">&bull;&nbsp;'.e($item->title).'</span>'
+                .($meta !== '' ? '<span style="display:block;font-size:0.65em;color:#64748b;line-height:1.15;margin-left:12px;">'.e($meta).'</span>' : '');
         });
+
+        if ($overflow > 0) {
+            $entries->push('<span style="display:block;font-weight:700;font-size:0.81em;color:#b45309;line-height:1.2;">&bull;&nbsp;+ '.$overflow.' more</span>');
+        }
 
         $rows = '';
         foreach ($entries->chunk(2) as $pair) {
-            $cells = $pair->map(fn ($html) => '<td style="width:50%;vertical-align:top;padding:4px 10px 4px 0;">'.$html.'</td>')->implode('');
+            $cells = $pair->map(fn ($html) => '<td style="width:50%;vertical-align:top;padding:2px 10px 2px 0;">'.$html.'</td>')->implode('');
             if ($pair->count() === 1) {
                 $cells .= '<td style="width:50%;"></td>';
             }
             $rows .= '<tr>'.$cells.'</tr>';
         }
 
-        return '<div style="border:1px solid #d6a95c;border-radius:8px;padding:10px 16px;margin:8px auto 0;max-width:94%;background:rgba(180,83,9,0.04);">'
-            .'<div style="text-align:center;font-size:10.5px;font-weight:700;letter-spacing:1.5px;color:#b45309;text-transform:uppercase;margin-bottom:6px;">&#10022;&nbsp;Participated Items&nbsp;&#10022;</div>'
+        // &bull; over the &#10022; star used elsewhere — confirmed via DomPDF preview
+        // testing that DomPDF's font set renders &bull; correctly but shows the star as
+        // a missing-glyph "?"; Chromium renders both fine, but this box must degrade
+        // correctly on the DomPDF fallback too.
+        return '<div style="border:1px solid #d6a95c;border-radius:6px;padding:6px 14px;margin:5px auto 0;max-width:94%;background:rgba(180,83,9,0.04);">'
+            .'<div style="text-align:center;font-size:0.73em;font-weight:700;letter-spacing:1.5px;color:#b45309;text-transform:uppercase;margin-bottom:4px;">&bull;&nbsp;Participated Items&nbsp;&bull;</div>'
             .'<table style="width:100%;border-collapse:collapse;">'.$rows.'</table>'
             .'</div>';
     }

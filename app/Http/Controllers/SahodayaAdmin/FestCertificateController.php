@@ -581,7 +581,9 @@ class FestCertificateController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $context = $this->buildPreviewContext($request, $event);
+        // embedAssets: false — viewed on-site in a normal browser tab, so the cheaper
+        // site-relative /storage/... URLs resolve fine (see renderContext()'s docblock).
+        $context = $this->buildPreviewContext($request, $event, embedAssets: false);
 
         return view('fest.certificate-print', $context);
     }
@@ -590,7 +592,12 @@ class FestCertificateController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $context = $this->buildPreviewContext($request, $event);
+        // embedAssets: true — DomPDF (and the external Chromium service) render the HTML
+        // outside the site's own browser origin, so a relative /storage/... URL for the
+        // background/logo/seal never resolves; every image must be a self-contained
+        // base64 data URI instead, same as every other real PDF-producing path
+        // (downloadZip(), RenderCertificateChunkJob) already does.
+        $context = $this->buildPreviewContext($request, $event, embedAssets: true);
         $isLandscape = ($context['overlayLayout']['orientation'] ?? 'landscape') !== 'portrait';
         $html = view('fest.certificate-print', $context)->render();
 
@@ -605,13 +612,20 @@ class FestCertificateController extends SahodayaAdminController
      * "Sample Student Name" values. Lets an admin catch a layout problem before
      * committing to a full bulk render.
      */
-    private function buildPreviewContext(Request $request, FestEvent $event): array
+    private function buildPreviewContext(Request $request, FestEvent $event, bool $embedAssets): array
     {
         $certType = $request->query('cert_type', 'participation');
         $itemId = $request->query('item_id') ? (int) $request->query('item_id') : null;
 
         $service = app(FestCertificateService::class);
-        $participant = $service->worstCaseParticipantForPreview($event, $certType, $itemId);
+
+        // Explicit override so an admin (or this preview screen itself, later) can check
+        // one specific person's certificate rather than only ever seeing the automatic
+        // worst-case pick — useful once the worst case itself looks right and you want
+        // to spot-check someone with a very different item count/name length instead.
+        $participant = $request->query('participant_id')
+            ? FestParticipant::find((int) $request->query('participant_id'))
+            : $service->worstCaseParticipantForPreview($event, $certType, $itemId);
 
         abort_if(! $participant, 404, 'No eligible participants yet to preview — register participants for this event first.');
 
@@ -627,7 +641,7 @@ class FestCertificateController extends SahodayaAdminController
 
         $templateCache = [];
         $participantsCache = [];
-        $context = $service->renderContext($certificate, null, $templateCache, $participantsCache, embedAssets: false);
+        $context = $service->renderContext($certificate, null, $templateCache, $participantsCache, embedAssets: $embedAssets);
         $context['isSample'] = true;
         $context['qr_src'] = null;
 
