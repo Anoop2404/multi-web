@@ -31,7 +31,13 @@ class FestEventActivityController extends SahodayaAdminController
             ->orderBy('title')
             ->get(['id', 'title', 'item_code', 'class_group', 'age_group']);
 
-        $schools = Tenant::whereHas('registrations', fn ($q) => $q->where('event_id', $event->id))
+        $schoolIds = \App\Models\FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->pluck('school_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $schools = Tenant::whereIn('id', $schoolIds)
             ->orderBy('name')
             ->get(['id', 'name']);
 
