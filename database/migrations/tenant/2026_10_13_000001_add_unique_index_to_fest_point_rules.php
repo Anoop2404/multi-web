@@ -32,6 +32,16 @@ return new class extends Migration
         $driver = Schema::getConnection()->getDriverName();
 
         if (in_array($driver, ['pgsql', 'sqlite'], true)) {
+            // Delete pre-existing duplicates keeping the latest record
+            DB::statement("
+                DELETE FROM fest_point_rules
+                WHERE id NOT IN (
+                    SELECT MAX(id)
+                    FROM fest_point_rules
+                    GROUP BY event_id, COALESCE(grade, ''), COALESCE(position, 0), is_group
+                )
+            ");
+
             DB::statement('
                 CREATE UNIQUE INDEX IF NOT EXISTS fest_point_rules_identity_unique
                 ON fest_point_rules (event_id, COALESCE(grade, \'\'), COALESCE(position, 0), is_group)

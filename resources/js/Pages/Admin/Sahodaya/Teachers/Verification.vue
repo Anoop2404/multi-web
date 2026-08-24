@@ -12,6 +12,9 @@
                 <button v-if="selectedIds.length" type="button" class="btn-primary text-sm" @click="bulkVerifySelected">
                     Verify selected ({{ selectedIds.length }})
                 </button>
+                <button v-if="selectedIds.length" type="button" class="btn-secondary text-sm ml-2 font-bold text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100" @click="bulkProvisionLoginsSelected">
+                    🔑 Create logins ({{ selectedIds.length }})
+                </button>
                 <button v-else-if="selectedSchool && schoolPendingCount > 0" type="button"
                         class="btn-primary text-sm" @click="bulkVerifySchool">
                     Verify all pending ({{ schoolPendingCount }})
@@ -23,6 +26,9 @@
                 <button v-else-if="showTeacherList && pendingOnPage.length" type="button"
                         class="btn-secondary text-sm" @click="bulkVerifyPage">
                     Verify all on this page ({{ pendingOnPage.length }})
+                </button>
+                <button type="button" class="btn-secondary text-sm ml-2 font-bold text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100" @click="bulkProvisionLoginsAllVerified">
+                    🔑 Assign logins (All Verified)
                 </button>
             </template>
         </PageHeader>
@@ -425,6 +431,31 @@ async function bulkVerifySchoolRow(row) {
         verify_all_unverified: true,
         school_id: row.id,
     }, { preserveScroll: true });
+}
+
+function bulkProvisionLoginsSelected() {
+    if (!selectedIds.value.length) return;
+    if (!confirm(`Create portal logins and email credentials to ${selectedIds.value.length} selected teacher(s)?`)) return;
+
+    router.post(`${base}/teachers/verification/bulk-provision-logins`, {
+        teacher_ids: selectedIds.value,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => { selectedIds.value = []; },
+    });
+}
+
+function bulkProvisionLoginsAllVerified() {
+    const scopeName = props.selectedSchool ? props.selectedSchool.name : 'all schools';
+    if (!confirm(`Create portal logins and email credentials to all verified teachers without logins in ${scopeName}?`)) return;
+
+    router.post(`${base}/teachers/verification/bulk-provision-logins`, {
+        provision_all_verified: true,
+        school_id: props.selectedSchool ? props.selectedSchool.id : (props.filters?.school_id || null),
+    }, {
+        preserveScroll: true,
+        onSuccess: () => { selectedIds.value = []; },
+    });
 }
 
 function initials(name) {

@@ -277,6 +277,66 @@ class TeacherVerificationController extends SahodayaAdminController
         return back()->with('success', $count > 0 ? "Verified {$count} teacher(s)." : 'No unverified teachers matched.');
     }
 
+    public function bulkProvisionLogins(Request $request)
+    {
+        $this->assertStaffCan('membership.manage');
+        $data = $request->validate([
+            'teacher_ids'            => 'nullable|array',
+            'teacher_ids.*'          => 'integer',
+            'provision_all_verified' => 'boolean',
+            'school_id'              => 'nullable|string',
+        ]);
+
+        $schoolIds = $this->membershipRegionScopedSchoolIds(
+            Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id')->all()
+        );
+
+        if (! empty($data['teacher_ids'])) {
+            $query = Teacher::whereIn('tenant_id', $schoolIds)
+                ->where('status', 'active')
+                ->whereIn('id', $data['teacher_ids']);
+        } elseif ($data['provision_all_verified'] ?? false) {
+            $query = Teacher::whereIn('tenant_id', $schoolIds)
+                ->where('status', 'active')
+                ->whereNotNull('verified_at')
+                ->whereNull('user_id')
+                ->when(! empty($data['school_id']), fn ($q) => $q->where('tenant_id', $data['school_id']));
+        } else {
+            abort(422, 'Select teachers or choose create logins for all verified teachers.');
+        }
+
+        $teachers = $query->get();
+        $provisioner = app(\App\Services\Portal\TeacherPortalProvisioner::class);
+
+        $successCount = 0;
+        $skippedCount = 0;
+        $errors = [];
+
+        foreach ($teachers as $teacher) {
+            if (! $teacher->email) {
+                $skippedCount++;
+                continue;
+            }
+
+            try {
+                $provisioner->provision($teacher, $teacher->email);
+                $successCount++;
+            } catch (\Throwable $e) {
+                $errors[] = "{$teacher->name}: {$e->getMessage()}";
+            }
+        }
+
+        $msg = "Provisioned portal logins for {$successCount} teacher(s).";
+        if ($skippedCount > 0) {
+            $msg .= " Skipped {$skippedCount} teacher(s) without email address.";
+        }
+        if (! empty($errors)) {
+            $msg .= " Note: " . implode(' | ', array_slice($errors, 0, 3));
+        }
+
+        return back()->with('success', $msg);
+    }
+
     /** Notify a school's admin/staff users from a NotificationTemplate slug. */
     private function notifySchool(string $schoolId, string $slug, array $replacements = []): void
     {
