@@ -494,8 +494,10 @@ class FestPortalController extends Controller
         // Deliberately a separate query from results()'s own $marks (which stays
         // top-3-only — it also feeds the item/individual/medal-tally tabs, where
         // "winners only" is the correct scope), not a reuse of it.
+        $scopePublished = (bool) ($selectedScope['results_published'] ?? false);
+
         $allSchoolMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
-            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+            ->when(! $scopePublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
             // Only set when schoolResults() was reached from a category-filtered
             // scoreboard — narrows the roster to that one category instead of the
             // school's full cross-category report.
