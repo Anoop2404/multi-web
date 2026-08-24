@@ -243,11 +243,13 @@ class FestGradePointService
 
             $ownMax = $cfg->max_percent ?? $cfg->max_score;
             if ($ownMax !== null) {
-                // Expand max ceiling up to nextMin so decimal scores (e.g. 139.5 between 139 and 140) don't fall into a gap
-                $max = max((float) $ownMax, $nextMin);
-                $matched = $i === 0
-                    ? ($percent >= $min && $percent <= $max)
-                    : ($percent >= $min && $percent < $max);
+                $floatOwnMax = (float) $ownMax;
+                // If ownMax was set as an integer boundary contiguous to nextMin (e.g. 69 vs 70 or 139 vs 140),
+                // bridge decimal scores like 69.5% or 139.5. If there is a larger gap (e.g. 75 vs 80), respect the deliberate gap.
+                $max = ($nextMin - $floatOwnMax <= 1.05) ? $nextMin : $floatOwnMax;
+                $matched = ($max == $nextMin && $i > 0)
+                    ? ($percent >= $min && $percent < $max)
+                    : ($percent >= $min && $percent <= $max);
             } else {
                 $max = $nextMin;
                 $matched = $i === 0
