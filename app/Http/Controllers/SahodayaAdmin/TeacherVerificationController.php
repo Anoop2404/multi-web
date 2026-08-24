@@ -310,53 +310,18 @@ class TeacherVerificationController extends SahodayaAdminController
             abort(422, 'Select teachers or choose create logins for all verified teachers.');
         }
 
-        // Limit to 50 per request for email delivery & sub-second processing speed
-        $teachers = (clone $query)->limit(50)->get();
-        $provisioner = app(\App\Services\Portal\TeacherPortalProvisioner::class);
-        $credentialService = app(\App\Services\Auth\UserCredentialService::class);
+        $allTeacherIds = $query->pluck('id')->all();
+        $totalCount = count($allTeacherIds);
 
-        $successCount = 0;
-        $errors = [];
-
-        foreach ($teachers as $teacher) {
-            $email = $teacher->email;
-            if (! $email) {
-                $cleanCode = preg_replace('/[^a-zA-Z0-9]/', '', $teacher->reg_no ?: "t{$teacher->id}");
-                $email = strtolower("teacher_{$cleanCode}@sahodaya.org");
-            }
-
-            try {
-                if (! $teacher->user_id) {
-                    $result = $provisioner->provision($teacher, $email);
-                    $this->sendTeacherCredentialsMail($teacher->fresh(), $result['password']);
-                } else {
-                    $user = User::findOrFail($teacher->user_id);
-                    $result = $credentialService->resetPassword($user, $request->user()?->id);
-                    $this->sendTeacherCredentialsMail($teacher->fresh(), $result['password']);
-                }
-                $successCount++;
-            } catch (\Throwable $e) {
-                $errors[] = "{$teacher->name}: {$e->getMessage()}";
-            }
+        if ($totalCount === 0) {
+            return back()->with('success', 'No eligible teachers matched.');
         }
 
-        $remainingQuery = Teacher::whereIn('tenant_id', $schoolIds)
-            ->where('status', 'active')
-            ->whereNotNull('verified_at')
-            ->when(! $includeExisting, fn ($q) => $q->whereNull('user_id'))
-            ->when(! empty($data['school_id']), fn ($q) => $q->where('tenant_id', $data['school_id']));
-
-        $remainingCount = $remainingQuery->count();
-
-        $msg = "Sent username & temporary password credentials to {$successCount} teacher(s).";
-        if ($remainingCount > 0) {
-            $msg .= " ({$remainingCount} verified teacher(s) remaining — click Send Credentials again to process next batch).";
-        }
-        if (! empty($errors)) {
-            $msg .= " Note: " . implode(' | ', array_slice($errors, 0, 2));
+        foreach (array_chunk($allTeacherIds, 50) as $chunkIds) {
+            \App\Jobs\ProvisionTeacherPortalUsersJob::dispatch($chunkIds, $includeExisting, $request->user()?->id);
         }
 
-        return back()->with('success', $msg);
+        return back()->with('success', "Queued username & password emails for {$totalCount} teacher(s). All emails are being dispatched by the background queue.");
     }
 
     public function resendCredentials(Request $request, string $tenantId, Teacher $teacher)
