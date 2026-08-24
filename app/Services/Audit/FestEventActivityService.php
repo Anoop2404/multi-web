@@ -273,8 +273,8 @@ class FestEventActivityService
         });
 
         if ($search !== null && $search !== '') {
-            $needle = strtolower(trim($search));
-            $mapped = $mapped->filter(function ($row) use ($needle) {
+            $rawTerms = array_filter(explode(' ', strtolower(trim($search))));
+            $mapped = $mapped->filter(function ($row) use ($rawTerms) {
                 $haystack = strtolower(implode(' ', array_filter([
                     $row['description'] ?? '',
                     $row['chest_no'] ?? '',
@@ -289,7 +289,13 @@ class FestEventActivityService
                     $row['ip_address'] ?? '',
                 ])));
 
-                return str_contains($haystack, $needle);
+                foreach ($rawTerms as $term) {
+                    if (! str_contains($haystack, $term)) {
+                        return false;
+                    }
+                }
+
+                return true;
             })->values();
         }
 

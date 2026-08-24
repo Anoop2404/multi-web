@@ -39,7 +39,7 @@
         </div>
 
         <div class="form-section overflow-hidden !p-0">
-            <EmptyState v-if="!activityLogs.length" title="No activity found" description="No logged actions match your selected item, page, or search query." icon="📋" class="p-8" />
+            <EmptyState v-if="!displayedLogs.length" title="No activity found" description="No logged actions match your selected item, page, or search query." icon="📋" class="p-8" />
             <div v-else class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
@@ -52,7 +52,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="log in activityLogs" :key="log.id" class="hover:bg-slate-50/80 transition">
+                        <tr v-for="log in displayedLogs" :key="log.id" class="hover:bg-slate-50/80 transition">
                             <td class="text-xs text-slate-500 whitespace-nowrap">
                                 <div class="font-medium text-slate-700">{{ formatTime(log.created_at) }}</div>
                                 <div class="text-[10px] text-slate-400 font-mono">{{ formatExactTime(log.created_at) }}</div>
@@ -204,6 +204,35 @@ const selectedPage = ref(props.filters?.page ?? null);
 const selectedLog = ref(null);
 
 const hasActiveFilters = computed(() => !!searchQuery.value || selectedItem.value !== null || selectedPage.value !== null);
+
+const displayedLogs = computed(() => {
+    let logs = props.activityLogs || [];
+    if (!logs.length) return [];
+
+    if (searchQuery.value && searchQuery.value.trim()) {
+        const terms = searchQuery.value.toLowerCase().trim().split(/\s+/);
+        logs = logs.filter(log => {
+            const text = [
+                log.description,
+                log.participant,
+                log.chest_no ? `chest #${log.chest_no}` : '',
+                log.chest_no,
+                log.school,
+                log.reg_no,
+                log.item_title,
+                log.item_code,
+                log.item_category,
+                log.page_label,
+                log.user?.name,
+                log.ip_address,
+            ].filter(Boolean).join(' ').toLowerCase();
+
+            return terms.every(term => text.includes(term));
+        });
+    }
+
+    return logs;
+});
 
 let searchTimeout = null;
 function onSearchInput() {
