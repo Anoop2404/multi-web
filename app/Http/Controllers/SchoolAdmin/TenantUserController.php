@@ -4,6 +4,8 @@ namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\SchoolHouse;
 use App\Models\SchoolClass;
+use App\Models\Student;
+use App\Models\Teacher;
 use App\Models\User;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Auth\TenantUserProvisioner;
@@ -48,8 +50,20 @@ class TenantUserController extends SchoolAdminController
                 'event_scopes'  => $scopes->scopesForUser($u->id, $this->school->id),
             ]);
 
+        $teacherStats = [
+            'total'      => Teacher::where('tenant_id', $this->school->id)->where('status', 'active')->count(),
+            'with_login' => Teacher::where('tenant_id', $this->school->id)->where('status', 'active')->whereNotNull('user_id')->count(),
+        ];
+
+        $studentStats = [
+            'total'      => Student::where('tenant_id', $this->school->id)->where('status', 'active')->count(),
+            'with_login' => Student::where('tenant_id', $this->school->id)->where('status', 'active')->whereNotNull('user_id')->count(),
+        ];
+
         return $this->inertia('School/Users/Index', [
             'users'             => $users,
+            'teacherStats'      => $teacherStats,
+            'studentStats'      => $studentStats,
             'classes'           => $this->schoolClasses(),
             'houses'            => SchoolHouse::forSchool($this->school->id)->orderBy('name')->get(['id', 'name']),
             'assignableRoles'   => $this->roleOptions($assignable),

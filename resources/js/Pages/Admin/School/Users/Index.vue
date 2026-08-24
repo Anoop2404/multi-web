@@ -28,6 +28,52 @@
             · Temp password: <strong class="font-mono">{{ newCredentials.password }}</strong> (shown once)
         </div>
 
+        <!-- Category Navigation Tabs -->
+        <div v-if="!coordinatorMode" class="mb-6 flex flex-wrap gap-2">
+            <Link :href="`/school-admin/${school.id}/users`" class="px-4 py-2.5 rounded-xl font-bold text-sm transition border bg-[#0f3d7a] text-white border-[#0f3d7a] shadow-sm flex items-center gap-2">
+                <span>🛡️ Staff & Admin Users</span>
+            </Link>
+            <Link :href="`/school-admin/${school.id}/teachers`" class="px-4 py-2.5 rounded-xl font-bold text-sm transition border bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 flex items-center gap-2">
+                <span>👨‍🏫 Teacher Logins & Portal</span>
+            </Link>
+            <Link :href="`/school-admin/${school.id}/students`" class="px-4 py-2.5 rounded-xl font-bold text-sm transition border bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 flex items-center gap-2">
+                <span>🎓 Student Logins & Portal</span>
+            </Link>
+        </div>
+
+        <!-- Teacher & Student Portal Login Quick Cards -->
+        <div v-if="!coordinatorMode" class="grid sm:grid-cols-2 gap-4 mb-6">
+            <div class="card !p-5 bg-gradient-to-br from-indigo-50/60 to-slate-50 border-indigo-100 flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-lg">👨‍🏫</span>
+                        <h4 class="font-bold text-slate-900">Teacher Portal Logins</h4>
+                    </div>
+                    <p class="text-xs text-slate-500">
+                        <strong>{{ teacherStats?.with_login || 0 }}</strong> of {{ teacherStats?.total || 0 }} teachers have active logins
+                    </p>
+                </div>
+                <Link :href="`/school-admin/${school.id}/teachers`" class="btn-secondary text-xs font-bold bg-white hover:bg-slate-50 border-indigo-200 text-indigo-700">
+                    Manage Teachers →
+                </Link>
+            </div>
+
+            <div class="card !p-5 bg-gradient-to-br from-emerald-50/60 to-slate-50 border-emerald-100 flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-lg">🎓</span>
+                        <h4 class="font-bold text-slate-900">Student Portal Logins</h4>
+                    </div>
+                    <p class="text-xs text-slate-500">
+                        <strong>{{ studentStats?.with_login || 0 }}</strong> of {{ studentStats?.total || 0 }} students have active logins
+                    </p>
+                </div>
+                <Link :href="`/school-admin/${school.id}/students`" class="btn-secondary text-xs font-bold bg-white hover:bg-slate-50 border-emerald-200 text-emerald-700">
+                    Manage Students →
+                </Link>
+            </div>
+        </div>
+
         <section v-if="!coordinatorMode" class="card mb-6 space-y-4">
             <div>
                 <h3 class="section-title">Leadership contact logins</h3>
@@ -375,6 +421,8 @@ const { confirm } = useConfirm();
 const props = defineProps({
     school: Object,
     users: Array,
+    teacherStats: Object,
+    studentStats: Object,
     classes: Array,
     houses: Array,
     assignableRoles: Array,
