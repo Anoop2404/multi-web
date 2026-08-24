@@ -84,9 +84,9 @@ class FestEventActivityService
             $term = '%'.strtolower(trim($search)).'%';
             $searchParticipantIds = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $event->reportableEventIds()))
                 ->where(function ($q) use ($term) {
-                    $q->whereRaw('LOWER(COALESCE(chest_no, \'\')) LIKE ?', [$term])
-                      ->orWhereHas('group', fn ($g) => $g->whereRaw('LOWER(COALESCE(chest_no, \'\')) LIKE ?', [$term])->orWhereRaw('LOWER(name) LIKE ?', [$term]))
-                      ->orWhereHas('student', fn ($s) => $s->whereRaw('LOWER(name) LIKE ?', [$term])->orWhereRaw('LOWER(COALESCE(reg_no, \'\')) LIKE ?', [$term]))
+                    $q->whereRaw('LOWER(CAST(chest_no AS TEXT)) LIKE ?', [$term])
+                      ->orWhereHas('group', fn ($g) => $g->whereRaw('LOWER(CAST(chest_no AS TEXT)) LIKE ?', [$term])->orWhereRaw('LOWER(name) LIKE ?', [$term]))
+                      ->orWhereHas('student', fn ($s) => $s->whereRaw('LOWER(name) LIKE ?', [$term])->orWhereRaw('LOWER(CAST(reg_no AS TEXT)) LIKE ?', [$term]))
                       ->orWhereHas('teacher', fn ($t) => $t->whereRaw('LOWER(name) LIKE ?', [$term]))
                       ->orWhereHas('registration.school', fn ($sch) => $sch->whereRaw('LOWER(name) LIKE ?', [$term]));
                 })
