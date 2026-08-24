@@ -415,7 +415,9 @@ class FestPortalController extends Controller
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         $selectedScope = $this->operationalEvents->directScope($event);
-        $isPublished = (bool) $selectedScope['results_published'];
+
+        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+        $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
         abort_unless($isPublished, 403, 'Public scoreboard & results are disabled for this event.');
 
@@ -427,12 +429,26 @@ class FestPortalController extends Controller
 
         $school = Tenant::findOrFail($schoolId);
 
-        [$overallRows] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished);
+        [$overallRows] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished, $isAdminPreview);
         $schoolRow = collect($overallRows)->firstWhere('school_id', $schoolId);
-        abort_unless($schoolRow, 404);
+        if (! $schoolRow && $isAdminPreview) {
+            $schoolRow = [
+                'school_id' => $schoolId,
+                'school_name' => $school->name,
+                'total_points' => '0.00',
+                'rank' => '—',
+                'gold' => 0,
+                'silver' => 0,
+                'bronze' => 0,
+            ];
+        } else {
+            abort_unless($schoolRow, 404);
+        }
 
         $roster = $this->schoolResultsRoster($event, $selectedScope, $isPublished, $category)->get($schoolId, []);
-        abort_if($roster === [], 404, 'No results recorded for this school yet.');
+        if (empty($roster) && ! $isAdminPreview) {
+            abort(404, 'No results recorded for this school yet.');
+        }
 
         return $this->renderPublic('public.fest.school-results', $tenant, [
             'event' => $event,
@@ -447,6 +463,7 @@ class FestPortalController extends Controller
             'activeCategoryLabel' => $category ? $this->scoreboards->categoryLabel($event, $category) : null,
             'scopes' => [$selectedScope],
             'selectedScope' => $selectedScope,
+            'isAdminPreview' => $isAdminPreview,
             'pageSeo' => ['title' => $event->title.' — '.$school->name.' — Results'],
         ]);
     }
