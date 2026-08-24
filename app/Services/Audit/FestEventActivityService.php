@@ -157,7 +157,7 @@ class FestEventActivityService
 
             $marksMap = \App\Models\FestMark::whereIn('participant_id', array_unique($missingParticipantIds))
                 ->get()
-                ->keyBy('participant_id');
+                ->keyBy(fn ($m) => "{$m->item_id}-{$m->participant_id}");
         }
 
         $itemsMap = collect();
@@ -168,8 +168,10 @@ class FestEventActivityService
         }
 
         $scoreboards = app(PublicFestScoreboardService::class);
+        $gradePointService = app(\App\Services\Events\FestGradePointService::class);
+        $itemResultsService = app(\App\Services\Events\FestItemResultsService::class);
 
-        $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $marksMap, $itemsMap, $event, $scoreboards) {
+        $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $marksMap, $itemsMap, $event, $scoreboards, $gradePointService, $itemResultsService) {
             $props = $log->properties ?? [];
             $pid = $props['participant_id'] ?? null;
             if (! $pid && preg_match('/participant\s+#(\d+)/i', $log->description, $matches)) {
@@ -177,7 +179,8 @@ class FestEventActivityService
             }
 
             $participant = $pid ? $participantsMap->get((int) $pid) : null;
-            $markRecord = $pid ? $marksMap->get((int) $pid) : null;
+            $itemId = $props['item_id'] ?? $participant?->registration?->item_id;
+            $markRecord = ($itemId && $pid) ? $marksMap->get("{$itemId}-{$pid}") : ($pid ? $marksMap->filter(fn ($m) => $m->participant_id == $pid)->first() : null);
 
             if ($markRecord) {
                 if (! isset($props['score']) && $markRecord->score !== null) {
@@ -197,6 +200,26 @@ class FestEventActivityService
                     $props['judge_scores'] = $markRecord->ref_data_json['judge_scores'];
                 }
             }
+
+            // Derive Grade from score if grade is still missing
+            $score = isset($props['score']) ? (float) $props['score'] : null;
+            if (empty($props['grade']) && $score !== null) {
+                $derivedGrade = $gradePointService->resolveGradeFromScore($event, $itemId ? (int) $itemId : null, $score);
+                if ($derivedGrade) {
+                    $props['grade'] = $derivedGrade;
+                }
+            }
+
+            // Derive Position / Rank if position is still missing
+            if (empty($props['position']) && $itemId && $pid) {
+                $itemResultRows = $itemResultsService->resultRowsForItem($event, (int) $itemId);
+                foreach ($itemResultRows as $row) {
+                    if (($row['participant_id'] ?? null) == $pid && ! empty($row['position'])) {
+                        $props['position'] = (int) $row['position'];
+                        break;
+                    }
+                }
+            }
             $personName = $props['participant'] ?? $participant?->student?->name ?? $participant?->teacher?->name ?? $participant?->group?->name;
             $chestNo = $props['chest_no'] ?? $participant?->group?->chest_no ?? $participant?->chest_no;
             $schoolName = $props['school'] ?? $participant?->registration?->school?->name;
@@ -213,7 +236,20 @@ class FestEventActivityService
                 $chestLabel = $chestNo ? "Chest #{$chestNo}" : "Participant #{$pid}";
                 $itemLabel = $itemTitle ? " in {$itemTitle}" : '';
                 $schoolLabel = $schoolName ? " ({$schoolName})" : '';
-                $description = "Mark saved for {$chestLabel} - {$personName}{$schoolLabel}{$itemLabel}";
+
+                $details = [];
+                if (! empty($props['position'])) {
+                    $details[] = "Rank #{$props['position']}";
+                }
+                if (isset($props['score']) && $props['score'] !== null && $props['score'] !== '') {
+                    $details[] = "Score: {$props['score']}";
+                }
+                if (! empty($props['grade'])) {
+                    $details[] = "Grade: {$props['grade']}";
+                }
+                $detailStr = $details !== [] ? ' [' . implode(', ', $details) . ']' : '';
+
+                $description = "Mark saved for {$chestLabel} - {$personName}{$schoolLabel}{$itemLabel}{$detailStr}";
             }
 
             return [
