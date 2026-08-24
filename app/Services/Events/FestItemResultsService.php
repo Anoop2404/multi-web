@@ -165,7 +165,7 @@ class FestItemResultsService
                 $mark = $teamParticipants->pluck('mark')->filter()->first();
 
                 $effectiveGrade = ($mark?->score !== null)
-                    ? $gradePointService->resolveGradeFromScore($event, $itemId, (float) $mark->score)
+                    ? ($gradePointService->resolveGradeFromScore($event, $itemId, (float) $mark->score) ?: $mark?->grade)
                     : $mark?->grade;
 
                 return [
@@ -185,7 +185,7 @@ class FestItemResultsService
             $gradePointService = app(FestGradePointService::class);
             $rows = $participants->map(function (FestParticipant $p) use ($event, $itemId, $gradePointService) {
                 $effectiveGrade = ($p->mark?->score !== null)
-                    ? $gradePointService->resolveGradeFromScore($event, $itemId, (float) $p->mark->score)
+                    ? ($gradePointService->resolveGradeFromScore($event, $itemId, (float) $p->mark->score) ?: $p->mark?->grade)
                     : $p->mark?->grade;
 
                 return [

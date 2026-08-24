@@ -70,11 +70,12 @@
                             <input v-model.number="gradeForm.max_percent" type="number" min="0" max="100" step="0.01" class="field" placeholder="Max %" aria-label="Maximum percentage">
                         </div>
                     </FormField>
-                    <FormField v-else label="Score range" :error="gradeForm.errors.min_score || gradeForm.errors.max_score">
+                    <FormField v-else label="Score range" :error="gradeForm.errors.min_score || gradeForm.errors.max_score"
+                               hint="Use a decimal like 69.99 to close the gap right up to the next band's start (e.g. 60–69.99, then 70–100) — whole numbers alone leave a real gap between bands.">
                         <div class="flex items-center gap-2">
-                            <input v-model.number="gradeForm.min_score" type="number" min="0" class="field" placeholder="Min" aria-label="Minimum score">
+                            <input v-model.number="gradeForm.min_score" type="number" min="0" step="0.01" class="field" placeholder="Min" aria-label="Minimum score">
                             <span class="text-slate-400">–</span>
-                            <input v-model.number="gradeForm.max_score" type="number" min="0" class="field" placeholder="Max" aria-label="Maximum score">
+                            <input v-model.number="gradeForm.max_score" type="number" min="0" step="0.01" class="field" placeholder="Max" aria-label="Maximum score">
                         </div>
                     </FormField>
                     <div class="sm:col-span-2 flex gap-2">

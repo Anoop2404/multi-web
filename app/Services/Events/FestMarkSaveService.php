@@ -67,11 +67,14 @@ class FestMarkSaveService
             ! $gradeExplicitlyChanged
             && isset($data['score']) && $data['score'] !== null && $data['score'] !== ''
         ) {
-            $data['grade'] = $this->gradePointService->resolveGradeFromScore(
+            $derivedGrade = $this->gradePointService->resolveGradeFromScore(
                 $event,
                 (int) $data['item_id'],
                 (float) $data['score']
             );
+            if ($derivedGrade !== null || empty($data['grade'])) {
+                $data['grade'] = $derivedGrade;
+            }
         }
 
         if ($event->event_type === 'sports' && ! empty($data['position']) && ($data['score'] ?? '') === '') {

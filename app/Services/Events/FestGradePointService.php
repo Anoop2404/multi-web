@@ -186,11 +186,11 @@ class FestGradePointService
         // been configured for this event; once an admin adds their own bands, those win.
         if (! $hasCustomConfigs) {
             if ($event->scoring_preset === 'mcs_kalotsav') {
-                return $this->resolveMcsGradeFromScore($score);
+                return $this->resolveMcsGradeFromScore($score, $maxPossibleMarks);
             }
 
             if ($event->scoring_preset === 'confed_kalotsav') {
-                return $this->resolveConfedGradeFromScore($score);
+                return $this->resolveConfedGradeFromScore($score, $maxPossibleMarks);
             }
         }
 
@@ -239,23 +239,17 @@ class FestGradePointService
         for ($i = 0; $i < $count; $i++) {
             $cfg = $sorted[$i];
             $min = (float) ($cfg->min_percent ?? $cfg->min_score ?? 0);
+            $nextMin = $i === 0 ? 100.0 : (float) ($sorted[$i - 1]->min_percent ?? $sorted[$i - 1]->min_score ?? 100.0);
 
-            // A band's own configured max always wins when the admin actually set one —
-            // previously every band except the top used the NEXT-higher band's min as an
-            // implicit ceiling instead, silently overriding even an explicitly lower max.
-            // That meant a deliberate gap between bands (e.g. B capped at 75%, A starting
-            // at 80%, intentionally excluding 76-79%) had no effect — a 77% score still
-            // resolved to B. Only fall back to the implicit "extend up to the next band"
-            // ceiling (or 100 for the top band) when max was left blank, matching how
-            // most existing configs are actually set up.
             $ownMax = $cfg->max_percent ?? $cfg->max_score;
             if ($ownMax !== null) {
-                $max = (float) $ownMax;
-                $matched = $percent >= $min && $percent <= $max;
+                // Expand max ceiling up to nextMin so decimal scores (e.g. 139.5 between 139 and 140) don't fall into a gap
+                $max = max((float) $ownMax, $nextMin);
+                $matched = $i === 0
+                    ? ($percent >= $min && $percent <= $max)
+                    : ($percent >= $min && $percent < $max);
             } else {
-                $max = $i === 0
-                    ? 100.0
-                    : (float) ($sorted[$i - 1]->min_percent ?? $sorted[$i - 1]->min_score ?? 100);
+                $max = $nextMin;
                 $matched = $i === 0
                     ? ($percent >= $min && $percent <= $max)
                     : ($percent >= $min && $percent < $max);
@@ -284,9 +278,11 @@ class FestGradePointService
         return (int) ($table[$grade][(string) $mark->position] ?? 0);
     }
 
-    public function resolveMcsGradeFromScore(float $score): ?string
+    public function resolveMcsGradeFromScore(float $score, float $maxPossibleMarks = 100.0): ?string
     {
-        return $this->highestMatchingBand(config('fest_mcs_scoring.grades', []), $score);
+        $percent = ($maxPossibleMarks > 0 && $maxPossibleMarks != 100.0) ? ($score / $maxPossibleMarks) * 100.0 : $score;
+
+        return $this->highestMatchingBand(config('fest_mcs_scoring.grades', []), $percent);
     }
 
     /** Official Confederation State Kalolsavam Manual table — see config/fest_confed_kalotsav_scoring.php. */
@@ -305,9 +301,11 @@ class FestGradePointService
         return (int) ($table[$grade][(string) $mark->position] ?? 0);
     }
 
-    public function resolveConfedGradeFromScore(float $score): ?string
+    public function resolveConfedGradeFromScore(float $score, float $maxPossibleMarks = 100.0): ?string
     {
-        return $this->highestMatchingBand(config('fest_confed_kalotsav_scoring.grades', []), $score);
+        $percent = ($maxPossibleMarks > 0 && $maxPossibleMarks != 100.0) ? ($score / $maxPossibleMarks) * 100.0 : $score;
+
+        return $this->highestMatchingBand(config('fest_confed_kalotsav_scoring.grades', []), $percent);
     }
 
     /**
