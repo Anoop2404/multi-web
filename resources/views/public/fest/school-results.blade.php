@@ -32,8 +32,12 @@
         @php $grouped = collect($roster)->groupBy('category'); @endphp
         <div class="space-y-10">
             @foreach($grouped as $category => $items)
+            @php $categoryPoints = collect($items)->sum('points'); @endphp
             <section aria-labelledby="cat-{{ Str::slug($category) }}">
-                <h2 id="cat-{{ Str::slug($category) }}" class="text-sm font-bold uppercase tracking-widest text-amber-400 mb-4">{{ $category }}</h2>
+                <div class="flex items-center justify-between gap-4 mb-4 pb-2 border-b border-slate-800/80">
+                    <h2 id="cat-{{ Str::slug($category) }}" class="text-sm font-bold uppercase tracking-widest text-amber-400">{{ $category }}</h2>
+                    <span class="text-xs font-mono font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-full">{{ $categoryPoints }} <small class="text-white/50 font-sans font-semibold">PTS</small></span>
+                </div>
                 <div class="grid sm:grid-cols-2 gap-4">
                     @foreach($items as $winner)
                     @php

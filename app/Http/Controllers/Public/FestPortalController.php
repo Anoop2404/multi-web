@@ -450,6 +450,21 @@ class FestPortalController extends Controller
             abort(404, 'No results recorded for this school yet.');
         }
 
+        $rosterTotalPoints = collect($roster)->sum('points');
+        if ($schoolRow) {
+            $schoolRow['total_points'] = (string) $rosterTotalPoints;
+        } else {
+            $schoolRow = [
+                'school_id' => $schoolId,
+                'school_name' => $school->name,
+                'total_points' => (string) $rosterTotalPoints,
+                'rank' => '—',
+                'gold' => 0,
+                'silver' => 0,
+                'bronze' => 0,
+            ];
+        }
+
         return $this->renderPublic('public.fest.school-results', $tenant, [
             'event' => $event,
             'eventContext' => $this->operationalEvents->publicContext($event),
