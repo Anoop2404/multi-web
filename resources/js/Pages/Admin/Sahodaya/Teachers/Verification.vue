@@ -36,7 +36,7 @@
             </template>
         </PageHeader>
 
-        <div class="grid sm:grid-cols-3 gap-4 mb-6">
+        <div class="grid sm:grid-cols-4 gap-4 mb-6">
             <button type="button" class="card card--muted !py-4 text-center hover:ring-2 hover:ring-[#0f3d7a]/20 transition"
                     @click="setVerification('all')">
                 <p class="text-2xl font-bold">{{ counts.total }}</p>
@@ -47,11 +47,14 @@
                 <p class="text-2xl font-bold text-emerald-700">{{ counts.verified }}</p>
                 <p class="text-xs text-slate-500 mt-1">Verified</p>
             </button>
-            <button type="button" class="card card--muted !py-4 text-center hover:ring-2 hover:ring-amber-500/20 transition"
-                    @click="setVerification('unverified')">
-                <p class="text-2xl font-bold text-amber-700">{{ counts.unverified }}</p>
-                <p class="text-xs text-slate-500 mt-1">Pending verification</p>
-            </button>
+            <div class="card card--muted !py-4 text-center bg-indigo-50/40 border-indigo-100">
+                <p class="text-2xl font-bold text-indigo-700">{{ counts.with_login || 0 }}</p>
+                <p class="text-xs text-indigo-700/80 font-medium mt-1">🔑 Logins Assigned</p>
+            </div>
+            <div class="card card--muted !py-4 text-center" :class="counts.without_login > 0 ? 'bg-amber-50/40 border-amber-100' : ''">
+                <p class="text-2xl font-bold" :class="counts.without_login > 0 ? 'text-amber-700' : 'text-slate-600'">{{ counts.without_login || 0 }}</p>
+                <p class="text-xs text-slate-500 mt-1">Pending Logins</p>
+            </div>
         </div>
 
         <form class="card !p-4 mb-4 flex flex-wrap gap-3 items-end" @submit.prevent="apply">

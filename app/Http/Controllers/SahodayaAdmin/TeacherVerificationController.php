@@ -50,9 +50,11 @@ class TeacherVerificationController extends SahodayaAdminController
             ->where('status', 'active');
 
         $counts = [
-            'total'      => (clone $base)->count(),
-            'verified'   => (clone $base)->whereNotNull('verified_at')->count(),
-            'unverified' => (clone $base)->whereNull('verified_at')->count(),
+            'total'         => (clone $base)->count(),
+            'verified'      => (clone $base)->whereNotNull('verified_at')->count(),
+            'unverified'    => (clone $base)->whereNull('verified_at')->count(),
+            'with_login'    => (clone $base)->whereNotNull('user_id')->count(),
+            'without_login' => (clone $base)->whereNull('user_id')->count(),
         ];
 
         $schools = Tenant::whereIn('id', $schoolIds)->orderBy('name')->get(['id', 'name']);
