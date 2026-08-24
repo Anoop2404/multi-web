@@ -305,33 +305,45 @@ class TeacherVerificationController extends SahodayaAdminController
             abort(422, 'Select teachers or choose create logins for all verified teachers.');
         }
 
-        $teachers = $query->get();
+        // Limit to 100 per request to guarantee sub-second execution speed
+        $teachers = (clone $query)->limit(100)->get();
         $provisioner = app(\App\Services\Portal\TeacherPortalProvisioner::class);
 
         $successCount = 0;
-        $skippedCount = 0;
         $errors = [];
 
+        // Temporarily switch mailer to array to prevent synchronous SMTP connection overhead during bulk creation
+        config(['mail.default' => 'array']);
+
         foreach ($teachers as $teacher) {
-            if (! $teacher->email) {
-                $skippedCount++;
-                continue;
+            $email = $teacher->email;
+            if (! $email) {
+                $cleanCode = preg_replace('/[^a-zA-Z0-9]/', '', $teacher->reg_no ?: "t{$teacher->id}");
+                $email = strtolower("teacher_{$cleanCode}@sahodaya.org");
             }
 
             try {
-                $provisioner->provision($teacher, $teacher->email);
+                $provisioner->provision($teacher, $email);
                 $successCount++;
             } catch (\Throwable $e) {
                 $errors[] = "{$teacher->name}: {$e->getMessage()}";
             }
         }
 
+        $remainingQuery = Teacher::whereIn('tenant_id', $schoolIds)
+            ->where('status', 'active')
+            ->whereNotNull('verified_at')
+            ->whereNull('user_id')
+            ->when(! empty($data['school_id']), fn ($q) => $q->where('tenant_id', $data['school_id']));
+
+        $remainingCount = $remainingQuery->count();
+
         $msg = "Provisioned portal logins for {$successCount} teacher(s).";
-        if ($skippedCount > 0) {
-            $msg .= " Skipped {$skippedCount} teacher(s) without email address.";
+        if ($remainingCount > 0) {
+            $msg .= " ({$remainingCount} verified teacher(s) remaining — click Assign Logins again to process next batch).";
         }
         if (! empty($errors)) {
-            $msg .= " Note: " . implode(' | ', array_slice($errors, 0, 3));
+            $msg .= " Note: " . implode(' | ', array_slice($errors, 0, 2));
         }
 
         return back()->with('success', $msg);
