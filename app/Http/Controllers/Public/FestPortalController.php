@@ -924,6 +924,102 @@ public function tv(Request $request, int $eventId)
         ]);
     }
 
+    public function manual(int $eventId)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        abort_unless($event->manual_pdf_path, 404);
+
+        return TenantStorage::downloadResponse($tenant, $event->manual_pdf_path);
+    }
+
+    public function live(Request $request, int $eventId)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        $selectedScope = $this->operationalEvents->directScope($event);
+
+        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+
+        return $this->renderPublic('public.fest.live', $tenant, array_merge(
+            ['event' => $event, 'selectedScope' => $selectedScope, 'scopes' => [$selectedScope], 'isAdminPreview' => $isAdminPreview],
+            $this->livePayload($request, $event, $selectedScope)
+        ));
+    }
+
+    public function liveData(Request $request, int $eventId)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        $selectedScope = $this->operationalEvents->directScope($event);
+
+        return response()->json($this->livePayload($request, $event, $selectedScope));
+    }
+
+    /** @return array<string, mixed> */
+    private function livePayload(Request $request, FestEvent $event, array $selectedScope): array
+    {
+        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+        $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
+
+        $ctx = EventContext::for($event);
+        $categories = $this->scoreboards->categories($event, $selectedScope);
+        $categoryLinks = collect($categories)->map(fn (string $key) => [
+            'key' => $key,
+            'label' => $this->scoreboards->categoryLabel($event, $key),
+            'url' => route('tenant.fest.scoreboard', [
+                'event' => $event->id,
+                'category' => $key,
+            ]),
+        ])->all();
+
+        $nowSlot = FestSchedule::whereIn('event_id', $selectedScope['event_ids'])
+            ->whereNotNull('scheduled_at')
+            ->where('scheduled_at', '<=', now())
+            ->orderByDesc('scheduled_at')
+            ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.event', 'participant.registration.item'])
+            ->first();
+
+        $nowPerforming = null;
+        if ($nowSlot?->participant) {
+            $nowPerforming = $this->visibility->formatPublicParticipant($event, $nowSlot->participant, $nowSlot, null, $isAdminPreview);
+            $nowPerforming['item_title'] = $nowSlot->item?->title;
+        }
+
+        $scoreboard = [];
+        if ($isPublished) {
+            $rawScoreboard = $this->cumulativeChampionship->publicStanding($event)['rows']
+                ?? ($selectedScope['results_published']
+                    ? $this->scoreboards->scoreboard($event, $selectedScope)
+                    : $this->scoreboards->provisionalScoreboard($event, $selectedScope));
+
+            $medalTally = $this->schoolMedalTally($selectedScope['event_ids'], true);
+            $scoreboard = collect($rawScoreboard)
+                ->map(fn (array $row) => $row + [
+                    'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
+                    'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
+                    'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return [
+            'scoreboard' => $scoreboard,
+            'standingsPublished' => $isPublished,
+            'standingsProvisional' => $isAdminPreview,
+            'isAdminPreview' => $isAdminPreview,
+            'categoryLinks' => $categoryLinks,
+            'houseScoreboard' => $isPublished
+                ? $ctx->scoreboardByHouse()
+                : [],
+            'nowPerforming' => $nowPerforming,
+            'athleticRecords' => $this->publicAthleticRecords($event),
+            'recentBreaks' => $this->recentRecordBreaks($event),
+            'refreshedAt' => now()->toIso8601String(),
+        ];
+    }
+
     /** @return array<string, mixed> */
     private function publicWinnerRow(FestMark $mark, FestEvent $event, ?Collection $rosterByRegistration = null): array
     {
