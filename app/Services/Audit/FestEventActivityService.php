@@ -79,6 +79,21 @@ class FestEventActivityService
         $morph = (new FestEvent)->getMorphClass();
         $eventId = (string) $event->id;
 
+        $searchParticipantIds = [];
+        if ($search !== null && $search !== '') {
+            $term = '%'.strtolower(trim($search)).'%';
+            $searchParticipantIds = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $event->reportableEventIds()))
+                ->where(function ($q) use ($term) {
+                    $q->whereRaw('LOWER(COALESCE(chest_no, \'\')) LIKE ?', [$term])
+                      ->orWhereHas('group', fn ($g) => $g->whereRaw('LOWER(COALESCE(chest_no, \'\')) LIKE ?', [$term])->orWhereRaw('LOWER(name) LIKE ?', [$term]))
+                      ->orWhereHas('student', fn ($s) => $s->whereRaw('LOWER(name) LIKE ?', [$term])->orWhereRaw('LOWER(COALESCE(reg_no, \'\')) LIKE ?', [$term]))
+                      ->orWhereHas('teacher', fn ($t) => $t->whereRaw('LOWER(name) LIKE ?', [$term]))
+                      ->orWhereHas('registration.school', fn ($sch) => $sch->whereRaw('LOWER(name) LIKE ?', [$term]));
+                })
+                ->pluck('id')
+                ->all();
+        }
+
         $logs = AuditLog::query()
             ->with('user:id,name,email')
             ->where(function ($q) use ($morph, $eventId, $event) {
@@ -93,13 +108,21 @@ class FestEventActivityService
                        ->orWhere('properties->item_id', (string) $itemId);
                 });
             })
-            ->when($search !== null && $search !== '', function ($q) use ($search) {
+            ->when($search !== null && $search !== '', function ($q) use ($search, $searchParticipantIds) {
                 $term = '%'.strtolower($search).'%';
-                $q->where(function ($q2) use ($term) {
+                $q->where(function ($q2) use ($term, $searchParticipantIds) {
                     $q2->whereRaw('LOWER(description) LIKE ?', [$term])
                        ->orWhereHas('user', fn ($u) => $u->whereRaw('LOWER(name) LIKE ?', [$term]))
                        ->orWhereRaw('LOWER(CAST(properties AS TEXT)) LIKE ?', [$term])
                        ->orWhereRaw('LOWER(COALESCE(ip_address, \'\')) LIKE ?', [$term]);
+
+                    if (! empty($searchParticipantIds)) {
+                        foreach ($searchParticipantIds as $pid) {
+                            $q2->orWhere('properties->participant_id', $pid)
+                               ->orWhere('properties->participant_id', (string) $pid)
+                               ->orWhere('description', 'LIKE', "%participant #{$pid}%");
+                        }
+                    }
                 });
             })
             ->latest()
@@ -119,7 +142,7 @@ class FestEventActivityService
             if (! $pid && preg_match('/participant\s+#(\d+)/i', $log->description, $matches)) {
                 $pid = (int) $matches[1];
             }
-            if ($pid && (empty($props['participant']) || empty($props['chest_no']))) {
+            if ($pid) {
                 $missingParticipantIds[] = (int) $pid;
             }
         }
@@ -141,7 +164,7 @@ class FestEventActivityService
 
         $scoreboards = app(PublicFestScoreboardService::class);
 
-        return $logs->map(function (AuditLog $log) use ($participantsMap, $itemsMap, $event, $scoreboards) {
+        $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $itemsMap, $event, $scoreboards) {
             $props = $log->properties ?? [];
             $pid = $props['participant_id'] ?? null;
             if (! $pid && preg_match('/participant\s+#(\d+)/i', $log->description, $matches)) {
@@ -187,5 +210,28 @@ class FestEventActivityService
                 'created_at'    => $log->created_at?->toIso8601String(),
             ];
         });
+
+        if ($search !== null && $search !== '') {
+            $needle = strtolower(trim($search));
+            $mapped = $mapped->filter(function ($row) use ($needle) {
+                $haystack = strtolower(implode(' ', array_filter([
+                    $row['description'] ?? '',
+                    $row['chest_no'] ?? '',
+                    isset($row['chest_no']) ? "chest #{$row['chest_no']}" : '',
+                    $row['participant'] ?? '',
+                    $row['school'] ?? '',
+                    $row['reg_no'] ?? '',
+                    $row['item_title'] ?? '',
+                    $row['item_category'] ?? '',
+                    $row['item_code'] ?? '',
+                    $row['user']['name'] ?? '',
+                    $row['ip_address'] ?? '',
+                ])));
+
+                return str_contains($haystack, $needle);
+            })->values();
+        }
+
+        return $mapped;
     }
 }
