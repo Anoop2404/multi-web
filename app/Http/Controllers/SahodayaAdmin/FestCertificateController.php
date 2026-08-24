@@ -625,7 +625,9 @@ class FestCertificateController extends SahodayaAdminController
             'verification_uuid' => 'PREVIEW-'.$participant->id,
         ]);
 
-        $context = $service->renderContext($certificate, null, $templateCache = [], $participantsCache = [], embedAssets: false);
+        $templateCache = [];
+        $participantsCache = [];
+        $context = $service->renderContext($certificate, null, $templateCache, $participantsCache, embedAssets: false);
         $context['isSample'] = true;
         $context['qr_src'] = null;
 

@@ -320,8 +320,7 @@ const quickLinks = computed(() => [
     { href: `${base.value}/training`, label: 'Training', description: 'Register & track', icon: '📚' },
     { href: `${base.value}/fest`, label: 'Fest', description: 'Entries & schedule', icon: '🎭' },
     { href: `${base.value}/exams`, label: 'Talent Search', description: 'Open exams', icon: '📝' },
-    { href: `${base.value}/question-banks`, label: 'Question Banks', description: 'MCQ Banks', icon: '🗂️' },
-    { href: `${base.value}/question-papers`, label: 'Question Papers', description: 'Upload & manage', icon: '📄' },
+    { href: `${base.value}/question-papers`, label: 'Question Bank', description: 'Upload & manage', icon: '📄' },
     { href: `${base.value}/certificates`, label: 'Certificates', description: 'Print & download', icon: '🏆' },
 ]);
 

@@ -95,6 +95,22 @@ class FestRegistrationReviewController extends SahodayaAdminController
             ->orderBy('name')
             ->pluck('name', 'id');
 
+        // Registrations.vue resolves every registration row's school NAME by looking it
+        // up in a schools map — previously the same approved-only $schools map above,
+        // which is meant to gate which schools a NEW "register on behalf" entry can be
+        // created for. A school whose membership_status later changes away from
+        // 'approved' (rejected, expired, pending renewal, ...) dropped out of that map
+        // entirely, so every one of its EXISTING registrations silently rendered as a
+        // raw UUID instead of a name — confirmed live with a school whose membership was
+        // rejected after it had already-approved fest registrations. Display needs every
+        // school that could possibly own a registration here, not just currently-approved
+        // ones; only the "create a new registration for..." dropdown should stay
+        // approved-only.
+        $schoolNames = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->orderBy('name')
+            ->pluck('name', 'id');
+
         $registerStudents = [];
         $registerSchoolId = $request->input('school_id');
         if ($registerSchoolId && $schools->has($registerSchoolId)) {
@@ -150,6 +166,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'registrations'        => $registrations,
             'pendingMatchingCount' => $pendingMatchingCount,
             'schools'            => $schools,
+            'schoolNames'        => $schoolNames,
             'schoolRegions'      => $schoolRegions,
             'regionOptions'      => $regionOptions,
             'childEvents'        => $childEvents,

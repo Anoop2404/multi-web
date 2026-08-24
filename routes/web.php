@@ -376,7 +376,8 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/documents/{document}/download', [\App\Http\Controllers\SchoolAdmin\SchoolDocumentController::class, 'download'])->name('documents.download');
 
     Route::get('/question-papers', [QuestionPaperController::class, 'index'])->name('question-papers.index');
-    Route::get('/question-papers/{paper}/download', [QuestionPaperController::class, 'download'])->name('question-papers.download');
+    Route::get('/question-papers/{paper}/files/{file}/download', [QuestionPaperController::class, 'download'])->name('question-papers.download');
+    Route::get('/question-papers/{paper}/files/{file}/preview', [QuestionPaperController::class, 'preview'])->name('question-papers.preview');
 
     Route::get('/students/setup', [SchoolClassController::class, 'index'])->name('students.setup');
 
@@ -1785,15 +1786,13 @@ Route::prefix('portal/teacher/{tenantId}')
         Route::get('/fest/{event}/admit-card', [TeacherDashboardController::class, 'admitCard'])->name('fest.admit-card');
         Route::post('/fest/{event}/appeals', [\App\Http\Controllers\Portal\PortalFestAppealController::class, 'storeTeacher'])->name('fest.appeals.store');
         Route::get('/training/{registration}/certificate', [TeacherDashboardController::class, 'trainingCertificate'])->name('training.certificate');
-        Route::get('/question-banks', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'banks'])->name('question-banks');
-        Route::post('/question-banks', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'storeBank'])->name('question-banks.store');
-        Route::get('/question-banks/{bank}', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'showBank'])->name('question-banks.show');
-        Route::post('/question-banks/{bank}/questions', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'storeQuestion'])->name('questions.store');
-        Route::delete('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'destroyQuestion'])->name('questions.destroy');
         Route::get('/question-papers', [TeacherQuestionPaperController::class, 'index'])->name('question-papers.index');
         Route::post('/question-papers', [TeacherQuestionPaperController::class, 'store'])->name('question-papers.store');
         Route::put('/question-papers/{paper}', [TeacherQuestionPaperController::class, 'update'])->name('question-papers.update');
-        Route::get('/question-papers/{paper}/download', [TeacherQuestionPaperController::class, 'download'])->name('question-papers.download');
+        Route::post('/question-papers/{paper}/files', [TeacherQuestionPaperController::class, 'storeFiles'])->name('question-papers.files.store');
+        Route::get('/question-papers/{paper}/files/{file}/download', [TeacherQuestionPaperController::class, 'downloadFile'])->name('question-papers.files.download');
+        Route::get('/question-papers/{paper}/files/{file}/preview', [TeacherQuestionPaperController::class, 'previewFile'])->name('question-papers.files.preview');
+        Route::delete('/question-papers/{paper}/files/{file}', [TeacherQuestionPaperController::class, 'destroyFile'])->name('question-papers.files.destroy');
         Route::delete('/question-papers/{paper}', [TeacherQuestionPaperController::class, 'destroy'])->name('question-papers.destroy');
         Route::get('/exams', [\App\Http\Controllers\Portal\TeacherMcqRegistrationController::class, 'index'])->name('exams');
         Route::post('/exams/{exam}/register', [\App\Http\Controllers\Portal\TeacherMcqRegistrationController::class, 'register'])->name('exams.register');

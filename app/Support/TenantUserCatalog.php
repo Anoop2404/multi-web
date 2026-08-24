@@ -575,7 +575,7 @@ class TenantUserCatalog
         foreach ([
             '/settings', '/fee-settings', '/venues', '/combo-rules', '/grade-configs',
             '/point-rules', '/volunteers', '/participation-policy', '/clone',
-            '/backfill-level-registrations',
+            '/backfill-level-registrations', '/phases',
         ] as $segment) {
             if (str_contains($path, $segment)) {
                 return true;

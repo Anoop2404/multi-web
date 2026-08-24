@@ -80,15 +80,21 @@ class QuestionPaperModuleTest extends TestCase
                 'subject_id' => $this->subject->id,
                 'academic_year' => '2026-27',
                 'exam_name' => 'First Term',
-                'file' => UploadedFile::fake()->create('mathematics.pdf', 120, 'application/pdf'),
+                'files' => [UploadedFile::fake()->create('mathematics.pdf', 120, 'application/pdf')],
             ])
             ->assertSessionHas('success');
 
-        $paper = QuestionPaper::firstOrFail();
+        $paper = QuestionPaper::with('files')->firstOrFail();
         $this->assertSame($teacher->id, $paper->teacher_id);
         $this->assertSame($this->school->id, $paper->school_id);
         $this->assertSame('Mathematics', $paper->subject_name);
-        Storage::disk('shared')->assertExists($paper->file_path);
+        $this->assertCount(1, $paper->files);
+        Storage::disk('shared')->assertExists($paper->files->first()->file_path);
+
+        $this->actingAs($teacherUser)
+            ->get(route('portal.teacher.question-papers.files.preview', ['tenantId' => $this->school->id, 'paper' => $paper->id, 'file' => $paper->files->first()->id]))
+            ->assertOk()
+            ->assertHeader('content-disposition', 'inline; filename=mathematics.pdf');
 
         $this->actingAs($teacherUser)
             ->put(route('portal.teacher.question-papers.update', ['tenantId' => $this->school->id, 'paper' => $paper->id]), [
@@ -115,7 +121,7 @@ class QuestionPaperModuleTest extends TestCase
             ->assertNotFound();
 
         $this->actingAs($otherUser)
-            ->get(route('portal.teacher.question-papers.download', ['tenantId' => $this->school->id, 'paper' => $paper->id]))
+            ->get(route('portal.teacher.question-papers.files.download', ['tenantId' => $this->school->id, 'paper' => $paper->id, 'file' => $paper->files->first()->id]))
             ->assertNotFound();
     }
 
@@ -135,12 +141,15 @@ class QuestionPaperModuleTest extends TestCase
             'academic_year' => '2026-27',
             'title' => 'Admin Library Paper',
             'exam_name' => 'Annual Exam',
+            'uploaded_by_user_id' => $teacher->user_id,
+        ]);
+
+        $file = $paper->files()->create([
             'file_path' => $path,
             'storage_disk' => 'shared',
             'original_name' => 'science.docx',
             'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'file_size' => 81920,
-            'uploaded_by_user_id' => $teacher->user_id,
         ]);
 
         $this->actingAs($this->admin)
@@ -157,14 +166,20 @@ class QuestionPaperModuleTest extends TestCase
                 ->where('papers.data.0.teacher.name', $teacher->name));
 
         $this->actingAs($this->admin)
-            ->get(route('school.question-papers.download', ['tenantId' => $this->school->id, 'paper' => $paper->id]))
+            ->get(route('school.question-papers.download', ['tenantId' => $this->school->id, 'paper' => $paper->id, 'file' => $file->id]))
             ->assertOk()
             ->assertDownload('science.docx');
     }
 
-    public function test_teacher_cannot_upload_for_an_unassigned_subject(): void
+    /**
+     * The subject picker intentionally shows the school's full subject list, not just a
+     * teacher's own assignments — teachers routinely archive material for subjects other
+     * than their own. Only class assignment is still enforced (a teacher can't file a
+     * paper under a class they have no access to at all).
+     */
+    public function test_teacher_with_subject_assignments_can_still_upload_for_a_different_subject(): void
     {
-        [$teacherUser] = $this->makeTeacher('restricted.teacher@example.com');
+        [$teacherUser] = $this->makeTeacher('assigned.teacher@example.com');
         $otherSubject = Subject::where('code', 'PHY')->firstOrFail();
 
         $this->actingAs($teacherUser)
@@ -173,19 +188,18 @@ class QuestionPaperModuleTest extends TestCase
                 'school_class_id' => $this->schoolClass->id,
                 'subject_id' => $otherSubject->id,
                 'academic_year' => '2026-27',
-                'file' => UploadedFile::fake()->create('physics.pdf', 50, 'application/pdf'),
+                'files' => [UploadedFile::fake()->create('physics.pdf', 50, 'application/pdf')],
             ])
-            ->assertSessionHasErrors('subject_id');
+            ->assertSessionDoesntHaveErrors();
 
-        $this->assertDatabaseCount('question_papers', 0);
+        $this->assertDatabaseCount('question_papers', 1);
     }
 
     /**
      * A teacher with no subject/class assigned to their profile (common for freshly
      * created or incompletely provisioned teacher records) must still be able to upload —
      * they just get the school's full subject/class lists instead of a filtered-to-mine
-     * one, rather than being blocked outright. Mirrors the pre-existing (and unaffected by
-     * this) fallback that already applied to classes; this closes the same gap for subjects.
+     * one, rather than being blocked outright.
      */
     public function test_teacher_with_no_assignments_can_upload_for_any_subject_or_class(): void
     {
@@ -213,7 +227,7 @@ class QuestionPaperModuleTest extends TestCase
                 'school_class_id' => $this->schoolClass->id,
                 'subject_id' => $anySubject->id,
                 'academic_year' => '2026-27',
-                'file' => UploadedFile::fake()->create('physics.pdf', 50, 'application/pdf'),
+                'files' => [UploadedFile::fake()->create('physics.pdf', 50, 'application/pdf')],
             ])
             ->assertSessionDoesntHaveErrors();
 

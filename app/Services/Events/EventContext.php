@@ -329,7 +329,17 @@ class EventContext
     public function recalculateSchoolPoints(): void
     {
         $gradePointService = app(FestGradePointService::class);
-        $isOverallPublished = (bool) $this->event->results_published_at;
+        // fest_events has no results_published_at column at all (only fest_event_items
+        // and the unrelated mcq_exams table do) — this read the boolean's non-existent
+        // timestamp sibling, which Eloquent silently resolves to null/false for every
+        // event, forever. The "whole event is published, stop requiring per-item publish"
+        // bypass below has therefore never actually activated; recalculateSchoolPoints()
+        // has always required every contributing item to be individually published,
+        // even after the whole event/leaf was published via FestResultsController::
+        // publish() or FestPhasePublicationService::publishResults() (both of which only
+        // ever set the boolean results_published, never a results_published_at that
+        // doesn't exist on this table).
+        $isOverallPublished = (bool) $this->event->results_published;
 
         // Same dedupe as scoreboardByCategory()/scoreboardByPhase() above.
         // Only published items (or all items if event overall results are published) contribute to school total points.

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\QuestionPaper;
+use App\Models\QuestionPaperFile;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Teacher;
@@ -12,7 +13,6 @@ use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Support\AcademicYear;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -29,10 +29,9 @@ class TeacherQuestionPaperController extends Controller
         $papers = QuestionPaper::query()
             ->where('school_id', $school->id)
             ->where('teacher_id', $teacher->id)
-            ->with('schoolClass:id,name')
+            ->with(['schoolClass:id,name', 'files'])
             ->latest()
-            ->paginate(15)
-            ->withQueryString();
+            ->get();
 
         return inertia('Portal/Teacher/QuestionPapers', [
             'school' => $school->only('id', 'name'),
@@ -50,24 +49,24 @@ class TeacherQuestionPaperController extends Controller
         /** @var Teacher $teacher */
         $teacher = $request->attributes->get('portalTeacher');
         $school = Tenant::findOrFail($tenantId);
-        $data = $this->validated($request, true);
+        $data = $this->validated($request);
         [$class, $subject] = $this->resolveAuthorizedChoices($teacher, $school, $resolver, $data);
-        $file = $request->file('file');
-        $disk = TenantStorage::uploadDisk();
-        $path = TenantStorage::storeUploadedFile($file, "schools/{$school->id}/question-papers/{$teacher->id}", $disk);
 
-        QuestionPaper::create([
-            ...$this->paperAttributes($data, $file),
+        $paper = QuestionPaper::create([
+            'title' => $data['title'],
+            'academic_year' => $data['academic_year'],
+            'exam_name' => $data['exam_name'] ?? null,
+            'description' => $data['description'] ?? null,
             'school_id' => $school->id,
             'teacher_id' => $teacher->id,
             'school_class_id' => $class->id,
             'class_name' => $class->name,
             'subject_id' => $subject->id,
             'subject_name' => $subject->label,
-            'file_path' => $path,
-            'storage_disk' => $disk,
             'uploaded_by_user_id' => $request->user()->id,
         ]);
+
+        $this->storeFilesFor($paper, $request->file('files'), $school, $teacher);
 
         return back()->with('success', 'Question paper uploaded.');
     }
@@ -78,10 +77,17 @@ class TeacherQuestionPaperController extends Controller
         $teacher = $request->attributes->get('portalTeacher');
         $school = Tenant::findOrFail($tenantId);
         $questionPaper = $this->ownedPaper($school->id, $teacher->id, $paper);
-        $data = $this->validated($request, false);
+        $data = $request->validate([
+            'title' => 'required|string|max:255',
+            'school_class_id' => 'required|integer',
+            'subject_id' => 'required|integer',
+            'academic_year' => ['required', 'string', 'max:20', 'regex:/^\d{4}-\d{2,4}$/'],
+            'exam_name' => 'nullable|string|max:120',
+            'description' => 'nullable|string|max:2000',
+        ]);
         [$class, $subject] = $this->resolveAuthorizedChoices($teacher, $school, $resolver, $data);
 
-        $attributes = [
+        $questionPaper->update([
             'title' => $data['title'],
             'school_class_id' => $class->id,
             'class_name' => $class->name,
@@ -90,31 +96,65 @@ class TeacherQuestionPaperController extends Controller
             'academic_year' => $data['academic_year'],
             'exam_name' => $data['exam_name'] ?? null,
             'description' => $data['description'] ?? null,
-        ];
-
-        if ($request->hasFile('file')) {
-            $file = $request->file('file');
-            $disk = TenantStorage::uploadDisk();
-            $path = TenantStorage::storeUploadedFile($file, "schools/{$school->id}/question-papers/{$teacher->id}", $disk);
-            $oldPath = $questionPaper->file_path;
-            $oldDisk = $questionPaper->storage_disk;
-            $attributes = [...$attributes, ...$this->fileAttributes($file), 'file_path' => $path, 'storage_disk' => $disk];
-            $questionPaper->update($attributes);
-            $this->deleteStoredFile($oldPath, $oldDisk);
-        } else {
-            $questionPaper->update($attributes);
-        }
+        ]);
 
         return back()->with('success', 'Question paper updated.');
     }
 
-    public function download(Request $request, string $tenantId, int $paper)
+    public function storeFiles(Request $request, string $tenantId, int $paper)
+    {
+        /** @var Teacher $teacher */
+        $teacher = $request->attributes->get('portalTeacher');
+        $school = Tenant::findOrFail($tenantId);
+        $questionPaper = $this->ownedPaper($school->id, $teacher->id, $paper);
+
+        $request->validate([
+            'files' => 'required|array|min:1|max:10',
+            'files.*' => 'file|mimes:pdf,doc,docx,odt,rtf,jpg,jpeg,png|max:20480',
+        ]);
+
+        $this->storeFilesFor($questionPaper, $request->file('files'), $school, $teacher);
+
+        return back()->with('success', 'Files added.');
+    }
+
+    public function downloadFile(Request $request, string $tenantId, int $paper, int $file)
     {
         /** @var Teacher $teacher */
         $teacher = $request->attributes->get('portalTeacher');
         $questionPaper = $this->ownedPaper($tenantId, $teacher->id, $paper);
+        $questionPaperFile = $questionPaper->files()->findOrFail($file);
 
-        return TenantStorage::downloadPrivate($questionPaper->file_path, $questionPaper->storage_disk, $questionPaper->original_name);
+        return TenantStorage::downloadPrivate($questionPaperFile->file_path, $questionPaperFile->storage_disk, $questionPaperFile->original_name);
+    }
+
+    public function previewFile(Request $request, string $tenantId, int $paper, int $file)
+    {
+        /** @var Teacher $teacher */
+        $teacher = $request->attributes->get('portalTeacher');
+        $questionPaper = $this->ownedPaper($tenantId, $teacher->id, $paper);
+        $questionPaperFile = $questionPaper->files()->findOrFail($file);
+
+        return TenantStorage::downloadPrivate($questionPaperFile->file_path, $questionPaperFile->storage_disk, $questionPaperFile->original_name, inline: true);
+    }
+
+    public function destroyFile(Request $request, string $tenantId, int $paper, int $file)
+    {
+        /** @var Teacher $teacher */
+        $teacher = $request->attributes->get('portalTeacher');
+        $questionPaper = $this->ownedPaper($tenantId, $teacher->id, $paper);
+        $questionPaperFile = $questionPaper->files()->findOrFail($file);
+
+        if ($questionPaper->files()->count() <= 1) {
+            throw ValidationException::withMessages([
+                'file' => 'This is the only file on this entry — remove the whole entry instead.',
+            ]);
+        }
+
+        $this->deleteStoredFile($questionPaperFile->file_path, $questionPaperFile->storage_disk);
+        $questionPaperFile->delete();
+
+        return back()->with('success', 'File removed.');
     }
 
     public function destroy(Request $request, string $tenantId, int $paper)
@@ -122,6 +162,10 @@ class TeacherQuestionPaperController extends Controller
         /** @var Teacher $teacher */
         $teacher = $request->attributes->get('portalTeacher');
         $questionPaper = $this->ownedPaper($tenantId, $teacher->id, $paper);
+
+        foreach ($questionPaper->files as $file) {
+            $this->deleteStoredFile($file->file_path, $file->storage_disk);
+        }
         $questionPaper->delete();
 
         return back()->with('success', 'Question paper removed.');
@@ -135,8 +179,29 @@ class TeacherQuestionPaperController extends Controller
             ->findOrFail($paper);
     }
 
+    /** @param list<\Illuminate\Http\UploadedFile> $files */
+    private function storeFilesFor(QuestionPaper $paper, array $files, Tenant $school, Teacher $teacher): void
+    {
+        $order = (int) ($paper->files()->max('display_order') ?? 0) + 1;
+        $disk = TenantStorage::uploadDisk();
+
+        foreach ($files as $file) {
+            $path = TenantStorage::storeUploadedFile($file, "schools/{$school->id}/question-papers/{$teacher->id}", $disk);
+
+            QuestionPaperFile::create([
+                'question_paper_id' => $paper->id,
+                'file_path' => $path,
+                'storage_disk' => $disk,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'file_size' => $file->getSize(),
+                'display_order' => $order++,
+            ]);
+        }
+    }
+
     /** @return array<string, mixed> */
-    private function validated(Request $request, bool $fileRequired): array
+    private function validated(Request $request): array
     {
         return $request->validate([
             'title' => 'required|string|max:255',
@@ -145,7 +210,8 @@ class TeacherQuestionPaperController extends Controller
             'academic_year' => ['required', 'string', 'max:20', 'regex:/^\d{4}-\d{2,4}$/'],
             'exam_name' => 'nullable|string|max:120',
             'description' => 'nullable|string|max:2000',
-            'file' => ($fileRequired ? 'required' : 'nullable').'|file|mimes:pdf,doc,docx,odt,rtf,jpg,jpeg,png|max:20480',
+            'files' => 'required|array|min:1|max:10',
+            'files.*' => 'file|mimes:pdf,doc,docx,odt,rtf,jpg,jpeg,png|max:20480',
         ]);
     }
 
@@ -157,10 +223,7 @@ class TeacherQuestionPaperController extends Controller
             ? $assignedClasses
             : SchoolClass::where('tenant_id', $school->id)->active()->orderBy('display_order')->orderBy('name')->get(['id', 'name']);
 
-        $allSubjects = $resolver->subjects($school->parent_id);
-        $subjectIds = array_map('intval', $teacher->subject_ids ?? []);
-        $assignedSubjects = $subjectIds === [] ? collect() : $allSubjects->whereIn('id', $subjectIds);
-        $subjects = $assignedSubjects->isNotEmpty() ? $assignedSubjects : $allSubjects;
+        $subjects = $resolver->subjects($school->parent_id);
 
         return [$classes, $subjects];
     }
@@ -175,34 +238,12 @@ class TeacherQuestionPaperController extends Controller
         if (! $class || ! $subject) {
             throw ValidationException::withMessages([
                 $class ? 'subject_id' : 'school_class_id' => $class
-                    ? 'Select one of your assigned subjects.'
+                    ? 'Select a valid subject.'
                     : 'Select one of your available classes.',
             ]);
         }
 
         return [$class, $subject];
-    }
-
-    /** @return array<string, mixed> */
-    private function paperAttributes(array $data, UploadedFile $file): array
-    {
-        return [
-            'title' => $data['title'],
-            'academic_year' => $data['academic_year'],
-            'exam_name' => $data['exam_name'] ?? null,
-            'description' => $data['description'] ?? null,
-            ...$this->fileAttributes($file),
-        ];
-    }
-
-    /** @return array<string, mixed> */
-    private function fileAttributes(UploadedFile $file): array
-    {
-        return [
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getMimeType(),
-            'file_size' => $file->getSize(),
-        ];
     }
 
     private function deleteStoredFile(?string $path, ?string $disk): void

@@ -25,7 +25,7 @@ class QuestionPaperController extends SchoolAdminController
 
         $papers = QuestionPaper::query()
             ->where('school_id', $this->school->id)
-            ->with(['teacher:id,name', 'schoolClass:id,name'])
+            ->with(['teacher:id,name', 'schoolClass:id,name', 'files'])
             ->when($filters['school_class_id'] ?? null, fn ($q, $id) => $q->where('school_class_id', $id))
             ->when($filters['subject_id'] ?? null, fn ($q, $id) => $q->where('subject_id', $id))
             ->when($filters['teacher_id'] ?? null, fn ($q, $id) => $q->where('teacher_id', $id))
@@ -54,12 +54,22 @@ class QuestionPaperController extends SchoolAdminController
         ]);
     }
 
-    public function download(Request $request, string $tenantId, int $paper)
+    public function download(Request $request, string $tenantId, int $paper, int $file)
     {
         $this->assertLeadershipAccess($request);
         $questionPaper = QuestionPaper::where('school_id', $this->school->id)->findOrFail($paper);
+        $questionPaperFile = $questionPaper->files()->findOrFail($file);
 
-        return TenantStorage::downloadPrivate($questionPaper->file_path, $questionPaper->storage_disk, $questionPaper->original_name);
+        return TenantStorage::downloadPrivate($questionPaperFile->file_path, $questionPaperFile->storage_disk, $questionPaperFile->original_name);
+    }
+
+    public function preview(Request $request, string $tenantId, int $paper, int $file)
+    {
+        $this->assertLeadershipAccess($request);
+        $questionPaper = QuestionPaper::where('school_id', $this->school->id)->findOrFail($paper);
+        $questionPaperFile = $questionPaper->files()->findOrFail($file);
+
+        return TenantStorage::downloadPrivate($questionPaperFile->file_path, $questionPaperFile->storage_disk, $questionPaperFile->original_name, inline: true);
     }
 
     private function assertLeadershipAccess(Request $request): void

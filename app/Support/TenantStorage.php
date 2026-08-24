@@ -101,7 +101,7 @@ class TenantStorage
     }
 
     /** Download or stream a private file; tries recorded disk then fallbacks. */
-    public static function downloadPrivate(string $relativePath, ?string $disk = null, ?string $filename = null): BinaryFileResponse|StreamedResponse|Response
+    public static function downloadPrivate(string $relativePath, ?string $disk = null, ?string $filename = null, bool $inline = false): BinaryFileResponse|StreamedResponse|Response
     {
         $relativePath = ltrim($relativePath, '/');
         $disks = array_values(array_unique(array_filter([
@@ -116,6 +116,10 @@ class TenantStorage
             try {
                 $storage = Storage::disk($name);
                 if ($storage->exists($relativePath)) {
+                    if ($inline) {
+                        return $storage->response($relativePath, $filename);
+                    }
+
                     return $filename
                         ? $storage->download($relativePath, $filename)
                         : $storage->response($relativePath);

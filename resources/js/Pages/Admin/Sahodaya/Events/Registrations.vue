@@ -51,7 +51,7 @@
                     <label class="text-xs font-semibold text-gray-600">Filter by school</label>
                     <select v-model="form.school_id" class="field text-sm mt-1" @change="applyFilters">
                         <option value="">All schools</option>
-                        <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
+                        <option v-for="(name, id) in schoolNames" :key="id" :value="id">{{ name }}</option>
                     </select>
                 </div>
                 <div>
@@ -122,7 +122,7 @@
             :grouped-registrations="sportsGroupedRegistrations"
             :has-registrations="registrationsList.length > 0"
             :selected-ids="selectedIds"
-            :schools="schools"
+            :schools="schoolNames"
             :gender-label="genderLabel"
             :status-class="statusClass"
             :standby-count="standbyCount"
@@ -155,7 +155,7 @@
                                    :checked="selectedIds.includes(reg.id)" @change="toggleId(reg.id)">
                         </td>
                         <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
-                        <td class="p-3">{{ (schools[reg.school_id] ?? reg.school_id ?? '').toString().toUpperCase() }}</td>
+                        <td class="p-3">{{ (schoolNames[reg.school_id] ?? reg.school_id ?? '').toString().toUpperCase() }}</td>
                         <td class="p-3">{{ reg.item?.title ?? '—' }}</td>
                         <td class="p-3">
                             <span :class="statusClass(reg.status)" class="text-xs font-semibold px-2 py-0.5 rounded">
@@ -248,7 +248,7 @@
                 <div class="flex items-center justify-between gap-2">
                     <div class="min-w-0">
                         <h3 class="font-semibold">Manage participants</h3>
-                        <p class="text-xs text-gray-500 truncate">{{ manageReg.item?.title }} · {{ (schools[manageReg.school_id] ?? '').toString().toUpperCase() }}</p>
+                        <p class="text-xs text-gray-500 truncate">{{ manageReg.item?.title }} · {{ (schoolNames[manageReg.school_id] ?? '').toString().toUpperCase() }}</p>
                     </div>
                     <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl leading-none shrink-0" @click="closeManageParticipants">&times;</button>
                 </div>
@@ -432,7 +432,7 @@ import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
-    event: Object, registrations: Object, schools: Object,
+    event: Object, registrations: Object, schools: Object, schoolNames: Object,
     pendingMatchingCount: { type: Number, default: 0 },
     feeRequired: Boolean, activityLogs: { type: Array, default: () => [] },
     registerStudents: { type: Array, default: () => [] },

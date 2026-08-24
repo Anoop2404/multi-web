@@ -211,7 +211,16 @@ class FestCumulativeChampionshipService
 
     private function openingMap(FestEvent $root, FestEventPhase $phase): Collection
     {
-        $previous = $root->phases()->where(function ($query) use ($phase) {
+        // FestEvent::phases() carries its own baked-in ->orderBy('sort_order') (ascending).
+        // Chaining ->orderByDesc(...) on top of that does NOT replace it — Laravel appends
+        // additional ORDER BY clauses, so the query actually ran as
+        // "ORDER BY sort_order ASC, sort_order DESC, id DESC", where the first (ascending)
+        // clause wins outright. For any event with 3+ phases this silently picked the
+        // EARLIEST phase below the current one as "previous" instead of the closest one —
+        // e.g. phase 4's opening balance came from phase 1's closing, completely dropping
+        // phases 2 and 3's contributions from the cumulative total. reorder() clears the
+        // relationship's default ordering before applying the one this method actually needs.
+        $previous = $root->phases()->reorder()->where(function ($query) use ($phase) {
             $query->where('sort_order', '<', $phase->sort_order)
                 ->orWhere(fn ($same) => $same->where('sort_order', $phase->sort_order)->where('id', '<', $phase->id));
         })->orderByDesc('sort_order')->orderByDesc('id')->first();

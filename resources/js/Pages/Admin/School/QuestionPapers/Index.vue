@@ -45,7 +45,6 @@
                         <td class="p-3 min-w-64">
                             <p class="font-semibold text-slate-900">{{ paper.title }}</p>
                             <p v-if="paper.exam_name" class="text-xs text-slate-500 mt-0.5">{{ paper.exam_name }}</p>
-                            <p class="text-xs text-slate-400 mt-0.5 truncate max-w-72">{{ paper.original_name }} · {{ fileSize(paper.file_size) }}</p>
                         </td>
                         <td class="p-3 text-slate-700">{{ paper.school_class?.name || paper.class_name || '—' }}</td>
                         <td class="p-3 text-slate-700">{{ paper.subject_name }}</td>
@@ -53,7 +52,15 @@
                         <td class="p-3 text-slate-600">{{ paper.academic_year }}</td>
                         <td class="p-3 text-slate-500 whitespace-nowrap">{{ formatDate(paper.created_at) }}</td>
                         <td class="p-3 text-right">
-                            <a :href="`/school-admin/${school.id}/question-papers/${paper.id}/download`" class="text-indigo-700 font-semibold">Download</a>
+                            <div class="flex flex-col items-end gap-1">
+                                <div v-for="file in paper.files" :key="file.id" class="text-xs whitespace-nowrap">
+                                    <span class="text-slate-500">{{ file.original_name }} ({{ fileSize(file.file_size) }})</span>
+                                    <a v-if="isPreviewable(file)" :href="`/school-admin/${school.id}/question-papers/${paper.id}/files/${file.id}/preview`"
+                                       target="_blank" rel="noopener" class="text-indigo-700 font-semibold ml-1">Preview</a>
+                                    <a :href="`/school-admin/${school.id}/question-papers/${paper.id}/files/${file.id}/download`"
+                                       class="text-indigo-700 font-semibold ml-1">Download</a>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
@@ -110,6 +117,11 @@ function fileSize(bytes) {
     if (!value) return 'Size unavailable';
     if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
     return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function isPreviewable(file) {
+    const mime = file.mime_type || '';
+    return mime.startsWith('image/') || mime === 'application/pdf';
 }
 
 function formatDate(value) {

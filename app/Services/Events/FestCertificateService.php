@@ -337,28 +337,38 @@ class FestCertificateService
      * Cascade: item-specific -> event-specific -> tenant-wide "fest" default.
      * Falls back to the 'participation' certificate_type at each level if the exact
      * type has no template configured.
+     *
+     * The event and its parent are deliberately tried as two separate, ordered passes
+     * (this event's item-specific, then this event's event-wide, then the parent's
+     * item-specific, then the parent's event-wide) rather than one `whereIn('event_id',
+     * [...])` query relying on ->latest() to sort them out — a `whereIn` query has no
+     * way to prefer "belongs to this exact event" over "belongs to the parent event"
+     * when both exist at the same specificity tier; it would only ever prefer whichever
+     * happened to be created more recently, which silently picked the parent region's
+     * template over a region's own more specific one once both existed.
      */
     public function resolveTemplate(FestEvent $event, ?int $itemId, string $certType): ?CertificateTemplate
     {
         $tenantId = $event->tenant_id;
-        $eventIds = array_values(array_filter([$event->id, $event->parent_event_id]));
 
-        if ($itemId) {
+        foreach (array_filter([$event->id, $event->parent_event_id]) as $eventId) {
+            if ($itemId) {
+                $template = $this->templateQuery($tenantId, $certType, $event)
+                    ->where('event_id', $eventId)
+                    ->where('item_id', $itemId)
+                    ->first();
+                if ($template) {
+                    return $template;
+                }
+            }
+
             $template = $this->templateQuery($tenantId, $certType, $event)
-                ->whereIn('event_id', $eventIds)
-                ->where('item_id', $itemId)
+                ->where('event_id', $eventId)
+                ->whereNull('item_id')
                 ->first();
             if ($template) {
                 return $template;
             }
-        }
-
-        $template = $this->templateQuery($tenantId, $certType, $event)
-            ->whereIn('event_id', $eventIds)
-            ->whereNull('item_id')
-            ->first();
-        if ($template) {
-            return $template;
         }
 
         $template = $this->templateQuery($tenantId, $certType, $event)
@@ -609,11 +619,17 @@ class FestCertificateService
             ?? $payload['participant']?->registration?->school?->name
             ?? '';
 
+        $positionLabel = match ($mark?->position) {
+            1 => 'First Prize',
+            2 => 'Second Prize',
+            3 => 'Third Prize',
+            default => null,
+        };
+        $gradeSuffix = ($certType === 'winner' && $mark?->grade) ? ' with '.$mark->grade.' Grade' : '';
+
         $achievementLine = match (true) {
             $recordBreak !== null => 'set a new record',
-            $certType === 'winner' && $mark?->position === 1 => 'secured the 1st position',
-            $certType === 'winner' && $mark?->position === 2 => 'secured the 2nd position',
-            $certType === 'winner' && $mark?->position === 3 => 'secured the 3rd position',
+            $certType === 'winner' && $positionLabel !== null => 'secured '.$positionLabel.$gradeSuffix,
             $certType === 'volunteer' => 'served as a volunteer',
             $certType === 'organizer' => 'served as an organizer',
             default => 'participated',
@@ -661,6 +677,14 @@ class FestCertificateService
             'participation_type'  => $participationType,
             'event_dates'         => $eventDates,
             'achievement_line'    => $achievementLine,
+            'grade'               => $mark?->grade ?? '',
+            // Pre-rendered HTML (see participationItemsBoxHtml()) — a bordered, 2-column
+            // "Participated Items" box listing every item this person entered with its
+            // category/type, for templates that want a structured list instead of
+            // item_title's single run-on sentence. Empty string for non-participation
+            // certs and templates that don't reference the {participation_items_box}
+            // token at all.
+            'participation_items_box' => $certType === 'participation' ? $this->participationItemsBoxHtml($items, $taxonomies) : '',
             'sahodaya_name'       => $sahodaya ? strtoupper($sahodaya->name) : '',
             'certificate_date'    => now()->format('j F Y'),
         ];
@@ -725,6 +749,49 @@ class FestCertificateService
         };
 
         return ['category' => $category, 'type' => $type];
+    }
+
+    /**
+     * A bordered, 2-column "Participated Items" box — bullet, item name, and
+     * category/type per entry — for a multi-item participation certificate. Built as an
+     * HTML <table> rather than CSS grid/flexbox specifically because DomPDF (the active
+     * renderer until PDF_CONVERTER_URL/Chromium is configured, see PdfGenerator) has poor
+     * support for modern CSS layout but solid, long-standing table support — the same
+     * markup must render correctly on both engines. Every style is inlined rather than
+     * relying on a shared stylesheet class, matching how template body HTML is already
+     * hand-authored elsewhere in this codebase (fully self-contained, since a template's
+     * body is free-text an admin can paste anywhere).
+     *
+     * @param  \Illuminate\Support\Collection<int, FestEventItem>  $items
+     * @param  \Illuminate\Support\Collection<int, array{category: string, type: string}>  $taxonomies  Same order/keys as $items.
+     */
+    private function participationItemsBoxHtml(\Illuminate\Support\Collection $items, \Illuminate\Support\Collection $taxonomies): string
+    {
+        if ($items->isEmpty()) {
+            return '';
+        }
+
+        $entries = $items->values()->map(function (FestEventItem $item, int $i) use ($taxonomies) {
+            $tax = $taxonomies->get($i, ['category' => '', 'type' => '']);
+            $meta = trim(implode('  •  ', array_filter([$tax['category'] ?? '', $tax['type'] ?? ''])));
+
+            return '<span style="display:block;font-weight:700;font-size:11.5px;color:#172033;line-height:1.35;">&bull;&nbsp;'.e($item->title).'</span>'
+                .($meta !== '' ? '<span style="display:block;font-size:9.5px;color:#64748b;line-height:1.3;margin-left:12px;">'.e($meta).'</span>' : '');
+        });
+
+        $rows = '';
+        foreach ($entries->chunk(2) as $pair) {
+            $cells = $pair->map(fn ($html) => '<td style="width:50%;vertical-align:top;padding:4px 10px 4px 0;">'.$html.'</td>')->implode('');
+            if ($pair->count() === 1) {
+                $cells .= '<td style="width:50%;"></td>';
+            }
+            $rows .= '<tr>'.$cells.'</tr>';
+        }
+
+        return '<div style="border:1px solid #d6a95c;border-radius:8px;padding:10px 16px;margin:8px auto 0;max-width:94%;background:rgba(180,83,9,0.04);">'
+            .'<div style="text-align:center;font-size:10.5px;font-weight:700;letter-spacing:1.5px;color:#b45309;text-transform:uppercase;margin-bottom:6px;">&#10022;&nbsp;Participated Items&nbsp;&#10022;</div>'
+            .'<table style="width:100%;border-collapse:collapse;">'.$rows.'</table>'
+            .'</div>';
     }
 
     /** @param  list<string>  $items */

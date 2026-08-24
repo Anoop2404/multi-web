@@ -28,6 +28,14 @@
             if (is_array($value)) {
                 continue;
             }
+            // Already-rendered, self-contained HTML (FestCertificateService::
+            // participationItemsBoxHtml()) — never escaped or bold-wrapped like a plain
+            // text token, and substituted before the generic path below so it's not
+            // touched twice.
+            if ($key === 'participation_items_box') {
+                $body = str_replace('{'.$key.'}', $value, $body);
+                continue;
+            }
             $safe = e((string) $value);
             if ($boldVariables && $safe !== '') {
                 $safe = '<strong>'.$safe.'</strong>';
