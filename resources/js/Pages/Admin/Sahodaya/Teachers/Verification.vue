@@ -28,7 +28,10 @@
                     Verify all on this page ({{ pendingOnPage.length }})
                 </button>
                 <button type="button" class="btn-secondary text-sm ml-2 font-bold text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100" @click="bulkProvisionLoginsAllVerified">
-                    🔑 Assign logins (All Verified)
+                    🔑 Create Logins (New)
+                </button>
+                <button type="button" class="btn-secondary text-sm ml-2 font-bold text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100" @click="bulkProvisionLoginsAllVerifiedIncludeExisting">
+                    📧 Send Credentials (All)
                 </button>
             </template>
         </PageHeader>
@@ -223,14 +226,20 @@
                             <td class="py-3 text-xs">{{ (t.subjects || []).join(', ') || '—' }}</td>
                             <td class="py-3">
                                 <span class="status-pill text-xs" :class="t.is_verified ? 'status-pill--completed' : 'status-pill--open'">{{ t.is_verified ? 'Verified' : 'Pending' }}</span>
+                                <span v-if="t.has_login" class="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Portal login created">
+                                    🔑 {{ t.login_code || 'Active' }}
+                                </span>
                                 <p v-if="t.is_verified && t.verified_at_display" class="text-[11px] text-slate-500 mt-1">
                                     {{ t.verified_at_display }}
                                     <template v-if="t.verified_by"> · {{ t.verified_by }}</template>
                                 </p>
                             </td>
                             <td class="py-3 text-right whitespace-nowrap">
-                                <button v-if="!t.is_verified" type="button" class="text-xs font-semibold text-emerald-700 mr-3" @click="verify(t)">Verify</button>
-                                <button v-if="!t.is_verified" type="button" class="text-xs font-semibold text-red-600" @click="openReject(t)">Reject</button>
+                                <button v-if="!t.is_verified" type="button" class="text-xs font-semibold text-emerald-700 mr-2" @click="verify(t)">Verify</button>
+                                <button v-if="!t.is_verified" type="button" class="text-xs font-semibold text-red-600 mr-2" @click="openReject(t)">Reject</button>
+                                <button type="button" class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-200 hover:bg-indigo-100" @click="resendCredentials(t)">
+                                    📧 Credentials
+                                </button>
                             </td>
                         </tr>
                         <tr v-if="!(teachers?.data?.length)">
@@ -265,6 +274,36 @@
                     <button type="submit" class="btn-primary text-sm bg-red-600 hover:bg-red-700" :disabled="!rejectReason.trim()">Reject</button>
                 </div>
             </form>
+        </div>
+
+        <!-- Credentials Modal -->
+        <div v-if="credentialsModalData" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4">
+            <div class="card max-w-md w-full !p-6 bg-white rounded-xl shadow-xl">
+                <div class="flex items-center justify-between border-b pb-3 mb-4">
+                    <h3 class="text-lg font-bold text-slate-900">🔑 Teacher Credentials</h3>
+                    <button type="button" class="text-slate-400 hover:text-slate-600 font-bold" @click="credentialsModalData = null">✕</button>
+                </div>
+                <p class="text-sm text-slate-600 mb-4">
+                    Credentials generated for <strong>{{ credentialsModalData.teacher_name }}</strong>:
+                </p>
+                <div class="bg-indigo-50/70 p-4 rounded-lg border border-indigo-200 space-y-3 font-mono text-sm mb-4">
+                    <div>
+                        <span class="text-indigo-500 text-xs font-sans font-bold uppercase block">Username / Login Code</span>
+                        <span class="font-bold text-indigo-950 text-base">{{ credentialsModalData.username }}</span>
+                    </div>
+                    <div>
+                        <span class="text-indigo-500 text-xs font-sans font-bold uppercase block">Temporary Password</span>
+                        <span class="font-bold text-emerald-700 text-base">{{ credentialsModalData.password }}</span>
+                    </div>
+                    <div>
+                        <span class="text-indigo-500 text-xs font-sans font-bold uppercase block">Portal URL</span>
+                        <span class="text-xs text-slate-600 font-sans font-medium underline">https://malappuramcentralsahodaya.org/portal/login</span>
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" class="btn-primary text-sm" @click="credentialsModalData = null">Close</button>
+                </div>
+            </div>
         </div>
     </SahodayaAdminLayout>
 </template>
@@ -451,6 +490,34 @@ function bulkProvisionLoginsAllVerified() {
 
     router.post(`${base}/teachers/verification/bulk-provision-logins`, {
         provision_all_verified: true,
+        school_id: props.selectedSchool ? props.selectedSchool.id : (props.filters?.school_id || null),
+    }, {
+        preserveScroll: true,
+        onSuccess: () => { selectedIds.value = []; },
+    });
+}
+
+const credentialsModalData = ref(null);
+
+function resendCredentials(teacher) {
+    if (!confirm(`Generate/resend portal username and temporary password for ${teacher.name}?`)) return;
+    router.post(`${base}/teachers/${teacher.id}/resend-credentials`, {}, {
+        preserveScroll: true,
+        onSuccess: (page) => {
+            if (page.props.flash?.newCredentials) {
+                credentialsModalData.value = page.props.flash.newCredentials;
+            }
+        },
+    });
+}
+
+function bulkProvisionLoginsAllVerifiedIncludeExisting() {
+    const scopeName = props.selectedSchool ? props.selectedSchool.name : 'all schools';
+    if (!confirm(`Send username and temporary password credentials to ALL verified teachers in ${scopeName} (including existing logins)?`)) return;
+
+    router.post(`${base}/teachers/verification/bulk-provision-logins`, {
+        provision_all_verified: true,
+        include_existing: true,
         school_id: props.selectedSchool ? props.selectedSchool.id : (props.filters?.school_id || null),
     }, {
         preserveScroll: true,

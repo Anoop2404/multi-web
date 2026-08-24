@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Http\Controllers\Concerns\ManagesTeacherPortalCredentials;
 use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\Tenant;
@@ -14,6 +15,7 @@ use Illuminate\Support\Collection;
 
 class TeacherVerificationController extends SahodayaAdminController
 {
+    use ManagesTeacherPortalCredentials;
     /** @var Collection<int, string>|null */
     private ?Collection $subjectLabelMap = null;
 
@@ -284,12 +286,15 @@ class TeacherVerificationController extends SahodayaAdminController
             'teacher_ids'            => 'nullable|array',
             'teacher_ids.*'          => 'integer',
             'provision_all_verified' => 'boolean',
+            'include_existing'       => 'nullable|boolean',
             'school_id'              => 'nullable|string',
         ]);
 
         $schoolIds = $this->membershipRegionScopedSchoolIds(
             Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id')->all()
         );
+
+        $includeExisting = (bool) ($data['include_existing'] ?? false);
 
         if (! empty($data['teacher_ids'])) {
             $query = Teacher::whereIn('tenant_id', $schoolIds)
@@ -299,21 +304,19 @@ class TeacherVerificationController extends SahodayaAdminController
             $query = Teacher::whereIn('tenant_id', $schoolIds)
                 ->where('status', 'active')
                 ->whereNotNull('verified_at')
-                ->whereNull('user_id')
+                ->when(! $includeExisting, fn ($q) => $q->whereNull('user_id'))
                 ->when(! empty($data['school_id']), fn ($q) => $q->where('tenant_id', $data['school_id']));
         } else {
             abort(422, 'Select teachers or choose create logins for all verified teachers.');
         }
 
-        // Limit to 100 per request to guarantee sub-second execution speed
-        $teachers = (clone $query)->limit(100)->get();
+        // Limit to 50 per request for email delivery & sub-second processing speed
+        $teachers = (clone $query)->limit(50)->get();
         $provisioner = app(\App\Services\Portal\TeacherPortalProvisioner::class);
+        $credentialService = app(\App\Services\Auth\UserCredentialService::class);
 
         $successCount = 0;
         $errors = [];
-
-        // Temporarily switch mailer to array to prevent synchronous SMTP connection overhead during bulk creation
-        config(['mail.default' => 'array']);
 
         foreach ($teachers as $teacher) {
             $email = $teacher->email;
@@ -323,7 +326,14 @@ class TeacherVerificationController extends SahodayaAdminController
             }
 
             try {
-                $provisioner->provision($teacher, $email);
+                if (! $teacher->user_id) {
+                    $result = $provisioner->provision($teacher, $email);
+                    $this->sendTeacherCredentialsMail($teacher->fresh(), $result['password']);
+                } else {
+                    $user = User::findOrFail($teacher->user_id);
+                    $result = $credentialService->resetPassword($user, $request->user()?->id);
+                    $this->sendTeacherCredentialsMail($teacher->fresh(), $result['password']);
+                }
                 $successCount++;
             } catch (\Throwable $e) {
                 $errors[] = "{$teacher->name}: {$e->getMessage()}";
@@ -333,20 +343,59 @@ class TeacherVerificationController extends SahodayaAdminController
         $remainingQuery = Teacher::whereIn('tenant_id', $schoolIds)
             ->where('status', 'active')
             ->whereNotNull('verified_at')
-            ->whereNull('user_id')
+            ->when(! $includeExisting, fn ($q) => $q->whereNull('user_id'))
             ->when(! empty($data['school_id']), fn ($q) => $q->where('tenant_id', $data['school_id']));
 
         $remainingCount = $remainingQuery->count();
 
-        $msg = "Provisioned portal logins for {$successCount} teacher(s).";
+        $msg = "Sent username & temporary password credentials to {$successCount} teacher(s).";
         if ($remainingCount > 0) {
-            $msg .= " ({$remainingCount} verified teacher(s) remaining — click Assign Logins again to process next batch).";
+            $msg .= " ({$remainingCount} verified teacher(s) remaining — click Send Credentials again to process next batch).";
         }
         if (! empty($errors)) {
             $msg .= " Note: " . implode(' | ', array_slice($errors, 0, 2));
         }
 
         return back()->with('success', $msg);
+    }
+
+    public function resendCredentials(Request $request, string $tenantId, Teacher $teacher)
+    {
+        $this->assertStaffCan('membership.manage');
+        abort_if($teacher->tenant?->parent_id !== $this->sahodaya->id, 403);
+        abort_if($this->membershipRegionScopedSchoolIds([$teacher->tenant_id]) === [], 403);
+
+        $email = $teacher->email;
+        if (! $email) {
+            return back()->with('error', 'Teacher does not have an email address.');
+        }
+
+        if (! $teacher->user_id) {
+            $result = app(\App\Services\Portal\TeacherPortalProvisioner::class)->provision($teacher, $email);
+            $plainPassword = $result['password'];
+        } else {
+            $user = User::findOrFail($teacher->user_id);
+            $result = app(\App\Services\Auth\UserCredentialService::class)->resetPassword($user, $request->user()?->id);
+            $plainPassword = $result['password'];
+        }
+
+        $teacherFresh = $teacher->fresh();
+        $sent = $this->sendTeacherCredentialsMail($teacherFresh, $plainPassword);
+
+        $loginCode = $teacherFresh->login_code ?? $teacherFresh->user?->username ?? '—';
+
+        $msg = $sent
+            ? "Credentials emailed to {$teacher->name} ({$email}). Username: {$loginCode}"
+            : "Generated credentials for {$teacher->name}. Username: {$loginCode}, Password: {$plainPassword}";
+
+        return back()->with([
+            'success'        => $msg,
+            'newCredentials' => [
+                'username'     => $loginCode,
+                'password'     => $plainPassword,
+                'teacher_name' => $teacher->name,
+            ],
+        ]);
     }
 
     /** Notify a school's admin/staff users from a NotificationTemplate slug. */
@@ -363,6 +412,7 @@ class TeacherVerificationController extends SahodayaAdminController
     private function mapTeacher(Teacher $teacher): array
     {
         $school = Tenant::find($teacher->tenant_id);
+        $teacher->loadMissing('user:id,username');
 
         return [
             'id'              => $teacher->id,
@@ -381,6 +431,8 @@ class TeacherVerificationController extends SahodayaAdminController
             'school_id'       => $teacher->tenant_id,
             'school_name'     => $school?->name,
             'is_verified'     => $teacher->isVerified(),
+            'has_login'       => ! empty($teacher->user_id),
+            'login_code'      => $teacher->login_code ?? $teacher->user?->username,
             'verified_at'     => $teacher->verified_at?->toIso8601String(),
             'verified_at_display' => $teacher->verified_at?->format('j M Y'),
             'verified_by'     => $teacher->verifiedBy?->name ?? $teacher->verifiedBy?->email,

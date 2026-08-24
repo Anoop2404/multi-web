@@ -944,6 +944,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/teachers/verification', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'index'])->name('teachers.verification.index');
         Route::post('/teachers/verification/bulk-verify', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'bulkVerify'])->name('teachers.verification.bulk');
         Route::post('/teachers/verification/bulk-provision-logins', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'bulkProvisionLogins'])->name('teachers.verification.bulk-provision-logins');
+        Route::post('/teachers/{teacher}/resend-credentials', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'resendCredentials'])->name('teachers.resend-credentials');
         Route::post('/teachers/{teacher}/verify', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'verify'])->name('teachers.verification.verify');
         Route::post('/teachers/{teacher}/reject', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'reject'])->name('teachers.verification.reject');
         Route::get('/teachers/{teacher}', [\App\Http\Controllers\SahodayaAdmin\TeacherProfileController::class, 'show'])->name('teachers.show');
