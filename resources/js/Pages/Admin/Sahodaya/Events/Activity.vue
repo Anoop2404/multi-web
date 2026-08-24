@@ -134,6 +134,33 @@
                         </div>
                     </div>
 
+                    <!-- Submitted Mark & Score Summary Card -->
+                    <div v-if="selectedLog.properties?.score !== undefined || selectedLog.properties?.grade || selectedLog.properties?.position" class="rounded-xl bg-amber-50/70 border border-amber-200 p-4">
+                        <h4 class="font-bold text-amber-900 mb-2 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                            📊 Submitted Mark & Score Data
+                        </h4>
+                        <div class="grid grid-cols-3 gap-3 text-center">
+                            <div class="rounded-lg bg-white p-2 border border-amber-200/60 shadow-sm">
+                                <div class="text-[10px] uppercase font-bold text-amber-700">Rank / Position</div>
+                                <div class="text-base font-extrabold text-amber-900">{{ selectedLog.properties?.position ? `#${selectedLog.properties.position}` : '—' }}</div>
+                            </div>
+                            <div class="rounded-lg bg-white p-2 border border-amber-200/60 shadow-sm">
+                                <div class="text-[10px] uppercase font-bold text-amber-700">Total Score</div>
+                                <div class="text-base font-extrabold text-amber-900">{{ selectedLog.properties?.score !== null && selectedLog.properties?.score !== undefined ? selectedLog.properties.score : '—' }}</div>
+                            </div>
+                            <div class="rounded-lg bg-white p-2 border border-amber-200/60 shadow-sm">
+                                <div class="text-[10px] uppercase font-bold text-amber-700">Grade</div>
+                                <div class="text-base font-extrabold text-amber-900">{{ selectedLog.properties?.grade ? `Grade ${selectedLog.properties.grade}` : '—' }}</div>
+                            </div>
+                        </div>
+                        <div v-if="selectedLog.properties?.judge_scores" class="mt-3 text-xs text-amber-900">
+                            <span class="font-semibold text-amber-800">Judge Breakdown: </span>
+                            <span class="font-mono bg-white px-2 py-0.5 rounded border border-amber-200 text-amber-950 font-bold">
+                                {{ Array.isArray(selectedLog.properties.judge_scores) ? selectedLog.properties.judge_scores.join(', ') : JSON.stringify(selectedLog.properties.judge_scores) }}
+                            </span>
+                        </div>
+                    </div>
+
                     <!-- Submitted Properties / Post Data -->
                     <div>
                         <h4 class="font-bold text-slate-700 mb-2 uppercase tracking-wider text-[10px]">Submitted Post Data & Properties</h4>

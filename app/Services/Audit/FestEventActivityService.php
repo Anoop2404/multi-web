@@ -148,11 +148,16 @@ class FestEventActivityService
         }
 
         $participantsMap = collect();
+        $marksMap = collect();
         if (! empty($missingParticipantIds)) {
             $participantsMap = FestParticipant::whereIn('id', array_unique($missingParticipantIds))
                 ->with(['student', 'teacher', 'group', 'registration.school', 'registration.item'])
                 ->get()
                 ->keyBy('id');
+
+            $marksMap = \App\Models\FestMark::whereIn('participant_id', array_unique($missingParticipantIds))
+                ->get()
+                ->keyBy('participant_id');
         }
 
         $itemsMap = collect();
@@ -164,7 +169,7 @@ class FestEventActivityService
 
         $scoreboards = app(PublicFestScoreboardService::class);
 
-        $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $itemsMap, $event, $scoreboards) {
+        $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $marksMap, $itemsMap, $event, $scoreboards) {
             $props = $log->properties ?? [];
             $pid = $props['participant_id'] ?? null;
             if (! $pid && preg_match('/participant\s+#(\d+)/i', $log->description, $matches)) {
@@ -172,6 +177,26 @@ class FestEventActivityService
             }
 
             $participant = $pid ? $participantsMap->get((int) $pid) : null;
+            $markRecord = $pid ? $marksMap->get((int) $pid) : null;
+
+            if ($markRecord) {
+                if (! isset($props['score']) && $markRecord->score !== null) {
+                    $props['score'] = (float) $markRecord->score;
+                }
+                if (! isset($props['grade']) && $markRecord->grade !== null) {
+                    $props['grade'] = $markRecord->grade;
+                }
+                if (! isset($props['position']) && $markRecord->position !== null) {
+                    $props['position'] = (int) $markRecord->position;
+                }
+                if (! isset($props['measurement_value']) && $markRecord->measurement_value !== null) {
+                    $props['measurement_value'] = $markRecord->measurement_value;
+                    $props['measurement_unit'] = $markRecord->measurement_unit;
+                }
+                if (! isset($props['judge_scores']) && ! empty($markRecord->ref_data_json['judge_scores'])) {
+                    $props['judge_scores'] = $markRecord->ref_data_json['judge_scores'];
+                }
+            }
             $personName = $props['participant'] ?? $participant?->student?->name ?? $participant?->teacher?->name ?? $participant?->group?->name;
             $chestNo = $props['chest_no'] ?? $participant?->group?->chest_no ?? $participant?->chest_no;
             $schoolName = $props['school'] ?? $participant?->registration?->school?->name;

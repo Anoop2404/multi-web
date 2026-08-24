@@ -331,16 +331,19 @@ class FestMarkEntryController extends SahodayaAdminController
         $logDescription = "Mark saved for {$chestLabel} - {$participantName}{$schoolLabel}{$itemTitle}{$detailStr}";
 
         $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.saved', $logDescription, [
-            'participant_id' => $data['participant_id'],
-            'item_id'        => $data['item_id'],
-            'chest_no'       => $chestNo,
-            'participant'    => $participantName,
-            'school'         => $schoolName,
-            'item_title'     => $item?->title,
-            'position'       => $data['position'] ?? null,
-            'score'          => $data['score'] ?? null,
-            'grade'          => $data['grade'] ?? null,
-            'team_size'      => count($teamParticipantIds),
+            'participant_id'    => $data['participant_id'],
+            'item_id'           => $data['item_id'],
+            'chest_no'          => $chestNo,
+            'participant'       => $participantName,
+            'school'            => $schoolName,
+            'item_title'        => $item?->title,
+            'position'          => $data['position'] ?? null,
+            'score'             => $data['score'] ?? null,
+            'grade'             => $data['grade'] ?? null,
+            'measurement_value' => $data['measurement_value'] ?? null,
+            'measurement_unit'  => $data['measurement_unit'] ?? null,
+            'judge_scores'      => $judgeScores ?? null,
+            'team_size'         => count($teamParticipantIds),
         ]);
 
         return back()->with('success', $result['message'] ?? 'Mark saved.');
