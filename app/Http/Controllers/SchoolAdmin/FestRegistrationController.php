@@ -840,7 +840,39 @@ class FestRegistrationController extends SchoolAdminController
         $event->setAttribute('payment_qr_code_url', $event->paymentQrCodeUrl());
 
         $feeRequired = $feeService->feeRequired($event);
+        if ($event->source_phase_id) {
+            $event->loadMissing('items.phase');
+        }
         $enabledItems = $event->items->filter(fn ($i) => ($i->is_enabled ?? true));
+        if ($event->source_phase_id) {
+            // A phased_regional_billing leaf's item table can hold items whose
+            // phase_id resolves (via FestEventPhase::sourcePhase, one hop — the same
+            // walk FestRegistrationRouterService::resolvePhasedTarget() does) to a
+            // DIFFERENT phase than this leaf's own source_phase_id — e.g. the Phase 1
+            // leaf's rows including a handful of Phase 2 items. Registering one of
+            // those from here doesn't error: the router silently routes the write to
+            // the OTHER phase's operational event, so the school sees a success toast
+            // but the item never shows as registered on the page they submitted from
+            // (confirmed live on Wayanad Sahodaya — event 5 "PHASE 1" listed all 141
+            // hub items instead of just its own 74, and "Light Music-Malayalam" /code
+            // 104, phase_id resolving to PHASE 2, silently landed a registration under
+            // event 6 instead). Keep only items whose canonical phase matches this
+            // leaf's own, so a mistagged/foreign-phase item can never be offered here
+            // in the first place — same fix needed regardless of which item(s) are
+            // currently mistagged, and self-healing if more turn up later.
+            $enabledItems = $enabledItems->filter(function ($i) use ($event) {
+                if (! $i->phase_id) {
+                    return true;
+                }
+                $phase = $i->phase;
+                if (! $phase) {
+                    return true;
+                }
+                $canonicalPhaseId = $phase->source_phase_id ?: $phase->id;
+
+                return $canonicalPhaseId === $event->source_phase_id;
+            });
+        }
         if ($headId !== null) {
             $enabledItems = $enabledItems->filter(fn ($i) => (int) ($i->head_id ?? 0) === $headId);
         }
