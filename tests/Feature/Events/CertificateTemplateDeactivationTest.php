@@ -162,4 +162,54 @@ class CertificateTemplateDeactivationTest extends TestCase
         $this->assertSame(1, CertificateTemplate::where('tenant_id', $sahodaya->id)
             ->where('title', 'Sahodaya Default')->count());
     }
+
+    /**
+     * Regression test: update()'s validate() call previously had no event_id/item_id
+     * rules at all, so Illuminate\Http\Request::validate() silently dropped both from
+     * $data regardless of what the admin picked in the edit form's Event/Item dropdowns
+     * — a template could never actually be moved to a different event after creation.
+     */
+    public function test_updating_a_template_can_change_its_event(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $eventOne] = $this->makeSahodayaAdminAndEvent();
+        $eventTwo = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Second Event', 'event_type' => 'kalolsavam']);
+
+        $template = CertificateTemplate::create([
+            'tenant_id' => $sahodaya->id, 'event_type' => 'fest', 'event_id' => $eventOne->id,
+            'certificate_type' => 'winner', 'title' => 'Movable Template', 'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('sahodaya.certificate-templates.update', [
+            'tenantId' => $sahodaya->id, 'template' => $template->id,
+        ]), ['event_id' => $eventTwo->id]);
+
+        $response->assertRedirect();
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertSame($eventTwo->id, $template->fresh()->event_id);
+    }
+
+    public function test_updating_a_template_into_an_occupied_scope_deactivates_the_incumbent_there(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $eventOne] = $this->makeSahodayaAdminAndEvent();
+        $eventTwo = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Second Event', 'event_type' => 'kalolsavam']);
+
+        $incumbent = CertificateTemplate::create([
+            'tenant_id' => $sahodaya->id, 'event_type' => 'fest', 'event_id' => $eventTwo->id,
+            'certificate_type' => 'winner', 'title' => 'Already At Event Two', 'is_active' => true,
+        ]);
+        $mover = CertificateTemplate::create([
+            'tenant_id' => $sahodaya->id, 'event_type' => 'fest', 'event_id' => $eventOne->id,
+            'certificate_type' => 'winner', 'title' => 'Moving In', 'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('sahodaya.certificate-templates.update', [
+            'tenantId' => $sahodaya->id, 'template' => $mover->id,
+        ]), ['event_id' => $eventTwo->id, 'is_active' => true]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', fn ($message) => str_contains($message, '1 existing template(s)'));
+        $this->assertFalse($incumbent->fresh()->is_active, 'Moving a template into an occupied scope must deactivate the one already there.');
+        $this->assertTrue($mover->fresh()->is_active);
+        $this->assertSame($eventTwo->id, $mover->fresh()->event_id);
+    }
 }

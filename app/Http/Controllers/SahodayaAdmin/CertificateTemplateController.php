@@ -323,6 +323,13 @@ class CertificateTemplateController extends SahodayaAdminController
         $data = $request->validate([
             'title'               => 'nullable|string|max:255',
             'body'                => 'nullable|string',
+            // event_id/item_id were missing here entirely — Illuminate\Http\Request::
+            // validate() only returns keys listed in its rules, so any event/item change
+            // submitted from the edit form was silently discarded below regardless of
+            // what the admin picked in the dropdown. store() already validated these
+            // correctly; this mirrors it.
+            'event_id'            => 'nullable|integer|exists:fest_events,id',
+            'item_id'             => 'nullable|integer|exists:fest_event_items,id',
             'template_file'       => 'nullable|file|mimes:pdf,png,jpg,jpeg|max:10240',
             'logo'                => 'nullable|image|max:2048',
             'seal'                => 'nullable|image|max:2048',
@@ -375,6 +382,16 @@ class CertificateTemplateController extends SahodayaAdminController
             'is_active'           => 'nullable|boolean',
         ]);
 
+        if (array_key_exists('event_id', $data) && ! empty($data['event_id'])) {
+            $event = FestEvent::where('id', $data['event_id'])->where('tenant_id', $this->sahodaya->id)->first();
+            abort_unless($event, 422, 'Event does not belong to this Sahodaya.');
+            if (! empty($data['item_id'])) {
+                abort_unless($event->items()->where('id', $data['item_id'])->exists(), 422, 'Item does not belong to the selected event.');
+            }
+        } elseif (empty($data['event_id'] ?? null) && ! empty($data['item_id'])) {
+            abort(422, 'Select an event before choosing an item.');
+        }
+
         $baseDir = 'sahodaya/'.$this->sahodaya->id.'/certificate-templates';
         $disk = TenantStorage::uploadDisk();
         $updates = array_filter([
@@ -426,13 +443,28 @@ class CertificateTemplateController extends SahodayaAdminController
             );
         }
 
+        if (array_key_exists('event_id', $data)) {
+            $updates['event_id'] = $data['event_id'];
+        }
+        if (array_key_exists('item_id', $data)) {
+            $updates['item_id'] = $data['item_id'];
+        }
+
+        // The scope this save is actually landing on — not necessarily $template's current
+        // event_id/item_id, since this request may itself be moving the template to a
+        // different event (see the event_id/item_id validation above). The dedup check
+        // below must guard the *destination* scope, or moving a template onto an event
+        // that already has an active one there silently leaves two active at once.
+        $targetEventId = array_key_exists('event_id', $data) ? $data['event_id'] : $template->event_id;
+        $targetItemId = array_key_exists('item_id', $data) ? $data['item_id'] : $template->item_id;
+
         $deactivatedCount = 0;
         if (array_key_exists('is_active', $data) && $data['is_active']) {
             $deactivatedCount = CertificateTemplate::where('tenant_id', $this->sahodaya->id)
                 ->where('event_type', $template->event_type)
                 ->where('certificate_type', $template->certificate_type)
-                ->when($template->event_id, fn ($q) => $q->where('event_id', $template->event_id), fn ($q) => $q->whereNull('event_id'))
-                ->when($template->item_id, fn ($q) => $q->where('item_id', $template->item_id), fn ($q) => $q->whereNull('item_id'))
+                ->when($targetEventId, fn ($q) => $q->where('event_id', $targetEventId), fn ($q) => $q->whereNull('event_id'))
+                ->when($targetItemId, fn ($q) => $q->where('item_id', $targetItemId), fn ($q) => $q->whereNull('item_id'))
                 ->where('id', '!=', $template->id)
                 ->update(['is_active' => false]);
             $updates['is_active'] = true;
