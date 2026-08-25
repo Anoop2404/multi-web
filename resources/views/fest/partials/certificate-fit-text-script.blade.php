@@ -93,18 +93,22 @@
         return true;
     }
 
-    // certificate-body.blade.php's overlayFieldStyle() gives the body field an explicit
-    // CSS `bottom` when the template configures one (the artwork's own fillable-zone
-    // edge, e.g. just above a "Congratulations" graphic) — position:absolute with both
-    // top and bottom set gives the box a fixed height, so its own offsetTop+offsetHeight
-    // *is* that edge regardless of how tall the content inside has grown. That's a much
-    // more reliable boundary than the next-field heuristic below, which was guessing from
-    // wherever the date/uuid fields happen to be (often far below the artwork's actual
-    // usable area, e.g. a uuid pinned near the page's bottom edge) and let long content
-    // visually run into background art the script has no other way to know about.
+    // certificate-body.blade.php stamps a `data-zone-bottom` percentage on the body field
+    // when the template configures one (the artwork's own fillable-zone edge, e.g. just
+    // above a "Congratulations" graphic) — deliberately a plain data value and not a CSS
+    // `bottom`: giving the element itself an explicit top+bottom-stretched height would
+    // make its scrollHeight clamp to that box height regardless of actual content size
+    // (scrollHeight can never report less than the element's own height), which silently
+    // defeats the overflow check below for any content shorter than the zone. Reading it
+    // as data keeps the element auto-height (scrollHeight stays a true content measure)
+    // while still giving a far more reliable boundary than the next-field heuristic this
+    // falls back to, which was guessing from wherever the date/uuid fields happen to be
+    // (often far below the artwork's actual usable area) and let long content visually run
+    // into background art the script has no other way to know about.
     function computeAllowedBottom(page, body, dateEl, uuidEl) {
-        if (getComputedStyle(body).bottom !== 'auto') {
-            return body.offsetTop + body.offsetHeight;
+        var zoneBottomPct = parseFloat(body.getAttribute('data-zone-bottom'));
+        if (!isNaN(zoneBottomPct)) {
+            return page.offsetHeight * (1 - zoneBottomPct / 100);
         }
         var nextTops = [dateEl, uuidEl].filter(Boolean).map(function (e) {
             return e.offsetTop;
@@ -123,8 +127,18 @@
         }
 
         if (body) {
-            fitTextToBox(body, 6, computeAllowedBottom(page, body, dateEl, uuidEl), truncateItemList);
-            centerWithinZone(body);
+            var allowedBottom = computeAllowedBottom(page, body, dateEl, uuidEl);
+            // floorPx = the body's own configured size, not a small fallback like the
+            // recipient field uses above: the participated-items box is already bounded by
+            // a hard cap server-side (see participationItemsBoxHtml()'s 7-item limit in
+            // FestCertificateService.php), so there's no real content this ever needs to
+            // shrink to protect. Letting it shrink anyway made borderline item counts
+            // render visibly smaller than the 1-3 item common case for no benefit —
+            // truncateItemList (the sentence-style ">3 items" cap) is the only correction
+            // still wired up here, unrelated to the box's own PHP-side cap.
+            var bodyOriginalSize = parseFloat(getComputedStyle(body).fontSize) || 6;
+            fitTextToBox(body, bodyOriginalSize, allowedBottom, truncateItemList);
+            centerWithinZone(body, allowedBottom);
         }
     }
 
@@ -136,13 +150,14 @@
     // graphic reads as "unfinished," while the same space just below the photo reads as
     // normal breathing room. Skipped entirely when content still fills/overflows the zone,
     // so this never fights the shrink pass.
-    function centerWithinZone(el) {
-        if (getComputedStyle(el).bottom === 'auto') {
+    function centerWithinZone(el, allowedBottom) {
+        var zoneBottomAttr = el.getAttribute('data-zone-bottom');
+        if (!zoneBottomAttr) {
             return;
         }
-        var slack = el.offsetHeight - el.scrollHeight;
+        var slack = allowedBottom - (el.offsetTop + el.scrollHeight);
         if (slack > 0) {
-            el.style.top = (el.offsetTop + slack * 0) + 'px';
+            el.style.top = (el.offsetTop + slack * 0.75) + 'px';
         }
     }
 

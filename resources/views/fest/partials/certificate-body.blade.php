@@ -68,8 +68,13 @@
                      style="top:{{ $ph['top'] ?? 31 }}%;left:{{ $ph['left'] ?? 50 }}%;width:{{ $ph['size'] ?? 118 }}px;height:{{ $ph['size'] ?? 118 }}px;transform:translateX(-50%);">
             @endif
 
-            @if(! $showParticipationLabel)
-                @php $c = $layout['participation_label_cover'] ?? []; @endphp
+            @php $c = $layout['participation_label_cover'] ?? []; @endphp
+            {{-- No positional UI exists for this yet — only render when a real position
+                 has actually been configured (see CertificateTemplate::defaultBackgroundLayout()).
+                 Guessing a position here previously painted a same-shaped patch over
+                 whatever art happened to be there on every template that unchecked
+                 "Show participation label," regardless of whether anything needed covering. --}}
+            @if(! $showParticipationLabel && ! empty($c))
                 <div class="overlay-field" style="top:{{ $c['top'] ?? 28 }}%;left:{{ $c['left'] ?? 18 }}%;width:{{ $c['width'] ?? 64 }}%;height:{{ $c['height'] ?? 7 }}%;background:#f7f3e8;border-radius:2px;"></div>
             @endif
 
@@ -81,7 +86,15 @@
             @endif
 
             @php $b = $layout['body'] ?? []; @endphp
-            <div class="overlay-field body" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($b, ['top' => 48, 'left' => 12, 'width' => 76, 'font_size' => 12.5, 'font_family' => 'Montserrat']) }}">
+            {{-- data-zone-bottom (not a CSS property): the artwork's fillable-zone edge as
+                 a plain percentage for certificate-fit-text-script.blade.php to read. Kept
+                 out of the element's own CSS box (no `bottom` style) deliberately — giving
+                 this element an explicit top+bottom-stretched height would make its own
+                 scrollHeight clamp to that height regardless of actual content size
+                 (scrollHeight can never report less than the box's own height), breaking
+                 the script's overflow check. Auto-height + a plain data value keeps
+                 scrollHeight meaningful while still telling the script where the zone ends. --}}
+            <div class="overlay-field body" data-zone-bottom="{{ $b['bottom'] ?? '' }}" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($b, ['top' => 48, 'left' => 12, 'width' => 76, 'font_size' => 12.5, 'font_family' => 'Montserrat']) }}">
                 @foreach($paragraphs as $paragraph)
                     <p style="margin-bottom:8px;">{!! nl2br($paragraph) !!}</p>
                 @endforeach

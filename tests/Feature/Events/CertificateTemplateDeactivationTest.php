@@ -101,4 +101,65 @@ class CertificateTemplateDeactivationTest extends TestCase
         $this->assertFalse($active->fresh()->is_active);
         $this->assertTrue($draft->fresh()->is_active);
     }
+
+    public function test_also_apply_to_event_ids_creates_an_independent_copy_per_event(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $eventOne] = $this->makeSahodayaAdminAndEvent();
+        $eventTwo = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Second Event', 'event_type' => 'kalolsavam']);
+        $eventThree = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Third Event', 'event_type' => 'kalolsavam']);
+
+        $response = $this->actingAs($admin)->post(route('sahodaya.certificate-templates.store', [
+            'tenantId' => $sahodaya->id,
+        ]), [
+            'event_type'              => 'fest',
+            'event_id'                => $eventOne->id,
+            'certificate_type'        => 'participation',
+            'title'                   => 'Shared Design',
+            'is_active'               => true,
+            'also_apply_to_event_ids' => [$eventTwo->id, $eventThree->id],
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', fn ($message) => str_contains($message, 'applied to 3 events'));
+
+        $templates = CertificateTemplate::where('tenant_id', $sahodaya->id)
+            ->where('certificate_type', 'participation')
+            ->where('title', 'Shared Design')
+            ->get();
+
+        $this->assertCount(3, $templates);
+        $this->assertSame(
+            [$eventOne->id, $eventTwo->id, $eventThree->id],
+            $templates->pluck('event_id')->sort()->values()->all()
+        );
+        $this->assertTrue($templates->every(fn (CertificateTemplate $t) => $t->item_id === null));
+
+        // Editing the copy for event two afterwards must not touch event one or three's rows.
+        $eventTwoTemplate = $templates->firstWhere('event_id', $eventTwo->id);
+        $eventTwoTemplate->update(['title' => 'Edited For Event Two Only']);
+        $this->assertSame('Shared Design', $templates->firstWhere('event_id', $eventOne->id)->fresh()->title);
+        $this->assertSame('Shared Design', $templates->firstWhere('event_id', $eventThree->id)->fresh()->title);
+    }
+
+    public function test_also_apply_to_event_ids_is_ignored_without_a_primary_event(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin] = $this->makeSahodayaAdminAndEvent();
+        $eventTwo = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Second Event', 'event_type' => 'kalolsavam']);
+
+        $response = $this->actingAs($admin)->post(route('sahodaya.certificate-templates.store', [
+            'tenantId' => $sahodaya->id,
+        ]), [
+            'event_type'              => 'fest',
+            'event_id'                => null,
+            'certificate_type'        => 'participation',
+            'title'                   => 'Sahodaya Default',
+            'is_active'               => true,
+            'also_apply_to_event_ids' => [$eventTwo->id],
+        ]);
+
+        $response->assertRedirect();
+
+        $this->assertSame(1, CertificateTemplate::where('tenant_id', $sahodaya->id)
+            ->where('title', 'Sahodaya Default')->count());
+    }
 }

@@ -192,6 +192,8 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.participation_label_cover.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.participation_label_cover.height' => 'nullable|numeric|min:1|max:30',
             'is_active'           => 'nullable|boolean',
+            'also_apply_to_event_ids'   => 'nullable|array',
+            'also_apply_to_event_ids.*' => 'integer|exists:fest_events,id',
         ]);
 
         if (! empty($data['event_id'])) {
@@ -202,6 +204,21 @@ class CertificateTemplateController extends SahodayaAdminController
             }
         } elseif (! empty($data['item_id'])) {
             abort(422, 'Select an event before choosing an item.');
+        }
+
+        // "Also apply to" only makes sense alongside a specific primary event (an item is
+        // always item-null on the copies — applying one item's template across several
+        // events' differing item rosters isn't a coherent request) and only targets this
+        // Sahodaya's own events, deduplicated against each other and the primary choice.
+        $additionalEventIds = [];
+        if (! empty($data['event_id']) && ! empty($data['also_apply_to_event_ids'])) {
+            $additionalEventIds = FestEvent::where('tenant_id', $this->sahodaya->id)
+                ->whereIn('id', $data['also_apply_to_event_ids'])
+                ->where('id', '!=', $data['event_id'])
+                ->pluck('id')
+                ->unique()
+                ->values()
+                ->all();
         }
 
         $baseDir = 'sahodaya/'.$this->sahodaya->id.'/certificate-templates';
@@ -247,37 +264,53 @@ class CertificateTemplateController extends SahodayaAdminController
             }
         }
 
+        // One row per event, all sharing the same body/layout/uploaded assets — each
+        // becomes fully independent the moment it's created (editing one later doesn't
+        // touch the others), matching how every other write path here already treats a
+        // template as scoped to one exact (event_type, certificate_type, event_id,
+        // item_id) tuple. The primary event keeps whatever item was selected; additional
+        // events always get the item-wide (item_id null) copy — applying one item's
+        // wording across other events' differently-numbered items isn't a coherent
+        // request the form even offers.
+        $eventIdsToApply = [$data['event_id'] ?? null, ...$additionalEventIds];
+
         $deactivatedCount = 0;
-        if ($data['is_active'] ?? true) {
-            $deactivatedCount = CertificateTemplate::where('tenant_id', $this->sahodaya->id)
-                ->where('event_type', $data['event_type'])
-                ->where('certificate_type', $data['certificate_type'])
-                ->when(! empty($data['event_id']), fn ($q) => $q->where('event_id', $data['event_id']), fn ($q) => $q->whereNull('event_id'))
-                ->when(! empty($data['item_id']), fn ($q) => $q->where('item_id', $data['item_id']), fn ($q) => $q->whereNull('item_id'))
-                ->update(['is_active' => false]);
+        $createdCount = 0;
+        foreach ($eventIdsToApply as $index => $eventId) {
+            $itemIdForThisEvent = $index === 0 ? ($data['item_id'] ?? null) : null;
+
+            if ($data['is_active'] ?? true) {
+                $deactivatedCount += CertificateTemplate::where('tenant_id', $this->sahodaya->id)
+                    ->where('event_type', $data['event_type'])
+                    ->where('certificate_type', $data['certificate_type'])
+                    ->when($eventId, fn ($q) => $q->where('event_id', $eventId), fn ($q) => $q->whereNull('event_id'))
+                    ->when($itemIdForThisEvent, fn ($q) => $q->where('item_id', $itemIdForThisEvent), fn ($q) => $q->whereNull('item_id'))
+                    ->update(['is_active' => false]);
+            }
+
+            CertificateTemplate::create([
+                'tenant_id'           => $this->sahodaya->id,
+                'event_type'          => $data['event_type'],
+                'event_id'            => $eventId,
+                'item_id'             => $itemIdForThisEvent,
+                'certificate_type'    => $data['certificate_type'],
+                'title'               => $data['title'] ?? 'Certificate of Participation',
+                'body'                => $body,
+                'template_file_path'  => $templatePath,
+                'background_path'     => $backgroundPath,
+                'logo_path'           => $logoPath,
+                'seal_path'           => $sealPath,
+                'signatories'         => $signatories,
+                'dynamic_fields_json' => $dynamicFields,
+                'layout_json'         => $layout,
+                'is_active'           => $data['is_active'] ?? true,
+            ]);
+            $createdCount++;
         }
 
-        CertificateTemplate::create([
-            'tenant_id'           => $this->sahodaya->id,
-            'event_type'          => $data['event_type'],
-            'event_id'            => $data['event_id'] ?? null,
-            'item_id'             => $data['item_id'] ?? null,
-            'certificate_type'    => $data['certificate_type'],
-            'title'               => $data['title'] ?? 'Certificate of Participation',
-            'body'                => $body,
-            'template_file_path'  => $templatePath,
-            'background_path'     => $backgroundPath,
-            'logo_path'           => $logoPath,
-            'seal_path'           => $sealPath,
-            'signatories'         => $signatories,
-            'dynamic_fields_json' => $dynamicFields,
-            'layout_json'         => $layout,
-            'is_active'           => $data['is_active'] ?? true,
-        ]);
-
-        $message = 'Template saved.';
+        $message = $createdCount > 1 ? "Template saved and applied to {$createdCount} events." : 'Template saved.';
         if ($deactivatedCount > 0) {
-            $message .= " {$deactivatedCount} existing template(s) for this exact event/item/type were automatically deactivated so only one is active at a time.";
+            $message .= " {$deactivatedCount} existing template(s) for the exact event/item/type combinations were automatically deactivated so only one is active at a time.";
         }
 
         return back()->with('success', $message);

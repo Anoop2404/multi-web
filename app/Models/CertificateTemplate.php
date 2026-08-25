@@ -67,12 +67,15 @@ class CertificateTemplate extends Model
                 'left' => 50,
                 'size' => 118,
             ],
-            'participation_label_cover' => [
-                'top' => 28,
-                'left' => 18,
-                'width' => 64,
-                'height' => 7,
-            ],
+            // Deliberately no positional defaults — there is no admin UI to configure
+            // this box's position (only the on/off toggle exists), so seeding a guessed
+            // top/left/width/height here meant every template that ever unchecked "Show
+            // participation label" painted a same-shaped cream patch at that fixed spot
+            // regardless of whether the background art has anything there to cover. Left
+            // empty, certificate-body.blade.php skips rendering the cover entirely unless
+            // a real position has actually been set (e.g. a future UI, or a direct
+            // layout_json edit) — see the `!empty($c)` guard there.
+            'participation_label_cover' => [],
             'recipient_name' => [
                 'top' => 38,
                 'left' => 10,
@@ -168,26 +171,6 @@ class CertificateTemplate extends Model
             'left:'.(float) ($field['left'] ?? $fallback['left'] ?? 0).'%',
             'width:'.(float) ($field['width'] ?? $fallback['width'] ?? 80).'%',
         ];
-
-        // Optional lower boundary of the background artwork's fillable zone (e.g. where a
-        // "Congratulations" graphic begins below the text). When set, top+bottom together
-        // define a fixed-height box instead of a top-anchored one that grows downward
-        // unboundedly: short content is centered inside it instead of leaving a visible
-        // gap above the artwork, and certificate-fit-text-script.blade.php reads this same
-        // box edge as the authoritative overflow boundary instead of guessing from
-        // unrelated sibling fields (see fitPage()/computeAllowedBottom() there).
-        // Deliberately NOT flex/justify-content:center here — content still flows from the
-        // box's top edge exactly as it does without `bottom` set. Centering short content
-        // within the zone is instead done as a post-pass in the fit-text script, after
-        // shrink/truncate settles on a final height: measuring overflow against a flex-
-        // centered box is unreliable (a flexbox can overflow symmetrically above *and*
-        // below when centered content exceeds its height, and scrollHeight's accounting
-        // for the above-the-box portion is inconsistent), whereas top-down flow keeps the
-        // existing offsetTop/scrollHeight overflow check exactly as simple as it is today.
-        $bottom = $field['bottom'] ?? $fallback['bottom'] ?? null;
-        if ($bottom !== null && $bottom !== '') {
-            $parts[] = 'bottom:'.(float) $bottom.'%';
-        }
 
         $align = $field['align'] ?? $fallback['align'] ?? null;
         if (in_array($align, ['left', 'right', 'center', 'justify'], true)) {

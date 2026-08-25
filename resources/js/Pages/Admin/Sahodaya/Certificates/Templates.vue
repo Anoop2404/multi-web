@@ -48,7 +48,8 @@
                     <template v-if="form.event_type === 'fest'">
                         <FormField label="Event" hint="Leave blank to make this the Sahodaya-wide default for this certificate type.">
                             <template #default="{ id }">
-                                <select :id="id" v-model="form.event_id" class="field" @change="form.item_id = null">
+                                <select :id="id" v-model="form.event_id" class="field"
+                                        @change="form.item_id = null; form.also_apply_to_event_ids = form.also_apply_to_event_ids.filter(id => id !== form.event_id)">
                                     <option :value="null">All events (default)</option>
                                     <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }}</option>
                                 </select>
@@ -60,6 +61,22 @@
                                     <option :value="null">All items in event</option>
                                     <option v-for="i in selectedEventItems" :key="i.id" :value="i.id">{{ i.title }}</option>
                                 </select>
+                            </template>
+                        </FormField>
+
+                        <FormField
+                            v-if="!editingId && form.event_id && otherEventOptions.length"
+                            label="Also apply to other events"
+                            class-extra="sm:col-span-2"
+                            hint="Creates an independent copy of this template (same background, body, and layout) for each event checked — editing one afterwards won't affect the others."
+                        >
+                            <template #default>
+                                <div class="grid max-h-40 grid-cols-1 gap-1 overflow-y-auto rounded border border-slate-200 p-2 sm:grid-cols-2">
+                                    <label v-for="e in otherEventOptions" :key="e.id" class="flex items-center gap-2 text-sm">
+                                        <input type="checkbox" :value="e.id" v-model="form.also_apply_to_event_ids" class="rounded">
+                                        {{ e.title }}
+                                    </label>
+                                </div>
                             </template>
                         </FormField>
                     </template>
@@ -532,6 +549,8 @@ const selectedEventItems = computed(() => {
     return event?.items || [];
 });
 
+const otherEventOptions = computed(() => props.festEvents.filter(e => e.id !== form.event_id));
+
 function scopeLabel(t) {
     const event = props.festEvents.find(e => e.id === t.event_id);
     if (!event) return 'All events (default)';
@@ -585,10 +604,23 @@ function layoutDefaults(from = null) {
         certificate_date: textFieldDefaults(src.certificate_date, d.certificate_date, {
             top: 72, left: 8, width: 42, font_size: 12, font_family: 'Montserrat', align: 'left',
         }),
-        participation_label_cover: {
-            top: src.participation_label_cover?.top ?? d.participation_label_cover?.top ?? 28,
-            height: src.participation_label_cover?.height ?? d.participation_label_cover?.height ?? 7,
-        },
+        // Deliberately no hardcoded top/left/width/height fallback — there's no form
+        // control to actually position this box (see BACKGROUND LAYOUT OPTIONS below),
+        // so guessing a position here made every template that ever unchecked "Show
+        // participation label" paint a same-shaped patch over whatever background art
+        // happened to be there, whether or not anything needed covering (mirrors the
+        // equivalent fix in CertificateTemplate::defaultBackgroundLayout() server-side).
+        // Left null unless this template or the Sahodaya-wide default actually has a
+        // saved position, matching CertificateLiveCanvas.vue's existing `participationLabelCover`
+        // truthiness check.
+        participation_label_cover: (src.participation_label_cover?.top !== undefined || d.participation_label_cover?.top !== undefined)
+            ? {
+                top: src.participation_label_cover?.top ?? d.participation_label_cover?.top,
+                left: src.participation_label_cover?.left ?? d.participation_label_cover?.left,
+                width: src.participation_label_cover?.width ?? d.participation_label_cover?.width,
+                height: src.participation_label_cover?.height ?? d.participation_label_cover?.height,
+            }
+            : null,
     };
 }
 
@@ -597,6 +629,7 @@ const form = useForm({
     certificate_type: 'participation',
     event_id: null,
     item_id: null,
+    also_apply_to_event_ids: [],
     title: 'Certificate of Participation',
     body: props.defaultFestBody,
     is_active: true,
@@ -642,6 +675,7 @@ function editTemplate(template) {
     form.certificate_type = template.certificate_type || 'participation';
     form.event_id = template.event_id ?? null;
     form.item_id = template.item_id ?? null;
+    form.also_apply_to_event_ids = [];
     form.title = template.title || 'Certificate of Participation';
     form.body = template.body || props.defaultBody;
     form.is_active = template.is_active ?? true;
@@ -669,6 +703,7 @@ function cancelEdit() {
     form.certificate_type = 'participation';
     form.event_id = null;
     form.item_id = null;
+    form.also_apply_to_event_ids = [];
     form.title = 'Certificate of Participation';
     form.body = props.defaultFestBody;
     form.is_active = true;

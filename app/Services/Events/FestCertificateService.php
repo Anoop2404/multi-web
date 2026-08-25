@@ -792,21 +792,31 @@ class FestCertificateService
         // script's font-size reduction on the parent .overlay-field.body — a fixed px
         // size here would otherwise be immune to that pass entirely (see
         // certificate-fit-text-script.blade.php's fitTextToBox()).
+        //
+        // Category/type sits inline after the item name (one line per item) rather than
+        // stacked on its own line below — halves the box's height for the same item
+        // count, which is what makes the larger font size here affordable within the
+        // reserved zone.
         $entries = $shown->values()->map(function (FestEventItem $item, int $i) use ($taxonomies) {
             $tax = $taxonomies->get($i, ['category' => '', 'type' => '']);
             $meta = trim(implode('  •  ', array_filter([$tax['category'] ?? '', $tax['type'] ?? ''])));
+            // Meta stays a size step below the item name (still larger than the original
+            // 0.65em) — keeping both at the same size left long category/type combos (e.g.
+            // "General Category • Team") wide enough to wrap the row onto a second line,
+            // which pushed the box past its reserved zone for exactly the item counts this
+            // is supposed to protect.
+            $metaInline = $meta !== '' ? ' <span style="font-size:0.86em;font-weight:400;color:#64748b;">('.e($meta).')</span>' : '';
 
-            return '<span style="display:block;font-weight:700;font-size:0.81em;color:#172033;line-height:1.2;">&bull;&nbsp;'.e($item->title).'</span>'
-                .($meta !== '' ? '<span style="display:block;font-size:0.65em;color:#64748b;line-height:1.15;margin-left:12px;">'.e($meta).'</span>' : '');
+            return '<span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>'.e($item->title).'</strong>'.$metaInline.'</span>';
         });
 
         if ($overflow > 0) {
-            $entries->push('<span style="display:block;font-weight:700;font-size:0.81em;color:#b45309;line-height:1.2;">&bull;&nbsp;+ '.$overflow.' more</span>');
+            $entries->push('<span style="display:block;font-weight:700;font-size:0.95em;color:#b45309;line-height:1.35;">&bull;&nbsp;+ '.$overflow.' more</span>');
         }
 
         $rows = '';
         foreach ($entries->chunk(2) as $pair) {
-            $cells = $pair->map(fn ($html) => '<td style="width:50%;vertical-align:top;padding:2px 10px 2px 0;">'.$html.'</td>')->implode('');
+            $cells = $pair->map(fn ($html) => '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;">'.$html.'</td>')->implode('');
             if ($pair->count() === 1) {
                 $cells .= '<td style="width:50%;"></td>';
             }
@@ -817,8 +827,8 @@ class FestCertificateService
         // testing that DomPDF's font set renders &bull; correctly but shows the star as
         // a missing-glyph "?"; Chromium renders both fine, but this box must degrade
         // correctly on the DomPDF fallback too.
-        return '<div style="border:1px solid #d6a95c;border-radius:6px;padding:6px 14px;margin:5px auto 0;max-width:94%;background:rgba(180,83,9,0.04);">'
-            .'<div style="text-align:center;font-size:0.73em;font-weight:700;letter-spacing:1.5px;color:#b45309;text-transform:uppercase;margin-bottom:4px;">&bull;&nbsp;Participated Items&nbsp;&bull;</div>'
+        return '<div style="border:1px solid #d6a95c;border-radius:6px;padding:6px 10px;margin:5px auto 0;max-width:98%;background:rgba(180,83,9,0.04);">'
+            .'<div style="text-align:center;font-size:0.85em;font-weight:700;letter-spacing:1.5px;color:#b45309;text-transform:uppercase;margin-bottom:5px;">&bull;&nbsp;Participated Items&nbsp;&bull;</div>'
             .'<table style="width:100%;border-collapse:collapse;">'.$rows.'</table>'
             .'</div>';
     }
