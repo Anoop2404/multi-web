@@ -66,19 +66,9 @@
                     </button>
                 </div>
             </template>
-            <select v-else v-model="f.school_id" class="field text-sm min-w-[12rem]">
-                <option value="">All schools</option>
-                <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
-            <select v-model="f.verification" class="field text-sm">
-                <option value="all">All</option>
-                <option value="unverified">Pending</option>
-                <option value="verified">Verified</option>
-            </select>
-            <select v-model="f.teaching_type_id" class="field text-sm">
-                <option value="">All teaching types</option>
-                <option v-for="tt in teachingTypes" :key="tt.id" :value="tt.id">{{ tt.label }}</option>
-            </select>
+            <SearchableSelect v-else v-model="f.school_id" :options="schools" :all-option="true" all-label="All schools" class="min-w-[12rem]" />
+            <SearchableSelect v-model="f.verification" :options="[{ value: 'all', label: 'All' }, { value: 'unverified', label: 'Pending' }, { value: 'verified', label: 'Verified' }]" :all-option="false" />
+            <SearchableSelect v-model="f.teaching_type_id" :options="teachingTypes" :all-option="true" all-label="All teaching types" />
             <input v-model="f.search" class="field text-sm"
                    :placeholder="showTeacherList ? 'Name, email, school' : 'School name'">
             <button class="btn-secondary text-sm">Apply</button>
@@ -315,6 +305,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({

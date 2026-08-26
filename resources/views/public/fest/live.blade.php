@@ -27,6 +27,9 @@
             @if($nowPerforming)
             <span class="text-xs font-bold uppercase tracking-widest text-amber-400 block mb-2">● Now performing</span>
             <strong class="text-2xl font-extrabold text-white block leading-tight uppercase">{{ $nowPerforming['item_title'] ?? '—' }}</strong>
+            @if(!empty($nowPerforming['category_label']))
+            <span class="text-amber-300/70 text-xs font-semibold uppercase tracking-wide mt-1 block">{{ $nowPerforming['category_label'] }}</span>
+            @endif
             @if(!empty($nowPerforming['show_name']) && !empty($nowPerforming['name']))
             <span class="text-amber-200 text-lg font-semibold mt-1 block">{{ $nowPerforming['name'] }}</span>
             @endif
@@ -156,6 +159,7 @@
         if (!p) { el.classList.add('hidden'); return; }
         el.classList.remove('hidden');
         let html = `<span class="text-xs font-bold uppercase tracking-widest text-amber-400 block mb-2">● Now performing</span><strong class="text-2xl font-extrabold text-white block leading-tight uppercase">${esc(p.item_title || '—')}</strong>`;
+        if (p.category_label) html += `<span class="text-amber-300/70 text-xs font-semibold uppercase tracking-wide mt-1 block">${esc(p.category_label)}</span>`;
         if (p.show_name && p.name) html += `<span class="text-amber-200 text-lg font-semibold mt-1 block">${esc(p.name)}</span>`;
         el.innerHTML = html;
     }

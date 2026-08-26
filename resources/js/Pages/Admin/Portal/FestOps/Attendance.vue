@@ -22,10 +22,13 @@
                         <td class="p-3">{{ p.student?.name ?? p.teacher?.name }}</td>
                         <td class="p-3 font-mono text-xs">{{ p.chest_no ?? p.level_registration_number ?? '—' }}</td>
                         <td class="p-3">
-                            <select :value="statusFor(p)" @change="save(p, $event.target.value)" class="border rounded px-2 py-1 text-xs">
-                                <option value="present">Present</option>
-                                <option value="absent">Absent</option>
-                            </select>
+                            <SearchableSelect
+                                :model-value="statusFor(p)"
+                                @update:model-value="value => save(p, value)"
+                                :options="[{ value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' }]"
+                                :all-option="false"
+                                placeholder="Select status"
+                            />
                         </td>
                     </tr>
                     <tr v-if="!participants?.length"><td colspan="4" class="p-6 text-center text-gray-400">No participants</td></tr>
@@ -39,6 +42,7 @@
 import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { festOpsEventNav } from '@/support/festOpsPortalNav.js';
 
 const props = defineProps({ sahodaya: Object, event: Object, participants: Array, attendance: Object, duties: Array });

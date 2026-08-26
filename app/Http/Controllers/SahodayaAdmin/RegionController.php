@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\CsvSafety;
 use App\Models\Region;
 use App\Models\SchoolRegionAssignment;
 use App\Models\Tenant;
@@ -238,15 +239,15 @@ class RegionController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($regions, $unassigned) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Region', 'Region code', 'School', 'School prefix']);
+            CsvSafety::fputcsv($out, ['Region', 'Region code', 'School', 'School prefix']);
 
             foreach ($regions as $region) {
                 foreach ($region['schools'] as $school) {
-                    fputcsv($out, [$region['name'], $region['code'], $school['name'], $school['school_prefix']]);
+                    CsvSafety::fputcsv($out, [$region['name'], $region['code'], $school['name'], $school['school_prefix']]);
                 }
             }
             foreach ($unassigned as $school) {
-                fputcsv($out, ['— No region assigned —', '', $school['name'], $school['school_prefix']]);
+                CsvSafety::fputcsv($out, ['— No region assigned —', '', $school['name'], $school['school_prefix']]);
             }
 
             fclose($out);

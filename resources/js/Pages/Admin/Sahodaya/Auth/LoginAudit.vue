@@ -27,11 +27,9 @@
                 <input v-model="filterForm.to" type="date" class="field">
             </FormField>
             <FormField label="Action">
-                <select v-model="filterForm.action" class="field">
-                    <option value="all">All</option>
-                    <option value="login.failed">Failed only</option>
-                    <option value="login">Success only</option>
-                </select>
+                <SearchableSelect v-model="filterForm.action"
+                                   :options="[{ value: 'all', label: 'All' }, { value: 'login.failed', label: 'Failed only' }, { value: 'login', label: 'Success only' }]"
+                                   :all-option="false" />
             </FormField>
             <button type="submit" class="btn-primary text-sm">Apply</button>
         </form>
@@ -65,6 +63,7 @@ import { reactive } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import FormField from '@/Components/ui/FormField.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatDateTime } from '@/support/calendarDates.js';
 
 const props = defineProps({

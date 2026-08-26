@@ -32,20 +32,14 @@
             <div class="flex flex-wrap gap-2 items-end">
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by category</label>
-                    <select v-model="filterCategory" class="field text-sm mt-1 w-44">
-                        <option value="">All categories</option>
-                        <option v-for="cat in categories" :key="cat" :value="cat">
-                            {{ cat.toUpperCase() }}
-                        </option>
-                    </select>
+                    <SearchableSelect v-model="filterCategory" class="mt-1 w-44" :options="categoryOptions"
+                                      :all-option="true" all-label="All categories" />
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by gender</label>
-                    <select v-model="filterGender" class="field text-sm mt-1 w-36">
-                        <option value="">All genders</option>
-                        <option value="male">Boys</option>
-                        <option value="female">Girls</option>
-                    </select>
+                    <SearchableSelect v-model="filterGender" class="mt-1 w-36"
+                                      :options="[{ value: 'male', label: 'Boys' }, { value: 'female', label: 'Girls' }]"
+                                      :all-option="true" all-label="All genders" />
                 </div>
             </div>
         </div>
@@ -83,6 +77,7 @@ import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -100,6 +95,8 @@ const categories = computed(() => {
     }
     return [...set];
 });
+
+const categoryOptions = computed(() => categories.value.map(cat => ({ value: cat, label: cat.toUpperCase() })));
 
 const stats = computed(() => {
     const points = (props.leaderboard ?? []).map(r => Number(r.points || 0));

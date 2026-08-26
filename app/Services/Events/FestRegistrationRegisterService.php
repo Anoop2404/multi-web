@@ -2,6 +2,7 @@
 
 namespace App\Services\Events;
 
+use App\Support\CsvSafety;
 use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
@@ -229,7 +230,7 @@ class FestRegistrationRegisterService
             if ($includeChestNo) {
                 $header[] = 'Chest no';
             }
-            fputcsv($out, array_merge($header, ['Item fee', 'School total due', 'Fee status']));
+            CsvSafety::fputcsv($out, array_merge($header, ['Item fee', 'School total due', 'Fee status']));
             foreach ($data['rows'] as $row) {
                 $line = [
                     $row['school_name'],
@@ -244,7 +245,7 @@ class FestRegistrationRegisterService
                 if ($includeChestNo) {
                     $line[] = $row['chest_no'];
                 }
-                fputcsv($out, array_merge($line, [$row['item_fee'], $row['school_total_due'], $row['school_fee_status']]));
+                CsvSafety::fputcsv($out, array_merge($line, [$row['item_fee'], $row['school_total_due'], $row['school_fee_status']]));
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);

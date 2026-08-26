@@ -31,21 +31,13 @@
                     <input v-model="form.exam_name" class="field" placeholder="e.g. Mid-Term / Annual Exam">
                 </FormField>
                 <FormField label="Class / Standard" required :error="form.errors.school_class_id">
-                    <select v-model="form.school_class_id" class="field" required>
-                        <option value="">Select class</option>
-                        <option v-for="item in classes" :key="item.id" :value="item.id">{{ item.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="form.school_class_id" :options="classes" :all-option="true" all-label="Select class" :required="true" />
                 </FormField>
                 <FormField label="Subject" required :error="form.errors.subject_id">
-                    <select v-model="form.subject_id" class="field" required>
-                        <option value="">Select subject</option>
-                        <option v-for="item in subjects" :key="item.id" :value="item.id">{{ item.label }}</option>
-                    </select>
+                    <SearchableSelect v-model="form.subject_id" :options="subjects" :all-option="true" all-label="Select subject" :required="true" />
                 </FormField>
                 <FormField label="Academic Year" required :error="form.errors.academic_year">
-                    <select v-model="form.academic_year" class="field" required>
-                        <option v-for="year in academicYears" :key="year" :value="year">{{ year }}</option>
-                    </select>
+                    <SearchableSelect v-model="form.academic_year" :options="academicYears" :all-option="false" placeholder="Select academic year" :required="true" />
                 </FormField>
                 <FormField label="Files" required :error="form.errors.files">
                     <input ref="createFileInput" type="file" class="field" multiple accept=".pdf,.doc,.docx,.odt,.rtf,.jpg,.jpeg,.png" required @change="onFilesSelected">
@@ -159,19 +151,13 @@
                 </FormField>
                 <div class="grid sm:grid-cols-2 gap-4">
                     <FormField label="Class" required :error="editForm.errors.school_class_id">
-                        <select v-model="editForm.school_class_id" class="field" required>
-                            <option v-for="item in classes" :key="item.id" :value="item.id">{{ item.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="editForm.school_class_id" :options="classes" :all-option="false" placeholder="Select class" :required="true" />
                     </FormField>
                     <FormField label="Subject" required :error="editForm.errors.subject_id">
-                        <select v-model="editForm.subject_id" class="field" required>
-                            <option v-for="item in subjects" :key="item.id" :value="item.id">{{ item.label }}</option>
-                        </select>
+                        <SearchableSelect v-model="editForm.subject_id" :options="subjects" :all-option="false" placeholder="Select subject" :required="true" />
                     </FormField>
                     <FormField label="Academic Year" required :error="editForm.errors.academic_year">
-                        <select v-model="editForm.academic_year" class="field" required>
-                            <option v-for="year in academicYears" :key="year" :value="year">{{ year }}</option>
-                        </select>
+                        <SearchableSelect v-model="editForm.academic_year" :options="academicYears" :all-option="false" placeholder="Select academic year" :required="true" />
                     </FormField>
                     <FormField label="Exam / Term" :error="editForm.errors.exam_name">
                         <input v-model="editForm.exam_name" class="field">
@@ -191,6 +177,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';

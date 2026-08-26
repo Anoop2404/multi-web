@@ -12,10 +12,7 @@
 
         <form @submit.prevent="applyFilter" class="card !p-4 mb-4 flex flex-wrap gap-3 items-end">
             <FormField label="School" class-extra="mb-0">
-                <select v-model="schoolFilter" class="field text-sm w-56">
-                    <option value="">All schools</option>
-                    <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                </select>
+                <SearchableSelect v-model="schoolFilter" :options="schools" class="w-56" :all-option="true" all-label="All schools" />
             </FormField>
             <button type="submit" class="btn-primary text-sm">Apply</button>
         </form>
@@ -50,6 +47,7 @@ import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, event: Object,

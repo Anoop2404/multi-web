@@ -138,11 +138,9 @@
                 <div class="flex flex-wrap items-center gap-2 flex-1 min-w-[14rem]">
                     <input v-model="searchQuery" type="search" class="field flex-1 min-w-[10rem] max-w-sm"
                            placeholder="Search by item name, code, discipline..." autocomplete="off">
-                    <select v-model="filterType" class="field text-xs w-auto">
-                        <option value="">All Participant Types</option>
-                        <option value="individual">Individual Only</option>
-                        <option value="multi">Team / Group / Pair / Trio</option>
-                    </select>
+                    <SearchableSelect v-model="filterType" class="w-auto"
+                                      :options="[{ value: 'individual', label: 'Individual Only' }, { value: 'multi', label: 'Team / Group / Pair / Trio' }]"
+                                      :all-option="true" all-label="All Participant Types" />
                     <span class="text-xs text-slate-500 font-medium tabular-nums">
                         Showing {{ filteredItems.length }} of {{ itemsList.length }} items
                     </span>
@@ -285,6 +283,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import EmptyState from '@/Components/ui/EmptyState.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,

@@ -31,9 +31,14 @@
                 
                 <!-- Academic Year Selector -->
                 <div class="relative">
-                    <select :value="selectedAcademicYear" @change="switchYear($event.target.value)" class="field text-xs py-1.5 font-medium pl-3 pr-8 w-32">
-                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">{{ ay.label }}</option>
-                    </select>
+                    <SearchableSelect
+                        :model-value="selectedAcademicYear"
+                        @update:model-value="switchYear"
+                        :options="academicYearSelectOptions"
+                        :all-option="false"
+                        placeholder="Select year"
+                        class="w-32"
+                    />
                 </div>
             </div>
         </div>
@@ -234,6 +239,7 @@
 import { Link, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     school: Object,
@@ -247,6 +253,10 @@ const props = defineProps({
 function switchYear(year) {
     router.get(`/school-admin/${props.school.id}/board-results/reports?class=${props.selectedClass}&academic_year=${year}`);
 }
+
+const academicYearSelectOptions = computed(() => {
+    return (props.academicYearOptions || []).map(ay => ({ value: ay.label, label: ay.label }));
+});
 
 const overallToppers = computed(() => {
     return (props.activeResult?.toppers || [])

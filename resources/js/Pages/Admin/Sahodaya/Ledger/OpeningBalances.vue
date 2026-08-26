@@ -11,11 +11,8 @@
         <form @submit.prevent="applyYear" class="card mb-4 flex flex-wrap items-end gap-3">
             <FormField label="Academic year">
                 <template #default="{ id }">
-                    <select :id="id" v-model="financialYearId" class="field max-w-xs">
-                        <option v-for="y in academicYears" :key="y.id" :value="String(y.id)">
-                            {{ y.label }} ({{ y.status }})
-                        </option>
-                    </select>
+                    <SearchableSelect :id="id" v-model="financialYearId" class="max-w-xs"
+                                       :options="academicYearOptions" :all-option="false" />
                 </template>
             </FormField>
             <button type="submit" class="btn-secondary text-sm">Apply</button>
@@ -28,19 +25,15 @@
                 <form @submit.prevent="saveOpening" class="space-y-2">
                     <FormField label="Account head" required>
                         <template #default="{ id }">
-                            <select :id="id" v-model="form.account_head_id" class="field" required>
-                                <option value="">Select head</option>
-                                <option v-for="h in heads" :key="h.id" :value="h.id">{{ h.code }} — {{ h.name }}</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="form.account_head_id" :required="true"
+                                               :all-option="true" all-label="Select head" :options="headOptions" />
                         </template>
                     </FormField>
                     <div class="grid grid-cols-2 gap-2">
                         <FormField label="Entry type">
                             <template #default="{ id }">
-                                <select :id="id" v-model="form.entry_type" class="field">
-                                    <option value="debit">Debit</option>
-                                    <option value="credit">Credit</option>
-                                </select>
+                                <SearchableSelect :id="id" v-model="form.entry_type" :all-option="false"
+                                                   :options="[{ value: 'debit', label: 'Debit' }, { value: 'credit', label: 'Credit' }]" />
                             </template>
                         </FormField>
                         <FormField label="Amount (₹)" required>
@@ -93,8 +86,9 @@
 
 <script setup>
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -108,6 +102,16 @@ const props = defineProps({
 });
 
 const financialYearId = ref(String(props.filterFinancialYearId ?? props.academicYears[0]?.id ?? ''));
+
+const academicYearOptions = computed(() => props.academicYears.map(y => ({
+    value: String(y.id),
+    label: `${y.label} (${y.status})`,
+})));
+
+const headOptions = computed(() => props.heads.map(h => ({
+    value: h.id,
+    label: `${h.code} — ${h.name}`,
+})));
 
 const { confirm } = useConfirm();
 

@@ -123,20 +123,30 @@
                 </FormField>
                 <FormField label="Status">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.status" class="field">
-                            <option value="draft">Draft</option>
-                            <option value="published">Published</option>
-                            <option value="ongoing">Ongoing</option>
-                            <option value="completed">Completed</option>
-                        </select>
+                        <SearchableSelect
+                            :id="id"
+                            v-model="form.status"
+                            :options="[
+                                { value: 'draft', label: 'Draft' },
+                                { value: 'published', label: 'Published' },
+                                { value: 'ongoing', label: 'Ongoing' },
+                                { value: 'completed', label: 'Completed' },
+                            ]"
+                            :all-option="false"
+                        />
                     </template>
                 </FormField>
                 <FormField label="Delivery mode">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.delivery_mode" class="field">
-                            <option value="offline">Offline (paper / venue)</option>
-                            <option value="online">Online (student portal)</option>
-                        </select>
+                        <SearchableSelect
+                            :id="id"
+                            v-model="form.delivery_mode"
+                            :options="[
+                                { value: 'offline', label: 'Offline (paper / venue)' },
+                                { value: 'online', label: 'Online (student portal)' },
+                            ]"
+                            :all-option="false"
+                        />
                     </template>
                 </FormField>
                 <p v-if="form.delivery_mode === 'online'" class="text-xs text-indigo-700 sm:col-span-2">
@@ -189,13 +199,12 @@
             <div class="border-t border-slate-100 pt-4">
                 <FormField label="Student verification for registration" class-extra="mb-4">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.student_verification_mode" class="field">
-                            <option value="inherit">
-                                Use cluster default — {{ clusterRequireStudentVerification ? 'verified students only' : 'unverified allowed' }}
-                            </option>
-                            <option value="required">Require verified students only</option>
-                            <option value="optional">Allow unverified students</option>
-                        </select>
+                        <SearchableSelect
+                            :id="id"
+                            v-model="form.student_verification_mode"
+                            :options="studentVerificationOptions"
+                            :all-option="false"
+                        />
                         <p class="text-xs text-slate-500 mt-1">
                             Cluster default is set under Membership → Settings. Applies to school registration for this exam.
                         </p>
@@ -208,26 +217,35 @@
             <FormGrid>
                 <FormField label="Grade master">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.grade_master_id" class="field">
-                            <option value="">Default Sahodaya grade master</option>
-                            <option v-for="m in gradeMasters" :key="m.id" :value="m.id">{{ m.title }}<template v-if="m.is_default"> (default)</template></option>
-                        </select>
+                        <SearchableSelect
+                            :id="id"
+                            v-model="form.grade_master_id"
+                            :options="gradeMasterOptions"
+                            :all-option="true"
+                            all-label="Default Sahodaya grade master"
+                        />
                     </template>
                 </FormField>
                 <FormField label="Hall ticket template">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.hall_ticket_template_id" class="field">
-                            <option value="">Default / per-exam design</option>
-                            <option v-for="t in hallTicketTemplates" :key="t.id" :value="t.id">{{ t.title }}</option>
-                        </select>
+                        <SearchableSelect
+                            :id="id"
+                            v-model="form.hall_ticket_template_id"
+                            :options="hallTicketTemplateOptions"
+                            :all-option="true"
+                            all-label="Default / per-exam design"
+                        />
                     </template>
                 </FormField>
                 <FormField label="Certificate template">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.certificate_template_id" class="field">
-                            <option value="">Default certificate template</option>
-                            <option v-for="t in certificateTemplates" :key="t.id" :value="t.id">{{ t.title }}</option>
-                        </select>
+                        <SearchableSelect
+                            :id="id"
+                            v-model="form.certificate_template_id"
+                            :options="certificateTemplateOptions"
+                            :all-option="true"
+                            all-label="Default certificate template"
+                        />
                     </template>
                 </FormField>
             </FormGrid>
@@ -277,6 +295,7 @@ import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
 import McqSahodayaWorkflowBanner from '@/Components/sahodaya/McqSahodayaWorkflowBanner.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -359,6 +378,21 @@ const form = useForm({
     hall_ticket_template_id: props.exam.hall_ticket_template_id ?? '',
     certificate_template_id: props.exam.certificate_template_id ?? '',
 });
+
+const studentVerificationOptions = computed(() => [
+    { value: 'inherit', label: `Use cluster default — ${props.clusterRequireStudentVerification ? 'verified students only' : 'unverified allowed'}` },
+    { value: 'required', label: 'Require verified students only' },
+    { value: 'optional', label: 'Allow unverified students' },
+]);
+
+const gradeMasterOptions = computed(() => props.gradeMasters.map((m) => ({
+    value: m.id,
+    label: m.is_default ? `${m.title} (default)` : m.title,
+})));
+
+const hallTicketTemplateOptions = computed(() => props.hallTicketTemplates.map((t) => ({ value: t.id, label: t.title })));
+
+const certificateTemplateOptions = computed(() => props.certificateTemplates.map((t) => ({ value: t.id, label: t.title })));
 
 const presentCount = computed(() => props.registrations.filter((r) => r.attendance_status === 'present').length);
 const markedCount = computed(() => props.registrations.filter((r) => r.mark?.score != null).length);

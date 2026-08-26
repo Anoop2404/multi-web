@@ -10,18 +10,12 @@
 
         <form class="card mb-6 max-w-2xl space-y-3" @submit.prevent="submit">
             <h3 class="font-semibold text-slate-900">Report a clash</h3>
-            <select v-model="form.participant_id" class="field text-sm" required @change="onParticipantChange">
-                <option value="">Select participant</option>
-                <option v-for="p in participants" :key="p.id" :value="p.id">{{ p.student ? studentDisplayName(p.student) : p.name }} — {{ p.item }}</option>
-            </select>
-            <select v-if="participantSchedules.length" v-model="form.schedule_id_a" class="field text-sm">
-                <option value="">Schedule slot A (optional)</option>
-                <option v-for="s in participantSchedules" :key="s.id" :value="s.id">{{ s.item_title }} · {{ formatTime(s.scheduled_at) }}</option>
-            </select>
-            <select v-if="participantSchedules.length" v-model="form.schedule_id_b" class="field text-sm">
-                <option value="">Schedule slot B (optional)</option>
-                <option v-for="s in participantSchedules" :key="s.id" :value="s.id">{{ s.item_title }} · {{ formatTime(s.scheduled_at) }}</option>
-            </select>
+            <SearchableSelect v-model="form.participant_id" :options="participantOptions" :all-option="true"
+                              all-label="Select participant" :required="true" @change="onParticipantChange" />
+            <SearchableSelect v-if="participantSchedules.length" v-model="form.schedule_id_a" :options="scheduleOptions"
+                              :all-option="true" all-label="Schedule slot A (optional)" />
+            <SearchableSelect v-if="participantSchedules.length" v-model="form.schedule_id_b" :options="scheduleOptions"
+                              :all-option="true" all-label="Schedule slot B (optional)" />
             <textarea v-model="form.description" class="field text-sm" rows="3" placeholder="Describe the clash" required />
             <textarea v-model="form.requested_resolution" class="field text-sm" rows="2" placeholder="Suggested resolution (optional)" />
             <button type="submit" class="btn-primary text-sm" :disabled="form.processing">Submit report</button>
@@ -63,6 +57,7 @@
 import { computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 
@@ -89,6 +84,16 @@ const participantSchedules = computed(() => {
     const p = props.participants.find((row) => String(row.id) === String(form.participant_id));
     return p?.schedules || [];
 });
+
+const participantOptions = computed(() => props.participants.map((p) => ({
+    value: p.id,
+    label: `${p.student ? studentDisplayName(p.student) : p.name} — ${p.item}${p.category_label ? ` (${p.category_label})` : ''}`,
+})));
+
+const scheduleOptions = computed(() => participantSchedules.value.map((s) => ({
+    value: s.id,
+    label: `${s.item_title}${s.category_label ? ` (${s.category_label})` : ''} · ${formatTime(s.scheduled_at)}`,
+})));
 
 function onParticipantChange() {
     form.schedule_id_a = '';

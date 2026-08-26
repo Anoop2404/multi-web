@@ -191,14 +191,8 @@
                                 <input v-model="form.title" class="field" required>
                             </FormField>
                             <FormField label="Lifecycle Phase Status" class-extra="sm:col-span-2" :hint="nextStepHint">
-                                <select v-model="form.status" class="field font-medium">
-                                    <option value="draft" :disabled="!isStatusReachable('draft')">Draft (setup — Sahodaya only)</option>
-                                    <option v-if="!isSports" value="published" :disabled="!isStatusReachable('published')">Published</option>
-                                    <option v-if="isSports" value="published" :disabled="!isStatusReachable('published')">Published (Sahodaya announce only)</option>
-                                    <option value="registration_open" :disabled="!isStatusReachable('registration_open')">Registration open</option>
-                                    <option value="ongoing" :disabled="!isStatusReachable('ongoing')">Ongoing</option>
-                                    <option value="completed" :disabled="!isStatusReachable('completed')">Completed</option>
-                                </select>
+                                <SearchableSelect v-model="form.status" :options="lifecycleStatusOptions"
+                                                  :all-option="false" class="font-medium" />
                             </FormField>
                         </FormGrid>
 
@@ -213,12 +207,8 @@
                         </div>
 
                         <FormField label="Academic Year Scope" hint="Only students enrolled in this academic year can register.">
-                            <select v-model="form.academic_year_id" class="field">
-                                <option :value="null">— Not scoped (All years) —</option>
-                                <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.id">
-                                    {{ ay.label }} ({{ ay.status }})
-                                </option>
-                            </select>
+                            <SearchableSelect v-model="form.academic_year_id" :options="academicYearSelectOptions"
+                                              :all-option="true" all-label="— Not scoped (All years) —" />
                         </FormField>
                     </div>
 
@@ -403,6 +393,7 @@ import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue
 import FormGrid from '@/Components/ui/FormGrid.vue';
 import FormField from '@/Components/ui/FormField.vue';
 import CheckboxField from '@/Components/ui/CheckboxField.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -469,6 +460,10 @@ const publicFestUrl = computed(() => {
     return root ? `${root}/fest/${props.event.id}` : `/fest/${props.event.id}`;
 });
 
+const academicYearSelectOptions = computed(() =>
+    (props.academicYearOptions ?? []).map((ay) => ({ value: ay.id, label: `${ay.label} (${ay.status})` }))
+);
+
 const selectableLevelLabels = computed(() => {
     const keys = isSports.value ? ['school', 'sahodaya'] : Object.keys(props.levelLabels ?? {});
     return Object.fromEntries(keys.map((k) => [k, props.levelLabels[k]]));
@@ -522,6 +517,19 @@ const allowedNextStatuses = computed(() => {
 function isStatusReachable(status) {
     return allowedNextStatuses.value.has(status);
 }
+
+const lifecycleStatusOptions = computed(() => {
+    const options = [
+        { value: 'draft', label: 'Draft (setup — Sahodaya only)' },
+        isSports.value
+            ? { value: 'published', label: 'Published (Sahodaya announce only)' }
+            : { value: 'published', label: 'Published' },
+        { value: 'registration_open', label: 'Registration open' },
+        { value: 'ongoing', label: 'Ongoing' },
+        { value: 'completed', label: 'Completed' },
+    ];
+    return options.map(opt => ({ ...opt, disabled: !isStatusReachable(opt.value) }));
+});
 
 const nextStepLabelList = computed(() => {
     const current = props.event.status;

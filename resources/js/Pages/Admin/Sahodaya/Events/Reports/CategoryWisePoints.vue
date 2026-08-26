@@ -8,9 +8,7 @@
 
         <div v-if="childEvents.length" class="card mb-4 !py-3 flex flex-wrap items-center gap-2">
             <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Region:</label>
-            <select :value="String(event.id)" @change="switchEvent" class="field text-xs !py-1 w-64 font-semibold">
-                <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">{{ ev.short_title || ev.title }}</option>
-            </select>
+            <SearchableSelect :model-value="String(event.id)" @update:model-value="switchEvent" :options="childEventOptions" :all-option="false" class="w-64" />
         </div>
 
         <div v-if="!categories.length" class="card p-8 text-center text-slate-400 text-sm">
@@ -83,6 +81,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import CategoryPointsBreakdownModal from '@/Components/reports/CategoryPointsBreakdownModal.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -99,8 +98,10 @@ const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/repo
 const activeKey = ref(props.categories[0]?.key ?? null);
 const activeCategory = computed(() => props.categories.find((c) => c.key === activeKey.value) ?? null);
 
-function switchEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports/category-wise-points`);
+const childEventOptions = computed(() => props.childEvents.map((ev) => ({ value: String(ev.id), label: ev.short_title || ev.title })));
+
+function switchEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/reports/category-wise-points`);
 }
 
 const modalOpen = ref(false);

@@ -17,10 +17,8 @@
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Category *</label>
-                            <select v-model="form.category" required
-                                    class="field">
-                                <option v-for="c in categories" :key="c.value" :value="c.value">{{ c.label }}</option>
-                            </select>
+                            <SearchableSelect v-model="form.category" :options="categories" :all-option="false"
+                                    :required="true" placeholder="Select category" />
                         </div>
                     </div>
                     <div class="grid sm:grid-cols-2 gap-4 items-end">
@@ -81,6 +79,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
 const { confirm, prompt } = useConfirm();

@@ -15,17 +15,10 @@
 
         <form @submit.prevent="applyFilter" class="card !p-4 mb-4 flex flex-wrap gap-3 items-end">
             <FormField label="Area" classExtra="mb-0">
-                <select v-model="areaFilter" class="field text-sm w-56">
-                    <option value="">All areas</option>
-                    <option v-for="a in areas" :key="a.id" :value="String(a.id)">{{ a.name }}</option>
-                    <option value="other">Unassigned items</option>
-                </select>
+                <SearchableSelect v-model="areaFilter" class="w-56" :options="areaOptions" :all-option="true" all-label="All areas" />
             </FormField>
             <FormField label="School" classExtra="mb-0">
-                <select v-model="schoolFilter" class="field text-sm w-56">
-                    <option value="">All schools</option>
-                    <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                </select>
+                <SearchableSelect v-model="schoolFilter" class="w-56" :options="schools" :all-option="true" all-label="All schools" />
             </FormField>
             <button type="submit" class="btn-primary text-sm">Apply</button>
         </form>
@@ -109,7 +102,10 @@
                                 <td>{{ row.school }}</td>
                                 <td class="font-medium">{{ row.student }}</td>
                                 <td>{{ row.reg_no }}</td>
-                                <td>{{ row.item }}</td>
+                                <td>
+                                    {{ row.item }}
+                                    <span v-if="row.category_label" class="text-slate-400"> · {{ row.category_label }}</span>
+                                </td>
                                 <td>{{ row.fest_id ?? '—' }}</td>
                                 <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
                                 <td>{{ row.chest_no ?? '—' }}</td>
@@ -130,6 +126,7 @@ import { computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -147,6 +144,11 @@ const props = defineProps({
 
 const areaFilter = ref(props.filterAreaId ? String(props.filterAreaId) : '');
 const schoolFilter = ref(props.filterSchoolId || '');
+
+const areaOptions = computed(() => [
+    ...props.areas.map((a) => ({ value: String(a.id), label: a.name })),
+    { value: 'other', label: 'Unassigned items' },
+]);
 
 const totals = computed(() => ({
     areas: props.summary.length,

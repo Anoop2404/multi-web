@@ -21,11 +21,8 @@
                         {{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}
                     </label>
                 </div>
-                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1.5 w-72 font-semibold shadow-sm border-slate-300">
-                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                        {{ ev.short_title || ev.title }}
-                    </option>
-                </select>
+                <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
+                                  :options="sportEventOptions" :all-option="false" class="w-72" />
             </div>
         </div>
 
@@ -41,10 +38,9 @@
                                @keyup.enter="applyFilters" />
                         <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     </div>
-                    <select v-if="schools?.length" v-model="selectedSchoolId" class="field text-xs w-64" @change="applyFilters">
-                        <option :value="null">All Schools ({{ schools.length }})</option>
-                        <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <SearchableSelect v-if="schools?.length" v-model="selectedSchoolId" class="w-64"
+                                      :options="schools" :all-label="`All Schools (${schools.length})`"
+                                      @change="applyFilters" />
                     <button type="button" @click="applyFilters" class="btn-secondary text-xs">Filter</button>
                     <button v-if="searchQuery || selectedSchoolId" type="button" @click="clearFilters" class="btn-subtle text-xs text-slate-500">Clear</button>
                 </div>
@@ -100,7 +96,15 @@
                             <tr v-for="(item, idx) in st.items" :key="item.item_id || idx" class="hover:bg-slate-50/50">
                                 <td class="text-center text-slate-400 font-mono">{{ idx + 1 }}</td>
                                 <td class="font-semibold text-slate-900">{{ item.item_title }}</td>
-                                <td class="text-slate-600">{{ item.head_name || '—' }}</td>
+                                <td class="text-slate-600">
+                                    <!-- studentWiseBrowserRows() only eager-loads item:id,title,head_id,event_id
+                                         today, so there's no class_group/age_group to fall back on here yet —
+                                         show category_label if a future backend change attaches it, else head. -->
+                                    <span v-if="item.category_label">{{ item.category_label }}</span>
+                                    <span v-if="item.category_label && item.head_name" class="text-slate-300"> · </span>
+                                    <span v-if="item.head_name">{{ item.head_name }}</span>
+                                    <span v-if="!item.category_label && !item.head_name">—</span>
+                                </td>
                                 <td class="text-center font-mono font-bold text-slate-800">{{ item.chest_no || '—' }}</td>
                                 <td class="text-center">
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block"
@@ -131,6 +135,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -164,8 +169,13 @@ const filteredRows = computed(() => {
     return result;
 });
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports/student-wise`);
+const sportEventOptions = computed(() => props.childEvents.map((ev) => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
+
+function switchSportEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/reports/student-wise`);
 }
 
 function applyFilters() {

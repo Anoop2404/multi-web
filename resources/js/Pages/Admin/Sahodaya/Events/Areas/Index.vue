@@ -14,10 +14,7 @@
                 <input v-model="form.name" class="field" required placeholder="e.g. Coding">
             </FormField>
             <FormField label="Parent area">
-                <select v-model="form.parent_id" class="field">
-                    <option :value="null">None (top level)</option>
-                    <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.name }}</option>
-                </select>
+                <SearchableSelect v-model="form.parent_id" :options="parentAreaOptions" :all-option="false" />
             </FormField>
             <FormField label="Default item fee (₹)">
                 <input v-model.number="form.default_item_fee" type="number" min="0" class="field" placeholder="Optional">
@@ -72,9 +69,10 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -98,6 +96,11 @@ const form = useForm({
     default_item_fee: '',
     sort_order: 100,
 });
+
+const parentAreaOptions = computed(() => [
+    { value: null, label: 'None (top level)' },
+    ...(props.areas ?? []).map((a) => ({ value: a.id, label: a.name })),
+]);
 
 function createArea() {
     form.post(base, {

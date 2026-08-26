@@ -6,6 +6,8 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestSchedule;
 use App\Models\FestStage;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use Carbon\Carbon;
 
 class FestItemScheduleService
@@ -19,6 +21,8 @@ class FestItemScheduleService
             ->get()
             ->keyBy('item_id');
 
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+
         return FestEventItem::query()
             ->where('event_id', $event->id)
             ->where('is_enabled', true)
@@ -26,13 +30,16 @@ class FestItemScheduleService
             ->orderBy('display_order')
             ->orderBy('title')
             ->get()
-            ->map(fn (FestEventItem $item) => $this->rowFromItem($item, $schedules->get($item->id)))
+            ->map(fn (FestEventItem $item) => $this->rowFromItem($item, $schedules->get($item->id), $classGroupLabels))
             ->values()
             ->all();
     }
 
-    /** @return array<string, mixed> */
-    public function rowFromItem(FestEventItem $item, ?FestSchedule $schedule = null): array
+    /**
+     * @param  array<string, string>  $classGroupLabels
+     * @return array<string, mixed>
+     */
+    public function rowFromItem(FestEventItem $item, ?FestSchedule $schedule = null, array $classGroupLabels = []): array
     {
         $at = $schedule?->scheduled_at;
 
@@ -42,6 +49,7 @@ class FestItemScheduleService
             'head_id'        => $item->head_id,
             'head_name'      => $item->head?->name,
             'age_group'      => $item->age_group,
+            'category_label' => FestItemCategoryLabel::resolve($item, $classGroupLabels),
             'gender'         => $item->gender,
             'schedule_id'    => $schedule?->id,
             'scheduled_at'   => $at?->format('Y-m-d\TH:i'),

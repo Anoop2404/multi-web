@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Support\CsvSafety;
 use App\Models\DataChangeLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -78,10 +79,10 @@ class AuditLogController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['When', 'Scope', 'Action', 'Description', 'Actor', 'Email', 'Subject type', 'Subject ID', 'IP', 'Changes', 'Properties']);
+            CsvSafety::fputcsv($out, ['When', 'Scope', 'Action', 'Description', 'Actor', 'Email', 'Subject type', 'Subject ID', 'IP', 'Changes', 'Properties']);
 
             foreach ($rows as $log) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $log->created_at?->toDateTimeString(),
                     $log->log_name ? Str::headline(str_replace('_', ' ', $log->log_name)) : 'General',
                     $log->action,

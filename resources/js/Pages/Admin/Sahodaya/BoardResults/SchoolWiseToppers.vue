@@ -86,32 +86,44 @@
             <div class="grid sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Report Mode</label>
-                    <select v-model="selectedMode" class="field text-xs bg-white font-semibold" @change="applyServerFilters">
-                        <option value="one_per_school">🏫 1 Overall Topper Per School</option>
-                        <option value="all">📋 Total Toppers List</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedMode"
+                        :options="[{ value: 'one_per_school', label: '🏫 1 Overall Topper Per School' }, { value: 'all', label: '📋 Total Toppers List' }]"
+                        :all-option="false"
+                        @change="applyServerFilters"
+                    />
                 </div>
 
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Academic Year</label>
-                    <select v-model="selectedYear" class="field text-xs bg-white font-semibold" @change="applyServerFilters">
-                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">{{ ay.label }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedYear"
+                        :options="academicYearSelectOptions"
+                        :all-option="false"
+                        @change="applyServerFilters"
+                    />
                 </div>
 
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Class</label>
-                    <select v-model="selectedClass" class="field text-xs bg-white font-semibold" @change="applyServerFilters">
-                        <option v-for="c in classOptions" :key="c" :value="c">Class {{ c }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedClass"
+                        :options="classSelectOptions"
+                        :all-option="false"
+                        @change="applyServerFilters"
+                    />
                 </div>
 
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Stream</label>
-                    <select v-model="selectedStream" class="field text-xs bg-white font-semibold" @change="applyServerFilters" :disabled="selectedClass !== 12">
-                        <option :value="null">All Streams</option>
-                        <option v-for="s in streamOptions" :key="s" :value="s">{{ s }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedStream"
+                        :options="streamOptions"
+                        :all-option="true"
+                        all-label="All Streams"
+                        :disabled="selectedClass !== 12"
+                        @change="applyServerFilters"
+                    />
                 </div>
 
                 <div v-if="selectedMode === 'one_per_school'" class="flex items-center gap-2 pt-5">
@@ -192,6 +204,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PdfPreviewModal from '@/Components/ui/PdfPreviewModal.vue';
 import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
 import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
@@ -212,6 +225,14 @@ const selectedYear = ref(props.filters.academic_year);
 const selectedClass = ref(props.filters.class || 10);
 const selectedStream = ref(props.filters.stream || null);
 const selectedMode = ref(props.filters.mode || 'one_per_school');
+
+const academicYearSelectOptions = computed(() =>
+    props.academicYearOptions.map((ay) => ({ value: ay.label, label: ay.label })),
+);
+
+const classSelectOptions = computed(() =>
+    props.classOptions.map((c) => ({ value: c, label: `Class ${c}` })),
+);
 
 const pdfPreviewUrl = computed(() => {
     let url = `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/school-wise-toppers/pdf?academic_year=${encodeURIComponent(selectedYear.value || '')}&class=${selectedClass.value}`;

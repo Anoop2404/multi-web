@@ -21,20 +21,14 @@
             </FormField>
             <FormField label="Category">
                 <template #default="{ id }">
-                    <select :id="id" v-model="category" class="field">
-                        <option value="">All categories</option>
-                        <option v-for="(label, key) in categoryLabels" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect :id="id" v-model="category" :options="categoryOptions"
+                                       :all-option="true" all-label="All categories" />
                 </template>
             </FormField>
             <FormField label="Academic year">
                 <template #default="{ id }">
-                    <select :id="id" v-model="financialYearId" class="field">
-                        <option value="">All years</option>
-                        <option v-for="y in academicYears" :key="y.id" :value="String(y.id)">
-                            {{ y.label }} ({{ y.status }})
-                        </option>
-                    </select>
+                    <SearchableSelect :id="id" v-model="financialYearId" :options="academicYearOptions"
+                                       :all-option="true" all-label="All years" />
                 </template>
             </FormField>
             <button type="submit" class="btn-primary">Apply</button>
@@ -242,6 +236,7 @@
 import { ref, computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -258,6 +253,9 @@ const from = ref(props.filterFrom ?? '');
 const to   = ref(props.filterTo ?? '');
 const category = ref(props.filterCategory ?? '');
 const financialYearId = ref(props.filterFinancialYearId ? String(props.filterFinancialYearId) : '');
+
+const categoryOptions = computed(() => Object.entries(props.categoryLabels).map(([key, label]) => ({ value: key, label })));
+const academicYearOptions = computed(() => props.academicYears.map(y => ({ value: String(y.id), label: `${y.label} (${y.status})` })));
 
 const exportUrl = computed(() => {
     const base = `/sahodaya-admin/${props.sahodaya.id}/ledger/export`;

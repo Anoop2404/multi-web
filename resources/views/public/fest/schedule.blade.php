@@ -28,6 +28,9 @@
                 <td class="p-3">
                     @if($row['item_id'] && $row['item_title'])
                     <a href="{{ route('tenant.fest.item-schedule', [$event->id, $row['item_id']]) }}" class="text-amber-400 hover:underline">{{ $row['item_title'] }}</a>
+                    @if($row['category_label'] ?? null)
+                    <span class="block text-xs text-white/40">{{ $row['category_label'] }}</span>
+                    @endif
                     @else <span class="text-white/30">—</span> @endif
                 </td>
                 <td class="p-3">

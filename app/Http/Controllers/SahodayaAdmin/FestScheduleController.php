@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\CsvSafety;
 use App\Support\FestPageActivity;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
@@ -15,6 +16,7 @@ use App\Services\Events\FestScheduleConflictService;
 use App\Services\Events\FestScheduleImportService;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestParticipantLookupService;
+use App\Support\FestClassGroupScheme;
 use Illuminate\Http\Request;
 
 class FestScheduleController extends SahodayaAdminController
@@ -55,6 +57,8 @@ class FestScheduleController extends SahodayaAdminController
             'clashCount'   => count($clashes) + count($stageConflicts),
             'clashes'      => array_slice($clashes, 0, 25),
             'stageConflicts' => array_slice($stageConflicts, 0, 25),
+            'classGroupLabels' => FestClassGroupScheme::labels(null, $event),
+            'ageGroupLabels'   => config('fest_item_taxonomy.age_group', []),
         ]));
     }
 
@@ -214,9 +218,9 @@ class FestScheduleController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['item_id', 'item_title', 'reg_no', 'chest_no', 'name', 'scheduled_at', 'stage', 'sort_order']);
+            CsvSafety::fputcsv($out, ['item_id', 'item_title', 'reg_no', 'chest_no', 'name', 'scheduled_at', 'stage', 'sort_order']);
             foreach ($rows as $row) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $row['item_id'],
                     $row['item_title'],
                     $row['reg_no'],
@@ -351,9 +355,9 @@ class FestScheduleController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($itemSchedule, $event) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['item_id', 'item_title', 'scheduled_date', 'scheduled_time', 'stage', 'sort_order']);
+            CsvSafety::fputcsv($out, ['item_id', 'item_title', 'scheduled_date', 'scheduled_time', 'stage', 'sort_order']);
             foreach ($itemSchedule->rowsForEvent($event) as $row) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $row['item_id'],
                     $row['title'],
                     $row['scheduled_date'] ?? '',

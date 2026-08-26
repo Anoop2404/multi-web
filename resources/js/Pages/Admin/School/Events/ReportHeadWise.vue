@@ -122,7 +122,10 @@
                                                        :class-label="row.class"
                                                        :photo-url="row.photo_url" />
                                 </td>
-                                <td>{{ row.item }}</td>
+                                <td>
+                                    {{ row.item }}
+                                    <span v-if="row.category_label" class="text-slate-400"> · {{ row.category_label }}</span>
+                                </td>
                                 <td class="font-mono text-xs">{{ row.fest_id ?? '—' }}</td>
                                 <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
                                 <td class="capitalize text-xs">{{ row.status ?? '—' }}</td>

@@ -147,10 +147,8 @@
             <form v-else-if="parentEvents?.length" @submit.prevent="linkParent" class="card space-y-3">
                 <h3 class="font-semibold">Link to Sahodaya sports meet</h3>
                 <p class="text-xs text-slate-500">Required before submitting school-round winners to the cluster meet.</p>
-                <select v-model="parentEventId" class="field" required>
-                    <option value="">Select Sahodaya event…</option>
-                    <option v-for="p in parentEvents" :key="p.id" :value="p.id">{{ p.title }} ({{ p.level_round }})</option>
-                </select>
+                <SearchableSelect v-model="parentEventId" :options="parentEventOptions"
+                                  :all-option="true" all-label="Select Sahodaya event…" :required="true" />
                 <button class="btn-primary text-sm">Link parent event</button>
             </form>
             <EmptyState v-else title="No Sahodaya sports events" description="Ask Sahodaya to publish a cluster sports meet first." icon="🔗" />
@@ -172,9 +170,10 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -207,6 +206,10 @@ const tabDescriptions = {
 };
 
 const parentEventId = ref('');
+const parentEventOptions = computed(() => (props.parentEvents ?? []).map((p) => ({
+    value: p.id,
+    label: `${p.title} (${p.level_round})`,
+})));
 const forms = reactive({});
 const bulkRank = reactive({});
 

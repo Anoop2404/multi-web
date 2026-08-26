@@ -2,10 +2,14 @@
     <PortalLayout role-label="House Admin Portal" :title="`${house?.name || 'House'} Ranking`" accent="emerald" :nav-items="navItems">
         <form class="mb-4 flex gap-2 items-center">
             <label class="text-xs text-gray-500">Event filter</label>
-            <select v-model="eventFilter" @change="applyFilter" class="field text-sm max-w-xs">
-                <option value="">All events (cumulative)</option>
-                <option v-for="e in events" :key="e.id" :value="e.id">{{ e.title }}</option>
-            </select>
+            <SearchableSelect
+                v-model="eventFilter"
+                @change="applyFilter"
+                class="max-w-xs"
+                :options="eventOptions"
+                :all-option="true"
+                all-label="All events (cumulative)"
+            />
         </form>
 
         <div class="card card--flush">
@@ -41,6 +45,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { houseAdminPortalNavItems } from '@/support/houseAdminPortalNav.js';
@@ -55,6 +60,7 @@ const props = defineProps({
 
 const eventFilter = ref(props.selectedEvent ?? '');
 const navItems = computed(() => houseAdminPortalNavItems(props.school.id));
+const eventOptions = computed(() => (props.events || []).map(e => ({ value: e.id, label: e.title })));
 
 function applyFilter() {
     const q = eventFilter.value ? `?event_id=${eventFilter.value}` : '';

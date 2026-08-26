@@ -63,13 +63,10 @@
                             <td class="font-bold text-slate-900">{{ r.student?.name || r.participant_name || '—' }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td>
-                                <select v-model="forms[r.id].attendance_status" class="field text-xs" :aria-label="`Attendance for ${r.student?.name}`">
-                                    <option value="pending">Pending</option>
-                                    <option value="present">Present</option>
-                                    <option value="absent">Absent</option>
-                                    <option value="malpractice">Malpractice</option>
-                                    <option value="withheld">Withheld</option>
-                                </select>
+                                <SearchableSelect v-model="forms[r.id].attendance_status"
+                                    :options="[{ value: 'pending', label: 'Pending' }, { value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' }, { value: 'malpractice', label: 'Malpractice' }, { value: 'withheld', label: 'Withheld' }]"
+                                    :all-option="false" placeholder="Select status"
+                                    :aria-label="`Attendance for ${r.student?.name}`" />
                             </td>
                             <td>
                                 <input v-if="['malpractice','withheld'].includes(forms[r.id].attendance_status)"
@@ -103,6 +100,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const alertMessage = ref('');
 

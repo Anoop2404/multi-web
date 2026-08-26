@@ -4,11 +4,10 @@
             <!-- Tenant selector -->
             <div class="card flex items-center gap-4">
                 <label class="text-sm font-semibold text-gray-600">Editing site:</label>
-                <select v-model="selectedTenantId" @change="loadSections"
-                        class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 max-w-xs focus:outline-none focus:ring-2">
-                    <option value="">— Select a tenant —</option>
-                    <option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }} ({{ t.type }})</option>
-                </select>
+                <SearchableSelect v-model="selectedTenantId" @change="loadSections"
+                        :options="tenantOptions"
+                        :all-option="true" all-label="— Select a tenant —"
+                        class="flex-1 max-w-xs" />
                 <button v-if="selectedTenantId" @click="addSection"
                         class="btn-primary ml-auto">
                     + Add Section
@@ -83,17 +82,17 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="form-label mb-1">Section Type</label>
-                            <select v-model="modal.form.section_type"
-                                    class="field">
-                                <option v-for="t in sectionTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
-                            </select>
+                            <SearchableSelect v-model="modal.form.section_type"
+                                    :options="sectionTypes"
+                                    :all-option="false"
+                                    placeholder="Select section type" />
                         </div>
                         <div>
                             <label class="form-label mb-1">Variant</label>
-                            <select v-model="modal.form.variant"
-                                    class="field">
-                                <option v-for="v in variantsFor(modal.form.section_type)" :key="v" :value="v">{{ v }}</option>
-                            </select>
+                            <SearchableSelect v-model="modal.form.variant"
+                                    :options="variantsFor(modal.form.section_type)"
+                                    :all-option="false"
+                                    placeholder="Select variant" />
                         </div>
                     </div>
 
@@ -140,10 +139,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive, watch, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import SectionConfigForm from '@/Components/SectionConfigForm.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -151,6 +151,8 @@ const props = defineProps({
 });
 
 const { confirm } = useConfirm();
+
+const tenantOptions = computed(() => props.tenants.map(t => ({ value: t.id, label: `${t.name} (${t.type})` })));
 
 const selectedTenantId = ref('');
 const sections = ref([]);

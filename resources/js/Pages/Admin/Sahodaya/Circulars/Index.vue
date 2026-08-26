@@ -32,9 +32,8 @@
                 </FormField>
                 <FormField label="Category">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.category" class="field">
-                            <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="form.category" :options="categories"
+                                          :all-option="false" placeholder="Select category" />
                     </template>
                 </FormField>
                 <FormField label="Issue date">
@@ -168,6 +167,7 @@
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { ref, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';

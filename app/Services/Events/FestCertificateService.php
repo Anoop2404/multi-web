@@ -13,6 +13,7 @@ use App\Models\FestVolunteer;
 use App\Models\FestRecordBreak;
 use App\Models\Tenant;
 use App\Support\FestClassGroupScheme;
+use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Illuminate\Support\Str;
@@ -545,6 +546,40 @@ class FestCertificateService
         ]);
     }
 
+    /**
+     * Serves RenderCertificateChunkJob's cached PDF when one exists and is fresh,
+     * otherwise renders on the spot — the exact cache-check duplicated across
+     * FestCertificateController::downloadZip() and
+     * SchoolAdmin\FestEventPortalController::downloadCertificatesZip() before this
+     * extraction. $buildContext is only invoked on a cache miss — building a full
+     * embedAssets renderContext() is the expensive part callers were already avoiding
+     * on cache hits, so this keeps that optimization rather than forcing it eagerly.
+     *
+     * @param  \Closure(): array  $buildContext  Returns a renderContext()-shaped array
+     *                                            (embedAssets: true, qr_src set) —
+     *                                            same shape RenderCertificateChunkJob
+     *                                            used to produce the cached file, so a
+     *                                            cache-miss render matches a cache-hit
+     *                                            one.
+     */
+    public function cachedOrFreshPdf(Certificate $certificate, \Closure $buildContext, bool $plain = false): string
+    {
+        $cachedPath = $plain ? $certificate->plain_file_path : $certificate->file_path;
+
+        if ($cachedPath && ! $certificate->is_stale && TenantStorage::exists($cachedPath, $certificate->storage_disk)) {
+            return TenantStorage::get($cachedPath, $certificate->storage_disk);
+        }
+
+        $context = $buildContext();
+        // Defaulting to landscape (PdfGenerator::render()'s own default) silently
+        // mis-renders any portrait template on a cache miss — RenderCertificateChunkJob
+        // always derives this from the template instead of relying on the default.
+        $isLandscape = ($context['overlayLayout']['orientation'] ?? 'landscape') !== 'portrait';
+        $html = view('fest.certificate-print', array_merge($context, $plain ? ['plainMode' => true] : []))->render();
+
+        return PdfGenerator::render($html, $isLandscape);
+    }
+
     /** @param  array<string, ?string>  $cache */
     private function cachedAssetDataUri(array &$cache, string $key, \Closure $resolve): ?string
     {
@@ -658,7 +693,19 @@ class FestCertificateService
         $categoryName = $this->humanJoin($taxonomies->pluck('category')->unique()->values()->all());
         $participationType = $this->humanJoin($taxonomies->pluck('type')->unique()->values()->all());
 
+        // Same gender-normalization pattern as participantPhotoUrl() above, applied to a
+        // Master/Miss honorific instead of an avatar choice. Falls back to the
+        // non-committal "Master/Miss" (rather than guessing) for teachers, an unset
+        // gender, or 'other' — student.gender is a nullable enum, not guaranteed present.
+        $rawGender = strtolower((string) ($participant?->student?->gender ?? ''));
+        $salutation = match (true) {
+            str_starts_with($rawGender, 'f') => 'Miss',
+            str_starts_with($rawGender, 'm') => 'Master',
+            default => 'Master/Miss',
+        };
+
         return [
+            'salutation'          => $salutation,
             'recipient_name'      => $recipientName,
             'school_name'         => $schoolName,
             'event_title'         => $event?->title ?? '',
@@ -691,7 +738,19 @@ class FestCertificateService
             // token at all.
             'participation_items_box' => $certType === 'participation' ? $this->participationItemsBoxHtml($items, $taxonomies) : '',
             'sahodaya_name'       => $sahodaya ? strtoupper($sahodaya->name) : '',
-            'certificate_date'    => now()->format('j F Y'),
+            // Ordinal suffix ("25th August 2026") to match the convention already used
+            // elsewhere for fest dates (event_dates/conducted_on's sample values are
+            // "21st - 23rd July 2026" style) — plain "j F Y" read as inconsistent next to
+            // those on the same certificate. The suffix itself is wrapped in <sup> —
+            // formal/certificate typography convention — which is why this is real HTML,
+            // not plain text (see the certificate_date escaping exemption in
+            // certificate-body.blade.php's substitution loop).
+            // Plain bold, no color override — {recipient_name}/{school_name}/{venue} in
+            // this same sentence are all bold-with-inherited-color (no special treatment
+            // of their own), so giving numbers a distinct accent color made them read as
+            // a mismatched, separate style rather than consistent emphasis. Bold alone
+            // matches how every other emphasized token in the sentence is already styled.
+            'certificate_date'    => '<strong>'.now()->format('j').'</strong><sup>'.now()->format('S').'</sup> '.now()->format('F').' <strong>'.now()->format('Y').'</strong>',
         ];
     }
 
@@ -800,12 +859,24 @@ class FestCertificateService
         $entries = $shown->values()->map(function (FestEventItem $item, int $i) use ($taxonomies) {
             $tax = $taxonomies->get($i, ['category' => '', 'type' => '']);
             $meta = trim(implode('  •  ', array_filter([$tax['category'] ?? '', $tax['type'] ?? ''])));
+            // Bold just the digits ("Category 1" -> "Category <strong>1</strong>") —
+            // split on digit runs first and escape only the surrounding text parts, so a
+            // category/type label containing an apostrophe or similar can't have its
+            // escaped HTML entity (e.g. &#039;) corrupted by the same digit-matching
+            // regex matching *inside* the entity. Odd indices are the captured digit runs
+            // (PREG_SPLIT_DELIM_CAPTURE alternates text, digits, text, digits, ...).
+            $metaParts = preg_split('/(\d+)/', $meta, -1, PREG_SPLIT_DELIM_CAPTURE);
+            $metaSafe = implode('', array_map(
+                fn ($part, $partIndex) => $partIndex % 2 === 1 ? '<strong>'.$part.'</strong>' : e($part),
+                $metaParts,
+                array_keys($metaParts)
+            ));
             // Meta stays a size step below the item name (still larger than the original
             // 0.65em) — keeping both at the same size left long category/type combos (e.g.
             // "General Category • Team") wide enough to wrap the row onto a second line,
             // which pushed the box past its reserved zone for exactly the item counts this
             // is supposed to protect.
-            $metaInline = $meta !== '' ? ' <span style="font-size:0.86em;font-weight:400;color:#64748b;">('.e($meta).')</span>' : '';
+            $metaInline = $meta !== '' ? ' <span style="font-size:0.86em;font-weight:400;color:#64748b;">('.$metaSafe.')</span>' : '';
 
             return '<span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>'.e($item->title).'</strong>'.$metaInline.'</span>';
         });

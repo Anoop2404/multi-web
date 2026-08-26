@@ -42,10 +42,7 @@
                     <span v-if="!maskNames">{{ p.student?.name ?? p.teacher?.name }}</span>
                     <span v-else class="text-gray-400 text-xs">(anonymous)</span>
                 </div>
-                <select v-if="!isSports" v-model="forms[p.id].grade" class="field">
-                    <option value="">Grade</option>
-                    <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
-                </select>
+                <SearchableSelect v-if="!isSports" v-model="forms[p.id].grade" :options="gradeOptions" :all-option="true" all-label="Grade" />
                 <input v-model.number="forms[p.id].position" type="number" min="1" placeholder="Rank (ties OK)" class="field" title="Same rank allowed for ties">
                 <input v-model.number="forms[p.id].score" type="number" min="0" step="0.01" placeholder="Score" class="field">
                 <template v-if="showMeasurement(reg.item)">
@@ -61,6 +58,7 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { judgePortalNavItems } from '@/support/judgePortalNav.js';
 import { computed, reactive, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';

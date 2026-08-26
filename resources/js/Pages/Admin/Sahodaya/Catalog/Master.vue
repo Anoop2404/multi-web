@@ -36,30 +36,38 @@
                 <div class="card !p-4 space-y-3">
                     <form @submit.prevent="applyFilters" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <input v-model="filterForm.q" class="field sm:col-span-2 lg:col-span-4" placeholder="Search name or code">
-                        <select v-if="isSports" v-model="filterForm.head_key" class="field">
-                            <option value="">All heads</option>
-                            <option value="__none__">No head assigned</option>
-                            <option v-for="head in itemHeads" :key="head.key" :value="head.key">{{ head.name }}</option>
-                        </select>
-                        <select v-if="isSports" v-model="filterForm.age_group" class="field">
-                            <option value="">All ages</option>
-                            <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                        <select v-model="filterForm.gender" class="field">
-                            <option value="">All genders</option>
-                            <option v-for="(label, key) in taxonomy?.gender ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                        <select v-model="filterForm.participant_type" class="field">
-                            <option value="">All formats</option>
-                            <option value="individual">Individual</option>
-                            <option value="group">Group</option>
-                            <option value="team">Team</option>
-                        </select>
-                        <select v-model="filterForm.enabled" class="field">
-                            <option value="">All statuses</option>
-                            <option value="1">Enabled</option>
-                            <option value="0">Disabled</option>
-                        </select>
+                        <SearchableSelect
+                            v-if="isSports"
+                            v-model="filterForm.head_key"
+                            :options="[{ value: '__none__', label: 'No head assigned' }, ...itemHeadOptions]"
+                            :all-option="true"
+                            all-label="All heads"
+                        />
+                        <SearchableSelect
+                            v-if="isSports"
+                            v-model="filterForm.age_group"
+                            :options="ageGroupOptions"
+                            :all-option="true"
+                            all-label="All ages"
+                        />
+                        <SearchableSelect
+                            v-model="filterForm.gender"
+                            :options="genderOptions"
+                            :all-option="true"
+                            all-label="All genders"
+                        />
+                        <SearchableSelect
+                            v-model="filterForm.participant_type"
+                            :options="[{ value: 'individual', label: 'Individual' }, { value: 'group', label: 'Group' }, { value: 'team', label: 'Team' }]"
+                            :all-option="true"
+                            all-label="All formats"
+                        />
+                        <SearchableSelect
+                            v-model="filterForm.enabled"
+                            :options="[{ value: '1', label: 'Enabled' }, { value: '0', label: 'Disabled' }]"
+                            :all-option="true"
+                            all-label="All statuses"
+                        />
                         <div class="sm:col-span-2 lg:col-span-4 flex flex-wrap gap-2">
                             <button type="submit" class="btn-primary text-sm">Apply filters</button>
                             <button type="button" class="btn-secondary text-sm" @click="clearFilters">Clear</button>
@@ -138,38 +146,55 @@
                 <FormSection title="Add custom item" hint="Saved to master catalog for all years.">
                     <form @submit.prevent="addCustom" class="space-y-3">
                         <input v-model="customForm.title" class="field text-sm" placeholder="Item name *" required>
-                        <select v-if="isSports" v-model="customForm.head_key" class="field text-sm" required>
-                            <option disabled value="">Main head *</option>
-                            <option v-for="head in itemHeads" :key="head.key" :value="head.key">{{ head.name }}</option>
-                        </select>
-                        <select v-if="isSports" v-model="customForm.age_group" class="field text-sm">
-                            <option value="">Age group</option>
-                            <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-if="isSports"
+                            v-model="customForm.head_key"
+                            :options="itemHeadOptions"
+                            :all-option="false"
+                            placeholder="Main head *"
+                            :required="true"
+                        />
+                        <SearchableSelect
+                            v-if="isSports"
+                            v-model="customForm.age_group"
+                            :options="ageGroupOptions"
+                            :all-option="true"
+                            all-label="Age group"
+                        />
                         <div v-if="isSports" class="grid grid-cols-2 gap-2">
-                            <select v-model="customForm.venue_type" class="field text-sm">
-                                <option value="">Venue</option>
-                                <option v-for="(label, key) in taxonomy?.venue_type ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
-                            <select v-model="customForm.competition_format" class="field text-sm">
-                                <option value="">Format</option>
-                                <option v-for="(label, key) in taxonomy?.competition_format ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="customForm.venue_type"
+                                :options="venueTypeOptions"
+                                :all-option="true"
+                                all-label="Venue"
+                            />
+                            <SearchableSelect
+                                v-model="customForm.competition_format"
+                                :options="competitionFormatOptions"
+                                :all-option="true"
+                                all-label="Format"
+                            />
                         </div>
-                        <select v-if="isSports" v-model="customForm.sport_discipline" class="field text-sm">
-                            <option value="">Discipline</option>
-                            <option v-for="(label, key) in taxonomy?.sport_discipline ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-if="isSports"
+                            v-model="customForm.sport_discipline"
+                            :options="sportDisciplineOptions"
+                            :all-option="true"
+                            all-label="Discipline"
+                        />
                         <div class="grid grid-cols-2 gap-2">
-                            <select v-model="customForm.gender" class="field text-sm">
-                                <option value="open">Open gender</option>
-                                <option v-for="(label, key) in taxonomy?.gender ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
-                            <select v-model="customForm.participant_type" class="field text-sm">
-                                <option value="individual">Individual</option>
-                                <option value="group">Group</option>
-                                <option value="team">Team</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="customForm.gender"
+                                :options="[{ value: 'open', label: 'Open gender' }, ...genderOptions]"
+                                :all-option="false"
+                                placeholder="Gender"
+                            />
+                            <SearchableSelect
+                                v-model="customForm.participant_type"
+                                :options="[{ value: 'individual', label: 'Individual' }, { value: 'group', label: 'Group' }, { value: 'team', label: 'Team' }]"
+                                :all-option="false"
+                                placeholder="Participant type"
+                            />
                         </div>
                         <input v-model.number="customForm.fee_amount" type="number" min="0" step="0.01" class="field text-sm" placeholder="Fee ₹ (optional)">
                         <Link v-if="taxonomyMastersUrl" :href="taxonomyMastersUrl" class="text-xs link-brand block">Category masters →</Link>
@@ -204,38 +229,55 @@
                         <input v-model="editForm.is_enabled" type="checkbox" class="rounded"> Enabled for assignment
                     </label>
                     <div class="grid grid-cols-2 gap-2">
-                        <select v-model="editForm.gender" class="field text-sm">
-                            <option value="open">Open gender</option>
-                            <option v-for="(label, key) in taxonomy?.gender ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                        <select v-model="editForm.participant_type" class="field text-sm">
-                            <option value="individual">Individual</option>
-                            <option value="group">Group</option>
-                            <option value="team">Team</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="editForm.gender"
+                            :options="[{ value: 'open', label: 'Open gender' }, ...genderOptions]"
+                            :all-option="false"
+                            placeholder="Gender"
+                        />
+                        <SearchableSelect
+                            v-model="editForm.participant_type"
+                            :options="[{ value: 'individual', label: 'Individual' }, { value: 'group', label: 'Group' }, { value: 'team', label: 'Team' }]"
+                            :all-option="false"
+                            placeholder="Participant type"
+                        />
                     </div>
-                    <select v-if="isSports" v-model="editForm.head_key" class="field text-sm" required>
-                        <option disabled value="">Main head *</option>
-                        <option v-for="head in itemHeads" :key="head.key" :value="head.key">{{ head.name }}</option>
-                    </select>
-                    <select v-if="isSports" v-model="editForm.age_group" class="field text-sm">
-                        <option value="">Age group</option>
-                        <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-if="isSports"
+                        v-model="editForm.head_key"
+                        :options="itemHeadOptions"
+                        :all-option="false"
+                        placeholder="Main head *"
+                        :required="true"
+                    />
+                    <SearchableSelect
+                        v-if="isSports"
+                        v-model="editForm.age_group"
+                        :options="ageGroupOptions"
+                        :all-option="true"
+                        all-label="Age group"
+                    />
                     <div v-if="isSports" class="grid grid-cols-2 gap-2">
-                        <select v-model="editForm.venue_type" class="field text-sm">
-                            <option value="">Venue</option>
-                            <option v-for="(label, key) in taxonomy?.venue_type ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                        <select v-model="editForm.competition_format" class="field text-sm">
-                            <option value="">Format</option>
-                            <option v-for="(label, key) in taxonomy?.competition_format ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="editForm.venue_type"
+                            :options="venueTypeOptions"
+                            :all-option="true"
+                            all-label="Venue"
+                        />
+                        <SearchableSelect
+                            v-model="editForm.competition_format"
+                            :options="competitionFormatOptions"
+                            :all-option="true"
+                            all-label="Format"
+                        />
                     </div>
-                    <select v-if="isSports" v-model="editForm.sport_discipline" class="field text-sm">
-                        <option value="">Discipline</option>
-                        <option v-for="(label, key) in taxonomy?.sport_discipline ?? {}" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-if="isSports"
+                        v-model="editForm.sport_discipline"
+                        :options="sportDisciplineOptions"
+                        :all-option="true"
+                        all-label="Discipline"
+                    />
                     <input v-model.number="editForm.fee_amount" type="number" min="0" step="0.01" class="field text-sm" placeholder="Fee ₹">
                 </div>
                 <div class="modal-foot flex justify-end gap-2">
@@ -270,6 +312,7 @@ import CatalogSubNav from '@/Components/sahodaya/CatalogSubNav.vue';
 import CatalogSectionNav from '@/Components/sahodaya/CatalogSectionNav.vue';
 import FestItemMetaIcons from '@/Components/sahodaya/FestItemMetaIcons.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 import { sahodayaCatalogHref, sahodayaCatalogSectionHref } from '@/support/sahodayaPrograms.js';
 
@@ -360,6 +403,13 @@ const headLabelMap = computed(() => Object.fromEntries(props.itemHeads.map((h) =
 function headLabel(key) {
     return headLabelMap.value[key] ?? key;
 }
+
+const itemHeadOptions = computed(() => props.itemHeads.map((h) => ({ value: h.key, label: h.name })));
+const ageGroupOptions = computed(() => Object.entries(props.ageGroupLabels ?? {}).map(([value, label]) => ({ value, label })));
+const genderOptions = computed(() => Object.entries(props.taxonomy?.gender ?? {}).map(([value, label]) => ({ value, label })));
+const venueTypeOptions = computed(() => Object.entries(props.taxonomy?.venue_type ?? {}).map(([value, label]) => ({ value, label })));
+const competitionFormatOptions = computed(() => Object.entries(props.taxonomy?.competition_format ?? {}).map(([value, label]) => ({ value, label })));
+const sportDisciplineOptions = computed(() => Object.entries(props.taxonomy?.sport_discipline ?? {}).map(([value, label]) => ({ value, label })));
 
 const allVisibleSelected = computed(() =>
     flatItems.value.length > 0 && flatItems.value.every((i) => selectedIds.value.includes(i.id)),

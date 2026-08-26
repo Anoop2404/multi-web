@@ -19,21 +19,23 @@
                 <form @submit.prevent="importToEvent" class="space-y-4 max-w-md">
                     <label class="block">
                         <span class="field-label">Fest event</span>
-                        <select v-model="importForm.event_id" class="field mt-1" required>
-                            <option value="">Choose event</option>
-                            <option v-for="ev in events" :key="ev.id" :value="ev.id">
-                                {{ ev.title }} ({{ ev.items_count ?? 0 }} items)
-                            </option>
-                        </select>
+                        <SearchableSelect
+                            v-model="importForm.event_id"
+                            class="mt-1"
+                            :options="eventOptions"
+                            :all-option="true"
+                            all-label="Choose event"
+                            :required="true"
+                        />
                     </label>
                     <label v-if="sections.length" class="block">
                         <span class="field-label">Catalog section</span>
-                        <select v-model="importForm.catalog_section" class="field mt-1">
-                            <option value="all">All enabled items ({{ summary.enabled }})</option>
-                            <option v-for="sec in sections" :key="sec.slug" :value="sec.slug">
-                                {{ sec.label }} ({{ sec.enabled }} enabled)
-                            </option>
-                        </select>
+                        <SearchableSelect
+                            v-model="importForm.catalog_section"
+                            class="mt-1"
+                            :options="catalogSectionOptions"
+                            :all-option="false"
+                        />
                     </label>
                     <button type="submit" class="btn-primary" :disabled="importForm.processing || !importForm.event_id">
                         Import into event
@@ -65,6 +67,7 @@ import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import CatalogSubNav from '@/Components/sahodaya/CatalogSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { sahodayaCatalogHref } from '@/support/sahodayaPrograms.js';
 
 const props = defineProps({
@@ -84,6 +87,19 @@ const eventQuery = computed(() => (page.props.event?.id ? `?event_id=${page.prop
 
 const catalogBase = computed(() => sahodayaCatalogHref(props.sahodaya.id, props.program.slug));
 const pageTitle = computed(() => `${props.program.label} — Assign to event`);
+
+const eventOptions = computed(() => props.events.map((ev) => ({
+    value: ev.id,
+    label: `${ev.title} (${ev.items_count ?? 0} items)`,
+})));
+
+const catalogSectionOptions = computed(() => [
+    { value: 'all', label: `All enabled items (${props.summary.enabled})` },
+    ...props.sections.map((sec) => ({
+        value: sec.slug,
+        label: `${sec.label} (${sec.enabled} enabled)`,
+    })),
+]);
 
 const importForm = useForm({
     event_id: page.props.event?.id ?? '',

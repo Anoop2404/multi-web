@@ -39,13 +39,12 @@
                                     <span class="text-xs text-gray-400">{{ enq.phone }}</span>
                                 </td>
                                 <td class="px-5 py-3">
-                                    <select :value="enq.status"
-                                            @change="updateStatus(enq, $event.target.value)"
+                                    <SearchableSelect :model-value="enq.status"
+                                            @update:model-value="(status) => updateStatus(enq, status)"
                                             @click.stop
-                                            class="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none bg-white"
-                                            :class="statusClass(enq.status)">
-                                        <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
-                                    </select>
+                                            :options="statuses"
+                                            :all-option="false"
+                                            :class="statusClass(enq.status)" />
                                 </td>
                                 <td class="px-5 py-3 text-gray-400 text-xs">
                                     {{ new Date(enq.created_at).toLocaleDateString('en-IN') }}
@@ -77,6 +76,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 

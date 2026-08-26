@@ -13,12 +13,7 @@
         <div class="card !p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-3">
                 <label class="form-label text-xs font-bold text-slate-700 mb-0">Academic Year</label>
-                <select v-model="selectedYear" @change="onYearChange" class="field text-sm font-bold bg-white w-44">
-                    <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                        {{ ay.label }}{{ ay.status === 'active' ? ' (Active)' : '' }}
-                    </option>
-                    <option v-if="!academicYearOptions.some(a => a.label === selectedYear)" :value="selectedYear">{{ selectedYear }}</option>
-                </select>
+                <SearchableSelect v-model="selectedYear" @change="onYearChange" :options="yearSelectorOptions" :all-option="false" class="w-44" />
             </div>
             <span class="text-[11px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide" :class="entryStatusBadgeClass">
                 {{ entryStatusLabel }}
@@ -130,15 +125,11 @@
             <div class="flex flex-wrap items-end gap-3">
                 <div>
                     <label class="text-xs font-semibold text-slate-700">From year</label>
-                    <select v-model="copyForm.from_year" class="field mt-1 text-sm">
-                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">{{ ay.label }}</option>
-                    </select>
+                    <SearchableSelect v-model="copyForm.from_year" :options="sortedYearLabels" :all-option="false" class="mt-1" />
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-700">To year</label>
-                    <select v-model="copyForm.to_year" class="field mt-1 text-sm">
-                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">{{ ay.label }}</option>
-                    </select>
+                    <SearchableSelect v-model="copyForm.to_year" :options="sortedYearLabels" :all-option="false" class="mt-1" />
                 </div>
                 <button type="button" class="btn-secondary text-sm" :disabled="copyForm.from_year === copyForm.to_year" @click="copyPreviousYear">
                     Copy settings →
@@ -153,6 +144,7 @@ import { computed, reactive, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -174,6 +166,17 @@ const selectedYear = ref(props.academicYear);
 function onYearChange() {
     router.get(`${base.value}/settings`, { academic_year: selectedYear.value }, { preserveScroll: true });
 }
+
+const yearSelectorOptions = computed(() => {
+    const opts = props.academicYearOptions.map(ay => ({
+        value: ay.label,
+        label: `${ay.label}${ay.status === 'active' ? ' (Active)' : ''}`,
+    }));
+    if (!props.academicYearOptions.some(a => a.label === selectedYear.value)) {
+        opts.push({ value: selectedYear.value, label: selectedYear.value });
+    }
+    return opts;
+});
 
 // ── Entry window ─────────────────────────────────────────────────────────
 const entryForm = reactive({

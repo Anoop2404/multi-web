@@ -11,9 +11,7 @@
                 <h3 class="font-semibold text-gray-900">New state program</h3>
                 <div class="grid sm:grid-cols-2 gap-3">
                     <input v-model="form.title" class="field" placeholder="Program title" required>
-                    <select v-model="form.event_type" class="field">
-                        <option v-for="(label, key) in eventTypes" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect v-model="form.event_type" :options="eventTypeOptions" :all-option="false" />
                 </div>
                 <div>
                     <p class="text-xs font-semibold text-gray-600 mb-2">Conducts at</p>
@@ -80,6 +78,7 @@
 import { computed, watch } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     programs: Array,
@@ -92,6 +91,8 @@ const form = useForm({
     event_type: 'kalolsavam',
     conduct_levels: ['state', 'sahodaya'],
 });
+
+const eventTypeOptions = computed(() => Object.entries(props.eventTypes ?? {}).map(([value, label]) => ({ value, label })));
 
 const selectableLevelLabels = computed(() => {
     const keys = form.event_type === 'sports' ? ['school', 'sahodaya'] : Object.keys(props.levelLabels ?? {});

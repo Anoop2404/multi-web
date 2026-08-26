@@ -103,10 +103,9 @@
                 <form @submit.prevent="updateTopology" class="pt-4 grid sm:grid-cols-3 gap-4 items-end text-xs">
                     <div>
                         <label class="font-bold text-slate-300 block mb-1.5 uppercase text-[10px] tracking-wider">Conduct Topology Mode</label>
-                        <select v-model="topologyForm.conduct_mode" class="field text-xs bg-white/10 text-white border-white/20 focus:bg-slate-900 focus:text-white">
-                            <option value="standard" class="text-slate-900">Single Venue / Single Event (Standard)</option>
-                            <option value="partitioned" class="text-slate-900">Region-Wise Partitions / Multi-Region</option>
-                        </select>
+                        <SearchableSelect v-model="topologyForm.conduct_mode"
+                                          :options="[{ value: 'standard', label: 'Single Venue / Single Event (Standard)' }, { value: 'partitioned', label: 'Region-Wise Partitions / Multi-Region' }]"
+                                          :all-option="false" />
                     </div>
 
                     <div class="flex items-center">
@@ -222,12 +221,9 @@
                                     </div>
                                     <div>
                                         <label class="form-label text-xs">Role</label>
-                                        <select v-model="partitionForm.partition_role" class="field text-xs">
-                                            <option value="region">Region</option>
-                                            <option value="finale">District Finale</option>
-                                            <option value="cluster">Cluster</option>
-                                            <option value="digi_fest">Digi Fest</option>
-                                        </select>
+                                        <SearchableSelect v-model="partitionForm.partition_role"
+                                                          :options="[{ value: 'region', label: 'Region' }, { value: 'finale', label: 'District Finale' }, { value: 'cluster', label: 'Cluster' }, { value: 'digi_fest', label: 'Digi Fest' }]"
+                                                          :all-option="false" />
                                     </div>
                                 </div>
                                 <div class="grid sm:grid-cols-2 gap-2">
@@ -299,10 +295,8 @@
                             <div v-if="!event.parent_event_id && conductPresets?.length" class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/80 space-y-2">
                                 <h5 class="text-xs font-bold text-slate-800">Conduct Presets</h5>
                                 <form @submit.prevent="applyPreset" class="flex gap-2">
-                                    <select v-model="presetForm.preset" class="field text-xs flex-1">
-                                        <option value="">Apply conduct preset…</option>
-                                        <option v-for="p in conductPresets" :key="p" :value="p">{{ p }}</option>
-                                    </select>
+                                    <SearchableSelect v-model="presetForm.preset" :options="conductPresets"
+                                                      all-label="Apply conduct preset…" class="flex-1" />
                                     <button class="btn-secondary text-xs shrink-0" :disabled="!presetForm.preset">Apply</button>
                                 </form>
                             </div>
@@ -344,12 +338,8 @@
                         <div v-for="school in memberSchools" :key="school.id" class="p-3 flex items-center justify-between gap-4 hover:bg-slate-50/70 transition">
                             <span class="font-medium text-slate-900 text-xs">{{ school.name }}</span>
                             <div class="w-64">
-                                <select v-model="assignmentMap[school.id]" class="field text-xs !py-1.5">
-                                    <option value="">— Select Region —</option>
-                                    <option v-for="p in partitions" :key="p.partition_key" :value="p.partition_key">
-                                        {{ p.cluster_label || p.title }}
-                                    </option>
-                                </select>
+                                <SearchableSelect v-model="assignmentMap[school.id]" :options="partitionRegionOptions"
+                                                  all-label="— Select Region —" />
                             </div>
                         </div>
                     </div>
@@ -373,6 +363,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import RegionDrillDownPanel from '@/Components/sahodaya/RegionDrillDownPanel.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -412,6 +403,7 @@ const showCustomForm = ref(false);
 
 const activePartitions = computed(() => props.partitions?.length ? props.partitions : (props.event.child_events || []));
 const assignedSchoolsCount = computed(() => Object.values(assignmentMap).filter(Boolean).length);
+const partitionRegionOptions = computed(() => (props.partitions || []).map(p => ({ value: p.partition_key, label: p.cluster_label || p.title })));
 
 const cascadeForm = useForm({ title: '' });
 const clusterForm = useForm({ title: '', cluster_key: '', cluster_label: '', venue: '', event_start: '', event_end: '' });

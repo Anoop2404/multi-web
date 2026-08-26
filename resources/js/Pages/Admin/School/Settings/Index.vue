@@ -141,11 +141,9 @@
                     <p class="text-xs text-gray-400 -mt-1">Sets the HTML lang attribute for accessibility and search engines.</p>
                     <div>
                         <label class="form-label mb-1.5">Public site language</label>
-                        <select v-model="form.locale"
-                                class="field">
-                            <option value="en">English</option>
-                            <option value="ml">Malayalam</option>
-                        </select>
+                        <SearchableSelect v-model="form.locale"
+                                :options="[{ value: 'en', label: 'English' }, { value: 'ml', label: 'Malayalam' }]"
+                                :all-option="false" />
                     </div>
                 </div>
 
@@ -163,6 +161,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 

@@ -73,22 +73,24 @@
                     </div>
 
                     <FormField v-if="cardScope === 'item'" label="Fest item" required>
-                        <select v-model="itemId" class="field text-sm" @change="onItemChange">
-                            <option value="">Select item…</option>
-                            <option value="all">All items (bundle PDF)</option>
-                            <option v-for="item in items" :key="item.id" :value="String(item.id)">
-                                {{ item.title }} ({{ itemCountLabel(item) }})
-                            </option>
-                        </select>
+                        <SearchableSelect
+                            v-model="itemId"
+                            :options="itemOptions"
+                            placeholder="Select item…"
+                            search-placeholder="Type item name to search…"
+                            :all-option="false"
+                            @change="onItemChange"
+                        />
                     </FormField>
 
                     <FormField v-if="cardScope === 'head'" :label="event.event_type === 'sports' ? 'Sport Event' : 'Item head'" required>
-                        <select v-model="headId" class="field text-sm" @change="loadPreview">
-                            <option value="">Select {{ event.event_type === 'sports' ? 'Sport Event' : 'item head' }}…</option>
-                            <option v-for="head in heads" :key="head.id" :value="String(head.id)">
-                                {{ head.name }} ({{ head.count }} cards)
-                            </option>
-                        </select>
+                        <SearchableSelect
+                            v-model="headId"
+                            :options="headOptions"
+                            :all-option="true"
+                            :all-label="`Select ${event.event_type === 'sports' ? 'Sport Event' : 'item head'}…`"
+                            @change="loadPreview"
+                        />
                     </FormField>
 
                     <div v-if="cardScope === 'item' && selectedItemSupportsTeam" class="flex flex-wrap gap-2">
@@ -171,6 +173,7 @@ import { computed, ref, onMounted } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import IdCardPreviewTile from '@/Components/fest/IdCardPreviewTile.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 
 const props = defineProps({
@@ -205,6 +208,20 @@ const templates = [
 ];
 
 const isAllItems = computed(() => cardScope.value === 'item' && itemId.value === 'all');
+
+function itemLabel(item) {
+    const withCategory = item.category_label ? `${item.title} — ${item.category_label}` : item.title;
+    return `${withCategory} (${itemCountLabel(item)})`;
+}
+
+const itemOptions = computed(() => [
+    { id: 'all', name: 'All items (bundle PDF)' },
+    ...props.items.map(item => ({ id: String(item.id), name: itemLabel(item) })),
+]);
+
+const headOptions = computed(() =>
+    props.heads.map(head => ({ id: String(head.id), name: `${head.name} (${head.count} cards)` })),
+);
 
 const selectedItem = computed(() =>
     props.items.find((item) => String(item.id) === String(itemId.value)) ?? null,

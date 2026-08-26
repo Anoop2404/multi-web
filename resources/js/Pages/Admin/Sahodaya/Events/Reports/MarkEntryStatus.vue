@@ -46,7 +46,7 @@
                     <tr>
                         <th>Head</th>
                         <th>Item</th>
-                        <th>Class</th>
+                        <th>Category</th>
                         <th>Competition</th>
                         <th>Progress</th>
                         <th>Judges</th>
@@ -66,7 +66,7 @@
                         <tr>
                             <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
                             <td class="font-medium">{{ row.title }}</td>
-                            <td>{{ row.class_group || '—' }}</td>
+                            <td>{{ categoryLabel(row) }}</td>
                             <td class="text-xs whitespace-nowrap">
                                 {{ formatDateRange(row.competition_start, row.competition_end) }}
                                 <span v-if="row.competition_time" class="block text-[10px] text-slate-400 font-mono">@ {{ row.competition_time.slice(0, 5) }}</span>
@@ -154,6 +154,17 @@ function applyFilter() {
         head_id: headFilter.value || undefined,
         item_id: itemFilter.value || undefined,
     }, { preserveScroll: true, preserveState: true });
+}
+
+function humanize(value) {
+    return String(value).replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function categoryLabel(row) {
+    if (row.category_label) return row.category_label;
+    if (row.class_group && row.class_group !== 'open') return humanize(row.class_group);
+    if (row.age_group) return humanize(row.age_group);
+    return '—';
 }
 
 function progressPercentage(row) {

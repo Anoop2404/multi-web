@@ -14,12 +14,8 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="min-w-0 lg:col-span-2 space-y-4">
                 <div class="card !p-4 flex flex-wrap gap-2 items-center">
-                    <select v-model="filterStatus" class="field text-sm w-40">
-                        <option value="">All statuses</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                    </select>
+                    <SearchableSelect v-model="filterStatus" class="w-40" :all-option="true" all-label="All statuses"
+                                      :options="[{ value: 'pending', label: 'Pending' }, { value: 'approved', label: 'Approved' }, { value: 'rejected', label: 'Rejected' }]" />
                     <span class="text-xs text-slate-500 ml-auto">{{ filteredAppeals.length }} appeal(s)</span>
                 </div>
 
@@ -84,12 +80,8 @@
             <aside class="min-w-0 space-y-4">
                 <FormSection title="Disqualify participant" hint="Administrative disqualification (not an appeal).">
                     <form @submit.prevent="submitDisqualify" class="space-y-3">
-                        <select v-model="disqualifyForm.participant_id" class="field text-sm" required>
-                            <option value="">Select participant</option>
-                            <option v-for="p in disqualifyCandidates" :key="p.id" :value="p.id">
-                                {{ p.label }}
-                            </option>
-                        </select>
+                        <SearchableSelect v-model="disqualifyForm.participant_id" :options="disqualifyCandidates"
+                                          :all-option="false" placeholder="Select participant" :required="true" />
                         <textarea v-model="disqualifyForm.reason" class="field text-sm h-20" placeholder="Reason *" required></textarea>
                         <button type="submit" class="btn-secondary w-full text-sm text-red-700 border-red-200">Disqualify</button>
                     </form>
@@ -133,6 +125,7 @@ import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,

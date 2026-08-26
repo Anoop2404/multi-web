@@ -7,18 +7,12 @@
         <form @submit.prevent="assign" class="card mb-4 grid gap-3 sm:grid-cols-2">
             <FormField label="User" class-extra="sm:col-span-2" required>
                 <template #default="{ id }">
-                    <select :id="id" v-model="form.user_id" class="field" required>
-                        <option value="">Select user</option>
-                        <option v-for="u in staffPool" :key="u.id" :value="u.id">{{ u.name }} ({{ u.email }})</option>
-                    </select>
+                    <SearchableSelect :id="id" v-model="form.user_id" :options="staffPool" :all-option="true" all-label="Select user" :required="true" />
                 </template>
             </FormField>
             <FormField label="Role on this exam">
                 <template #default="{ id }">
-                    <select :id="id" v-model="form.role" class="field">
-                        <option value="controller">Controller</option>
-                        <option value="staff">Staff</option>
-                    </select>
+                    <SearchableSelect :id="id" v-model="form.role" :all-option="false" :options="[{ value: 'controller', label: 'Controller' }, { value: 'staff', label: 'Staff' }]" />
                 </template>
             </FormField>
             <div class="sm:col-span-2">
@@ -44,6 +38,7 @@
 import { Link, useForm, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, assignments: Array, staffPool: Array });
 const form = useForm({ user_id: '', role: 'staff' });

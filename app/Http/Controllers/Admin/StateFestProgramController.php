@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Support\CsvSafety;
 use App\Http\Controllers\Controller;
 use App\Models\FestEvent;
 use App\Models\FestMark;
@@ -196,9 +197,9 @@ class StateFestProgramController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Participant', 'Reg No', 'School', 'Item', 'Category', 'Grade', 'From Event', 'Next Level', 'Promoted At']);
+            CsvSafety::fputcsv($out, ['Participant', 'Reg No', 'School', 'Item', 'Category', 'Grade', 'From Event', 'Next Level', 'Promoted At']);
             foreach ($rows as $w) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $w['participant'], $w['reg_no'], $w['school'], $w['item'], $w['category'],
                     $w['grade'], $w['from_event'], $w['next_level'], $w['promoted_at'],
                 ]);

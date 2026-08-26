@@ -7,6 +7,7 @@ use App\Models\FestEvent;
 use App\Models\FestJudgeAssignment;
 use App\Models\User;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Support\FestClassGroupScheme;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -32,6 +33,7 @@ class FestJudgeAssignmentController extends SahodayaAdminController
             'event'       => $event,
             'assignments' => $assignments,
             'judges'      => $judges,
+            'classGroupLabels' => FestClassGroupScheme::labels(null, $event),
         ]));
     }
 

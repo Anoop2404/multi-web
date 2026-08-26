@@ -20,10 +20,7 @@
                 <input v-model="form.name" class="field" required placeholder="e.g. Chess">
             </FormField>
             <FormField label="Sport discipline">
-                <select v-model="form.sport_discipline" class="field">
-                    <option value="">Any</option>
-                    <option v-for="(label, key) in disciplines" :key="key" :value="key">{{ label }}</option>
-                </select>
+                <SearchableSelect v-model="form.sport_discipline" :options="disciplineOptions" :all-option="true" all-label="Any" />
             </FormField>
             <label class="flex items-center gap-2 text-sm pb-2">
                 <input type="checkbox" v-model="form.is_team_heading"> ID card heading
@@ -89,6 +86,7 @@ import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import CatalogSubNav from '@/Components/sahodaya/CatalogSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { sahodayaCatalogHref } from '@/support/sahodayaPrograms.js';
 
 const props = defineProps({
@@ -104,6 +102,7 @@ const props = defineProps({
 });
 
 const catalogBase = computed(() => sahodayaCatalogHref(props.sahodaya.id, props.program.slug));
+const disciplineOptions = computed(() => Object.entries(props.disciplines).map(([value, label]) => ({ value, label })));
 const masterUrl = computed(() => `${catalogBase.value}/master`);
 const pageTitle = computed(() => `${props.program.label} — Event Heads`);
 

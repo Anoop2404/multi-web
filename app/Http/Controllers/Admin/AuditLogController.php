@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Support\CsvSafety;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Tenant;
@@ -88,10 +89,10 @@ class AuditLogController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['When', 'Category', 'Action', 'Description', 'User', 'Email', 'IP', 'Subject type', 'Subject ID', 'Properties']);
+            CsvSafety::fputcsv($out, ['When', 'Category', 'Action', 'Description', 'User', 'Email', 'IP', 'Subject type', 'Subject ID', 'Properties']);
 
             foreach ($rows as $log) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $log->created_at?->toDateTimeString(),
                     AuditLogCatalog::label($log->category ?? 'system'),
                     $log->action,

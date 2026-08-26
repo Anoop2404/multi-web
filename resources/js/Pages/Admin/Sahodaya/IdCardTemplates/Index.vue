@@ -16,29 +16,39 @@
 
                 <FormField label="Audience" hint="Leave blank to apply to all audiences.">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.audience" class="field">
-                            <option :value="null">All audiences</option>
-                            <option value="student">Student</option>
-                            <option value="volunteer">Volunteer</option>
-                            <option value="staff">Staff</option>
-                        </select>
+                        <SearchableSelect
+                            :id="id"
+                            v-model="form.audience"
+                            :options="[{ value: 'student', label: 'Student' }, { value: 'volunteer', label: 'Volunteer' }, { value: 'staff', label: 'Staff' }]"
+                            :all-option="true"
+                            all-label="All audiences"
+                        />
                     </template>
                 </FormField>
 
                 <FormField label="Event" :hint="editingId ? 'Scope cannot be changed after creation — delete and recreate to change it.' : 'Leave blank for a Sahodaya-wide default.'">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.event_id" class="field" :disabled="!!editingId" @change="form.item_id = null">
-                            <option :value="null">All events (default)</option>
-                            <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }}</option>
-                        </select>
+                        <SearchableSelect
+                            :id="id"
+                            v-model="form.event_id"
+                            :options="festEventOptions"
+                            :disabled="!!editingId"
+                            :all-option="true"
+                            all-label="All events (default)"
+                            @change="form.item_id = null"
+                        />
                     </template>
                 </FormField>
                 <FormField label="Item" hint="Leave blank to cover every item in the selected event.">
-                    <template #default="{ id }">
-                        <select :id="id" v-model="form.item_id" class="field" :disabled="!!editingId || !form.event_id">
-                            <option :value="null">All items in event</option>
-                            <option v-for="i in selectedEventItems" :key="i.id" :value="i.id">{{ i.title }}</option>
-                        </select>
+                    <template #default>
+                        <SearchableSelect
+                            v-model="form.item_id"
+                            :options="selectedEventItemOptions"
+                            :disabled="!!editingId || !form.event_id"
+                            placeholder="All items in event"
+                            search-placeholder="Type item name to search…"
+                            all-label="All items in event"
+                        />
                     </template>
                 </FormField>
 
@@ -82,22 +92,29 @@
                     <div v-for="(field, i) in form.fields" :key="i" class="grid gap-2 sm:grid-cols-6 border rounded-lg p-3 items-end">
                         <div class="sm:col-span-2">
                             <label class="text-[10px] uppercase text-slate-400">Type</label>
-                            <select v-model="field.type" class="field text-sm">
-                                <option value="text">Text</option>
-                                <option value="photo">Photo</option>
-                                <option value="qr">QR code</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="field.type"
+                                :options="[{ value: 'text', label: 'Text' }, { value: 'photo', label: 'Photo' }, { value: 'qr', label: 'QR code' }]"
+                                :all-option="false"
+                                placeholder="Select type"
+                            />
                         </div>
                         <div class="sm:col-span-2">
                             <label class="text-[10px] uppercase text-slate-400">Data source</label>
-                            <select v-if="field.type === 'text'" v-model="field.source" class="field text-sm">
-                                <option v-for="(label, key) in dataSourceOptions" :key="key" :value="key">{{ label }}</option>
-                            </select>
-                            <select v-else v-model="field.source" class="field text-sm">
-                                <option :value="field.type === 'photo' ? 'photo_src' : 'qr_src'">
-                                    {{ field.type === 'photo' ? 'Participant photo' : 'QR code' }}
-                                </option>
-                            </select>
+                            <SearchableSelect
+                                v-if="field.type === 'text'"
+                                v-model="field.source"
+                                :options="dataSourceSelectOptions"
+                                :all-option="false"
+                                placeholder="Select data source"
+                            />
+                            <SearchableSelect
+                                v-else
+                                v-model="field.source"
+                                :options="[{ value: field.type === 'photo' ? 'photo_src' : 'qr_src', label: field.type === 'photo' ? 'Participant photo' : 'QR code' }]"
+                                :all-option="false"
+                                placeholder="Select data source"
+                            />
                         </div>
                         <div>
                             <label class="text-[10px] uppercase text-slate-400">Top %</label>
@@ -203,6 +220,7 @@
 import { useForm, router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -223,6 +241,21 @@ const selectedEventItems = computed(() => {
     const event = props.festEvents.find(e => e.id === form.event_id);
     return event?.items || [];
 });
+
+const selectedEventItemOptions = computed(() => selectedEventItems.value.map(i => ({
+    id: i.id,
+    name: i.category_label ? `${i.title} — ${i.category_label}` : i.title,
+})));
+
+const festEventOptions = computed(() => props.festEvents.map(e => ({
+    value: e.id,
+    label: e.title,
+})));
+
+const dataSourceSelectOptions = computed(() => Object.entries(props.dataSourceOptions).map(([key, label]) => ({
+    value: key,
+    label,
+})));
 
 function scopeLabel(t) {
     const event = props.festEvents.find(e => e.id === t.event_id);

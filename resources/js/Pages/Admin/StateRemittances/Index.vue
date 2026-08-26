@@ -25,10 +25,7 @@
             <div class="card space-y-3">
                 <h3 class="font-semibold text-sm">Create Remittance Demand</h3>
                 <form @submit.prevent="createDemand" class="space-y-2">
-                    <select v-model="form.sahodaya_id" class="field" required>
-                        <option value="">Select Sahodaya</option>
-                        <option v-for="s in sahodayas" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="form.sahodaya_id" :options="sahodayas" :all-option="true" all-label="Select Sahodaya" :required="true" />
                     <input v-model="form.title" class="field" placeholder="Title (e.g. Annual contribution)" required>
                     <textarea v-model="form.description" class="field" rows="2" placeholder="Description (optional)"></textarea>
                     <div class="grid grid-cols-2 gap-2">
@@ -45,13 +42,9 @@
                 <div class="p-4 border-b flex items-center justify-between">
                     <h3 class="font-semibold text-sm">All Remittances</h3>
                     <div class="flex gap-2">
-                        <select v-model="filterStatus" @change="applyFilter" class="field text-xs py-1">
-                            <option value="">All statuses</option>
-                            <option value="pending">Pending</option>
-                            <option value="submitted">Submitted</option>
-                            <option value="verified">Verified</option>
-                            <option value="rejected">Rejected</option>
-                        </select>
+                        <SearchableSelect v-model="filterStatus" @change="applyFilter"
+                            :options="[{ value: 'pending', label: 'Pending' }, { value: 'submitted', label: 'Submitted' }, { value: 'verified', label: 'Verified' }, { value: 'rejected', label: 'Rejected' }]"
+                            :all-option="true" all-label="All statuses" />
                     </div>
                 </div>
                 <table class="w-full text-sm">
@@ -121,6 +114,7 @@
 import { ref } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({ remittances: Object, sahodayas: Array, summary: Object, filters: Object });
 

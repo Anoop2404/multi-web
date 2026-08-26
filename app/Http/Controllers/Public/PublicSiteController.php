@@ -20,7 +20,7 @@ class PublicSiteController extends Controller
         $site = WebsiteSite::ensurePrimary($tenant->id);
 
         return $this->renderPublic('public.home', $tenant, [
-            'sections' => $site->sectionQuery()->forPublic()->get(),
+            'sections' => $site->sectionQuery()->forPublic()->orderBy('display_order')->get(),
             'site' => $site,
             'experience' => $this->experienceData($site),
         ]);
@@ -39,7 +39,7 @@ class PublicSiteController extends Controller
 
         $sections = ! empty($site->draft_template_json)
             ? app(SahodayaTemplateApplier::class)->previewSections($site)
-            : $site->sectionQuery()->active()->get();
+            : $site->sectionQuery()->active()->orderBy('display_order')->get();
 
         return $this->renderPublic('public.home', $tenant, [
             'sections' => $sections,
@@ -59,7 +59,7 @@ class PublicSiteController extends Controller
             ->firstOrFail();
 
         return $this->renderPublic('public.home', $tenant, [
-            'sections' => WebsiteSite::find($site->id) ? \App\Models\SiteSection::where('site_id', $site->id)->forPublic()->get() : collect(),
+            'sections' => $site->sectionQuery()->forPublic()->orderBy('display_order')->get(),
             'microsite' => $site,
             'pageSeo' => $site->seo_json ?? [],
             'site' => $site,
@@ -74,7 +74,7 @@ class PublicSiteController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
-        $allSections = \App\Models\SiteSection::where('site_id', $site->id)->forPublic()->get();
+        $allSections = $site->sectionQuery()->forPublic()->orderBy('display_order')->get();
 
         $pageLower = strtolower($page);
         switch ($pageLower) {

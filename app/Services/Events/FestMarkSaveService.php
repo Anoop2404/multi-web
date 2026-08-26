@@ -17,8 +17,24 @@ class FestMarkSaveService
         private FestAthleticRecordService $recordService,
     ) {}
 
-    /** @return array{message: string, record_break: bool} */
-    public function save(FestEvent $event, array $data, int $lockedBy): array
+    /**
+     * @param  bool  $recalculate  Pass false when the caller is saving several marks for
+     *                             one logical submit (team/group expansion in
+     *                             FestMarkEntryController::store(), the CSV loop in
+     *                             FestMarksImportController::importStore()) and will call
+     *                             recalculate() itself once after the whole batch — see
+     *                             that method's docblock for why this matters: leaving it
+     *                             true inside a loop reran the event's ENTIRE points
+     *                             recalculation once per participant (recalculateSchoolPoints()
+     *                             rescans every FestMark row in the event, not just this
+     *                             one), so a 10-member team save that already took N writes
+     *                             also took N full-event recomputes — the dominant cost, not
+     *                             the writes themselves. Every other caller (single-mark
+     *                             coordinator/ops/school endpoints) keeps the default and is
+     *                             unaffected.
+     * @return array{message: string, record_break: bool}
+     */
+    public function save(FestEvent $event, array $data, int $lockedBy, bool $recalculate = true): array
     {
         $item = FestEventItem::findOrFail($data['item_id']);
         abort_if($item->event_id !== $event->id, 403);
@@ -96,8 +112,9 @@ class FestMarkSaveService
 
         $recordResult = $this->recordService->evaluateMark($mark->fresh());
 
-        EventContext::for($event)->recalculateSchoolPoints();
-        FestScoreboardUpdated::dispatch($event->fresh());
+        if ($recalculate) {
+            $this->recalculate($event);
+        }
 
         $message = 'Mark saved.';
         if ($recordResult['record_break']) {
@@ -108,5 +125,16 @@ class FestMarkSaveService
             'message'      => $message,
             'record_break' => (bool) $recordResult['record_break'],
         ];
+    }
+
+    /**
+     * The whole-event points recalculation + scoreboard broadcast that a single save()
+     * normally does inline. Call this once after saving a batch with recalculate: false
+     * — see save()'s docblock.
+     */
+    public function recalculate(FestEvent $event): void
+    {
+        EventContext::for($event)->recalculateSchoolPoints();
+        FestScoreboardUpdated::dispatch($event->fresh());
     }
 }

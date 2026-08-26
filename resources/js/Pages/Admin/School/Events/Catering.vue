@@ -7,12 +7,12 @@
 
         <form @submit.prevent="submit" class="card mb-4 grid sm:grid-cols-2 gap-2">
             <input v-model="form.meal_date" type="date" class="field" required>
-            <select v-model="form.meal_type" class="field" required>
-                <option value="breakfast">Breakfast</option>
-                <option value="lunch">Lunch</option>
-                <option value="dinner">Dinner</option>
-                <option value="snacks">Snacks</option>
-            </select>
+            <SearchableSelect v-model="form.meal_type" :options="[
+                { value: 'breakfast', label: 'Breakfast' },
+                { value: 'lunch', label: 'Lunch' },
+                { value: 'dinner', label: 'Dinner' },
+                { value: 'snacks', label: 'Snacks' },
+            ]" :all-option="false" placeholder="Select meal type" :required="true" />
             <input v-model.number="form.head_count" type="number" min="1" class="field" placeholder="Head count" required>
             <input v-model="form.notes" class="field" placeholder="Notes (optional)">
             <button class="sm:col-span-2 px-4 py-2 text-white rounded-lg text-sm">Request meals</button>
@@ -31,6 +31,7 @@
 import { useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({ school: Object, event: Object, hierarchy: { type: Object, default: null }, orders: Array });

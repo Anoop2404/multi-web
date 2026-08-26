@@ -31,10 +31,8 @@
                     </label>
                 </div>
                 <div v-if="payeeForm.food_payee_type === 'host_school'">
-                    <select v-model="payeeForm.food_host_school_id" class="field text-sm">
-                        <option value="">— Select school —</option>
-                        <option v-for="s in schoolOptions" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="payeeForm.food_host_school_id" :options="schoolOptions"
+                                      :all-option="true" all-label="— Select school —" />
                     <p v-if="payeeForm.errors.food_host_school_id" class="text-xs text-red-600 mt-1">{{ payeeForm.errors.food_host_school_id }}</p>
                     <p v-if="event.conducting_school_id" class="text-xs text-gray-400 mt-1">
                         This event's conducting school is set — you can pick the same one here if that's who should be paid.
@@ -113,17 +111,13 @@
 
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <select v-if="eventDates.length" v-model="assignForm.menu_date" class="field text-sm">
-                                <option value="">— Date —</option>
-                                <option v-for="d in eventDates" :key="d" :value="d">{{ formatCalendarDate(d) }}</option>
-                            </select>
+                            <SearchableSelect v-if="eventDates.length" v-model="assignForm.menu_date" :options="eventDateOptions"
+                                              :all-option="true" all-label="— Date —" />
                             <input v-else v-model="assignForm.menu_date" type="date" class="field text-sm"
                                    :min="event.event_start" :max="event.event_end">
                         </div>
-                        <select v-model="assignForm.meal_type" class="field text-sm">
-                            <option value="">— Meal —</option>
-                            <option v-for="(label, key) in mealTypes" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect v-model="assignForm.meal_type" :options="mealTypeOptions"
+                                          :all-option="true" all-label="— Meal —" />
                     </div>
                     <p v-if="assignForm.errors.menu_date" class="text-xs text-red-600 -mt-2">{{ assignForm.errors.menu_date }}</p>
                     <p v-if="assignForm.errors.meal_type" class="text-xs text-red-600 -mt-2">{{ assignForm.errors.meal_type }}</p>
@@ -193,9 +187,8 @@
                                     <td class="p-2" colspan="6">
                                         <form @submit.prevent="saveEdit(item)" class="grid grid-cols-7 gap-2 items-center">
                                             <input v-model="editForm.sort_order" type="number" min="0" class="field text-xs" placeholder="Order">
-                                            <select v-model="editForm.meal_type" class="field text-xs">
-                                                <option v-for="(label, key) in mealTypes" :key="key" :value="key">{{ label }}</option>
-                                            </select>
+                                            <SearchableSelect v-model="editForm.meal_type" :options="mealTypeOptions"
+                                                              :all-option="false" placeholder="Select meal" />
                                             <input v-model="editForm.name" type="text" class="field text-xs col-span-2">
                                             <input v-model="editForm.price" type="number" min="0" step="0.01" class="field text-xs">
                                             <input v-model="editForm.max_per_school" type="number" min="1" class="field text-xs" placeholder="Max">
@@ -247,6 +240,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
 import FoodRegionDrillDown from '@/Components/sahodaya/FoodRegionDrillDown.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -314,6 +308,11 @@ async function removeCatalogItem(c) {
 const catalogSearch = ref('');
 const selectedCatalogIds = ref([]);
 const assignForm = useForm({ catalog_item_ids: [], menu_date: '', meal_type: '' });
+
+// Options for the date/meal SearchableSelects above — dates need their labels formatted,
+// and meal types (a plain object keyed by meal type) need flattening into {value, label}.
+const eventDateOptions = computed(() => props.eventDates.map((d) => ({ value: d, label: formatCalendarDate(d) })));
+const mealTypeOptions = computed(() => Object.entries(props.mealTypes).map(([value, label]) => ({ value, label })));
 
 const filteredCatalogItems = computed(() => {
     const q = catalogSearch.value.trim().toLowerCase();

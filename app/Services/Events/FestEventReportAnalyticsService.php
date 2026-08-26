@@ -2,6 +2,7 @@
 
 namespace App\Services\Events;
 
+use App\Support\CsvSafety;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestCompetitionArea;
@@ -14,10 +15,14 @@ use App\Models\FestSchedule;
 use App\Models\FestSchoolEventFee;
 use App\Models\FestVolunteer;
 use App\Models\FestCateringOrder;
+use App\Models\FestAttendance;
 use App\Models\AuditLog;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Support\ExcelExport;
+use App\Support\FestClassGroupScheme;
 use App\Support\FestIdCardTemplates;
+use App\Support\FestItemCategoryLabel;
 use App\Services\Events\FestIdCardService;
 use App\Support\FestTeamSquadRules;
 use App\Support\TenantBranding;
@@ -648,6 +653,9 @@ class FestEventReportAnalyticsService
             }
         }
 
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
+
         $rows = [];
         foreach ($items as $item) {
             $approved = $statusMap[$item->id]['approved'] ?? 0;
@@ -672,6 +680,7 @@ class FestEventReportAnalyticsService
                 'item_code'          => $item->item_code,
                 'class_group'        => $item->class_group,
                 'age_group'          => $item->age_group,
+                'category_label'     => FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels),
                 'stage_type'         => $item->stage_type,
                 'participant_type'   => $item->participant_type,
                 'approved'           => $approved,
@@ -843,6 +852,9 @@ class FestEventReportAnalyticsService
             ->groupBy('item_id')
             ->pluck('cnt', 'item_id');
 
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
+
         $rows = [];
         foreach ($items as $item) {
             $approved = $statusMap[$item->id]['approved'] ?? 0;
@@ -863,6 +875,7 @@ class FestEventReportAnalyticsService
                 'title'                  => $item->title,
                 'age_group'              => $item->age_group,
                 'class_group'            => $item->class_group,
+                'category_label'         => FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels),
                 'approved'               => $approved,
                 'pending'                => $pending,
                 'registration_count'   => $approved + $pending,
@@ -1103,6 +1116,9 @@ class FestEventReportAnalyticsService
             ->orderBy('sort_order')
             ->get();
 
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
+
         $rows = [];
         foreach ($heads as $head) {
             $itemIds = FestEventItem::where('event_id', $this->event->id)
@@ -1120,7 +1136,7 @@ class FestEventReportAnalyticsService
                     'student.schoolClass:id,name',
                     'teacher:id,name,reg_no',
                     'registration.school:id,name',
-                    'registration.item:id,title,head_id,competition_start,competition_end,competition_time',
+                    'registration.item:id,title,head_id,class_group,category,competition_start,competition_end,competition_time',
                 ])
                 ->get();
 
@@ -1136,6 +1152,7 @@ class FestEventReportAnalyticsService
                     'class'      => $p->student?->schoolClass?->name,
                     'photo_url'  => $p->student?->sahodayaPhotoUrl($this->event->tenant_id),
                     'item'       => $p->registration?->item?->title,
+                    'category_label' => FestItemCategoryLabel::resolve($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
                     'item_reg'   => $p->item_registration_number,
                     'chest_no'   => $p->chest_no,
                     'fest_id'    => $p->level_registration_number,
@@ -1171,6 +1188,9 @@ class FestEventReportAnalyticsService
                 ->get()
             : collect([$this->event])->when($headId, fn ($c) => $c->where('id', $headId));
 
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
+
         $rows = [];
         foreach ($sports as $sport) {
             $participants = FestParticipant::query()
@@ -1183,7 +1203,7 @@ class FestEventReportAnalyticsService
                     'student.schoolClass:id,name',
                     'teacher:id,name,reg_no',
                     'registration.school:id,name',
-                    'registration.item:id,title,head_id,competition_start,competition_end,competition_time',
+                    'registration.item:id,title,head_id,class_group,category,competition_start,competition_end,competition_time',
                 ])
                 ->get();
 
@@ -1199,6 +1219,7 @@ class FestEventReportAnalyticsService
                     'class'      => $p->student?->schoolClass?->name,
                     'photo_url'  => $p->student?->sahodayaPhotoUrl($this->event->tenant_id),
                     'item'       => $p->registration?->item?->title,
+                    'category_label' => FestItemCategoryLabel::resolve($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
                     'item_reg'   => $p->item_registration_number,
                     'chest_no'   => $p->chest_no,
                     'fest_id'    => $p->level_registration_number,
@@ -1433,6 +1454,9 @@ class FestEventReportAnalyticsService
             ->orderBy('name')
             ->get();
 
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
+
         $rows = [];
         foreach ($areas as $area) {
             $itemIds = FestEventItem::where('event_id', $this->event->id)
@@ -1449,7 +1473,7 @@ class FestEventReportAnalyticsService
                     'student:id,name,reg_no,tenant_id',
                     'teacher:id,name,reg_no',
                     'registration.school:id,name',
-                    'registration.item:id,title,area_id',
+                    'registration.item:id,title,area_id,class_group,category',
                 ])
                 ->get();
 
@@ -1462,6 +1486,7 @@ class FestEventReportAnalyticsService
                     'student' => $p->student?->name ?? $p->teacher?->name,
                     'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
                     'item' => $p->registration?->item?->title,
+                    'category_label' => FestItemCategoryLabel::resolve($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
                     'item_reg' => $p->item_registration_number,
                     'chest_no' => $p->chest_no,
                     'fest_id' => $p->level_registration_number,
@@ -1483,7 +1508,7 @@ class FestEventReportAnalyticsService
                         'student:id,name,reg_no,tenant_id',
                         'teacher:id,name,reg_no',
                         'registration.school:id,name',
-                        'registration.item:id,title,area_id',
+                        'registration.item:id,title,area_id,class_group,category',
                     ])
                     ->get();
 
@@ -1496,6 +1521,7 @@ class FestEventReportAnalyticsService
                         'student' => $p->student?->name ?? $p->teacher?->name,
                         'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
                         'item' => $p->registration?->item?->title,
+                        'category_label' => FestItemCategoryLabel::resolve($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
                         'item_reg' => $p->item_registration_number,
                         'chest_no' => $p->chest_no,
                         'fest_id' => $p->level_registration_number,
@@ -1661,9 +1687,9 @@ class FestEventReportAnalyticsService
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Timestamp', 'User', 'Action', 'Description', 'Page', 'Category']);
+            CsvSafety::fputcsv($out, ['Timestamp', 'User', 'Action', 'Description', 'Page', 'Category']);
             foreach ($rows as $row) {
-                fputcsv($out, $row);
+                CsvSafety::fputcsv($out, $row);
             }
             fclose($out);
         }, str($this->event->title)->slug()->limit(40).'-audit-log.csv', ['Content-Type' => 'text/csv']);
@@ -1787,31 +1813,175 @@ class FestEventReportAnalyticsService
         return $rows;
     }
 
-    /** @return list<array<string, mixed>> */
-    public function itemWiseBrowserRows(int $itemId): array
+    /**
+     * Every item across the resolved scope, in one flat table — one row per registered
+     * participant, carrying its item's category/name, the school, and (for a
+     * phased_regional_billing root) which phase/region the registration actually landed
+     * in. Built to replace picking one item at a time (the older itemWiseBrowserRows()
+     * flow): a Sahodaya wants "every item, every registration, filterable by phase and
+     * region" as a single report, not 140 separate item pages.
+     *
+     * Phase/region labels are read from registration.event (the leaf the write actually
+     * landed on), never from the item's own phase_id — an item's phase_id can be
+     * mistagged relative to the leaf it's catalogued under (see the Wayanad Sahodaya
+     * "Light Music-Malayalam" incident, 2026-08-25: item lived on the Phase 1 leaf's item
+     * table but phase_id resolved to Phase 2, so trusting it for display would repeat the
+     * exact confusion that bug caused). The event a registration is actually attached to
+     * is authoritative for "which phase/region this happened in."
+     *
+     * @param  ?string  $schoolId  Narrow to one school (school-admin callers always pass
+     *                             their own id; Sahodaya-admin callers pass null and rely
+     *                             on the constructor's FestReportScope for authorization).
+     * @return list<array<string, mixed>>
+     */
+    public function itemWiseReportRows(?string $schoolId = null): array
     {
+        $taxonomy = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
+        $usesPhasedRegionalBilling = $this->event->rootEvent()->usesPhasedRegionalBilling();
+
         return FestParticipant::query()
-            ->whereHas('registration', fn ($q) => $q
-                ->whereIn('event_id', $this->eventIds())
-                ->where('item_id', $itemId)
-                ->active())
-            ->with(['student', 'teacher', 'registration.school', 'mark'])
-            ->orderBy('chest_no')
-            ->get()
-            ->map(fn (FestParticipant $p) => [
-                'id'          => $p->id,
-                'participant' => $p->student?->name ?? $p->teacher?->name,
-                'reg_no'      => $p->student?->reg_no ?? $p->teacher?->reg_no,
-                'school'      => $p->registration?->school?->name,
-                'fest_id'     => $p->level_registration_number,
-                'item_reg'    => $p->item_registration_number,
-                'chest_no'    => $p->chest_no,
-                'grade'       => $p->mark?->grade,
-                'position'    => $p->mark?->position,
-                'score'       => $p->mark?->score,
-                'status'      => $p->registration?->status,
+            ->whereHas('registration', function ($q) use ($schoolId) {
+                $q->whereIn('event_id', $this->eventIds())->active();
+                if ($schoolId) {
+                    $q->where('school_id', $schoolId);
+                }
+            })
+            ->with([
+                'student:id,name,reg_no',
+                'teacher:id,name,reg_no',
+                'registration:id,event_id,item_id,school_id,status',
+                'registration.school:id,name',
+                'registration.item:id,title,item_code,category,stage_type,participant_type,class_group',
+                'registration.event:id,source_phase_id,region_id',
+                'registration.event.sourcePhase:id,name',
+                'registration.event.region:id,name,code',
+                'mark:id,participant_id,grade,position,score',
             ])
+            ->get()
+            ->filter(fn (FestParticipant $p) => $p->registration && $p->registration->item)
+            ->map(function (FestParticipant $p) use ($taxonomy, $usesPhasedRegionalBilling) {
+                $registration = $p->registration;
+                $item = $registration->item;
+                $event = $registration->event;
+
+                return [
+                    'id'              => $p->id,
+                    'item_id'         => $item->id,
+                    'item_title'      => $item->title,
+                    'item_code'       => $item->item_code,
+                    'category'        => $item->category,
+                    'category_label'  => $taxonomy[$item->category] ?? ucfirst((string) $item->category),
+                    'stage_type'      => $item->stage_type,
+                    'participant_type' => $item->participant_type,
+                    'phase_name'      => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,
+                    'region_name'     => $event?->region?->name,
+                    'region_code'     => $event?->region?->code,
+                    'school_id'       => $registration->school_id,
+                    'school_name'     => $registration->school?->name,
+                    'participant'     => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no'          => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    'fest_id'         => $p->level_registration_number,
+                    'item_reg'        => $p->item_registration_number,
+                    'chest_no'        => $p->chest_no,
+                    'status'          => $registration->status,
+                    'grade'           => $p->mark?->grade,
+                    'position'        => $p->mark?->position,
+                    'score'           => $p->mark?->score,
+                ];
+            })
+            ->sortBy(['item_title', 'participant'])
+            ->values()
             ->all();
+    }
+
+    /**
+     * Participant-level list of everyone marked absent (fest_attendance.status =
+     * 'absent') — no existing report exposed this; attendance only had a write-side
+     * marking UI. Mirrors itemWiseReportRows()'s phase/region resolution (off the
+     * registration's own operational event, never item.phase_id — see that method's
+     * docblock) so the two reports stay consistent.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function absentReportRows(?string $schoolId = null): array
+    {
+        $absentByKey = FestAttendance::whereIn('event_id', $this->eventIds())
+            ->where('status', 'absent')
+            ->get(['item_id', 'participant_id', 'marked_by', 'marked_at'])
+            ->keyBy(fn (FestAttendance $a) => $a->item_id.'-'.$a->participant_id);
+
+        if ($absentByKey->isEmpty()) {
+            return [];
+        }
+
+        $markedByNames = User::whereIn('id', $absentByKey->pluck('marked_by')->filter()->unique())
+            ->pluck('name', 'id');
+
+        $taxonomy = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
+        $usesPhasedRegionalBilling = $this->event->rootEvent()->usesPhasedRegionalBilling();
+
+        return FestParticipant::query()
+            ->whereHas('registration', function ($q) use ($schoolId) {
+                $q->whereIn('event_id', $this->eventIds())->active();
+                if ($schoolId) {
+                    $q->where('school_id', $schoolId);
+                }
+            })
+            ->with([
+                'student:id,name,reg_no',
+                'teacher:id,name,reg_no',
+                'group:id,chest_no',
+                'registration:id,event_id,item_id,school_id,status',
+                'registration.school:id,name',
+                'registration.item:id,title,item_code,category',
+                'registration.event:id,source_phase_id,region_id',
+                'registration.event.sourcePhase:id,name',
+                'registration.event.region:id,name,code',
+            ])
+            ->get()
+            ->filter(fn (FestParticipant $p) => $p->registration && $p->registration->item)
+            ->map(fn (FestParticipant $p) => [$p, $absentByKey->get($p->registration->item_id.'-'.$p->id)])
+            ->filter(fn (array $tuple) => $tuple[1] !== null)
+            ->map(function (array $tuple) use ($taxonomy, $usesPhasedRegionalBilling, $markedByNames) {
+                [$p, $attendance] = $tuple;
+                $registration = $p->registration;
+                $item = $registration->item;
+                $event = $registration->event;
+
+                return [
+                    'item_id'        => $item->id,
+                    'item_title'     => $item->title,
+                    'item_code'      => $item->item_code,
+                    'category_label' => $taxonomy[$item->category] ?? ucfirst((string) $item->category),
+                    'phase_name'     => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,
+                    'region_name'    => $event?->region?->name,
+                    'region_code'    => $event?->region?->code,
+                    'school_id'      => $registration->school_id,
+                    'school_name'    => $registration->school?->name,
+                    'participant'    => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no'         => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    'chest_no'       => $p->group?->chest_no ?? $p->chest_no,
+                    'marked_by'      => $markedByNames->get($attendance->marked_by),
+                    'marked_at'      => $attendance->marked_at?->format('Y-m-d H:i'),
+                ];
+            })
+            ->sortBy(['item_title', 'participant'])
+            ->values()
+            ->all();
+    }
+
+    public function exportAbsentReport(?string $schoolId = null): StreamedResponse
+    {
+        $rows = collect($this->absentReportRows($schoolId))->map(fn ($r) => [
+            $r['item_title'], $r['item_code'], $r['category_label'], $r['phase_name'], $r['region_name'],
+            $r['school_name'], $r['participant'], $r['reg_no'], $r['chest_no'], $r['marked_by'], $r['marked_at'],
+        ]);
+
+        return ExcelExport::download(
+            str($this->event->title)->slug()->limit(40).'-absent-report',
+            ['Item', 'Item Code', 'Category', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Chest No', 'Marked By', 'Marked At'],
+            $rows,
+        );
     }
 
     /**

@@ -5,6 +5,8 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\Tenant;
 use App\Support\ExcelExport;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
 use Illuminate\Http\Request;
@@ -84,12 +86,14 @@ class FestSchoolReportExportService
     ): Response {
         $slug = str($event->title)->slug()->limit(40);
         $itemSlug = str($item->title)->slug()->limit(30);
+        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event));
 
         return $this->renderPdf('fest.reports.item-wise-school', [
-            'event'  => $event,
-            'school' => $school,
-            'item'   => $item,
-            'rows'   => $rows,
+            'event'         => $event,
+            'school'        => $school,
+            'item'          => $item,
+            'categoryLabel' => $categoryLabel,
+            'rows'          => $rows,
             ...$this->brandingData($event),
         ])->download("{$slug}-{$itemSlug}-participants.pdf");
     }

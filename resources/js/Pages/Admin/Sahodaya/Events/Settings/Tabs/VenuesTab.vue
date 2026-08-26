@@ -32,10 +32,12 @@
                     </div>
                     <div v-if="regions?.length" class="sm:col-span-4">
                         <label class="form-label text-xs">Assigned Region (Optional — for Region-Wise Preliminaries)</label>
-                        <select v-model="venueForm.region_id" class="field text-xs font-medium">
-                            <option value="">— All Regions / Central Venue —</option>
-                            <option v-for="r in regions" :key="r.id" :value="r.id">📍 {{ r.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="venueForm.region_id"
+                            :options="regions"
+                            :all-option="true"
+                            all-label="— All Regions / Central Venue —"
+                        />
                     </div>
                 </div>
                 <div class="flex justify-end pt-1">
@@ -64,10 +66,12 @@
                                 </div>
                                 <div v-if="regions?.length" class="sm:col-span-4">
                                     <label class="form-label text-xs">Assigned Region</label>
-                                    <select v-model="venueEditForm.region_id" class="field text-xs font-medium">
-                                        <option value="">— All Regions / Central Venue —</option>
-                                        <option v-for="r in regions" :key="r.id" :value="r.id">📍 {{ r.name }}</option>
-                                    </select>
+                                    <SearchableSelect
+                                        v-model="venueEditForm.region_id"
+                                        :options="regions"
+                                        :all-option="true"
+                                        all-label="— All Regions / Central Venue —"
+                                    />
                                 </div>
                             </div>
                             <div class="flex justify-end gap-2">
@@ -134,12 +138,12 @@
                     </div>
                     <div>
                         <label class="form-label text-xs">Link to Venue</label>
-                        <select v-model="stageForm.venue_id" class="field text-xs">
-                            <option value="">No venue link</option>
-                            <option v-for="v in venues" :key="v.id" :value="v.id">
-                                {{ v.name }} {{ v.region ? `(${v.region.name})` : '' }}
-                            </option>
-                        </select>
+                        <SearchableSelect
+                            v-model="stageForm.venue_id"
+                            :options="venueStageOptions"
+                            :all-option="true"
+                            all-label="No venue link"
+                        />
                     </div>
                 </div>
                 <div class="flex justify-end pt-1">
@@ -171,10 +175,16 @@
 </template>
 
 <script setup>
-import { inject } from 'vue';
+import { computed, inject } from 'vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const {
     venueForm, stageForm, venues, stages, regions, addVenue, removeVenue, addStage, removeStage,
     editingVenueId, venueEditForm, startEditVenue, cancelEditVenue, saveVenueEdit,
 } = inject('eventSettings');
+
+const venueStageOptions = computed(() => venues.value.map((v) => ({
+    value: v.id,
+    label: v.region ? `${v.name} (${v.region.name})` : v.name,
+})));
 </script>

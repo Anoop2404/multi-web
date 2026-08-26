@@ -23,12 +23,8 @@
                 <ProfilePhotoCropper v-model="photoFile" required />
 
                 <FormField label="Class" required>
-                    <select v-model="form.school_class_id" class="field" required>
-                        <option value="">Select class</option>
-                        <option v-for="c in schoolClassesSorted" :key="c.id" :value="c.id">
-                            {{ formatClassOption(c) }}
-                        </option>
-                    </select>
+                    <SearchableSelect v-model="form.school_class_id" :options="schoolClassOptions"
+                                      :all-option="true" all-label="Select class" :required="true" />
                     <p v-if="form.errors.school_class_id" class="form-error">{{ form.errors.school_class_id }}</p>
                 </FormField>
 
@@ -46,12 +42,9 @@
 
                 <FormGrid>
                     <FormField label="Gender" required>
-                        <select v-model="form.gender" class="field" required>
-                            <option value="">Select gender</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                            <option value="other">Other</option>
-                        </select>
+                        <SearchableSelect v-model="form.gender"
+                                          :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
+                                          :all-option="true" all-label="Select gender" :required="true" />
                         <p v-if="form.errors.gender" class="form-error">{{ form.errors.gender }}</p>
                     </FormField>
                     <FormField label="Date of birth" required>
@@ -79,6 +72,7 @@
 
 <script setup>
 import ProfilePhotoCropper from '@/Components/school/ProfilePhotoCropper.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -117,6 +111,10 @@ function formatClassOption(schoolClass) {
     const cat = props.categories.find(c => Number(c.id) === Number(schoolClass.class_category_id));
     return cat ? `Class ${schoolClass.name} (${cat.label})` : `Class ${schoolClass.name}`;
 }
+
+const schoolClassOptions = computed(() =>
+    schoolClassesSorted.value.map(c => ({ value: c.id, label: formatClassOption(c) })),
+);
 
 function submit() {
     clientError.value = '';

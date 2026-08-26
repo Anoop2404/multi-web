@@ -13,21 +13,26 @@
             <div class="grid sm:grid-cols-2 gap-4">
                 <label class="block">
                     <span class="text-xs font-semibold text-slate-500">From item (regional phase)</span>
-                    <select v-model="fromItemId" class="input mt-1" @change="loadCandidates">
-                        <option :value="null">Select an item…</option>
-                        <option v-for="item in fromItems" :key="item.id" :value="item.id">
-                            {{ item.title }}<span v-if="item.item_code"> ({{ item.item_code }})</span>
-                        </option>
-                    </select>
+                    <SearchableSelect
+                        v-model="fromItemId"
+                        :options="fromItemOptions"
+                        placeholder="Select an item…"
+                        search-placeholder="Type item name to search…"
+                        :all-option="false"
+                        class="mt-1"
+                        @change="loadCandidates"
+                    />
                 </label>
                 <label class="block">
                     <span class="text-xs font-semibold text-slate-500">To item (later phase)</span>
-                    <select v-model="toItemId" class="input mt-1">
-                        <option :value="null">Select an item…</option>
-                        <option v-for="item in toItems" :key="item.id" :value="item.id">
-                            {{ item.title }}<span v-if="item.item_code"> ({{ item.item_code }})</span>
-                        </option>
-                    </select>
+                    <SearchableSelect
+                        v-model="toItemId"
+                        :options="toItemOptions"
+                        placeholder="Select an item…"
+                        search-placeholder="Type item name to search…"
+                        :all-option="false"
+                        class="mt-1"
+                    />
                 </label>
             </div>
         </div>
@@ -96,8 +101,9 @@
 
 <script setup>
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 import { useBulkSelection } from '@/composables/useBulkSelection';
 
@@ -118,6 +124,14 @@ const { confirm } = useConfirm();
 
 const fromItemId = ref(props.selectedFromItemId ?? null);
 const toItemId = ref(null);
+
+function itemOptionLabel(item) {
+    const codeSuffix = item.item_code ? ` (${item.item_code})` : '';
+    return item.category_label ? `${item.title} — ${item.category_label}${codeSuffix}` : `${item.title}${codeSuffix}`;
+}
+
+const fromItemOptions = computed(() => props.fromItems.map(item => ({ id: item.id, name: itemOptionLabel(item) })));
+const toItemOptions = computed(() => props.toItems.map(item => ({ id: item.id, name: itemOptionLabel(item) })));
 
 const selectableCandidates = () => props.candidates.filter((c) => ! c.already_advanced);
 const { selectedIds, toggle: toggleSelected, clear: clearSelection } = useBulkSelection(selectableCandidates, 'registration_id');

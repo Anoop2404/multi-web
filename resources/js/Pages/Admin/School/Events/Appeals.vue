@@ -25,12 +25,14 @@
             <form @submit.prevent="submitAppeal" class="space-y-4 max-w-xl">
                 <FormField label="Participant" :error="appealForm.errors.participant_id" required>
                     <template #default="{ id }">
-                        <select :id="id" v-model="appealForm.participant_id" class="field" required>
-                            <option value="">Select participant</option>
-                            <option v-for="p in allParticipants" :key="p.id" :value="p.id">
-                                {{ participantLabel(p) }} — {{ p.registration?.item?.title }}
-                            </option>
-                        </select>
+                        <SearchableSelect
+                            :id="id"
+                            v-model="appealForm.participant_id"
+                            :options="participantOptions"
+                            :all-option="true"
+                            all-label="Select participant"
+                            :required="true"
+                        />
                     </template>
                 </FormField>
                 <FormField label="Reason for appeal" :error="appealForm.errors.reason" required>
@@ -95,6 +97,7 @@
 import { computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
@@ -108,6 +111,13 @@ const appealForm = useForm({ participant_id: '', reason: '' });
 
 const allParticipants = computed(() =>
     props.registrations.flatMap(r => (r.participants ?? []).map(p => ({ ...p, registration: r })))
+);
+
+const participantOptions = computed(() =>
+    allParticipants.value.map(p => ({
+        value: p.id,
+        label: `${participantLabel(p)} — ${p.registration?.item?.title}`,
+    }))
 );
 
 function participantLabel(p) {

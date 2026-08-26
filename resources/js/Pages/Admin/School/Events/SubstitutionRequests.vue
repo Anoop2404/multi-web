@@ -9,18 +9,9 @@
 
         <form class="card mb-6 max-w-2xl space-y-3" @submit.prevent="submit">
             <h3 class="font-semibold text-slate-900">New request</h3>
-            <select v-model="form.registration_id" class="field text-sm" required @change="form.original_participant_id = ''; form.replacement_participant_id = ''">
-                <option value="">Select registration</option>
-                <option v-for="r in registrations" :key="r.id" :value="r.id">{{ r.item_title }}</option>
-            </select>
-            <select v-model="form.original_participant_id" class="field text-sm" required>
-                <option value="">Performer to replace</option>
-                <option v-for="p in performers" :key="p.id" :value="p.id">{{ p.name }} ({{ p.role }})</option>
-            </select>
-            <select v-model="form.replacement_participant_id" class="field text-sm">
-                <option value="">Replacement standby (optional)</option>
-                <option v-for="p in standbys" :key="p.id" :value="p.id">{{ p.name }}</option>
-            </select>
+            <SearchableSelect v-model="form.registration_id" :options="registrationOptions" :all-option="true" all-label="Select registration" :required="true" @change="form.original_participant_id = ''; form.replacement_participant_id = ''" />
+            <SearchableSelect v-model="form.original_participant_id" :options="performerOptions" :all-option="true" all-label="Performer to replace" :required="true" />
+            <SearchableSelect v-model="form.replacement_participant_id" :options="standbys" :all-option="true" all-label="Replacement standby (optional)" />
             <textarea v-model="form.reason" class="field text-sm" rows="3" placeholder="Reason for substitution" required />
             <button type="submit" class="btn-primary text-sm" :disabled="form.processing">Submit request</button>
         </form>
@@ -38,7 +29,7 @@
                 </thead>
                 <tbody>
                     <tr v-for="r in requests" :key="r.id">
-                        <td>{{ r.registration?.item?.title }}</td>
+                        <td>{{ r.registration?.item?.title }}{{ r.registration?.item?.category_label ? ` (${r.registration.item.category_label})` : '' }}</td>
                         <td>{{ r.original_participant?.student ? studentDisplayName(r.original_participant.student) : '—' }}</td>
                         <td>{{ r.replacement_participant?.student ? studentDisplayName(r.replacement_participant.student) : (r.replacement_student?.name || '—') }}</td>
                         <td>
@@ -61,6 +52,7 @@
 import { computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 
@@ -93,6 +85,17 @@ const performers = computed(() =>
 
 const standbys = computed(() =>
     (selectedRegistration.value?.participants || []).filter((p) => p.role === 'standby')
+);
+
+const registrationOptions = computed(() =>
+    props.registrations.map((r) => ({
+        value: r.id,
+        label: `${r.item_title}${r.category_label ? ` (${r.category_label})` : ''}`,
+    }))
+);
+
+const performerOptions = computed(() =>
+    performers.value.map((p) => ({ value: p.id, label: `${p.name} (${p.role})` }))
 );
 
 function submit() {

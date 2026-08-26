@@ -188,29 +188,25 @@
                             ⭐ Share Training Feedback
                         </p>
                         <FormField label="Overall Rating (1–5 Stars)">
-                            <select v-model="feedbackForms[t.id].rating" required class="field field--sm">
-                                <option value="" disabled>Select Rating…</option>
-                                <option v-for="n in 5" :key="n" :value="n">⭐ {{ n }} / 5</option>
-                            </select>
+                            <SearchableSelect v-model="feedbackForms[t.id].rating" :required="true"
+                                              :all-option="true" all-label="Select Rating…"
+                                              :options="[{ value: 1, label: '⭐ 1 / 5' }, { value: 2, label: '⭐ 2 / 5' }, { value: 3, label: '⭐ 3 / 5' }, { value: 4, label: '⭐ 4 / 5' }, { value: 5, label: '⭐ 5 / 5' }]" />
                         </FormField>
                         <div class="grid grid-cols-3 gap-2">
                             <FormField label="Content">
-                                <select v-model="feedbackForms[t.id].content_rating" class="field field--sm">
-                                    <option value="">—</option>
-                                    <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-                                </select>
+                                <SearchableSelect v-model="feedbackForms[t.id].content_rating"
+                                                  :all-option="true" all-label="—"
+                                                  :options="[1, 2, 3, 4, 5]" />
                             </FormField>
                             <FormField label="Trainer">
-                                <select v-model="feedbackForms[t.id].trainer_rating" class="field field--sm">
-                                    <option value="">—</option>
-                                    <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-                                </select>
+                                <SearchableSelect v-model="feedbackForms[t.id].trainer_rating"
+                                                  :all-option="true" all-label="—"
+                                                  :options="[1, 2, 3, 4, 5]" />
                             </FormField>
                             <FormField label="Venue">
-                                <select v-model="feedbackForms[t.id].venue_rating" class="field field--sm">
-                                    <option value="">—</option>
-                                    <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-                                </select>
+                                <SearchableSelect v-model="feedbackForms[t.id].venue_rating"
+                                                  :all-option="true" all-label="—"
+                                                  :options="[1, 2, 3, 4, 5]" />
                             </FormField>
                         </div>
                         <textarea v-model="feedbackForms[t.id].comments" rows="2" class="field text-xs"
@@ -231,6 +227,7 @@
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import FormField from '@/Components/ui/FormField.vue';
 import EmptyState from '@/Components/ui/EmptyState.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { computed, reactive, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';

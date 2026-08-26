@@ -12,7 +12,7 @@ th{background:#f1f5f9;font-size:10px;text-transform:uppercase}
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2>{{ $event->title }}</h2>
-<p class="meta">{{ strtoupper($school->name) }} — {{ $item->title }}</p>
+<p class="meta">{{ strtoupper($school->name) }} — {{ $item->title }}{{ !empty($categoryLabel) ? ' — '.$categoryLabel : '' }}</p>
 
 <table>
 <thead><tr><th>Sl No</th><th>Participant</th><th>Reg no</th><th>Class</th><th>Fest ID</th><th>Item reg</th><th>Status</th></tr></thead>

@@ -159,18 +159,10 @@
                     <input v-model.number="levelForm.school_discount_amount" type="number" min="0" step="0.01" class="field">
                 </FormField>
                 <FormField v-if="levelForm.exam_level > 1" label="Parent exam" class-extra="sm:col-span-2">
-                    <select v-model="levelForm.parent_exam_id" class="field" :required="levelForm.exam_level > 1">
-                        <option value="">Select completed parent exam</option>
-                        <option v-for="e in parentOptions" :key="e.id" :value="e.id">{{ e.title }} (L{{ e.exam_level }})</option>
-                    </select>
+                    <SearchableSelect v-model="levelForm.parent_exam_id" :options="parentSelectOptions" :all-option="true" all-label="Select completed parent exam" :required="levelForm.exam_level > 1" />
                 </FormField>
                 <FormField v-if="levelForm.exam_level > 1" label="Promotion rule" class-extra="sm:col-span-2">
-                    <select v-model="levelForm.eligibility_mode" class="field">
-                        <option value="open">Open (class/gender only)</option>
-                        <option value="cutoff_marks">Minimum score from parent</option>
-                        <option value="top_rank">Top N ranks from parent</option>
-                        <option value="manual">Manual student list</option>
-                    </select>
+                    <SearchableSelect v-model="levelForm.eligibility_mode" :options="[{ value: 'open', label: 'Open (class/gender only)' }, { value: 'cutoff_marks', label: 'Minimum score from parent' }, { value: 'top_rank', label: 'Top N ranks from parent' }, { value: 'manual', label: 'Manual student list' }]" :all-option="false" placeholder="Select promotion rule" />
                 </FormField>
                 <FormField v-if="levelForm.exam_level > 1 && levelForm.eligibility_mode === 'cutoff_marks'" label="Cutoff score">
                     <input v-model="levelForm.cutoff_score" type="number" step="0.01" class="field">
@@ -179,10 +171,7 @@
                     <input v-model="levelForm.top_rank_count" type="number" min="1" class="field">
                 </FormField>
                 <FormField label="Delivery mode" class-extra="sm:col-span-2">
-                    <select v-model="levelForm.delivery_mode" class="field">
-                        <option value="offline">Offline (paper / venue)</option>
-                        <option value="online">Online (student portal)</option>
-                    </select>
+                    <SearchableSelect v-model="levelForm.delivery_mode" :options="[{ value: 'offline', label: 'Offline (paper / venue)' }, { value: 'online', label: 'Online (student portal)' }]" :all-option="false" placeholder="Select delivery mode" />
                 </FormField>
             </FormGrid>
 
@@ -203,6 +192,7 @@ import { computed } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -252,6 +242,10 @@ const parentOptions = computed(() => {
     const inSeries = (props.series.exams ?? []).filter((e) => e.status === 'completed' && e.results_published);
     return [...inSeries, ...(props.parentExams ?? [])];
 });
+
+const parentSelectOptions = computed(() =>
+    parentOptions.value.map((e) => ({ value: e.id, label: `${e.title} (L${e.exam_level})` })),
+);
 
 const promotionExams = computed(() =>
     (props.series.exams ?? []).filter((e) => (e.exam_level ?? 1) > 1 && e.promotion),

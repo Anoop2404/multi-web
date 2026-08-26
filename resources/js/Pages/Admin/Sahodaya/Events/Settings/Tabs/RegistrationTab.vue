@@ -27,13 +27,9 @@
                 <span>Allow students to self-register from their portal profile</span>
             </label>
             <FormField label="Student verification for item registration">
-                <select v-model="registrationSettingsForm.student_verification_mode" class="field">
-                    <option value="inherit">
-                        Use cluster default — {{ clusterRequireStudentVerification ? 'verified students only' : 'unverified allowed' }}
-                    </option>
-                    <option value="required">Require verified students only</option>
-                    <option value="optional">Allow unverified students</option>
-                </select>
+                <SearchableSelect v-model="registrationSettingsForm.student_verification_mode"
+                                   :options="studentVerificationOptions"
+                                   :all-option="false" />
             </FormField>
             <FormActions>
                 <button type="submit" class="btn-primary" :disabled="registrationSettingsForm.processing">Save registration settings</button>
@@ -158,9 +154,10 @@
 </template>
 
 <script setup>
-import { inject, ref, watch } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const { registrationSettingsForm, saveRegistrationSettings, saveItemWindow, saveAllItemWindows, bulkSavingItemWindows, saveHeadWindow, sahodaya, event, itemHeads, clusterRequireStudentVerification } = inject('eventSettings');
 
@@ -174,6 +171,15 @@ const itemHeadsVal = itemHeads.value ?? [];
 
 const savingId = ref(null);
 const savingHeadId = ref(null);
+
+const studentVerificationOptions = computed(() => [
+    {
+        value: 'inherit',
+        label: `Use cluster default — ${clusterRequireStudentVerification.value ? 'verified students only' : 'unverified allowed'}`,
+    },
+    { value: 'required', label: 'Require verified students only' },
+    { value: 'optional', label: 'Allow unverified students' },
+]);
 
 function toDateInput(value) {
     if (!value) return '';

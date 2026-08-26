@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Support\CsvSafety;
 use App\Http\Controllers\Concerns\ManagesStudentPortalCredentials;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
@@ -583,13 +584,13 @@ class StudentController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['student_name', 'student_id', 'photo_filename', 'photo_filename_by_name', 'has_photo']);
+            CsvSafety::fputcsv($out, ['student_name', 'student_id', 'photo_filename', 'photo_filename_by_name', 'has_photo']);
             foreach ($rows as $student) {
                 $row = StudentPhotoNaming::namingRow($student);
                 if (! $row) {
                     continue;
                 }
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $row['name'],
                     $row['reg_no'],
                     $row['photo_filename'],
@@ -731,7 +732,7 @@ class StudentController extends SchoolAdminController
                 $out = fopen('php://output', 'w');
                 fwrite($out, "\xEF\xBB\xBF");
                 foreach ($rows as $row) {
-                    fputcsv($out, $row);
+                    CsvSafety::fputcsv($out, $row);
                 }
                 fclose($out);
             }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);

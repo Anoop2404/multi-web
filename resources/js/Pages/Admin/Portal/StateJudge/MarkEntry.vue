@@ -16,13 +16,9 @@
                     <form class="flex items-center gap-2" @submit.prevent="submit(registration, participant)">
                         <input v-model="forms[participant.id].score" type="number" step="0.01" min="0" placeholder="Score"
                                class="field !py-1 !text-xs w-20">
-                        <select v-model="forms[participant.id].grade" class="field !py-1 !text-xs w-20">
-                            <option value="">Grade</option>
-                            <option value="A+">A+</option>
-                            <option value="A">A</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                        </select>
+                        <SearchableSelect v-model="forms[participant.id].grade" class="w-20"
+                            :all-option="true" all-label="Grade"
+                            :options="[{ value: 'A+', label: 'A+' }, { value: 'A', label: 'A' }, { value: 'B', label: 'B' }, { value: 'C', label: 'C' }]" />
                         <button type="submit" class="btn-primary !py-1 !px-3 text-xs" :disabled="submitting === participant.id">
                             {{ marks[participant.id] ? 'Update' : 'Save' }}
                         </button>
@@ -37,6 +33,7 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { reactive, ref } from 'vue';
 
 const props = defineProps({

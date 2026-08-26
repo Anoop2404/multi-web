@@ -73,28 +73,22 @@
                 </FormField>
                 <FormField label="Category">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.category_id" class="field">
-                            <option value="">— None —</option>
-                            <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.label }}</option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="form.category_id" :options="categories"
+                                          :all-option="true" all-label="— None —" />
                     </template>
                 </FormField>
                 <FormField label="Certificate type" hint="Used for eligibility labeling; template below overrides print layout">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.certificate_type" class="field">
-                            <option v-for="t in certificateTypes" :key="t" :value="t">{{ formatCertType(t) }}</option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="form.certificate_type" :options="certificateTypeOptions"
+                                          :all-option="false" />
                     </template>
                 </FormField>
                 <FormField label="Certificate template" hint="Choose a saved template (PDF/image background). Leave empty to match by type.">
                     <template #default="{ id }">
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <select :id="id" v-model="form.certificate_template_id" class="field flex-1">
-                                <option value="">— Match by certificate type —</option>
-                                <option v-for="t in certificateTemplates" :key="t.id" :value="t.id">
-                                    {{ t.title }} ({{ formatCertType(t.certificate_type) }}){{ t.has_background ? ' · background' : '' }}{{ t.is_active ? '' : ' · inactive' }}
-                                </option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="form.certificate_template_id" class="flex-1"
+                                              :options="certificateTemplateOptions"
+                                              :all-option="true" all-label="— Match by certificate type —" />
                             <a :href="certificatePreviewUrl"
                                target="_blank" rel="noopener"
                                class="btn-secondary text-sm whitespace-nowrap shrink-0">
@@ -170,21 +164,16 @@
                 </FormField>
                 <FormField label="Status">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.status" class="field">
-                            <option value="draft">Draft</option>
-                            <option value="published">Published</option>
-                            <option value="ongoing">Ongoing</option>
-                            <option value="completed">Completed</option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="form.status"
+                                          :options="[{ value: 'draft', label: 'Draft' }, { value: 'published', label: 'Published' }, { value: 'ongoing', label: 'Ongoing' }, { value: 'completed', label: 'Completed' }]"
+                                          :all-option="false" />
                     </template>
                 </FormField>
                 <FormField label="Fee type">
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.fee_type" class="field">
-                            <option value="none">No fee</option>
-                            <option value="flat">Flat fee (per teacher)</option>
-                            <option value="school">School batch fee</option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="form.fee_type"
+                                          :options="[{ value: 'none', label: 'No fee' }, { value: 'flat', label: 'Flat fee (per teacher)' }, { value: 'school', label: 'School batch fee' }]"
+                                          :all-option="false" />
                         <p v-if="form.fee_type === 'school'" class="text-xs text-gray-500 mt-1">
                             School pays one batch amount = nominated teachers × fee amount. Per-teacher uploads are skipped.
                         </p>
@@ -264,12 +253,8 @@
                                hint="Blank = any prior completed programme"
                                class-extra="sm:col-span-2">
                         <template #default="{ id }">
-                            <select :id="id" v-model="form.eligibility_config.prior_training.program_id" class="field">
-                                <option :value="null">Any prior completed programme</option>
-                                <option v-for="p in eligibilityOptions.prior_programs || []" :key="p.id" :value="p.id">
-                                    {{ p.title }}
-                                </option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="form.eligibility_config.prior_training.program_id"
+                                              :options="priorProgramOptions" :all-option="false" />
                         </template>
                     </FormField>
                     <FormField v-if="(eligibilityOptions.regions || []).length"
@@ -347,12 +332,9 @@
                 <input v-model="sessionForm.scheduled_at" type="datetime-local" class="field" placeholder="Date & time">
                 <input v-model="sessionForm.venue" class="field" placeholder="Venue (optional override)">
                 <input v-model="sessionForm.duration_minutes" type="number" min="15" class="field" placeholder="Duration (minutes)">
-                <select v-model="sessionForm.resource_person_id" class="field sm:col-span-2">
-                    <option value="">Resource person / trainer (optional)</option>
-                    <option v-for="rp in resourcePersons" :key="rp.id" :value="rp.id">
-                        {{ rp.name }}{{ rp.designation ? ` · ${rp.designation}` : '' }}
-                    </option>
-                </select>
+                <SearchableSelect v-model="sessionForm.resource_person_id" class="sm:col-span-2"
+                                  :options="resourcePersonOptions"
+                                  :all-option="true" all-label="Resource person / trainer (optional)" />
                 <p v-if="!resourcePersons?.length" class="text-xs text-amber-700 sm:col-span-2">
                     No active resource persons yet.
                     <Link :href="`/sahodaya-admin/${sahodaya.id}/training/resource-persons`" class="font-semibold underline">Add one</Link>
@@ -367,12 +349,9 @@
                         <input v-model="editSessionForm.scheduled_at" type="datetime-local" class="field">
                         <input v-model="editSessionForm.venue" class="field" placeholder="Venue">
                         <input v-model="editSessionForm.duration_minutes" type="number" min="15" class="field" placeholder="Duration (minutes)">
-                        <select v-model="editSessionForm.resource_person_id" class="field">
-                            <option value="">Resource person (optional)</option>
-                            <option v-for="rp in resourcePersons" :key="rp.id" :value="rp.id">
-                                {{ rp.name }}{{ rp.designation ? ` · ${rp.designation}` : '' }}
-                            </option>
-                        </select>
+                        <SearchableSelect v-model="editSessionForm.resource_person_id"
+                                          :options="resourcePersonOptions"
+                                          :all-option="true" all-label="Resource person (optional)" />
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <button type="button" class="btn-primary text-xs" :disabled="editSessionForm.processing"
@@ -415,12 +394,9 @@
                 </div>
             </div>
             <form @submit.prevent="assignPerson" class="grid gap-2 sm:grid-cols-4 mb-4">
-                <select v-model="assignForm.resource_person_id" class="field sm:col-span-2" required>
-                    <option value="">Select person</option>
-                    <option v-for="rp in assignablePersons" :key="rp.id" :value="rp.id">
-                        {{ rp.name }}{{ rp.designation ? ` · ${rp.designation}` : '' }}
-                    </option>
-                </select>
+                <SearchableSelect v-model="assignForm.resource_person_id" class="sm:col-span-2"
+                                  :options="assignablePersonOptions"
+                                  :all-option="true" all-label="Select person" :required="true" />
                 <input v-model="assignForm.role" class="field" placeholder="Role (trainer / facilitator)">
                 <input v-model="assignForm.honorarium" type="number" min="0" step="0.01" class="field" placeholder="Honorarium ₹">
                 <button class="btn-secondary px-3 py-1.5 rounded text-xs whitespace-nowrap sm:col-span-4 sm:w-fit">
@@ -479,6 +455,7 @@
 import { useForm, router, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatDateTime } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -505,6 +482,36 @@ const { confirm } = useConfirm();
 const assignedIds = computed(() => new Set((props.program.resource_persons || []).map((p) => p.id)));
 const assignablePersons = computed(() =>
     (props.resourcePersons || []).filter((p) => !assignedIds.value.has(p.id)),
+);
+
+const certificateTypeOptions = computed(() =>
+    (props.certificateTypes || []).map((t) => ({ value: t, label: formatCertType(t) })),
+);
+
+const certificateTemplateOptions = computed(() =>
+    (props.certificateTemplates || []).map((t) => ({
+        value: t.id,
+        label: `${t.title} (${formatCertType(t.certificate_type)})${t.has_background ? ' · background' : ''}${t.is_active ? '' : ' · inactive'}`,
+    })),
+);
+
+const priorProgramOptions = computed(() => [
+    { value: null, label: 'Any prior completed programme' },
+    ...(props.eligibilityOptions.prior_programs || []).map((p) => ({ value: p.id, label: p.title })),
+]);
+
+const resourcePersonOptions = computed(() =>
+    (props.resourcePersons || []).map((rp) => ({
+        value: rp.id,
+        label: `${rp.name}${rp.designation ? ` · ${rp.designation}` : ''}`,
+    })),
+);
+
+const assignablePersonOptions = computed(() =>
+    assignablePersons.value.map((rp) => ({
+        value: rp.id,
+        label: `${rp.name}${rp.designation ? ` · ${rp.designation}` : ''}`,
+    })),
 );
 
 const form = useForm({

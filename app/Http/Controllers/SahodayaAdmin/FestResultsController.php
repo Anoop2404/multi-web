@@ -430,7 +430,13 @@ class FestResultsController extends SahodayaAdminController
             ->where('is_enabled', true)
             ->whereNotNull('phase_id')
             ->orderBy('title')
-            ->get(['id', 'event_id', 'title', 'item_code', 'phase_id', 'participant_type']);
+            ->get(['id', 'event_id', 'title', 'item_code', 'phase_id', 'participant_type', 'class_group', 'category']);
+
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $root);
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+        $items->each(function (FestEventItem $item) use ($classGroupLabels, $artsCategoryLabels) {
+            $item->category_label = \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels);
+        });
 
         $fromItems = $items->filter(fn (FestEventItem $i) => $phases->firstWhere('id', $i->phase_id)?->isRegional());
         $toItems = $items->filter(fn (FestEventItem $i) => ! $phases->firstWhere('id', $i->phase_id)?->isRegional());
@@ -498,4 +504,14 @@ class FestResultsController extends SahodayaAdminController
 
         return back()->with('success', 'Advancement withdrawn.');
     }
+
+    /**
+     * Human-readable class/age-bracket or arts-genre label for an item, for display
+     * next to the item's title in the phase-advancement pickers — this page's whole
+     * point is moving winners between items, so telling apart same-named items in
+     * different categories matters more here than most pickers. Null when the item
+     * is in the generic 'open' class group and 'general' arts category.
+     *
+     * @param  array<string, string>  $classGroupLabels
+     */
 }

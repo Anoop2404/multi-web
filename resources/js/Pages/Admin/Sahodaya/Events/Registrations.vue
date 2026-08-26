@@ -28,11 +28,13 @@
         <div v-if="childEvents.length > 1" class="card mb-4 !py-3">
             <div class="flex flex-wrap gap-3 items-center">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}</label>
-                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
-                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                        {{ ev.short_title || ev.title }}
-                    </option>
-                </select>
+                <SearchableSelect
+                    :model-value="String(event.id)"
+                    @update:model-value="switchSportEvent"
+                    :options="childEventOptions"
+                    :all-option="false"
+                    class="w-64 text-xs font-semibold"
+                />
             </div>
         </div>
 
@@ -40,38 +42,45 @@
             <div class="flex flex-wrap gap-2 items-end">
                 <div v-if="regionOptions.length">
                     <label class="text-xs font-semibold text-gray-600">Filter by region</label>
-                    <select v-model="form.region_id" class="field text-sm mt-1 w-44" @change="applyFilters">
-                        <option value="">All regions</option>
-                        <option v-for="reg in regionOptions" :key="reg.id" :value="String(reg.id)">
-                            {{ reg.name }}
-                        </option>
-                    </select>
+                    <SearchableSelect
+                        v-model="form.region_id"
+                        :options="regionOptions"
+                        all-label="All regions"
+                        class="mt-1 w-44"
+                        @change="applyFilters"
+                    />
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by school</label>
-                    <select v-model="form.school_id" class="field text-sm mt-1" @change="applyFilters">
-                        <option value="">All schools</option>
-                        <option v-for="(name, id) in schoolNames" :key="id" :value="id">{{ name }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="form.school_id"
+                        :options="schoolFilterOptions"
+                        all-label="All schools"
+                        class="mt-1"
+                        @change="applyFilters"
+                    />
                 </div>
-                <div>
+                <div class="w-56">
                     <label class="text-xs font-semibold text-gray-600">Filter by item</label>
-                    <select v-model="form.item_id" class="field text-sm mt-1 w-56" @change="applyFilters">
-                        <option value="">All items</option>
-                        <option v-for="item in eventItems" :key="item.id" :value="String(item.id)">
-                            {{ item.title }}
-                        </option>
-                    </select>
+                    <SearchableSelect
+                        v-model="form.item_id"
+                        :options="eventItemOptions"
+                        placeholder="All items"
+                        search-placeholder="Type item name to search…"
+                        all-label="All items"
+                        class="mt-1"
+                        @change="applyFilters"
+                    />
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by status</label>
-                    <select v-model="form.status" class="field text-sm mt-1 w-32" @change="applyFilters">
-                        <option value="">All statuses</option>
-                        <option value="submitted">Submitted</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="withdrawn">Withdrawn</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="form.status"
+                        :options="[{ value: 'submitted', label: 'Submitted' }, { value: 'approved', label: 'Approved' }, { value: 'rejected', label: 'Rejected' }, { value: 'withdrawn', label: 'Withdrawn' }]"
+                        all-label="All statuses"
+                        class="mt-1 w-32"
+                        @change="applyFilters"
+                    />
                 </div>
                 <div class="flex-1 min-w-[180px]">
                     <label class="text-xs font-semibold text-gray-600">Search participant</label>
@@ -227,14 +236,18 @@
                 <h3 class="font-semibold mb-3">Substitute performer</h3>
                 <p class="text-xs text-gray-500 mb-3">{{ substituteReg.item?.title }}</p>
                 <FormField label="Performer (out)">
-                    <select v-model="substituteForm.performer_id" class="field text-sm">
-                        <option v-for="p in performers(substituteReg)" :key="p.id" :value="p.id">{{ participantLabel(p) }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="substituteForm.performer_id"
+                        :options="substitutePerformerOptions"
+                        :all-option="false"
+                    />
                 </FormField>
                 <FormField label="Standby (in)" class-extra="mt-2">
-                    <select v-model="substituteForm.standby_id" class="field text-sm">
-                        <option v-for="p in standbys(substituteReg)" :key="p.id" :value="p.id">{{ participantLabel(p) }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="substituteForm.standby_id"
+                        :options="substituteStandbyOptions"
+                        :all-option="false"
+                    />
                 </FormField>
                 <div class="flex gap-2 mt-4">
                     <button type="button" class="btn-primary text-sm" @click="submitSubstitute">Confirm swap</button>
@@ -271,10 +284,12 @@
                 <div class="border-t border-gray-100 mt-3 pt-3">
                     <label class="text-xs font-semibold text-gray-600">Add participant as</label>
                     <div class="flex items-center gap-3 mt-1">
-                        <select v-model="addParticipantRole" class="field text-sm w-36">
-                            <option value="performer">Performer</option>
-                            <option value="standby">Standby</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="addParticipantRole"
+                            :options="[{ value: 'performer', label: 'Performer' }, { value: 'standby', label: 'Standby' }]"
+                            :all-option="false"
+                            class="w-36"
+                        />
                         <button type="button" class="btn-secondary text-xs" @click="openAddParticipantPicker">Pick student</button>
                     </div>
                 </div>
@@ -306,10 +321,14 @@
                 </div>
                 <form @submit.prevent="submitOnBehalf" class="p-5 space-y-4 overflow-y-auto">
                     <FormField label="School" required>
-                        <select v-model="onBehalfForm.school_id" class="field text-sm" required @change="loadSchoolStudents">
-                            <option value="">Select school</option>
-                            <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="onBehalfForm.school_id"
+                            :options="onBehalfSchoolOptions"
+                            :all-option="true"
+                            all-label="Select school"
+                            :required="true"
+                            @change="loadSchoolStudents"
+                        />
                     </FormField>
                     <div v-if="event.event_type === 'kalolsavam' && onBehalfForm.school_id"
                          class="rounded-lg border px-3 py-2 text-xs"
@@ -323,12 +342,13 @@
                         </p>
                     </div>
                     <FormField label="Event item" required>
-                        <select v-model="onBehalfForm.item_id" class="field text-sm" required>
-                            <option value="">Select item</option>
-                            <option v-for="item in eventItems" :key="item.id" :value="item.id">
-                                {{ item.title }}
-                            </option>
-                        </select>
+                        <SearchableSelect
+                            v-model="onBehalfForm.item_id"
+                            :options="eventItemOptions"
+                            placeholder="Select item"
+                            search-placeholder="Type item name to search…"
+                            :all-option="false"
+                        />
                     </FormField>
                     <FormField v-if="selectedItemIsGroup" label="Team name" required>
                         <input v-model="onBehalfForm.team_name" type="text" class="field text-sm" required>
@@ -428,6 +448,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import FestStudentPickerModal from '@/Components/school/FestStudentPickerModal.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -462,9 +483,14 @@ const filterDescription = computed(() => {
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const { confirm, prompt } = useConfirm();
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/registrations`);
+function switchSportEvent(eventId) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${eventId}/registrations`);
 }
+
+const childEventOptions = computed(() => props.childEvents.map(ev => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
 
 // Server-driven filters — school_id/item_id/status now run as real query constraints
 // (see FestRegistrationReviewController::index()), not just an in-memory slice of an
@@ -499,6 +525,21 @@ function applyFilters() {
 }
 
 const registrationsList = computed(() => props.registrations?.data ?? []);
+
+const eventItemOptions = computed(() => props.eventItems.map(i => ({
+    id: i.id,
+    name: i.category_label ? `${i.title} — ${i.category_label}` : i.title,
+})));
+
+const schoolFilterOptions = computed(() => Object.entries(props.schoolNames).map(([id, name]) => ({
+    value: id,
+    label: name,
+})));
+
+const onBehalfSchoolOptions = computed(() => Object.entries(props.schools).map(([id, name]) => ({
+    value: id,
+    label: name,
+})));
 
 // ── Selection / bulk approve-reject ─────────────────────────────────────────────
 // selectedIds is an explicit id list, now necessarily page-scoped since the list
@@ -718,6 +759,14 @@ function standbys(reg) {
 function participantLabel(p) {
     return p.student?.name ?? p.teacher?.name ?? `#${p.id}`;
 }
+
+const substitutePerformerOptions = computed(() =>
+    substituteReg.value ? performers(substituteReg.value).map(p => ({ value: p.id, label: participantLabel(p) })) : [],
+);
+
+const substituteStandbyOptions = computed(() =>
+    substituteReg.value ? standbys(substituteReg.value).map(p => ({ value: p.id, label: participantLabel(p) })) : [],
+);
 
 function openSubstitute(reg) {
     substituteReg.value = reg;

@@ -37,10 +37,8 @@
                 <div class="grid grid-cols-12 gap-2 items-center">
                     <input v-model="phase.code" placeholder="Code e.g. L1_REGION" class="field col-span-3 text-xs uppercase">
                     <input v-model="phase.name" placeholder="Name e.g. Level 1 – Region Round" class="field col-span-4 text-xs">
-                    <select v-model="phase.batch_code" class="field col-span-3 text-xs">
-                        <option value="">Payment level…</option>
-                        <option v-for="b in batches" :key="b.code" :value="b.code">{{ b.name || b.code }}</option>
-                    </select>
+                    <SearchableSelect v-model="phase.batch_code" class="col-span-3" :options="batchOptions"
+                                      :all-option="true" all-label="Payment level…" />
                     <button type="button" class="col-span-2 text-rose-600 text-xs font-semibold hover:underline"
                             :disabled="phases.length <= 1" @click="phases.splice(idx, 1)">Remove</button>
                 </div>
@@ -72,10 +70,8 @@
                         {{ item.title }}
                         <span class="text-slate-400 font-mono">{{ item.item_code || '(no code — cannot be mapped)' }}</span>
                     </span>
-                    <select v-model="itemPhaseMap[item.item_code]" class="field text-xs !py-1 w-56 shrink-0" :disabled="!item.item_code">
-                        <option value="">— Unassigned —</option>
-                        <option v-for="p in phases.filter(p => p.code)" :key="p.code" :value="p.code">{{ p.name || p.code }}</option>
-                    </select>
+                    <SearchableSelect v-model="itemPhaseMap[item.item_code]" class="w-56 shrink-0" :options="phaseOptions"
+                                      :all-option="true" all-label="— Unassigned —" :disabled="!item.item_code" />
                 </div>
                 <p v-if="!filteredItems.length" class="px-3 py-6 text-center text-slate-400">No items match your search.</p>
             </div>
@@ -135,6 +131,7 @@ import { reactive, ref, computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -176,6 +173,9 @@ function addBatch() {
 function addPhase() {
     phases.push({ _key: keySeq++, code: '', name: '', batch_code: '', is_regional: false, region_codes: [] });
 }
+
+const batchOptions = computed(() => batches.map((b) => ({ value: b.code, label: b.name || b.code })));
+const phaseOptions = computed(() => phases.filter((p) => p.code).map((p) => ({ value: p.code, label: p.name || p.code })));
 
 const itemPhaseMap = reactive({});
 const itemSearch = ref('');

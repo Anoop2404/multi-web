@@ -36,7 +36,11 @@
                 $body = str_replace('{'.$key.'}', $value, $body);
                 continue;
             }
-            $safe = e((string) $value);
+            // certificate_date carries a real <sup> tag around its ordinal suffix (see
+            // resolveFieldValues()) — server-built from now()->format(), never user
+            // input, so skipping escaping here is safe and lets the tag actually render
+            // instead of showing as literal "&lt;sup&gt;" text.
+            $safe = $key === 'certificate_date' ? (string) $value : e((string) $value);
             if ($boldVariables && $safe !== '') {
                 $safe = '<strong>'.$safe.'</strong>';
             }

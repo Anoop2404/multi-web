@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\ExportJob;
 use App\Models\User;
 use App\Services\Notifications\NotificationService;
+use App\Support\CsvSafety;
 use App\Support\TenantStorage;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -41,9 +42,9 @@ class GenerateCsvExportJob implements ShouldQueue
 
             $relativePath = 'exports/completed/'.$exportJob->id.'-'.$exportJob->filename;
             $handle = fopen('php://temp', 'r+');
-            fputcsv($handle, $payload['headers']);
+            CsvSafety::fputcsv($handle, $payload['headers']);
             foreach ($payload['rows'] as $row) {
-                fputcsv($handle, $row);
+                CsvSafety::fputcsv($handle, $row);
             }
             rewind($handle);
             $csv = stream_get_contents($handle);

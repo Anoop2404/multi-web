@@ -54,10 +54,8 @@
             <div class="card">
                 <h3 class="font-semibold text-sm mb-3">Assign students to house</h3>
                 <form @submit.prevent="assignStudents" class="space-y-3">
-                    <select v-model="assignForm.school_house_id" class="field max-w-xs" required>
-                        <option value="">Select house</option>
-                        <option v-for="h in houses" :key="h.id" :value="h.id">{{ h.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="assignForm.school_house_id" class="max-w-xs" :options="houses"
+                        :all-option="true" all-label="Select house" :required="true" />
                     <div class="max-h-64 overflow-y-auto border rounded-lg divide-y text-sm">
                         <label v-for="s in students" :key="s.id" class="flex items-center gap-2 p-2 hover:bg-gray-50">
                             <input type="checkbox" :value="s.id" v-model="assignForm.student_ids">
@@ -76,6 +74,7 @@
 <script setup>
 import { useForm, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 const { confirm, prompt } = useConfirm();
 

@@ -6,6 +6,8 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestItemHead;
 use App\Models\FestParticipant;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use Illuminate\Support\Facades\DB;
 
 class FestHeadItemNavigationService
@@ -15,7 +17,9 @@ class FestHeadItemNavigationService
     ) {}
 
     /**
-     * Lightweight head tabs for school item registration (no per-item payloads).
+     * Lightweight head tabs for school item registration. Item payloads (title,
+     * category_label, etc.) are only fetched/computed when $withItems is true —
+     * callers that just need tab counts skip the extra columns and label lookups.
      *
      * @return array{
      *     headItemGroups: list<array<string, mixed>>,
@@ -45,10 +49,28 @@ class FestHeadItemNavigationService
             ->orderBy('name')
             ->get(['id', 'name', 'sort_order', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time', 'status']);
 
+        $itemColumns = ['id', 'head_id'];
+        $classGroupLabels = [];
+        $artsCategoryLabels = [];
+        $defaultChestStart = 1;
+
+        if ($withItems) {
+            $itemColumns = [
+                'id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start',
+                'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end',
+                'competition_time', 'results_published_at', 'participant_type', 'gender',
+                'age_group', 'class_group', 'category', 'min_group_size', 'max_group_size', 'criteria_json',
+            ];
+            $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+            $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+            $numbering = app(FestNumberingService::class)->settings($event);
+            $defaultChestStart = (int) ($numbering['chest_no_start'] ?? 1);
+        }
+
         $items = FestEventItem::query()
             ->where('event_id', $event->id)
             ->where('is_enabled', true)
-            ->get(['id', 'head_id']);
+            ->get($itemColumns);
 
         $itemsByHead = $items->groupBy(fn ($i) => $i->head_id ?? 0);
         $groups = [];
@@ -64,7 +86,7 @@ class FestHeadItemNavigationService
                 fn (FestEventItem $item) => $stats[$item->id]['participant_count'] ?? 0,
             );
 
-            $groups[] = [
+            $group = [
                 'head_id'            => $head->id,
                 'head_name'          => $head->name,
                 'item_count'         => $headItems->count(),
@@ -80,12 +102,20 @@ class FestHeadItemNavigationService
                 'registration_open'  => $this->headRegistrationOpen($head),
             ];
 
+            if ($withItems) {
+                $group['items'] = $headItems->map(
+                    fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, $head->name, $classGroupLabels, $artsCategoryLabels),
+                )->values()->all();
+            }
+
+            $groups[] = $group;
+
             $headsForFilter[] = ['id' => $head->id, 'name' => $head->name];
         }
 
         $unassigned = $itemsByHead->get(0) ?? collect();
         if ($unassigned->isNotEmpty()) {
-            $groups[] = [
+            $unassignedGroup = [
                 'head_id'           => null,
                 'head_name'         => 'Other items',
                 'item_count'        => $unassigned->count(),
@@ -100,6 +130,14 @@ class FestHeadItemNavigationService
                 'competition_time'  => null,
                 'registration_open' => true,
             ];
+
+            if ($withItems) {
+                $unassignedGroup['items'] = $unassigned->map(
+                    fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, null, $classGroupLabels, $artsCategoryLabels),
+                )->values()->all();
+            }
+
+            $groups[] = $unassignedGroup;
         }
 
         return [
@@ -140,10 +178,12 @@ class FestHeadItemNavigationService
             ->where('is_enabled', true)
             ->orderBy('display_order')
             ->orderBy('title')
-            ->get(['id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at']);
+            ->get(['id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at', 'class_group', 'category', 'age_group']);
 
         $numbering = app(FestNumberingService::class)->settings($targetEvent);
         $defaultChestStart = (int) ($numbering['chest_no_start'] ?? 1);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $targetEvent);
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         $itemsByHead = $items->groupBy(fn ($i) => $i->head_id ?? 0);
         $groups = [];
@@ -151,7 +191,7 @@ class FestHeadItemNavigationService
 
         foreach ($heads as $head) {
             $headItems = ($itemsByHead->get($head->id) ?? collect())->map(
-                fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, $head->name),
+                fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, $head->name, $classGroupLabels, $artsCategoryLabels),
             )->values()->all();
 
             if ($headItems === [] && $schoolId) {
@@ -181,7 +221,7 @@ class FestHeadItemNavigationService
         }
 
         $unassigned = ($itemsByHead->get(0) ?? collect())->map(
-            fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, null),
+            fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, null, $classGroupLabels, $artsCategoryLabels),
         )->values()->all();
 
         if ($unassigned !== []) {
@@ -207,7 +247,7 @@ class FestHeadItemNavigationService
         $orphaned = $items->filter(fn (FestEventItem $item) => ! in_array($item->id, $assignedItemIds, true));
         if ($orphaned->isNotEmpty()) {
             $orphanPayloads = $orphaned
-                ->map(fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, null))
+                ->map(fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, null, $classGroupLabels, $artsCategoryLabels))
                 ->values()
                 ->all();
 
@@ -230,7 +270,7 @@ class FestHeadItemNavigationService
 
         if ($groups === [] && $items->isNotEmpty()) {
             $allItems = $items
-                ->map(fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, null))
+                ->map(fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, null, $classGroupLabels, $artsCategoryLabels))
                 ->values()
                 ->all();
 
@@ -431,7 +471,8 @@ class FestHeadItemNavigationService
                     'id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start',
                     'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end',
                     'competition_time', 'results_published_at',
-                    'participant_type', 'gender', 'age_group', 'min_group_size', 'max_group_size', 'criteria_json'
+                    'participant_type', 'gender', 'age_group', 'min_group_size', 'max_group_size', 'criteria_json',
+                    'class_group', 'category',
                 ]);
 
             if ($items->isEmpty() && $schoolId) {
@@ -440,9 +481,11 @@ class FestHeadItemNavigationService
 
             $numbering = app(FestNumberingService::class)->settings($sport);
             $defaultChestStart = (int) ($numbering['chest_no_start'] ?? 1);
+            $classGroupLabels = FestClassGroupScheme::labels(null, $sport);
+            $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
             $itemPayloads = $items->map(
-                fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, $sport->title),
+                fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, $sport->title, $classGroupLabels, $artsCategoryLabels),
             )->values()->all();
 
             $groups[] = [
@@ -482,6 +525,8 @@ class FestHeadItemNavigationService
         array $stats,
         int $defaultChestStart,
         ?string $headName,
+        array $classGroupLabels = [],
+        array $artsCategoryLabels = [],
     ): array {
         $stat = $stats[$item->id] ?? ['participant_count' => 0, 'chest_assigned' => 0, 'item_reg_assigned' => 0];
         $total = $stat['participant_count'];
@@ -509,6 +554,7 @@ class FestHeadItemNavigationService
             'participant_type'  => $item->participant_type,
             'gender'            => $item->gender,
             'age_group'         => $item->age_group,
+            'category_label'    => FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels),
             'squad_summary'     => $item->squadSummary(),
         ];
     }

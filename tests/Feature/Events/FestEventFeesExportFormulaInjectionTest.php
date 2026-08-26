@@ -14,16 +14,19 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * SCRATCH / THROWAWAY — security audit verification only. Proves CWE-1236 (CSV formula
- * injection) in FestEventFeesController::exportPayments by round-tripping a malicious
- * transaction_ref through the real HTTP export endpoint and inspecting the raw bytes.
- * Delete after the audit run.
+ * Security regression test for CWE-1236 (CSV formula injection) in
+ * FestEventFeesController::exportPayments. Originally a scratch audit that proved the
+ * vulnerability (a raw =HYPERLINK(...) transaction_ref round-tripped unescaped into the
+ * exported CSV); now that FestEventFeesController::exportPayments writes through
+ * App\Support\CsvSafety::fputcsv(), this asserts the payload is neutralized instead —
+ * prefixed with a leading quote so Excel/Sheets treat it as inert text, not a live
+ * formula, while the raw payload text still shows up in the export for reconciliation.
  */
-class ScratchFormulaInjectionAuditTest extends TestCase
+class FestEventFeesExportFormulaInjectionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_transaction_ref_formula_payload_is_not_escaped_in_csv_export(): void
+    public function test_transaction_ref_formula_payload_is_neutralized_in_csv_export(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
 
@@ -91,24 +94,19 @@ class ScratchFormulaInjectionAuditTest extends TestCase
 
         $csv = $response->streamedContent();
 
-        fwrite(STDERR, "\n----- RAW CSV BYTES (first 600 chars) -----\n");
-        fwrite(STDERR, substr($csv, 0, 600)."\n");
-        fwrite(STDERR, "----- END RAW CSV BYTES -----\n");
+        // fputcsv() doubles internal quote characters as ordinary CSV escaping (unrelated
+        // to formula-injection safety), so a raw substring match against $payload would be
+        // wrong either way — parse the actual data row instead of guessing at the escaped
+        // bytes.
+        $lines = array_values(array_filter(explode("\n", trim($csv))));
+        $dataRow = str_getcsv($lines[1]);
+        $transactionRef = $dataRow[9] ?? null;
 
-        $this->assertStringContainsString(
-            $payload,
-            $csv,
-            'Expected the raw, unescaped formula payload to appear verbatim in the CSV (confirming no sanitization is applied).'
-        );
+        $this->assertNotSame($payload, $transactionRef, 'Transaction ref should no longer round-trip as the raw, unneutralized formula payload.');
 
-        // A CSV-formula-injection-safe implementation would neutralize a leading =/+/-/@,
-        // typically by prefixing the cell with a plain quote or a tab before the sign. If
-        // that were happening, the raw payload would NOT appear immediately after a comma
-        // the way it does here.
-        $this->assertStringContainsString(
-            ','.$payload,
-            $csv,
-            'Cell value follows a CSV delimiter with no neutralizing prefix (no leading \', tab, etc.) — Excel/Sheets will parse it as a live formula on open.'
-        );
+        // A leading single quote is Excel/Sheets' force-text marker — it neutralizes formula
+        // interpretation without altering how the cell displays, so the visible payload
+        // text is still present (and usable for reconciliation) right behind it.
+        $this->assertSame("'".$payload, $transactionRef);
     }
 }

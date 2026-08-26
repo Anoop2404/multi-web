@@ -23,11 +23,9 @@
                         {{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}
                     </label>
                 </div>
-                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1.5 w-72 font-semibold shadow-sm border-slate-300">
-                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                        {{ ev.short_title || ev.title }}
-                    </option>
-                </select>
+                <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
+                                  :options="sportEventOptions" :all-option="false" placeholder="Select event"
+                                  class="w-72" />
             </div>
         </div>
 
@@ -148,7 +146,7 @@
                                         {{ row.title }}
                                         <span v-if="row.item_code" class="block text-xs font-mono text-slate-400 font-normal">{{ row.item_code }}</span>
                                     </td>
-                                    <td class="text-slate-600 font-medium">{{ row.age_group || row.class_group || '—' }}</td>
+                                    <td class="text-slate-600 font-medium">{{ categoryLabel(row) }}</td>
                                     <td>
                                         <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block"
                                               :class="row.participant_type === 'individual' ? 'bg-slate-100 text-slate-700 border border-slate-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'">
@@ -184,6 +182,7 @@
 import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadFilter from '@/Components/reports/ReportHeadFilter.vue';
@@ -206,9 +205,14 @@ const props = defineProps({
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/item-counts`;
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports/item-counts`);
+function switchSportEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/reports/item-counts`);
 }
+
+const sportEventOptions = computed(() => props.childEvents.map((ev) => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
 
 const {
     headFilter,
@@ -233,6 +237,20 @@ const filteredHeadSummary = computed(() => {
     if (!headId) return props.headSummary ?? [];
     return (props.headSummary ?? []).filter((h) => String(h.head_id) === headId);
 });
+
+// Prefers the backend-provided category_label; falls back to humanizing
+// whichever raw grouping field the row carries (age_group for sports events,
+// class_group otherwise), same fallback order used across the report pages.
+function humanize(value) {
+    return String(value).replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function categoryLabel(row) {
+    if (row.category_label) return row.category_label;
+    if (row.age_group) return humanize(row.age_group);
+    if (row.class_group && row.class_group !== 'open') return humanize(row.class_group);
+    return '—';
+}
 
 function formatDate(iso) {
     if (!iso) return '—';

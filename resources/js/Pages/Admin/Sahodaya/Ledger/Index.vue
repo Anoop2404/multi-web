@@ -17,12 +17,14 @@
         <form @submit.prevent="applyYearFilter" class="card mb-4 flex flex-wrap items-end gap-3">
             <FormField label="Academic year">
                 <template #default="{ id }">
-                    <select :id="id" v-model="financialYearId" class="field max-w-xs">
-                        <option value="">All years</option>
-                        <option v-for="y in academicYears" :key="y.id" :value="String(y.id)">
-                            {{ y.label }} ({{ y.status }})
-                        </option>
-                    </select>
+                    <SearchableSelect
+                        :id="id"
+                        v-model="financialYearId"
+                        class="max-w-xs"
+                        :options="academicYearOptions"
+                        :all-option="true"
+                        all-label="All years"
+                    />
                 </template>
             </FormField>
             <button type="submit" class="btn-secondary text-sm">Apply</button>
@@ -61,12 +63,17 @@
                     </FormField>
                     <FormField label="Type">
                         <template #default="{ id }">
-                            <select :id="id" v-model="headForm.type" class="field">
-                                <option value="income">Income</option>
-                                <option value="expense">Expense</option>
-                                <option value="asset">Asset</option>
-                                <option value="liability">Liability</option>
-                            </select>
+                            <SearchableSelect
+                                :id="id"
+                                v-model="headForm.type"
+                                :all-option="false"
+                                :options="[
+                                    { value: 'income', label: 'Income' },
+                                    { value: 'expense', label: 'Expense' },
+                                    { value: 'asset', label: 'Asset' },
+                                    { value: 'liability', label: 'Liability' },
+                                ]"
+                            />
                         </template>
                     </FormField>
                     <button type="submit" class="btn-primary w-full text-sm">Add head</button>
@@ -93,27 +100,39 @@
                 <form @submit.prevent="postTransaction" class="space-y-2">
                     <FormField label="Primary account head" required>
                         <template #default="{ id }">
-                            <select :id="id" v-model="txForm.account_head_id" class="field" required>
-                                <option value="">Select head</option>
-                                <option v-for="h in heads" :key="h.id" :value="h.id">{{ h.code }} — {{ h.name }}</option>
-                            </select>
+                            <SearchableSelect
+                                :id="id"
+                                v-model="txForm.account_head_id"
+                                :required="true"
+                                :all-option="true"
+                                all-label="Select head"
+                                :options="headOptions"
+                            />
                         </template>
                     </FormField>
                     <FormField label="Counter account">
                         <template #default="{ id }">
-                            <select :id="id" v-model="txForm.counter_account_head_id" class="field">
-                                <option value="">Cash & Bank (default)</option>
-                                <option v-for="h in heads" :key="'c-'+h.id" :value="h.id">{{ h.code }} — {{ h.name }}</option>
-                            </select>
+                            <SearchableSelect
+                                :id="id"
+                                v-model="txForm.counter_account_head_id"
+                                :all-option="true"
+                                all-label="Cash & Bank (default)"
+                                :options="headOptions"
+                            />
                         </template>
                     </FormField>
                     <div class="grid grid-cols-2 gap-2">
                         <FormField label="Entry type">
                             <template #default="{ id }">
-                                <select :id="id" v-model="txForm.entry_type" class="field">
-                                    <option value="credit">Credit (+)</option>
-                                    <option value="debit">Debit (−)</option>
-                                </select>
+                                <SearchableSelect
+                                    :id="id"
+                                    v-model="txForm.entry_type"
+                                    :all-option="false"
+                                    :options="[
+                                        { value: 'credit', label: 'Credit (+)' },
+                                        { value: 'debit', label: 'Debit (−)' },
+                                    ]"
+                                />
                             </template>
                         </FormField>
                         <FormField label="Amount (₹)" required>
@@ -188,6 +207,7 @@
 import { Link, useForm, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -210,6 +230,16 @@ const transactionRows = computed(() => {
 });
 
 const financialYearId = ref(props.filterFinancialYearId ? String(props.filterFinancialYearId) : '');
+
+const academicYearOptions = computed(() => props.academicYears.map((y) => ({
+    value: String(y.id),
+    label: `${y.label} (${y.status})`,
+})));
+
+const headOptions = computed(() => props.heads.map((h) => ({
+    value: h.id,
+    label: `${h.code} — ${h.name}`,
+})));
 
 function applyYearFilter() {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/ledger`, {

@@ -64,12 +64,7 @@
             <form v-if="bill.status === 'open'" @submit.prevent="addItem" class="p-3 border-t flex flex-wrap items-end gap-3">
                 <FormField label="Menu item" :error="itemForm.errors.menu_item_id">
                     <template #default="{ id }">
-                        <select :id="id" v-model="itemForm.menu_item_id" class="field text-sm">
-                            <option value="">— Select item —</option>
-                            <option v-for="mi in menuItems" :key="mi.id" :value="mi.id">
-                                {{ formatCalendarDate(mi.menu_date) }} · {{ mi.meal_type }} · {{ mi.name }} (₹{{ Number(mi.price).toFixed(2) }})
-                            </option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="itemForm.menu_item_id" :options="menuItemOptions" :all-option="true" all-label="— Select item —" />
                     </template>
                 </FormField>
                 <FormField label="Qty" :error="itemForm.errors.quantity">
@@ -120,12 +115,7 @@
                 </FormField>
                 <FormField label="Mode" :error="paymentForm.errors.payment_mode">
                     <template #default="{ id }">
-                        <select :id="id" v-model="paymentForm.payment_mode" class="field text-sm">
-                            <option value="cash">Cash</option>
-                            <option value="upi">UPI</option>
-                            <option value="bank_transfer">Bank transfer</option>
-                            <option value="other">Other</option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="paymentForm.payment_mode" :options="[{ value: 'cash', label: 'Cash' }, { value: 'upi', label: 'UPI' }, { value: 'bank_transfer', label: 'Bank transfer' }, { value: 'other', label: 'Other' }]" :all-option="false" />
                     </template>
                 </FormField>
                 <FormField label="Notes (optional)" :error="paymentForm.errors.notes" class-extra="flex-1 min-w-[10rem]">
@@ -146,6 +136,7 @@ import { computed } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -175,6 +166,11 @@ const statusBadgeClass = computed(() => ({
 const { confirm } = useConfirm();
 
 const itemForm = useForm({ menu_item_id: '', quantity: 1 });
+
+const menuItemOptions = computed(() => props.menuItems.map((mi) => ({
+    value: mi.id,
+    label: `${formatCalendarDate(mi.menu_date)} · ${mi.meal_type} · ${mi.name} (₹${Number(mi.price).toFixed(2)})`,
+})));
 
 // Live remaining-quantity check against max_per_school for the currently selected item,
 // mirroring the server-side check in FestFoodBillingController::addItem.

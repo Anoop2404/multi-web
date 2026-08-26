@@ -156,11 +156,13 @@
 
                             <div class="sm:col-span-2">
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Status</label>
-                                <select v-model="entryForm.status" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                    <option value="pending">Pending Review</option>
-                                    <option value="approved">Approved</option>
-                                    <option value="rejected">Rejected</option>
-                                </select>
+                                <SearchableSelect
+                                    v-model="entryForm.status"
+                                    class="w-full"
+                                    :options="[{ value: 'pending', label: 'Pending Review' }, { value: 'approved', label: 'Approved' }, { value: 'rejected', label: 'Rejected' }]"
+                                    :all-option="false"
+                                    placeholder="Select status"
+                                />
                             </div>
                         </div>
 
@@ -183,6 +185,7 @@
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     intake: Object,

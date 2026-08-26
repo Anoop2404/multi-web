@@ -186,8 +186,15 @@ class TenantStorage
 
     public static function exists(string $relativePath, ?string $disk = null): bool
     {
-        return self::get($relativePath, $disk) !== null
-            || Storage::disk(self::resolveDisk($disk))->exists(ltrim($relativePath, '/'));
+        if (self::get($relativePath, $disk) !== null) {
+            return true;
+        }
+
+        try {
+            return Storage::disk(self::resolveDisk($disk))->exists(ltrim($relativePath, '/'));
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public static function publicFilePath(Tenant $tenant, string $relativePath): ?string

@@ -7,10 +7,7 @@
         <form @submit.prevent="create" class="card mb-4 grid md:grid-cols-4 gap-3">
             <input v-model="form.title" class="field" placeholder="Screen title" required>
             <input v-model="form.slug" class="field" placeholder="slug (optional)">
-            <select v-model="form.event_id" class="field">
-                <option value="">No event linked</option>
-                <option v-for="e in events" :key="e.id" :value="e.id">{{ e.title }}</option>
-            </select>
+            <SearchableSelect v-model="form.event_id" :options="events" :all-option="true" all-label="No event linked" />
             <button class="btn-primary">Create screen</button>
         </form>
 
@@ -39,6 +36,7 @@
 import { computed } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();

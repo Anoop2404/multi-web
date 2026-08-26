@@ -20,11 +20,13 @@
 
         <form @submit.prevent="applyFilters" class="flex flex-wrap gap-3 items-end mb-4">
             <input v-model="filterForm.q" class="field flex-1 min-w-[12rem]" placeholder="Search name">
-            <select v-model="filterForm.enabled" class="field w-40">
-                <option value="">All statuses</option>
-                <option value="1">Enabled only</option>
-                <option value="0">Disabled only</option>
-            </select>
+            <SearchableSelect
+                v-model="filterForm.enabled"
+                class="w-40"
+                :options="[{ value: '1', label: 'Enabled only' }, { value: '0', label: 'Disabled only' }]"
+                :all-option="true"
+                all-label="All statuses"
+            />
             <button type="submit" class="btn-primary text-sm">Apply</button>
             <button type="button" class="btn-secondary text-sm" @click="clearFilters">Clear</button>
         </form>
@@ -80,6 +82,7 @@
 import { computed } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import CatalogSubNav from '@/Components/sahodaya/CatalogSubNav.vue';
 import CatalogSectionNav from '@/Components/sahodaya/CatalogSectionNav.vue';
 import FestItemMetaIcons from '@/Components/sahodaya/FestItemMetaIcons.vue';

@@ -68,11 +68,7 @@
                 </div>
                 <label class="text-xs text-slate-500 block">
                     Batch status
-                    <select v-model="addBatchForm.status" class="field text-sm mt-0.5">
-                        <option value="registration_open">Registration Open</option>
-                        <option value="published">Published</option>
-                        <option value="draft">Draft</option>
-                    </select>
+                    <SearchableSelect v-model="addBatchForm.status" class="mt-0.5" :options="[{ value: 'registration_open', label: 'Registration Open' }, { value: 'published', label: 'Published' }, { value: 'draft', label: 'Draft' }]" :all-option="false" />
                 </label>
                 <label class="text-xs text-slate-500 block">
                     Student registration fee (₹ per student, optional)
@@ -107,11 +103,7 @@
                                 <input v-model="editBatchForm.registration_close" type="datetime-local" class="field !py-1 !text-xs">
                             </div>
                             <div class="grid grid-cols-2 gap-2">
-                                <select v-model="editBatchForm.status" class="field !py-1 !text-xs">
-                                    <option value="registration_open">Registration Open</option>
-                                    <option value="published">Published</option>
-                                    <option value="draft">Draft</option>
-                                </select>
+                                <SearchableSelect v-model="editBatchForm.status" :options="[{ value: 'registration_open', label: 'Registration Open' }, { value: 'published', label: 'Published' }, { value: 'draft', label: 'Draft' }]" :all-option="false" />
                                 <input v-model.number="editBatchForm.student_registration_fee" type="number" min="0" step="0.01" class="field !py-1 !text-xs" placeholder="Student fee (₹/student)">
                             </div>
                         </div>
@@ -188,20 +180,11 @@
                     <div class="grid grid-cols-2 gap-2">
                         <label class="text-xs text-slate-500 block">
                             Phase status
-                            <select v-model="addForm.status" class="field text-sm mt-0.5">
-                                <option value="registration_open">Registration Open</option>
-                                <option value="published">Published</option>
-                                <option value="draft">Draft</option>
-                                <option value="ongoing">Ongoing</option>
-                                <option value="completed">Completed</option>
-                            </select>
+                            <SearchableSelect v-model="addForm.status" class="mt-0.5" :options="[{ value: 'registration_open', label: 'Registration Open' }, { value: 'published', label: 'Published' }, { value: 'draft', label: 'Draft' }, { value: 'ongoing', label: 'Ongoing' }, { value: 'completed', label: 'Completed' }]" :all-option="false" />
                         </label>
                         <label class="text-xs text-slate-500 block">
                             Payment batch
-                            <select v-model="addForm.registration_batch_id" class="field text-sm mt-0.5">
-                                <option :value="null">No payment level</option>
-                                <option v-for="batch in registrationBatches" :key="batch.id" :value="batch.id">{{ batch.name }}</option>
-                            </select>
+                            <SearchableSelect v-model="addForm.registration_batch_id" class="mt-0.5" :options="registrationBatches" :all-option="true" all-label="No payment level" />
                         </label>
                     </div>
                     <div class="flex items-center gap-2 pt-1">
@@ -268,20 +251,11 @@
                                 <div class="grid grid-cols-2 gap-2">
                                     <label class="text-[11px] text-slate-500 block">
                                         Phase status
-                                        <select v-model="editForm.status" class="field !py-1 !text-xs mt-0.5">
-                                            <option value="registration_open">Registration Open</option>
-                                            <option value="published">Published</option>
-                                            <option value="draft">Draft</option>
-                                            <option value="ongoing">Ongoing</option>
-                                            <option value="completed">Completed</option>
-                                        </select>
+                                        <SearchableSelect v-model="editForm.status" class="mt-0.5" :options="[{ value: 'registration_open', label: 'Registration Open' }, { value: 'published', label: 'Published' }, { value: 'draft', label: 'Draft' }, { value: 'ongoing', label: 'Ongoing' }, { value: 'completed', label: 'Completed' }]" :all-option="false" />
                                     </label>
                                     <label class="text-[11px] text-slate-500 block">
                                         Payment batch
-                                        <select v-model="editForm.registration_batch_id" class="field !py-1 !text-xs mt-0.5">
-                                            <option :value="null">No payment level</option>
-                                            <option v-for="batch in registrationBatches" :key="batch.id" :value="batch.id">{{ batch.name }}</option>
-                                        </select>
+                                        <SearchableSelect v-model="editForm.registration_batch_id" class="mt-0.5" :options="registrationBatches" :all-option="true" all-label="No payment level" />
                                     </label>
                                 </div>
                                 <div class="flex items-center gap-2 pt-1">
@@ -357,10 +331,7 @@
                     <input v-model="itemSearch" type="search" class="field text-sm" placeholder="Search items by title, code, or category…">
 
                     <div class="flex items-center gap-2">
-                        <select v-model="assignPhaseId" class="field text-sm flex-1">
-                            <option :value="null">— No phase (unassign) —</option>
-                            <option v-for="phase in phases" :key="phase.id" :value="phase.id">{{ phase.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="assignPhaseId" class="flex-1" :options="phases" :all-option="true" all-label="— No phase (unassign) —" />
                         <button type="button" class="btn-primary text-sm shrink-0" :disabled="selectedItemIds.length === 0 || assignForm.processing" @click="assignItems">
                             Assign ({{ selectedItemIds.length }})
                         </button>
@@ -414,6 +385,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import FestPhaseWorkflowNav from '@/Components/sahodaya/FestPhaseWorkflowNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({

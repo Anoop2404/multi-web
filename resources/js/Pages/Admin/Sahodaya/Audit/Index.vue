@@ -24,17 +24,13 @@
         <div class="card mb-4 flex flex-wrap gap-2 items-end">
             <div>
                 <label class="form-label">School</label>
-                <select v-model="localFilters.school_id" class="field text-sm min-w-[11rem]">
-                    <option value="">All schools</option>
-                    <option v-for="school in schools" :key="school.id" :value="school.id">{{ school.name }}</option>
-                </select>
+                <SearchableSelect v-model="localFilters.school_id" :options="schools" :all-option="true"
+                                   all-label="All schools" class="min-w-[11rem]" />
             </div>
             <div>
                 <label class="form-label">Category</label>
-                <select v-model="localFilters.category" class="field text-sm min-w-[10rem]">
-                    <option value="">All categories</option>
-                    <option v-for="(label, key) in categories" :key="key" :value="key">{{ label }}</option>
-                </select>
+                <SearchableSelect v-model="localFilters.category" :options="categoryOptions" :all-option="true"
+                                   all-label="All categories" class="min-w-[10rem]" />
             </div>
             <div>
                 <label class="form-label">Action</label>
@@ -75,6 +71,7 @@ import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFil
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import DetailedLogTable from '@/Components/logs/DetailedLogTable.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: { type: Object, required: true },
@@ -97,6 +94,8 @@ const localFilters = reactive({
     school_id: props.filters.school_id ?? '',
     q: props.filters.q ?? '',
 });
+
+const categoryOptions = computed(() => Object.entries(props.categories).map(([key, label]) => ({ value: key, label })));
 
 const exportUrl = computed(() => {
     const params = new URLSearchParams();

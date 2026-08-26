@@ -44,17 +44,11 @@
                    class="px-3 py-6 text-center text-sm text-white/50">
                     No menus match “{{ navSearch.trim() }}”
                 </p>
-                <template v-for="group in filteredNavGroups" :key="group.section">
-                    <p class="px-3 pt-4 pb-1 text-[11px] font-bold text-[#fbbf24]/90 uppercase tracking-widest">
-                        {{ group.section }}
-                    </p>
-                    <SahodayaNavItem v-for="item in group.items" :key="item.href"
-                                     :href="item.href"
-                                     :icon="item.icon"
-                                     :label="item.label"
-                                     :badge="item.badge ?? 0"
-                                     :active="adminNavItemActive(page.url, item.href, item.exact)" />
-                </template>
+                <SidebarNavGroup v-for="group in filteredNavGroups" :key="group.section"
+                                  :group="group"
+                                  :item-active="(item) => adminNavItemActive(page.url, item.href, item.exact)"
+                                  :storage-key="`nav-open:sahodaya:${group.section}`"
+                                  :force-open="Boolean(navSearch.trim())" />
             </nav>
 
             <!-- Footer — always pinned at bottom -->
@@ -119,7 +113,7 @@ import ImpersonationBanner from '@/Components/ImpersonationBanner.vue';
 import AnnouncementBanner from '@/Components/AnnouncementBanner.vue';
 import FlashBanner from '@/Components/ui/FlashBanner.vue';
 import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
-import SahodayaNavItem from '@/Components/sahodaya/SahodayaNavItem.vue';
+import SidebarNavGroup from '@/Components/ui/SidebarNavGroup.vue';
 import SahodayaSidebarNavSearch from '@/Components/sahodaya/SahodayaSidebarNavSearch.vue';
 import SvgIcon from '@/Components/icons/SvgIcon.vue';
 import { filterNavGroups } from '@/support/filterNavGroups.js';

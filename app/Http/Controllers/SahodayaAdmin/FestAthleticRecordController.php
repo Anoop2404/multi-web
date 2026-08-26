@@ -42,6 +42,7 @@ class FestAthleticRecordController extends SahodayaAdminController
             'records' => $records,
             'breaks'  => $breaks,
             'classGroups' => FestClassGroupScheme::labels(null, $event),
+            'ageGroupLabels' => config('fest_item_taxonomy.age_group', []),
         ]));
     }
 

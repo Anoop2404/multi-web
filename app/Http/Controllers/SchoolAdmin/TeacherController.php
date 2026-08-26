@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Support\CsvSafety;
 use App\Http\Controllers\Concerns\ManagesTeacherPortalCredentials;
 use App\Models\SchoolClass;
 use App\Models\Teacher;
@@ -196,7 +197,7 @@ class TeacherController extends SchoolAdminController
                 $out = fopen('php://output', 'w');
                 fwrite($out, "\xEF\xBB\xBF");
                 foreach ($rows as $row) {
-                    fputcsv($out, $row);
+                    CsvSafety::fputcsv($out, $row);
                 }
                 fclose($out);
             }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);

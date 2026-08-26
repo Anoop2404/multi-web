@@ -29,12 +29,10 @@
                      class="flex flex-wrap items-end gap-3 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0">
                     <div class="min-w-[220px] flex-1 max-w-sm">
                         <label class="label-xs">{{ group.label }} region</label>
-                        <select v-model="groupRegionChoices[group.key]" class="field">
-                            <option :value="null">— Select region —</option>
-                            <option v-for="region in regions" :key="region.id" :value="region.id">
-                                {{ region.name }}
-                            </option>
-                        </select>
+                        <SearchableSelect v-model="groupRegionChoices[group.key]"
+                                           :options="regions"
+                                           :all-option="true"
+                                           all-label="— Select region —" />
                     </div>
                 </div>
                 <button type="button" class="btn-primary text-sm" :disabled="savingRegion" @click="saveRegions">
@@ -53,12 +51,10 @@
                 <div class="flex flex-wrap items-end gap-3">
                     <div class="min-w-[220px] flex-1 max-w-sm">
                         <label class="label-xs">Region</label>
-                        <select v-model="regionChoice" class="field">
-                            <option :value="null">— Select region —</option>
-                            <option v-for="region in regions" :key="region.id" :value="region.id">
-                                {{ region.name }}
-                            </option>
-                        </select>
+                        <SearchableSelect v-model="regionChoice"
+                                           :options="regions"
+                                           :all-option="true"
+                                           all-label="— Select region —" />
                     </div>
                     <button type="button" class="btn-primary text-sm" :disabled="savingRegion" @click="saveRegion">
                         Save region
@@ -331,6 +327,7 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import MembershipWorkflowNav from '@/Components/school/MembershipWorkflowNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import {

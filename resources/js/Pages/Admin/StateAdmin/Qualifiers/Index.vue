@@ -69,17 +69,11 @@
                         <div class="grid sm:grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">State Program *</label>
-                                <select v-model="form.state_program_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" required>
-                                    <option value="">Select Program</option>
-                                    <option v-for="p in statePrograms" :key="p.id" :value="p.id">{{ p.title }}</option>
-                                </select>
+                                <SearchableSelect v-model="form.state_program_id" class="w-full" :options="stateProgramOptions" :all-option="true" all-label="Select Program" :required="true" />
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Source Sahodaya / Cluster *</label>
-                                <select v-model="form.source_tenant_id" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" required>
-                                    <option value="">Select Sahodaya</option>
-                                    <option v-for="s in sahodayas" :key="s.id" :value="s.id">{{ s.name }} ({{ s.id }})</option>
-                                </select>
+                                <SearchableSelect v-model="form.source_tenant_id" class="w-full" :options="sahodayaOptions" :all-option="true" all-label="Select Sahodaya" :required="true" />
                             </div>
                         </div>
 
@@ -123,8 +117,9 @@
 
 <script setup>
 import { Link, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     intakes: Object,
@@ -134,6 +129,9 @@ const props = defineProps({
 });
 
 const showAddModal = ref(false);
+
+const stateProgramOptions = computed(() => (props.statePrograms || []).map((p) => ({ value: p.id, label: p.title })));
+const sahodayaOptions = computed(() => (props.sahodayas || []).map((s) => ({ value: s.id, label: `${s.name} (${s.id})` })));
 
 const form = useForm({
     state_program_id: '',

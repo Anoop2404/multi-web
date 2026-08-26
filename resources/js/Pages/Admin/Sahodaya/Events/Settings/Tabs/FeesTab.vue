@@ -131,9 +131,8 @@
 
                 <FormField v-if="event.event_type !== 'sports'" label="Billing model" :error="feeSettingsForm.errors.fee_model">
                     <template #default="{ id }">
-                        <select :id="id" v-model="feeSettingsForm.fee_model" class="field mt-1">
-                            <option v-for="(label, key) in feeModels" :key="key" :value="key">{{ billingModelLabel(key, label) }}</option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="feeSettingsForm.fee_model" class="mt-1"
+                                          :options="feeModelOptions" :all-option="false" placeholder="Select billing model" />
                     </template>
                 </FormField>
                 <input v-else type="hidden" v-model="feeSettingsForm.fee_model">
@@ -610,18 +609,16 @@
                     </FormField>
                     <FormField label="Verification policy" hint="Require Sahodaya-verified students only or allow all student registrations.">
                         <template #default="{ id }">
-                            <select :id="id" v-model="feeSettingsForm.sport_event_fees.verification_policy" class="field">
-                                <option value="all_students">All students</option>
-                                <option value="verified_only">Verified students only</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="feeSettingsForm.sport_event_fees.verification_policy"
+                                              :options="[{ value: 'all_students', label: 'All students' }, { value: 'verified_only', label: 'Verified students only' }]"
+                                              :all-option="false" placeholder="Select verification policy" />
                         </template>
                     </FormField>
                     <FormField label="Approval policy" hint="Auto-approve registrations on full payment or require manual admin review.">
                         <template #default="{ id }">
-                            <select :id="id" v-model="feeSettingsForm.sport_event_fees.approval_policy" class="field">
-                                <option value="auto">Auto (on full payment)</option>
-                                <option value="manual">Manual review</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="feeSettingsForm.sport_event_fees.approval_policy"
+                                              :options="[{ value: 'auto', label: 'Auto (on full payment)' }, { value: 'manual', label: 'Manual review' }]"
+                                              :all-option="false" placeholder="Select approval policy" />
                         </template>
                     </FormField>
                     <FormField label="Max participants" hint="Maximum individual entries allowed per school, per item (each item like U17_BOYS/U19_BOYS gets its own quota — leave blank for no limit).">
@@ -653,12 +650,9 @@
 
                     <FormField label="Class Category Scheme">
                         <template #default="{ id }">
-                            <select :id="id" v-model="feeSettingsForm.class_group_scheme" class="field bg-white mt-1 font-medium">
-                                <option value="">Use Sahodaya Default Scheme</option>
-                                <option v-for="scheme in classCategorySchemes" :key="scheme.id" :value="String(scheme.id)">
-                                    {{ scheme.name }}{{ scheme.is_default ? ' (Sahodaya default)' : '' }}
-                                </option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="feeSettingsForm.class_group_scheme" class="mt-1"
+                                              :options="classCategorySchemeOptions" :all-option="true"
+                                              all-label="Use Sahodaya Default Scheme" />
                         </template>
                     </FormField>
 
@@ -946,11 +940,9 @@
                 <div class="flex flex-wrap gap-3 items-center">
                     <input v-model="itemSearch" type="search" class="field flex-1 min-w-[12rem] max-w-md"
                            placeholder="Search items…" autocomplete="off">
-                    <select v-model="itemFilter" class="field w-44">
-                        <option value="all">All items</option>
-                        <option value="override">Overrides only</option>
-                        <option value="category">Using category rate</option>
-                    </select>
+                    <SearchableSelect v-model="itemFilter" class="w-44"
+                                      :options="[{ value: 'all', label: 'All items' }, { value: 'override', label: 'Overrides only' }, { value: 'category', label: 'Using category rate' }]"
+                                      :all-option="false" placeholder="Filter items" />
                     <button v-if="itemSearch.trim() || itemFilter !== 'all'" type="button" class="btn-secondary text-sm"
                             @click="itemSearch = ''; itemFilter = 'all'">
                         Clear
@@ -1050,6 +1042,7 @@ import { computed, inject, ref } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
 import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const {
     feeSettingsForm, feeModels, feePresets, event, classGroupLabels,
@@ -1120,6 +1113,13 @@ const selectedScheme = computed(() => (
     (classCategorySchemes.value ?? []).find((s) => String(s.id) === String(feeSettingsForm.class_group_scheme)) ?? null
 ));
 
+// SearchableSelect options for the scheme picker — mirrors the native <option v-for>'s
+// value/label derivation (id stringified, default-scheme suffix appended to the label).
+const classCategorySchemeOptions = computed(() => (classCategorySchemes.value ?? []).map((scheme) => ({
+    value: String(scheme.id),
+    label: `${scheme.name}${scheme.is_default ? ' (Sahodaya default)' : ''}`,
+})));
+
 // Deleting a scheme or a category inside it doesn't cascade-fix anything elsewhere — any
 // event still pointed at the scheme, or any student/item already tagged with the category's
 // key, keeps that stale reference until someone manually reassigns it. Warn with exactly
@@ -1157,6 +1157,14 @@ function billingModelLabel(key, label) {
     }
     return label;
 }
+
+// feeModels is an object map (key -> label) rather than an array, so SearchableSelect
+// needs it pre-normalized into { value, label } entries (also applying the same
+// billingModelLabel relabeling the native <option v-for> used to apply per-key).
+const feeModelOptions = computed(() => Object.entries(feeModels?.value ?? feeModels ?? {}).map(([key, label]) => ({
+    value: key,
+    label: billingModelLabel(key, label),
+})));
 
 // N-tier school registration map (Phase I) — feeSettingsForm.school_registration is now
 // an arbitrary-keyed object (see SchoolClassCategoryResolver on the backend) instead of

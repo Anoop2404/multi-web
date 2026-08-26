@@ -5,6 +5,8 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 
 class FestItemResultsService
 {
@@ -46,10 +48,13 @@ class FestItemResultsService
             ->orderBy('display_order')
             ->orderBy('title')
             ->get([
-                'id', 'title', 'item_code', 'head_id', 'age_group', 'class_group', 'gender',
+                'id', 'title', 'item_code', 'head_id', 'age_group', 'class_group', 'category', 'gender',
                 'sport_discipline', 'stage_type', 'reg_start', 'reg_end', 'competition_start',
                 'competition_end', 'results_published_at', 'inherited_from_item_id', 'event_id',
             ]);
+
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         // Group items by canonical root item ID (inherited_from_item_id ?: id)
         $grouped = $items->groupBy(fn (FestEventItem $item) => (int) ($item->inherited_from_item_id ?: $item->id));
@@ -92,6 +97,7 @@ class FestItemResultsService
                 'item_code'             => $primary->item_code,
                 'age_group'             => $primary->age_group,
                 'class_group'           => $primary->class_group,
+                'category_label'        => FestItemCategoryLabel::resolve($primary, $classGroupLabels, $artsCategoryLabels),
                 'gender'                => $primary->gender,
                 'sport_discipline'      => $primary->sport_discipline,
                 'stage_type'            => $primary->stage_type,

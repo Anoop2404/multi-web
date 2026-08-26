@@ -15,22 +15,13 @@
             <div v-if="competitionPhases.length" class="card mb-4 !py-4">
                 <div class="grid gap-3 md:grid-cols-4 items-end">
                     <label class="text-xs font-semibold text-slate-600">Competition phase
-                        <select v-model="scopePhaseId" class="field mt-1 text-sm w-full">
-                            <option value="">All published phases</option>
-                            <option v-for="item in competitionPhases" :key="item.id" :value="item.id">{{ item.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="scopePhaseId" :options="competitionPhases" :all-option="true" all-label="All published phases" class="mt-1 w-full" />
                     </label>
                     <label class="text-xs font-semibold text-slate-600">Region
-                        <select v-model="scopeRegionId" class="field mt-1 text-sm w-full">
-                            <option value="">Combined</option>
-                            <option v-for="item in regions" :key="item.id" :value="item.id">{{ item.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="scopeRegionId" :options="regions" :all-option="true" all-label="Combined" class="mt-1 w-full" />
                     </label>
                     <label class="text-xs font-semibold text-slate-600">Registration / payment level
-                        <select v-model="scopeBatchId" class="field mt-1 text-sm w-full">
-                            <option value="">All levels</option>
-                            <option v-for="item in registrationBatches" :key="item.id" :value="item.id">{{ item.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="scopeBatchId" :options="registrationBatches" :all-option="true" all-label="All levels" class="mt-1 w-full" />
                     </label>
                     <button type="button" class="btn-primary text-sm" @click="applyReportScope">Apply report scope</button>
                 </div>
@@ -41,11 +32,7 @@
             <div v-if="childEvents.length && !competitionPhases.length" class="card mb-4 !py-3">
                 <div class="flex flex-wrap gap-3 items-center">
                     <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Select Sport Event / Region:</label>
-                    <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
-                        <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                            {{ ev.short_title || ev.title }}
-                        </option>
-                    </select>
+                    <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent" :options="childEventOptions" :all-option="false" placeholder="Select sport event" class="w-64" />
                 </div>
             </div>
 
@@ -209,6 +196,7 @@ import FestEventMetaBar from '@/Components/reports/FestEventMetaBar.vue';
 import ReportToolbar from '@/Components/reports/ReportToolbar.vue';
 import ReportPhasePackCards from '@/Components/reports/ReportPhasePackCards.vue';
 import ReportInteractiveTile from '@/Components/reports/ReportInteractiveTile.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import {
     REPORT_CATEGORIES,
     INTERACTIVE_CATEGORY_MAP,
@@ -239,9 +227,13 @@ const props = defineProps({
     reportScopeSelection: { type: Object, default: () => ({}) },
 });
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports`);
+function switchSportEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/reports`);
 }
+
+const childEventOptions = computed(() =>
+    (props.childEvents ?? []).map((ev) => ({ value: String(ev.id), label: ev.short_title || ev.title })),
+);
 
 const categoryMeta = REPORT_CATEGORIES;
 const searchQuery = ref('');

@@ -9,9 +9,13 @@
             </div>
 
             <div class="flex items-center gap-3 self-start md:self-auto">
-                <select :value="academicYear" @change="switchYear($event.target.value)" class="field text-xs py-1.5 font-medium pl-3 pr-8 w-32">
-                    <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">{{ ay.label }}</option>
-                </select>
+                <SearchableSelect
+                    :model-value="academicYear"
+                    @update:model-value="switchYear"
+                    :options="academicYearSelectOptions"
+                    :all-option="false"
+                    class="w-32"
+                />
             </div>
         </div>
 
@@ -67,9 +71,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     school: Object,
@@ -81,6 +86,10 @@ const props = defineProps({
 });
 
 const submittingId = ref(null);
+
+const academicYearSelectOptions = computed(() =>
+    (props.academicYearOptions || []).map((ay) => ({ value: ay.label, label: ay.label }))
+);
 
 function openAndStartReview(card) {
     router.get(`/school-admin/${props.school.id}/board-results/${card.board_result_id}/principal-verification`);

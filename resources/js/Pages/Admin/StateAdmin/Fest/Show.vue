@@ -61,13 +61,7 @@
                         <td class="p-2" v-if="registration.participants?.[0]">
                             <form class="flex items-center gap-1" @submit.prevent="enterMark(registration.participants[0])">
                                 <input v-model="markForms[registration.participants[0].id].score" type="number" step="0.01" min="0" placeholder="Score" class="field !py-1 !text-xs w-16" :disabled="event.scoring_locked">
-                                <select v-model="markForms[registration.participants[0].id].grade" class="field !py-1 !text-xs w-16" :disabled="event.scoring_locked">
-                                    <option value="">Grade</option>
-                                    <option value="A+">A+</option>
-                                    <option value="A">A</option>
-                                    <option value="B">B</option>
-                                    <option value="C">C</option>
-                                </select>
+                                <SearchableSelect v-model="markForms[registration.participants[0].id].grade" class="w-16" :disabled="event.scoring_locked" :all-option="true" all-label="Grade" :options="[{ value: 'A+', label: 'A+' }, { value: 'A', label: 'A' }, { value: 'B', label: 'B' }, { value: 'C', label: 'C' }]" />
                                 <button type="submit" class="btn-secondary !py-1 !px-2 text-xs" :disabled="event.scoring_locked">Save</button>
                             </form>
                         </td>
@@ -111,6 +105,7 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { reactive } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';

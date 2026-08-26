@@ -28,11 +28,9 @@
             <div class="flex flex-wrap gap-3 items-center">
                 <div>
                     <label class="text-xs font-semibold text-slate-600">{{ event.event_type === 'sports' ? 'Select Sport Event / Region' : 'Select Region' }}</label>
-                    <select :value="String(event.id)" @change="switchSportEvent" class="field text-sm mt-1 w-64 font-semibold">
-                        <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                            {{ ev.short_title || ev.title }}
-                        </option>
-                    </select>
+                    <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
+                                      :options="sportEventOptions" :all-option="false"
+                                      placeholder="Select event" class="mt-1 w-64" />
                 </div>
             </div>
         </div>
@@ -212,10 +210,10 @@
                                     <p v-if="row.item_code" class="text-xs font-mono text-slate-400 mt-0.5">{{ row.item_code }}</p>
                                 </td>
                                 <td class="text-xs text-slate-600">
-                                    <span v-if="row.age_group">{{ row.age_group }}</span>
-                                    <span v-if="row.class_group && row.class_group !== 'open'"> · {{ row.class_group }}</span>
+                                    <span v-if="row.category_label">{{ row.category_label }}</span>
+                                    <span v-else-if="row.age_group">{{ row.age_group }}</span>
                                     <span v-if="row.sport_discipline"> · {{ row.sport_discipline }}</span>
-                                    <span v-if="!row.age_group && !row.sport_discipline">—</span>
+                                    <span v-if="!row.category_label && !row.age_group && !row.sport_discipline">—</span>
                                 </td>
                                 <td class="text-xs text-slate-600">{{ formatWindow(row) }}</td>
                                 <td class="text-sm">
@@ -284,12 +282,8 @@
         <div class="flex flex-wrap justify-between gap-3 mb-4">
             <div class="flex flex-wrap gap-2 items-center">
                 <form @submit.prevent="promote" class="flex flex-wrap gap-2 items-center">
-                    <select v-model="promoteForm.next_event_id" class="field" required>
-                        <option value="">Promote winners to…</option>
-                        <option v-for="e in nextEvents" :key="e.id" :value="e.id">
-                            {{ e.title }} ({{ levelLabels[e.level_round] ?? e.level_round }}){{ e.suggested ? ' ★' : '' }}
-                        </option>
-                    </select>
+                    <SearchableSelect v-model="promoteForm.next_event_id" :options="nextEventOptions"
+                                      :all-option="true" all-label="Promote winners to…" :required="true" />
                     <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm">Promote qualifiers</button>
                 </form>
                 <button v-if="suggestedNextId"
@@ -364,6 +358,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
 import FestHeadItemInfoPanel from '@/Components/fest/FestHeadItemInfoPanel.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -396,6 +391,16 @@ watch(() => props.suggestedNextId, (id) => {
 }, { immediate: true });
 
 const isSports = computed(() => props.event?.event_type === 'sports');
+
+const sportEventOptions = computed(() => (props.childEvents ?? []).map((ev) => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
+
+const nextEventOptions = computed(() => (props.nextEvents ?? []).map((e) => ({
+    value: e.id,
+    label: `${e.title} (${props.levelLabels[e.level_round] ?? e.level_round})${e.suggested ? ' ★' : ''}`,
+})));
 
 const pageTitle = computed(() => {
     if (props.selectedItem) return `${props.event.title} — ${props.selectedItem.title}`;
@@ -555,8 +560,7 @@ async function revoke(id) {
 
 const selectedPublishIds = ref([]);
 
-function switchSportEvent(evt) {
-    const nextEventId = evt.target.value;
+function switchSportEvent(nextEventId) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${nextEventId}/results`);
 }
 

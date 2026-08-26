@@ -21,16 +21,22 @@
                 <div class="min-w-0">
                     <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-700 mb-2">Scope</p>
                     <div class="flex flex-wrap items-center gap-2">
-                        <select v-model="selectedItemId" class="text-xs py-1.5 px-2.5 rounded border-gray-300 bg-white shadow-sm focus:ring-1 focus:ring-indigo-500 max-w-[220px] truncate">
-                            <option :value="null">All items</option>
-                            <option v-for="item in publishedItems" :key="item.id" :value="item.id">
-                                {{ item.item_code ? `[${item.item_code}] ` : '' }}{{ item.title }}
-                            </option>
-                        </select>
-                        <select v-model="selectedSchoolId" class="text-xs py-1.5 px-2.5 rounded border-gray-300 bg-white shadow-sm focus:ring-1 focus:ring-indigo-500 max-w-[220px] truncate">
-                            <option :value="null">All schools ({{ schools.length }})</option>
-                            <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="selectedItemId"
+                            :options="itemOptions"
+                            placeholder="All items"
+                            search-placeholder="Type item name to search…"
+                            all-label="All items"
+                            class="max-w-[220px]"
+                        />
+                        <SearchableSelect
+                            v-model="selectedSchoolId"
+                            :options="schools"
+                            placeholder="All schools"
+                            search-placeholder="Type school name to search…"
+                            :all-label="`All schools (${schools.length})`"
+                            class="max-w-[220px]"
+                        />
                         <button @click="generate(selectedItemId)" class="btn-secondary py-1.5 px-3 text-xs">
                             ⚡ Generate{{ selectedItemId ? ' for item' : '' }}
                         </button>
@@ -101,12 +107,13 @@
                            class="w-full text-xs py-2 pl-8 pr-3 rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                     <span class="absolute left-2.5 top-2 text-gray-400 text-xs">🔍</span>
                 </div>
-                <select v-model="perPage" class="text-xs py-1.5 px-2 rounded border-gray-300 shrink-0">
-                    <option :value="25">25</option>
-                    <option :value="50">50</option>
-                    <option :value="100">100</option>
-                    <option value="all">All</option>
-                </select>
+                <SearchableSelect
+                    v-model="perPage"
+                    :options="[{ value: 25, label: '25' }, { value: 50, label: '50' }, { value: 100, label: '100' }, { value: 'all', label: 'All' }]"
+                    :all-option="false"
+                    placeholder="Per page"
+                    class="shrink-0"
+                />
             </div>
 
             <div v-if="paginatedCertificates.length" class="divide-y divide-gray-100">
@@ -141,6 +148,10 @@
                         <a :href="`/certificates/print/${c.uuid}?preview=1`" target="_blank" class="text-gray-500 hover:text-gray-700">Preview ↗</a>
                         <a :href="`/certificates/print/${c.uuid}`" target="_blank" class="font-semibold text-indigo-600 hover:underline">Print ↗</a>
                         <a :href="`/certificates/print/${c.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
+                        <template v-if="c.is_rendered && !c.is_stale">
+                            <a :href="`/certificates/pdf/${c.uuid}`" target="_blank" class="font-semibold text-emerald-600 hover:underline">View PDF ↗</a>
+                            <a :href="`/certificates/pdf/${c.uuid}?download=1`" class="font-semibold text-emerald-600 hover:underline">Download PDF</a>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -165,6 +176,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -187,6 +199,12 @@ const currentPage = ref(1);
 const selectedCertIds = ref([]);
 const jobStatus = ref(null);
 let pollTimer = null;
+
+const itemOptions = computed(() => props.publishedItems.map(item => {
+    const codePrefix = item.item_code ? `[${item.item_code}] ` : '';
+    const name = item.category_label ? `${codePrefix}${item.title} — ${item.category_label}` : `${codePrefix}${item.title}`;
+    return { id: item.id, name };
+}));
 
 const filteredCertificates = computed(() => props.certificates.filter(c => {
     if (selectedItemId.value && c.item?.id !== selectedItemId.value) return false;

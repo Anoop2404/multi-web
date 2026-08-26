@@ -10,12 +10,12 @@
     @if($date) · Date filter: {{ $date }} @endif
 </p>
 <table>
-<thead><tr><th>Item</th><th>Age</th><th>Date</th><th>Time</th><th>Venue</th><th>Stage</th></tr></thead>
+<thead><tr><th>Item</th><th>Category</th><th>Date</th><th>Time</th><th>Venue</th><th>Stage</th></tr></thead>
 <tbody>
 @foreach($rows as $row)
 <tr>
     <td>{{ $row['title'] }}</td>
-    <td>{{ strtoupper($row['age_group'] ?? '—') }}</td>
+    <td>{{ $row['category_label'] ?? '—' }}</td>
     <td>{{ $row['scheduled_date'] ?? '—' }}</td>
     <td>{{ $row['scheduled_time'] ?? '—' }}</td>
     <td>{{ $row['venue'] ?? '—' }}</td>

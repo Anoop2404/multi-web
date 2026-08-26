@@ -13,10 +13,8 @@ use App\Services\Events\FestCertificateService;
 use App\Services\Events\FestIdCardQrService;
 use App\Services\Events\FestRegistrationRouterService;
 use App\Services\Events\FestSchoolPartitionService;
-use App\Support\PdfGenerator;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
-use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class FestEventPortalController extends SchoolAdminController
@@ -258,22 +256,20 @@ class FestEventPortalController extends SchoolAdminController
         // (FestCertificateController::downloadZip()) — this endpoint used to zip raw
         // .html with no QR and site-relative image URLs that only resolved on-site.
         foreach ($certificates as $certificate) {
-            // Prefer the file RenderCertificateChunkJob already rendered and cached —
-            // a certificate predating that pipeline has no cached path yet and falls
-            // back to rendering on the spot, same as before this fix.
-            $pdf = ($certificate->file_path && ! $certificate->is_stale && TenantStorage::exists($certificate->file_path, $certificate->storage_disk))
-                ? TenantStorage::get($certificate->file_path, $certificate->storage_disk)
-                : null;
-
             $payload = $basePayloads->get($certificate->id);
 
-            if ($pdf === null) {
+            // $payload starts as payloadsFor()'s cheap version; the closure only upgrades
+            // it to the expensive embedAssets+qr_src renderContext() on a cache miss —
+            // captured by reference so the filename lookup below sees whichever version
+            // actually ran, and $templateCache/$participantsCache stay shared across every
+            // certificate in this loop (renderContext()'s own cross-call cache), not reset
+            // per closure invocation.
+            $pdf = $service->cachedOrFreshPdf($certificate, function () use (&$payload, $certificate, $service, &$templateCache, &$participantsCache) {
                 $payload = $service->renderContext($certificate, $payload, $templateCache, $participantsCache, embedAssets: true);
                 $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
 
-                $html = view('fest.certificate-print', $payload)->render();
-                $pdf = PdfGenerator::render($html);
-            }
+                return $payload;
+            });
 
             $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.pdf';
             $zip->addFromString($name, $pdf);

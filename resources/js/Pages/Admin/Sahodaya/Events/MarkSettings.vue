@@ -32,11 +32,9 @@
         <div class="card !p-4 space-y-3 mb-5">
             <div v-if="childEvents.length" class="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ isSports ? 'Sport Event / Region:' : 'Region:' }}</label>
-                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
-                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                        {{ ev.short_title || ev.title }}
-                    </option>
-                </select>
+                <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
+                                  :options="childEventOptions" :all-option="false" placeholder="Select event"
+                                  class="w-64" />
             </div>
 
             <ReportItemSearchSelect :items="flatItems" :model-value="props.selectedItemId"
@@ -99,10 +97,9 @@
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                     Apply template
                 </label>
-                <select v-model="applyTemplateId" class="field text-xs !py-1.5 flex-1 max-w-sm">
-                    <option value="">Select a rubric template…</option>
-                    <option v-for="t in rubricTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
-                </select>
+                <SearchableSelect v-model="applyTemplateId" :options="rubricTemplates"
+                                  :all-option="true" all-label="Select a rubric template…"
+                                  class="flex-1 max-w-sm" />
                 <button type="button" class="btn-secondary text-xs !py-1.5 !px-3"
                         :disabled="!applyTemplateId || applyingTemplate" @click="applyRubricTemplate">
                     {{ applyingTemplate ? 'Applying…' : 'Apply' }}
@@ -164,6 +161,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -196,12 +194,17 @@ const bulkSettingsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/eve
 
 const flatItems = computed(() => (props.headItemGroups ?? []).flatMap((h) => h.items ?? []));
 
+const childEventOptions = computed(() => (props.childEvents ?? []).map((ev) => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
+
 function onItemSelect(itemId) {
     router.get(settingsBaseUrl.value, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: false });
 }
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/mark-settings`);
+function switchSportEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/mark-settings`);
 }
 
 function itemConfiguredMark(item) {

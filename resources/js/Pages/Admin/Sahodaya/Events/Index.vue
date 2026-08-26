@@ -51,17 +51,15 @@
                     </FormField>
                     <FormField label="Event type" :error="form.errors.event_type">
                         <template #default="{ id }">
-                            <select :id="id" v-model="form.event_type" class="field">
-                                <option v-for="(label, key) in customEventTypes" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="form.event_type" :options="customEventTypeOptions"
+                                               :all-option="false" placeholder="Select event type" />
                         </template>
                     </FormField>
                     <FormField label="Round" :error="form.errors.level_round" class-extra="sm:col-span-2">
                         <template #default="{ id }">
-                            <select :id="id" v-model="form.level_round" class="field">
-                                <option value="sahodaya">Sahodaya round (cluster-wide)</option>
-                                <option value="school">School round template</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="form.level_round"
+                                               :options="[{ value: 'sahodaya', label: 'Sahodaya round (cluster-wide)' }, { value: 'school', label: 'School round template' }]"
+                                               :all-option="false" placeholder="Select round" />
                         </template>
                     </FormField>
                 </div>
@@ -86,10 +84,8 @@
                             <input type="radio" value="host_school" v-model="form.food_payee_type"> A host school
                         </label>
                     </div>
-                    <select v-if="form.food_payee_type === 'host_school'" v-model="form.food_host_school_id" class="field">
-                        <option value="">— Select school —</option>
-                        <option v-for="s in schoolOptions" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <SearchableSelect v-if="form.food_payee_type === 'host_school'" v-model="form.food_host_school_id"
+                                       :options="schoolOptions" all-label="— Select school —" />
                     <InputError :message="form.errors.food_host_school_id" class="mt-2" />
                 </div>
                 <button type="submit" class="btn-primary" :disabled="form.processing">
@@ -234,6 +230,7 @@ import { computed, ref } from 'vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import InputError from '@/Components/ui/InputError.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { PROGRAM_SLUGS, SAHODAYA_PROGRAMS, sahodayaProgramHref } from '@/support/sahodayaPrograms.js';
 import { isNavProgramVisible } from '@/support/sahodayaAdminNav.js';
 import { useConfirm } from '@/composables/useConfirm';
@@ -307,6 +304,10 @@ const customEventTypes = computed(() => {
         Object.entries(types).filter(([key]) => !['kalolsavam', 'sports', 'kids_fest'].includes(key)),
     );
 });
+
+const customEventTypeOptions = computed(() =>
+    Object.entries(customEventTypes.value).map(([value, label]) => ({ value, label })),
+);
 
 const form = useForm({
     title: '',

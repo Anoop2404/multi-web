@@ -23,17 +23,13 @@
         <div class="card mb-4 flex flex-wrap gap-2 items-end">
             <div>
                 <label class="form-label">Sahodaya</label>
-                <select v-model="localFilters.tenant_id" class="field text-sm min-w-[10rem]">
-                    <option value="">All Sahodayas</option>
-                    <option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option>
-                </select>
+                <SearchableSelect v-model="localFilters.tenant_id" class="min-w-[10rem]" :options="tenants"
+                                   :all-option="true" all-label="All Sahodayas" />
             </div>
             <div>
                 <label class="form-label">Category</label>
-                <select v-model="localFilters.category" class="field text-sm min-w-[10rem]">
-                    <option value="">All categories</option>
-                    <option v-for="(label, key) in categories" :key="key" :value="key">{{ label }}</option>
-                </select>
+                <SearchableSelect v-model="localFilters.category" class="min-w-[10rem]" :options="categoryOptions"
+                                   :all-option="true" all-label="All categories" />
             </div>
             <div>
                 <label class="form-label">Action</label>
@@ -74,6 +70,7 @@ import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFil
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import DetailedLogTable from '@/Components/logs/DetailedLogTable.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     logs: { type: Object, default: () => ({ data: [], links: [] }) },
@@ -93,6 +90,8 @@ const localFilters = reactive({
     q: props.filters.q ?? '',
     tenant_id: props.filters.tenant_id ?? '',
 });
+
+const categoryOptions = computed(() => Object.entries(props.categories).map(([value, label]) => ({ value, label })));
 
 const exportUrl = computed(() => {
     const params = new URLSearchParams();

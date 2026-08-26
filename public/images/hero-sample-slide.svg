@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F2942"/>
+      <stop offset="100%" stop-color="#163B60"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#D97706" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#D97706" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="800" cy="430" r="520" fill="url(#glow)"/>
+
+  <g opacity="0.08" fill="#ffffff">
+    <circle cx="120" cy="120" r="2"/><circle cx="180" cy="120" r="2"/><circle cx="240" cy="120" r="2"/>
+    <circle cx="120" cy="180" r="2"/><circle cx="180" cy="180" r="2"/><circle cx="240" cy="180" r="2"/>
+    <circle cx="1360" cy="720" r="2"/><circle cx="1420" cy="720" r="2"/><circle cx="1480" cy="720" r="2"/>
+    <circle cx="1360" cy="780" r="2"/><circle cx="1420" cy="780" r="2"/><circle cx="1480" cy="780" r="2"/>
+  </g>
+
+  <!-- Three simple emblem circles: academics, achievement, community -->
+  <g transform="translate(560,330)">
+    <circle r="92" fill="#ffffff" opacity="0.06"/>
+    <circle r="92" fill="none" stroke="#D97706" stroke-width="2" opacity="0.55"/>
+    <path d="M-38,-6 L0,-28 L38,-6 L0,16 Z" fill="#ffffff" opacity="0.9"/>
+    <path d="M-38,-6 V22" stroke="#ffffff" stroke-width="3" opacity="0.7" stroke-linecap="round"/>
+    <path d="M-20,4 V30 Q0,44 20,30 V4" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.7" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(800,470)">
+    <circle r="110" fill="#D97706" opacity="0.14"/>
+    <circle r="110" fill="none" stroke="#D97706" stroke-width="2.5" opacity="0.8"/>
+    <path d="M0,-46 L13,-14 L48,-14 L20,6 L30,40 L0,20 L-30,40 L-20,6 L-48,-14 L-13,-14 Z" fill="#D97706" opacity="0.9"/>
+  </g>
+
+  <g transform="translate(1040,330)">
+    <circle r="92" fill="#ffffff" opacity="0.06"/>
+    <circle r="92" fill="none" stroke="#D97706" stroke-width="2" opacity="0.55"/>
+    <circle cx="-28" cy="6" r="16" fill="#ffffff" opacity="0.85"/>
+    <circle cx="6" cy="-4" r="20" fill="#ffffff" opacity="0.95"/>
+    <circle cx="34" cy="8" r="14" fill="#ffffff" opacity="0.8"/>
+    <path d="M-46,34 Q-28,14 -10,34" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.7" stroke-linecap="round"/>
+    <path d="M-14,38 Q6,10 26,38" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.8" stroke-linecap="round"/>
+    <path d="M18,36 Q34,18 50,36" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.7" stroke-linecap="round"/>
+  </g>
+
+  <text x="800" y="640" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" letter-spacing="4" fill="#ffffff" opacity="0.35">SAMPLE SLIDE — REPLACE WITH A REAL PHOTO</text>
+</svg>

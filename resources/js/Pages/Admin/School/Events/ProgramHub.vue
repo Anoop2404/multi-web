@@ -84,14 +84,12 @@
                             <span v-else class="text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">Pending Selection</span>
                         </div>
                         <label class="block text-xs text-slate-600 font-medium mb-1">Select Region &amp; Venue</label>
-                        <select v-model="hubPhaseChoices[phase.phase_id]"
-                                class="field text-xs w-full py-1.5"
-                                :disabled="phase.selection?.locked">
-                            <option value="" disabled>Select a region for {{ phase.phase_name }}…</option>
-                            <option v-for="r in phase.regions" :key="r.id" :value="r.id">
-                                {{ r.name }}{{ r.venue ? ` — ${r.venue}` : '' }}
-                            </option>
-                        </select>
+                        <SearchableSelect v-model="hubPhaseChoices[phase.phase_id]"
+                                class="w-full"
+                                :options="phaseRegionOptions(phase)"
+                                :all-option="false"
+                                :placeholder="`Select a region for ${phase.phase_name}…`"
+                                :disabled="phase.selection?.locked" />
 
                         <!-- Host Venue & Conduct Date Details Box -->
                         <div v-if="getSelectedRegionDetails(phase)" class="mt-3 p-2.5 rounded-lg bg-amber-50/70 border border-amber-200/70 text-xs space-y-1">
@@ -202,6 +200,7 @@
 import { computed, reactive, watch } from 'vue';
 import { Link, usePage, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 
 const props = defineProps({
@@ -239,6 +238,13 @@ function saveHubPhaseRegion(phase) {
         phase_id: phase.phase_id,
         region_id: regionId,
     }, { preserveScroll: true });
+}
+
+function phaseRegionOptions(phase) {
+    return (phase.regions || []).map(r => ({
+        value: r.id,
+        label: `${r.name}${r.venue ? ` — ${r.venue}` : ''}`,
+    }));
 }
 
 function getSelectedRegionDetails(phase) {

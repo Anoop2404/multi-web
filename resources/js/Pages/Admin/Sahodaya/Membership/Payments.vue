@@ -320,10 +320,8 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Payment Status</label>
-                        <select v-model="proofForm.status" class="w-full text-sm border border-gray-200 rounded-xl p-2.5">
-                            <option value="verified">✓ Verified (Fee cleared immediately)</option>
-                            <option value="submitted">⏳ Submitted (Pending Review)</option>
-                        </select>
+                        <SearchableSelect v-model="proofForm.status" class="w-full" :all-option="false"
+                                          :options="[{ value: 'verified', label: '✓ Verified (Fee cleared immediately)' }, { value: 'submitted', label: '⏳ Submitted (Pending Review)' }]" />
                     </div>
 
                     <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
@@ -344,6 +342,7 @@ import { Link, router, useForm } from '@inertiajs/vue3';
 import { reactive, computed, defineComponent, h, ref } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm, prompt } = useConfirm();

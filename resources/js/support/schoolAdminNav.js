@@ -362,14 +362,13 @@ export function schoolAdminNav(schoolId, options = {}) {
                 icon: p.icon,
             }));
 
+        // Reports/School events/Food coupons/Circulars aren't listed directly here —
+        // once inside Fest Hub, schoolFestScopedNav() switches the sidebar to a
+        // "Fest & tools" section with direct links to all of them (see
+        // detectSchoolFestContextFromUrl). Notifications is already in Home above.
         const festItems = [
             ...festProgramItems,
             { label: 'Fest Hub', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'star' },
-            { label: 'Reports', href: schoolAdminHref(schoolId, 'fest', 'reports'), icon: 'file-text', exact: true },
-            { label: 'School events', href: schoolAdminHref(schoolId, 'fest-programs'), icon: 'calendar' },
-            { label: 'Food coupons', href: schoolAdminHref(schoolId, 'food-coupons'), icon: 'clipboard' },
-            { label: 'Circulars', href: schoolAdminHref(schoolId, 'circulars'), icon: 'file-text' },
-            { label: 'Notifications', href: schoolAdminHref(schoolId, 'notifications'), icon: 'bell' },
         ];
 
         if (festItems.length) {
@@ -404,24 +403,14 @@ export function schoolAdminNav(schoolId, options = {}) {
 
     // ── Website (collapses to single hub entry) ────────────────────────
     if (websiteEnabled && publicWebsiteEnabled && canNav('website')) {
+        // Unlike the old site-builder-only entry point (which covered just Page
+        // Sections/Navigation/Footer and left the rest unreachable except via nav
+        // search), Website/Hub.vue actually links out to all 12 of these — safe to
+        // collapse to one sidebar entry.
         groups.push({
             section: 'Website',
             items: [
-                { label: 'School Website →', href: `${base}/site-builder`, icon: 'layers' },
-                // Previously hidden on the assumption the site-builder hub above cross-links
-                // to all of these — it doesn't (it's Page Sections/Navigation/Footer only,
-                // see SiteBuilder.vue's `tabs`), so they were only reachable via nav search.
-                { label: 'News', href: `${base}/news`, icon: 'file-text' },
-                { label: 'Events', href: `${base}/events`, icon: 'calendar' },
-                { label: 'Gallery', href: `${base}/gallery`, icon: 'image' },
-                { label: 'Staff', href: `${base}/staff`, icon: 'users' },
-                { label: 'Achievements', href: `${base}/achievements`, icon: 'star' },
-                { label: 'Downloads', href: `${base}/downloads`, icon: 'folder' },
-                { label: 'Job Vacancies', href: `${base}/job-vacancies`, icon: 'briefcase' },
-                { label: 'Alumni', href: `${base}/alumni`, icon: 'award' },
-                { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star' },
-                { label: 'Contact Page', href: `${base}/contact`, icon: 'file-text' },
-                { label: 'Enquiries', href: `${base}/enquiries`, icon: 'inbox' },
+                { label: 'Website hub', href: `${base}/website/hub`, icon: 'layers' },
             ],
         });
     }

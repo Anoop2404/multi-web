@@ -67,11 +67,9 @@
 
         <FormField v-if="showsStudentFilters" label="Gender">
             <template #default="{ id }">
-                <select :id="id" v-model="local.gender" class="field max-w-xs" @change="emitUpdate">
-                    <option value="open">All</option>
-                    <option value="male">Boys only</option>
-                    <option value="female">Girls only</option>
-                </select>
+                <SearchableSelect :id="id" v-model="local.gender" class="max-w-xs"
+                                   :options="[{ value: 'open', label: 'All' }, { value: 'male', label: 'Boys only' }, { value: 'female', label: 'Girls only' }]"
+                                   :all-option="false" @change="emitUpdate" />
             </template>
         </FormField>
 
@@ -94,6 +92,7 @@
 <script setup>
 import { computed, reactive, watch } from 'vue';
 import FormField from '@/Components/ui/FormField.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     modelValue: {

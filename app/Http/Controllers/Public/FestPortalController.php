@@ -25,6 +25,8 @@ use App\Services\Events\FestPublicVisibilityService;
 use App\Services\Events\FestWinnerPosterService;
 use App\Services\Events\PublicFestScoreboardService;
 use App\Services\Events\PublicOperationalEventService;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -587,8 +589,9 @@ class FestPortalController extends Controller
 
         $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
         $schedules = $this->mapScheduleRows($event, $item->id, [$event->id], $isAdminPreview);
+        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event), config('fest_item_taxonomy.arts_category', []));
 
-        return $this->renderPublic('public.fest.item-schedule', $tenant, compact('event', 'item', 'schedules') + ['isAdminPreview' => $isAdminPreview]);
+        return $this->renderPublic('public.fest.item-schedule', $tenant, compact('event', 'item', 'schedules', 'categoryLabel') + ['isAdminPreview' => $isAdminPreview]);
     }
 
     public function itemResults(Request $request, int $eventId, FestEventItem $item)
@@ -1018,6 +1021,15 @@ public function tv(Request $request, int $eventId)
         if ($nowSlot?->participant) {
             $nowPerforming = $this->visibility->formatPublicParticipant($event, $nowSlot->participant, $nowSlot, null, $isAdminPreview);
             $nowPerforming['item_title'] = $nowSlot->item?->title;
+            // Same reasoning as the item_title override above: this widget is anchored to the
+            // schedule slot's own item, not necessarily the registration's item, so recompute
+            // the category label from the same $nowSlot->item rather than trusting the one
+            // formatPublicParticipant() derived from the participant's registration.
+            $nowPerforming['category_label'] = FestItemCategoryLabel::resolve(
+                $nowSlot->item,
+                FestClassGroupScheme::labels(null, $event),
+                config('fest_item_taxonomy.arts_category', [])
+            );
         }
 
         $scoreboard = [];
@@ -1339,9 +1351,11 @@ public function tv(Request $request, int $eventId)
         // Group by registration so the public schedule shows one slot per performance,
         // with the full roster attached, matching how results()/itemResults() already
         // resolve rosters for the same reason.
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+
         return $rows
             ->groupBy(fn (FestSchedule $row) => $row->participant?->registration_id ?? 'solo-'.$row->id)
-            ->map(function (Collection $group) use ($event, $isAdminPreview) {
+            ->map(function (Collection $group) use ($event, $isAdminPreview, $classGroupLabels) {
                 $first = $group->first();
                 // showParticipantName()'s $item param gates on THIS item's own publish
                 // state, not just the event-wide results_published flag — that flag flips
@@ -1365,6 +1379,7 @@ public function tv(Request $request, int $eventId)
                     'scheduled_at' => $first->scheduled_at,
                     'item_id' => $first->item_id,
                     'item_title' => $first->item?->title,
+                    'category_label' => FestItemCategoryLabel::resolve($first->item, $classGroupLabels, config('fest_item_taxonomy.arts_category', [])),
                     'stage' => $first->stage,
                     'sort_order' => $first->sort_order,
                     'participant' => $first->participant

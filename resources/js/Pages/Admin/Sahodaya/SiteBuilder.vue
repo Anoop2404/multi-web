@@ -13,12 +13,9 @@
                     <label for="website-site-selector" class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
                         Editing website
                     </label>
-                    <select id="website-site-selector" :value="currentSite?.id" @change="switchSite($event.target.value)"
-                            class="w-full max-w-lg border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                        <option v-for="site in sites" :key="site.id" :value="site.id">
-                            {{ site.name }}{{ site.is_primary ? ' — Primary website' : ' — Microsite' }}
-                        </option>
-                    </select>
+                    <SearchableSelect id="website-site-selector" :model-value="currentSite?.id" @update:model-value="switchSite"
+                            :options="siteOptions" :all-option="false" placeholder="Select website"
+                            class="w-full max-w-lg" />
                     <p class="text-xs text-gray-500 mt-2">
                         Sections, experience and V2 design belong to this website. Navigation links and footer contact content remain shared by this Sahodaya.
                     </p>
@@ -167,10 +164,9 @@
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-600 mb-1.5">Navbar style</label>
-                        <select v-model="navConfig.layout_variant"
-                                class="w-full max-w-md border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                            <option v-for="opt in navLayoutOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                        </select>
+                        <SearchableSelect v-model="navConfig.layout_variant" :options="navLayoutOptions"
+                                :all-option="false" placeholder="Select navbar style"
+                                class="w-full max-w-md" />
                     </div>
                 </div>
 
@@ -380,38 +376,32 @@
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-gray-600 mb-1.5">Heading font</label>
-                            <select v-model="themeConfig.font_heading"
-                                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
-                                <option value="Inter">Inter</option>
-                                <option value="Roboto">Roboto</option>
-                                <option value="Poppins">Poppins</option>
-                                <option value="Montserrat">Montserrat</option>
-                            </select>
+                            <SearchableSelect v-model="themeConfig.font_heading" :all-option="false"
+                                    placeholder="Select heading font"
+                                    :options="[{ value: 'Inter', label: 'Inter' }, { value: 'Roboto', label: 'Roboto' }, { value: 'Poppins', label: 'Poppins' }, { value: 'Montserrat', label: 'Montserrat' }]"
+                                    class="w-full" />
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-600 mb-1.5">Body font</label>
-                            <select v-model="themeConfig.font_body"
-                                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
-                                <option value="Inter">Inter</option>
-                                <option value="Roboto">Roboto</option>
-                                <option value="Poppins">Poppins</option>
-                                <option value="Montserrat">Montserrat</option>
-                            </select>
+                            <SearchableSelect v-model="themeConfig.font_body" :all-option="false"
+                                    placeholder="Select body font"
+                                    :options="[{ value: 'Inter', label: 'Inter' }, { value: 'Roboto', label: 'Roboto' }, { value: 'Poppins', label: 'Poppins' }, { value: 'Montserrat', label: 'Montserrat' }]"
+                                    class="w-full" />
                         </div>
                     </div>
 
                     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-gray-100">
-                        <label class="text-xs font-bold text-gray-600">Type scale<select v-model="designConfig.type_scale" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="compact">Compact</option><option value="balanced">Balanced</option><option value="editorial">Editorial</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Density<select v-model="designConfig.density" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Surface<select v-model="designConfig.surface" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="flat">Flat</option><option value="bordered">Bordered</option><option value="soft">Soft</option><option value="elevated">Elevated</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Corners<select v-model="designConfig.corners" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="square">Square</option><option value="soft">Soft</option><option value="rounded">Rounded</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Buttons<select v-model="designConfig.buttons" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="solid">Solid</option><option value="bordered">Bordered</option><option value="understated">Understated</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Images<select v-model="designConfig.images" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="documentary">Documentary</option><option value="vibrant">Vibrant</option><option value="formal">Formal</option><option value="monochrome">Monochrome</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Motion<select v-model="designConfig.motion" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="none">None</option><option value="restrained">Restrained</option><option value="expressive">Expressive</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Homepage mode<select v-model="designConfig.homepage_mode" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="evergreen">Evergreen</option><option value="registration_open">Registration open</option><option value="event_live">Event live</option><option value="results_published">Results published</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Type scale<SearchableSelect v-model="designConfig.type_scale" :all-option="false" placeholder="Select type scale" :options="[{ value: 'compact', label: 'Compact' }, { value: 'balanced', label: 'Balanced' }, { value: 'editorial', label: 'Editorial' }]" class="mt-1.5 w-full" /></label>
+                        <label class="text-xs font-bold text-gray-600">Density<SearchableSelect v-model="designConfig.density" :all-option="false" placeholder="Select density" :options="[{ value: 'compact', label: 'Compact' }, { value: 'comfortable', label: 'Comfortable' }, { value: 'spacious', label: 'Spacious' }]" class="mt-1.5 w-full" /></label>
+                        <label class="text-xs font-bold text-gray-600">Surface<SearchableSelect v-model="designConfig.surface" :all-option="false" placeholder="Select surface" :options="[{ value: 'flat', label: 'Flat' }, { value: 'bordered', label: 'Bordered' }, { value: 'soft', label: 'Soft' }, { value: 'elevated', label: 'Elevated' }]" class="mt-1.5 w-full" /></label>
+                        <label class="text-xs font-bold text-gray-600">Corners<SearchableSelect v-model="designConfig.corners" :all-option="false" placeholder="Select corners" :options="[{ value: 'square', label: 'Square' }, { value: 'soft', label: 'Soft' }, { value: 'rounded', label: 'Rounded' }]" class="mt-1.5 w-full" /></label>
+                        <label class="text-xs font-bold text-gray-600">Buttons<SearchableSelect v-model="designConfig.buttons" :all-option="false" placeholder="Select buttons" :options="[{ value: 'solid', label: 'Solid' }, { value: 'bordered', label: 'Bordered' }, { value: 'understated', label: 'Understated' }]" class="mt-1.5 w-full" /></label>
+                        <label class="text-xs font-bold text-gray-600">Images<SearchableSelect v-model="designConfig.images" :all-option="false" placeholder="Select images" :options="[{ value: 'documentary', label: 'Documentary' }, { value: 'vibrant', label: 'Vibrant' }, { value: 'formal', label: 'Formal' }, { value: 'monochrome', label: 'Monochrome' }]" class="mt-1.5 w-full" /></label>
+                        <label class="text-xs font-bold text-gray-600">Motion<SearchableSelect v-model="designConfig.motion" :all-option="false" placeholder="Select motion" :options="[{ value: 'none', label: 'None' }, { value: 'restrained', label: 'Restrained' }, { value: 'expressive', label: 'Expressive' }]" class="mt-1.5 w-full" /></label>
+                        <label class="text-xs font-bold text-gray-600">Homepage mode<SearchableSelect v-model="designConfig.homepage_mode" :all-option="false" placeholder="Select homepage mode" :options="[{ value: 'evergreen', label: 'Evergreen' }, { value: 'registration_open', label: 'Registration open' }, { value: 'event_live', label: 'Event live' }, { value: 'results_published', label: 'Results published' }]" class="mt-1.5 w-full" /></label>
                         <label class="text-xs font-bold text-gray-600">Manual mode expires<input v-model="designConfig.homepage_mode_override_until" type="datetime-local" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><span class="block mt-1 font-normal text-gray-400">Leave blank to follow ERP event status.</span></label>
-                        <label class="text-xs font-bold text-gray-600">Navigation layout<select v-model="designConfig.navigation" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="directory">Directory (logo left)</option><option value="event">Event (dark)</option><option value="editorial">Editorial (centered)</option><option value="institutional">Institutional (pill)</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Footer layout<select v-model="designConfig.footer" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="directory">Directory (four column)</option><option value="event">Event (minimal row)</option><option value="editorial">Editorial (two column)</option><option value="institutional">Institutional (three column)</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Navigation layout<SearchableSelect v-model="designConfig.navigation" :all-option="false" placeholder="Select navigation layout" :options="[{ value: 'directory', label: 'Directory (logo left)' }, { value: 'event', label: 'Event (dark)' }, { value: 'editorial', label: 'Editorial (centered)' }, { value: 'institutional', label: 'Institutional (pill)' }]" class="mt-1.5 w-full" /></label>
+                        <label class="text-xs font-bold text-gray-600">Footer layout<SearchableSelect v-model="designConfig.footer" :all-option="false" placeholder="Select footer layout" :options="[{ value: 'directory', label: 'Directory (four column)' }, { value: 'event', label: 'Event (minimal row)' }, { value: 'editorial', label: 'Editorial (two column)' }, { value: 'institutional', label: 'Institutional (three column)' }]" class="mt-1.5 w-full" /></label>
                     </div>
 
                     <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
@@ -537,17 +527,13 @@
                                 </div>
                             </div>
                             <div v-if="(section.archived_configs || []).length" class="ml-auto">
-                                <select @change="restoreArchived(section, $event.target.value)"
-                                        class="text-xs border border-gray-200 rounded-xl px-3 py-2 text-gray-500 bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                                    <option value="">↩ Restore previous content…</option>
-                                    <option v-for="(arc, ai) in section.archived_configs" :key="ai"
-                                            :value="ai">
-                                        {{ arc.variant }} — {{ formatDate(arc.archived_at) }}
-                                    </option>
-                                </select>
+                                <SearchableSelect :model-value="''" @update:model-value="val => restoreArchived(section, val)"
+                                        :options="archivedConfigOptions(section)" :all-option="true"
+                                        all-label="↩ Restore previous content…"
+                                        class="text-xs" />
                             </div>
                             <div v-if="sectionVersions[section.id]?.length" :class="(section.archived_configs || []).length ? '' : 'ml-auto'">
-                                <select @change="restorePublishedVersion(section, $event.target.value)" class="text-xs border border-gray-200 rounded-xl px-3 py-2 text-gray-500 bg-white"><option value="">Restore saved version…</option><option v-for="version in sectionVersions[section.id]" :key="version.id" :value="version.id">{{ version.note || 'Saved' }} — {{ formatDate(version.created_at) }}</option></select>
+                                <SearchableSelect :model-value="''" @update:model-value="val => restorePublishedVersion(section, val)" :options="sectionVersionOptions(section)" :all-option="true" all-label="Restore saved version…" class="text-xs" />
                             </div>
                         </div>
 
@@ -665,6 +651,7 @@ import ExperiencePicker from '@/Components/sahodaya/website/ExperiencePicker.vue
 import ReadinessPanel from '@/Components/sahodaya/website/ReadinessPanel.vue';
 import SectionLayoutEditor from '@/Components/sahodaya/website/SectionLayoutEditor.vue';
 import PreviewToolbar from '@/Components/sahodaya/website/PreviewToolbar.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -794,6 +781,10 @@ const readinessReport = ref({ ...(props.readiness ?? {}) });
 const experienceSaving = ref(false);
 const siteVersions = ref([]);
 const currentSite = computed(() => props.currentSite ?? props.sites?.[0] ?? null);
+const siteOptions = computed(() => (props.sites ?? []).map(site => ({
+    value: site.id,
+    label: `${site.name}${site.is_primary ? ' — Primary website' : ' — Microsite'}`,
+})));
 const selectedPublicUrl = computed(() => {
     if (!props.publicUrl || !currentSite.value) return null;
     const base = props.publicUrl.replace(/\/$/, '');
@@ -850,6 +841,18 @@ function sourceBadge(type) {
 function formatDate(d) {
     if (!d) return '';
     try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return ''; }
+}
+function archivedConfigOptions(section) {
+    return (section.archived_configs ?? []).map((arc, ai) => ({
+        value: ai,
+        label: `${arc.variant} — ${formatDate(arc.archived_at)}`,
+    }));
+}
+function sectionVersionOptions(section) {
+    return (sectionVersions[section.id] ?? []).map(version => ({
+        value: version.id,
+        label: `${version.note || 'Saved'} — ${formatDate(version.created_at)}`,
+    }));
 }
 
 // ── API calls (using fetch directly — same pattern as super-admin builder) ───
@@ -1359,6 +1362,15 @@ const SectionFieldEditor = defineComponent({
             emit('update', { ...local });
         }
 
+        function onRepeaterMove(key, idx, direction) {
+            const arr = [...(local[key] ?? [])];
+            const target = idx + direction;
+            if (target < 0 || target >= arr.length) return;
+            [arr[idx], arr[target]] = [arr[target], arr[idx]];
+            local[key] = arr;
+            emit('update', { ...local });
+        }
+
         function onRepeaterField(key, idx, fieldKey, val) {
             const arr = [...(local[key] ?? [])];
             arr[idx] = { ...arr[idx], [fieldKey]: val };
@@ -1406,11 +1418,29 @@ const SectionFieldEditor = defineComponent({
                                     ])
                                 )
                             ),
-                            h('button', {
-                                type: 'button',
-                                onClick: () => onRepeaterRemove(field.key, idx),
-                                class: 'text-xs text-red-400 hover:text-red-600',
-                            }, 'Remove'),
+                            h('div', { class: 'flex items-center justify-between' }, [
+                                h('div', { class: 'flex items-center gap-2' }, [
+                                    h('button', {
+                                        type: 'button',
+                                        onClick: () => onRepeaterMove(field.key, idx, -1),
+                                        disabled: idx === 0,
+                                        class: 'text-xs text-gray-500 hover:text-gray-800 disabled:opacity-30 disabled:cursor-not-allowed',
+                                        title: 'Move up',
+                                    }, '↑'),
+                                    h('button', {
+                                        type: 'button',
+                                        onClick: () => onRepeaterMove(field.key, idx, 1),
+                                        disabled: idx === (local[field.key] ?? []).length - 1,
+                                        class: 'text-xs text-gray-500 hover:text-gray-800 disabled:opacity-30 disabled:cursor-not-allowed',
+                                        title: 'Move down',
+                                    }, '↓'),
+                                ]),
+                                h('button', {
+                                    type: 'button',
+                                    onClick: () => onRepeaterRemove(field.key, idx),
+                                    class: 'text-xs text-red-400 hover:text-red-600',
+                                }, 'Remove'),
+                            ]),
                         ])
                     ),
                 ]);

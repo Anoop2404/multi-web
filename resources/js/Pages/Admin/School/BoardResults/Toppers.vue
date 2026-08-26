@@ -133,18 +133,26 @@
                                     <tr v-for="(row, i) in batchForm.toppers" :key="i" class="hover:bg-slate-50/50">
                                         <td class="p-3"><input v-model="row.name" type="text" required class="field text-sm" placeholder="Student name" :disabled="!canEdit"></td>
                                         <td class="p-3">
-                                            <select v-model="row.gender" required class="field text-sm w-28" :disabled="!canEdit">
-                                                <option value="">— Select —</option>
-                                                <option value="male">Male</option>
-                                                <option value="female">Female</option>
-                                                <option value="other">Other</option>
-                                            </select>
+                                            <SearchableSelect
+                                                v-model="row.gender"
+                                                :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
+                                                :all-option="true"
+                                                all-label="— Select —"
+                                                :required="true"
+                                                :disabled="!canEdit"
+                                                class="w-28"
+                                            />
                                         </td>
                                         <td v-if="isClass12" class="p-3">
-                                            <select v-model="row.stream_key" required class="field text-sm w-32" :disabled="!canEdit">
-                                                <option value="">— Select —</option>
-                                                <option v-for="(label, key) in streamOptions" :key="key" :value="key">{{ label }}</option>
-                                            </select>
+                                            <SearchableSelect
+                                                v-model="row.stream_key"
+                                                :options="streamOptionsList"
+                                                :all-option="true"
+                                                all-label="— Select —"
+                                                :required="true"
+                                                :disabled="!canEdit"
+                                                class="w-32"
+                                            />
                                             <p class="text-[10px] text-gray-400 mt-0.5" v-if="row.stream_key">Out of {{ rowTotalMarks(row) ?? '—' }}</p>
                                         </td>
                                         <td class="p-3"><input v-model="row.roll_no" type="text" class="field text-sm w-36" placeholder="CBSE Roll No" :disabled="!canEdit"></td>
@@ -189,20 +197,25 @@
                             </div>
                             <div>
                                 <label class="form-label mb-1">Gender *</label>
-                                <select v-model="form.gender" required class="field text-sm" :disabled="!canEdit">
-                                    <option value="">— Select —</option>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                    <option value="other">Other</option>
-                                </select>
+                                <SearchableSelect
+                                    v-model="form.gender"
+                                    :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
+                                    :all-option="true"
+                                    all-label="— Select —"
+                                    :required="true"
+                                    :disabled="!canEdit"
+                                />
                             </div>
                             <div v-if="isClass12">
                                 <label class="form-label mb-1">Stream *</label>
-                                <select v-model="form.stream_key" required class="field text-sm" @change="onStreamChange">
-                                    <option value="science">Science</option>
-                                    <option value="commerce">Commerce</option>
-                                    <option value="humanities">Humanities</option>
-                                </select>
+                                <SearchableSelect
+                                    v-model="form.stream_key"
+                                    :options="[{ value: 'science', label: 'Science' }, { value: 'commerce', label: 'Commerce' }, { value: 'humanities', label: 'Humanities' }]"
+                                    :all-option="false"
+                                    placeholder="Select stream"
+                                    :required="true"
+                                    @change="onStreamChange"
+                                />
                             </div>
                             <div>
                                 <label class="form-label mb-1">CBSE Roll No</label>
@@ -388,11 +401,13 @@
                     <div class="flex items-center gap-3 flex-wrap">
                         <div class="flex items-center gap-2">
                             <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">Subject:</label>
-                            <select v-model="selectedSubjectOption" class="field text-xs py-1.5 w-56 font-semibold bg-white">
-                                <option value="" disabled>Select Subject</option>
-                                <option v-for="subj in masterSubjectList" :key="subj" :value="subj">{{ subj }}</option>
-                                <option value="__custom__">+ Add Custom Subject...</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="selectedSubjectOption"
+                                :options="subjectSelectOptions"
+                                :all-option="false"
+                                placeholder="Select Subject"
+                                class="w-56"
+                            />
                         </div>
                     </div>
 
@@ -426,12 +441,14 @@
                         </div>
                         <div>
                             <label class="form-label mb-1 font-semibold">Gender *</label>
-                            <select v-model="subjectForm.gender" required class="field text-sm" :disabled="!canEdit">
-                                <option value="">— Select —</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="subjectForm.gender"
+                                :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
+                                :all-option="true"
+                                all-label="— Select —"
+                                :required="true"
+                                :disabled="!canEdit"
+                            />
                         </div>
                         <div>
                             <label class="form-label mb-1 font-semibold">CBSE Roll No *</label>
@@ -552,6 +569,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { computed, ref } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
@@ -582,6 +600,18 @@ const default23Subjects = [
 const masterSubjectList = computed(() =>
     props.standardSubjects?.length ? props.standardSubjects : default23Subjects
 );
+
+// SearchableSelect options derived from the streamOptions prop object ({ key: label }).
+const streamOptionsList = computed(() =>
+    Object.entries(props.streamOptions ?? {}).map(([key, label]) => ({ value: key, label }))
+);
+
+// SearchableSelect options for the subject picker: the master subject list plus the
+// trailing "add custom subject" choice.
+const subjectSelectOptions = computed(() => [
+    ...masterSubjectList.value.map((subj) => ({ value: subj, label: subj })),
+    { value: '__custom__', label: '+ Add Custom Subject...' },
+]);
 
 const pageTitle = computed(() => `Toppers — Class ${props.boardResult.class} (${props.boardResult.academic_year})`);
 const overallTopperCount = computed(() => sortedToppers.value.length);

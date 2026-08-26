@@ -23,10 +23,8 @@
             </p>
             <div class="mb-6 flex flex-wrap gap-2">
                 <input v-model="search" type="search" placeholder="Search reports…" class="field max-w-xs">
-                <select v-model="moduleFilter" class="field max-w-[180px]">
-                    <option value="">All modules</option>
-                    <option v-for="m in modules" :key="m" :value="m">{{ m }}</option>
-                </select>
+                <SearchableSelect v-model="moduleFilter" class="max-w-[180px]"
+                                  :options="modules" :all-option="true" all-label="All modules" />
             </div>
             <ReportModuleGrid :modules="filteredModules" />
         </div>
@@ -39,12 +37,9 @@
 
             <form class="card !p-4 mb-6 flex flex-wrap gap-3 items-end" @submit.prevent="loadEvent">
                 <FormField label="Event" class="min-w-[280px]">
-                    <select v-model="eventId" class="field" required>
-                        <option value="">Choose an event…</option>
-                        <option v-for="e in events" :key="e.id" :value="e.id">
-                            {{ e.title }} ({{ e.event_type }}) · {{ formatDate(e.event_start) }}
-                        </option>
-                    </select>
+                    <SearchableSelect v-model="eventId"
+                                      :options="eventOptions" :all-option="true" all-label="Choose an event…"
+                                      :required="true" />
                 </FormField>
                 <button type="submit" class="btn-primary text-sm">Load event reports</button>
             </form>
@@ -108,6 +103,7 @@ import FormField from '@/Components/ui/FormField.vue';
 import EmptyState from '@/Components/ui/EmptyState.vue';
 import ReportHeadHubSection from '@/Components/reports/ReportHeadHubSection.vue';
 import ReportModuleGrid from '@/Components/reports/ReportModuleGrid.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -151,6 +147,11 @@ watch(() => props.selectedEventId, (id) => {
 });
 
 const modules = computed(() => Object.keys(props.reportsByModule ?? {}));
+
+const eventOptions = computed(() => (props.events ?? []).map(e => ({
+    value: e.id,
+    label: `${e.title} (${e.event_type}) · ${formatDate(e.event_start)}`,
+})));
 
 const filteredModules = computed(() => {
     const term = search.value.trim().toLowerCase();

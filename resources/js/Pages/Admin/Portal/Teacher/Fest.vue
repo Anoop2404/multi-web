@@ -138,10 +138,13 @@
             <form v-if="appealableParticipants?.length" @submit.prevent="submitAppeal" class="border-t border-slate-100 pt-4 space-y-3">
                 <p class="text-xs font-bold text-slate-800">Submit New Result Appeal</p>
                 <FormField label="Select Entry" required>
-                    <select v-model="appealForm.participant_id" class="field" required>
-                        <option value="">Select entry…</option>
-                        <option v-for="p in appealableParticipants" :key="p.participant_id" :value="p.participant_id">{{ p.event_title }} — {{ p.item_title }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="appealForm.participant_id"
+                        :options="appealableParticipantOptions"
+                        :all-option="true"
+                        all-label="Select entry…"
+                        :required="true"
+                    />
                 </FormField>
                 <FormField label="Reason for Appeal" required>
                     <textarea v-model="appealForm.reason" class="field text-xs" rows="2" required placeholder="Explain the grounds for your result appeal"></textarea>
@@ -158,6 +161,7 @@
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import FormField from '@/Components/ui/FormField.vue';
 import EmptyState from '@/Components/ui/EmptyState.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';
@@ -188,6 +192,13 @@ const hasFestContent = computed(() =>
     || props.admitCardEvents?.length
     || props.festAppeals?.length
     || props.appealableParticipants?.length
+);
+
+const appealableParticipantOptions = computed(() =>
+    props.appealableParticipants.map(p => ({
+        value: p.participant_id,
+        label: `${p.event_title} — ${p.item_title}`,
+    }))
 );
 
 function pillClass(status) {

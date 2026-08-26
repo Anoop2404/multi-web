@@ -2,6 +2,7 @@
 
 namespace App\Services\Events;
 
+use App\Support\CsvSafety;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\Student;
@@ -276,9 +277,9 @@ class FestRegistrationImportService
             $school = Tenant::findOrFail($schoolId);
             $tmp = tempnam(sys_get_temp_dir(), 'fest-import-');
             $out = fopen($tmp, 'w');
-            fputcsv($out, ['item_id', 'item_title', 'reg_no', 'team_name', 'role']);
+            CsvSafety::fputcsv($out, ['item_id', 'item_title', 'reg_no', 'team_name', 'role']);
             foreach ($rows as $r) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $r['item_id'] ?? '',
                     $r['item_title'] ?? '',
                     $r['reg_no'] ?? '',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\CsvSafety;
 use App\Support\FestPageActivity;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
@@ -32,9 +33,9 @@ class FestMarksImportController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['participant_id', 'reg_no', 'chest_no', 'item_title', 'name', 'grade', 'position', 'score', 'measurement_value', 'measurement_unit']);
+            CsvSafety::fputcsv($out, ['participant_id', 'reg_no', 'chest_no', 'item_title', 'name', 'grade', 'position', 'score', 'measurement_value', 'measurement_unit']);
             foreach ($rows as $row) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $row['participant_id'],
                     $row['reg_no'],
                     $row['chest_no'],
@@ -99,6 +100,11 @@ class FestMarksImportController extends SahodayaAdminController
 
             try {
                 EventLifecycleGate::allowMarkEntryForItem($event, $item);
+                // recalculate: false — this loop can run hundreds of rows per import; the
+                // default recalculate() rescans every FestMark in the event, so leaving it
+                // on here reran that full-event recompute once per CSV row (O(rows ×
+                // total event marks)). Recalculating once after the loop instead makes the
+                // whole import do that expensive pass exactly once, regardless of row count.
                 $markSave->save($event, [
                     'participant_id'    => $participant->id,
                     'item_id'           => $itemId,
@@ -107,7 +113,7 @@ class FestMarksImportController extends SahodayaAdminController
                     'score'             => $score,
                     'measurement_value' => $data['measurement_value'] ?? null,
                     'measurement_unit'  => $data['measurement_unit'] ?? null,
-                ], $request->user()->id);
+                ], $request->user()->id, recalculate: false);
             } catch (ValidationException|HttpException $e) {
                 $message = $e instanceof ValidationException
                     ? (collect($e->errors())->flatten()->first() ?? 'Mark could not be imported.')
@@ -121,6 +127,10 @@ class FestMarksImportController extends SahodayaAdminController
         }
 
         fclose($handle);
+
+        if ($imported > 0) {
+            $markSave->recalculate($event);
+        }
 
         $audit->festEvent($event, FestPageActivity::MARKS_IMPORT, 'fest.marks.imported', "Imported {$imported} mark row(s)", [
             'imported' => $imported,

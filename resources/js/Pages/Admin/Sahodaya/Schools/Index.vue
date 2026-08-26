@@ -91,12 +91,14 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Payment status</label>
-                        <select v-model="filterForm.payment_status" class="field">
-                            <option value="all">All payment statuses</option>
-                            <option value="no_proof">⚠️ Approved — No Payment Proof / Fee Due</option>
-                            <option value="payment_pending">⏳ Payment Uploaded (Pending Review)</option>
-                            <option value="payment_verified">✓ Fee Verified</option>
-                        </select>
+                        <SearchableSelect v-model="filterForm.payment_status"
+                            :options="[
+                                { value: 'all', label: 'All payment statuses' },
+                                { value: 'no_proof', label: '⚠️ Approved — No Payment Proof / Fee Due' },
+                                { value: 'payment_pending', label: '⏳ Payment Uploaded (Pending Review)' },
+                                { value: 'payment_verified', label: '✓ Fee Verified' },
+                            ]"
+                            :all-option="false" />
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">From</label>
@@ -108,12 +110,14 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Sort</label>
-                        <select :value="sortSelection" @change="applySort" class="field">
-                            <option value="name-asc">Name A–Z</option>
-                            <option value="name-desc">Name Z–A</option>
-                            <option value="created_at-desc">Newest first</option>
-                            <option value="created_at-asc">Oldest first</option>
-                        </select>
+                        <SearchableSelect :model-value="sortSelection" @update:model-value="applySort"
+                            :options="[
+                                { value: 'name-asc', label: 'Name A–Z' },
+                                { value: 'name-desc', label: 'Name Z–A' },
+                                { value: 'created_at-desc', label: 'Newest first' },
+                                { value: 'created_at-asc', label: 'Oldest first' },
+                            ]"
+                            :all-option="false" />
                     </div>
                     <div class="flex items-end gap-2">
                         <button v-if="hasActiveFilters" @click="clearFilters"
@@ -243,6 +247,7 @@
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import DashboardStatCard from '@/Components/ui/DashboardStatCard.vue';
 import EmptyState from '@/Components/ui/EmptyState.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { reactive, computed, ref } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
@@ -334,8 +339,8 @@ const sortSelection = computed({
     set: () => {},
 });
 
-function applySort(e) {
-    const [sort, dir] = e.target.value.split('-');
+function applySort(value) {
+    const [sort, dir] = value.split('-');
     router.get(`/sahodaya-admin/${props.sahodaya.id}/schools`, listParams({ sort, dir }), {
         preserveState: true, replace: true,
     });

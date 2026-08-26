@@ -4,22 +4,10 @@
                     description="View and download question papers uploaded by teachers across all classes and subjects." />
 
         <form class="card !p-4 grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5" @submit.prevent="applyFilters">
-            <select v-model="filterForm.school_class_id" class="field" aria-label="Filter by class">
-                <option value="">All classes</option>
-                <option v-for="item in classes" :key="item.id" :value="item.id">{{ item.name }}</option>
-            </select>
-            <select v-model="filterForm.subject_id" class="field" aria-label="Filter by subject">
-                <option value="">All subjects</option>
-                <option v-for="item in subjects" :key="item.id" :value="item.id">{{ item.label }}</option>
-            </select>
-            <select v-model="filterForm.teacher_id" class="field" aria-label="Filter by teacher">
-                <option value="">All teachers</option>
-                <option v-for="item in teachers" :key="item.id" :value="item.id">{{ item.name }}</option>
-            </select>
-            <select v-model="filterForm.academic_year" class="field" aria-label="Filter by academic year">
-                <option value="">All years</option>
-                <option v-for="year in academicYears" :key="year" :value="year">{{ year }}</option>
-            </select>
+            <SearchableSelect v-model="filterForm.school_class_id" :options="classes" :all-option="true" all-label="All classes" aria-label="Filter by class" />
+            <SearchableSelect v-model="filterForm.subject_id" :options="subjects" :all-option="true" all-label="All subjects" aria-label="Filter by subject" />
+            <SearchableSelect v-model="filterForm.teacher_id" :options="teachers" :all-option="true" all-label="All teachers" aria-label="Filter by teacher" />
+            <SearchableSelect v-model="filterForm.academic_year" :options="academicYears" :all-option="true" all-label="All years" aria-label="Filter by academic year" />
             <div class="flex gap-2">
                 <input v-model="filterForm.search" class="field flex-1 min-w-0" type="search" placeholder="Search papers" aria-label="Search papers">
                 <button class="btn-primary">Filter</button>
@@ -80,6 +68,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, reactive } from 'vue';
 

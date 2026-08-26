@@ -144,21 +144,25 @@
 
                         <div class="profile-field">
                             <label class="form-label">Class *</label>
-                            <select v-model="editForm.school_class_id" required class="field">
-                                <option value="">Select class</option>
-                                <option v-for="c in classesSorted" :key="c.id" :value="c.id">{{ formatClassOption(c) }}</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="editForm.school_class_id"
+                                :options="classOptions"
+                                :all-option="true"
+                                all-label="Select class"
+                                :required="true"
+                            />
                             <p v-if="editForm.errors.school_class_id" class="field-error">{{ editForm.errors.school_class_id }}</p>
                         </div>
 
                         <div class="profile-field">
                             <label class="form-label">Gender *</label>
-                            <select v-model="editForm.gender" required class="field">
-                                <option value="">Select gender</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="editForm.gender"
+                                :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
+                                :all-option="true"
+                                all-label="Select gender"
+                                :required="true"
+                            />
                             <p v-if="editForm.errors.gender" class="field-error">{{ editForm.errors.gender }}</p>
                         </div>
 
@@ -291,6 +295,7 @@ import ProfilePhotoCropper from '@/Components/school/ProfilePhotoCropper.vue';
 import StudentPhotoEditModal from '@/Components/school/StudentPhotoEditModal.vue';
 import StudentPortalLoginCard from '@/Components/students/StudentPortalLoginCard.vue';
 import StudentSportsProfileSection from '@/Components/students/StudentSportsProfileSection.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import {
     calendarDateInputValue,
     calendarDateStatus,
@@ -336,6 +341,10 @@ const canEdit = computed(() => props.canManageDirectly || !needsChangeRequest.va
 
 const classesSorted = computed(() =>
     [...props.classes].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0) || String(a.name).localeCompare(String(b.name))),
+);
+
+const classOptions = computed(() =>
+    classesSorted.value.map((c) => ({ value: c.id, label: formatClassOption(c) })),
 );
 
 const todayIso = new Date().toISOString().slice(0, 10);

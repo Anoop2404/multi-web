@@ -23,12 +23,7 @@
                     <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-700 mb-2">Step 1 · Generate</p>
                     <div class="flex flex-wrap items-center gap-2">
                         <div class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded p-1">
-                            <select v-if="publishedItems.length" v-model="selectedItemId" class="text-xs py-1.5 px-2 rounded border-gray-300 bg-white shadow-sm focus:ring-1 focus:ring-indigo-500 max-w-[160px] truncate">
-                                <option :value="null">All items</option>
-                                <option v-for="item in publishedItems" :key="item.id" :value="item.id">
-                                    {{ item.item_code ? `[${item.item_code}] ` : '' }}{{ item.title }}
-                                </option>
-                            </select>
+                            <SearchableSelect v-if="publishedItems.length" v-model="selectedItemId" :options="publishedItemOptions" :all-option="true" all-label="All items" class="max-w-[160px]" />
                             <button @click="generate(selectedItemId)" class="btn-primary py-1.5 px-3 text-xs shrink-0">
                                 🏆 Merit{{ selectedItemId ? ' (item)' : '' }}
                             </button>
@@ -98,8 +93,8 @@
         </div>
 
         <!-- View mode tabs -->
-        <div class="border-b border-gray-200 mb-6">
-            <nav class="-mb-px flex gap-6" aria-label="Tabs">
+        <div class="border-b border-gray-200 mb-6 overflow-x-auto">
+            <nav class="-mb-px flex gap-6 w-max" aria-label="Tabs">
                 <button @click="activeTab = 'winners_item'"
                         class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
                         :class="activeTab === 'winners_item'
@@ -113,6 +108,20 @@
                             ? 'border-indigo-600 text-indigo-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
                     🏫 Merit Winners (Grouped by School)
+                </button>
+                <button @click="activeTab = 'participation_item'"
+                        class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
+                        :class="activeTab === 'participation_item'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                    📜 Participation (Grouped by Item)
+                </button>
+                <button @click="activeTab = 'participation_school'"
+                        class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
+                        :class="activeTab === 'participation_school'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                    📜 Participation (Grouped by School)
                 </button>
                 <button @click="activeTab = 'all'"
                         class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
@@ -133,33 +142,16 @@
                 </div>
             </div>
 
-            <div v-if="winnersByItem.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div v-for="group in winnersByItem" :key="group.item_id" class="card p-4 flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-start justify-between gap-2 mb-3">
-                            <p class="font-semibold text-sm text-gray-900 leading-tight">{{ group.item_title }}</p>
+            <div v-if="winnersByItem.length" class="card divide-y divide-gray-100">
+                <div v-for="group in winnersByItem" :key="group.item_id" class="py-3 first:pt-0 last:pb-0">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="min-w-0 flex items-center gap-3">
+                            <p class="font-semibold text-sm text-gray-900">{{ group.item_title }}</p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
                                 {{ group.winners.length }} merit winner{{ group.winners.length === 1 ? '' : 's' }}
                             </span>
                         </div>
-                        <ul class="space-y-2 mb-4">
-                            <li v-for="w in group.winners" :key="w.id" class="flex items-center justify-between gap-2 text-xs">
-                                <span class="flex items-center gap-2 min-w-0">
-                                    <span class="shrink-0 rounded-full bg-amber-500 text-white font-bold w-5 h-5 flex items-center justify-center text-[10px]">
-                                        {{ w.position ?? '—' }}
-                                    </span>
-                                    <span class="truncate font-medium text-gray-800">{{ w.name }}</span>
-                                </span>
-                                <span class="flex items-center gap-2 shrink-0 text-[11px]">
-                                    <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
-                                    <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
-                                </span>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <div class="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-                        <div class="flex items-center gap-3">
+                        <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
                             <button @click="generate(group.item_id)" class="font-semibold text-amber-700 hover:text-amber-900">
                                 ⚡ Generate
                             </button>
@@ -171,18 +163,34 @@
                             <a :href="`${base}/preview-sample?cert_type=winner&item_id=${group.item_id}`" target="_blank" class="text-gray-500 hover:text-gray-800" title="Preview worst case">
                                 👁️
                             </a>
+                            <details class="relative">
+                                <summary class="font-semibold text-gray-600 hover:text-gray-800 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                                    📦 Download ▾
+                                </summary>
+                                <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                                    <a :href="`${base}/download-zip?item_id=${group.item_id}&cert_type=winner`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
+                                    <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=winner`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
+                                    <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=winner&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
+                                </div>
+                            </details>
                         </div>
-                        <details class="relative">
-                            <summary class="font-semibold text-gray-600 hover:text-gray-800 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-                                📦 Download ▾
-                            </summary>
-                            <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                                <a :href="`${base}/download-zip?item_id=${group.item_id}&cert_type=winner`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
-                                <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=winner`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
-                                <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=winner&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
-                            </div>
-                        </details>
                     </div>
+                    <ul class="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+                        <li v-for="w in group.winners" :key="w.id" class="flex items-center gap-2 text-xs">
+                            <span class="shrink-0 rounded-full bg-amber-500 text-white font-bold w-5 h-5 flex items-center justify-center text-[10px]">
+                                {{ w.position ?? '—' }}
+                            </span>
+                            <span class="font-medium text-gray-800">{{ w.name }}</span>
+                            <span class="flex items-center gap-2 text-[11px]">
+                                <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
+                                <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
+                                <template v-if="w.is_rendered && !w.is_stale">
+                                    <a :href="`/certificates/pdf/${w.uuid}`" target="_blank" class="text-emerald-600 font-medium hover:underline">View PDF ↗</a>
+                                    <a :href="`/certificates/pdf/${w.uuid}?download=1`" class="text-emerald-600 font-medium hover:underline">Download PDF</a>
+                                </template>
+                            </span>
+                        </li>
+                    </ul>
                 </div>
             </div>
             <div v-else class="card p-6 text-center text-gray-500 text-sm">
@@ -199,55 +207,180 @@
                 </div>
             </div>
 
-            <div v-if="winnersBySchool.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div v-for="group in winnersBySchool" :key="group.school_id" class="card p-4 flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-start justify-between gap-2 mb-3">
-                            <p class="font-semibold text-sm text-gray-900 leading-tight">{{ group.school_name }}</p>
+            <div v-if="winnersBySchool.length" class="card divide-y divide-gray-100">
+                <div v-for="group in winnersBySchool" :key="group.school_id" class="py-3 first:pt-0 last:pb-0">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="min-w-0 flex items-center gap-3">
+                            <p class="font-semibold text-sm text-gray-900">{{ group.school_name }}</p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-medium">
                                 {{ group.winners.length }} merit winner{{ group.winners.length === 1 ? '' : 's' }}
                             </span>
                         </div>
-                        <ul class="space-y-2 mb-4">
-                            <li v-for="w in group.winners" :key="w.id" class="flex items-center justify-between gap-2 text-xs">
-                                <div class="min-w-0">
-                                    <p class="truncate font-medium text-gray-800 flex items-center gap-1.5">
-                                        <span class="shrink-0 rounded-full bg-amber-500 text-white font-bold w-4 h-4 flex items-center justify-center text-[9px]">
-                                            {{ w.position ?? '—' }}
-                                        </span>
-                                        <span>{{ w.name }}</span>
-                                    </p>
-                                    <p class="text-[11px] text-gray-500 truncate">{{ w.item_title }}</p>
+                        <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
+                            <button @click="renderAndCache({ school_id: group.school_id, cert_type: 'winner' })"
+                                    class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    :disabled="isBatchRunning">
+                                ⚙️ Render
+                            </button>
+                            <details class="relative">
+                                <summary class="font-semibold text-gray-600 hover:text-gray-800 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                                    📦 Download ▾
+                                </summary>
+                                <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                                    <a :href="`${base}/download-zip?school_id=${group.school_id}&cert_type=winner`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
+                                    <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=winner`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
+                                    <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=winner&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
                                 </div>
-                                <div class="flex items-center gap-2 shrink-0 text-[11px]">
-                                    <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
-                                    <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
-                                </div>
-                            </li>
-                        </ul>
+                            </details>
+                        </div>
                     </div>
-
-                    <div class="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-                        <button @click="renderAndCache({ school_id: group.school_id, cert_type: 'winner' })"
-                                class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                                :disabled="isBatchRunning">
-                            ⚙️ Render
-                        </button>
-                        <details class="relative">
-                            <summary class="font-semibold text-gray-600 hover:text-gray-800 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-                                📦 Download ▾
-                            </summary>
-                            <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                                <a :href="`${base}/download-zip?school_id=${group.school_id}&cert_type=winner`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
-                                <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=winner`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
-                                <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=winner&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
-                            </div>
-                        </details>
-                    </div>
+                    <ul class="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+                        <li v-for="w in group.winners" :key="w.id" class="flex items-center gap-2 text-xs">
+                            <span class="shrink-0 rounded-full bg-amber-500 text-white font-bold w-5 h-5 flex items-center justify-center text-[10px]">
+                                {{ w.position ?? '—' }}
+                            </span>
+                            <span class="font-medium text-gray-800">{{ w.name }}</span>
+                            <span class="text-[11px] text-gray-500">{{ w.item_title }}</span>
+                            <span class="flex items-center gap-2 text-[11px]">
+                                <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
+                                <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
+                                <template v-if="w.is_rendered && !w.is_stale">
+                                    <a :href="`/certificates/pdf/${w.uuid}`" target="_blank" class="text-emerald-600 font-medium hover:underline">View PDF ↗</a>
+                                    <a :href="`/certificates/pdf/${w.uuid}?download=1`" class="text-emerald-600 font-medium hover:underline">Download PDF</a>
+                                </template>
+                            </span>
+                        </li>
+                    </ul>
                 </div>
             </div>
             <div v-else class="card p-6 text-center text-gray-500 text-sm">
                 No merit winners grouped by school available yet.
+            </div>
+        </div>
+
+        <!-- TAB: Participation Certificates Grouped by Item -->
+        <div v-if="activeTab === 'participation_item'" class="mb-6">
+            <div class="flex items-center justify-between gap-4 mb-3">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-800">Participation Certificates Grouped by Item</h3>
+                    <p class="text-xs text-gray-500">Every item with at least one participation certificate generated.</p>
+                </div>
+            </div>
+
+            <div v-if="participationByItem.length" class="card divide-y divide-gray-100">
+                <div v-for="group in participationByItem" :key="group.item_id" class="py-3 first:pt-0 last:pb-0">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="min-w-0 flex items-center gap-3">
+                            <p class="font-semibold text-sm text-gray-900">{{ group.item_title }}</p>
+                            <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-medium">
+                                {{ group.winners.length }} participant{{ group.winners.length === 1 ? '' : 's' }}
+                            </span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
+                            <button @click="renderAndCache({ item_id: group.item_id, cert_type: 'participation' })"
+                                    class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    :disabled="isBatchRunning">
+                                ⚙️ Render
+                            </button>
+                            <a :href="`${base}/preview-sample?cert_type=participation&item_id=${group.item_id}`" target="_blank" class="text-gray-500 hover:text-gray-800" title="Preview worst case">
+                                👁️
+                            </a>
+                            <details class="relative">
+                                <summary class="font-semibold text-gray-600 hover:text-gray-800 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                                    📦 Download ▾
+                                </summary>
+                                <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                                    <a :href="`${base}/download-zip?item_id=${group.item_id}&cert_type=participation`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
+                                    <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=participation`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
+                                    <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=participation&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                    <details class="mt-2">
+                        <summary class="text-xs font-medium text-gray-500 hover:text-gray-700 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                            ▸ View {{ group.winners.length }} name{{ group.winners.length === 1 ? '' : 's' }}
+                        </summary>
+                        <ul class="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+                            <li v-for="w in group.winners" :key="w.id" class="flex items-center gap-2 text-xs">
+                                <span class="font-medium text-gray-800">{{ w.name }}</span>
+                                <span class="flex items-center gap-2 text-[11px]">
+                                    <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
+                                    <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
+                                    <template v-if="w.is_rendered && !w.is_stale">
+                                        <a :href="`/certificates/pdf/${w.uuid}`" target="_blank" class="text-emerald-600 font-medium hover:underline">View PDF ↗</a>
+                                        <a :href="`/certificates/pdf/${w.uuid}?download=1`" class="text-emerald-600 font-medium hover:underline">Download PDF</a>
+                                    </template>
+                                </span>
+                            </li>
+                        </ul>
+                    </details>
+                </div>
+            </div>
+            <div v-else class="card p-6 text-center text-gray-500 text-sm">
+                No participation certificates generated by item yet.
+            </div>
+        </div>
+
+        <!-- TAB: Participation Certificates Grouped by School -->
+        <div v-if="activeTab === 'participation_school'" class="mb-6">
+            <div class="flex items-center justify-between gap-4 mb-3">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-800">Participation Certificates Grouped by School</h3>
+                    <p class="text-xs text-gray-500">Participation certificates organized by school for distribution.</p>
+                </div>
+            </div>
+
+            <div v-if="participationBySchool.length" class="card divide-y divide-gray-100">
+                <div v-for="group in participationBySchool" :key="group.school_id" class="py-3 first:pt-0 last:pb-0">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="min-w-0 flex items-center gap-3">
+                            <p class="font-semibold text-sm text-gray-900">{{ group.school_name }}</p>
+                            <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-medium">
+                                {{ group.winners.length }} participant{{ group.winners.length === 1 ? '' : 's' }}
+                            </span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
+                            <button @click="renderAndCache({ school_id: group.school_id, cert_type: 'participation' })"
+                                    class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    :disabled="isBatchRunning">
+                                ⚙️ Render
+                            </button>
+                            <details class="relative">
+                                <summary class="font-semibold text-gray-600 hover:text-gray-800 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                                    📦 Download ▾
+                                </summary>
+                                <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                                    <a :href="`${base}/download-zip?school_id=${group.school_id}&cert_type=participation`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
+                                    <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=participation`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
+                                    <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=participation&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                    <details class="mt-2">
+                        <summary class="text-xs font-medium text-gray-500 hover:text-gray-700 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                            ▸ View {{ group.winners.length }} name{{ group.winners.length === 1 ? '' : 's' }}
+                        </summary>
+                        <ul class="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+                            <li v-for="w in group.winners" :key="w.id" class="flex items-center gap-2 text-xs">
+                                <span class="font-medium text-gray-800">{{ w.name }}</span>
+                                <span class="text-[11px] text-gray-500">{{ w.item_title }}</span>
+                                <span class="flex items-center gap-2 text-[11px]">
+                                    <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
+                                    <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
+                                    <template v-if="w.is_rendered && !w.is_stale">
+                                        <a :href="`/certificates/pdf/${w.uuid}`" target="_blank" class="text-emerald-600 font-medium hover:underline">View PDF ↗</a>
+                                        <a :href="`/certificates/pdf/${w.uuid}?download=1`" class="text-emerald-600 font-medium hover:underline">Download PDF</a>
+                                    </template>
+                                </span>
+                            </li>
+                        </ul>
+                    </details>
+                </div>
+            </div>
+            <div v-else class="card p-6 text-center text-gray-500 text-sm">
+                No participation certificates grouped by school available yet.
             </div>
         </div>
 
@@ -264,17 +397,10 @@
                     </div>
 
                     <!-- School Filter -->
-                    <select v-model="selectedSchoolId" class="text-xs py-2 px-3 rounded border-gray-300 shadow-sm focus:ring-indigo-500 max-w-[240px] truncate">
-                        <option :value="null">All Schools ({{ schools.length }})</option>
-                        <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="selectedSchoolId" :options="schools" :all-option="true" :all-label="`All Schools (${schools.length})`" class="max-w-[240px]" />
 
                     <!-- Certificate Type Filter -->
-                    <select v-model="selectedCertType" class="text-xs py-2 px-3 rounded border-gray-300 shadow-sm focus:ring-indigo-500">
-                        <option :value="null">All Types</option>
-                        <option value="winner">Merit Winners</option>
-                        <option value="participation">Participation</option>
-                    </select>
+                    <SearchableSelect v-model="selectedCertType" :options="[{ value: 'winner', label: 'Merit Winners' }, { value: 'participation', label: 'Participation' }]" :all-option="true" all-label="All Types" />
                 </div>
 
                 <!-- Page Size & Download School ZIP -->
@@ -286,12 +412,7 @@
                     </a>
                     <div class="flex items-center gap-1.5">
                         <span>Show:</span>
-                        <select v-model="perPage" class="text-xs py-1.5 px-2 rounded border-gray-300">
-                            <option :value="25">25</option>
-                            <option :value="50">50</option>
-                            <option :value="100">100</option>
-                            <option value="all">All</option>
-                        </select>
+                        <SearchableSelect v-model="perPage" :options="[{ value: 25, label: '25' }, { value: 50, label: '50' }, { value: 100, label: '100' }, { value: 'all', label: 'All' }]" :all-option="false" />
                     </div>
                 </div>
             </div>
@@ -357,6 +478,10 @@
                             <a :href="`/certificates/print/${c.uuid}?preview=1`" target="_blank" class="text-gray-500 hover:text-gray-700">Preview ↗</a>
                             <a :href="`/certificates/print/${c.uuid}`" target="_blank" class="font-semibold text-indigo-600 hover:underline">Print (With BG) ↗</a>
                             <a :href="`/certificates/print/${c.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Print Plain ↗</a>
+                            <template v-if="c.is_rendered && !c.is_stale">
+                                <a :href="`/certificates/pdf/${c.uuid}`" target="_blank" class="font-semibold text-emerald-600 hover:underline">View PDF ↗</a>
+                                <a :href="`/certificates/pdf/${c.uuid}?download=1`" class="font-semibold text-emerald-600 hover:underline">Download PDF</a>
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -418,6 +543,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -426,6 +552,8 @@ const props = defineProps({
     schools: { type: Array, default: () => [] },
     winnersByItem: { type: Array, default: () => [] },
     winnersBySchool: { type: Array, default: () => [] },
+    participationByItem: { type: Array, default: () => [] },
+    participationBySchool: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
     recentBatches: { type: Array, default: () => [] },
     staleCount: { type: Number, default: 0 },
@@ -437,6 +565,11 @@ const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/cert
 const activeTab = ref('winners_item');
 const plainMode = ref(false);
 const selectedItemId = ref(null);
+
+const publishedItemOptions = computed(() => props.publishedItems.map(item => ({
+    value: item.id,
+    label: item.item_code ? `[${item.item_code}] ${item.title}` : item.title,
+})));
 
 // Render/cache batch progress — same dispatch -> flash key -> poll /progress pattern as
 // Settings/StorageMigration.vue's async job UX.

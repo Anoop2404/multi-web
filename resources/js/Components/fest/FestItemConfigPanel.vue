@@ -13,10 +13,7 @@
 
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <FormField v-if="headsForAssign.length" :label="isSports ? 'Sport Event' : 'Item head'">
-                <select v-model="row.head_id" class="field text-sm">
-                    <option :value="null">Unassigned</option>
-                    <option v-for="h in headsForAssign" :key="h.id" :value="h.id">{{ h.name }}</option>
-                </select>
+                <SearchableSelect v-model="row.head_id" :options="headsForAssign" :all-option="true" all-label="Unassigned" />
             </FormField>
             <FormField v-if="!isSports" label="Item fee (₹)">
                 <input v-model.number="row.fee_amount" type="number" min="0" step="0.01" class="field text-sm" placeholder="Leave blank for head/default">
@@ -68,6 +65,7 @@
 import { reactive, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodayaId: { type: [String, Number], required: true },

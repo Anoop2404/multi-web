@@ -130,7 +130,7 @@
                                 <span>·</span>
                                 <span class="capitalize">{{ item.participant_type }}</span>
                                 <span>·</span>
-                                <span class="uppercase font-mono">{{ item.age_group || 'open' }}</span>
+                                <span class="uppercase font-mono">{{ item.category_label || item.age_group || 'open' }}</span>
                                 <span v-if="item.gender && item.gender !== 'open'">·</span>
                                 <span v-if="item.gender && item.gender !== 'open'" class="capitalize">{{ item.gender }}</span>
                                 <span v-if="item.squad_summary">·</span>

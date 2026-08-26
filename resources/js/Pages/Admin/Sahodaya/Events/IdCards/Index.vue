@@ -16,11 +16,9 @@
                         {{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}
                     </label>
                 </div>
-                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1.5 w-72 font-semibold shadow-sm border-slate-300">
-                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                        {{ ev.short_title || ev.title }}
-                    </option>
-                </select>
+                <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
+                                  :options="childEventOptions" :all-option="false"
+                                  placeholder="Select event" class="w-72" />
             </div>
         </div>
 
@@ -62,23 +60,29 @@
 
                     <div class="grid sm:grid-cols-3 gap-3">
                         <FormField label="Card scope">
-                            <select v-model="filters.scope" class="field text-sm" @change="loadPreview">
-                                <option value="event">Event Pass (Event-wise)</option>
-                                <option value="item">Item Pass (Item-wise)</option>
-                                <option value="head">Discipline Pass (Head-wise)</option>
-                            </select>
+                            <SearchableSelect v-model="filters.scope" :all-option="false"
+                                :options="[
+                                    { value: 'event', label: 'Event Pass (Event-wise)' },
+                                    { value: 'item', label: 'Item Pass (Item-wise)' },
+                                    { value: 'head', label: 'Discipline Pass (Head-wise)' },
+                                ]"
+                                @change="loadPreview" />
                         </FormField>
                         <FormField label="School filter">
-                            <select v-model="filters.school_id" class="field text-sm" @change="loadPreview">
-                                <option value="">All schools</option>
-                                <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                            </select>
+                            <SearchableSelect v-model="filters.school_id" :options="schools"
+                                :all-option="true" all-label="All schools"
+                                search-placeholder="Type school name to search…"
+                                @change="loadPreview" />
                         </FormField>
                         <FormField label="Item filter (optional)">
-                            <select v-model="filters.item_id" class="field text-sm" @change="loadPreview">
-                                <option value="">All items</option>
-                                <option v-for="item in items" :key="item.id" :value="item.id">{{ item.title }}</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="filters.item_id"
+                                :options="itemOptions"
+                                placeholder="All items"
+                                search-placeholder="Type item name to search…"
+                                all-label="All items"
+                                @change="loadPreview"
+                            />
                         </FormField>
                     </div>
 
@@ -189,6 +193,7 @@ import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import IdCardPreviewTile from '@/Components/fest/IdCardPreviewTile.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -197,8 +202,8 @@ const props = defineProps({
     childEvents: { type: Array, default: () => [] },
 });
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/id-cards`);
+function switchSportEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/id-cards`);
 }
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/id-cards`;
@@ -232,6 +237,16 @@ const types = computed(() => [
 ]);
 
 const activeType = computed(() => types.value.find(t => t.id === audience.value) ?? types.value[0]);
+
+const itemOptions = computed(() => props.items.map(i => ({
+    id: i.id,
+    name: i.category_label ? `${i.title} — ${i.category_label}` : i.title,
+})));
+
+const childEventOptions = computed(() => props.childEvents.map(ev => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
 
 const canGenerate = computed(() => {
     if (audience.value === 'head' || audience.value === 'participant') {

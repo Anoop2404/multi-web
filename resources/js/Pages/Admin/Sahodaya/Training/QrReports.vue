@@ -54,12 +54,8 @@
                         <td class="py-2 capitalize">{{ row.status }}</td>
                         <td class="py-2 text-right">
                             <div v-if="row.status === 'pending'" class="flex flex-wrap items-center justify-end gap-2">
-                                <select v-model="linkSchoolId[row.id]" class="field !py-1 !text-xs max-w-[180px]">
-                                    <option value="">Link to school…</option>
-                                    <option v-for="s in schools" :key="s.id" :value="s.id">
-                                        {{ s.name }}{{ s.school_prefix ? ` (${s.school_prefix})` : '' }}
-                                    </option>
-                                </select>
+                                <SearchableSelect v-model="linkSchoolId[row.id]" :options="schoolOptions"
+                                                  class="max-w-[180px]" :all-option="true" all-label="Link to school…" />
                                 <button type="button" class="btn-primary text-xs !min-h-0"
                                         :disabled="!linkSchoolId[row.id] || linkingId === row.id"
                                         @click="linkSchool(row)">
@@ -120,8 +116,9 @@
 
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -132,6 +129,11 @@ const props = defineProps({
     report: Object,
     schools: { type: Array, default: () => [] },
 });
+
+const schoolOptions = computed(() => (props.schools || []).map((s) => ({
+    value: s.id,
+    label: `${s.name}${s.school_prefix ? ` (${s.school_prefix})` : ''}`,
+})));
 
 const linkSchoolId = reactive({});
 const linkingId = ref(null);

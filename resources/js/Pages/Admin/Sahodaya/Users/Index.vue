@@ -22,14 +22,7 @@
 
         <div class="card mb-4 flex flex-wrap items-center gap-3 py-3">
             <label class="text-xs font-semibold text-slate-500" for="role-filter">Filter by role</label>
-            <select id="role-filter" v-model="roleFilter" class="field field--sm max-w-xs">
-                <option value="all">All roles ({{ users.length }})</option>
-                <optgroup v-for="group in groupedRoles" :key="group.name" :label="group.name">
-                    <option v-for="r in group.roles" :key="r.value" :value="r.value">
-                        {{ r.label }} ({{ countForRole(r.value) }})
-                    </option>
-                </optgroup>
-            </select>
+            <SearchableSelect id="role-filter" v-model="roleFilter" :options="roleFilterOptions" :all-option="false" class="max-w-xs" />
             <span class="text-xs text-slate-400">{{ filteredUsers.length }} of {{ users.length }} shown</span>
         </div>
 
@@ -168,10 +161,7 @@
                     <p class="text-xs font-semibold text-violet-900">Event ops assignment</p>
                     <FormField label="Event">
                         <template #default="{ id }">
-                            <select :id="id" v-model="form.fest_ops_event_id" class="field">
-                                <option value="">Select event (optional)</option>
-                                <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="form.fest_ops_event_id" :options="festEventOptions" all-option all-label="Select event (optional)" />
                         </template>
                     </FormField>
                     <div>
@@ -199,18 +189,12 @@
                     <p class="text-xs font-semibold text-sky-900">Exam assignment</p>
                     <FormField label="Talent Search exam">
                         <template #default="{ id }">
-                            <select :id="id" v-model="form.exam_staff_exam_id" class="field">
-                                <option value="">Select exam (optional)</option>
-                                <option v-for="e in mcqExams" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="form.exam_staff_exam_id" :options="mcqExamOptions" all-option all-label="Select exam (optional)" />
                         </template>
                     </FormField>
                     <FormField label="Exam role">
                         <template #default="{ id }">
-                            <select :id="id" v-model="form.exam_staff_role" class="field">
-                                <option value="staff">Hall staff (attendance)</option>
-                                <option value="controller">Exam controller (attendance + marks)</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="form.exam_staff_role" :options="[{ value: 'staff', label: 'Hall staff (attendance)' }, { value: 'controller', label: 'Exam controller (attendance + marks)' }]" :all-option="false" />
                         </template>
                     </FormField>
                 </div>
@@ -220,18 +204,12 @@
                     <div class="grid gap-3 sm:grid-cols-2">
                         <FormField label="Event" :error="form.errors.region_admin_event_id" required>
                             <template #default="{ id }">
-                                <select :id="id" v-model="form.region_admin_event_id" class="field" @change="onRegionAdminEventChange(form)">
-                                    <option value="">Select event</option>
-                                    <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
-                                </select>
+                                <SearchableSelect :id="id" v-model="form.region_admin_event_id" :options="festEventOptions" all-option all-label="Select event" @change="onRegionAdminEventChange(form)" />
                             </template>
                         </FormField>
                         <FormField label="Region" :error="form.errors.region_admin_region_id" required>
                             <template #default="{ id }">
-                                <select :id="id" v-model="form.region_admin_region_id" class="field">
-                                    <option value="">Select region</option>
-                                    <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-                                </select>
+                                <SearchableSelect :id="id" v-model="form.region_admin_region_id" :options="regions" all-option all-label="Select region" />
                             </template>
                         </FormField>
                     </div>
@@ -305,10 +283,7 @@
                 <div v-if="editForm.roles.includes('fest_ops')" class="card card--accent space-y-3">
                     <FormField label="Event">
                         <template #default="{ id }">
-                            <select :id="id" v-model="editForm.fest_ops_event_id" class="field">
-                                <option value="">Select event (optional)</option>
-                                <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="editForm.fest_ops_event_id" :options="festEventOptions" all-option all-label="Select event (optional)" />
                         </template>
                     </FormField>
                     <div class="flex flex-wrap gap-2">
@@ -331,18 +306,12 @@
                 <div v-if="hasExamRole(editForm.roles)" class="card card--muted space-y-3">
                     <FormField label="Talent Search exam">
                         <template #default="{ id }">
-                            <select :id="id" v-model="editForm.exam_staff_exam_id" class="field">
-                                <option value="">Select exam (optional)</option>
-                                <option v-for="e in mcqExams" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="editForm.exam_staff_exam_id" :options="mcqExamOptions" all-option all-label="Select exam (optional)" />
                         </template>
                     </FormField>
                     <FormField label="Exam role">
                         <template #default="{ id }">
-                            <select :id="id" v-model="editForm.exam_staff_role" class="field">
-                                <option value="staff">Hall staff (attendance)</option>
-                                <option value="controller">Exam controller (attendance + marks)</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="editForm.exam_staff_role" :options="[{ value: 'staff', label: 'Hall staff (attendance)' }, { value: 'controller', label: 'Exam controller (attendance + marks)' }]" :all-option="false" />
                         </template>
                     </FormField>
                 </div>
@@ -352,18 +321,12 @@
                     <div class="grid gap-3 sm:grid-cols-2">
                         <FormField label="Event" :error="editForm.errors.region_admin_event_id" required>
                             <template #default="{ id }">
-                                <select :id="id" v-model="editForm.region_admin_event_id" class="field" @change="onRegionAdminEventChange(editForm)">
-                                    <option value="">Select event</option>
-                                    <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }} ({{ e.status }})</option>
-                                </select>
+                                <SearchableSelect :id="id" v-model="editForm.region_admin_event_id" :options="festEventOptions" all-option all-label="Select event" @change="onRegionAdminEventChange(editForm)" />
                             </template>
                         </FormField>
                         <FormField label="Region" :error="editForm.errors.region_admin_region_id" required>
                             <template #default="{ id }">
-                                <select :id="id" v-model="editForm.region_admin_region_id" class="field">
-                                    <option value="">Select region</option>
-                                    <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-                                </select>
+                                <SearchableSelect :id="id" v-model="editForm.region_admin_region_id" :options="regions" all-option all-label="Select region" />
                             </template>
                         </FormField>
                     </div>
@@ -401,6 +364,7 @@
 import { ref, watch, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -468,6 +432,20 @@ const groupedRoles = computed(() => {
     }
     return order.map((name) => ({ name, roles: byGroup.get(name) }));
 });
+
+const roleFilterOptions = computed(() => {
+    const options = [{ value: 'all', label: `All roles (${props.users.length})` }];
+    for (const group of groupedRoles.value) {
+        for (const r of group.roles) {
+            options.push({ value: r.value, label: `${r.label} (${countForRole(r.value)})` });
+        }
+    }
+    return options;
+});
+
+const festEventOptions = computed(() => props.festEvents.map((e) => ({ value: e.id, label: `${e.title} (${e.status})` })));
+
+const mcqExamOptions = computed(() => props.mcqExams.map((e) => ({ value: e.id, label: `${e.title} (${e.status})` })));
 
 function roleLabel(value) {
     return props.assignableRoles.find((r) => r.value === value)?.label ?? value;

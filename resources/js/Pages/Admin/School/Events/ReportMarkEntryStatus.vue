@@ -48,6 +48,7 @@
                         <tr>
                             <th>Head</th>
                             <th>Item</th>
+                            <th>Category</th>
                             <th>Participants</th>
                             <th>Marked</th>
                             <th>Pending</th>
@@ -57,13 +58,14 @@
                     <tbody>
                         <template v-for="(row, idx) in displayRows" :key="row.item_id">
                             <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                                <td colspan="6" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                <td colspan="7" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                     {{ row.head_name ?? 'Other items' }}
                                 </td>
                             </tr>
                             <tr>
                                 <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
                                 <td class="font-medium">{{ row.title }}</td>
+                                <td class="text-xs">{{ categoryLabel(row) }}</td>
                                 <td>{{ row.participants }}</td>
                                 <td>{{ row.marked }}</td>
                                 <td>{{ row.pending }}</td>
@@ -75,7 +77,7 @@
                             </tr>
                         </template>
                         <tr v-if="!displayRows.length">
-                            <td colspan="6" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
+                            <td colspan="7" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -123,6 +125,17 @@ const flatItems = computed(() => headItemGroups.value.flatMap((h) => h.items ?? 
 function onItemSelect(itemId) {
     headFilter.value = '';
     itemFilter.value = itemId || '';
+}
+
+function humanize(value) {
+    return String(value).replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function categoryLabel(row) {
+    if (row.category_label) return row.category_label;
+    if (row.class_group && row.class_group !== 'open') return humanize(row.class_group);
+    if (row.age_group) return humanize(row.age_group);
+    return '—';
 }
 
 const filteredSummary = computed(() => ({

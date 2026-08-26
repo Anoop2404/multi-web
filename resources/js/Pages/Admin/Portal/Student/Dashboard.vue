@@ -149,10 +149,13 @@
                 </li>
             </ul>
             <form v-if="appealableParticipants?.length" @submit.prevent="submitAppeal" class="border-t pt-3 space-y-2">
-                <select v-model="appealForm.participant_id" class="field text-sm" required>
-                    <option value="">Select entry to appeal…</option>
-                    <option v-for="p in appealableParticipants" :key="p.participant_id" :value="p.participant_id">{{ p.event_title }} — {{ p.item_title }}</option>
-                </select>
+                <SearchableSelect
+                    v-model="appealForm.participant_id"
+                    :options="appealParticipantOptions"
+                    :all-option="true"
+                    all-label="Select entry to appeal…"
+                    :required="true"
+                />
                 <textarea v-model="appealForm.reason" class="field text-sm" rows="2" placeholder="Reason" required></textarea>
                 <button type="submit" class="btn-primary text-xs">Submit appeal</button>
             </form>
@@ -171,6 +174,7 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import StudentSportsProfileSection from '@/Components/students/StudentSportsProfileSection.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { studentPortalNavItems } from '@/support/studentPortalNav.js';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
@@ -198,6 +202,13 @@ const showSportsSection = computed(() =>
 );
 
 const appealForm = ref({ participant_id: '', reason: '' });
+
+const appealParticipantOptions = computed(() =>
+    (props.appealableParticipants ?? []).map(p => ({
+        value: p.participant_id,
+        label: `${p.event_title} — ${p.item_title}`,
+    })),
+);
 
 function submitAppeal() {
     const p = props.appealableParticipants.find(x => String(x.participant_id) === String(appealForm.value.participant_id));

@@ -23,6 +23,12 @@
                     <Link :href="importUrl" class="btn-primary text-xs shrink-0 whitespace-nowrap">
                         Import Marks
                     </Link>
+                    <Link :href="markEntryReportUrl" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
+                        📄 Mark Entry Report (PDF)
+                    </Link>
+                    <Link :href="marksAuditLogUrl" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
+                        🕓 Marks Audit Log
+                    </Link>
                 </div>
             </template>
         </PageHeader>
@@ -84,11 +90,9 @@
             <!-- Child Event / Region Selector -->
             <div v-if="childEvents.length" class="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Sport Event / Region:' : 'Region:' }}</label>
-                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
-                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                        {{ ev.short_title || ev.title }}
-                    </option>
-                </select>
+                <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
+                                  :options="childEventOptions" :all-option="false" placeholder="Select region"
+                                  class="w-64" />
             </div>
 
             <!-- Item Picker -->
@@ -162,12 +166,9 @@
                     <div class="flex flex-nowrap items-center gap-2 text-xs overflow-x-auto pb-1 -mb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:mb-0">
                         <div v-if="section.rows.length > 1" class="flex items-center gap-1.5 shrink-0">
                             <span class="text-slate-500 font-medium text-[11px] whitespace-nowrap">Same rank for all:</span>
-                            <select v-model="bulkRank[section.bulkKey]" class="field text-xs !py-1 min-w-[9rem]">
-                                <option :value="null">—</option>
-                                <option v-for="opt in rankOptionsFor(section)" :key="opt.rank" :value="opt.rank">
-                                    {{ opt.label }}
-                                </option>
-                            </select>
+                            <SearchableSelect v-model="bulkRank[section.bulkKey]"
+                                              :options="[{ value: null, label: '—' }, ...rankOptionsFor(section).map((opt) => ({ value: opt.rank, label: opt.label }))]"
+                                              :all-option="false" class="min-w-[9rem]" />
                             <button type="button" class="btn-secondary text-xs !py-1 !px-2.5 whitespace-nowrap"
                                     :disabled="!bulkRank[section.bulkKey] || itemLocked"
                                     @click="applyBulkRank(section, markForms)">
@@ -241,15 +242,12 @@
 
                                 <!-- Attendance -->
                                 <td class="p-3.5">
-                                    <select :value="attendanceStatus(participant, item)"
-                                            class="field text-xs !py-1 font-semibold"
+                                    <SearchableSelect :model-value="attendanceStatus(participant, item)"
                                             :class="isAbsent(participant, item) ? '!border-rose-300 !bg-rose-50 !text-rose-700' : ''"
                                             :disabled="itemLocked"
-                                            @change="markAttendance(participant, item, $event.target.value)">
-                                        <option value="">Present ✓</option>
-                                        <option value="present">Present ✓</option>
-                                        <option value="absent">Absent ✕</option>
-                                    </select>
+                                            :options="[{ value: 'present', label: 'Present ✓' }, { value: 'absent', label: 'Absent ✕' }]"
+                                            :all-option="true" all-label="Present ✓"
+                                            @update:model-value="(value) => markAttendance(participant, item, value)" />
                                 </td>
 
                                 <!-- Time / Distance (if applicable) -->
@@ -268,15 +266,11 @@
 
                                 <!-- Rank Dropdown -->
                                 <td class="p-3.5">
-                                    <select :value="markForms[participant.id].position ?? ''"
-                                            class="field text-xs !py-1 font-bold text-slate-900"
+                                    <SearchableSelect :model-value="markForms[participant.id].position ?? ''"
                                             :disabled="isAbsent(participant, item) || itemLocked"
-                                            @change="setRank(participant.id, item, markForms, $event.target.value)">
-                                        <option value="">— Select Rank —</option>
-                                        <option v-for="opt in rankOptionsFor(section)" :key="opt.rank" :value="opt.rank">
-                                            {{ opt.label }}
-                                        </option>
-                                    </select>
+                                            :options="rankOptionsFor(section).map((opt) => ({ value: opt.rank, label: opt.label }))"
+                                            :all-option="true" all-label="— Select Rank —"
+                                            @update:model-value="(value) => setRank(participant.id, item, markForms, value)" />
                                 </td>
 
                                 <!-- Per-judge subtotal columns + computed Grand Total -->
@@ -302,10 +296,10 @@
 
                                 <!-- Grade (Optional for Kalolsavam / Fest) -->
                                 <td v-if="showGradeColumn" class="p-3.5">
-                                    <select v-model="markForms[participant.id].grade" class="field text-xs" :disabled="isAbsent(participant, item) || itemLocked" @change="markForms[participant.id]._user_edited_grade = true">
-                                        <option value="">—</option>
-                                        <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
-                                    </select>
+                                    <SearchableSelect v-model="markForms[participant.id].grade"
+                                            :disabled="isAbsent(participant, item) || itemLocked"
+                                            :options="gradeOptions" :all-option="true" all-label="—"
+                                            @change="markForms[participant.id]._user_edited_grade = true" />
                                 </td>
 
                                 <!-- Action Button -->
@@ -340,6 +334,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useFestMarkEntryDisplay } from '@/composables/useFestMarkEntryDisplay.js';
 
 const props = defineProps({
@@ -371,9 +366,19 @@ const props = defineProps({
 });
 
 const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/import`);
+const markEntryReportUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/item-wise`);
+const marksAuditLogUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/audit-logs?action=fest.mark.saved`);
 const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
 const chestNumbersUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/chest-numbers?item_id=${props.selectedItemId}`);
 const isSports = computed(() => props.event?.event_type === 'sports');
+
+// Maps childEvents (sport-event/region children) to the {value, label} shape
+// SearchableSelect expects — the label combines short_title/title, so it can't
+// be passed straight through as :options like a plain {id, name} array.
+const childEventOptions = computed(() => (props.childEvents ?? []).map((ev) => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
 
 // Once an item's results are published, EventLifecycleGate rejects any further mark
 // save for it server-side — this mirrors that lock in the UI so the grid doesn't look
@@ -433,8 +438,8 @@ function onItemSelect(itemId) {
     router.get(marksBaseUrl.value, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: false });
 }
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/marks`);
+function switchSportEvent(eventId) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${eventId}/marks`);
 }
 
 // Real marks-entered progress, not scoring-criteria setup — previously this checked

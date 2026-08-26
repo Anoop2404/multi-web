@@ -92,7 +92,7 @@
                 <td>
                     <strong style="color: #0f172a;">{{ $item->title }}</strong>
                 </td>
-                <td>{{ strtoupper($item->class_group ?? '—') }}</td>
+                <td>{{ $item->category_label ?? '—' }}</td>
                 <td class="text-center">
                     <span class="badge {{ ($item->participant_type ?? 'individual') === 'individual' ? 'badge-indiv' : 'badge-team' }}">
                         {{ ($item->participant_type ?? 'individual') === 'individual' ? 'Indiv' : 'Team' }}

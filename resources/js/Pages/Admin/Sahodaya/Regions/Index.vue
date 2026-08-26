@@ -116,12 +116,13 @@
                     <p class="text-xs font-semibold text-slate-700">Bulk assign</p>
                     <div class="flex flex-wrap items-center gap-2">
                         <input v-model="schoolFilter" class="field !py-1 !text-xs max-w-xs" placeholder="Search schools...">
-                        <select v-model="bulkRegionId" class="field !py-1 !text-xs max-w-xs">
-                            <option :value="null">Choose a region…</option>
-                            <option v-for="region in activeRegions" :key="region.id" :value="region.id">
-                                {{ region.name }}
-                            </option>
-                        </select>
+                        <SearchableSelect
+                            v-model="bulkRegionId"
+                            :options="activeRegions"
+                            :all-option="false"
+                            placeholder="Choose a region…"
+                            class="max-w-xs"
+                        />
                         <button type="button" class="btn-secondary text-xs" :disabled="selectedSchoolIds.length === 0 || bulkRegionId === null" @click="applyBulkAssign">
                             Assign {{ selectedSchoolIds.length }} selected school(s)
                         </button>
@@ -156,12 +157,13 @@
                                 <td class="p-3 font-medium text-slate-700">{{ (school.name || '').toUpperCase() }}</td>
                                 <td class="p-3 font-mono text-xs text-slate-500">{{ school.school_prefix || '—' }}</td>
                                 <td class="p-3">
-                                    <select v-model="assignMap[school.id]" class="field !py-1 !text-xs" @change="dirty = true">
-                                        <option :value="null">— Unassigned —</option>
-                                        <option v-for="region in activeRegions" :key="region.id" :value="region.id">
-                                            {{ region.name }}
-                                        </option>
-                                    </select>
+                                    <SearchableSelect
+                                        v-model="assignMap[school.id]"
+                                        :options="activeRegions"
+                                        :all-option="false"
+                                        placeholder="— Unassigned —"
+                                        @change="dirty = true"
+                                    />
                                 </td>
                             </tr>
                         </tbody>
@@ -176,6 +178,7 @@
 import { computed, reactive, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({

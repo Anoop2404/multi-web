@@ -41,11 +41,7 @@
                     <input v-model="form.code" class="field font-mono uppercase" maxlength="64" placeholder="e.g. TS-2026">
                 </FormField>
                 <FormField label="Type">
-                    <select v-model="form.exam_type" class="field">
-                        <option value="assessment">Assessment</option>
-                        <option value="practice">Practice</option>
-                        <option value="competitive">Competitive</option>
-                    </select>
+                    <SearchableSelect v-model="form.exam_type" :options="[{ value: 'assessment', label: 'Assessment' }, { value: 'practice', label: 'Practice' }, { value: 'competitive', label: 'Competitive' }]" :all-option="false" />
                 </FormField>
                 <FormField label="Duration (min)">
                     <input v-model.number="form.duration_minutes" type="number" min="5" max="480" class="field" placeholder="60">
@@ -63,10 +59,7 @@
                     <input v-model="form.result_date" type="date" class="field">
                 </FormField>
                 <FormField label="Delivery mode">
-                    <select v-model="form.delivery_mode" class="field">
-                        <option value="offline">Offline (paper / venue)</option>
-                        <option value="online">Online (student portal)</option>
-                    </select>
+                    <SearchableSelect v-model="form.delivery_mode" :options="[{ value: 'offline', label: 'Offline (paper / venue)' }, { value: 'online', label: 'Online (student portal)' }]" :all-option="false" />
                 </FormField>
                 <FormField label="Per-student fee (₹)" hint="Optional while draft">
                     <input v-model.number="form.fee_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
@@ -139,19 +132,10 @@
                         <input v-model="editForm.code" class="field font-mono uppercase" maxlength="64">
                     </FormField>
                     <FormField label="Type">
-                        <select v-model="editForm.exam_type" class="field">
-                            <option value="assessment">Assessment</option>
-                            <option value="practice">Practice</option>
-                            <option value="competitive">Competitive</option>
-                        </select>
+                        <SearchableSelect v-model="editForm.exam_type" :options="[{ value: 'assessment', label: 'Assessment' }, { value: 'practice', label: 'Practice' }, { value: 'competitive', label: 'Competitive' }]" :all-option="false" />
                     </FormField>
                     <FormField label="Status">
-                        <select v-model="editForm.status" class="field">
-                            <option value="draft">Draft</option>
-                            <option value="published">Published</option>
-                            <option value="ongoing">Ongoing</option>
-                            <option value="completed">Completed</option>
-                        </select>
+                        <SearchableSelect v-model="editForm.status" :options="[{ value: 'draft', label: 'Draft' }, { value: 'published', label: 'Published' }, { value: 'ongoing', label: 'Ongoing' }, { value: 'completed', label: 'Completed' }]" :all-option="false" />
                     </FormField>
                     <FormField label="Scheduled date & time">
                         <input v-model="editForm.scheduled_at" type="datetime-local" class="field">
@@ -169,10 +153,7 @@
                         <input v-model.number="editForm.duration_minutes" type="number" min="5" max="480" class="field">
                     </FormField>
                     <FormField label="Delivery mode">
-                        <select v-model="editForm.delivery_mode" class="field">
-                            <option value="offline">Offline</option>
-                            <option value="online">Online</option>
-                        </select>
+                        <SearchableSelect v-model="editForm.delivery_mode" :options="[{ value: 'offline', label: 'Offline' }, { value: 'online', label: 'Online' }]" :all-option="false" />
                     </FormField>
                     <FormField label="Per-student fee (₹)" class-extra="sm:col-span-2" hint="Required when status is Published or Ongoing">
                         <input v-model.number="editForm.fee_amount" type="number" min="0" step="0.01" class="field">
@@ -198,6 +179,7 @@ import { ref } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,

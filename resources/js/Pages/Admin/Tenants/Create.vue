@@ -84,22 +84,15 @@
 
                     <div v-if="defaultType === 'school'">
                         <label class="form-label mb-1.5">Parent Sahodaya *</label>
-                        <select v-model="form.parent_id" required
-                                class="field">
-                            <option value="">— Select Sahodaya —</option>
-                            <option v-for="s in sahodayas" :key="s.id" :value="s.id">{{ s.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="form.parent_id" :options="sahodayas" :required="true"
+                                          :all-option="true" all-label="— Select Sahodaya —" />
                         <p v-if="form.errors.parent_id" class="text-xs text-red-500 mt-1">{{ form.errors.parent_id }}</p>
                     </div>
 
                     <div>
                         <label class="form-label mb-1.5">Plan</label>
-                        <select v-model="form.plan"
-                                class="field">
-                            <option value="free">Free</option>
-                            <option value="basic">Basic</option>
-                            <option value="pro">Pro</option>
-                        </select>
+                        <SearchableSelect v-model="form.plan" :all-option="false"
+                                          :options="[{ value: 'free', label: 'Free' }, { value: 'basic', label: 'Basic' }, { value: 'pro', label: 'Pro' }]" />
                     </div>
 
                     <div class="flex items-center gap-4 pt-2">
@@ -117,6 +110,7 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 

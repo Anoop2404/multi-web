@@ -27,11 +27,13 @@
 
         <div v-if="childEvents.length" class="card !p-4 mb-5 flex flex-wrap items-center gap-2">
             <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Region:</label>
-            <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
-                <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                    {{ ev.short_title || ev.title }}
-                </option>
-            </select>
+            <SearchableSelect
+                :model-value="String(event.id)"
+                @update:model-value="switchSportEvent"
+                :options="regionOptions"
+                :all-option="false"
+                class="w-64"
+            />
         </div>
 
         <div class="space-y-6 max-w-3xl">
@@ -45,13 +47,15 @@
                 </div>
                 <form @submit.prevent="saveGradeConfig" class="grid gap-3 sm:grid-cols-2">
                     <FormField label="Item" class-extra="sm:col-span-2">
-                        <template #default="{ id }">
-                            <select :id="id" v-model="gradeForm.item_id" class="field" @change="clearRangeFields">
-                                <option value="">Event-wide (all items)</option>
-                                <option v-for="item in event.items" :key="item.id" :value="item.id">
-                                    {{ item.title }}{{ item.total_marks ? ` — /${item.total_marks}` : '' }}
-                                </option>
-                            </select>
+                        <template #default>
+                            <SearchableSelect
+                                v-model="gradeForm.item_id"
+                                :options="itemOptions"
+                                placeholder="Event-wide (all items)"
+                                search-placeholder="Type item name to search…"
+                                all-label="Event-wide (all items)"
+                                @change="clearRangeFields"
+                            />
                         </template>
                     </FormField>
                     <FormField label="Grade" required hint="Pick an existing grade or type a new label — this event's grade set isn't limited to A+/A/B/C.">
@@ -130,6 +134,7 @@ import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -142,12 +147,34 @@ const props = defineProps({
     gradeConfigs: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
+    classGroupLabels: { type: Object, default: () => ({}) },
 });
+
+function itemCategoryLabel(item) {
+    if (item.class_group && item.class_group !== 'open') {
+        return props.classGroupLabels?.[item.class_group] ?? String(item.class_group).toUpperCase();
+    }
+    return null;
+}
+
+const itemOptions = computed(() => (props.event?.items ?? []).map(item => {
+    const marksSuffix = item.total_marks ? ` — /${item.total_marks}` : '';
+    const category = itemCategoryLabel(item);
+    return {
+        id: item.id,
+        name: category ? `${item.title} — ${category}${marksSuffix}` : `${item.title}${marksSuffix}`,
+    };
+}));
 
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`);
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/grade-master`);
+const regionOptions = computed(() => props.childEvents.map((ev) => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
+
+function switchSportEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/grade-master`);
 }
 
 // childEvents[0] is always the hub ("All Regions") when regions exist — see

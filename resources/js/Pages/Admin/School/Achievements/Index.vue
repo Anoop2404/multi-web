@@ -7,24 +7,15 @@
             <form class="card flex flex-wrap gap-3 items-end" @submit.prevent="applyFilters">
                 <div>
                     <label class="form-label mb-1.5">Category</label>
-                    <select v-model="filterForm.category" class="field">
-                        <option value="">All</option>
-                        <option v-for="(label, key) in categories" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect v-model="filterForm.category" :options="categoryOptions" :all-option="true" all-label="All" />
                 </div>
                 <div>
                     <label class="form-label mb-1.5">Level</label>
-                    <select v-model="filterForm.level" class="field">
-                        <option value="">All</option>
-                        <option v-for="(label, key) in levels" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect v-model="filterForm.level" :options="levelOptions" :all-option="true" all-label="All" />
                 </div>
                 <div>
                     <label class="form-label mb-1.5">Academic year</label>
-                    <select v-model="filterForm.academic_year" class="field">
-                        <option value="">All</option>
-                        <option v-for="y in academicYears" :key="y" :value="y">{{ y }}</option>
-                    </select>
+                    <SearchableSelect v-model="filterForm.academic_year" :options="academicYears" :all-option="true" all-label="All" />
                 </div>
                 <button type="submit" class="btn-primary text-sm">Filter</button>
             </form>
@@ -39,17 +30,11 @@
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Category</label>
-                            <select v-model="form.category" class="field">
-                                <option value="">— Select —</option>
-                                <option v-for="(label, key) in categories" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="form.category" :options="categoryOptions" :all-option="true" all-label="— Select —" />
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Level</label>
-                            <select v-model="form.level" class="field">
-                                <option value="">— Select —</option>
-                                <option v-for="(label, key) in levels" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="form.level" :options="levelOptions" :all-option="true" all-label="— Select —" />
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Academic year</label>
@@ -140,7 +125,8 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
-import { reactive, ref } from 'vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import { computed, reactive, ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
 const { confirm, prompt } = useConfirm();
@@ -153,6 +139,9 @@ const props = defineProps({
     academicYears: { type: Array, default: () => [] },
     filters: { type: Object, default: () => ({}) },
 });
+
+const categoryOptions = computed(() => Object.entries(props.categories).map(([value, label]) => ({ value, label })));
+const levelOptions = computed(() => Object.entries(props.levels).map(([value, label]) => ({ value, label })));
 
 const editing = ref(null);
 const filterForm = reactive({

@@ -21,11 +21,8 @@
         <div v-if="childEvents.length" class="card mb-4 !py-3">
             <div class="flex flex-wrap gap-3 items-center">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}</label>
-                <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
-                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                        {{ ev.short_title || ev.title }}
-                    </option>
-                </select>
+                <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
+                                  :options="childEventOptions" :all-option="false" class="w-64" />
             </div>
         </div>
 
@@ -155,6 +152,7 @@ import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -175,9 +173,13 @@ const props = defineProps({
     eventHasMarksOrAttendance: { type: Boolean, default: false },
 });
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/chest-numbers`);
+function switchSportEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/chest-numbers`);
 }
+
+const childEventOptions = computed(() =>
+    props.childEvents.map((ev) => ({ value: String(ev.id), label: ev.short_title || ev.title })),
+);
 
 const showGreen = ref(props.view === 'green-room');
 const hasTeamRows = computed(() => props.participants.some((p) => p.is_team));

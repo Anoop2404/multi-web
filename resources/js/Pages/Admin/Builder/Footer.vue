@@ -4,11 +4,9 @@
             <!-- Tenant selector -->
             <div class="card flex items-center gap-4">
                 <label class="text-sm font-semibold text-gray-600 shrink-0">Tenant:</label>
-                <select v-model="selectedTenantId" @change="loadFooter"
-                        class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2">
-                    <option value="">— Select tenant —</option>
-                    <option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option>
-                </select>
+                <SearchableSelect v-model="selectedTenantId" @change="loadFooter"
+                        :options="tenants" :all-option="true" all-label="— Select tenant —"
+                        class="flex-1" />
             </div>
 
             <div v-if="selectedTenantId" class="card space-y-6">
@@ -101,6 +99,7 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     tenants: { type: Array, default: () => [] },

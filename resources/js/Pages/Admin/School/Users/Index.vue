@@ -188,12 +188,14 @@
 
         <div v-if="!coordinatorMode" class="card mb-4 flex flex-wrap items-center gap-3 py-3">
             <label class="text-xs font-semibold text-slate-500" for="role-filter">Filter by role</label>
-            <select id="role-filter" v-model="roleFilter" class="field field--sm max-w-xs">
-                <option value="all">All roles ({{ users.length }})</option>
-                <option v-for="r in assignableRoles" :key="r.value" :value="r.value">
-                    {{ r.label }} ({{ countForRole(r.value) }})
-                </option>
-            </select>
+            <SearchableSelect
+                id="role-filter"
+                v-model="roleFilter"
+                class="max-w-xs"
+                :options="roleFilterOptions"
+                :all-option="true"
+                :all-label="`All roles (${users.length})`"
+            />
             <span class="text-xs text-slate-400">{{ visibleUsers.length }} of {{ users.length }} shown</span>
         </div>
 
@@ -320,10 +322,15 @@
                 </div>
                 <FormField v-if="form.roles.includes('house_admin')" label="Assigned house" required>
                     <template #default="{ id }">
-                        <select :id="id" v-model="form.school_house_id" class="field max-w-xs" required>
-                            <option value="">Select house</option>
-                            <option v-for="h in houses" :key="h.id" :value="h.id">{{ h.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            :id="id"
+                            v-model="form.school_house_id"
+                            class="max-w-xs"
+                            :options="houses"
+                            :all-option="true"
+                            all-label="Select house"
+                            :required="true"
+                        />
                     </template>
                 </FormField>
                 <div class="flex justify-end gap-2 pt-2">
@@ -414,6 +421,7 @@ import { ref, watch, computed } from 'vue';
 import { Link, useForm, router, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import EventScopePicker from '@/Components/school/EventScopePicker.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -438,14 +446,14 @@ const props = defineProps({
 const page = usePage();
 const coordinatorMode = computed(() => page.url.includes('coordinators=1'));
 const creating = ref(false);
-const roleFilter = ref('all');
+const roleFilter = ref('');
 
 const visibleUsers = computed(() => {
     const base = coordinatorMode.value
         ? (props.users ?? []).filter((u) => u.roles?.includes('school_event_coordinator'))
         : (props.users ?? []);
 
-    if (coordinatorMode.value || roleFilter.value === 'all') return base;
+    if (coordinatorMode.value || roleFilter.value === '') return base;
 
     return base.filter((u) => u.roles?.includes(roleFilter.value));
 });
@@ -453,6 +461,11 @@ const visibleUsers = computed(() => {
 function countForRole(role) {
     return (props.users ?? []).filter((u) => u.roles?.includes(role)).length;
 }
+
+const roleFilterOptions = computed(() => (props.assignableRoles ?? []).map((r) => ({
+    value: r.value,
+    label: `${r.label} (${countForRole(r.value)})`,
+})));
 
 const form = useForm({
     name: '', email: '', username: '', password: '', roles: ['school_event_coordinator'],

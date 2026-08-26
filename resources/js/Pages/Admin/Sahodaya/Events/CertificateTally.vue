@@ -12,11 +12,9 @@
 
         <div v-if="childEvents.length" class="card !p-4 mb-5 flex flex-wrap items-center gap-2">
             <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Region:</label>
-            <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
-                <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                    {{ ev.short_title || ev.title }}
-                </option>
-            </select>
+            <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
+                               :options="regionOptions" :all-option="false" placeholder="Select region"
+                               class="w-64" />
         </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -72,11 +70,13 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import SahodayaDataTable from '@/Components/SahodayaDataTable.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -87,9 +87,14 @@ const props = defineProps({
     childEvents: { type: Array, default: () => [] },
 });
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/certificates/tally`);
+function switchSportEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/certificates/tally`);
 }
+
+const regionOptions = computed(() => props.childEvents.map(ev => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
 
 const columns = [
     { key: 'title', label: 'Item' },

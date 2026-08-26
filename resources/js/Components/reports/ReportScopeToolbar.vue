@@ -48,17 +48,14 @@
       <!-- Right side: Competition Phase Selector (if enabled) -->
       <div v-if="hasPhases" class="flex items-center space-x-2">
         <label for="competition-phase-select" class="text-xs font-medium text-gray-600 dark:text-gray-400">Phase:</label>
-        <select
+        <SearchableSelect
           id="competition-phase-select"
-          :value="selectedPhaseId"
-          @change="onPhaseChange($event)"
-          class="text-xs rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-        >
-          <option :value="null">All Phases</option>
-          <option v-for="phase in phases" :key="phase.id" :value="phase.id">
-            {{ phase.name }}
-          </option>
-        </select>
+          :model-value="selectedPhaseId"
+          @update:model-value="onPhaseChange"
+          :options="phases"
+          :all-option="true"
+          all-label="All Phases"
+        />
       </div>
     </div>
   </div>
@@ -66,6 +63,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
   regions: { type: Array, default: () => [] },
@@ -90,8 +88,8 @@ function selectScope(mode, regionId) {
   emit('change-scope', { mode, regionId });
 }
 
-function onPhaseChange(event) {
-  const val = event.target.value ? Number(event.target.value) : null;
+function onPhaseChange(value) {
+  const val = value ? Number(value) : null;
   emit('change-phase', val);
 }
 </script>

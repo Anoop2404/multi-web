@@ -61,10 +61,9 @@
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-600 mb-1.5">Navbar style</label>
-                        <select v-model="navConfig.layout_variant"
-                                class="w-full max-w-md border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-sky-200 focus:outline-none">
-                            <option v-for="opt in navLayoutOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                        </select>
+                        <SearchableSelect v-model="navConfig.layout_variant"
+                                :options="navLayoutOptions" :all-option="false"
+                                class="w-full max-w-md" />
                     </div>
                 </div>
 
@@ -329,14 +328,11 @@
                                 </div>
                             </div>
                             <div v-if="(section.archived_configs || []).length" class="ml-auto">
-                                <select @change="restoreArchived(section, $event.target.value)"
-                                        class="text-xs border border-gray-200 rounded-xl px-3 py-2 text-gray-500 bg-white focus:ring-2 focus:ring-sky-200 focus:outline-none">
-                                    <option value="">↩ Restore previous content…</option>
-                                    <option v-for="(arc, ai) in section.archived_configs" :key="ai"
-                                            :value="ai">
-                                        {{ arc.variant }} — {{ formatDate(arc.archived_at) }}
-                                    </option>
-                                </select>
+                                <SearchableSelect :model-value="''"
+                                        @update:model-value="val => restoreArchived(section, val)"
+                                        :options="archivedConfigOptions(section)"
+                                        :all-option="true" all-label="↩ Restore previous content…"
+                                        class="text-xs" />
                             </div>
                         </div>
 
@@ -436,6 +432,7 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ExperiencePicker from '@/Components/sahodaya/website/ExperiencePicker.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { ref, reactive, computed, defineComponent, h, onMounted } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -594,6 +591,12 @@ function sectionPreview(s) {
 function formatDate(d) {
     if (!d) return '';
     try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return ''; }
+}
+function archivedConfigOptions(section) {
+    return (section.archived_configs || []).map((arc, ai) => ({
+        value: ai,
+        label: `${arc.variant} — ${formatDate(arc.archived_at)}`,
+    }));
 }
 
 // ── API calls (using fetch directly — same pattern as super-admin builder) ───

@@ -66,13 +66,18 @@
         <form class="card !p-4 mb-5 flex flex-wrap gap-3 items-end bg-white border border-slate-200 shadow-xs rounded-xl" @submit.prevent="applyFilters">
             <div class="flex-1 min-w-[130px]">
                 <label class="form-label text-xs text-slate-600 font-semibold mb-1">Module</label>
-                <select v-model="form.type" class="form-input text-sm w-full bg-slate-50 border-slate-200 rounded-lg">
-                    <option value="all">All Modules</option>
-                    <option value="membership">Membership</option>
-                    <option value="fest">Fest &amp; Sports</option>
-                    <option value="mcq">Talent Search</option>
-                    <option value="training">Training</option>
-                </select>
+                <SearchableSelect
+                    v-model="form.type"
+                    class="w-full"
+                    :all-option="false"
+                    :options="[
+                        { value: 'all', label: 'All Modules' },
+                        { value: 'membership', label: 'Membership' },
+                        { value: 'fest', label: 'Fest & Sports' },
+                        { value: 'mcq', label: 'Talent Search' },
+                        { value: 'training', label: 'Training' },
+                    ]"
+                />
             </div>
             <div class="flex-1 min-w-[200px]">
                 <label class="form-label text-xs text-slate-600 font-semibold mb-1">School</label>

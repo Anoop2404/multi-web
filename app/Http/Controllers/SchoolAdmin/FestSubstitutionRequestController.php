@@ -6,6 +6,8 @@ use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSubstitutionRequest;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use App\Support\SchoolFestProgram;
 use App\Support\ProgramRouteMap;
 use Illuminate\Http\Request;
@@ -18,6 +20,9 @@ class FestSubstitutionRequestController extends SchoolAdminController
         $meta = SchoolFestProgram::meta($program);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
         $requests = FestSubstitutionRequest::where('event_id', $event->id)
             ->where('school_id', $this->school->id)
             ->with([
@@ -27,7 +32,16 @@ class FestSubstitutionRequestController extends SchoolAdminController
                 'replacementStudent:id,name,reg_no',
             ])
             ->latest()
-            ->get();
+            ->get()
+            ->each(function (FestSubstitutionRequest $r) use ($classGroupLabels, $artsCategoryLabels) {
+                if ($r->registration?->item) {
+                    $r->registration->item->category_label = FestItemCategoryLabel::resolve(
+                        $r->registration->item,
+                        $classGroupLabels,
+                        $artsCategoryLabels
+                    );
+                }
+            });
 
         $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
@@ -35,9 +49,10 @@ class FestSubstitutionRequestController extends SchoolAdminController
             ->with(['item', 'participants.student'])
             ->get()
             ->map(fn (FestRegistration $r) => [
-                'id'           => $r->id,
-                'item_title'   => $r->item?->title,
-                'participants' => $r->participants->map(fn (FestParticipant $p) => [
+                'id'             => $r->id,
+                'item_title'     => $r->item?->title,
+                'category_label' => FestItemCategoryLabel::resolve($r->item, $classGroupLabels, $artsCategoryLabels),
+                'participants'   => $r->participants->map(fn (FestParticipant $p) => [
                     'id'   => $p->id,
                     'name' => $p->student?->name ?? $p->teacher?->name,
                     'role' => $p->participant_role,

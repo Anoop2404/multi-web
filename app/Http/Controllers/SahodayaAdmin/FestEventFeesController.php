@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\CsvSafety;
 use App\Support\FestPageActivity;
 use App\Models\FestEvent;
 use App\Models\FestRegistration;
@@ -411,9 +412,9 @@ class FestEventFeesController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows, $event) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Event', 'School', 'Head / payment level', 'Status', 'School reg fee', 'Participation fee', 'Total due', 'Receipt #', 'Payment date', 'Transaction ref', 'Credit owed']);
+            CsvSafety::fputcsv($out, ['Event', 'School', 'Head / payment level', 'Status', 'School reg fee', 'Participation fee', 'Total due', 'Receipt #', 'Payment date', 'Transaction ref', 'Credit owed']);
             foreach ($rows as $fee) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $event->title,
                     $fee->school?->name ?? $fee->school_id,
                     $fee->registrationBatch?->name ?? $fee->head?->name ?? '',

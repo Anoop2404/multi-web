@@ -28,7 +28,7 @@
                     @endif
                 </a>
                 @endif
-                <p class="text-xs text-white/40">{{ $p['item_title'] ?? '' }}{{ ($p['item_title'] ?? null) && ($p['school'] ?? null) ? ' · ' : '' }}{{ $p['school'] ?? '' }}</p>
+                <p class="text-xs text-white/40">{{ $p['item_title'] ?? '' }}{{ ($p['item_title'] ?? null) && ($p['category_label'] ?? null) ? ' · ' : '' }}{{ $p['category_label'] ?? '' }}{{ (($p['item_title'] ?? null) || ($p['category_label'] ?? null)) && ($p['school'] ?? null) ? ' · ' : '' }}{{ $p['school'] ?? '' }}</p>
             </li>
             @empty
             @if($q)<li class="p-4 text-white/30 text-sm">No matches for "{{ $q }}"</li>@endif

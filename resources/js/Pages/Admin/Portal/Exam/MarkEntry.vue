@@ -30,10 +30,14 @@
                         <td class="p-3"><input v-model.number="forms[r.id].unanswered_count" type="number" min="0" class="w-14 field" :disabled="exam.results_published"></td>
                         <td class="p-3"><input v-model.number="forms[r.id].score" type="number" min="0" step="0.01" class="w-16 field" :disabled="exam.results_published"></td>
                         <td class="p-3">
-                            <select v-model="forms[r.id].grade" class="field w-14" :disabled="exam.results_published">
-                                <option value="">—</option>
-                                <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="forms[r.id].grade"
+                                class="w-14"
+                                :options="gradeOptions"
+                                :all-option="true"
+                                all-label="—"
+                                :disabled="exam.results_published"
+                            />
                         </td>
                         <td class="p-3">
                             <button v-if="!exam.results_published" @click="save(r)" class="text-xs font-semibold text-indigo-600">Save</button>
@@ -52,6 +56,7 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';

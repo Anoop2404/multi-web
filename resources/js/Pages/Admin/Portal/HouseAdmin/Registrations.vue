@@ -9,17 +9,11 @@
         <form class="bg-white border rounded-xl p-4 flex flex-wrap gap-2 items-end mb-4" @submit.prevent="applyFilters">
             <div class="flex-1 min-w-[140px]">
                 <label class="text-xs text-gray-500 block mb-1">Event</label>
-                <select v-model="filterForm.event_id" class="field">
-                    <option value="">All events</option>
-                    <option v-for="e in events" :key="e.id" :value="e.id">{{ e.title }}</option>
-                </select>
+                <SearchableSelect v-model="filterForm.event_id" :options="eventOptions" :all-option="true" all-label="All events" />
             </div>
             <div class="flex-1 min-w-[120px]">
                 <label class="text-xs text-gray-500 block mb-1">Status</label>
-                <select v-model="filterForm.status" class="field">
-                    <option value="">All statuses</option>
-                    <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
-                </select>
+                <SearchableSelect v-model="filterForm.status" :options="statusOptions" :all-option="true" all-label="All statuses" />
             </div>
             <button class="btn-primary px-4 py-2 rounded-lg text-sm font-semibold">Filter</button>
         </form>
@@ -62,6 +56,7 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { router } from '@inertiajs/vue3';
 import { computed, reactive } from 'vue';
 import { houseAdminPortalNavItems } from '@/support/houseAdminPortalNav.js';
@@ -81,6 +76,8 @@ const filterForm = reactive({
 });
 
 const navItems = computed(() => houseAdminPortalNavItems(props.school.id));
+
+const eventOptions = computed(() => (props.events || []).map(e => ({ value: e.id, label: e.title })));
 
 function applyFilters() {
     const params = {};

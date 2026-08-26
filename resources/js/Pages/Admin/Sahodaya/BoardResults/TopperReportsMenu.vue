@@ -10,11 +10,14 @@
 
         <div class="card !p-4 mb-6 flex flex-wrap items-center gap-3">
             <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Academic Year</label>
-            <select class="field text-sm py-1.5 min-w-40" :value="selectedYear" @change="switchYear($event.target.value)">
-                <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label" :disabled="ay.status === 'closed'">
-                    {{ ay.label }}
-                </option>
-            </select>
+            <SearchableSelect
+                class="min-w-40"
+                :model-value="selectedYear"
+                @update:model-value="switchYear"
+                :options="academicYearSelectOptions"
+                :all-option="false"
+                placeholder="Select academic year"
+            />
             <p class="text-xs text-slate-400">
                 Applies to every report link below. Each report page also has its own Rank / Percentage toggle and PDF download.
             </p>
@@ -83,6 +86,7 @@ import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import PdfPreviewModal from '@/Components/ui/PdfPreviewModal.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -93,6 +97,12 @@ const props = defineProps({
 });
 
 const selectedYear = ref(props.filters.academic_year);
+
+// SearchableSelect's default {id,name}/{value,label} normalization would key options
+// by ay.id, but the original <select> used ay.label as the option value — remap so
+// selection semantics stay identical.
+const academicYearSelectOptions = computed(() =>
+    props.academicYearOptions.map(ay => ({ value: ay.label, label: ay.label })));
 
 function switchYear(year) {
     selectedYear.value = year;

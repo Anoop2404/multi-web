@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\School;
 
+use App\Support\CsvSafety;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestGroup;
@@ -122,8 +123,8 @@ class FestApiController extends SchoolApiController
     {
         return response()->streamDownload(function () {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['item_id', 'item_title', 'reg_no', 'team_name', 'role']);
-            fputcsv($out, ['123', 'Mono Act', 'S2024001', '', 'performer']);
+            CsvSafety::fputcsv($out, ['item_id', 'item_title', 'reg_no', 'team_name', 'role']);
+            CsvSafety::fputcsv($out, ['123', 'Mono Act', 'S2024001', '', 'performer']);
             fclose($out);
         }, 'fest-registration-template.csv', ['Content-Type' => 'text/csv']);
     }

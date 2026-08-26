@@ -19,11 +19,8 @@
             <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
                 <div>
                     <label class="form-label mb-1 font-bold text-xs text-slate-700">Academic Year Window</label>
-                    <select v-model="selectedYear" @change="onYearChange" class="field text-sm font-bold bg-white w-56">
-                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                            {{ ay.label }}{{ ay.status === 'active' ? ' (Active)' : '' }}
-                        </option>
-                    </select>
+                    <SearchableSelect v-model="selectedYear" @change="onYearChange" :options="yearSelectOptions"
+                                      :all-option="false" class="w-56" />
                 </div>
                 <p class="text-xs text-slate-500 max-w-sm">
                     Configure student registration and editing windows for <strong>{{ academicYear }}</strong>. Outside these windows, schools must submit change requests.
@@ -67,13 +64,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import FormSection from '@/Components/ui/FormSection.vue';
 import FormGrid from '@/Components/ui/FormGrid.vue';
 import FormField from '@/Components/ui/FormField.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -86,6 +84,11 @@ const props = defineProps({
 });
 
 const selectedYear = ref(props.academicYear);
+
+const yearSelectOptions = computed(() => props.academicYearOptions.map((ay) => ({
+    value: ay.label,
+    label: `${ay.label}${ay.status === 'active' ? ' (Active)' : ''}`,
+})));
 
 function onYearChange() {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/students/registration-windows`, {

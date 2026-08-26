@@ -33,12 +33,11 @@
             <div v-else class="notice-banner notice-banner--warning text-sm">
                 <p class="font-semibold mb-2">{{ schoolRegion.region ? 'Change your' : 'Select your' }} {{ programLabel }} region</p>
                 <form @submit.prevent="submitRegion" class="flex flex-wrap items-center gap-3">
-                    <select v-model="regionForm.region_id" class="field !py-1.5 min-w-[15rem]" required>
-                        <option value="" disabled>Choose your region...</option>
-                        <option v-for="region in schoolRegion.regions" :key="region.id" :value="region.id">
-                            {{ region.name }}
-                        </option>
-                    </select>
+                    <SearchableSelect v-model="regionForm.region_id" class="min-w-[15rem]"
+                                      :options="schoolRegion.regions"
+                                      :all-option="false"
+                                      placeholder="Choose your region..."
+                                      :required="true" />
                     <button type="submit" class="btn-primary text-xs !py-1.5" :disabled="regionForm.processing">
                         {{ regionForm.processing ? 'Saving…' : 'Save Region' }}
                     </button>
@@ -82,14 +81,12 @@
                                     <span class="font-bold text-xs text-slate-900">{{ phase.phase_name }}</span>
                                     <span v-if="phase.selection?.locked" class="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Locked</span>
                                 </div>
-                                <select v-model="quickRegionChoices[phase.phase_id]"
-                                        class="field text-xs w-full py-1.5"
-                                        :disabled="phase.selection?.locked">
-                                    <option value="" disabled>Select region for {{ phase.phase_name }}…</option>
-                                    <option v-for="r in phase.regions" :key="r.id" :value="r.id">
-                                        {{ r.name }}{{ r.venue ? ` — ${r.venue}` : '' }}
-                                    </option>
-                                </select>
+                                <SearchableSelect v-model="quickRegionChoices[phase.phase_id]"
+                                        class="w-full"
+                                        :options="phaseRegionOptions(phase)"
+                                        :all-option="false"
+                                        :placeholder="`Select region for ${phase.phase_name}…`"
+                                        :disabled="phase.selection?.locked" />
 
                                 <!-- Host Venue & Date Details Box -->
                                 <div v-if="getQuickSelectedRegionDetails(phase)" class="mt-2.5 p-2 rounded-lg bg-amber-50/80 border border-amber-200/80 text-[11px] space-y-0.5">
@@ -122,10 +119,9 @@
             <div class="flex flex-wrap gap-2 items-end">
                 <a :href="`${programBase}/import-template`"
                    class="btn-secondary text-xs">Download template</a>
-                <select v-model="importEventId" class="field text-sm max-w-xs">
-                    <option value="">Select event</option>
-                    <option v-for="ev in events" :key="ev.id" :value="ev.id">{{ ev.title }}</option>
-                </select>
+                <SearchableSelect v-model="importEventId" class="max-w-xs"
+                                  :options="eventSelectOptions"
+                                  all-label="Select event" />
                 <input type="file" accept=".csv,text/csv" class="text-xs" @change="onImportFile" />
                 <button type="button" class="btn-primary text-xs" :disabled="!importEventId || !importFile || importForm.processing"
                         @click="submitImport">
@@ -145,10 +141,9 @@
             <div class="grid gap-3 sm:grid-cols-2">
                 <label class="block text-sm">
                     <span class="text-gray-600">Event</span>
-                    <select v-model="bulkAssignEventId" class="field mt-1">
-                        <option value="">Select event</option>
-                        <option v-for="ev in events" :key="ev.id" :value="ev.id">{{ ev.title }}</option>
-                    </select>
+                    <SearchableSelect v-model="bulkAssignEventId" class="mt-1"
+                                      :options="eventSelectOptions"
+                                      all-label="Select event" />
                 </label>
             </div>
             <p class="text-xs text-slate-500 mt-3">Select students and items on the registration grid below, then use bulk assign from the event row actions.</p>
@@ -395,12 +390,9 @@
                             <input v-model="sportsSearch[event.id]" type="search"
                                    class="field flex-1 min-w-[10rem] !py-1.5 text-sm"
                                    placeholder="Search items…" autocomplete="off">
-                            <select v-model="sportsAgeFilter[event.id]" class="field text-xs !py-1.5 min-w-[9rem] max-w-[14rem]">
-                                <option value="">All age categories</option>
-                                <option v-for="(label, key) in (event.item_group_labels ?? {})" :key="key" :value="key">
-                                    {{ label }}
-                                </option>
-                            </select>
+                            <SearchableSelect v-model="sportsAgeFilter[event.id]" class="min-w-[9rem] max-w-[14rem]"
+                                              :options="itemGroupLabelOptions(event)"
+                                              all-label="All age categories" />
                             <button v-if="sportsSearch[event.id] || sportsAgeFilter[event.id]"
                                     type="button" class="btn-ghost text-xs !py-1.5"
                                     @click="clearSportsFilters(event.id)">
@@ -514,29 +506,32 @@
                                            placeholder="Search items by name or code..." autocomplete="off">
                                 </div>
                                 <div>
-                                    <select v-model="itemCategoryFilter[event.id]" class="field w-full text-xs !py-1.5 rounded-lg border-slate-300">
-                                        <option value="">All Categories</option>
-                                        <option value="category1">Category 1 (Classes 3 & 4)</option>
-                                        <option value="category2">Category 2 (Classes 5, 6 & 7)</option>
-                                        <option value="category3">Category 3 (Classes 8–10)</option>
-                                        <option value="category4">Category 4 (Classes 11 & 12)</option>
-                                        <option value="open">Category 5 / Open</option>
-                                    </select>
+                                    <SearchableSelect v-model="itemCategoryFilter[event.id]" class="w-full"
+                                                      :options="[
+                                                          { value: 'category1', label: 'Category 1 (Classes 3 & 4)' },
+                                                          { value: 'category2', label: 'Category 2 (Classes 5, 6 & 7)' },
+                                                          { value: 'category3', label: 'Category 3 (Classes 8–10)' },
+                                                          { value: 'category4', label: 'Category 4 (Classes 11 & 12)' },
+                                                          { value: 'open', label: 'Category 5 / Open' },
+                                                      ]"
+                                                      all-label="All Categories" />
                                 </div>
                                 <div>
-                                    <select v-model="itemStageFilter[event.id]" class="field w-full text-xs !py-1.5 rounded-lg border-slate-300">
-                                        <option value="">All Stage Modes</option>
-                                        <option value="on_stage">🎭 On-stage</option>
-                                        <option value="off_stage">🎨 Off-stage</option>
-                                    </select>
+                                    <SearchableSelect v-model="itemStageFilter[event.id]" class="w-full"
+                                                      :options="[
+                                                          { value: 'on_stage', label: '🎭 On-stage' },
+                                                          { value: 'off_stage', label: '🎨 Off-stage' },
+                                                      ]"
+                                                      all-label="All Stage Modes" />
                                 </div>
                                 <div>
-                                    <select v-model="itemSort[event.id]" class="field w-full text-xs !py-1.5 rounded-lg border-indigo-200 bg-indigo-50/50 font-medium text-indigo-900">
-                                        <option value="">Sort: Default</option>
-                                        <option value="category">Sort by Category (Cat 1 → 5)</option>
-                                        <option value="stage">Sort by Stage (On-stage first)</option>
-                                        <option value="name">Sort by Item Name (A → Z)</option>
-                                    </select>
+                                    <SearchableSelect v-model="itemSort[event.id]" class="w-full"
+                                                      :options="[
+                                                          { value: 'category', label: 'Sort by Category (Cat 1 → 5)' },
+                                                          { value: 'stage', label: 'Sort by Stage (On-stage first)' },
+                                                          { value: 'name', label: 'Sort by Item Name (A → Z)' },
+                                                      ]"
+                                                      all-label="Sort: Default" />
                                 </div>
                             </div>
 
@@ -679,6 +674,7 @@ import InlineAlert from '@/Components/ui/InlineAlert.vue';
 import SchoolEventWorkflowStepper from '@/Components/school/SchoolEventWorkflowStepper.vue';
 import EventBillingPanel from '@/Components/school/EventBillingPanel.vue';
 import PhasedRegionBillingPanel from '@/Components/school/PhasedRegionBillingPanel.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { genderLabel } from '@/support/festItemEligibility.js';
 import { studentDisplayName } from '@/support/studentDisplay.js';
@@ -837,6 +833,10 @@ function getQuickSelectedRegionDetails(phase) {
     return phase.regions?.find(r => String(r.id) === String(selectedId)) || null;
 }
 
+function phaseRegionOptions(phase) {
+    return (phase.regions || []).map(r => ({ value: r.id, label: r.name + (r.venue ? ` — ${r.venue}` : '') }));
+}
+
 function formatDateStr(val) {
     if (!val) return '';
     const d = new Date(val);
@@ -918,6 +918,12 @@ async function searchStudentsForEvent(eventId, query) {
     } catch {
         // keep whatever's already loaded — user can retry the search
     }
+}
+
+const eventSelectOptions = computed(() => (props.events ?? []).map(ev => ({ value: ev.id, label: ev.title })));
+
+function itemGroupLabelOptions(event) {
+    return Object.entries(event.item_group_labels ?? {}).map(([key, label]) => ({ value: key, label }));
 }
 
 const importEventId = ref('');

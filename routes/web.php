@@ -601,6 +601,8 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/settings',  [SettingsController::class, 'update'])->name('settings.update');
 
     Route::middleware('public.website.admin.cms')->group(function () {
+    Route::get('/website/hub', [\App\Http\Controllers\SchoolAdmin\WebsiteHubController::class, 'index'])->name('website.hub');
+
     // News
     Route::get('/news',                  [NewsController::class, 'index'])->name('news.index');
     Route::get('/news/create',           [NewsController::class, 'create'])->name('news.create');
@@ -1439,6 +1441,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/house-detailed', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'houseDetailed'])->name('reports.house-detailed');
                 Route::get('/{event}/reports/participation-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'participationCounts'])->name('reports.participation-counts');
                 Route::get('/{event}/reports/mark-entry-status', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'markEntryStatus'])->name('reports.mark-entry-status');
+                Route::get('/{event}/reports/results-pending', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'resultsPending'])->name('reports.results-pending');
+                Route::get('/{event}/reports/absent-report', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'absentReport'])->name('reports.absent-report');
                 Route::get('/{event}/reports/schedule-clashes', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'scheduleClashes'])->name('reports.schedule-clashes');
                 Route::get('/{event}/reports/item-schedule', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemSchedule'])->name('reports.item-schedule');
                 Route::get('/{event}/reports/item-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemCounts'])->name('reports.item-counts');
@@ -1457,6 +1461,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/pending-approvals/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportPendingApprovals'])->name('reports.pending-approvals.export');
                 Route::get('/{event}/reports/student-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'studentWise'])->name('reports.student-wise');
                 Route::get('/{event}/reports/item-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemWise'])->name('reports.item-wise');
+                Route::get('/{event}/reports/item-wise/export-all', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportItemWiseAll'])->name('reports.item-wise.export-all');
+                Route::get('/{event}/reports/item-wise/pdf', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemWisePdf'])->name('reports.item-wise.pdf');
                 Route::get('/{event}/reports/category-wise-points', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePoints'])->name('reports.category-wise-points');
                 Route::get('/{event}/reports/category-wise-points/{itemId}/participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePointsParticipants'])->name('reports.category-wise-points.participants');
                 Route::get('/{event}/reports/category-item-matrix', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryItemMatrix'])->name('reports.category-item-matrix');
@@ -1644,6 +1650,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/transactions', [LedgerController::class, 'storeTransaction'])->name('transactions.store');
             Route::post('/expenses', [LedgerController::class, 'storeExpense'])->name('expenses.store');
         });
+
+        Route::get('/fest-tools', [\App\Http\Controllers\SahodayaAdmin\FestToolsHubController::class, 'index'])->name('fest-tools.hub');
 
         Route::prefix('certificate-templates')->name('certificate-templates.')->group(function () {
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'index'])->name('index');
@@ -1878,6 +1886,10 @@ Route::get('/certificates/verify/{uuid}', [PublicCertificateController::class, '
 Route::get('/certificates/print/{uuid}', [PublicCertificateController::class, 'print'])
     ->middleware(['web', 'throttle:60,1'])
     ->name('certificates.print');
+
+Route::get('/certificates/pdf/{uuid}', [PublicCertificateController::class, 'pdf'])
+    ->middleware(['web', 'throttle:60,1'])
+    ->name('certificates.pdf');
 
 Route::get('/verify/{uuid}', [PublicCertificateController::class, 'verify'])
     ->middleware(['web', 'throttle:60,1'])

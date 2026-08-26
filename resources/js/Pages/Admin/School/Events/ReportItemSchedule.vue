@@ -31,10 +31,7 @@
                 <input v-model="filterDate" type="date" class="field !py-1.5 text-sm">
             </FormField>
             <FormField v-if="stages.length" label="Stage / venue" class-extra="mb-0">
-                <select v-model="filterStageId" class="field !py-1.5 text-sm min-w-[10rem]">
-                    <option value="">All stages</option>
-                    <option v-for="s in stages" :key="s.id" :value="String(s.id)">{{ stageLabel(s) }}</option>
-                </select>
+                <SearchableSelect v-model="filterStageId" :options="stageOptions" :all-option="true" all-label="All stages" class="min-w-[10rem]" />
             </FormField>
             <button type="submit" class="btn-secondary text-sm">Apply date/stage</button>
         </form>
@@ -61,7 +58,7 @@
                         <tr>
                             <th>Head</th>
                             <th>Item</th>
-                            <th>Age</th>
+                            <th>Category</th>
                             <th>Date</th>
                             <th>Time</th>
                             <th>Venue</th>
@@ -77,10 +74,10 @@
                             </tr>
                             <tr class="border-t">
                                 <td class="text-xs text-slate-500">{{ row.head_name ?? '—' }}</td>
-                                <td class="font-medium">{{ row.item_title }}</td>
-                                <td class="text-xs">{{ row.age_group_label ?? row.age_group ?? '—' }}</td>
-                                <td>{{ row.date ?? '—' }}</td>
-                                <td>{{ row.time ?? '—' }}</td>
+                                <td class="font-medium">{{ row.title }}</td>
+                                <td class="text-xs">{{ categoryLabel(row) }}</td>
+                                <td>{{ formatCalendarDate(row.scheduled_date) }}</td>
+                                <td>{{ row.scheduled_time ?? '—' }}</td>
                                 <td class="text-xs">{{ row.venue ?? '—' }}</td>
                                 <td class="text-xs">{{ row.stage ?? '—' }}</td>
                             </tr>
@@ -101,8 +98,10 @@ import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({
     school: Object,
@@ -143,7 +142,7 @@ function onItemSelect(itemId) {
 
 const filteredSummary = computed(() => {
     const list = displayRows.value;
-    const scheduled = list.filter((r) => r.scheduled_at || r.date).length;
+    const scheduled = list.filter((r) => r.scheduled_at).length;
     return {
         total: list.length,
         scheduled,
@@ -151,9 +150,27 @@ const filteredSummary = computed(() => {
     };
 });
 
+// Same fallback chain as the Sahodaya ItemSchedule.vue report: prefer a
+// backend-supplied category_label, else humanize whichever raw grouping
+// field the row carries. Kept row.age_group_label in the chain since the
+// pre-existing template referenced it (harmless if the backend never sets it).
+function humanize(value) {
+    return String(value).replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function categoryLabel(row) {
+    if (row.category_label) return row.category_label;
+    if (row.age_group_label) return row.age_group_label;
+    if (row.age_group) return humanize(row.age_group);
+    if (row.class_group && row.class_group !== 'open') return humanize(row.class_group);
+    return '—';
+}
+
 function stageLabel(stage) {
     return stage.venue?.name ? `${stage.name} · ${stage.venue.name}` : stage.name;
 }
+
+const stageOptions = computed(() => props.stages.map((s) => ({ value: String(s.id), label: stageLabel(s) })));
 
 function applyFilters() {
     router.get(base, {

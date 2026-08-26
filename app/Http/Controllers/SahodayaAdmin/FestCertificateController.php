@@ -4,7 +4,6 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Support\FestPageActivity;
 use App\Support\PdfGenerator;
-use App\Support\TenantStorage;
 use App\Models\Certificate;
 use App\Models\CertificateBatch;
 use App\Models\FestEvent;
@@ -33,6 +32,8 @@ class FestCertificateController extends SahodayaAdminController
             'schools'         => $this->schoolsFromCertificates($certificates),
             'winnersByItem'   => $this->winnersByItem($certificates, $event),
             'winnersBySchool' => $this->winnersBySchool($certificates, $event),
+            'participationByItem'   => $this->participationByItem($certificates, $event),
+            'participationBySchool' => $this->participationBySchool($certificates, $event),
             'recentBatches'   => $this->recentBatchesForEvent($event),
             'staleCount'      => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
         ]));
@@ -110,14 +111,18 @@ class FestCertificateController extends SahodayaAdminController
 
     private function publishedItemsForEvent(FestEvent $event): \Illuminate\Support\Collection
     {
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
         return FestEventItem::whereIn('event_id', $event->reportableEventIds())
             ->whereNotNull('results_published_at')
             ->orderBy('title')
-            ->get(['id', 'title', 'item_code'])
+            ->get(['id', 'title', 'item_code', 'class_group', 'category'])
             ->map(fn ($item) => [
-                'id'        => $item->id,
-                'title'     => $item->title,
-                'item_code' => $item->item_code,
+                'id'              => $item->id,
+                'title'           => $item->title,
+                'item_code'       => $item->item_code,
+                'category_label'  => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels),
             ])
             ->values();
     }
@@ -149,8 +154,35 @@ class FestCertificateController extends SahodayaAdminController
 
     private function winnersByItem(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
     {
+        return $this->groupCertificatesByItem($certificates, 'winner');
+    }
+
+    private function winnersBySchool(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
+    {
+        return $this->groupCertificatesBySchool($certificates, 'winner');
+    }
+
+    /**
+     * A participation certificate is anchored to one arbitrary FestParticipant row (see
+     * FestCertificateService::generateParticipationForEvent()'s $anchor), so grouping by
+     * $c['item'] here groups by that person's *first* registered item, same simplification
+     * ParticipationCertificates.vue's item filter already makes — not every item they
+     * participated in. Multi-item participants aren't fanned out into multiple groups.
+     */
+    private function participationByItem(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
+    {
+        return $this->groupCertificatesByItem($certificates, 'participation');
+    }
+
+    private function participationBySchool(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
+    {
+        return $this->groupCertificatesBySchool($certificates, 'participation');
+    }
+
+    private function groupCertificatesByItem(\Illuminate\Support\Collection $certificates, string $certType): \Illuminate\Support\Collection
+    {
         return $certificates
-            ->filter(fn ($c) => ($c['cert_type'] ?? null) === 'winner' && ! empty($c['item']))
+            ->filter(fn ($c) => ($c['cert_type'] ?? null) === $certType && ! empty($c['item']))
             ->groupBy(fn ($c) => $c['item']->id)
             ->map(function ($group) {
                 $first = $group->first();
@@ -160,10 +192,12 @@ class FestCertificateController extends SahodayaAdminController
                     'item_title' => $first['item']->title,
                     'winners'    => $group->sortBy(fn ($c) => $c['mark']?->position ?? $c['position'] ?? 99)
                         ->map(fn ($c) => [
-                            'id'       => $c['id'],
-                            'uuid'     => $c['uuid'],
-                            'name'     => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
-                            'position' => $c['mark']?->position ?? $c['position'] ?? null,
+                            'id'          => $c['id'],
+                            'uuid'        => $c['uuid'],
+                            'name'        => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
+                            'position'    => $c['mark']?->position ?? $c['position'] ?? null,
+                            'is_rendered' => $c['is_rendered'] ?? false,
+                            'is_stale'    => $c['is_stale'] ?? false,
                         ])
                         ->values(),
                 ];
@@ -172,10 +206,10 @@ class FestCertificateController extends SahodayaAdminController
             ->values();
     }
 
-    private function winnersBySchool(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
+    private function groupCertificatesBySchool(\Illuminate\Support\Collection $certificates, string $certType): \Illuminate\Support\Collection
     {
         return $certificates
-            ->filter(fn ($c) => ($c['cert_type'] ?? null) === 'winner' && ! empty($c['item']))
+            ->filter(fn ($c) => ($c['cert_type'] ?? null) === $certType && ! empty($c['item']))
             ->groupBy(fn ($c) => $c['registration']?->school_id ?? $c['participant']?->registration?->school_id ?? 0)
             ->map(function ($group) {
                 $first = $group->first();
@@ -186,11 +220,13 @@ class FestCertificateController extends SahodayaAdminController
                     'school_name' => $school?->name ?? 'Unknown School',
                     'winners'     => $group->sortBy(fn ($c) => $c['mark']?->position ?? $c['position'] ?? 99)
                         ->map(fn ($c) => [
-                            'id'         => $c['id'],
-                            'uuid'       => $c['uuid'],
-                            'name'       => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
-                            'item_title' => $c['item']?->title ?? '',
-                            'position'   => $c['mark']?->position ?? $c['position'] ?? null,
+                            'id'          => $c['id'],
+                            'uuid'        => $c['uuid'],
+                            'name'        => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
+                            'item_title'  => $c['item']?->title ?? '',
+                            'position'    => $c['mark']?->position ?? $c['position'] ?? null,
+                            'is_rendered' => $c['is_rendered'] ?? false,
+                            'is_stale'    => $c['is_stale'] ?? false,
                         ])
                         ->values(),
                 ];
@@ -269,22 +305,16 @@ class FestCertificateController extends SahodayaAdminController
         $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
 
         $plain = $request->boolean('plain');
+        $service = app(FestCertificateService::class);
 
         foreach ($payloads as $payload) {
             $certificate = $payload['certificate'];
-            $cachedPath = $plain ? $certificate->plain_file_path : $certificate->file_path;
 
-            // Prefer the already-rendered file from RenderCertificateChunkJob — a
-            // certificate predating that pipeline simply has no cached path yet and
-            // transparently falls back to the old render-on-request behavior below.
-            $pdf = ($cachedPath && ! $certificate->is_stale && TenantStorage::exists($cachedPath, $certificate->storage_disk))
-                ? TenantStorage::get($cachedPath, $certificate->storage_disk)
-                : null;
-
-            if ($pdf === null) {
-                $html = view('fest.certificate-print', $payload)->render();
-                $pdf = PdfGenerator::render($html);
-            }
+            // $payload is already the final, ready-to-render shape (exportPayloadsForEvent()
+            // above built it with embedAssets+plain baked in for every certificate, cache
+            // status notwithstanding), so the closure has no computation to defer — it
+            // still gets us the shared cache-check + orientation-correct render on a miss.
+            $pdf = $service->cachedOrFreshPdf($certificate, fn () => $payload, $plain);
 
             $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.pdf';
             $zip->addFromString($name, $pdf);

@@ -16,22 +16,32 @@
             <div class="space-y-4">
                 <h3 class="font-semibold text-sm">Standing records</h3>
                 <form @submit.prevent="saveRecord" class="bg-white border rounded-xl p-4 grid sm:grid-cols-2 gap-3 shadow-sm">
-                    <select v-model="recordForm.item_id" class="field sm:col-span-2" required>
-                        <option value="">Sports item</option>
-                        <option v-for="item in sportsItems" :key="item.id" :value="item.id">{{ item.title }}</option>
-                    </select>
-                    <select v-model="recordForm.class_group" class="field">
-                        <option v-for="(label, key) in classGroups" :key="key" :value="key">{{ label }}</option>
-                    </select>
-                    <select v-model="recordForm.gender" class="field">
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                        <option value="open">Open</option>
-                    </select>
-                    <select v-model="recordForm.record_direction" class="field">
-                        <option value="lower_better">Lower is better (track)</option>
-                        <option value="higher_better">Higher is better (jump/throw)</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="recordForm.item_id"
+                        :options="sportsItemOptions"
+                        placeholder="Sports item"
+                        search-placeholder="Type item name to search…"
+                        :all-option="false"
+                        class="sm:col-span-2"
+                    />
+                    <SearchableSelect
+                        v-model="recordForm.class_group"
+                        :options="classGroupOptions"
+                        placeholder="Select class group"
+                        :all-option="false"
+                    />
+                    <SearchableSelect
+                        v-model="recordForm.gender"
+                        :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'open', label: 'Open' }]"
+                        placeholder="Select gender"
+                        :all-option="false"
+                    />
+                    <SearchableSelect
+                        v-model="recordForm.record_direction"
+                        :options="[{ value: 'lower_better', label: 'Lower is better (track)' }, { value: 'higher_better', label: 'Higher is better (jump/throw)' }]"
+                        placeholder="Select record direction"
+                        :all-option="false"
+                    />
                     <input v-model="recordForm.record_value" class="field" placeholder="Value (e.g. 12.4 or 1:23.5)" required>
                     <input v-model="recordForm.record_unit" class="field" placeholder="Unit (s, m)">
                     <input v-model="recordForm.holder_name" class="field sm:col-span-2" placeholder="Holder name (optional)">
@@ -91,18 +101,36 @@ import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatDateTime } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, records: Array, breaks: Array, classGroups: Object,
+    ageGroupLabels: { type: Object, default: () => ({}) },
     activityLogs: { type: Array, default: () => [] },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const { confirm } = useConfirm();
 const sportsItems = computed(() => (props.event.items || []).filter(i => i.category === 'sports' || i.sport_discipline));
+
+function itemCategoryLabel(item) {
+    if (item.age_group && item.age_group !== 'open') {
+        return props.ageGroupLabels?.[item.age_group] ?? String(item.age_group).toUpperCase();
+    }
+    if (item.class_group && item.class_group !== 'open') {
+        return props.classGroups?.[item.class_group] ?? String(item.class_group).toUpperCase();
+    }
+    return null;
+}
+
+const sportsItemOptions = computed(() => sportsItems.value.map(i => ({
+    id: i.id,
+    name: itemCategoryLabel(i) ? `${i.title} — ${itemCategoryLabel(i)}` : i.title,
+})));
+const classGroupOptions = computed(() => Object.entries(props.classGroups || {}).map(([value, label]) => ({ value, label })));
 const recordForm = useForm({
     item_id: '', class_group: 'open', gender: 'open',
     record_direction: 'lower_better', record_value: '', record_unit: 's',
@@ -110,6 +138,7 @@ const recordForm = useForm({
 });
 
 function saveRecord() {
+    if (!recordForm.item_id) return;
     recordForm.post(`${base}/athletic-records`, { preserveScroll: true, onSuccess: () => recordForm.reset('record_value', 'holder_name') });
 }
 async function removeRecord(id) {

@@ -17,23 +17,14 @@
                     </label>
                 </FormField>
                 <FormField label="Student verification for item registration">
-                    <select v-model="settingsForm.student_verification_mode" class="field">
-                        <option value="inherit">
-                            Use cluster default — {{ clusterRequireStudentVerification ? 'verified students only' : 'unverified allowed' }}
-                        </option>
-                        <option value="required">Require verified students only</option>
-                        <option value="optional">Allow unverified students</option>
-                    </select>
+                    <SearchableSelect v-model="settingsForm.student_verification_mode" :options="studentVerificationOptions" :all-option="false" />
                     <p class="text-xs text-slate-500 mt-1">
                         Applies to all items in this event (Kalotsav, Sports, Kids Fest, Custom, etc.).
                         Cluster default is set under Membership → Settings.
                     </p>
                 </FormField>
                 <FormField label="Approval policy" hint="Auto-approve submitted registrations, or hold every registration for manual Sahodaya review. Falls back to this event-level setting for any item with no Event Head.">
-                    <select v-model="settingsForm.approval_policy" class="field">
-                        <option value="auto">Auto (on submission / full payment)</option>
-                        <option value="manual">Manual review</option>
-                    </select>
+                    <SearchableSelect v-model="settingsForm.approval_policy" :options="[{ value: 'auto', label: 'Auto (on submission / full payment)' }, { value: 'manual', label: 'Manual review' }]" :all-option="false" />
                 </FormField>
                 <FormField label="Capacity caps" hint="Maximum total participants / team entries per school for this event (leave blank for no limit).">
                     <div class="grid grid-cols-2 gap-3">
@@ -66,10 +57,7 @@
                 </FormField>
                 <FormField label="Chest reveal mode">
                     <template #default="{ id }">
-                        <select :id="id" v-model="settingsForm.chest_reveal_mode" class="field">
-                            <option value="immediate">Immediate</option>
-                            <option value="stage_entry">At stage entry</option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="settingsForm.chest_reveal_mode" :options="[{ value: 'immediate', label: 'Immediate' }, { value: 'stage_entry', label: 'At stage entry' }]" :all-option="false" />
                     </template>
                 </FormField>
                 <FormField label="Appeal fee (₹)">
@@ -124,6 +112,7 @@
 
 <script setup>
 import { computed, inject } from 'vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const {
     settingsForm, judgeGate, saveSettings, backfillRegs, event, clusterRequireStudentVerification,
@@ -131,6 +120,14 @@ const {
     notificationTriggers, eligibleNotificationUsers,
 } = inject('eventSettings');
 const isSports = computed(() => event.value?.event_type === 'sports');
+const studentVerificationOptions = computed(() => [
+    {
+        value: 'inherit',
+        label: `Use cluster default — ${clusterRequireStudentVerification.value ? 'verified students only' : 'unverified allowed'}`,
+    },
+    { value: 'required', label: 'Require verified students only' },
+    { value: 'optional', label: 'Allow unverified students' },
+]);
 
 function triggerLabel(trigger) {
     return trigger.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());

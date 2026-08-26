@@ -29,13 +29,13 @@
                 <input v-model="row.venue" type="text" class="field text-sm" placeholder="Competition venue">
             </FormField>
             <FormField label="Status">
-                <select v-model="row.status" class="field text-sm">
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
-                    <option value="registration_open">Registration open</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="completed">Completed</option>
-                </select>
+                <SearchableSelect v-model="row.status" :options="[
+                    { value: 'draft', label: 'Draft' },
+                    { value: 'published', label: 'Published' },
+                    { value: 'registration_open', label: 'Registration open' },
+                    { value: 'ongoing', label: 'Ongoing' },
+                    { value: 'completed', label: 'Completed' },
+                ]" :all-option="false" />
             </FormField>
             <FormField label="Event start">
                 <input v-model="row.event_start" type="date" class="field text-sm">
@@ -149,10 +149,7 @@
                     <input v-model="headForm.name" class="field" required>
                 </FormField>
                 <FormField label="Sport discipline">
-                    <select v-model="headForm.sport_discipline" class="field">
-                        <option value="">Any</option>
-                        <option v-for="(label, key) in disciplines" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect v-model="headForm.sport_discipline" :options="disciplineOptions" :all-option="true" all-label="Any" />
                 </FormField>
                 <label class="flex items-center gap-2 text-sm">
                     <input type="checkbox" v-model="headForm.is_team_heading"> Use as ID card heading
@@ -173,9 +170,10 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import FestHeadFeeFields from '@/Components/fest/FestHeadFeeFields.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { emptyHeadFeeFields, headFeeFieldsFromRecord } from '@/support/festHeadFeeFields';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -191,6 +189,10 @@ const props = defineProps({
 });
 
 const { confirm } = useConfirm();
+
+const disciplineOptions = computed(() =>
+    Object.entries(props.disciplines).map(([key, label]) => ({ value: key, label })),
+);
 
 const saving = ref(false);
 const savingNotifications = ref(false);

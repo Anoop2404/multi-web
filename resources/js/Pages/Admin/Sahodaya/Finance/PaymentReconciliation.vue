@@ -27,26 +27,19 @@
             <div class="grid gap-3 md:grid-cols-3">
                 <label class="text-xs font-semibold text-slate-600">
                     Payment type
-                    <select v-model="filterForm.type" class="field mt-1">
-                        <option value="all">All payment types</option>
-                        <option value="fest">Fest / sports</option>
-                        <option value="mcq">Talent Search</option>
-                        <option value="training">Teacher training</option>
-                    </select>
+                    <SearchableSelect v-model="filterForm.type" class="mt-1"
+                        :options="[{ value: 'all', label: 'All payment types' }, { value: 'fest', label: 'Fest / sports' }, { value: 'mcq', label: 'Talent Search' }, { value: 'training', label: 'Teacher training' }]"
+                        :all-option="false" />
                 </label>
                 <label class="text-xs font-semibold text-slate-600">
                     Event
-                    <select v-model="filterForm.event_id" class="field mt-1">
-                        <option value="">All events and programmes</option>
-                        <option v-for="event in events" :key="event.id" :value="event.id">{{ event.title }}</option>
-                    </select>
+                    <SearchableSelect v-model="filterForm.event_id" class="mt-1"
+                        :options="eventOptions" :all-option="true" all-label="All events and programmes" />
                 </label>
                 <label class="text-xs font-semibold text-slate-600">
                     School
-                    <select v-model="filterForm.school_id" class="field mt-1">
-                        <option value="">All schools</option>
-                        <option v-for="school in schools" :key="school.id" :value="school.id">{{ school.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="filterForm.school_id" class="mt-1"
+                        :options="schools" :all-option="true" all-label="All schools" />
                 </label>
             </div>
             <div class="mt-3 flex gap-2">
@@ -179,10 +172,11 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -205,6 +199,8 @@ const filterForm = reactive({
 const busyKey = ref('');
 const { confirm } = useConfirm();
 const base = `/sahodaya-admin/${props.sahodaya.id}/finance/payment-reconciliation`;
+
+const eventOptions = computed(() => props.events.map((event) => ({ value: event.id, label: event.title })));
 
 function fmt(value) {
     return Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

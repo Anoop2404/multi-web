@@ -81,49 +81,49 @@
                     </div>
                     <div class="min-w-[10rem]">
                         <label class="text-xs font-semibold text-slate-600 block mb-1">Status</label>
-                        <select v-model="filterForm.status" class="field text-sm">
-                            <option value="all">All statuses</option>
-                            <option value="registered">Registered</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="completed">Completed</option>
-                            <option value="waitlisted">Waitlisted</option>
-                            <option value="cancelled">Cancelled</option>
-                            <option value="rejected">Rejected</option>
-                        </select>
+                        <SearchableSelect v-model="filterForm.status" :all-option="false" :options="[
+                            { value: 'all', label: 'All statuses' },
+                            { value: 'registered', label: 'Registered' },
+                            { value: 'confirmed', label: 'Confirmed' },
+                            { value: 'completed', label: 'Completed' },
+                            { value: 'waitlisted', label: 'Waitlisted' },
+                            { value: 'cancelled', label: 'Cancelled' },
+                            { value: 'rejected', label: 'Rejected' },
+                        ]" />
                     </div>
                     <div class="min-w-[9rem]">
                         <label class="text-xs font-semibold text-slate-600 block mb-1">Source</label>
-                        <select v-model="filterForm.source" class="field text-sm">
-                            <option value="all">All sources</option>
-                            <option value="qr">QR</option>
-                            <option value="portal">Portal</option>
-                            <option value="school">School</option>
-                        </select>
+                        <SearchableSelect v-model="filterForm.source" :all-option="false" :options="[
+                            { value: 'all', label: 'All sources' },
+                            { value: 'qr', label: 'QR' },
+                            { value: 'portal', label: 'Portal' },
+                            { value: 'school', label: 'School' },
+                        ]" />
                     </div>
                     <div class="min-w-[11rem]">
                         <label class="text-xs font-semibold text-slate-600 block mb-1">Verification</label>
-                        <select v-model="filterForm.verification" class="field text-sm">
-                            <option value="all">All teachers</option>
-                            <option value="verified">Verified</option>
-                            <option value="unverified">Unverified</option>
-                        </select>
+                        <SearchableSelect v-model="filterForm.verification" :all-option="false" :options="[
+                            { value: 'all', label: 'All teachers' },
+                            { value: 'verified', label: 'Verified' },
+                            { value: 'unverified', label: 'Unverified' },
+                        ]" />
                     </div>
                     <div class="min-w-[10rem]">
                         <label class="text-xs font-semibold text-slate-600 block mb-1">School</label>
-                        <select v-model="filterForm.school" class="field text-sm">
-                            <option value="all">All</option>
-                            <option value="assigned">Has a school</option>
-                            <option value="pending">Pending school</option>
-                            <option value="none">No school at all</option>
-                        </select>
+                        <SearchableSelect v-model="filterForm.school" :all-option="false" :options="[
+                            { value: 'all', label: 'All' },
+                            { value: 'assigned', label: 'Has a school' },
+                            { value: 'pending', label: 'Pending school' },
+                            { value: 'none', label: 'No school at all' },
+                        ]" />
                     </div>
                     <div class="min-w-[7rem]">
                         <label class="text-xs font-semibold text-slate-600 block mb-1">Per page</label>
-                        <select v-model="filterForm.per_page" class="field text-sm">
-                            <option :value="25">25</option>
-                            <option :value="50">50</option>
-                            <option :value="100">100</option>
-                        </select>
+                        <SearchableSelect v-model="filterForm.per_page" :all-option="false" :options="[
+                            { value: 25, label: '25' },
+                            { value: 50, label: '50' },
+                            { value: 100, label: '100' },
+                        ]" />
                     </div>
                     <button v-if="hasActiveFilters" type="button" class="btn-ghost text-sm" @click="clearFilters">
                         Clear
@@ -223,6 +223,7 @@ import { router, Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import SahodayaDataTable from '@/Components/SahodayaDataTable.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 import { useConfirm } from '@/composables/useConfirm';
 

@@ -7,6 +7,8 @@ use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestSchedule;
 use App\Services\Events\FestRegistrationRouterService;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use App\Support\SchoolFestProgram;
 use App\Support\ProgramRouteMap;
 use Illuminate\Http\Request;
@@ -31,30 +33,35 @@ class FestClashRequestController extends SchoolAdminController
             ->latest()
             ->get();
 
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->where('status', 'approved'))
             ->with(['student', 'registration.item'])
             ->get()
-            ->map(function (FestParticipant $p) use ($event) {
+            ->map(function (FestParticipant $p) use ($event, $classGroupLabels, $artsCategoryLabels) {
                 $schedules = FestSchedule::whereIn('event_id', $event->reportableEventIds())
                     ->where('participant_id', $p->id)
                     ->with('item')
                     ->orderBy('scheduled_at')
                     ->get()
                     ->map(fn (FestSchedule $s) => [
-                        'id'           => $s->id,
-                        'item_title'   => $s->item?->title,
-                        'scheduled_at' => $s->scheduled_at?->toIso8601String(),
-                        'stage'        => $s->stage,
+                        'id'             => $s->id,
+                        'item_title'     => $s->item?->title,
+                        'category_label' => FestItemCategoryLabel::resolve($s->item, $classGroupLabels, $artsCategoryLabels),
+                        'scheduled_at'   => $s->scheduled_at?->toIso8601String(),
+                        'stage'          => $s->stage,
                     ]);
 
                 return [
-                    'id'        => $p->id,
-                    'name'      => $p->student?->name ?? $p->teacher?->name,
-                    'item'      => $p->registration?->item?->title,
-                    'schedules' => $schedules,
+                    'id'             => $p->id,
+                    'name'           => $p->student?->name ?? $p->teacher?->name,
+                    'item'           => $p->registration?->item?->title,
+                    'category_label' => FestItemCategoryLabel::resolve($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
+                    'schedules'      => $schedules,
                 ];
             });
 

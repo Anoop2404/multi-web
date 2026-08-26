@@ -37,11 +37,9 @@
         <div v-if="childEvents.length" class="card !p-4 space-y-3 mb-5">
             <div class="flex flex-wrap items-center gap-2">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ isSports ? 'Sport Event / Region:' : 'Region:' }}</label>
-                <select :value="String(event.id)" @change="switchEvent" class="field text-xs !py-1 w-64 font-semibold">
-                    <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                        {{ ev.short_title || ev.title }}
-                    </option>
-                </select>
+                <SearchableSelect :model-value="String(event.id)" @update:model-value="switchEvent"
+                                  :options="childEventOptions" :all-option="false"
+                                  placeholder="Select event/region" class="w-64" />
             </div>
             <p class="text-[11px] text-slate-500">
                 This applies only to items in the region/event selected above — switch above to configure another region separately.
@@ -142,6 +140,7 @@
                             <td class="py-3 px-3">
                                 <div class="font-bold text-slate-900 flex items-center gap-1.5">
                                     <span>{{ item.title }}</span>
+                                    <span v-if="item.category_label" class="text-[10px] font-semibold text-slate-500">({{ item.category_label }})</span>
                                     <span v-if="isDirty(item.id)" class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
                                         Edited
                                     </span>
@@ -194,6 +193,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import EmptyState from '@/Components/ui/EmptyState.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -205,9 +205,14 @@ const props = defineProps({
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const isSports = computed(() => props.event.event_type === 'sports');
 
-function switchEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/mark-settings/bulk`);
+function switchEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/mark-settings/bulk`);
 }
+
+const childEventOptions = computed(() => props.childEvents.map(ev => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
 
 const searchQuery = ref('');
 const selectedIds = ref([]);

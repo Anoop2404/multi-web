@@ -93,27 +93,36 @@
             <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Academic Year</label>
-                    <select v-model="selectedYear" class="field text-xs bg-white font-semibold" @change="applyServerFilters">
-                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                            {{ ay.label }}{{ ay.status === 'active' ? ' (Active)' : '' }}
-                        </option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedYear"
+                        :options="academicYearSelectOptions"
+                        :all-option="false"
+                        placeholder="Select academic year"
+                        @change="applyServerFilters"
+                    />
                 </div>
 
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Class</label>
-                    <select v-model="selectedClass" class="field text-xs bg-white font-semibold" @change="applyServerFilters">
-                        <option :value="null">All Classes (10 & 12)</option>
-                        <option v-for="c in classOptions" :key="c" :value="c">Class {{ c }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedClass"
+                        :options="classSelectOptions"
+                        :all-option="true"
+                        all-label="All Classes (10 & 12)"
+                        @change="applyServerFilters"
+                    />
                 </div>
 
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Stream</label>
-                    <select v-model="selectedStream" class="field text-xs bg-white font-semibold" @change="applyServerFilters" :disabled="selectedClass !== 12">
-                        <option :value="null">All Streams</option>
-                        <option v-for="s in streamOptions" :key="s" :value="s">{{ s }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedStream"
+                        :options="streamOptions"
+                        :all-option="true"
+                        all-label="All Streams"
+                        :disabled="selectedClass !== 12"
+                        @change="applyServerFilters"
+                    />
                 </div>
 
                 <div class="flex items-center justify-between text-xs text-gray-500 pt-2">
@@ -267,6 +276,7 @@
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PdfPreviewModal from '@/Components/ui/PdfPreviewModal.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import SubjectMarksPreviewModal from '@/Components/BoardResults/SubjectMarksPreviewModal.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
 import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
@@ -292,6 +302,17 @@ const searchQuery = ref('');
 const selectedYear = ref(props.filters.academic_year);
 const selectedClass = ref(props.filters.class || '');
 const selectedStream = ref(props.filters.stream || '');
+
+const academicYearSelectOptions = computed(() =>
+    props.academicYearOptions.map((ay) => ({
+        value: ay.label,
+        label: `${ay.label}${ay.status === 'active' ? ' (Active)' : ''}`,
+    })),
+);
+
+const classSelectOptions = computed(() =>
+    props.classOptions.map((c) => ({ value: c, label: `Class ${c}` })),
+);
 
 const pdfPreviewUrl = computed(() => {
     let url = `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/full-a1-achievers/pdf?academic_year=${encodeURIComponent(selectedYear.value || '')}`;

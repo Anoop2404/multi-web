@@ -1,0 +1,210 @@
+<?php
+
+namespace Tests\Feature\SahodayaAdmin;
+
+use App\Models\FestEvent;
+use App\Models\FestEventItem;
+use App\Models\FestEventPhase;
+use App\Models\FestEventStaff;
+use App\Models\FestParticipant;
+use App\Models\FestRegistration;
+use App\Models\SahodayaProfile;
+use App\Models\SchoolClass;
+use App\Models\Student;
+use App\Models\Tenant;
+use App\Models\User;
+use App\Support\TenantUserCatalog;
+use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Tests\TestCase;
+
+/**
+ * The old Item-wise report made an admin pick one item at a time and had no
+ * category/phase/region columns at all. This covers the 2026-08-25 rework: one
+ * combined table across the whole phased_regional_billing hub, phase/region resolved
+ * from the registration's own operational event (never the item's own phase_id — see
+ * FestEventReportAnalyticsService::itemWiseReportRows() docblock for why), with
+ * category label and school name on every row.
+ */
+class FestItemWiseReportTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_combined_item_wise_report_shows_category_phase_region_and_school_across_the_hub(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Item Wise Report Sahodaya',
+            'domain' => Str::uuid().'.test',
+            'is_active' => true,
+        ]);
+        SahodayaProfile::create([
+            'tenant_id' => $sahodaya->id,
+            'prefix' => 'IW',
+            'student_data_mode' => 'counts_only',
+        ]);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Item Wise Report School',
+            'parent_id' => $sahodaya->id,
+            'membership_status' => 'approved',
+            'is_active' => true,
+        ]);
+
+        $hub = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Item Wise Report Kalotsav', 'event_type' => 'kalolsavam',
+            'conduct_mode' => 'partitioned', 'workflow_mode' => 'phased_regional_billing',
+            'level_round' => 'sahodaya', 'status' => 'registration_open',
+        ]);
+
+        $phase1 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'PHASE 1', 'code' => 'P1', 'sort_order' => 1, 'is_regional' => false]);
+        $phase2 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'PHASE 2', 'code' => 'P2', 'sort_order' => 2, 'is_regional' => false]);
+
+        $phase1Leaf = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Item Wise Report Kalotsav — PHASE 1', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'registration_open',
+            'parent_event_id' => $hub->id, 'source_phase_id' => $phase1->id, 'partition_role' => 'phase',
+        ]);
+        $phase2Leaf = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Item Wise Report Kalotsav — PHASE 2', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'registration_open',
+            'parent_event_id' => $hub->id, 'source_phase_id' => $phase2->id, 'partition_role' => 'phase',
+        ]);
+
+        $musicItem = FestEventItem::create([
+            'event_id' => $phase1Leaf->id, 'title' => 'Light Music-Malayalam', 'item_code' => '104',
+            'stage_type' => 'on_stage', 'participant_type' => 'individual', 'category' => 'music', 'is_enabled' => true,
+        ]);
+        $danceItem = FestEventItem::create([
+            'event_id' => $phase2Leaf->id, 'title' => 'Bharatanatyam', 'item_code' => '215',
+            'stage_type' => 'on_stage', 'participant_type' => 'individual', 'category' => 'dance', 'is_enabled' => true,
+        ]);
+
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '10']);
+        $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Test Student', 'reg_no' => 'STU/1']);
+
+        $musicReg = FestRegistration::create(['event_id' => $phase1Leaf->id, 'item_id' => $musicItem->id, 'school_id' => $school->id, 'status' => 'approved']);
+        FestParticipant::create(['registration_id' => $musicReg->id, 'student_id' => $student->id, 'participant_type' => 'student', 'event_id' => $phase1Leaf->id]);
+
+        $danceReg = FestRegistration::create(['event_id' => $phase2Leaf->id, 'item_id' => $danceItem->id, 'school_id' => $school->id, 'status' => 'approved']);
+        FestParticipant::create(['registration_id' => $danceReg->id, 'student_id' => $student->id, 'participant_type' => 'student', 'event_id' => $phase2Leaf->id]);
+
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('event_admin');
+        $admin->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('event_admin'));
+        FestEventStaff::create(['event_id' => $hub->id, 'user_id' => $admin->id, 'duty' => 'event_admin']);
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.reports.item-wise', [
+            'tenantId' => $sahodaya->id,
+            'event' => $hub->id,
+        ]));
+
+        $response->assertOk();
+
+        $props = $response->viewData('page')['props'];
+        $rows = collect($props['rows']);
+
+        $this->assertCount(2, $rows, 'both phases\' registrations must appear in the combined report');
+
+        $musicRow = $rows->firstWhere('item_id', $musicItem->id);
+        $this->assertSame('Music', $musicRow['category_label']);
+        $this->assertSame('PHASE 1', $musicRow['phase_name']);
+        $this->assertSame('Item Wise Report School', $musicRow['school_name']);
+        $this->assertSame('Test Student', $musicRow['participant']);
+
+        $danceRow = $rows->firstWhere('item_id', $danceItem->id);
+        $this->assertSame('Dance', $danceRow['category_label']);
+        $this->assertSame('PHASE 2', $danceRow['phase_name']);
+        $this->assertSame('Item Wise Report School', $danceRow['school_name']);
+
+        $categories = collect($props['categories'])->pluck('key')->all();
+        $this->assertEqualsCanonicalizing(['music', 'dance'], $categories);
+
+        $pdfResponse = $this->actingAs($admin)->get(route('sahodaya.events.reports.item-wise.pdf', [
+            'tenantId' => $sahodaya->id,
+            'event' => $hub->id,
+            'for_whom' => 'District Committee',
+        ]));
+        $pdfResponse->assertOk();
+        $this->assertSame('application/pdf', $pdfResponse->headers->get('content-type'));
+    }
+
+    public function test_school_item_wise_report_is_scoped_to_own_school_and_shows_school_name(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'School Item Wise Sahodaya',
+            'domain' => Str::uuid().'.test',
+            'is_active' => true,
+        ]);
+        SahodayaProfile::create([
+            'tenant_id' => $sahodaya->id,
+            'prefix' => 'SW',
+            'student_data_mode' => 'counts_only',
+        ]);
+
+        $ourSchool = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Our School',
+            'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true,
+        ]);
+        $otherSchool = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Other School',
+            'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true,
+        ]);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'School Item Wise Kalotsav', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'registration_open',
+        ]);
+
+        $item = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Recitation-Malayalam', 'item_code' => '101',
+            'stage_type' => 'on_stage', 'participant_type' => 'individual', 'category' => 'music', 'is_enabled' => true,
+        ]);
+
+        $ourClass = SchoolClass::create(['tenant_id' => $ourSchool->id, 'name' => '10']);
+        $otherClass = SchoolClass::create(['tenant_id' => $otherSchool->id, 'name' => '10']);
+        $ourStudent = Student::create(['tenant_id' => $ourSchool->id, 'school_class_id' => $ourClass->id, 'name' => 'Our Student', 'reg_no' => 'STU/OWN']);
+        $otherStudent = Student::create(['tenant_id' => $otherSchool->id, 'school_class_id' => $otherClass->id, 'name' => 'Other Student', 'reg_no' => 'STU/OTH']);
+
+        $ourReg = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $ourSchool->id, 'status' => 'approved']);
+        FestParticipant::create(['registration_id' => $ourReg->id, 'student_id' => $ourStudent->id, 'participant_type' => 'student', 'event_id' => $event->id]);
+
+        $otherReg = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $otherSchool->id, 'status' => 'approved']);
+        FestParticipant::create(['registration_id' => $otherReg->id, 'student_id' => $otherStudent->id, 'participant_type' => 'student', 'event_id' => $event->id]);
+
+        $schoolAdmin = User::factory()->create(['tenant_id' => $ourSchool->id, 'email_verified_at' => now()]);
+        $schoolAdmin->assignRole('school_admin');
+
+        $response = $this->actingAs($schoolAdmin)->get(route('school.kalotsav.reports.item-wise', [
+            'tenantId' => $ourSchool->id,
+            'event' => $event->id,
+        ]));
+
+        $response->assertOk();
+
+        $props = $response->viewData('page')['props'];
+        $rows = collect($props['rows']);
+
+        $this->assertCount(1, $rows, 'must only include the acting school\'s own registrations');
+        $this->assertSame('Our Student', $rows->first()['participant']);
+        $this->assertSame('Our School', $rows->first()['school_name']);
+        $this->assertSame('Music', $rows->first()['category_label']);
+
+        $pdfResponse = $this->actingAs($schoolAdmin)->get(route('school.kalotsav.reports.item-wise.marks-pdf', [
+            'tenantId' => $ourSchool->id,
+            'event' => $event->id,
+        ]));
+        $pdfResponse->assertOk();
+        $this->assertSame('application/pdf', $pdfResponse->headers->get('content-type'));
+    }
+}

@@ -13,9 +13,8 @@
 
         <div v-if="childEvents.length" class="card mb-4 !py-3 flex flex-wrap items-center gap-2">
             <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Region:</label>
-            <select :value="String(event.id)" @change="switchEvent" class="field text-xs !py-1 w-64 font-semibold">
-                <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">{{ ev.short_title || ev.title }}</option>
-            </select>
+            <SearchableSelect :model-value="String(event.id)" @update:model-value="switchEvent" :options="regionOptions"
+                :all-option="false" placeholder="Select region" class="text-xs w-64 font-semibold" />
         </div>
 
         <div v-if="!schools.length" class="card p-8 text-center text-slate-400 text-sm">
@@ -35,6 +34,9 @@
                             <th rowspan="2" class="sticky right-0 z-20 bg-indigo-900 text-white p-2.5 text-center border-l border-slate-700 min-w-[5rem]">OVERALL</th>
                         </tr>
                         <tr>
+                            <!-- Deliberately no per-item category label here — the parent <th> above
+                                 already groups every item column under its category (cat.label), so
+                                 repeating it on each item cell would just add noise. -->
                             <template v-for="cat in categories" :key="`${cat.key}-items`">
                                 <th v-for="item in cat.items" :key="item.id" :title="item.title"
                                     class="bg-slate-700 text-white p-1.5 text-center border-l border-slate-600 font-medium whitespace-nowrap max-w-[6rem] overflow-hidden text-ellipsis">
@@ -72,10 +74,12 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -90,7 +94,12 @@ const props = defineProps({
 
 const exportBase = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export`;
 
-function switchEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports/category-item-matrix`);
+const regionOptions = computed(() => props.childEvents.map(ev => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
+
+function switchEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/reports/category-item-matrix`);
 }
 </script>

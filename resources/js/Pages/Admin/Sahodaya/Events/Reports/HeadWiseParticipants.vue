@@ -30,20 +30,14 @@
                           @apply="applyFilter">
             <template #extra>
                 <FormField label="School" class-extra="mb-0 min-w-[14rem]">
-                    <select v-model="schoolFilter" class="field text-sm">
-                        <option value="">All schools</option>
-                        <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="schoolFilter" :options="schools" :all-option="true" all-label="All schools" />
                 </FormField>
             </template>
         </ReportHeadFilter>
 
         <form v-else @submit.prevent="applyFilter" class="card !p-4 mb-4 flex flex-wrap gap-3 items-end">
             <FormField label="School" class-extra="mb-0">
-                <select v-model="schoolFilter" class="field text-sm w-56">
-                    <option value="">All schools</option>
-                    <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                </select>
+                <SearchableSelect v-model="schoolFilter" :options="schools" :all-option="true" all-label="All schools" class="w-56" />
             </FormField>
             <button type="submit" class="btn-primary text-sm">Apply</button>
         </form>
@@ -170,6 +164,7 @@
                                     <td>{{ row.reg_no }}</td>
                                     <td>
                                         {{ row.item }}
+                                        <span v-if="row.category_label" class="text-slate-400"> · {{ row.category_label }}</span>
                                         <div v-if="row.competition_start && event.event_type === 'sports'" class="mt-0.5">
                                             <span class="inline-flex items-center gap-1 rounded bg-sky-50 px-1 py-0.5 text-[9px] font-bold text-sky-800 border border-sky-100 uppercase tracking-wide">
                                                 📅 {{ formatDate(row.competition_start) }}<span v-if="row.competition_time"> @ {{ row.competition_time.slice(0, 5) }}</span>
@@ -201,6 +196,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadFilter from '@/Components/reports/ReportHeadFilter.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
 
 const props = defineProps({

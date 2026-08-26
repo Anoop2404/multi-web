@@ -58,10 +58,7 @@
                 </div>
                 <div class="min-w-[10rem]">
                     <label class="block text-xs font-bold text-slate-700 mb-1">Category</label>
-                    <select v-model="form.category_id" class="form-input text-sm w-full bg-slate-50 border-slate-200 rounded-lg">
-                        <option value="">— None —</option>
-                        <option v-for="c in activeCategories" :key="c.id" :value="c.id">{{ c.label }}</option>
-                    </select>
+                    <SearchableSelect v-model="form.category_id" :options="activeCategories" all-label="— None —" />
                 </div>
                 <button type="submit" class="btn-primary text-sm px-4 !py-2 rounded-lg shadow-sm" :disabled="form.processing">
                     Create Program
@@ -71,10 +68,7 @@
             <div class="card !p-5 bg-white border border-slate-200 shadow-xs rounded-xl flex flex-wrap gap-3 items-end">
                 <div class="min-w-[10rem]">
                     <label class="block text-xs font-bold text-slate-700 mb-1">Filter by Category</label>
-                    <select :value="filters.category_id ?? ''" class="form-input text-sm w-full bg-slate-50 border-slate-200 rounded-lg" @change="filterCategory">
-                        <option value="">All Categories</option>
-                        <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.label }}{{ c.is_active ? '' : ' (inactive)' }}</option>
-                    </select>
+                    <SearchableSelect :model-value="filters.category_id ?? ''" :options="categoryFilterOptions" all-label="All Categories" @update:model-value="filterCategory" />
                 </div>
                 <form @submit.prevent="createCategory" class="flex flex-wrap gap-2 items-end flex-1 min-w-[14rem]">
                     <div class="flex-1 min-w-[8rem]">
@@ -130,6 +124,7 @@
 import { computed } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -142,6 +137,11 @@ const props = defineProps({
 });
 
 const activeCategories = computed(() => props.categories.filter(c => c.is_active));
+
+const categoryFilterOptions = computed(() => props.categories.map(c => ({
+    value: c.id,
+    label: c.label + (c.is_active ? '' : ' (inactive)'),
+})));
 
 const form = useForm({ title: '', category_id: '' });
 const categoryForm = useForm({ label: '' });
@@ -157,8 +157,7 @@ function createCategory() {
     });
 }
 
-function filterCategory(e) {
-    const value = e.target.value;
+function filterCategory(value) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/training`, {
         category_id: value || undefined,
     }, { preserveState: true, replace: true });

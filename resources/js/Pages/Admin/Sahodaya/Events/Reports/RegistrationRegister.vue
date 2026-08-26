@@ -31,32 +31,20 @@
                           @apply="applyFilter">
             <template #extra>
                 <FormField v-if="regions?.length" label="Region" class-extra="mb-0 min-w-[10rem]">
-                    <select v-model="regionFilter" class="field text-sm" @change="applyFilter">
-                        <option value="">All regions</option>
-                        <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="regionFilter" :options="regions" :all-option="true" all-label="All regions" @change="applyFilter" />
                 </FormField>
                 <FormField label="School" class-extra="mb-0 min-w-[12rem]">
-                    <select v-model="schoolFilter" class="field text-sm" @change="applyFilter">
-                        <option value="">All schools</option>
-                        <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
-                    </select>
+                    <SearchableSelect v-model="schoolFilter" :options="schoolOptions" :all-option="true" all-label="All schools" @change="applyFilter" />
                 </FormField>
             </template>
         </ReportHeadFilter>
 
         <div v-else class="card !p-4 mb-4 flex flex-wrap gap-3 items-end">
             <FormField v-if="regions?.length" label="Region" class-extra="mb-0">
-                <select v-model="regionFilter" class="field text-sm w-48" @change="applyFilter">
-                    <option value="">All regions</option>
-                    <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-                </select>
+                <SearchableSelect v-model="regionFilter" :options="regions" :all-option="true" all-label="All regions" class="w-48" @change="applyFilter" />
             </FormField>
             <FormField label="School" class-extra="mb-0">
-                <select v-model="schoolFilter" class="field text-sm w-56" @change="applyFilter">
-                    <option value="">All schools</option>
-                    <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
-                </select>
+                <SearchableSelect v-model="schoolFilter" :options="schoolOptions" :all-option="true" all-label="All schools" class="w-56" @change="applyFilter" />
             </FormField>
         </div>
 
@@ -160,6 +148,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadFilter from '@/Components/reports/ReportHeadFilter.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -174,6 +163,7 @@ const headItemGroups = computed(() => page.props.headItemGroups ?? []);
 const headsForFilter = computed(() => page.props.headsForFilter ?? []);
 const hasItemHeads = computed(() => page.props.hasItemHeads ?? false);
 const regions = computed(() => page.props.regions ?? []);
+const schoolOptions = computed(() => Object.entries(props.schools ?? {}).map(([id, name]) => ({ value: id, label: name })));
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/registration-register`;
 const params = new URLSearchParams(window.location.search);

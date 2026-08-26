@@ -29,7 +29,7 @@
                     <span v-if="item.registration_count || item.participant_count" class="reports-head-card__count">{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.participant_count) : (item.participant_count ?? item.registration_count) }}</span>
                     <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-navy)]">{{ item.title }}</p>
                     <p v-if="item.item_code" class="text-xs font-mono text-slate-500 mt-0.5">{{ item.item_code }}</p>
-                    <p v-if="item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.age_group }}</p>
+                    <p v-if="item.category_label || item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.category_label || item.age_group }}</p>
                     <dl v-if="showItemStats" class="mt-3 grid grid-cols-2 gap-2 text-xs border-t border-slate-100 pt-3">
                         <div v-if="showResultStats">
                             <dt class="text-slate-400">Marks</dt>
@@ -92,7 +92,7 @@
                     <span v-if="item.registration_count || item.participant_count" class="reports-head-card__count">{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.participant_count) : (item.participant_count ?? item.registration_count) }}</span>
                     <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-navy)]">{{ item.title }}</p>
                     <p v-if="item.item_code" class="text-xs font-mono text-slate-500 mt-0.5">{{ item.item_code }}</p>
-                    <p v-if="item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.age_group }}</p>
+                    <p v-if="item.category_label || item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.category_label || item.age_group }}</p>
                     <dl v-if="showItemStats" class="mt-3 grid grid-cols-2 gap-2 text-xs border-t border-slate-100 pt-3">
                         <div v-if="showResultStats">
                             <dt class="text-slate-400">Marks</dt>

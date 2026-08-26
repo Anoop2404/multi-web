@@ -26,10 +26,7 @@
 
         <form class="card !p-5 mb-6 space-y-4" @submit.prevent="submit">
             <FormField label="Sahodaya scope">
-                <select v-model="form.tenant" class="field">
-                    <option value="">All Sahodayas</option>
-                    <option v-for="s in sahodayas" :key="s.id" :value="s.id">{{ s.name }}</option>
-                </select>
+                <SearchableSelect v-model="form.tenant" :options="sahodayas" :all-option="true" all-label="All Sahodayas" />
             </FormField>
 
             <label class="flex items-center gap-2 text-sm">
@@ -100,6 +97,7 @@ import { useForm, usePage } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import FormField from '@/Components/ui/FormField.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     status: Object,

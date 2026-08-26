@@ -10,14 +10,8 @@
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="school-detailed" />
 
         <form @submit.prevent="filter" class="flex flex-wrap gap-2 my-4">
-            <select v-model="f.school_id" class="field" required>
-                <option value="">Select school</option>
-                <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
-            <select v-model="f.class_group" class="field">
-                <option value="">All classes</option>
-                <option v-for="(label, key) in classGroups" :key="key" :value="key">{{ label }}</option>
-            </select>
+            <SearchableSelect v-model="f.school_id" :options="schools" :all-option="true" all-label="Select school" :required="true" />
+            <SearchableSelect v-model="f.class_group" :options="classGroupOptions" :all-option="true" all-label="All classes" />
             <button class="btn-primary">Show</button>
         </form>
         <div v-for="(rows, item) in grouped" :key="item" class="mb-4 bg-white border rounded-xl p-4">
@@ -35,11 +29,12 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { reactive, computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -48,6 +43,8 @@ const props = defineProps({
 });
 
 const f = reactive({ school_id: props.filters?.school_id ?? '', class_group: props.filters?.class_group ?? '' });
+
+const classGroupOptions = computed(() => Object.entries(props.classGroups ?? {}).map(([value, label]) => ({ value, label })));
 
 function filter() {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/school-detailed`, { ...f }, { preserveState: true });

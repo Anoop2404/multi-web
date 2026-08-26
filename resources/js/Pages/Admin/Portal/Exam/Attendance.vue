@@ -36,13 +36,18 @@
                         <td class="p-3">{{ r.student?.name }}</td>
                         <td class="p-3 text-xs text-gray-500">{{ r.school?.name }}</td>
                         <td class="p-3">
-                            <select v-model="forms[r.id].attendance_status" class="field" :disabled="!!r.pending_correction_status">
-                                <option value="pending">Pending</option>
-                                <option value="present">Present</option>
-                                <option value="absent">Absent</option>
-                                <option value="malpractice">Malpractice</option>
-                                <option value="withheld">Withheld</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="forms[r.id].attendance_status"
+                                :disabled="!!r.pending_correction_status"
+                                :all-option="false"
+                                :options="[
+                                    { value: 'pending', label: 'Pending' },
+                                    { value: 'present', label: 'Present' },
+                                    { value: 'absent', label: 'Absent' },
+                                    { value: 'malpractice', label: 'Malpractice' },
+                                    { value: 'withheld', label: 'Withheld' },
+                                ]"
+                            />
                         </td>
                         <td class="p-3">
                             <input v-if="['malpractice','withheld'].includes(forms[r.id].attendance_status)"
@@ -75,6 +80,7 @@ import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({ sahodaya: Object, exam: Object, registrations: Object, isTrustedReviewer: { type: Boolean, default: false } });
 const csvFile = ref(null);

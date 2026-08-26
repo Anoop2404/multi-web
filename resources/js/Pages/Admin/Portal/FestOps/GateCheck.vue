@@ -10,10 +10,14 @@
             <form @submit.prevent="scan" class="space-y-3">
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Event</label>
-                    <select v-model="eventId" class="field mt-1" required>
-                        <option value="">Select event</option>
-                        <option v-for="e in events" :key="e.id" :value="e.id">{{ e.title }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="eventId"
+                        class="mt-1"
+                        :options="eventOptions"
+                        :all-option="true"
+                        all-label="Select event"
+                        :required="true"
+                    />
                 </div>
 
                 <div v-if="cameraAvailable" class="space-y-2">
@@ -70,6 +74,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { festOpsDashboardNav } from '@/support/festOpsPortalNav.js';
 
 const props = defineProps({
@@ -92,6 +97,7 @@ let scanFrame = null;
 let jsQR = null;
 
 const navItems = computed(() => festOpsDashboardNav(props.sahodaya.id));
+const eventOptions = computed(() => (props.events || []).map(e => ({ value: e.id, label: e.title })));
 
 function flatPayload(data) {
     if (! data || typeof data !== 'object') return {};

@@ -16,19 +16,11 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Filter by Item & Category</label>
-                    <select v-model="selectedItem" @change="applyFilters" class="w-full rounded-xl border-slate-300 text-xs shadow-sm focus:border-amber-500 focus:ring-amber-500">
-                        <option :value="null">All Items ({{ items.length }})</option>
-                        <option v-for="it in items" :key="it.id" :value="it.id">
-                            {{ it.item_code ? `[${it.item_code}] ` : '' }}{{ it.title }}{{ it.category ? ` — ${it.category}` : '' }}
-                        </option>
-                    </select>
+                    <SearchableSelect v-model="selectedItem" @change="applyFilters" :options="itemOptions" :all-option="true" :all-label="`All Items (${items.length})`" class="w-full" placeholder="All Items" search-placeholder="Search items…" />
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Filter by Page</label>
-                    <select v-model="selectedPage" @change="applyFilters" class="w-full rounded-xl border-slate-300 text-xs shadow-sm focus:border-amber-500 focus:ring-amber-500">
-                        <option :value="null">All Pages</option>
-                        <option v-for="(label, key) in pageLabels" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect v-model="selectedPage" @change="applyFilters" :options="pageOptions" :all-option="true" all-label="All Pages" class="w-full" placeholder="All Pages" search-placeholder="Search pages…" />
                 </div>
                 <div class="flex items-end">
                     <button v-if="hasActiveFilters" @click="clearFilters" type="button" class="w-full rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition">
@@ -193,6 +185,7 @@ import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -210,6 +203,13 @@ const selectedPage = ref(props.filters?.page ?? null);
 const selectedLog = ref(null);
 
 const hasActiveFilters = computed(() => !!searchQuery.value || selectedItem.value !== null || selectedPage.value !== null);
+
+const itemOptions = computed(() => props.items.map(it => ({
+    value: it.id,
+    label: `${it.item_code ? `[${it.item_code}] ` : ''}${it.title}${it.category ? ` — ${it.category}` : ''}`,
+})));
+
+const pageOptions = computed(() => Object.entries(props.pageLabels || {}).map(([key, label]) => ({ value: key, label })));
 
 const displayedLogs = computed(() => {
     let logs = props.activityLogs || [];

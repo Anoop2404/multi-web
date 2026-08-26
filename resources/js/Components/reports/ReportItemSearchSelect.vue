@@ -71,6 +71,9 @@ const filteredItems = computed(() => {
             item.item_code,
             item.age_group,
             item.head_name,
+            item.category_label,
+            item.class_group,
+            item.category,
         ].filter(Boolean).join(' ').toLowerCase();
         return haystack.includes(q);
     });
@@ -84,11 +87,28 @@ const viewEnabled = computed(() => {
     return true;
 });
 
+// Humanizes a raw class_group/category value the same way other report
+// pages already do (e.g. Attendance.vue's formatItemCat) — used only when
+// the backend hasn't attached a ready-made category_label to the item yet.
+function humanize(value) {
+    return String(value).replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function categoryFor(item) {
+    if (item.category_label) return item.category_label;
+    if (item.class_group && item.class_group !== 'open') return humanize(item.class_group).toUpperCase();
+    if (item.category && item.category !== 'general') return humanize(item.category);
+    return '';
+}
+
 function itemLabel(item) {
     const parts = [];
     const status = typeof props.statusFor === 'function' ? props.statusFor(item) : null;
     if (status) parts.push(status);
-    parts.push(item.title);
+    let title = item.title;
+    const category = categoryFor(item);
+    if (category) title += ` — ${category}`;
+    parts.push(title);
     if (item.participant_count) parts.push(`(${item.participant_count} reg.)`);
     return parts.join(' ');
 }

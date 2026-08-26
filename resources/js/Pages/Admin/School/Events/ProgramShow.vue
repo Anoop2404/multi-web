@@ -26,20 +26,16 @@
             <form v-if="parentEvents?.length && !event.parent_event_id" @submit.prevent="linkParent" class="card space-y-2">
                 <h3 class="font-semibold">Link to Sahodaya parent event</h3>
                 <p class="text-xs text-slate-500">Required for promoting school-round winners to the cluster event.</p>
-                <select v-model="parentEventId" class="field" required>
-                    <option value="">Select Sahodaya event…</option>
-                    <option v-for="p in parentEvents" :key="p.id" :value="p.id">{{ p.title }} ({{ p.level_round }})</option>
-                </select>
+                <SearchableSelect v-model="parentEventId" :options="parentEventOptions" :all-option="true"
+                    all-label="Select Sahodaya event…" :required="true" />
                 <button class="btn-primary text-sm">Link parent event</button>
             </form>
 
             <div class="card">
                 <h3 class="section-title">Participation policy (school round)</h3>
                 <form @submit.prevent="savePolicy" class="grid sm:grid-cols-3 gap-2 mb-4">
-                    <select v-model="policyForm.preset_key" class="field sm:col-span-3">
-                        <option value="">Custom limits</option>
-                        <option v-for="(label, key) in participationPresets" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect v-model="policyForm.preset_key" :options="participationPresetOptions"
+                        :all-option="true" all-label="Custom limits" class="sm:col-span-3" />
                     <input v-model.number="policyForm.max_onstage_per_student" type="number" min="0" class="field" placeholder="On-stage / student">
                     <input v-model.number="policyForm.max_offstage_per_student" type="number" min="0" class="field" placeholder="Off-stage / student">
                     <input v-model.number="policyForm.max_group_per_student" type="number" min="0" class="field" placeholder="Group / student">
@@ -51,15 +47,11 @@
                 <h3 class="section-title">Add school custom item</h3>
                 <form @submit.prevent="addItem" class="grid sm:grid-cols-2 gap-2">
                     <input v-model="itemForm.title" class="field sm:col-span-2" placeholder="Item name" required>
-                    <select v-model="itemForm.class_group" class="field">
-                        <option value="">Class category</option>
-                        <option v-for="(label, key) in taxonomy.class_group" :key="key" :value="key">{{ label }}</option>
-                    </select>
-                    <select v-model="itemForm.participant_type" class="field">
-                        <option value="individual">Individual</option>
-                        <option value="group">Group</option>
-                        <option value="team">Team</option>
-                    </select>
+                    <SearchableSelect v-model="itemForm.class_group" :options="classGroupOptions" :all-option="true"
+                        all-label="Class category" />
+                    <SearchableSelect v-model="itemForm.participant_type"
+                        :options="[{ value: 'individual', label: 'Individual' }, { value: 'group', label: 'Group' }, { value: 'team', label: 'Team' }]"
+                        :all-option="false" placeholder="Participant type" />
                     <button class="btn-primary text-sm sm:col-span-2">Add school item</button>
                 </form>
             </div>
@@ -88,8 +80,9 @@
 
 <script setup>
 import { Link, useForm, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     school: Object,
@@ -132,6 +125,21 @@ function removeItem(id) {
 }
 
 const parentEventId = ref('');
+
+const parentEventOptions = computed(() => (props.parentEvents ?? []).map((p) => ({
+    value: p.id,
+    label: `${p.title} (${p.level_round})`,
+})));
+
+const participationPresetOptions = computed(() => Object.entries(props.participationPresets ?? {}).map(([key, label]) => ({
+    value: key,
+    label,
+})));
+
+const classGroupOptions = computed(() => Object.entries(props.taxonomy?.class_group ?? {}).map(([key, label]) => ({
+    value: key,
+    label,
+})));
 
 function linkParent() {
     router.post(`/school-admin/${props.school.id}/fest-programs/${props.event.id}/link-parent`, {

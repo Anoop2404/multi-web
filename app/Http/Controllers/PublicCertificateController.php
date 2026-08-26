@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Certificate;
+use App\Models\FestParticipant;
 use App\Models\McqCertificate;
 use App\Models\Tenant;
 use App\Models\Topper;
@@ -107,6 +108,42 @@ class PublicCertificateController extends Controller
         $payload['isSample'] = $request->boolean('preview');
 
         return view('fest.certificate-print', $payload);
+    }
+
+    /**
+     * Serves the real rendered PDF (from RenderCertificateChunkJob's cache, or a fresh
+     * render on a miss/stale) — unlike print() above, which always returns the
+     * browser-printable HTML page. Same public/throttled/uuid-keyed trust boundary as
+     * print(), since that link already sits right next to this one in the admin UI and a
+     * tighter boundary here would be an inconsistent, confusing regression rather than a
+     * real tightening (the certificate is already reachable via print()'s link).
+     */
+    public function pdf(string $uuid, Request $request)
+    {
+        $certificate = Certificate::where('verification_uuid', $uuid)->firstOrFail();
+
+        // file_path/plain_file_path (what this route serves) are only ever populated for
+        // Fest certificates via RenderCertificateChunkJob — training/topper/mcq certs have
+        // their own dedicated print/verify flows above and never populate these columns.
+        abort_unless($certificate->entity_type === FestParticipant::class, 404);
+
+        $service = app(FestCertificateService::class);
+        $plain = $request->boolean('plain');
+
+        $pdf = $service->cachedOrFreshPdf($certificate, function () use ($certificate, $service) {
+            $payload = $service->renderContext($certificate, embedAssets: true);
+            $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
+
+            return $payload;
+        }, $plain);
+
+        $studentName = $service->payloadFor($certificate)['student']?->name ?? 'certificate';
+        $filename = str($studentName)->slug().'-'.$certificate->verification_uuid.($plain ? '-plain' : '').'.pdf';
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => ($request->boolean('download') ? 'attachment' : 'inline').'; filename="'.$filename.'"',
+        ]);
     }
 
     /** @param  array{uuid: string, sahodaya: Tenant}  $found */

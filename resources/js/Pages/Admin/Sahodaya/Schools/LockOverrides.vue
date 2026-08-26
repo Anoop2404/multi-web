@@ -16,9 +16,8 @@
 
             <form class="card space-y-3" @submit.prevent="submit">
                 <h2 class="font-semibold">Grant override</h2>
-                <select v-model="form.override_type" class="field" required>
-                    <option v-for="(label, value) in overrideTypes" :key="value" :value="value">{{ label }}</option>
-                </select>
+                <SearchableSelect v-model="form.override_type" :options="overrideTypeOptions" :all-option="false"
+                                  placeholder="Select override type" :required="true" />
                 <input v-model="form.expires_at" type="datetime-local" class="field" placeholder="Expires at">
                 <textarea v-model="form.reason" class="field" rows="3" placeholder="Reason"></textarea>
                 <button type="submit" class="btn-primary" :disabled="form.processing">Save override</button>
@@ -47,8 +46,10 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -57,6 +58,8 @@ const props = defineProps({
     windowState: Object,
     overrideTypes: Object,
 });
+
+const overrideTypeOptions = computed(() => Object.entries(props.overrideTypes || {}).map(([value, label]) => ({ value, label })));
 
 const form = useForm({
     override_type: 'unlock_all',

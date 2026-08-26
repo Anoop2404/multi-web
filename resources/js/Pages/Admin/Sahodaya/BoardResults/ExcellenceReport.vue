@@ -19,9 +19,7 @@
                     :description="`Source: ${report.source || 'Board Examination Engine'}. Award rankings and year-over-year pass percentage trends.`">
             <template #actions>
                 <div class="flex items-center gap-3 print:hidden">
-                    <select v-model="year" @change="apply" class="field text-sm font-semibold pr-8 py-2 max-w-[150px]">
-                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">{{ ay.label }}</option>
-                    </select>
+                    <SearchableSelect v-model="year" @change="apply" :options="academicYearSelectOptions" :all-option="false" class="max-w-[150px]" />
                     <button type="button" @click="openHistorySearch" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
                         <span>📜</span> Student History Lookup
                     </button>
@@ -135,11 +133,12 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -152,6 +151,10 @@ const props = defineProps({
 
 const year = ref(props.filters.academic_year || '');
 const showHistoryModal = ref(false);
+
+// The native select bound its option value to ay.label (not ay.id), so mirror
+// that by passing plain label strings through to SearchableSelect.
+const academicYearSelectOptions = computed(() => props.academicYearOptions.map(ay => ay.label));
 
 function apply() {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/board-results/reports/excellence`, {

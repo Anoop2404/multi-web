@@ -6,6 +6,8 @@ use App\Models\CertificateTemplate;
 use App\Models\FestEvent;
 use App\Services\Certificates\CertificateBackgroundConverter;
 use App\Services\Training\TrainingCertificateService;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
@@ -42,11 +44,20 @@ class CertificateTemplateController extends SahodayaAdminController
             ->orderByDesc('event_start')
             ->with(['items' => fn ($q) => $q->orderBy('display_order')])
             ->get(['id', 'title', 'event_type', 'event_start'])
-            ->map(fn (FestEvent $e) => [
-                'id'    => $e->id,
-                'title' => $e->title,
-                'items' => $e->items->map(fn ($i) => ['id' => $i->id, 'title' => $i->title])->values(),
-            ]);
+            ->map(function (FestEvent $e) {
+                $classGroupLabels = FestClassGroupScheme::labels(null, $e);
+                $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
+                return [
+                    'id'    => $e->id,
+                    'title' => $e->title,
+                    'items' => $e->items->map(fn ($i) => [
+                        'id'             => $i->id,
+                        'title'          => $i->title,
+                        'category_label' => FestItemCategoryLabel::resolve($i, $classGroupLabels, $artsCategoryLabels),
+                    ])->values(),
+                ];
+            });
 
         return $this->inertia('Sahodaya/Certificates/Templates', [
             'templates'          => $templates,

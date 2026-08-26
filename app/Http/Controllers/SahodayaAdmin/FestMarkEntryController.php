@@ -305,7 +305,18 @@ class FestMarkEntryController extends SahodayaAdminController
             // (which also knows how to respect an explicit grade change/clear) —
             // duplicating it here used to pre-fill grade before save() could tell
             // that was a revert-to-null, silently discarding it.
-            $result = $markSave->save($event, [...$rowData, 'participant_id' => $participantId], $request->user()->id);
+            //
+            // recalculate: false — a team/group item's expandToTeam() above can return
+            // many participant ids for what the admin experiences as ONE save click.
+            // Recalculating here on every iteration reran the event's entire points
+            // recalculation once per team member (see FestMarkSaveService::save()'s
+            // docblock); doing it once after the loop instead turns an N-member team
+            // save from N full-event recomputes into 1, with zero behavior change for
+            // individual items (N=1 either way).
+            $result = $markSave->save($event, [...$rowData, 'participant_id' => $participantId], $request->user()->id, recalculate: false);
+        }
+        if ($result !== null) {
+            $markSave->recalculate($event);
         }
 
         $participantModel = FestParticipant::with(['student', 'teacher', 'group', 'registration.school'])->find($data['participant_id']);
@@ -503,14 +514,17 @@ class FestMarkEntryController extends SahodayaAdminController
         $event = $this->regionAwareTargetEvent($request, $event);
         $event->load('items');
 
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+
         $items = $event->items
             ->sortBy('title')
             ->map(fn (FestEventItem $item) => [
-                'id'          => $item->id,
-                'title'       => $item->title,
-                'item_code'   => $item->item_code,
-                'total_marks' => $item->total_marks,
-                'judge_count' => $criteriaService->judgeCountForItem($item),
+                'id'             => $item->id,
+                'title'          => $item->title,
+                'item_code'      => $item->item_code,
+                'category_label' => $this->itemCategoryLabel($item, $classGroupLabels),
+                'total_marks'    => $item->total_marks,
+                'judge_count'    => $criteriaService->judgeCountForItem($item),
             ])
             ->values();
 
@@ -806,21 +820,14 @@ class FestMarkEntryController extends SahodayaAdminController
 
     /**
      * "Category" for a Kalotsav item means its class/age bracket (e.g. "Category 1 —
-     * Classes 3 & 4"), not the internal arts_category genre tag. Falls back to the arts
-     * genre only when the item has no meaningful class/age scoping (class_group is the
-     * universal 'open' bucket), and to null when neither says anything distinctive.
+     * Classes 3 & 4"), not the internal arts_category genre tag. Falls back to the
+     * sports age_group, then the arts genre, and to null when nothing says anything
+     * distinctive. Delegates to the shared \App\Support\FestItemCategoryLabel resolver
+     * so mark entry sheets stay in sync with exports/reports/public visibility.
      */
     private function itemCategoryLabel(FestEventItem $item, array $classGroupLabels): ?string
     {
-        if ($item->class_group && $item->class_group !== 'open') {
-            return $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
-        }
-
-        if ($item->category && $item->category !== 'general') {
-            return ucwords(str_replace(['_', '-'], ' ', $item->category));
-        }
-
-        return null;
+        return \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels);
     }
 
     public function autoRankItem(string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)

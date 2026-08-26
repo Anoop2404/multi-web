@@ -4,14 +4,21 @@
         <PageHeader :title="`${event.title} — Judges`" eyebrow="Registration"
                     description="Assign judges to event items." />
         <form @submit.prevent="assign" class="card mb-4 flex flex-wrap gap-2">
-            <select v-model="form.item_id" class="field" required>
-                <option value="">Select item</option>
-                <option v-for="item in event.items" :key="item.id" :value="item.id">{{ item.title }}</option>
-            </select>
-            <select v-model="form.user_id" class="field" required>
-                <option value="">Select judge</option>
-                <option v-for="j in judges" :key="j.id" :value="j.id">{{ j.name }} ({{ j.email }})</option>
-            </select>
+            <SearchableSelect
+                v-model="form.item_id"
+                :options="itemOptions"
+                placeholder="Select item"
+                search-placeholder="Type item name to search…"
+                :all-option="false"
+                class="max-w-xs"
+            />
+            <SearchableSelect
+                v-model="form.user_id"
+                :options="judgeOptions"
+                :all-option="true"
+                all-label="Select judge"
+                :required="true"
+            />
             <button class="btn-primary">Assign</button>
         </form>
 
@@ -39,19 +46,32 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, assignments: Array, judges: Array,
     activityLogs: { type: Array, default: () => [] },
+    classGroupLabels: { type: Object, default: () => ({}) },
 });
 
 const form = useForm({ item_id: '', user_id: '' });
 
+const itemOptions = computed(() => (props.event?.items ?? []).map(item => {
+    const category = item.class_group && item.class_group !== 'open'
+        ? (props.classGroupLabels?.[item.class_group] ?? String(item.class_group).toUpperCase())
+        : null;
+    return { id: item.id, name: category ? `${item.title} — ${category}` : item.title };
+}));
+
+const judgeOptions = computed(() => (props.judges ?? []).map(j => ({ value: j.id, label: `${j.name} (${j.email})` })));
+
 function assign() {
+    if (!form.item_id || !form.user_id) return;
     form.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/judges`, {
         preserveScroll: true,
         onSuccess: () => form.reset(),

@@ -9,44 +9,27 @@
         <form @submit.prevent="assign" class="card mb-4 flex flex-wrap gap-2 items-end">
             <div class="flex-1 min-w-[200px]">
                 <label class="text-xs text-gray-500">User</label>
-                <select v-model="form.user_id" class="field w-full" required>
-                    <option value="">Select user</option>
-                    <option v-for="u in staffPool" :key="u.id" :value="u.id">{{ u.name }} ({{ u.email }})</option>
-                </select>
+                <SearchableSelect v-model="form.user_id" class="w-full" :options="staffOptions" :required="true" :all-option="true" all-label="Select user" />
             </div>
             <div>
                 <label class="text-xs text-gray-500">Duty</label>
-                <select v-model="form.duty" class="field" required>
-                    <option v-for="d in duties" :key="d.value" :value="d.value">{{ d.label }}</option>
-                </select>
+                <SearchableSelect v-model="form.duty" :options="duties" :required="true" :all-option="false" placeholder="Select duty" />
             </div>
             <div v-if="form.duty === 'stage'" class="min-w-[180px]">
                 <label class="text-xs text-gray-500">Stage (optional scope)</label>
-                <select v-model="form.stage_id" class="field w-full">
-                    <option value="">All stages</option>
-                    <option v-for="s in stages" :key="s.id" :value="s.id">{{ stageOptionLabel(s) }}</option>
-                </select>
+                <SearchableSelect v-model="form.stage_id" class="w-full" :options="stageOptions" :all-option="true" all-label="All stages" />
             </div>
             <div v-if="showHeadSelector" class="min-w-[180px]">
                 <label class="text-xs text-gray-500">{{ headFieldLabel }}</label>
-                <select v-model="form.head_id" class="field w-full" :required="headRequired">
-                    <option v-if="!headRequired" value="">All heads</option>
-                    <option v-for="h in heads" :key="h.id" :value="h.id">{{ h.name }}</option>
-                </select>
+                <SearchableSelect v-model="form.head_id" class="w-full" :options="heads" :required="headRequired" :all-option="!headRequired" all-label="All heads" />
             </div>
             <div v-if="regionOptions && regionOptions.length && form.duty !== 'phase_admin'" class="min-w-[180px]">
                 <label class="text-xs text-gray-500">Region (optional scope)</label>
-                <select v-model="form.region_id" class="field w-full">
-                    <option value="">All regions</option>
-                    <option v-for="r in regionOptions" :key="r.id" :value="r.id">{{ r.name }}</option>
-                </select>
+                <SearchableSelect v-model="form.region_id" class="w-full" :options="regionOptions" :all-option="true" all-label="All regions" />
             </div>
             <div v-if="(form.duty === 'region_admin' || form.duty === 'phase_admin') && phaseOptions.length" class="min-w-[180px]">
                 <label class="text-xs text-gray-500">{{ form.duty === 'phase_admin' ? 'Phase (required — every region)' : 'Phase (optional scope)' }}</label>
-                <select v-model="form.source_phase_id" class="field w-full" :required="form.duty === 'phase_admin'">
-                    <option value="">{{ form.duty === 'phase_admin' ? 'Select phase' : 'All phases in region' }}</option>
-                    <option v-for="phase in phaseOptions" :key="phase.id" :value="phase.id">{{ phase.name }}</option>
-                </select>
+                <SearchableSelect v-model="form.source_phase_id" class="w-full" :options="phaseOptions" :required="form.duty === 'phase_admin'" :all-option="true" :all-label="form.duty === 'phase_admin' ? 'Select phase' : 'All phases in region'" />
             </div>
             <button class="btn-primary" :disabled="form.processing">Assign</button>
         </form>
@@ -93,6 +76,7 @@ import { Link, useForm, router } from '@inertiajs/vue3';
 import { computed, watch } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -157,6 +141,9 @@ function dutyLabel(duty) {
 function stageOptionLabel(stage) {
     return stage.venue?.name ? `${stage.name} · ${stage.venue.name}` : stage.name;
 }
+
+const staffOptions = computed(() => props.staffPool.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` })));
+const stageOptions = computed(() => props.stages.map((s) => ({ value: s.id, label: stageOptionLabel(s) })));
 
 function assign() {
     form.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/event-staff`, {

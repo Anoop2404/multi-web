@@ -60,22 +60,18 @@
             <!-- Filters + table -->
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center gap-3">
-                    <select v-model="filterForm.verification"
-                            class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                        <option value="all">All verification</option>
-                        <option value="verified">Verified</option>
-                        <option value="unverified">Pending verification</option>
-                    </select>
-                    <select v-model="filterForm.class_category_id"
-                            class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                        <option :value="null">All categories</option>
-                        <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
-                    </select>
-                    <select v-model="filterForm.school_class_id"
-                            class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                        <option :value="null">All classes</option>
-                        <option v-for="c in filteredClasses" :key="c.id" :value="c.id">Class {{ c.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="filterForm.verification"
+                            :options="[{ value: 'all', label: 'All verification' }, { value: 'verified', label: 'Verified' }, { value: 'unverified', label: 'Pending verification' }]"
+                            :all-option="false"
+                            placeholder="All verification" />
+                    <SearchableSelect v-model="filterForm.class_category_id"
+                            :options="categories"
+                            :all-option="true"
+                            all-label="All categories" />
+                    <SearchableSelect v-model="filterForm.school_class_id"
+                            :options="classOptions"
+                            :all-option="true"
+                            all-label="All classes" />
                     <input v-model="filterForm.search" type="search" placeholder="Search name, admission no..."
                            class="border border-gray-200 rounded-lg px-3 py-2 text-sm w-48">
                     <button v-if="unverifiedCount > 0" type="button"
@@ -167,6 +163,7 @@
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, reactive, watch } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
@@ -202,6 +199,8 @@ const filteredClasses = computed(() => {
     if (!filterForm.class_category_id) return props.classes;
     return props.classes.filter(c => c.class_category_id === filterForm.class_category_id);
 });
+
+const classOptions = computed(() => filteredClasses.value.map(c => ({ value: c.id, label: `Class ${c.name}` })));
 
 const hasFilters = computed(() =>
     filterForm.class_category_id || filterForm.school_class_id || filterForm.search

@@ -33,20 +33,14 @@
         <div class="flex flex-wrap gap-2 items-end mb-4">
             <input v-model="search" type="search" class="field flex-1 min-w-[12rem] !py-1.5 text-sm"
                    placeholder="Search items…" autocomplete="off">
-            <select v-if="headOptions.length" v-model="headFilter" class="field text-sm max-w-[14rem]">
-                <option value="">{{ event.event_type === 'sports' ? 'All Event Heads' : 'All item heads' }}</option>
-                <option v-for="h in headOptions" :key="h.id" :value="h.id">{{ h.name }}</option>
-                <option value="other">Unassigned</option>
-            </select>
-            <select v-if="ageGroups.length" v-model="ageFilter" class="field text-sm max-w-[10rem]">
-                <option value="">All age groups</option>
-                <option v-for="g in ageGroups" :key="g" :value="g">{{ String(g).toUpperCase() }}</option>
-            </select>
-            <select v-model="statusFilter" class="field text-sm max-w-[10rem]">
-                <option value="">All items</option>
-                <option value="scheduled">Scheduled only</option>
-                <option value="unscheduled">Not scheduled</option>
-            </select>
+            <SearchableSelect v-if="headOptions.length" v-model="headFilter" class="max-w-[14rem]"
+                              :options="headFilterOptions" :all-option="true"
+                              :all-label="event.event_type === 'sports' ? 'All Event Heads' : 'All item heads'" />
+            <SearchableSelect v-if="ageGroups.length" v-model="ageFilter" class="max-w-[10rem]"
+                              :options="ageGroupOptions" :all-option="true" all-label="All age groups" />
+            <SearchableSelect v-model="statusFilter" class="max-w-[10rem]"
+                              :options="[{ value: 'scheduled', label: 'Scheduled only' }, { value: 'unscheduled', label: 'Not scheduled' }]"
+                              :all-option="true" all-label="All items" />
             <a :href="importTemplateUrl" class="btn-secondary text-xs">CSV template</a>
         </div>
 
@@ -90,10 +84,8 @@
                                     <input v-model="draft[row.item_id].scheduled_time" type="time" class="field !py-1 !text-xs">
                                 </td>
                                 <td>
-                                    <select v-if="stages.length" v-model="draft[row.item_id].stage_id" class="field !py-1 !text-xs">
-                                        <option value="">— Optional —</option>
-                                        <option v-for="s in stages" :key="s.id" :value="String(s.id)">{{ stageLabel(s) }}</option>
-                                    </select>
+                                    <SearchableSelect v-if="stages.length" v-model="draft[row.item_id].stage_id"
+                                                      :options="stageOptions" :all-option="true" all-label="— Optional —" />
                                     <input v-else v-model="draft[row.item_id].stage" type="text" class="field !py-1 !text-xs"
                                            placeholder="Stage name">
                                 </td>
@@ -120,6 +112,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -186,6 +179,15 @@ const headOptions = computed(() => {
     }
     return [...map.entries()].map(([id, name]) => ({ id, name }));
 });
+
+const headFilterOptions = computed(() => [
+    ...headOptions.value,
+    { id: 'other', name: 'Unassigned' },
+]);
+
+const ageGroupOptions = computed(() => (props.ageGroups ?? []).map((g) => ({ value: g, label: String(g).toUpperCase() })));
+
+const stageOptions = computed(() => (props.stages ?? []).map((s) => ({ value: String(s.id), label: stageLabel(s) })));
 
 const groupedFilteredRows = computed(() => {
     const groups = [];

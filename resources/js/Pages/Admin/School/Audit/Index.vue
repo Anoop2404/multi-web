@@ -23,12 +23,13 @@
         <div class="card mb-4 flex flex-wrap gap-2 items-end">
             <div>
                 <label class="form-label">Log type</label>
-                <select v-model="localFilters.log_name" class="field text-sm min-w-[11rem]">
-                    <option value="">All logs</option>
-                    <option v-for="(count, key) in logNameSummary" :key="key" :value="key">
-                        {{ labelForLogName(key) }} ({{ count }})
-                    </option>
-                </select>
+                <SearchableSelect
+                    v-model="localFilters.log_name"
+                    :options="logNameOptions"
+                    :all-option="true"
+                    all-label="All logs"
+                    class="min-w-[11rem]"
+                />
             </div>
             <div>
                 <label class="form-label">Action</label>
@@ -68,6 +69,7 @@ import { router } from '@inertiajs/vue3';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import DetailedLogTable from '@/Components/logs/DetailedLogTable.vue';
 
 const props = defineProps({
@@ -124,4 +126,9 @@ function labelForLogName(key) {
         .replace(/[_-]/g, ' ')
         .replace(/\b\w/g, (m) => m.toUpperCase());
 }
+
+const logNameOptions = computed(() => Object.entries(props.logNameSummary).map(([key, count]) => ({
+    value: key,
+    label: `${labelForLogName(key)} (${count})`,
+})));
 </script>

@@ -9,6 +9,8 @@ use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\SahodayaProfile;
+use App\Models\SchoolClass;
+use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Events\FestCertificateService;
@@ -241,5 +243,47 @@ class FestCertificateExportTest extends TestCase
         } finally {
             @unlink($absoluteBgPath);
         }
+    }
+
+    /**
+     * {salutation} resolves Master/Miss from the student's own gender field (matching
+     * participantPhotoUrl()'s existing gender-normalization pattern) rather than showing
+     * a fixed choice — and falls back to the non-committal "Master/Miss" rather than
+     * guessing when gender is unset.
+     */
+    public function test_salutation_resolves_from_student_gender(): void
+    {
+        $sahodaya = $this->makeSahodaya();
+        $school = $this->makeSchool($sahodaya->id);
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Salutation Event', 'event_type' => 'kalolsavam']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'SS1']);
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => 'Class 8']);
+        $service = app(FestCertificateService::class);
+
+        $certifyFor = function (?string $gender) use ($event, $item, $school, $schoolClass, $service) {
+            $student = Student::create([
+                'tenant_id' => $school->id, 'school_class_id' => $schoolClass->id,
+                'name' => 'Salutation Student', 'reg_no' => 'SAL-'.($gender ?? 'unset'),
+                'gender' => $gender, 'status' => 'active', 'verified_at' => now(),
+            ]);
+            $registration = FestRegistration::create([
+                'event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved',
+            ]);
+            $participant = FestParticipant::create([
+                'registration_id' => $registration->id, 'event_id' => $event->id, 'student_id' => $student->id,
+                'participant_type' => 'student', 'participant_role' => 'performer',
+            ]);
+            $certificate = Certificate::create([
+                'entity_type' => FestParticipant::class, 'entity_id' => $participant->id,
+                'cert_type' => 'participation', 'verification_uuid' => (string) Str::uuid(), 'generated_at' => now(),
+            ]);
+
+            return $service->renderContext($certificate)['fieldValues']['salutation'];
+        };
+
+        $this->assertSame('Master', $certifyFor('male'));
+        $this->assertSame('Miss', $certifyFor('female'));
+        $this->assertSame('Master/Miss', $certifyFor('other'));
+        $this->assertSame('Master/Miss', $certifyFor(null));
     }
 }

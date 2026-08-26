@@ -59,11 +59,13 @@
             <!-- ACADEMIC YEAR -->
             <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm print:hidden">
                 <label class="form-label mb-1 font-semibold text-xs text-gray-700">Academic Year</label>
-                <select v-model="selectedYear" class="field text-sm font-semibold bg-white max-w-xs" @change="onYearChange">
-                    <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                        {{ academicYearOptionLabel(ay) }}
-                    </option>
-                </select>
+                <SearchableSelect
+                    v-model="selectedYear"
+                    class="max-w-xs"
+                    :options="academicYearSelectOptions"
+                    :all-option="false"
+                    @change="onYearChange"
+                />
             </div>
 
             <!-- ADD / EDIT STUDENT FORM -->
@@ -87,12 +89,18 @@
                         </div>
                         <div>
                             <label class="form-label mb-1 text-xs text-gray-600">Gender *</label>
-                            <select v-model="form.gender" required class="field text-sm bg-white" :disabled="!canEdit">
-                                <option value="">— Select —</option>
-                                <option value="male">♂ Male</option>
-                                <option value="female">♀ Female</option>
-                                <option value="other">Other</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="form.gender"
+                                :required="true"
+                                :disabled="!canEdit"
+                                :all-option="true"
+                                all-label="— Select —"
+                                :options="[
+                                    { value: 'male', label: '♂ Male' },
+                                    { value: 'female', label: '♀ Female' },
+                                    { value: 'other', label: 'Other' },
+                                ]"
+                            />
                         </div>
                         <div>
                             <label class="form-label mb-1 text-xs text-gray-600">CBSE Roll No *</label>
@@ -100,10 +108,14 @@
                         </div>
                         <div v-if="boardResult.class === 12">
                             <label class="form-label mb-1 text-xs text-gray-600">Stream *</label>
-                            <select v-model="form.stream" required class="field text-sm bg-white" :disabled="!canEdit">
-                                <option value="">— Select —</option>
-                                <option v-for="(label, key) in streamOptions" :key="key" :value="label">{{ label }}</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="form.stream"
+                                :required="true"
+                                :disabled="!canEdit"
+                                :all-option="true"
+                                all-label="— Select —"
+                                :options="streamSelectOptions"
+                            />
                         </div>
                         <div>
                             <label class="form-label mb-1 text-xs text-gray-600">Marksheet / Proof (PDF or Image) *</label>
@@ -131,16 +143,13 @@
                                 <tbody class="divide-y divide-gray-100 bg-white">
                                     <tr v-for="(row, i) in form.subjects" :key="i" :class="{ 'bg-red-50': isDuplicateRow(i) }">
                                         <td class="py-2 px-3">
-                                            <select v-model="row.subject" class="field text-xs py-1.5 bg-white" :disabled="!canEdit">
-                                                <option value="" disabled>-- Select Subject --</option>
-                                                <option
-                                                    v-for="s in standardSubjects"
-                                                    :key="s"
-                                                    :value="s"
-                                                    :disabled="isSubjectUsedElsewhere(i, s)"
-                                                >{{ subjectCodes[s] ? `${s} (${subjectCodes[s]})` : s }}{{ isSubjectUsedElsewhere(i, s) ? ' — already added' : '' }}</option>
-                                                <option value="__custom__">+ Custom subject...</option>
-                                            </select>
+                                            <SearchableSelect
+                                                v-model="row.subject"
+                                                :disabled="!canEdit"
+                                                :all-option="false"
+                                                placeholder="-- Select Subject --"
+                                                :options="subjectOptionsForRow(i)"
+                                            />
                                             <input
                                                 v-if="row.subject === '__custom__'"
                                                 v-model="row.customSubject"
@@ -268,6 +277,7 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SubjectMarksPreviewModal from '@/Components/BoardResults/SubjectMarksPreviewModal.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
@@ -302,6 +312,16 @@ function academicYearOptionLabel(year) {
     if (year.entry_status === 'closed') return `${year.label} (Entry Closed)`;
     return year.label;
 }
+
+const academicYearSelectOptions = computed(() => props.academicYearOptions.map((ay) => ({
+    value: ay.label,
+    label: academicYearOptionLabel(ay),
+})));
+
+const streamSelectOptions = computed(() => Object.entries(props.streamOptions).map(([key, label]) => ({
+    value: label,
+    label,
+})));
 
 function navigate(extra = {}) {
     router.get(`/school-admin/${props.school.id}/board-results/full-a1-achievers`, {
@@ -415,6 +435,14 @@ function isDuplicateRow(rowIndex) {
     const label = resolvedSubjectLabel(form.value.subjects[rowIndex]);
     if (!label) return false;
     return isSubjectUsedElsewhere(rowIndex, label);
+}
+
+function subjectOptionsForRow(i) {
+    const subjectOptions = props.standardSubjects.map((s) => ({
+        value: s,
+        label: `${props.subjectCodes[s] ? `${s} (${props.subjectCodes[s]})` : s}${isSubjectUsedElsewhere(i, s) ? ' — already added' : ''}`,
+    }));
+    return [...subjectOptions, { value: '__custom__', label: '+ Custom subject...' }];
 }
 
 function markClass(marks) {

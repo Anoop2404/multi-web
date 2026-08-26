@@ -30,29 +30,36 @@
         <div v-if="exp.params?.length" class="reports-export-card__filters">
             <FormField v-if="exp.params.includes('school_id')" label="School" class-extra="min-w-[12rem] mb-0">
                 <template #default="{ id }">
-                    <select :id="id" :value="paramValues.school_id" class="field text-sm"
-                            @change="emitParam('school_id', $event.target.value)">
-                        <option value="">All schools</option>
-                        <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <SearchableSelect
+                        :id="id"
+                        :model-value="paramValues.school_id"
+                        :options="schools"
+                        all-label="All schools"
+                        @update:model-value="value => emitParam('school_id', value)"
+                    />
                 </template>
             </FormField>
             <FormField v-if="exp.params.includes('item_id')" label="Item" class-extra="min-w-[12rem] mb-0">
-                <template #default="{ id }">
-                    <select :id="id" :value="paramValues.item_id" class="field text-sm"
-                            @change="emitParam('item_id', $event.target.value)">
-                        <option value="">Select item</option>
-                        <option v-for="i in items" :key="i.id" :value="i.id">{{ i.title }}</option>
-                    </select>
+                <template #default>
+                    <SearchableSelect
+                        :model-value="paramValues.item_id"
+                        :options="itemOptions"
+                        placeholder="Select item"
+                        search-placeholder="Type item name to search…"
+                        all-label="Select item"
+                        @update:model-value="value => emitParam('item_id', value)"
+                    />
                 </template>
             </FormField>
             <FormField v-if="exp.params.includes('class_group')" label="Class" class-extra="min-w-[10rem] mb-0">
                 <template #default="{ id }">
-                    <select :id="id" :value="paramValues.class_group" class="field text-sm"
-                            @change="emitParam('class_group', $event.target.value)">
-                        <option value="">All</option>
-                        <option v-for="(label, key) in classGroups" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect
+                        :id="id"
+                        :model-value="paramValues.class_group"
+                        :options="classGroupOptions"
+                        all-label="All"
+                        @update:model-value="value => emitParam('class_group', value)"
+                    />
                 </template>
             </FormField>
             <FormField v-if="exp.params.includes('date')" label="Date" class-extra="mb-0">
@@ -69,29 +76,35 @@
             </FormField>
             <FormField v-if="exp.params.includes('head_id')" :label="isSports ? 'Sport Event' : 'Item head'" class-extra="min-w-[12rem] mb-0">
                 <template #default="{ id }">
-                    <select :id="id" :value="paramValues.head_id" class="field text-sm"
-                            @change="emitParam('head_id', $event.target.value)">
-                        <option value="">{{ isSports ? 'All sport events' : 'All heads' }}</option>
-                        <option v-for="h in heads" :key="h.id" :value="h.id">{{ h.name }}</option>
-                    </select>
+                    <SearchableSelect
+                        :id="id"
+                        :model-value="paramValues.head_id"
+                        :options="heads"
+                        :all-label="isSports ? 'All sport events' : 'All heads'"
+                        @update:model-value="value => emitParam('head_id', value)"
+                    />
                 </template>
             </FormField>
             <FormField v-if="exp.params.includes('stage_id')" label="Stage" class-extra="min-w-[12rem] mb-0">
                 <template #default="{ id }">
-                    <select :id="id" :value="paramValues.stage_id" class="field text-sm"
-                            @change="emitParam('stage_id', $event.target.value)">
-                        <option value="">All stages</option>
-                        <option v-for="st in stages" :key="st.id" :value="st.id">{{ st.name }}</option>
-                    </select>
+                    <SearchableSelect
+                        :id="id"
+                        :model-value="paramValues.stage_id"
+                        :options="stages"
+                        all-label="All stages"
+                        @update:model-value="value => emitParam('stage_id', value)"
+                    />
                 </template>
             </FormField>
             <FormField v-if="exp.params.includes('audience')" label="Audience" class-extra="min-w-[10rem] mb-0">
                 <template #default="{ id }">
-                    <select :id="id" :value="paramValues.audience" class="field text-sm"
-                            @change="emitParam('audience', $event.target.value)">
-                        <option value="">Staff</option>
-                        <option value="public">Public</option>
-                    </select>
+                    <SearchableSelect
+                        :id="id"
+                        :model-value="paramValues.audience"
+                        :options="[{ value: 'public', label: 'Public' }]"
+                        all-label="Staff"
+                        @update:model-value="value => emitParam('audience', value)"
+                    />
                 </template>
             </FormField>
         </div>
@@ -101,6 +114,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { previewHrefForExport, FORMAT_LABELS } from '@/support/festReportCatalog.js';
 
 const props = defineProps({
@@ -138,6 +152,16 @@ const pdfPreviewHref = computed(() => {
     if (props.exp.format !== 'pdf') return null;
     return downloadHref.value + (downloadHref.value.includes('?') ? '&' : '?') + 'preview=1';
 });
+
+const itemOptions = computed(() => props.items.map(i => ({
+    id: i.id,
+    name: i.category_label ? `${i.title} — ${i.category_label}` : i.title,
+})));
+
+const classGroupOptions = computed(() => Object.entries(props.classGroups ?? {}).map(([key, label]) => ({
+    value: key,
+    label,
+})));
 
 const formatLabel = computed(() => FORMAT_LABELS[props.exp.format] ?? props.exp.format?.toUpperCase() ?? 'FILE');
 const formatClass = computed(() => `reports-format-badge--${props.exp.format ?? 'pdf'}`);

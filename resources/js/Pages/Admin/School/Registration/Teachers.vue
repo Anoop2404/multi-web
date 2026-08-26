@@ -27,10 +27,7 @@
                         <input v-model="form.name" required class="field" placeholder="Teacher name">
                     </FormField>
                     <FormField label="Teaching type" :error="form.errors.teaching_type_id">
-                        <select v-model="form.teaching_type_id" class="field">
-                            <option value="">Select type</option>
-                            <option v-for="t in teachingTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
-                        </select>
+                        <SearchableSelect v-model="form.teaching_type_id" :options="teachingTypes" :all-option="true" all-label="Select type" />
                     </FormField>
                 </FormGrid>
                 <FormField label="Subjects" :error="form.errors.subject_ids">
@@ -55,10 +52,7 @@
                                     <input v-model="row.name" class="field" placeholder="Teacher name">
                                 </FormField>
                                 <FormField label="Teaching type">
-                                    <select v-model="row.teaching_type_id" class="field">
-                                        <option value="">Select type</option>
-                                        <option v-for="t in teachingTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
-                                    </select>
+                                    <SearchableSelect v-model="row.teaching_type_id" :options="teachingTypes" :all-option="true" all-label="Select type" />
                                 </FormField>
                             </FormGrid>
                             <FormField label="Subjects">
@@ -119,6 +113,7 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import FormField from '@/Components/ui/FormField.vue';
 import FormGrid from '@/Components/ui/FormGrid.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import MembershipWorkflowNav from '@/Components/school/MembershipWorkflowNav.vue';
 import TrackStatusPill from '@/Components/ui/TrackStatusPill.vue';
 import SubjectPicker from '@/Components/school/SubjectPicker.vue';

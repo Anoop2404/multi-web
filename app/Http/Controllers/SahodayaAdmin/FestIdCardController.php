@@ -5,6 +5,8 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsFestIdCardResponses;
 use App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
+use App\Support\FestClassGroupScheme;
 use App\Support\FestPageActivity;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestIdCardService;
@@ -25,15 +27,18 @@ class FestIdCardController extends SahodayaAdminController
 
         $itemCounts = $service->itemParticipantCounts($targetEvent);
         $registrationCounts = $service->itemRegistrationCounts($targetEvent);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $targetEvent);
+        $ageGroupLabels = config('fest_item_taxonomy.age_group', []);
 
         return $this->inertia('Sahodaya/Events/IdCards/Index', $this->withEventActivity($event, FestPageActivity::ID_CARDS, [
             'event'  => $targetEvent->only('id', 'title', 'status', 'event_type'),
-            'items'  => $targetEvent->items->map(fn ($item) => [
+            'items'  => $targetEvent->items->map(fn (FestEventItem $item) => [
                 'id'                  => $item->id,
                 'title'               => $item->title,
                 'participant_type'    => $item->participant_type,
                 'count'               => $itemCounts[$item->id] ?? 0,
                 'registration_count'  => $registrationCounts[$item->id] ?? 0,
+                'category_label'      => $this->itemCategoryLabel($item, $classGroupLabels, $ageGroupLabels),
             ]),
             'heads'  => $service->headOptions($targetEvent),
             'meta'   => $service->indexMeta($targetEvent),
@@ -233,6 +238,33 @@ class FestIdCardController extends SahodayaAdminController
         ))->render();
 
         return \App\Support\PdfGenerator::download($html, "{$slug}-all-heads-id-cards.pdf");
+    }
+
+    /**
+     * Human-readable class/age-bracket or arts-genre label for an item, for display
+     * next to the item's title in pickers. Sports events use age_group; everything
+     * else uses class_group, falling back to the arts category. Null when nothing
+     * more specific than the generic 'open'/'general' buckets applies.
+     *
+     * @param  array<string, string>  $classGroupLabels
+     * @param  array<string, string>  $ageGroupLabels
+     */
+    private function itemCategoryLabel(FestEventItem $item, array $classGroupLabels, array $ageGroupLabels): ?string
+    {
+        if ($item->age_group && $item->age_group !== 'open') {
+            return $ageGroupLabels[$item->age_group] ?? strtoupper($item->age_group);
+        }
+
+        if ($item->class_group && $item->class_group !== 'open') {
+            return $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
+        }
+
+        if ($item->category && $item->category !== 'general') {
+            return config("fest_item_taxonomy.arts_category.{$item->category}")
+                ?? ucwords(str_replace(['_', '-'], ' ', $item->category));
+        }
+
+        return null;
     }
 
     /** @return array<string, mixed> */

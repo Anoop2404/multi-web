@@ -17,6 +17,7 @@ use App\Models\Student;
 use App\Models\Tenant;
 use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use App\Support\PdfGenerator;
 use App\Support\ReportFilename;
 use App\Support\TenantBranding;
@@ -323,6 +324,31 @@ class FestReportService
             ->itemRegistrationRows();
     }
 
+    /**
+     * Items where every performer already has marks entered but results haven't been
+     * published yet — the same "marks ready, not published" state the Overview page's
+     * marked_unpublished_items tile counts (FestEventController::show()), surfaced here
+     * as an actual listing so an admin can see which items still need the Publish click
+     * instead of just a number. Reuses FestItemResultsService::itemSummaries() rather
+     * than reimplementing its marks_ready/results_published logic.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function resultsPendingRows(): array
+    {
+        $summaries = app(FestItemResultsService::class)->itemSummaries($this->event);
+
+        if ($this->scope) {
+            $allowedItemIds = array_flip($this->scope->itemIds);
+            $summaries = array_values(array_filter($summaries, fn (array $r) => isset($allowedItemIds[$r['item_id']])));
+        }
+
+        return array_values(array_filter(
+            $summaries,
+            fn (array $r) => ($r['marks_ready'] ?? false) && ! ($r['results_published'] ?? false),
+        ));
+    }
+
     /** @return array{participant: list<array<string, mixed>>, stage: list<array<string, mixed>>} */
     public function scheduleClashRows(?string $schoolId = null): array
     {
@@ -414,6 +440,8 @@ class FestReportService
             'attendance-sheet' => $this->attendanceSheetPdf($request),
             'attendance-sheet-school' => $this->attendanceSheetSchoolPdf($request),
             'mark-entry-status' => $this->markEntryStatusCsv(),
+            'results-pending' => $this->resultsPendingCsv(),
+            'absent-report' => $analytics()->exportAbsentReport($request->input('school_id')),
             'item-order-public' => $this->itemOrderPublicPdf($request),
             'green-room-list' => $this->greenRoomListPdf($request),
             'clashes' => $this->clashesCsv($request),
@@ -757,7 +785,7 @@ class FestReportService
         $items = collect($this->itemRegistrationCountRows())->map(fn ($row) => (object) [
             'title'            => $row['title'],
             'head_name'        => $row['head_name'] ?? null,
-            'class_group'      => $row['age_group'] ?? $row['class_group'] ?? '—',
+            'category_label'   => $row['category_label'] ?? '—',
             'participant_type' => $row['participant_type'] ?? 'individual',
             'approved'         => $row['approved'],
             'pending'          => $row['pending'],
@@ -787,12 +815,14 @@ class FestReportService
             ->get();
 
         $item = FestEventItem::find($itemId);
+        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $this->event));
 
         return $this->renderPdf('fest.reports.item-wise', [
-            'event' => $this->event,
-            'item'  => $item,
-            'marks' => $marks,
-            'topN'  => $topN,
+            'event'         => $this->event,
+            'item'          => $item,
+            'categoryLabel' => $categoryLabel,
+            'marks'         => $marks,
+            'topN'          => $topN,
             ...$this->brandingData(),
         ], $this->slug().'-item-wise.pdf');
     }
@@ -1192,6 +1222,18 @@ class FestReportService
         ], $rows);
     }
 
+    private function resultsPendingCsv(): StreamedResponse
+    {
+        $rows = array_map(fn (array $r) => [
+            $r['title'], $r['item_code'] ?? '', $r['category_label'] ?? '', $r['head_name'] ?? '',
+            $r['performers'], $r['marks_entered'], $r['judges_assigned'],
+        ], $this->resultsPendingRows());
+
+        return ExcelExport::download($this->slug().'-results-pending', [
+            'Item', 'Item Code', 'Category', 'Head', 'Performers', 'Marks Entered', 'Judges Assigned',
+        ], $rows);
+    }
+
     private function clashesCsv(Request $request): StreamedResponse
     {
         $clashes = $this->scheduleClashRows($request->input('school_id'))['participant'];
@@ -1214,10 +1256,10 @@ class FestReportService
         $stageId = $request->integer('stage_id') ?: null;
         $rows = $this->itemScheduleRows($date, $stageId);
 
-        $csv = "Item,Age group,Date,Time,Venue,Stage\n";
+        $csv = "Item,Category,Date,Time,Venue,Stage\n";
         foreach ($rows as $row) {
             $csv .= '"'.str_replace('"', '""', (string) $row['title']).'",';
-            $csv .= '"'.strtoupper((string) ($row['age_group'] ?? '')).'",';
+            $csv .= '"'.str_replace('"', '""', (string) ($row['category_label'] ?? '')).'",';
             $csv .= '"'.($row['scheduled_date'] ?? '').'",';
             $csv .= '"'.($row['scheduled_time'] ?? '').'",';
             $csv .= '"'.str_replace('"', '""', (string) ($row['venue'] ?? '')).'",';

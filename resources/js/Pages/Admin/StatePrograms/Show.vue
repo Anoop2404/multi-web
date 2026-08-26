@@ -77,17 +77,15 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Program Status *</label>
-                            <select v-model="form.status" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-[color:var(--brand-blue)] text-sm font-medium">
-                                <option value="published">🟢 Published / Active</option>
-                                <option value="draft">🟡 Draft (Setup mode)</option>
-                                <option value="inactive">🔴 Inactive (Disabled)</option>
-                            </select>
+                            <SearchableSelect v-model="form.status" :all-option="false" :options="[
+                                { value: 'published', label: '🟢 Published / Active' },
+                                { value: 'draft', label: '🟡 Draft (Setup mode)' },
+                                { value: 'inactive', label: '🔴 Inactive (Disabled)' },
+                            ]" class="w-full" />
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Event Type *</label>
-                            <select v-model="form.event_type" :disabled="program.status === 'published'" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-[color:var(--brand-blue)] text-sm font-medium">
-                                <option v-for="(label, key) in eventTypes" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="form.event_type" :disabled="program.status === 'published'" :all-option="false" :options="eventTypeOptions" class="w-full" />
                         </div>
                     </div>
 
@@ -190,31 +188,27 @@
                             <input v-model="itemForm.title" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium sm:col-span-2" placeholder="Item Name (e.g. Light Music, Bharatanatyam)" required>
                             <input v-model.number="itemForm.fee_amount" type="number" min="0" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="Fee (₹) — optional">
                             
-                            <select v-if="form.event_type === 'sports'" v-model="itemForm.age_group" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                <option value="">Age Group</option>
-                                <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-if="form.event_type === 'sports'" v-model="itemForm.age_group" all-label="Age Group" :options="ageGroupOptions" />
                             <div v-else>
-                                <select v-model="itemForm.class_group" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                    <option value="">Select Category / Group</option>
-                                    <option value="category_1">Category 1 — Classes 3 & 4 (LP)</option>
-                                    <option value="category_2">Category 2 — Classes 5, 6 & 7 (UP)</option>
-                                    <option value="category_3">Category 3 — Classes 8, 9 & 10 (HS)</option>
-                                    <option value="category_4">Category 4 — Classes 11 & 12 (HSS)</option>
-                                    <option value="category_5">Category 5 — Group Items (Open)</option>
-                                    <option value="open">Open / All Categories</option>
-                                    <option value="lp">LP (Category 1)</option>
-                                    <option value="up">UP (Category 2)</option>
-                                    <option value="hs">HS (Category 3)</option>
-                                    <option value="hss">HSS (Category 4)</option>
-                                </select>
+                                <SearchableSelect v-model="itemForm.class_group" all-label="Select Category / Group" :options="[
+                                    { value: 'category_1', label: 'Category 1 — Classes 3 & 4 (LP)' },
+                                    { value: 'category_2', label: 'Category 2 — Classes 5, 6 & 7 (UP)' },
+                                    { value: 'category_3', label: 'Category 3 — Classes 8, 9 & 10 (HS)' },
+                                    { value: 'category_4', label: 'Category 4 — Classes 11 & 12 (HSS)' },
+                                    { value: 'category_5', label: 'Category 5 — Group Items (Open)' },
+                                    { value: 'open', label: 'Open / All Categories' },
+                                    { value: 'lp', label: 'LP (Category 1)' },
+                                    { value: 'up', label: 'UP (Category 2)' },
+                                    { value: 'hs', label: 'HS (Category 3)' },
+                                    { value: 'hss', label: 'HSS (Category 4)' },
+                                ]" class="w-full" />
                             </div>
 
-                            <select v-model="itemForm.participant_type" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                <option value="individual">Individual</option>
-                                <option value="group">Group</option>
-                                <option value="team">Team</option>
-                            </select>
+                            <SearchableSelect v-model="itemForm.participant_type" :all-option="false" :options="[
+                                { value: 'individual', label: 'Individual' },
+                                { value: 'group', label: 'Group' },
+                                { value: 'team', label: 'Team' },
+                            ]" />
 
                             <input v-model.number="itemForm.qualify_count" type="number" min="1" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="State Qualifiers (default 2)">
                         </div>
@@ -273,15 +267,14 @@
                                 <button v-if="catalogSearch" type="button" @click="catalogSearch = ''" class="absolute right-2.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
                             </div>
 
-                            <select v-model="catalogCategoryFilter" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-medium bg-white">
-                                <option value="">All Categories</option>
-                                <option value="category_1">Category 1</option>
-                                <option value="category_2">Category 2</option>
-                                <option value="category_3">Category 3</option>
-                                <option value="category_4">Category 4</option>
-                                <option value="category_5">Category 5 (Group)</option>
-                                <option value="open">Open</option>
-                            </select>
+                            <SearchableSelect v-model="catalogCategoryFilter" all-label="All Categories" :options="[
+                                { value: 'category_1', label: 'Category 1' },
+                                { value: 'category_2', label: 'Category 2' },
+                                { value: 'category_3', label: 'Category 3' },
+                                { value: 'category_4', label: 'Category 4' },
+                                { value: 'category_5', label: 'Category 5 (Group)' },
+                                { value: 'open', label: 'Open' },
+                            ]" />
                         </div>
                     </div>
 
@@ -379,59 +372,58 @@
 
                                 <div>
                                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Category / Group *</label>
-                                    <select v-model="editItemForm.class_group" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                        <option value="">Select Category</option>
-                                        <option value="category_1">Category 1 — Classes 3 & 4 (LP)</option>
-                                        <option value="category_2">Category 2 — Classes 5, 6 & 7 (UP)</option>
-                                        <option value="category_3">Category 3 — Classes 8, 9 & 10 (HS)</option>
-                                        <option value="category_4">Category 4 — Classes 11 & 12 (HSS)</option>
-                                        <option value="category_5">Category 5 — Group Items (Open)</option>
-                                        <option value="open">Open / All Categories</option>
-                                        <option value="lp">LP (Category 1)</option>
-                                        <option value="up">UP (Category 2)</option>
-                                        <option value="hs">HS (Category 3)</option>
-                                        <option value="hss">HSS (Category 4)</option>
-                                    </select>
+                                    <SearchableSelect v-model="editItemForm.class_group" all-label="Select Category" :options="[
+                                        { value: 'category_1', label: 'Category 1 — Classes 3 & 4 (LP)' },
+                                        { value: 'category_2', label: 'Category 2 — Classes 5, 6 & 7 (UP)' },
+                                        { value: 'category_3', label: 'Category 3 — Classes 8, 9 & 10 (HS)' },
+                                        { value: 'category_4', label: 'Category 4 — Classes 11 & 12 (HSS)' },
+                                        { value: 'category_5', label: 'Category 5 — Group Items (Open)' },
+                                        { value: 'open', label: 'Open / All Categories' },
+                                        { value: 'lp', label: 'LP (Category 1)' },
+                                        { value: 'up', label: 'UP (Category 2)' },
+                                        { value: 'hs', label: 'HS (Category 3)' },
+                                        { value: 'hss', label: 'HSS (Category 4)' },
+                                    ]" class="w-full" />
                                 </div>
 
                                 <div>
                                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Discipline Category</label>
-                                    <select v-model="editItemForm.category" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                        <option value="music">Music</option>
-                                        <option value="dance">Dance</option>
-                                        <option value="drama">Drama / Theatre</option>
-                                        <option value="literary">Literary</option>
-                                        <option value="fine_arts">Fine Arts</option>
-                                        <option value="traditional">Traditional / Folk</option>
-                                        <option value="sports">Sports</option>
-                                        <option value="general">General</option>
-                                    </select>
+                                    <SearchableSelect v-model="editItemForm.category" :all-option="false" :options="[
+                                        { value: 'music', label: 'Music' },
+                                        { value: 'dance', label: 'Dance' },
+                                        { value: 'drama', label: 'Drama / Theatre' },
+                                        { value: 'literary', label: 'Literary' },
+                                        { value: 'fine_arts', label: 'Fine Arts' },
+                                        { value: 'traditional', label: 'Traditional / Folk' },
+                                        { value: 'sports', label: 'Sports' },
+                                        { value: 'general', label: 'General' },
+                                    ]" class="w-full" />
                                 </div>
 
                                 <div>
                                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Participant Type</label>
-                                    <select v-model="editItemForm.participant_type" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                        <option value="individual">Individual</option>
-                                        <option value="group">Group</option>
-                                        <option value="team">Team</option>
-                                    </select>
+                                    <SearchableSelect v-model="editItemForm.participant_type" :all-option="false" :options="[
+                                        { value: 'individual', label: 'Individual' },
+                                        { value: 'group', label: 'Group' },
+                                        { value: 'team', label: 'Team' },
+                                    ]" class="w-full" />
                                 </div>
 
                                 <div>
                                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Stage Type</label>
-                                    <select v-model="editItemForm.stage_type" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                        <option value="on_stage">On Stage</option>
-                                        <option value="off_stage">Off Stage</option>
-                                    </select>
+                                    <SearchableSelect v-model="editItemForm.stage_type" :all-option="false" :options="[
+                                        { value: 'on_stage', label: 'On Stage' },
+                                        { value: 'off_stage', label: 'Off Stage' },
+                                    ]" class="w-full" />
                                 </div>
 
                                 <div>
                                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Gender Restriction</label>
-                                    <select v-model="editItemForm.gender" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                        <option value="open">Open (All)</option>
-                                        <option value="male">Boys Only</option>
-                                        <option value="female">Girls Only</option>
-                                    </select>
+                                    <SearchableSelect v-model="editItemForm.gender" :all-option="false" :options="[
+                                        { value: 'open', label: 'Open (All)' },
+                                        { value: 'male', label: 'Boys Only' },
+                                        { value: 'female', label: 'Girls Only' },
+                                    ]" class="w-full" />
                                 </div>
 
                                 <div>
@@ -481,9 +473,7 @@
                                 <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">{{ levelLabels[lvl] ?? lvl }} Fee Model</h3>
                                 <span class="text-xs text-slate-500">{{ levelFeeHints[lvl] }}</span>
                             </div>
-                            <select v-model="form.level_fees[lvl].fee_model" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                <option v-for="(label, key) in feeTypes" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="form.level_fees[lvl].fee_model" :all-option="false" :options="feeTypeOptions" class="w-full" />
                             <div v-if="form.level_fees[lvl].fee_model === 'cksc_tiered'" class="grid sm:grid-cols-2 gap-3 text-xs">
                                 <div>
                                     <label class="block font-semibold text-slate-700 mb-1">First Item Registration Fee (₹)</label>
@@ -513,10 +503,7 @@
                         <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Per-Student Participation Limits</h3>
                         <div v-for="lvl in form.conduct_levels.filter(l => l !== 'state')" :key="`pol-${lvl}`" class="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
                             <p class="text-xs font-bold text-slate-700 uppercase">{{ levelLabels[lvl] ?? lvl }} Limit Preset</p>
-                            <select v-model="form.level_policies[lvl].preset_key" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium">
-                                <option value="">Custom</option>
-                                <option v-for="(preset, key) in participationPresets" :key="key" :value="key">{{ preset.label }}</option>
-                            </select>
+                            <SearchableSelect v-model="form.level_policies[lvl].preset_key" all-label="Custom" :options="participationPresetOptions" class="w-full" />
                             <div v-if="!form.level_policies[lvl].preset_key" class="grid sm:grid-cols-4 gap-3 text-xs">
                                 <div>
                                     <label class="block font-semibold text-slate-700 mb-1">Max On-Stage</label>
@@ -692,6 +679,7 @@
 import { Link, useForm, router } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     program: Object,
@@ -707,6 +695,11 @@ const props = defineProps({
     taxonomy: Object,
     allSahodayas: { type: Array, default: () => [] },
 });
+
+const eventTypeOptions = computed(() => Object.entries(props.eventTypes ?? {}).map(([value, label]) => ({ value, label })));
+const ageGroupOptions = computed(() => Object.entries(props.ageGroupLabels ?? {}).map(([value, label]) => ({ value, label })));
+const feeTypeOptions = computed(() => Object.entries(props.feeTypes ?? {}).map(([value, label]) => ({ value, label })));
+const participationPresetOptions = computed(() => Object.entries(props.participationPresets ?? {}).map(([value, preset]) => ({ value, label: preset.label })));
 
 const activeTab = ref('general');
 const hasResultsRollup = computed(() => ['kids_fest', 'teacher_fest', 'custom'].includes(props.program.event_type));

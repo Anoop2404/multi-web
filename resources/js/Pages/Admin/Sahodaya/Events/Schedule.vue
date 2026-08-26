@@ -44,21 +44,31 @@
             <h3 class="section-title">Add schedule slot</h3>
             <p class="section-desc mb-3">Assign a date/time and stage for a specific item or individual participant.</p>
             <form @submit.prevent="save" class="grid md:grid-cols-5 gap-2">
-                <select v-model="form.item_id" class="field" required>
-                    <option value="">Item</option>
-                    <option v-for="item in event.items" :key="item.id" :value="item.id">{{ item.title }}</option>
-                </select>
-                <select v-model="form.participant_id" class="field">
-                    <option value="">All item (block)</option>
-                    <option v-for="p in participantsForItem" :key="p.id" :value="p.id">
-                        #{{ p.chest_no }} {{ p.student?.name ?? p.teacher?.name }}
-                    </option>
-                </select>
+                <SearchableSelect
+                    v-model="form.item_id"
+                    :options="itemOptions"
+                    placeholder="Item"
+                    search-placeholder="Type item name to search…"
+                    :all-option="false"
+                />
+                <SearchableSelect
+                    v-model="form.participant_id"
+                    :options="participantSelectOptions"
+                    placeholder="Participant"
+                    search-placeholder="Type name or chest no. to search…"
+                    :all-option="true"
+                    all-label="All item (block)"
+                />
                 <input v-model="form.scheduled_at" type="datetime-local" class="field">
-                <select v-if="stages.length" v-model="form.stage_id" class="field">
-                    <option value="">Stage</option>
-                    <option v-for="s in stages" :key="s.id" :value="s.id">{{ stageOptionLabel(s) }}</option>
-                </select>
+                <SearchableSelect
+                    v-if="stages.length"
+                    v-model="form.stage_id"
+                    :options="stageSelectOptions"
+                    placeholder="Stage"
+                    search-placeholder="Type stage name to search…"
+                    :all-option="true"
+                    all-label="Stage"
+                />
                 <input v-else v-model="form.stage" class="field" placeholder="Stage">
                 <button class="btn-primary">Save slot</button>
             </form>
@@ -107,6 +117,7 @@ import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -116,7 +127,24 @@ const props = defineProps({
     clashes: { type: Array, default: () => [] },
     stageConflicts: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
+    classGroupLabels: { type: Object, default: () => ({}) },
+    ageGroupLabels: { type: Object, default: () => ({}) },
 });
+
+function itemCategoryLabel(item) {
+    if (item.age_group && item.age_group !== 'open') {
+        return props.ageGroupLabels?.[item.age_group] ?? String(item.age_group).toUpperCase();
+    }
+    if (item.class_group && item.class_group !== 'open') {
+        return props.classGroupLabels?.[item.class_group] ?? String(item.class_group).toUpperCase();
+    }
+    return null;
+}
+
+const itemOptions = computed(() => (props.event?.items ?? []).map(item => ({
+    id: item.id,
+    name: itemCategoryLabel(item) ? `${item.title} — ${itemCategoryLabel(item)}` : item.title,
+})));
 
 const form = useForm({ item_id: '', participant_id: '', scheduled_at: '', stage_id: '', stage: '' });
 const scheduleImportFile = ref(null);
@@ -151,6 +179,11 @@ const participantsForItem = computed(() =>
     props.participants.filter(p => p.registration?.item_id == form.item_id)
 );
 
+const participantSelectOptions = computed(() => participantsForItem.value.map(p => ({
+    value: p.id,
+    label: `#${p.chest_no} ${p.student?.name ?? p.teacher?.name ?? ''}`,
+})));
+
 function formatTime(value) {
     if (!value) return '—';
     return new Date(value).toLocaleString();
@@ -166,7 +199,13 @@ function stageOptionLabel(stage) {
     return stage.venue?.name ? `${stage.name} · ${stage.venue.name}` : stage.name;
 }
 
+const stageSelectOptions = computed(() => props.stages.map(s => ({
+    value: s.id,
+    label: stageOptionLabel(s),
+})));
+
 function save() {
+    if (!form.item_id) return;
     form.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/schedule`, {
         preserveScroll: true,
         onSuccess: () => form.reset('participant_id', 'scheduled_at', 'stage', 'stage_id'),

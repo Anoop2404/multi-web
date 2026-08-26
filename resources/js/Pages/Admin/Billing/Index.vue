@@ -74,17 +74,13 @@
                     <div class="grid sm:grid-cols-2 gap-3">
                         <div>
                             <label class="label-xs">Tenant <span class="text-red-500">*</span></label>
-                            <select v-model="subForm.tenant_id" class="field" required>
-                                <option value="">Select tenant…</option>
-                                <option v-for="t in tenantsForSelectComputed" :key="t.id" :value="t.id">{{ t.name }}</option>
-                            </select>
+                            <SearchableSelect v-model="subForm.tenant_id" :options="tenantsForSelectComputed"
+                                              :all-option="true" all-label="Select tenant…" :required="true" />
                         </div>
                         <div>
                             <label class="label-xs">Plan</label>
-                            <select v-model="subForm.plan_id" class="field">
-                                <option value="">No plan</option>
-                                <option v-for="p in plans" :key="p.id" :value="p.id">{{ p.name }}</option>
-                            </select>
+                            <SearchableSelect v-model="subForm.plan_id" :options="plans"
+                                              :all-option="true" all-label="No plan" />
                         </div>
                         <div>
                             <label class="label-xs">Period Start <span class="text-red-500">*</span></label>
@@ -96,12 +92,9 @@
                         </div>
                         <div>
                             <label class="label-xs">Status <span class="text-red-500">*</span></label>
-                            <select v-model="subForm.status" class="field" required>
-                                <option value="active">Active</option>
-                                <option value="grace">Grace Period</option>
-                                <option value="readonly">Read-only</option>
-                                <option value="suspended">Suspended</option>
-                            </select>
+                            <SearchableSelect v-model="subForm.status" :required="true" :all-option="false"
+                                              placeholder="Select status"
+                                              :options="[{ value: 'active', label: 'Active' }, { value: 'grace', label: 'Grace Period' }, { value: 'readonly', label: 'Read-only' }, { value: 'suspended', label: 'Suspended' }]" />
                         </div>
                     </div>
                     <label class="flex items-center gap-2 text-sm text-gray-600">
@@ -164,10 +157,8 @@
                         </div>
                         <div>
                             <label class="label-xs">Billing Period</label>
-                            <select v-model="planForm.billing_period" class="field">
-                                <option value="annual">Annual</option>
-                                <option value="monthly">Monthly</option>
-                            </select>
+                            <SearchableSelect v-model="planForm.billing_period" :all-option="false"
+                                              :options="[{ value: 'annual', label: 'Annual' }, { value: 'monthly', label: 'Monthly' }]" />
                         </div>
                         <div>
                             <label class="label-xs">Grace period (days)</label>
@@ -240,6 +231,7 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { ref, reactive, computed, defineComponent, h } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';

@@ -102,20 +102,23 @@
                 <form @submit.prevent="search" class="flex items-center gap-3 flex-wrap">
                     <div v-if="(selectedClass ?? searchClass) == 12" class="flex items-center gap-2">
                         <label class="text-xs font-semibold text-gray-600 whitespace-nowrap">Stream:</label>
-                        <select v-model="searchStream" class="field text-xs py-1.5 w-36 font-semibold bg-white">
-                            <option value="science">Science</option>
-                            <option value="commerce">Commerce</option>
-                            <option value="humanities">Humanities</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="searchStream"
+                            class="w-36"
+                            :all-option="false"
+                            :options="[{ value: 'science', label: 'Science' }, { value: 'commerce', label: 'Commerce' }, { value: 'humanities', label: 'Humanities' }]"
+                        />
                     </div>
                     <div class="flex items-center gap-2">
                         <label class="text-xs font-semibold text-gray-600 whitespace-nowrap">Academic Year:</label>
-                        <select v-model="searchYear" required class="field text-xs py-1.5 w-48 font-medium">
-                            <option value="" disabled>Select Academic Year</option>
-                            <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                                {{ academicYearOptionLabel(ay) }}
-                            </option>
-                        </select>
+                        <SearchableSelect
+                            v-model="searchYear"
+                            class="w-48"
+                            :required="true"
+                            :all-option="false"
+                            placeholder="Select Academic Year"
+                            :options="academicYearSelectOptions"
+                        />
                     </div>
                     <button type="submit" class="btn-primary text-xs px-4 py-1.5 font-semibold">
                         Search
@@ -370,18 +373,22 @@
                                     <tr v-for="(row, i) in form.toppers" :key="i" class="hover:bg-slate-50/50">
                                         <td class="p-3"><input v-model="row.name" type="text" placeholder="Student name" class="field text-sm" :disabled="!canEditActive"></td>
                                         <td class="p-3">
-                                            <select v-model="row.gender" class="field text-sm w-28" :disabled="!canEditActive">
-                                                <option value="">— Select —</option>
-                                                <option value="male">Male</option>
-                                                <option value="female">Female</option>
-                                                <option value="other">Other</option>
-                                            </select>
+                                            <SearchableSelect
+                                                v-model="row.gender"
+                                                class="w-28"
+                                                :disabled="!canEditActive"
+                                                all-label="— Select —"
+                                                :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
+                                            />
                                         </td>
                                         <td v-if="isXii" class="p-3">
-                                            <select v-model="row.stream_key" class="field text-sm w-32" :disabled="!canEditActive">
-                                                <option value="">— Select —</option>
-                                                <option v-for="(label, key) in streamOptions" :key="key" :value="key">{{ label }}</option>
-                                            </select>
+                                            <SearchableSelect
+                                                v-model="row.stream_key"
+                                                class="w-32"
+                                                :disabled="!canEditActive"
+                                                all-label="— Select —"
+                                                :options="streamOptionsList"
+                                            />
                                             <p class="text-[10px] text-gray-400 mt-0.5" v-if="row.stream_key">Out of {{ rowTotalMarks(row) ?? '—' }}</p>
                                         </td>
                                         <td class="p-3"><input v-model="row.roll_no" type="text" placeholder="CBSE Roll No" class="field text-sm w-36" :disabled="!canEditActive"></td>
@@ -512,6 +519,7 @@
 import { Link, useForm, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import BoardResultWorkflowStepper from '@/Components/BoardResults/BoardResultWorkflowStepper.vue';
 import { useConfirm } from '@/composables/useConfirm';
 const { confirm, prompt } = useConfirm();
@@ -539,6 +547,14 @@ function academicYearOptionLabel(year) {
     if (year.entry_status === 'closed') return `${year.label} (Entry Closed)`;
     return year.label;
 }
+
+const academicYearSelectOptions = computed(() =>
+    (props.academicYearOptions || []).map((ay) => ({ value: ay.label, label: academicYearOptionLabel(ay) }))
+);
+
+const streamOptionsList = computed(() =>
+    Object.entries(props.streamOptions ?? {}).map(([value, label]) => ({ value, label }))
+);
 
 const pageTitle = computed(() => {
     if (props.selectedClass === 12) return 'Class XII Board Results';

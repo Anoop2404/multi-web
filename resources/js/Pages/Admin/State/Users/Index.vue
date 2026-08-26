@@ -17,12 +17,7 @@
 
             <div class="card flex flex-wrap items-center gap-3 py-3">
                 <label class="text-xs font-semibold text-gray-500" for="role-filter">Filter by role</label>
-                <select id="role-filter" v-model="roleFilter" class="field field--sm max-w-xs">
-                    <option value="all">All roles ({{ users.length }})</option>
-                    <option v-for="r in assignableRoles" :key="r.value" :value="r.value">
-                        {{ r.label }} ({{ countForRole(r.value) }})
-                    </option>
-                </select>
+                <SearchableSelect id="role-filter" v-model="roleFilter" :options="roleFilterOptions" :all-option="false" class="max-w-xs" />
                 <span class="text-xs text-gray-400">{{ filteredUsers.length }} of {{ users.length }} shown</span>
             </div>
 
@@ -83,10 +78,7 @@
                 <input v-model="form.name" class="field w-full" placeholder="Full name" required>
                 <input v-model="form.email" type="email" class="field w-full" placeholder="Email" required>
                 <input v-model="form.password" type="password" class="field w-full" placeholder="Password (min 8)" minlength="8" required>
-                <select v-model="form.state_id" class="field w-full">
-                    <option value="">No state assigned yet (locks them out until assigned)</option>
-                    <option v-for="s in states" :key="s.id" :value="s.id">{{ s.name }} ({{ s.code }})</option>
-                </select>
+                <SearchableSelect v-model="form.state_id" :options="stateOptions" :all-option="true" all-label="No state assigned yet (locks them out until assigned)" class="w-full" />
                 <div>
                     <p class="text-xs font-semibold text-gray-500 mb-1">Roles <span class="text-red-500">*</span></p>
                     <div class="flex flex-wrap gap-2">
@@ -117,10 +109,7 @@
                 <input v-model="editForm.name" class="field w-full" placeholder="Full name" required>
                 <input v-model="editForm.email" type="email" class="field w-full" placeholder="Email" required>
                 <input v-model="editForm.password" type="password" class="field w-full" placeholder="New password (leave blank to keep)">
-                <select v-model="editForm.state_id" class="field w-full">
-                    <option value="">No state assigned yet (locks them out until assigned)</option>
-                    <option v-for="s in states" :key="s.id" :value="s.id">{{ s.name }} ({{ s.code }})</option>
-                </select>
+                <SearchableSelect v-model="editForm.state_id" :options="stateOptions" :all-option="true" all-label="No state assigned yet (locks them out until assigned)" class="w-full" />
                 <div class="flex flex-wrap gap-2">
                     <label v-for="r in assignableRoles" :key="r.value" class="text-xs flex items-center gap-1 border rounded-lg px-2 py-1 cursor-pointer hover:bg-gray-50">
                         <input type="checkbox" :value="r.value" v-model="editForm.roles">
@@ -141,6 +130,7 @@ import { ref, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import Modal from '@/Components/ui/Modal.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -158,6 +148,13 @@ const filteredUsers = computed(() => {
 function countForRole(role) {
     return props.users.filter((u) => u.roles.includes(role)).length;
 }
+
+const roleFilterOptions = computed(() => [
+    { value: 'all', label: `All roles (${props.users.length})` },
+    ...props.assignableRoles.map((r) => ({ value: r.value, label: `${r.label} (${countForRole(r.value)})` })),
+]);
+
+const stateOptions = computed(() => props.states.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` })));
 
 const form = useForm({ name: '', email: '', password: '', roles: ['state_admin'], state_id: '' });
 const editing = ref(null);

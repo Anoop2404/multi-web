@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\CsvSafety;
 use App\Models\AuditLog;
 use App\Models\Tenant;
 use App\Support\AuditLogCatalog;
@@ -98,11 +99,11 @@ class AuditLogController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($logs) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['When', 'Category', 'Action', 'Description', 'Actor', 'Email', 'Origin ID', 'Subject type', 'Subject ID', 'IP', 'Properties']);
+            CsvSafety::fputcsv($out, ['When', 'Category', 'Action', 'Description', 'Actor', 'Email', 'Origin ID', 'Subject type', 'Subject ID', 'IP', 'Properties']);
 
             foreach ($logs as $log) {
                 $originId = $log->properties['tenant_id'] ?? $log->properties['school_id'] ?? null;
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $log->created_at?->toDateTimeString(),
                     AuditLogCatalog::label($log->category ?? 'system'),
                     $log->action,

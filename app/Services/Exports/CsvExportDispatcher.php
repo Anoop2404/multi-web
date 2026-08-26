@@ -5,6 +5,7 @@ namespace App\Services\Exports;
 use App\Models\ExportJob;
 use App\Models\User;
 use App\Services\Notifications\NotificationService;
+use App\Support\CsvSafety;
 use App\Support\ReportRegistry;
 use App\Support\TenantStorage;
 use Illuminate\Http\RedirectResponse;
@@ -72,9 +73,9 @@ class CsvExportDispatcher
     ): StreamedResponse {
         return response()->streamDownload(function () use ($headers, $rows, $mapRow) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, $headers);
+            CsvSafety::fputcsv($out, $headers);
             foreach ($rows as $row) {
-                fputcsv($out, $mapRow(is_array($row) ? $row : (array) $row));
+                CsvSafety::fputcsv($out, $mapRow(is_array($row) ? $row : (array) $row));
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);

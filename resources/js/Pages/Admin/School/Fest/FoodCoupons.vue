@@ -7,10 +7,7 @@
         <form class="bg-white border rounded-xl p-4 flex flex-wrap gap-2 items-end mb-4" @submit.prevent="applyFilter">
             <div class="flex-1 min-w-[200px]">
                 <label class="text-xs text-gray-500 block mb-1">Festival</label>
-                <select v-model="eventFilter" class="field">
-                    <option value="">All festivals</option>
-                    <option v-for="e in events" :key="e.id" :value="e.id">{{ e.title }}</option>
-                </select>
+                <SearchableSelect v-model="eventFilter" :options="eventOptions" :all-option="true" all-label="All festivals" />
             </div>
             <button class="btn-primary">Filter</button>
             <a v-if="eventFilter" :href="printUrl" target="_blank"
@@ -56,6 +53,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
@@ -68,6 +66,7 @@ const props = defineProps({
 
 const school = computed(() => usePage().props.school);
 const eventFilter = ref(props.filters?.event_id ?? '');
+const eventOptions = computed(() => (props.events ?? []).map(e => ({ value: e.id, label: e.title })));
 
 const printUrl = computed(() => {
     if (!eventFilter.value) return '#';

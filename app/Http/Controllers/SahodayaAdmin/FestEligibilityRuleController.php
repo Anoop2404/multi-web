@@ -6,6 +6,9 @@ use App\Models\FestCompetitionArea;
 use App\Models\FestEligibilityRule;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Services\Events\FestTaxonomyRegistry;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -41,12 +44,24 @@ class FestEligibilityRuleController extends SahodayaAdminController
             ->orderBy('sort_order')
             ->get();
 
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($event->tenant_id)->labels('arts_category');
+
+        $items = FestEventItem::where('event_id', $event->id)
+            ->orderBy('title')
+            ->get(['id', 'title', 'class_group', 'category'])
+            ->map(fn (FestEventItem $item) => [
+                'id' => $item->id,
+                'title' => $item->title,
+                'category_label' => FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels),
+            ]);
+
         return $this->inertia('Sahodaya/Events/EligibilityRules/Index', $this->withFestNavContext([
             'event' => $event->only('id', 'title', 'event_type', 'status'),
             'rules' => $rules,
             'ruleTypes' => FestEligibilityRule::RULE_TYPES,
             'areas' => FestCompetitionArea::where('event_id', $event->id)->orderBy('sort_order')->get(['id', 'name']),
-            'items' => FestEventItem::where('event_id', $event->id)->orderBy('title')->get(['id', 'title']),
+            'items' => $items,
         ]));
     }
 

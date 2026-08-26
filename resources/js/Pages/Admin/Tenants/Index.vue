@@ -32,11 +32,10 @@
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Status</label>
-                    <select v-model="filterForm.status" class="field mt-1 text-sm">
-                        <option value="all">All</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
+                    <SearchableSelect v-model="filterForm.status"
+                        :options="[{ value: 'all', label: 'All' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]"
+                        :all-option="false"
+                        class="mt-1" />
                 </div>
                 <button v-if="hasFilters" type="button" @click="clearFilters" class="btn-ghost text-sm">Clear</button>
             </div>
@@ -132,6 +131,7 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, reactive, watch } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';

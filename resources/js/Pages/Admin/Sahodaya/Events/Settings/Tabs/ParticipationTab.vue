@@ -6,10 +6,8 @@
                 <!-- Preset Selector -->
                 <div class="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-700">Policy Preset</label>
-                    <select v-model="policyForm.preset_key" class="field bg-white">
-                        <option value="">Custom limits</option>
-                        <option v-for="(label, key) in participationPresets" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect v-model="policyForm.preset_key" :options="participationPresetOptions"
+                                      :all-option="true" all-label="Custom limits" />
                     <p class="text-[11px] text-slate-500">Choosing a preset auto-populates standard limits. You can customize any value below.</p>
                 </div>
 
@@ -104,7 +102,12 @@
 </template>
 
 <script setup>
-import { inject } from 'vue';
+import { inject, computed } from 'vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const { policyForm, participationPresets, savePolicy } = inject('eventSettings');
+
+const participationPresetOptions = computed(() =>
+    Object.entries(participationPresets).map(([key, label]) => ({ value: key, label }))
+);
 </script>

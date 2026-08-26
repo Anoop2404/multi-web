@@ -30,13 +30,8 @@
         <form class="mb-4 flex gap-2 items-end" @submit.prevent="applyFilter">
             <div>
                 <label class="form-label text-xs">Email status</label>
-                <select v-model="status" class="form-input text-sm">
-                    <option value="all">All</option>
-                    <option value="sent">Sent</option>
-                    <option value="failed">Failed</option>
-                    <option value="skipped">Skipped</option>
-                    <option value="pending">Pending</option>
-                </select>
+                <SearchableSelect v-model="status" :all-option="false"
+                                  :options="[{ value: 'all', label: 'All' }, { value: 'sent', label: 'Sent' }, { value: 'failed', label: 'Failed' }, { value: 'skipped', label: 'Skipped' }, { value: 'pending', label: 'Pending' }]" />
             </div>
             <button type="submit" class="btn-primary text-sm">Filter</button>
         </form>
@@ -87,6 +82,7 @@ import { computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatDateTime } from '@/support/calendarDates.js';
 
 const props = defineProps({

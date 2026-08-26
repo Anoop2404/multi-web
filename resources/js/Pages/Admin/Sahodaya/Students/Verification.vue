@@ -60,17 +60,13 @@
                 </div>
             </FormField>
             <FormField v-else label="School" class-extra="mb-0 min-w-[12rem]">
-                <select v-model="f.school_id" class="field text-sm">
-                    <option value="">All schools (summary)</option>
-                    <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                </select>
+                <SearchableSelect v-model="f.school_id" :options="schools" :all-option="true"
+                                   all-label="All schools (summary)" />
             </FormField>
             <FormField label="Status" class-extra="mb-0">
-                <select v-model="f.verification" class="field text-sm">
-                    <option value="all">All students</option>
-                    <option value="unverified">Pending verification</option>
-                    <option value="verified">Verified</option>
-                </select>
+                <SearchableSelect v-model="f.verification"
+                                   :options="[{ value: 'all', label: 'All students' }, { value: 'unverified', label: 'Pending verification' }, { value: 'verified', label: 'Verified' }]"
+                                   :all-option="false" />
             </FormField>
             <FormField label="Search" class-extra="mb-0">
                 <input v-model="f.search" type="search" class="field text-sm"
@@ -272,6 +268,7 @@ import { computed, reactive, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatAgeLabel } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 

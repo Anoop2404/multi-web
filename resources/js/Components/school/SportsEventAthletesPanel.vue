@@ -27,18 +27,14 @@
         <div class="px-4 py-2 border-b border-indigo-50 flex flex-wrap gap-2 items-center bg-white/60">
             <input v-model="search" type="search" class="field flex-1 min-w-[10rem] !py-1.5 text-sm"
                    placeholder="Search students…" autocomplete="off">
-            <select v-if="classOptions.length" v-model="classFilter"
-                    class="field text-xs !py-1.5 min-w-[7rem] max-w-[10rem]">
-                <option value="">All classes</option>
-                <option v-for="cls in classOptions" :key="cls" :value="cls">Class {{ cls }}</option>
-            </select>
-            <select v-if="ageGroupOptions.length" v-model="ageFilter"
-                    class="field text-xs !py-1.5 min-w-[9rem] max-w-[14rem]">
-                <option value="">All age categories</option>
-                <option v-for="group in ageGroupOptions" :key="group.key" :value="group.key">
-                    {{ group.label }}
-                </option>
-            </select>
+            <SearchableSelect v-if="classOptions.length" v-model="classFilter"
+                    class="min-w-[7rem] max-w-[10rem]"
+                    :options="classFilterOptions"
+                    :all-option="true" all-label="All classes" />
+            <SearchableSelect v-if="ageGroupOptions.length" v-model="ageFilter"
+                    class="min-w-[9rem] max-w-[14rem]"
+                    :options="ageFilterOptions"
+                    :all-option="true" all-label="All age categories" />
             <button v-if="hasActiveFilters" type="button" class="btn-ghost text-xs !py-1.5" @click="clearFilters">
                 Clear
             </button>
@@ -159,6 +155,7 @@ import { computed, ref, watch, watchEffect } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -219,6 +216,10 @@ const classOptions = computed(() => {
     );
 });
 
+const classFilterOptions = computed(() =>
+    classOptions.value.map((cls) => ({ value: cls, label: `Class ${cls}` })),
+);
+
 const ageGroupOptions = computed(() => {
     const keys = new Set();
     for (const student of props.students ?? []) {
@@ -241,6 +242,10 @@ const ageGroupOptions = computed(() => {
             label: ageGroupLabels.value[key] ?? key.toUpperCase(),
         }));
 });
+
+const ageFilterOptions = computed(() =>
+    ageGroupOptions.value.map((group) => ({ value: group.key, label: group.label })),
+);
 
 const ageLabelCache = new Map();
 

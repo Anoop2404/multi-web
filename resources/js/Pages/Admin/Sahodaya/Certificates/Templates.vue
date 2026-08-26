@@ -22,25 +22,28 @@
                 <FormGrid>
                     <FormField label="Event type" required>
                         <template #default="{ id }">
-                            <select :id="id" v-model="form.event_type" class="field" required>
-                                <option value="fest">Fest / Event certificate</option>
-                                <option value="training">Teacher Training</option>
-                                <option value="topper">Topper (Congratulations)</option>
-                            </select>
+                            <SearchableSelect
+                                :id="id"
+                                v-model="form.event_type"
+                                :options="[{ value: 'fest', label: 'Fest / Event certificate' }, { value: 'training', label: 'Teacher Training' }, { value: 'topper', label: 'Topper (Congratulations)' }]"
+                                :all-option="false"
+                                :required="true"
+                                placeholder="Select event type"
+                            />
                         </template>
                     </FormField>
 
                     <FormField label="Certificate type" hint="e.g. participation, congratulations, winner" required>
                         <template #default="{ id }">
-                            <select v-if="form.event_type === 'training'" :id="id" v-model="form.certificate_type" class="field" required>
-                                <option v-for="t in trainingCertificateTypes" :key="t" :value="t">{{ t.replaceAll('_', ' ') }}</option>
-                            </select>
-                            <select v-else-if="form.event_type === 'topper'" :id="id" v-model="form.certificate_type" class="field" required>
-                                <option value="congratulations">congratulations</option>
-                            </select>
-                            <select v-else-if="form.event_type === 'fest'" :id="id" v-model="form.certificate_type" class="field" required>
-                                <option v-for="t in festCertificateTypes" :key="t" :value="t">{{ t.replaceAll('_', ' ') }}</option>
-                            </select>
+                            <SearchableSelect v-if="form.event_type === 'training'" :id="id" v-model="form.certificate_type"
+                                :options="trainingCertificateTypeOptions" :all-option="false" :required="true"
+                                placeholder="Select certificate type" />
+                            <SearchableSelect v-else-if="form.event_type === 'topper'" :id="id" v-model="form.certificate_type"
+                                :options="[{ value: 'congratulations', label: 'congratulations' }]" :all-option="false" :required="true"
+                                placeholder="Select certificate type" />
+                            <SearchableSelect v-else-if="form.event_type === 'fest'" :id="id" v-model="form.certificate_type"
+                                :options="festCertificateTypeOptions" :all-option="false" :required="true"
+                                placeholder="Select certificate type" />
                             <input v-else :id="id" v-model="form.certificate_type" class="field" placeholder="participation" required>
                         </template>
                     </FormField>
@@ -48,19 +51,22 @@
                     <template v-if="form.event_type === 'fest'">
                         <FormField label="Event" hint="Leave blank to make this the Sahodaya-wide default for this certificate type.">
                             <template #default="{ id }">
-                                <select :id="id" v-model="form.event_id" class="field"
-                                        @change="form.item_id = null; form.also_apply_to_event_ids = form.also_apply_to_event_ids.filter(id => id !== form.event_id)">
-                                    <option :value="null">All events (default)</option>
-                                    <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }}</option>
-                                </select>
+                                <SearchableSelect :id="id" v-model="form.event_id" :options="festEventOptions"
+                                        all-label="All events (default)" placeholder="All events (default)"
+                                        search-placeholder="Type event name to search…"
+                                        @change="form.item_id = null; form.also_apply_to_event_ids = form.also_apply_to_event_ids.filter(id => id !== form.event_id)" />
                             </template>
                         </FormField>
                         <FormField label="Item" hint="Leave blank to cover every item in the selected event.">
-                            <template #default="{ id }">
-                                <select :id="id" v-model="form.item_id" class="field" :disabled="!form.event_id">
-                                    <option :value="null">All items in event</option>
-                                    <option v-for="i in selectedEventItems" :key="i.id" :value="i.id">{{ i.title }}</option>
-                                </select>
+                            <template #default>
+                                <SearchableSelect
+                                    v-model="form.item_id"
+                                    :options="selectedEventItemOptions"
+                                    :disabled="!form.event_id"
+                                    placeholder="All items in event"
+                                    search-placeholder="Type item name to search…"
+                                    all-label="All items in event"
+                                />
                             </template>
                         </FormField>
 
@@ -162,12 +168,10 @@
                                 </FormField>
                                 <FormField label="Text Align">
                                     <template #default="{ id }">
-                                        <select :id="id" v-model="form.layout_json.recipient_name.align" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
-                                            <option value="none">Default / None (Disabled alignment)</option>
-                                            <option value="center">Center</option>
-                                            <option value="left">Left</option>
-                                            <option value="right">Right</option>
-                                        </select>
+                                        <SearchableSelect :id="id" v-model="form.layout_json.recipient_name.align"
+                                            :options="[{ value: 'none', label: 'Default / None (Disabled alignment)' }, { value: 'center', label: 'Center' }, { value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]"
+                                            :all-option="false" :disabled="!isTruthy(form.layout_json.show_recipient_name)"
+                                            placeholder="Select text align" />
                                     </template>
                                 </FormField>
                                 <FormField label="Font size (px)">
@@ -177,9 +181,9 @@
                                 </FormField>
                                 <FormField label="Font family">
                                     <template #default="{ id }">
-                                        <select :id="id" v-model="form.layout_json.recipient_name.font_family" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
-                                            <option v-for="font in fontFamilies" :key="font" :value="font">{{ font }}</option>
-                                        </select>
+                                        <SearchableSelect :id="id" v-model="form.layout_json.recipient_name.font_family" :options="fontFamilies"
+                                            :all-option="false" :disabled="!isTruthy(form.layout_json.show_recipient_name)"
+                                            placeholder="Select font family" />
                                     </template>
                                 </FormField>
                                 <FormField label="Style" class-extra="sm:col-span-2">
@@ -215,13 +219,9 @@
                                 </FormField>
                                 <FormField label="Text Align">
                                     <template #default="{ id }">
-                                        <select :id="id" v-model="form.layout_json.body.align" class="field">
-                                            <option value="none">Default / None (Disabled alignment)</option>
-                                            <option value="center">Center</option>
-                                            <option value="justify">Justify (Full Width)</option>
-                                            <option value="left">Left</option>
-                                            <option value="right">Right</option>
-                                        </select>
+                                        <SearchableSelect :id="id" v-model="form.layout_json.body.align"
+                                            :options="[{ value: 'none', label: 'Default / None (Disabled alignment)' }, { value: 'center', label: 'Center' }, { value: 'justify', label: 'Justify (Full Width)' }, { value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]"
+                                            :all-option="false" placeholder="Select text align" />
                                     </template>
                                 </FormField>
                                 <FormField label="Font size (px)">
@@ -231,9 +231,8 @@
                                 </FormField>
                                 <FormField label="Font family">
                                     <template #default="{ id }">
-                                        <select :id="id" v-model="form.layout_json.body.font_family" class="field">
-                                            <option v-for="font in fontFamilies" :key="font" :value="font">{{ font }}</option>
-                                        </select>
+                                        <SearchableSelect :id="id" v-model="form.layout_json.body.font_family" :options="fontFamilies"
+                                            :all-option="false" placeholder="Select font family" />
                                     </template>
                                 </FormField>
                                 <FormField label="Style" class-extra="sm:col-span-2">
@@ -269,12 +268,9 @@
                                 </FormField>
                                 <FormField label="Text Align">
                                     <template #default="{ id }">
-                                        <select :id="id" v-model="form.layout_json.certificate_date.align" class="field">
-                                            <option value="none">Default / None (Disabled alignment)</option>
-                                            <option value="left">Left</option>
-                                            <option value="center">Center</option>
-                                            <option value="right">Right</option>
-                                        </select>
+                                        <SearchableSelect :id="id" v-model="form.layout_json.certificate_date.align"
+                                            :options="[{ value: 'none', label: 'Default / None (Disabled alignment)' }, { value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]"
+                                            :all-option="false" placeholder="Select text align" />
                                     </template>
                                 </FormField>
                             </div>
@@ -470,6 +466,7 @@ import { useForm, router } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import CertificateLiveCanvas from '@/Components/certificates/CertificateLiveCanvas.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -505,7 +502,10 @@ const placeholderTokens = computed(() => {
         return ['{recipient_name}', '{school_name}', '{sahodaya_name}', '{academic_year}', '{class}', '{percentage}', '{rank}'];
     }
     if (form.event_type === 'fest') {
-        return ['{recipient_name}', '{school_name}', '{event_title}', '{event_name}', '{item_title}', '{item_details}', '{category_name}', '{participation_type}', '{event_dates}', '{achievement_line}', '{sahodaya_name}', '{certificate_date}'];
+        // venue/grade/salutation were already resolved server-side (FestCertificateService::
+        // resolveFieldValues()) but missing from this button list — worked if typed by hand,
+        // just undiscoverable.
+        return ['{salutation}', '{recipient_name}', '{school_name}', '{event_title}', '{event_name}', '{item_title}', '{item_details}', '{category_name}', '{participation_type}', '{event_dates}', '{venue}', '{achievement_line}', '{grade}', '{sahodaya_name}', '{certificate_date}'];
     }
     return ['{salutation}', '{recipient_name}', '{designation}', '{school_name}', '{program_title}', '{sahodaya_name}', '{venue}', '{conducted_on}', '{certificate_date}'];
 });
@@ -544,10 +544,21 @@ const festCertificateTypes = [
     'organizer',
 ];
 
+const trainingCertificateTypeOptions = computed(() => trainingCertificateTypes.map(t => ({ value: t, label: t.replaceAll('_', ' ') })));
+
+const festCertificateTypeOptions = computed(() => festCertificateTypes.map(t => ({ value: t, label: t.replaceAll('_', ' ') })));
+
+const festEventOptions = computed(() => props.festEvents.map(e => ({ id: e.id, name: e.title })));
+
 const selectedEventItems = computed(() => {
     const event = props.festEvents.find(e => e.id === form.event_id);
     return event?.items || [];
 });
+
+const selectedEventItemOptions = computed(() => selectedEventItems.value.map(i => ({
+    id: i.id,
+    name: i.category_label ? `${i.title} — ${i.category_label}` : i.title,
+})));
 
 const otherEventOptions = computed(() => props.festEvents.filter(e => e.id !== form.event_id));
 

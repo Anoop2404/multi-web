@@ -24,10 +24,7 @@
                     <input v-model="filterDate" type="date" class="field !py-1.5 text-sm">
                 </FormField>
                 <FormField v-if="stages.length" label="Stage / venue" class-extra="mb-0 min-w-[10rem]">
-                    <select v-model="filterStageId" class="field !py-1.5 text-sm">
-                        <option value="">All stages</option>
-                        <option v-for="s in stages" :key="s.id" :value="String(s.id)">{{ stageLabel(s) }}</option>
-                    </select>
+                    <SearchableSelect v-model="filterStageId" :options="stageOptions" :all-option="true" all-label="All stages" />
                 </FormField>
                 <button v-if="filterDate || filterStageId" type="button" class="btn-secondary text-sm" @click="clearDateStage">Clear date/stage</button>
             </template>
@@ -40,10 +37,7 @@
             </div>
             <div v-if="stages.length">
                 <label class="text-xs font-semibold text-slate-600">Stage / venue</label>
-                <select v-model="filterStageId" class="field !py-1.5 text-sm mt-1 block min-w-[10rem]">
-                    <option value="">All stages</option>
-                    <option v-for="s in stages" :key="s.id" :value="String(s.id)">{{ stageLabel(s) }}</option>
-                </select>
+                <SearchableSelect v-model="filterStageId" :options="stageOptions" :all-option="true" all-label="All stages" class="mt-1 block min-w-[10rem]" />
             </div>
             <button type="submit" class="btn-secondary text-sm">Apply filters</button>
             <button v-if="filterDate || filterStageId" type="button" class="btn-secondary text-sm" @click="clearDateStage">Clear</button>
@@ -71,7 +65,7 @@
                     <tr>
                         <th>Head</th>
                         <th>Item</th>
-                        <th>Age</th>
+                        <th>Category</th>
                         <th>Date</th>
                         <th>Time</th>
                         <th>Venue</th>
@@ -88,7 +82,7 @@
                         <tr>
                             <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
                             <td class="font-medium">{{ row.title }}</td>
-                            <td class="text-xs uppercase">{{ row.age_group || '—' }}</td>
+                            <td class="text-xs uppercase">{{ categoryLabel(row) }}</td>
                             <td>{{ formatCalendarDate(row.scheduled_date) }}</td>
                             <td>{{ row.scheduled_time || '—' }}</td>
                             <td>{{ row.venue || '—' }}</td>
@@ -116,6 +110,7 @@ import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue
 import { formatCalendarDate } from '@/support/calendarDates.js';
 import ReportHeadFilter from '@/Components/reports/ReportHeadFilter.vue';
 import { useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -156,9 +151,26 @@ const filteredSummary = computed(() => {
     };
 });
 
+// FestItemScheduleService's rows only carry age_group today (no class_group
+// or category_label yet), but this keeps the same fallback chain used by the
+// other report pages so it picks up category_label automatically once the
+// backend adds it.
+function humanize(value) {
+    return String(value).replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function categoryLabel(row) {
+    if (row.category_label) return row.category_label;
+    if (row.age_group) return humanize(row.age_group);
+    if (row.class_group && row.class_group !== 'open') return humanize(row.class_group);
+    return '—';
+}
+
 function stageLabel(stage) {
     return stage.venue?.name ? `${stage.name} · ${stage.venue.name}` : stage.name;
 }
+
+const stageOptions = computed(() => props.stages.map((s) => ({ value: String(s.id), label: stageLabel(s) })));
 
 function applyFilters() {
     router.get(base, {

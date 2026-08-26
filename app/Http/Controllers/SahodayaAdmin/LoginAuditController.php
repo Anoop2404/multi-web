@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\CsvSafety;
 use App\Models\AuditLog;
 use App\Models\NotificationLog;
 use App\Models\Tenant;
@@ -88,9 +89,9 @@ class LoginAuditController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($logs) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Action', 'Username', 'IP', 'Description', 'Date']);
+            CsvSafety::fputcsv($out, ['Action', 'Username', 'IP', 'Description', 'Date']);
             foreach ($logs as $log) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $log->action,
                     $log->properties['username'] ?? $log->properties['email'] ?? '',
                     $log->ip_address,

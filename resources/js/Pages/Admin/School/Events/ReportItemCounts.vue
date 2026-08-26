@@ -111,7 +111,7 @@
                         <tr>
                             <th>Head</th>
                             <th>Item</th>
-                            <th>Age / class</th>
+                            <th>Category</th>
                             <th>Approved</th>
                             <th>Pending</th>
                             <th>Participants</th>
@@ -132,7 +132,7 @@
                             <tr>
                                 <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
                                 <td class="font-medium">{{ row.title }}</td>
-                                <td>{{ row.age_group || row.class_group || '—' }}</td>
+                                <td>{{ categoryLabel(row) }}</td>
                                 <td>{{ row.approved }}</td>
                                 <td>{{ row.pending }}</td>
                                 <td>{{ row.participant_count }}</td>
@@ -259,6 +259,7 @@ const searchedRows = computed(() => {
             row.head_name,
             row.age_group,
             row.class_group,
+            row.category_label,
             row.item_code,
         ].filter(Boolean).join(' ').toLowerCase();
         return haystack.includes(q);
@@ -272,6 +273,17 @@ const filteredTotals = computed(() => ({
     registrations: searchedRows.value.reduce((n, r) => n + r.registration_count, 0),
     estimated_fee: Math.round(searchedRows.value.reduce((n, r) => n + (r.line_fee ?? 0), 0) * 100) / 100,
 }));
+
+function humanize(value) {
+    return String(value).replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function categoryLabel(row) {
+    if (row.category_label) return row.category_label;
+    if (row.age_group) return humanize(row.age_group);
+    if (row.class_group && row.class_group !== 'open') return humanize(row.class_group);
+    return '—';
+}
 
 function filterQueryString() {
     const q = new URLSearchParams();

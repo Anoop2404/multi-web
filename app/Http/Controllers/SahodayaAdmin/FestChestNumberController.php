@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\CsvSafety;
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
@@ -245,9 +246,9 @@ class FestChestNumberController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Chest No', 'Fest ID', 'Item Reg No', 'Participant', 'Item', 'School']);
+            CsvSafety::fputcsv($out, ['Chest No', 'Fest ID', 'Item Reg No', 'Participant', 'Item', 'School']);
             foreach ($rows as $row) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $row['chest_no'],
                     $row['fest_id'],
                     $row['item_reg'],

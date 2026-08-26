@@ -220,13 +220,16 @@ const sampleData = computed(() => {
         venue: `${pageSahodaya} Central Complex`,
         days_attended: '2',
         training_hours: '12',
-        salutation: 'Mr.',
+        // Fest uses Master/Miss (matches FestCertificateService::resolveFieldValues()'s
+        // real gender-based token); training/topper keep the Mr./Mrs.-style honorific.
+        salutation: props.eventType === 'fest' ? 'Master' : 'Mr.',
         designation: 'Senior PGT Teacher',
         class: 'Class X',
         academic_year: '2026-27',
         percentage: '98.4%',
         rank: 'First Rank',
         achievement_line: 'secured First Place in 100m Sprint',
+        grade: 'A',
     };
 });
 

@@ -163,11 +163,13 @@
                 <FormSection title="Data Requirements" hint="What annual data schools must submit.">
                     <FormGrid>
                         <FormField label="Student Data Mode">
-                            <select v-model="profileForm.student_data_mode" class="field">
-                                <option value="full_records">Full student records (name, DOB, etc.)</option>
-                                <option value="counts_only">Student counts only (by category)</option>
-                                <option value="not_required">Not required</option>
-                            </select>
+                            <SearchableSelect v-model="profileForm.student_data_mode"
+                                :options="[
+                                    { value: 'full_records', label: 'Full student records (name, DOB, etc.)' },
+                                    { value: 'counts_only', label: 'Student counts only (by category)' },
+                                    { value: 'not_required', label: 'Not required' },
+                                ]"
+                                :all-option="false" />
                         </FormField>
                         <FormField label="">
                             <label class="flex items-center gap-3 cursor-pointer mt-6">
@@ -221,9 +223,8 @@
                 <FormSection title="Fest class categories" hint="Default age-category labels for Kalotsav / Sports item fees across events.">
                     <FormGrid>
                         <FormField label="Class category scheme" class-extra="sm:col-span-2">
-                            <select v-model="profileForm.fest_class_group_scheme" class="field">
-                                <option v-for="(label, key) in classGroupSchemeOptions" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="profileForm.fest_class_group_scheme"
+                                :options="classGroupSchemeOptionsList" :all-option="false" />
                             <p class="text-xs text-gray-500 mt-1">
                                 CBSE Kerala uses Category I–IV (classes III–XII). Sahodaya standard uses LP–HSS (classes I–XII).
                                 <strong>Class master</strong> uses your Membership → Class master categories (CATEGORY1–4, etc.) for custom events and item fees.
@@ -311,11 +312,13 @@
                     </p>
                     <FormGrid>
                         <FormField label="ZeptoMail region">
-                            <select v-model="mailForm.zeptomail_region" class="field">
-                                <option value="in">India (api.zeptomail.in)</option>
-                                <option value="com">Global (api.zeptomail.com)</option>
-                                <option value="eu">EU (api.zeptomail.eu)</option>
-                            </select>
+                            <SearchableSelect v-model="mailForm.zeptomail_region"
+                                :options="[
+                                    { value: 'in', label: 'India (api.zeptomail.in)' },
+                                    { value: 'com', label: 'Global (api.zeptomail.com)' },
+                                    { value: 'eu', label: 'EU (api.zeptomail.eu)' },
+                                ]"
+                                :all-option="false" />
                         </FormField>
                         <FormField label="ZeptoMail API token" class-extra="sm:col-span-2"
                                    hint="ZeptoMail → SMTP/API → Send Mail token. Paste the full Zoho-enczapikey … value.">
@@ -526,12 +529,14 @@
                 <FormSection title="Fee Type">
                     <FormGrid>
                         <FormField label="Membership Fee Type" class-extra="sm:col-span-2">
-                            <select v-model="feeForm.membership_fee_type" class="field">
-                                <option value="fixed">Fixed fee (same for all schools)</option>
-                                <option value="variable_by_student_count">Variable by student count (slabs)</option>
-                                <option value="variable_by_school_category">Variable by school category (class range)</option>
-                                <option value="none">No membership fee (₹0)</option>
-                            </select>
+                            <SearchableSelect v-model="feeForm.membership_fee_type"
+                                :options="[
+                                    { value: 'fixed', label: 'Fixed fee (same for all schools)' },
+                                    { value: 'variable_by_student_count', label: 'Variable by student count (slabs)' },
+                                    { value: 'variable_by_school_category', label: 'Variable by school category (class range)' },
+                                    { value: 'none', label: 'No membership fee (₹0)' },
+                                ]"
+                                :all-option="false" />
                             <p v-if="feeForm.membership_fee_type === 'none'" class="text-xs text-slate-600 mt-2">
                                 Schools complete annual registration without a payment step. Save this tab to apply.
                             </p>
@@ -623,10 +628,12 @@
 
                     <div v-if="feeForm.allow_non_affiliated_schools" class="grid sm:grid-cols-2 gap-4 pt-3">
                         <FormField label="Non-affiliated fee type">
-                            <select v-model="feeForm.non_affiliated_membership_fee_type" class="field">
-                                <option value="fixed">Fixed amount</option>
-                                <option value="none">No fee (₹0)</option>
-                            </select>
+                            <SearchableSelect v-model="feeForm.non_affiliated_membership_fee_type"
+                                :options="[
+                                    { value: 'fixed', label: 'Fixed amount' },
+                                    { value: 'none', label: 'No fee (₹0)' },
+                                ]"
+                                :all-option="false" />
                         </FormField>
                         <FormField v-if="feeForm.non_affiliated_membership_fee_type === 'fixed'"
                                    label="Non-affiliated membership fee (₹)" required>
@@ -874,11 +881,9 @@
                                                 <input v-model="editClassForm.name" class="field w-28 font-mono" placeholder="1">
                                             </FormField>
                                             <FormField label="Category">
-                                                <select v-model="editClassForm.class_category_id" class="field min-w-[10rem]">
-                                                    <option v-for="cat in effectiveCategories" :key="cat.id" :value="cat.id">
-                                                        {{ cat.label }}
-                                                    </option>
-                                                </select>
+                                                <SearchableSelect v-model="editClassForm.class_category_id"
+                                                    :options="effectiveCategories" :all-option="false"
+                                                    class="min-w-[10rem]" />
                                             </FormField>
                                             <div class="flex gap-2 pb-0.5">
                                                 <button type="button" @click="saveClassEdit(cls)" class="btn-secondary text-xs">Save</button>
@@ -910,12 +915,9 @@
                             <input v-model="classForm.name" required class="field w-28 font-mono" placeholder="LKG">
                         </FormField>
                         <FormField label="Category">
-                            <select v-model="classForm.class_category_id" required class="field min-w-[10rem]">
-                                <option value="">Select category</option>
-                                <option v-for="cat in effectiveCategories" :key="cat.id" :value="cat.id">
-                                    {{ cat.sort_order }}. {{ cat.label }}
-                                </option>
-                            </select>
+                            <SearchableSelect v-model="classForm.class_category_id" :required="true"
+                                :options="classCategoryOptionsWithSort" :all-option="true" all-label="Select category"
+                                class="min-w-[10rem]" />
                         </FormField>
                         <button type="submit" :disabled="!classForm.class_category_id" class="btn-secondary mb-0.5">Add Class</button>
                     </form>
@@ -1136,6 +1138,7 @@
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';
@@ -1493,6 +1496,14 @@ const sortedCustomCategories = computed(() =>
 
 const sortedMasterClasses = computed(() =>
     [...(props.masterClasses ?? [])].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0) || String(a.name).localeCompare(String(b.name))),
+);
+
+const classGroupSchemeOptionsList = computed(() =>
+    Object.entries(props.classGroupSchemeOptions ?? {}).map(([value, label]) => ({ value, label })),
+);
+
+const classCategoryOptionsWithSort = computed(() =>
+    (props.effectiveCategories ?? []).map((cat) => ({ value: cat.id, label: `${cat.sort_order}. ${cat.label}` })),
 );
 
 function saveProfile() { profileForm.put(`/sahodaya-admin/${props.sahodaya.id}/membership/settings`); }

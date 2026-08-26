@@ -10,22 +10,13 @@
             <div v-if="competitionPhases.length" class="card mb-4 !py-4">
                 <div class="grid gap-3 md:grid-cols-4 items-end">
                     <label class="text-xs font-semibold text-slate-600">Competition phase
-                        <select v-model="scopePhaseId" class="field mt-1 text-sm w-full">
-                            <option value="">All phases</option>
-                            <option v-for="item in competitionPhases" :key="item.id" :value="item.id">{{ item.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="scopePhaseId" class="mt-1 w-full" :options="competitionPhases" :all-option="true" all-label="All phases" />
                     </label>
                     <label class="text-xs font-semibold text-slate-600">Region
-                        <select v-model="scopeRegionId" class="field mt-1 text-sm w-full">
-                            <option value="">Combined</option>
-                            <option v-for="item in regions" :key="item.id" :value="item.id">{{ item.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="scopeRegionId" class="mt-1 w-full" :options="regions" :all-option="true" all-label="Combined" />
                     </label>
                     <label class="text-xs font-semibold text-slate-600">Registration / payment level
-                        <select v-model="scopeBatchId" class="field mt-1 text-sm w-full">
-                            <option value="">All levels</option>
-                            <option v-for="item in registrationBatches" :key="item.id" :value="item.id">{{ item.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="scopeBatchId" class="mt-1 w-full" :options="registrationBatches" :all-option="true" all-label="All levels" />
                     </label>
                     <button type="button" class="btn-primary text-sm" @click="applyReportScope">Apply report scope</button>
                 </div>
@@ -35,11 +26,9 @@
             <div v-if="childEvents.length && !competitionPhases.length" class="card mb-4 !py-3">
                 <div class="flex flex-wrap gap-3 items-center">
                     <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}</label>
-                    <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
-                        <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                            {{ ev.short_title || ev.title }}
-                        </option>
-                    </select>
+                    <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
+                                      class="w-64" :options="childEventOptions" :all-option="false"
+                                      placeholder="Select sport event" />
                 </div>
             </div>
 
@@ -211,6 +200,7 @@ import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportExportCard from '@/Components/reports/ReportExportCard.vue';
 import ReportToolbar from '@/Components/reports/ReportToolbar.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import {
     REPORT_CATEGORIES,
     REPORT_CATEGORY_ORDER,
@@ -235,9 +225,13 @@ const props = defineProps({
     reportScopeSelection: { type: Object, default: () => ({}) },
 });
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/reports/downloads/${props.phase}`);
+function switchSportEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/reports/downloads/${props.phase}`);
 }
+
+const childEventOptions = computed(() =>
+    (props.childEvents ?? []).map((ev) => ({ value: String(ev.id), label: ev.short_title || ev.title })),
+);
 
 const categoryMeta = REPORT_CATEGORIES;
 const searchQuery = ref('');

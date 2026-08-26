@@ -71,13 +71,12 @@
                                     {{ participant.student?.name ?? participant.teacher?.name }}
                                 </td>
                                 <td v-if="isSports" class="p-2 align-middle">
-                                    <select :value="attendanceStatus(participant, item)"
-                                            class="field text-sm !py-2 min-w-[6.5rem] w-full"
-                                            @change="markAttendance(participant, item, $event.target.value)">
-                                        <option value="">—</option>
-                                        <option value="present">Present</option>
-                                        <option value="absent">Absent</option>
-                                    </select>
+                                    <SearchableSelect :model-value="attendanceStatus(participant, item)"
+                                            class="min-w-[6.5rem] w-full"
+                                            :options="[{ value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' }]"
+                                            :all-option="true"
+                                            all-label="—"
+                                            @update:model-value="(status) => markAttendance(participant, item, status)" />
                                 </td>
                                 <td v-if="showMeasurement(section.item)" class="p-2 align-middle">
                                     <input v-model="markForms[participant.id].measurement_value"
@@ -92,16 +91,14 @@
                                            :disabled="isAbsent(participant, item)">
                                 </td>
                                 <td class="p-2 align-middle">
-                                    <select v-if="isSports"
-                                            :value="markForms[participant.id].position ?? ''"
-                                            class="field !py-2 text-sm min-w-[11rem] w-full"
+                                    <SearchableSelect v-if="isSports"
+                                            :model-value="markForms[participant.id].position ?? ''"
+                                            class="min-w-[11rem] w-full"
+                                            :options="rankSelectOptions(item)"
+                                            :all-option="true"
+                                            all-label="—"
                                             :disabled="isAbsent(participant, item)"
-                                            @change="setRank(participant.id, item, markForms, $event.target.value)">
-                                        <option value="">—</option>
-                                        <option v-for="opt in rankOptionsForItem(item)" :key="opt.rank" :value="opt.rank">
-                                            {{ opt.label }} ({{ opt.points }} pts)
-                                        </option>
-                                    </select>
+                                            @update:model-value="(value) => setRank(participant.id, item, markForms, value)" />
                                     <input v-else
                                            v-model.number="markForms[participant.id].position"
                                            type="number" min="1"
@@ -131,6 +128,7 @@ import { reactive, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { festMarkPortalPaths, festOpsEventNav } from '@/support/festOpsPortalNav.js';
 import { festCoordinatorPortalNavItems } from '@/support/festCoordinatorPortalNav.js';
 import { useFestMarkEntryDisplay } from '@/composables/useFestMarkEntryDisplay.js';
@@ -198,6 +196,10 @@ for (const reg of props.registrations ?? []) {
             measurement_unit: existing?.measurement_unit ?? '',
         };
     }
+}
+
+function rankSelectOptions(item) {
+    return rankOptionsForItem(item).map((opt) => ({ value: opt.rank, label: `${opt.label} (${opt.points} pts)` }));
 }
 
 function markAttendance(participant, item, status) {

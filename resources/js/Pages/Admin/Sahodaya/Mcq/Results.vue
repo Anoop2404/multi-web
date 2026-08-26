@@ -117,10 +117,9 @@
                                        class="field w-20" :disabled="!canEnterMarks(r)" :aria-label="`Score for ${r.student?.name || r.id}`">
                             </td>
                             <td>
-                                <select v-model="markForms[r.id].grade" class="field w-16" :disabled="!canEnterMarks(r)" :aria-label="`Grade for ${r.student?.name || r.id}`">
-                                    <option value="">—</option>
-                                    <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
-                                </select>
+                                <SearchableSelect v-model="markForms[r.id].grade" class="w-16" :options="gradeOptions"
+                                                  :disabled="!canEnterMarks(r)" :all-option="true" all-label="—"
+                                                  :aria-label="`Grade for ${r.student?.name || r.id}`" />
                             </td>
                             <td class="text-xs whitespace-nowrap">
                                 <button v-if="canEnterMarks(r)" type="button" @click="saveMark(r)" class="link-brand text-xs">Save</button>
@@ -156,6 +155,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, gradeBands: { type: Array, default: () => [] } });

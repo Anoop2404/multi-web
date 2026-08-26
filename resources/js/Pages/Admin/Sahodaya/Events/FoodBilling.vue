@@ -89,10 +89,8 @@
         <form v-if="!isPartitionedHub" @submit.prevent="openBill" class="flex flex-wrap items-end gap-3 mb-6">
             <FormField label="Open/find bill for school" :error="openForm.errors.school_id">
                 <template #default="{ id }">
-                    <select :id="id" v-model="openForm.school_id" class="field text-sm">
-                        <option value="">— Select school —</option>
-                        <option v-for="s in schoolOptions" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <SearchableSelect :id="id" v-model="openForm.school_id" :options="schoolOptions"
+                                       :all-option="true" all-label="— Select school —" />
                 </template>
             </FormField>
             <button type="submit" class="btn-secondary text-sm" :disabled="openForm.processing || !openForm.school_id">Open</button>
@@ -102,11 +100,9 @@
         <div class="flex flex-wrap gap-3 items-center mb-4">
             <input v-model="search" type="search" class="field flex-1 min-w-[12rem] max-w-sm text-sm"
                    placeholder="Search by school…" autocomplete="off">
-            <select v-model="statusFilter" class="field text-sm w-auto">
-                <option value="">All statuses</option>
-                <option value="open">Open</option>
-                <option value="settled">Settled</option>
-            </select>
+            <SearchableSelect v-model="statusFilter" class="w-auto"
+                               :options="[{ value: 'open', label: 'Open' }, { value: 'settled', label: 'Settled' }]"
+                               :all-option="true" all-label="All statuses" />
             <label class="flex items-center gap-2 text-sm text-gray-600">
                 <input type="checkbox" v-model="onlyBalanceDue"> Only with balance due
             </label>
@@ -162,6 +158,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
 import FoodRegionDrillDown from '@/Components/sahodaya/FoodRegionDrillDown.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,

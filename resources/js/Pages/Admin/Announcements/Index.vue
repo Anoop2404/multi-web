@@ -19,19 +19,16 @@
                 <textarea v-model="form.body" class="field w-full" rows="3" placeholder="Message" required></textarea>
 
                 <div class="grid sm:grid-cols-4 gap-3">
-                    <select v-model="form.type" class="field">
-                        <option value="info">Info</option>
-                        <option value="warning">Warning</option>
-                        <option value="critical">Critical</option>
-                        <option value="maintenance">Maintenance</option>
-                    </select>
-                    <select v-model="form.audience" class="field">
-                        <option value="all">Everyone</option>
-                        <option value="superadmin">Superadmins</option>
-                        <option value="state_admin">State admins</option>
-                        <option value="sahodaya_admin">Sahodaya admins</option>
-                        <option value="school_admin">School admins</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="form.type"
+                        :options="[{ value: 'info', label: 'Info' }, { value: 'warning', label: 'Warning' }, { value: 'critical', label: 'Critical' }, { value: 'maintenance', label: 'Maintenance' }]"
+                        :all-option="false"
+                    />
+                    <SearchableSelect
+                        v-model="form.audience"
+                        :options="[{ value: 'all', label: 'Everyone' }, { value: 'superadmin', label: 'Superadmins' }, { value: 'state_admin', label: 'State admins' }, { value: 'sahodaya_admin', label: 'Sahodaya admins' }, { value: 'school_admin', label: 'School admins' }]"
+                        :all-option="false"
+                    />
                     <input v-model="form.starts_at" type="datetime-local" class="field" title="Starts (optional — immediate if blank)">
                     <input v-model="form.ends_at" type="datetime-local" class="field" title="Ends (optional — indefinite if blank)">
                 </div>
@@ -93,19 +90,16 @@
                 <textarea v-model="editForm.body" class="field w-full" rows="3" placeholder="Message" required></textarea>
 
                 <div class="grid sm:grid-cols-2 gap-3">
-                    <select v-model="editForm.type" class="field">
-                        <option value="info">Info</option>
-                        <option value="warning">Warning</option>
-                        <option value="critical">Critical</option>
-                        <option value="maintenance">Maintenance</option>
-                    </select>
-                    <select v-model="editForm.audience" class="field">
-                        <option value="all">Everyone</option>
-                        <option value="superadmin">Superadmins</option>
-                        <option value="state_admin">State admins</option>
-                        <option value="sahodaya_admin">Sahodaya admins</option>
-                        <option value="school_admin">School admins</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="editForm.type"
+                        :options="[{ value: 'info', label: 'Info' }, { value: 'warning', label: 'Warning' }, { value: 'critical', label: 'Critical' }, { value: 'maintenance', label: 'Maintenance' }]"
+                        :all-option="false"
+                    />
+                    <SearchableSelect
+                        v-model="editForm.audience"
+                        :options="[{ value: 'all', label: 'Everyone' }, { value: 'superadmin', label: 'Superadmins' }, { value: 'state_admin', label: 'State admins' }, { value: 'sahodaya_admin', label: 'Sahodaya admins' }, { value: 'school_admin', label: 'School admins' }]"
+                        :all-option="false"
+                    />
                     <input v-model="editForm.starts_at" type="datetime-local" class="field" title="Starts (optional — immediate if blank)">
                     <input v-model="editForm.ends_at" type="datetime-local" class="field" title="Ends (optional — indefinite if blank)">
                 </div>
@@ -126,6 +120,7 @@
 import { ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 import { formatDateTime } from '@/support/calendarDates.js';
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Support\CsvSafety;
 use App\Models\FeeReceipt;
 use App\Models\Teacher;
 use App\Models\Tenant;
@@ -324,7 +325,7 @@ class TrainingRegistrationController extends SchoolAdminController
                 $out = fopen('php://output', 'w');
                 fwrite($out, "\xEF\xBB\xBF");
                 foreach ($rows as $row) {
-                    fputcsv($out, $row);
+                    CsvSafety::fputcsv($out, $row);
                 }
                 fclose($out);
             }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);

@@ -50,10 +50,7 @@
                                     <input v-model="row.mobile" class="field" placeholder="10-digit mobile" required>
                                 </FormField>
                                 <FormField label="Teacher category" required>
-                                    <select v-model="row.teaching_type_id" class="field" required>
-                                        <option :value="null">Select category</option>
-                                        <option v-for="t in teachingTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
-                                    </select>
+                                    <SearchableSelect v-model="row.teaching_type_id" :options="teachingTypes" :all-option="true" all-label="Select category" :required="true" />
                                 </FormField>
                             </FormGrid>
                             <FormField label="Subjects" required>
@@ -136,24 +133,13 @@
                         <input type="file" accept="image/*" required class="field" @change="form.photo = $event.target.files[0]">
                     </FormField>
                     <FormField label="Teacher category" required :error="form.errors.teaching_type_id">
-                        <select v-model="form.teaching_type_id" class="field" required>
-                            <option :value="null">Select category</option>
-                            <option v-for="t in teachingTypes" :key="t.id" :value="t.id">{{ t.code }} — {{ t.label }}</option>
-                        </select>
+                        <SearchableSelect v-model="form.teaching_type_id" :options="teachingTypeOptions" :all-option="true" all-label="Select category" :required="true" />
                     </FormField>
                     <FormField label="Designation" :error="form.errors.designation_id">
-                        <select v-model="form.designation_id" class="field">
-                            <option :value="null">Select designation</option>
-                            <option v-for="d in designations" :key="d.id" :value="d.id">{{ d.label }}</option>
-                        </select>
+                        <SearchableSelect v-model="form.designation_id" :options="designations" :all-option="true" all-label="Select designation" />
                     </FormField>
                     <FormField label="Gender" :error="form.errors.gender">
-                        <select v-model="form.gender" class="field">
-                            <option value="">Select gender</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                            <option value="other">Other</option>
-                        </select>
+                        <SearchableSelect v-model="form.gender" :all-option="true" all-label="Select gender" :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]" />
                     </FormField>
                 </FormGrid>
                 <FormField label="Subjects" hint="Select at least one subject" required :error="form.errors.subject_ids">
@@ -180,24 +166,13 @@
 
             <form class="card !p-4 flex flex-wrap gap-3 items-end" @submit.prevent="applyFilters">
                 <FormField label="Teacher category" class-extra="mb-0">
-                    <select v-model="f.teaching_type_id" class="field text-sm">
-                        <option value="">All categories</option>
-                        <option v-for="t in teachingTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
-                    </select>
+                    <SearchableSelect v-model="f.teaching_type_id" :all-option="true" all-label="All categories" :options="teachingTypes" />
                 </FormField>
                 <FormField label="Status" class-extra="mb-0">
-                    <select v-model="f.status" class="field text-sm">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="all">All</option>
-                    </select>
+                    <SearchableSelect v-model="f.status" :all-option="false" placeholder="Select status" :options="[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }, { value: 'all', label: 'All' }]" />
                 </FormField>
                 <FormField label="Verification" class-extra="mb-0">
-                    <select v-model="f.verification" class="field text-sm">
-                        <option value="all">All</option>
-                        <option value="unverified">Pending</option>
-                        <option value="verified">Verified</option>
-                    </select>
+                    <SearchableSelect v-model="f.verification" :all-option="false" placeholder="Select verification" :options="[{ value: 'all', label: 'All' }, { value: 'unverified', label: 'Pending' }, { value: 'verified', label: 'Verified' }]" />
                 </FormField>
                 <FormField label="Search" class-extra="mb-0">
                     <input v-model="f.search" type="search" class="field text-sm" placeholder="Name, email, mobile, login code">
@@ -269,14 +244,8 @@
                 <input v-model="editForm.name" class="field" required>
                 <input v-model="editForm.email" type="email" class="field" required>
                 <input v-model="editForm.mobile" class="field" placeholder="Mobile">
-                <select v-model="editForm.teaching_type_id" class="field">
-                    <option :value="null">Teacher category</option>
-                    <option v-for="tt in teachingTypes" :key="tt.id" :value="tt.id">{{ tt.label }}</option>
-                </select>
-                <select v-model="editForm.designation_id" class="field">
-                    <option :value="null">Designation</option>
-                    <option v-for="d in designations" :key="d.id" :value="d.id">{{ d.label }}</option>
-                </select>
+                <SearchableSelect v-model="editForm.teaching_type_id" :all-option="true" all-label="Teacher category" :options="teachingTypes" />
+                <SearchableSelect v-model="editForm.designation_id" :all-option="true" all-label="Designation" :options="designations" />
                 <div class="flex flex-wrap gap-2">
                     <label v-for="s in subjects" :key="s.id" class="text-xs border rounded px-2 py-1">
                         <input type="checkbox" :value="s.id" v-model="editForm.subject_ids"> {{ s.label }}
@@ -343,6 +312,7 @@ import FormField from '@/Components/ui/FormField.vue';
 import FormGrid from '@/Components/ui/FormGrid.vue';
 import PortalCredentialsBanner from '@/Components/school/PortalCredentialsBanner.vue';
 import SubjectPicker from '@/Components/school/SubjectPicker.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useScrollToFirstError } from '@/composables/useScrollToFirstError.js';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -359,6 +329,7 @@ const props = defineProps({
 
 const importErrors = computed(() => usePage().props.flash?.importErrors ?? []);
 const bulkErrors = computed(() => usePage().props.flash?.bulkErrors ?? []);
+const teachingTypeOptions = computed(() => (props.teachingTypes || []).map((t) => ({ value: t.id, label: `${t.code} — ${t.label}` })));
 
 const f = reactive({
     teaching_type_id: '',

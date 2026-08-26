@@ -24,11 +24,17 @@
                         <td class="p-3 text-xs">{{ schools[o.school_id] || o.school_id }}</td>
                         <td class="p-3">{{ o.head_count }}</td>
                         <td class="p-3">
-                            <select v-model="forms[o.id]" class="field text-xs" @change="save(o)">
-                                <option value="requested">Requested</option>
-                                <option value="confirmed">Confirmed</option>
-                                <option value="cancelled">Cancelled</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="forms[o.id]"
+                                :options="[
+                                    { value: 'requested', label: 'Requested' },
+                                    { value: 'confirmed', label: 'Confirmed' },
+                                    { value: 'cancelled', label: 'Cancelled' },
+                                ]"
+                                :all-option="false"
+                                placeholder="Select status"
+                                @change="save(o)"
+                            />
                         </td>
                     </tr>
                     <tr v-if="!orders.length">
@@ -42,6 +48,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { festOpsEventNav } from '@/support/festOpsPortalNav.js';
 import { computed, reactive } from 'vue';
 import { router } from '@inertiajs/vue3';

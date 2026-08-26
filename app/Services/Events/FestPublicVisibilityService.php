@@ -8,6 +8,7 @@ use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestSchedule;
 use App\Models\Tenant;
+use App\Support\FestItemCategoryLabel;
 
 /**
  * Real-world public visibility rules for festival portals.
@@ -160,6 +161,10 @@ class FestPublicVisibilityService
         $showMarks = $this->showIndividualMarks($event, $isAdminPreview);
         $showName = $this->showParticipantName($event, $participant, $participant->registration?->item, $isAdminPreview);
 
+        $item = $participant->registration?->item;
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+        $categoryLabel = FestItemCategoryLabel::resolve($item, $classGroupLabels, config('fest_item_taxonomy.arts_category', []));
+
         return [
             'reference'          => $this->publicReference($event, $participant, $isAdminPreview),
             'link_ref'           => $this->participantLinkRef($participant),
@@ -168,7 +173,8 @@ class FestPublicVisibilityService
             // identifies a specific competitor just as directly as their name would.
             'photo'              => $showName ? ($participant->student?->photoDataUri() ?? $participant->teacher?->photoDataUri()) : null,
             'school'             => $showName ? $participant->registration?->school?->name : null,
-            'item_title'         => $participant->registration?->item?->title,
+            'item_title'         => $item?->title,
+            'category_label'     => $categoryLabel,
             'team_name'          => $showName ? $participant->group?->team_name : null,
             'scheduled_at'       => $schedule?->scheduled_at,
             'stage'              => $schedule?->stage,
@@ -208,8 +214,10 @@ class FestPublicVisibilityService
             ->get()
             ->keyBy('participant_id');
 
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+
         return $entries
-            ->map(function (FestParticipant $p) use ($event, $showMarks, $marksByParticipant, $isAdminPreview) {
+            ->map(function (FestParticipant $p) use ($event, $showMarks, $marksByParticipant, $isAdminPreview, $classGroupLabels) {
                 $item = $p->registration?->item;
                 if (! $item) {
                     return null;
@@ -220,6 +228,7 @@ class FestPublicVisibilityService
                 return [
                     'item_id'          => $item->id,
                     'item_title'       => $item->title,
+                    'category_label'   => FestItemCategoryLabel::resolve($item, $classGroupLabels, config('fest_item_taxonomy.arts_category', [])),
                     'participant_type' => $item->participant_type ?: 'individual',
                     'is_team_item'     => $item->isTeamItem(),
                     'position'         => $showMarks ? $mark?->position : null,
@@ -261,16 +270,7 @@ class FestPublicVisibilityService
         $item = $participant->registration?->item;
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
 
-        $category = null;
-        if ($item?->class_group && $item->class_group !== 'open') {
-            $category = $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
-        } elseif ($item?->age_group) {
-            $category = $item->age_group;
-        } elseif ($item?->category && $item->category !== 'general') {
-            $category = ucwords(str_replace(['_', '-'], ' ', $item->category));
-        } else {
-            $category = 'General Category';
-        }
+        $category = FestItemCategoryLabel::resolve($item, $classGroupLabels) ?? 'General Category';
 
         $itemType = match (strtolower((string) $item?->participant_type)) {
             'group' => 'Group Item',

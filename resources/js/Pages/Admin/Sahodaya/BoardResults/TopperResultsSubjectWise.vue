@@ -49,11 +49,13 @@
                     90%+ Achievers →
                 </Link>
                 <span class="text-xs text-slate-300 mx-1">|</span>
-                <select class="field text-xs py-1.5" :value="filters.academic_year" @change="switchYear($event.target.value)">
-                    <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label" :disabled="ay.status === 'closed'">
-                        {{ ay.label }}
-                    </option>
-                </select>
+                <SearchableSelect
+                    :model-value="filters.academic_year"
+                    :options="academicYearSelectOptions"
+                    :all-option="false"
+                    placeholder="Select academic year"
+                    @update:model-value="switchYear"
+                />
             </div>
         </div>
 
@@ -148,6 +150,7 @@ import { computed, ref, watch } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import PdfPreviewModal from '@/Components/ui/PdfPreviewModal.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -158,6 +161,13 @@ const props = defineProps({
     subjectLeaders: { type: Array, default: () => [] },
     noRank: { type: Boolean, default: false },
 });
+
+// The select's option value is the academic-year label itself (switchYear navigates by label,
+// not id), so the raw academicYearOptions array can't be passed through as-is.
+const academicYearSelectOptions = computed(() => props.academicYearOptions.map((ay) => ({
+    value: ay.label,
+    label: ay.label,
+})));
 
 const pdfPreviewUrl = computed(() => {
     const view = props.noRank ? 'percentage' : 'rank';

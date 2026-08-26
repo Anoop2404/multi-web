@@ -443,12 +443,13 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
             programOn('science-fest') && programAllowed('science_fest') ? { label: 'Science Fest', href: `${base}/science-fest`, icon: 'layers' } : null,
             !isScoped ? { label: 'All events', href: `${base}/events`, icon: 'calendar', exact: true } : null,
             !isScoped ? { label: 'Competition types', href: `${base}/competition-types`, icon: 'layers' } : null,
-            menuOn('fest_appeals') ? { label: 'Appeals queue', href: `${base}/fest/appeals`, icon: 'inbox', badge: pendingFestAppealsCount } : null,
-            menuOn('fest_payments') ? { label: 'Fest payments', href: `${base}/fest/payments`, icon: 'credit-card' } : null,
-            menuOn('display_screens') ? { label: 'Display screens', href: `${base}/display-screens`, icon: 'monitor' } : null,
-            menuOn('certificate_templates') ? { label: 'Certificate templates', href: `${base}/certificate-templates`, icon: 'award' } : null,
-            menuOn('id_card_templates') ? { label: 'ID card templates', href: `${base}/id-card-templates`, icon: 'credit-card' } : null,
-            { label: 'Find certificate', href: `${base}/events/certificates/search`, icon: 'file-text' },
+            // Appeals/payments/display screens/certificate & ID card templates/find-certificate
+            // all live behind one sidebar entry now — see Fest/ToolsHub.vue, which itself
+            // respects each item's menuOn(...) visibility flag.
+            (menuOn('fest_appeals') || menuOn('fest_payments') || menuOn('display_screens')
+                || menuOn('certificate_templates') || menuOn('id_card_templates'))
+                ? { label: 'Fest tools hub', href: `${base}/fest-tools`, icon: 'inbox', badge: pendingFestAppealsCount }
+                : null,
             programOn('custom') && programAllowed('custom') ? { label: 'Custom events', href: `${base}/programs/custom`, icon: 'layers' } : null,
         ].filter(Boolean);
 
@@ -488,18 +489,15 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
     }
 
     if (canNav('ledger') && menuOn('finance')) {
+        // Finance hub already links out to every item that used to be listed here
+        // directly (unified payments, reconciliation, receipt emails, payables,
+        // receivables, opening balances) — see Finance/Hub.vue. Only the hub itself
+        // and the ledger (heaviest daily-use page) stay as direct sidebar entries.
         groups.push({
             section: 'Finance',
             items: [
                 { label: 'Finance hub', href: `${base}/finance`, icon: 'credit-card' },
-                { label: 'Unified payments', href: `${base}/finance/payments`, icon: 'credit-card' },
-                { label: 'Payment reconciliation', href: `${base}/finance/payment-reconciliation`, icon: 'clipboard' },
-                { label: 'Receipt emails', href: `${base}/finance/receipt-emails`, icon: 'file-text' },
-                { label: 'Email delivery log', href: `${base}/finance/email-delivery`, icon: 'file-text' },
                 { label: 'Accounts ledger', href: `${base}/ledger`, icon: 'layers' },
-                { label: 'Payables', href: `${base}/finance/payables`, icon: 'credit-card' },
-                { label: 'Receivables', href: `${base}/finance/receivables`, icon: 'bar-chart' },
-                { label: 'Opening balances', href: `${base}/ledger/opening-balances`, icon: 'credit-card' },
             ],
         });
     }

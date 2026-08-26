@@ -72,26 +72,36 @@
             <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-3 items-end">
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Class</label>
-                    <select :value="selectedClass" class="field text-xs bg-white font-semibold" @change="switchClass($event.target.value)">
-                        <option :value="10">Class X (AISSE)</option>
-                        <option :value="12">Class XII (AISSCE)</option>
-                    </select>
+                    <SearchableSelect
+                        :model-value="selectedClass"
+                        :options="[{ value: 10, label: 'Class X (AISSE)' }, { value: 12, label: 'Class XII (AISSCE)' }]"
+                        :all-option="false"
+                        placeholder="Select class"
+                        @update:model-value="switchClass"
+                    />
                 </div>
 
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Stream</label>
-                    <select :value="selectedStreamCode" class="field text-xs bg-white font-semibold" :disabled="selectedClass !== 12" @change="switchStream($event.target.value)">
-                        <option v-for="[code, label] in streamEntries" :key="code" :value="code">{{ label }}</option>
-                    </select>
+                    <SearchableSelect
+                        :model-value="selectedStreamCode"
+                        :options="streamSelectOptions"
+                        :disabled="selectedClass !== 12"
+                        :all-option="false"
+                        placeholder="Select stream"
+                        @update:model-value="switchStream"
+                    />
                 </div>
 
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Academic Year</label>
-                    <select :value="filters.academic_year" class="field text-xs bg-white font-semibold" @change="switchYear($event.target.value)">
-                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                            {{ ay.label }}
-                        </option>
-                    </select>
+                    <SearchableSelect
+                        :model-value="filters.academic_year"
+                        :options="academicYearSelectOptions"
+                        :all-option="false"
+                        placeholder="Select academic year"
+                        @update:model-value="switchYear"
+                    />
                 </div>
             </div>
         </div>
@@ -163,6 +173,7 @@ import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
 import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -198,6 +209,8 @@ const selectedStreamCode = computed(() => {
     return streamEntries.value[0]?.[0] ?? null;
 });
 const selectedStreamLabel = computed(() => selectedStreamCode.value ? props.streamOptions?.[selectedStreamCode.value] ?? null : null);
+const streamSelectOptions = computed(() => streamEntries.value.map(([code, label]) => ({ value: code, label })));
+const academicYearSelectOptions = computed(() => (props.academicYearOptions ?? []).map(ay => ({ value: ay.label, label: ay.label })));
 
 function switchClass(cls) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/board-results/toppers?class=${cls}&academic_year=${props.filters.academic_year}`);

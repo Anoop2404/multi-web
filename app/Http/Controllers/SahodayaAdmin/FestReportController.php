@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\CsvSafety;
 use App\Models\FestEvent;
 use App\Services\Events\EventContext;
 use App\Services\Events\EventLifecycleGate;
@@ -387,6 +388,32 @@ class FestReportController extends SahodayaAdminController
             'summary' => $data['summary'],
             'rows'    => $data['rows'],
             'csvUrl'  => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/mark-entry-status",
+        ])));
+    }
+
+    public function resultsPending(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $service = $this->scopedReportService($request, $this->regionAwareTargetEvent($request, $event));
+
+        return $this->inertia('Sahodaya/Events/Reports/ResultsPending', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'rows'   => $service->resultsPendingRows(),
+            'csvUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/results-pending",
+        ])));
+    }
+
+    public function absentReport(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
+        $schoolId = $request->input('school_id');
+
+        return $this->inertia('Sahodaya/Events/Reports/AbsentReport', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'rows'    => $analytics->absentReportRows($schoolId),
+            'filters' => ['school_id' => $schoolId],
+            'csvUrl'  => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/absent-report".($schoolId ? '?'.http_build_query(['school_id' => $schoolId]) : ''),
         ])));
     }
 
@@ -815,22 +842,85 @@ class FestReportController extends SahodayaAdminController
             app(\App\Services\Events\FestItemHeadService::class)->syncEventHeads($event);
         }
 
-        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        // All items, one flat table (2026-08-25 rework) — replaces the old "pick one item
+        // to see its roster" flow. Phase/region narrowing still happens server-side via
+        // scopedAnalytics()'s FestReportScope (competition_phase_id/region_id query
+        // params, same as every other report on this controller) since that's also an
+        // authorization boundary for a region_admin/phase_admin actor, not just a filter.
+        $rows = $analytics->itemWiseReportRows();
+
         $itemId = $request->integer('item_id') ?: null;
-        $participants = $itemId ? $analytics->itemWiseBrowserRows($itemId) : [];
 
         $headId = $request->input('head_id') !== null && $request->input('head_id') !== ''
             ? ($request->input('head_id') === 'other' ? 'other' : (string) $request->integer('head_id'))
             : null;
 
+        $taxonomy = app(\App\Services\Events\FestTaxonomyRegistry::class)->forTenant($tenantId)->labels('arts_category');
+        $categories = collect($rows)->pluck('category')->unique()->filter()->sort()->values()
+            ->map(fn ($key) => ['key' => $key, 'label' => $taxonomy[$key] ?? ucfirst($key)])
+            ->all();
+
         return $this->inertia('Sahodaya/Events/Reports/ItemWise', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
-            'participants'   => $participants,
+            'rows'           => $rows,
+            'categories'     => $categories,
             'filterHeadId'   => $headId,
             'filterItemId'   => $itemId,
-            'pdfUrl'         => $itemId ? '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/item-wise?'.http_build_query(['item_id' => $itemId]) : null,
-            'xlsUrl'         => $itemId ? '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/item-participants?'.http_build_query(['item_id' => $itemId]) : null,
+            'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/item-wise/export-all',
+            'pdfUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/item-wise/pdf',
             'childEvents'    => $event->sportEventDropdownOptions(),
         ])));
+    }
+
+    /** All-items CSV — companion export to itemWise() above, honoring the same FestReportScope (phase/region query params). */
+    public function exportItemWiseAll(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows();
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Fest ID', 'Item Reg', 'Chest', 'Status', 'Grade', 'Rank', 'Score']);
+            foreach ($rows as $row) {
+                CsvSafety::fputcsv($out, [
+                    $row['category_label'], $row['item_title'], $row['item_code'],
+                    $row['phase_name'], $row['region_name'], $row['school_name'],
+                    $row['participant'], $row['reg_no'], $row['fest_id'], $row['item_reg'], $row['chest_no'],
+                    $row['status'], $row['grade'], $row['position'], $row['score'],
+                ]);
+            }
+            fclose($out);
+        }, "{$event->id}-item-wise-report.csv", ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * Mark entry report as PDF — chest no / grade / rank / score per registration, same
+     * FestReportScope (phase/region) as itemWise() above. Stamps who generated it and
+     * when (no prior view in this codebase recorded the generating user — every other
+     * "Generated on {date}" footer is timestamp-only), and an optional free-text
+     * ?for_whom= line for a named recipient/audience note.
+     */
+    public function itemWisePdf(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.item-wise-marks', [
+            'sahodaya'    => $this->sahodaya,
+            'event'       => $event,
+            'rows'        => $rows,
+            'showPhase'   => collect($rows)->contains(fn ($r) => $r['phase_name']),
+            'showRegion'  => collect($rows)->contains(fn ($r) => $r['region_name']),
+            'generatedBy' => $request->user()->name ?? 'Unknown',
+            'generatedAt' => now()->format('d M Y, h:i A'),
+            'forWhom'     => trim((string) $request->input('for_whom', '')) ?: null,
+            'logoSrc'     => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download("{$event->id}-mark-entry-report.pdf");
     }
 
     public function categoryWisePoints(Request $request, string $tenantId, FestEvent $event)

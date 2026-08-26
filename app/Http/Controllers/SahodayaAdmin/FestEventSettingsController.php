@@ -194,6 +194,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'event'        => $event,
             'gradeConfigs' => FestGradeConfig::where('event_id', $event->id)->with('item')->get(),
             'childEvents'  => $event->sportEventDropdownOptions(),
+            'classGroupLabels' => FestClassGroupScheme::labels(null, $event),
         ]));
     }
 

@@ -19,9 +19,8 @@
                 <h3 class="font-semibold">New school event</h3>
                 <div class="grid sm:grid-cols-2 gap-3">
                     <input v-model="form.title" class="field" placeholder="Event title" required>
-                    <select v-model="form.event_type" class="field">
-                        <option v-for="(label, key) in eventTypes" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect v-model="form.event_type" :options="eventTypeOptions" :all-option="false"
+                        placeholder="Select event type" />
                 </div>
                 <button class="btn-primary">Create</button>
             </form>
@@ -56,14 +55,20 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     school: Object,
     events: Array,
     eventTypes: Object,
 });
+
+const eventTypeOptions = computed(() =>
+    Object.entries(props.eventTypes).map(([key, label]) => ({ value: key, label }))
+);
 
 const form = useForm({ title: '', event_type: 'kalolsavam' });
 

@@ -18,6 +18,8 @@ use App\Services\Events\FestRegistrationApprovalService;
 use App\Services\Events\FestMandatoryItemService;
 use App\Support\ExcelExport;
 use App\Services\Events\FestRegistrationBulkService;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use App\Support\FestPageActivity;
 use App\Services\Events\FestRegistrationCreateService;
 use App\Services\Events\FestRegistrationImportService;
@@ -173,7 +175,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'feeRequired'        => $feeService->feeRequired($event),
             'registerStudents'   => $registerStudents,
             'registerSchoolId'   => $registerSchoolId,
-            'eventItems'         => $event->items->values(),
+            'eventItems'         => $this->itemsWithCategoryLabel($event),
             'filters'            => [
                 'search'    => $request->input('search', ''),
                 'school_id' => $filterSchoolId ?? '',
@@ -194,6 +196,26 @@ class FestRegistrationReviewController extends SahodayaAdminController
      *
      * @param  ?list<int>  $itemIds
      */
+    /**
+     * The event's enabled items (same set as $event->items after the eager-load in
+     * index()) with a display-only 'category_label' attribute added — class/age
+     * bracket if the item has one, else its arts genre, else null. Used by
+     * Registrations.vue's item pickers so admins can tell same-named items in
+     * different categories apart.
+     */
+    private function itemsWithCategoryLabel(FestEvent $event)
+    {
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
+        return $event->items->values()->map(function (FestEventItem $item) use ($classGroupLabels, $artsCategoryLabels) {
+            $row = $item->toArray();
+            $row['category_label'] = FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels);
+
+            return $row;
+        });
+    }
+
     /**
      * @param  ?list<int>  $itemIds
      * @param  ?list<string>  $regionSchoolIds  school IDs scoped to a region filter

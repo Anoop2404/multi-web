@@ -129,33 +129,22 @@
 
                         <FormGrid class-extra="sm:grid-cols-2 lg:grid-cols-5 items-end">
                             <FormField label="Category">
-                                <select v-model="filterForm.class_category_id" @change="onCategoryChange" class="field">
-                                    <option :value="null">All categories</option>
-                                    <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
-                                </select>
+                                <SearchableSelect v-model="filterForm.class_category_id" @change="onCategoryChange"
+                                                   :options="categoryFilterOptions" :all-option="false" />
                             </FormField>
                             <FormField label="Class">
-                                <select v-model="filterForm.school_class_id" class="field">
-                                    <option :value="null">All classes</option>
-                                    <option value="unassigned">⚠️ Unassigned (No Class) ({{ unassignedCount }})</option>
-                                    <option v-for="c in filteredClasses" :key="c.id" :value="c.id">Class {{ c.name }}</option>
-                                </select>
+                                <SearchableSelect v-model="filterForm.school_class_id"
+                                                   :options="schoolClassFilterOptions" :all-option="false" />
                             </FormField>
                             <FormField label="Status">
-                                <select v-model="filterForm.status" class="field">
-                                    <option value="active">Active</option>
-                                    <option value="all">All statuses</option>
-                                    <option value="transferred">Transferred</option>
-                                    <option value="graduated">Graduated</option>
-                                    <option value="withdrawn">Withdrawn</option>
-                                </select>
+                                <SearchableSelect v-model="filterForm.status"
+                                                   :options="[{ value: 'active', label: 'Active' }, { value: 'all', label: 'All statuses' }, { value: 'transferred', label: 'Transferred' }, { value: 'graduated', label: 'Graduated' }, { value: 'withdrawn', label: 'Withdrawn' }]"
+                                                   :all-option="false" />
                             </FormField>
                             <FormField label="Verification">
-                                <select v-model="filterForm.verification" class="field">
-                                    <option value="all">All</option>
-                                    <option value="verified">Verified</option>
-                                    <option value="unverified">Pending Sahodaya verification</option>
-                                </select>
+                                <SearchableSelect v-model="filterForm.verification"
+                                                   :options="[{ value: 'all', label: 'All' }, { value: 'verified', label: 'Verified' }, { value: 'unverified', label: 'Pending Sahodaya verification' }]"
+                                                   :all-option="false" />
                             </FormField>
                             <FormField label="Search">
                                 <input v-model="filterForm.search" type="search" placeholder="Name, reg no, email, roll no…"
@@ -305,26 +294,17 @@
 
                     <div>
                         <label class="form-label mb-1.5">Class *</label>
-                        <select v-model="editForm.school_class_id" required
-                                class="field">
-                            <option value="">Select class</option>
-                            <option v-for="c in schoolClassesSorted" :key="c.id" :value="c.id">
-                                {{ formatClassOption(c) }}
-                            </option>
-                        </select>
+                        <SearchableSelect v-model="editForm.school_class_id" :required="true"
+                                          :options="schoolClassOptionsFormatted" :all-option="true" all-label="Select class" />
                         <p v-if="editForm.errors.school_class_id" class="text-xs text-red-500 mt-1">{{ editForm.errors.school_class_id }}</p>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="form-label mb-1.5">Gender *</label>
-                            <select v-model="editForm.gender" required
-                                    class="field">
-                                <option value="">Select gender</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                            </select>
+                            <SearchableSelect v-model="editForm.gender" :required="true"
+                                              :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
+                                              :all-option="true" all-label="Select gender" />
                             <p v-if="editForm.errors.gender" class="text-xs text-red-500 mt-1">{{ editForm.errors.gender }}</p>
                         </div>
                         <div>
@@ -380,20 +360,15 @@
                     </div>
                     <div>
                         <label class="form-label mb-1.5">Class *</label>
-                        <select v-model="createForm.school_class_id" required class="field">
-                            <option value="">Select class</option>
-                            <option v-for="c in schoolClassesSorted" :key="c.id" :value="c.id">{{ formatClassOption(c) }}</option>
-                        </select>
+                        <SearchableSelect v-model="createForm.school_class_id" :required="true"
+                                          :options="schoolClassOptionsFormatted" :all-option="true" all-label="Select class" />
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="form-label mb-1.5">Gender *</label>
-                            <select v-model="createForm.gender" required class="field">
-                                <option value="">Select</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                            </select>
+                            <SearchableSelect v-model="createForm.gender" :required="true"
+                                              :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
+                                              :all-option="true" all-label="Select" />
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Date of birth *</label>
@@ -428,12 +403,8 @@
                 <form @submit.prevent="submitBulkAssignClass" class="p-6 space-y-4">
                     <div>
                         <label class="form-label mb-1.5">Target Class *</label>
-                        <select v-model="bulkAssignForm.school_class_id" required class="field">
-                            <option value="">Select class</option>
-                            <option v-for="c in schoolClassesSorted" :key="c.id" :value="c.id">
-                                {{ formatClassOption(c) }}
-                            </option>
-                        </select>
+                        <SearchableSelect v-model="bulkAssignForm.school_class_id" :required="true"
+                                          :options="schoolClassOptionsFormatted" :all-option="true" all-label="Select class" />
                     </div>
                     <div class="flex items-center justify-end gap-3 pt-2">
                         <button type="button" @click="showBulkAssignModal = false" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
@@ -464,6 +435,7 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ProfilePhotoCropper from '@/Components/school/ProfilePhotoCropper.vue';
 import StudentPhotoEditModal from '@/Components/school/StudentPhotoEditModal.vue';
 import StudentBulkUploadModal from '@/Components/school/StudentBulkUploadModal.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
@@ -663,6 +635,21 @@ function formatClassOption(schoolClass) {
 function classesInCategory(categoryId) {
     return schoolClasses.value.filter(c => Number(c.class_category_id) === Number(categoryId));
 }
+
+const categoryFilterOptions = computed(() => [
+    { value: null, label: 'All categories' },
+    ...props.categories,
+]);
+
+const schoolClassFilterOptions = computed(() => [
+    { value: null, label: 'All classes' },
+    { value: 'unassigned', label: `⚠️ Unassigned (No Class) (${props.unassignedCount})` },
+    ...filteredClasses.value.map(c => ({ value: c.id, label: `Class ${c.name}` })),
+]);
+
+const schoolClassOptionsFormatted = computed(() =>
+    schoolClassesSorted.value.map(c => ({ value: c.id, label: formatClassOption(c) })),
+);
 
 function listParams(overrides = {}) {
     return {

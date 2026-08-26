@@ -6,11 +6,9 @@
                 <!-- Tenant selector -->
                 <div class="card flex items-center gap-4">
                     <label class="text-sm font-semibold text-gray-600 shrink-0">Tenant:</label>
-                    <select v-model="selectedTenantId" @change="loadTheme"
-                            class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2">
-                        <option value="">— Select tenant —</option>
-                        <option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="selectedTenantId" @change="loadTheme"
+                            :options="tenants" :all-option="true" all-label="— Select tenant —"
+                            class="flex-1" />
                 </div>
 
                 <!-- Presets -->
@@ -48,10 +46,9 @@
                                 <input type="text" v-model="theme[field.key]"
                                        class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2">
                             </div>
-                            <select v-else-if="field.type === 'select'" v-model="theme[field.key]"
-                                    class="field">
-                                <option v-for="opt in field.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                            </select>
+                            <SearchableSelect v-else-if="field.type === 'select'" v-model="theme[field.key]"
+                                    :options="field.options" :all-option="false"
+                                    :placeholder="`Select ${field.label}`" />
                             <input v-else type="text" v-model="theme[field.key]"
                                    class="field">
                         </div>
@@ -77,9 +74,9 @@
                                 <input type="text" v-model="v2Design[field.key]"
                                        class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2">
                             </div>
-                            <select v-else v-model="v2Design[field.key]" class="field">
-                                <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
-                            </select>
+                            <SearchableSelect v-else v-model="v2Design[field.key]"
+                                    :options="field.options" :all-option="false"
+                                    :placeholder="`Select ${field.label}`" />
                         </div>
                     </div>
                     <button @click="saveV2Design" :disabled="!selectedTenantId"
@@ -133,6 +130,7 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     tenants: { type: Array, default: () => [] },

@@ -53,10 +53,8 @@
                     </div>
                     <FormField label="Expense head">
                         <template #default="{ id }">
-                            <select :id="id" v-model="createForm.expense_head_id" class="field">
-                                <option value="">Administrative (default)</option>
-                                <option v-for="h in expenseHeads" :key="h.id" :value="h.id">{{ h.code }} — {{ h.name }}</option>
-                            </select>
+                            <SearchableSelect :id="id" v-model="createForm.expense_head_id" :options="expenseHeadOptions"
+                                               :all-option="true" all-label="Administrative (default)" />
                         </template>
                     </FormField>
                     <label class="flex items-center gap-2 text-sm">
@@ -70,11 +68,9 @@
             <section class="card card--flush overflow-hidden !p-0 lg:col-span-2">
                 <div class="p-4 border-b border-slate-100 flex flex-wrap gap-2 items-center">
                     <h3 class="section-title !mb-0 mr-auto">Payables</h3>
-                    <select v-model="statusFilter" @change="applyFilter" class="field text-sm max-w-[10rem]">
-                        <option value="open">Open</option>
-                        <option value="paid">Paid</option>
-                        <option value="all">All</option>
-                    </select>
+                    <SearchableSelect v-model="statusFilter" @change="applyFilter"
+                                       :options="[{ value: 'open', label: 'Open' }, { value: 'paid', label: 'Paid' }, { value: 'all', label: 'All' }]"
+                                       :all-option="false" class="max-w-[10rem]" />
                 </div>
                 <div class="overflow-x-auto">
                     <table class="data-table">
@@ -120,8 +116,9 @@
 
 <script setup>
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -136,6 +133,11 @@ const props = defineProps({
 });
 
 const statusFilter = ref(props.filters?.status ?? 'open');
+
+const expenseHeadOptions = computed(() => (props.expenseHeads ?? []).map(h => ({
+    value: h.id,
+    label: `${h.code} — ${h.name}`,
+})));
 
 const { confirm } = useConfirm();
 

@@ -21,10 +21,8 @@
                     <button @click="removeHouse(house.id)" class="text-red-600 text-xs">Remove</button>
                 </div>
                 <form @submit.prevent="assign(house.id)" class="flex gap-2 mb-2">
-                    <select v-model="assignForms[house.id]" class="field flex-1">
-                        <option value="">Assign school…</option>
-                        <option v-for="s in availableSchools(house.id)" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="assignForms[house.id]" :options="availableSchools(house.id)"
+                                      :all-option="true" all-label="Assign school…" class="flex-1" />
                     <button class="btn-primary px-3 py-2 rounded-lg text-xs">Assign</button>
                 </form>
                 <ul class="text-xs text-gray-600 space-y-1">
@@ -50,6 +48,7 @@ import { reactive } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({

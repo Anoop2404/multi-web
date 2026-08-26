@@ -93,20 +93,12 @@
                 <div class="grid md:grid-cols-2 gap-4 items-end">
                     <div>
                         <label class="form-label mb-1 font-semibold text-xs text-gray-700">1. Academic Year *</label>
-                        <select v-model="selectedYear" class="field text-sm font-semibold bg-white" @change="onYearChange">
-                            <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                                {{ academicYearOptionLabel(ay) }}
-                            </option>
-                        </select>
+                        <SearchableSelect v-model="selectedYear" :options="academicYearSelectOptions" :all-option="false" placeholder="Select academic year" @change="onYearChange" />
                     </div>
 
                     <div>
                         <label class="form-label mb-1 font-semibold text-xs text-gray-700">2. Select Subject *</label>
-                        <select v-model="selectedSubjectOption" class="field text-sm bg-white font-medium" :disabled="!canEdit">
-                            <option value="" disabled>-- Select Subject --</option>
-                            <option v-for="subj in filteredSubjectOptions" :key="subj" :value="subj">{{ subj }}</option>
-                            <option value="__custom__">+ Add Custom Subject...</option>
-                        </select>
+                        <SearchableSelect v-model="selectedSubjectOption" :options="subjectSelectOptions" :all-option="false" placeholder="-- Select Subject --" :disabled="!canEdit" />
 
                         <input
                             v-if="selectedSubjectOption === '__custom__'"
@@ -197,18 +189,14 @@
 
                                     <!-- GENDER (required) -->
                                     <td class="py-2 px-3">
-                                        <select
+                                        <SearchableSelect
                                             v-model="row.gender"
-                                            class="field text-xs py-1.5 bg-white"
-                                            :class="{ 'border-red-400': row._touched && !row.gender }"
+                                            :options="[{ value: 'male', label: '♂ Male' }, { value: 'female', label: '♀ Female' }, { value: 'other', label: 'Other' }]"
+                                            :all-option="true"
+                                            all-label="— Select Gender —"
                                             :disabled="!canEdit"
                                             @blur="row._touched = true"
-                                        >
-                                            <option value="">— Select Gender —</option>
-                                            <option value="male">♂ Male</option>
-                                            <option value="female">♀ Female</option>
-                                            <option value="other">Other</option>
-                                        </select>
+                                        />
                                         <p v-if="row._touched && !row.gender" class="text-[10px] text-red-500 mt-0.5">Gender is required</p>
                                     </td>
 
@@ -368,6 +356,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { computed, ref, watch } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
@@ -394,6 +383,10 @@ function academicYearOptionLabel(year) {
     return year.label;
 }
 
+const academicYearSelectOptions = computed(() =>
+    (props.academicYearOptions ?? []).map(ay => ({ value: ay.label, label: academicYearOptionLabel(ay) }))
+);
+
 const default23Subjects = [
     'English core', 'Hindi core', 'Hindi elective', 'Malayalam', 'Sanskrit',
     'Physics', 'Chemistry', 'Biology', 'Mathematics', 'Computer science',
@@ -411,6 +404,11 @@ const filteredSubjectOptions = computed(() => {
     const q = searchQuery.value.toLowerCase();
     return masterSubjectList.value.filter(s => s.toLowerCase().includes(q));
 });
+
+const subjectSelectOptions = computed(() => [
+    ...filteredSubjectOptions.value.map(subj => ({ value: subj, label: subj })),
+    { value: '__custom__', label: '+ Add Custom Subject...' },
+]);
 
 const distinctStudentCount = computed(() => {
     const set = new Set();

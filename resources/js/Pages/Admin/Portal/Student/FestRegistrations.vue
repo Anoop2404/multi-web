@@ -80,6 +80,7 @@
                                    class="rounded mt-0.5">
                             <span class="min-w-0">
                                 <span class="font-medium text-slate-900">{{ item.title }}</span>
+                                <span v-if="item.age_group" class="text-xs text-slate-500">({{ String(item.age_group).toUpperCase() }})</span>
                                 <span v-if="item.head_name" class="text-xs text-slate-500 block">{{ item.head_name }}</span>
                                 <span v-if="item.reason && !item.eligible" class="text-xs text-amber-700 block mt-0.5">{{ item.reason }}</span>
                             </span>

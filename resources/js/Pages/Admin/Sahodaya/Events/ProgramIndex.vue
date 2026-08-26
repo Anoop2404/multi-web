@@ -207,10 +207,9 @@
                         </FormField>
                         <FormField label="Round" :error="form.errors.level_round" class-extra="sm:col-span-2">
                             <template #default="{ id }">
-                                <select :id="id" v-model="form.level_round" class="field">
-                                    <option value="sahodaya">Sahodaya round (cluster-wide)</option>
-                                    <option value="school">School round template</option>
-                                </select>
+                                <SearchableSelect :id="id" v-model="form.level_round"
+                                    :options="[{ value: 'sahodaya', label: 'Sahodaya round (cluster-wide)' }, { value: 'school', label: 'School round template' }]"
+                                    :all-option="false" placeholder="Select round" />
                             </template>
                         </FormField>
                     </div>
@@ -267,10 +266,8 @@
                                 <input type="radio" value="host_school" v-model="form.food_payee_type"> A host school
                             </label>
                         </div>
-                        <select v-if="form.food_payee_type === 'host_school'" v-model="form.food_host_school_id" class="field">
-                            <option value="">— Select school —</option>
-                            <option v-for="s in schoolOptions" :key="s.id" :value="s.id">{{ s.name }}</option>
-                        </select>
+                        <SearchableSelect v-if="form.food_payee_type === 'host_school'" v-model="form.food_host_school_id"
+                            :options="schoolOptions" :all-option="true" all-label="— Select school —" />
                         <InputError :message="form.errors.food_host_school_id" class="mt-2" />
                     </div>
                     <div class="flex justify-end gap-2 pt-2">
@@ -438,6 +435,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import FormField from '@/Components/ui/FormField.vue';
 import InputError from '@/Components/ui/InputError.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 import { sahodayaProgramHref } from '@/support/sahodayaPrograms.js';
 import { useConfirm } from '@/composables/useConfirm';

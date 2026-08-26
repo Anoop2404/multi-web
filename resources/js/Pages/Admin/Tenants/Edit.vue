@@ -47,21 +47,17 @@
 
                     <div v-if="tenant.type === 'school'">
                         <label class="form-label mb-1.5">Parent Sahodaya</label>
-                        <select v-model="form.parent_id"
-                                class="field">
-                            <option value="">— No parent —</option>
-                            <option v-for="s in sahodayas" :key="s.id" :value="s.id">{{ s.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="form.parent_id"
+                                :options="sahodayas"
+                                :all-option="true"
+                                all-label="— No parent —" />
                     </div>
 
                     <div>
                         <label class="form-label mb-1.5">Plan</label>
-                        <select v-model="form.plan"
-                                class="field">
-                            <option value="free">Free</option>
-                            <option value="basic">Basic</option>
-                            <option value="pro">Pro</option>
-                        </select>
+                        <SearchableSelect v-model="form.plan"
+                                :options="[{ value: 'free', label: 'Free' }, { value: 'basic', label: 'Basic' }, { value: 'pro', label: 'Pro' }]"
+                                :all-option="false" />
                     </div>
 
                     <div class="flex items-center gap-3">
@@ -87,6 +83,7 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
 

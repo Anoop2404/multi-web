@@ -38,10 +38,7 @@
                     <input v-model="form.name" class="field" required placeholder="e.g. Chess">
                 </FormField>
                 <FormField label="Sport discipline">
-                    <select v-model="form.sport_discipline" class="field">
-                        <option value="">Any</option>
-                        <option v-for="(label, key) in disciplines" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect v-model="form.sport_discipline" :options="disciplineOptions" :all-option="true" all-label="Any" />
                 </FormField>
                 <label class="flex items-center gap-2 text-sm">
                     <input type="checkbox" v-model="form.is_team_heading"> Use as ID card heading
@@ -62,9 +59,10 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import FestHeadFeeFields from '@/Components/fest/FestHeadFeeFields.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { emptyHeadFeeFields } from '@/support/festHeadFeeFields';
 
 const props = defineProps({
@@ -83,6 +81,7 @@ const form = useForm({
 const feeFields = reactive(emptyHeadFeeFields());
 const syncing = ref(false);
 const showAddHead = ref(false);
+const disciplineOptions = computed(() => Object.entries(props.disciplines).map(([value, label]) => ({ value, label })));
 
 watch(feeFields, (fields) => {
     Object.assign(form, fields);

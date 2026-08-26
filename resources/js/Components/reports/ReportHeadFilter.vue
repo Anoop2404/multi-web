@@ -2,18 +2,26 @@
     <form class="card !p-4 mb-4 flex flex-wrap gap-3 items-end" @submit.prevent="$emit('apply')">
         <FormField :label="resolvedLabel" class-extra="mb-0 min-w-[12rem]">
             <template #default="{ id }">
-                <select :id="id" :value="modelValue" class="field text-sm" @change="onChange">
-                    <option value="">{{ resolvedAllLabel }}</option>
-                    <option v-for="h in heads" :key="h.id" :value="h.id">{{ h.name }}</option>
-                </select>
+                <SearchableSelect
+                    :id="id"
+                    :model-value="modelValue"
+                    :options="heads"
+                    :all-option="true"
+                    :all-label="resolvedAllLabel"
+                    @update:model-value="onChange"
+                />
             </template>
         </FormField>
         <FormField v-if="items.length" label="Item" class-extra="mb-0 min-w-[14rem]">
             <template #default="{ id }">
-                <select :id="id" :value="itemId" class="field text-sm" @change="onItemChange">
-                    <option value="">All items{{ modelValue ? ' in head' : '' }}</option>
-                    <option v-for="item in items" :key="item.id" :value="item.id">{{ item.title }}</option>
-                </select>
+                <SearchableSelect
+                    :id="id"
+                    :model-value="itemId"
+                    :options="items"
+                    :all-option="true"
+                    :all-label="itemAllLabel"
+                    @update:model-value="onItemChange"
+                />
             </template>
         </FormField>
         <button type="submit" class="btn-primary text-sm">Apply</button>
@@ -23,6 +31,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     modelValue: { type: [String, Number], default: '' },
@@ -38,6 +47,7 @@ const emit = defineEmits(['update:modelValue', 'update:itemId', 'apply']);
 
 const resolvedLabel = computed(() => props.label ?? (props.isSports ? 'Sport Event' : 'Item head'));
 const resolvedAllLabel = computed(() => props.allLabel ?? (props.isSports ? 'All sport events' : 'All heads'));
+const itemAllLabel = computed(() => `All items${props.modelValue ? ' in head' : ''}`);
 
 const items = computed(() => {
     if (!props.modelValue) {
@@ -47,12 +57,12 @@ const items = computed(() => {
     return group?.items ?? [];
 });
 
-function onChange(e) {
-    emit('update:modelValue', e.target.value);
+function onChange(value) {
+    emit('update:modelValue', value);
     emit('update:itemId', '');
 }
 
-function onItemChange(e) {
-    emit('update:itemId', e.target.value);
+function onItemChange(value) {
+    emit('update:itemId', value);
 }
 </script>

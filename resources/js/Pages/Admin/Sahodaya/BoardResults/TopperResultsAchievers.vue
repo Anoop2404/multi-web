@@ -55,11 +55,12 @@
                     Class XII
                 </Link>
                 <span class="text-xs text-slate-300 mx-1">|</span>
-                <select class="field text-xs py-1.5" :value="filters.academic_year" @change="switchYear($event.target.value)">
-                    <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label" :disabled="ay.status === 'closed'">
-                        {{ ay.label }}
-                    </option>
-                </select>
+                <SearchableSelect
+                    :model-value="filters.academic_year"
+                    @update:model-value="switchYear"
+                    :options="academicYearLabels"
+                    :all-option="false"
+                />
             </div>
             <div class="flex flex-wrap gap-2">
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=${selectedClass}&academic_year=${filters.academic_year}${selectedClass === 12 && selectedStream ? `&stream=${selectedStream}` : ''}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
@@ -137,6 +138,7 @@ import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import PdfPreviewModal from '@/Components/ui/PdfPreviewModal.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -223,6 +225,8 @@ function sortArrow(key) {
 }
 
 const streamEntries = computed(() => Object.entries(props.streamOptions ?? {}));
+
+const academicYearLabels = computed(() => (props.academicYearOptions ?? []).map((ay) => ay.label));
 
 const flatRows = computed(() => props.rows ?? []);
 

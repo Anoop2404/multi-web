@@ -11,14 +11,15 @@
         </div>
 
         <div class="flex flex-wrap gap-2 items-center">
-            <select v-model="pickedLabel" class="form-input text-xs !w-auto" @change="addPicked">
-                <option value="">+ Add existing subject…</option>
-                <optgroup v-for="(group, category) in subjectsByCategory" :key="category" :label="categoryLabel(category)">
-                    <option v-for="subj in group" :key="subj.id" :value="subj.label" :disabled="subjects?.includes(subj.label)">
-                        {{ subj.label }}
-                    </option>
-                </optgroup>
-            </select>
+            <SearchableSelect
+                v-model="pickedLabel"
+                :options="pickableSubjectOptions"
+                :all-option="true"
+                all-label="+ Add existing subject…"
+                placeholder="+ Add existing subject…"
+                class="!w-auto"
+                @change="addPicked"
+            />
             <span class="text-xs text-slate-400">or</span>
             <input v-model="customLabel" type="text" maxlength="120" placeholder="Type a custom subject name…"
                    class="form-input text-xs !w-48" @keydown.enter.prevent="addCustom">
@@ -28,7 +29,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     subjects: { type: Array, default: () => [] },
@@ -52,6 +54,20 @@ const CATEGORY_LABELS = {
 function categoryLabel(category) {
     return CATEGORY_LABELS[category] ?? (category ? category[0].toUpperCase() + category.slice(1) : 'Other');
 }
+
+// Flattens the grouped subjectsByCategory map into a single options list (SearchableSelect has no
+// optgroup/disabled-option support), prefixing each label with its category and dropping subjects
+// already added — selecting an already-added subject was already a no-op in addPicked().
+const pickableSubjectOptions = computed(() => {
+    const options = [];
+    for (const [category, group] of Object.entries(props.subjectsByCategory ?? {})) {
+        for (const subj of group) {
+            if (props.subjects?.includes(subj.label)) continue;
+            options.push({ value: subj.label, label: `${categoryLabel(category)}: ${subj.label}` });
+        }
+    }
+    return options;
+});
 
 function addPicked() {
     const label = pickedLabel.value.trim();

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Support\CsvSafety;
 use App\Models\FestEvent;
 use App\Models\FestItemHead;
 use App\Models\FestMark;
@@ -23,6 +24,7 @@ use App\Services\Events\FestItemHeadService;
 use App\Services\School\SchoolDocumentDownloadGateService;
 use App\Support\FestReportCatalog;
 use App\Support\ExcelExport;
+use App\Support\FestClassGroupScheme;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
 use App\Support\TenantBranding;
@@ -266,18 +268,20 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $meta = SchoolFestProgram::meta($program);
-        $itemId = $request->integer('item_id') ?: null;
 
-        $participants = collect();
-        if ($itemId) {
-            $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-                ->whereIn('event_id', $event->reportableEventIds())
-                ->where('school_id', $this->school->id)
-                ->where('item_id', $itemId)
-                ->active())
-                ->with(['student:id,name,admission_number,school_class_id', 'student.schoolClass:id,name', 'teacher:id,name,reg_no', 'mark'])
-                ->get();
-        }
+        // All items, one flat table (2026-08-25 rework) — replaces the old "pick one
+        // item to see its roster" flow. No FestReportScope needed here (unlike the
+        // Sahodaya-admin version): a school is always confined to its own school_id
+        // regardless of phase/region, so there's no authorization boundary to enforce —
+        // phase/region are pure display/filter dimensions on the client below.
+        $analytics = new FestEventReportAnalyticsService($event);
+        $rows = $analytics->itemWiseReportRows($this->school->id);
+
+        $root = $event->rootEvent();
+        $taxonomy = app(\App\Services\Events\FestTaxonomyRegistry::class)->forTenant($tenantId)->labels('arts_category');
+        $categories = collect($rows)->pluck('category')->unique()->filter()->sort()->values()
+            ->map(fn ($key) => ['key' => $key, 'label' => $taxonomy[$key] ?? ucfirst($key)])
+            ->all();
 
         $base = $this->schoolReportsBase($program, $event);
 
@@ -288,13 +292,11 @@ class FestSchoolReportController extends SchoolAdminController
                 'programMeta'  => $meta,
                 'school'       => $this->school->only('id', 'name'),
                 'event'        => $event->only('id', 'title'),
-                'itemId'       => $itemId,
-                'participants' => $participants,
-                'pdfUrl'       => $itemId ? "{$base}/item-wise/pdf?item_id={$itemId}" : null,
-                'csvUrl'       => $itemId ? "{$base}/item-wise/export?item_id={$itemId}" : null,
-                'resultsPdfUrl'=> ($itemId && $event->results_published)
-                    ? "{$base}/export/item-wise?item_id={$itemId}"
-                    : null,
+                'rows'         => $rows,
+                'categories'   => $categories,
+                'usesPhases'   => $root->usesPhasedRegionalBilling(),
+                'csvUrl'       => "{$base}/item-wise/export",
+                'pdfUrl'       => "{$base}/item-wise/marks-pdf",
             ],
         ));
     }
@@ -466,10 +468,10 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($event, $rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Reg / Adm No', 'Name', 'Gender', 'Item Count', 'Registered Items', 'Total Score']);
+            CsvSafety::fputcsv($out, ['Reg / Adm No', 'Name', 'Gender', 'Item Count', 'Registered Items', 'Total Score']);
             foreach ($rows as $row) {
                 $itemTitles = collect($row['items'])->pluck('item_title')->filter()->implode('; ');
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $row['reg_no'] ?? '',
                     $row['name'] ?? '',
                     $row['gender'] ?? '',
@@ -491,52 +493,60 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($event, $itemsByTeacher, $marksByTeacher) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Reg No', 'Name', 'Designation', 'Items', 'Total Score', 'Results']);
+            CsvSafety::fputcsv($out, ['Reg No', 'Name', 'Designation', 'Items', 'Total Score', 'Results']);
             $teachers = \App\Models\Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no', 'designation']);
             foreach ($teachers as $teacher) {
                 $items = ($itemsByTeacher->get($teacher->id) ?? collect())->filter()->implode('; ');
                 $marks = $marksByTeacher->get($teacher->id) ?? collect();
                 $results = $marks->map(fn ($m) => ($m->item?->title ?? '').':'.($m->grade ?? $m->position ?? $m->score))->implode('; ');
-                fputcsv($out, [$teacher->reg_no, $teacher->name, $teacher->designation, $items, $marks->sum('score'), $results]);
+                CsvSafety::fputcsv($out, [$teacher->reg_no, $teacher->name, $teacher->designation, $items, $marks->sum('score'), $results]);
             }
             fclose($out);
         }, "{$event->id}-teacher-wise.csv", ['Content-Type' => 'text/csv']);
     }
 
+    /** All-items CSV — companion export to itemWise() above (2026-08-25 rework, replaces the old single-item export). */
     public function exportItemWise(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $eventIds = $event->reportableEventIds();
-        $itemsQuery = \App\Models\FestEventItem::whereIn('event_id', $eventIds);
-        $itemId = $request->integer('item_id') ?: (clone $itemsQuery)->value('id');
-        $item = (clone $itemsQuery)->findOrFail($itemId);
+        $rows = (new FestEventReportAnalyticsService($event))->itemWiseReportRows($this->school->id);
 
-        return response()->streamDownload(function () use ($event, $eventIds, $itemId, $item) {
+        return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Item', 'Participant', 'Admission No', 'Class', 'Fest ID', 'Item reg', 'Grade', 'Position', 'Score']);
-            $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-                ->whereIn('event_id', $eventIds)
-                ->where('school_id', $this->school->id)
-                ->where('item_id', $itemId)
-                ->active())
-                ->with(['student:id,name,admission_number,school_class_id', 'student.schoolClass:id,name', 'teacher:id,name,reg_no', 'mark'])
-                ->get();
-            foreach ($participants as $p) {
-                fputcsv($out, [
-                    $item->title,
-                    $p->student?->name ?? $p->teacher?->name,
-                    $p->student?->admission_number ?? $p->teacher?->reg_no ?? '',
-                    $p->student?->schoolClass?->name,
-                    $p->level_registration_number,
-                    $p->item_registration_number,
-                    $p->mark?->grade,
-                    $p->mark?->position,
-                    $p->mark?->score,
+            CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Fest ID', 'Item Reg', 'Chest', 'Status', 'Grade', 'Rank', 'Score']);
+            foreach ($rows as $row) {
+                CsvSafety::fputcsv($out, [
+                    $row['category_label'], $row['item_title'], $row['item_code'],
+                    $row['phase_name'], $row['region_name'], $row['school_name'],
+                    $row['participant'], $row['reg_no'], $row['fest_id'], $row['item_reg'], $row['chest_no'],
+                    $row['status'], $row['grade'], $row['position'], $row['score'],
                 ]);
             }
             fclose($out);
-        }, "{$event->id}-item-{$itemId}.csv", ['Content-Type' => 'text/csv']);
+        }, "{$event->id}-item-wise-report.csv", ['Content-Type' => 'text/csv']);
+    }
+
+    /** Mark entry report as PDF — chest no / grade / rank / score for the school's own registrations, stamped with who generated it and when (and an optional ?for_whom= recipient note). */
+    public function itemWisePdf(Request $request, string $tenantId, FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $rows = (new FestEventReportAnalyticsService($event))->itemWiseReportRows($this->school->id);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.item-wise-marks', [
+            'sahodaya'    => Tenant::find($event->tenant_id),
+            'event'       => $event,
+            'rows'        => $rows,
+            'showPhase'   => collect($rows)->contains(fn ($r) => $r['phase_name']),
+            'showRegion'  => collect($rows)->contains(fn ($r) => $r['region_name']),
+            'generatedBy' => $request->user()->name ?? 'Unknown',
+            'generatedAt' => now()->format('d M Y, h:i A'),
+            'forWhom'     => trim((string) $request->input('for_whom', '')) ?: null,
+            'logoSrc'     => \App\Support\TenantBranding::logoEmbedSrc($this->school),
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download("{$event->id}-mark-entry-report.pdf");
     }
 
     public function exportItemWisePdf(
@@ -583,9 +593,9 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($event, $usage) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Event', 'Limit type', 'Used', 'Limit']);
+            CsvSafety::fputcsv($out, ['Event', 'Limit type', 'Used', 'Limit']);
             foreach ($usage['used'] as $type => $count) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $event->title,
                     $type,
                     $count,
@@ -613,9 +623,9 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Participant', 'Reg No', 'Item', 'From event', 'From level', 'Next event', 'Next level', 'Promoted at']);
+            CsvSafety::fputcsv($out, ['Participant', 'Reg No', 'Item', 'From event', 'From level', 'Next event', 'Next level', 'Promoted at']);
             foreach ($rows as $q) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $q->participant?->student?->name ?? $q->participant?->teacher?->name,
                     $q->participant?->student?->reg_no ?? $q->participant?->teacher?->reg_no,
                     $q->item?->title,
@@ -696,6 +706,8 @@ class FestSchoolReportController extends SchoolAdminController
 
         $itemCounts = $service->itemParticipantCounts($event, $this->school->id);
         $registrationCounts = $service->itemRegistrationCounts($event, $this->school->id);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $ageGroupLabels = config('fest_item_taxonomy.age_group', []);
 
         $cluster = Tenant::find($this->school->parent_id);
         $downloadGate = app(SchoolDocumentDownloadGateService::class)->payload($this->school, $event);
@@ -707,12 +719,13 @@ class FestSchoolReportController extends SchoolAdminController
             'clusterName' => $cluster?->name ?? 'Sahodaya',
             'clusterLogoUrl' => $cluster ? TenantBranding::logoUrl($cluster) : null,
             'event'       => $event->only('id', 'title', 'status'),
-            'items'       => $event->items->map(fn ($item) => [
+            'items'       => $event->items->map(fn (\App\Models\FestEventItem $item) => [
                 'id'                 => $item->id,
                 'title'              => $item->title,
                 'participant_type'   => $item->participant_type,
                 'count'              => $itemCounts[$item->id] ?? 0,
                 'registration_count' => $registrationCounts[$item->id] ?? 0,
+                'category_label'     => $this->itemCategoryLabel($item, $classGroupLabels, $ageGroupLabels),
             ]),
             'heads'       => $service->headOptions($event, $this->school->id),
             'meta'        => $service->indexMeta($event, $this->school->id),
@@ -1716,5 +1729,32 @@ class FestSchoolReportController extends SchoolAdminController
 
             return $std;
         }, $students);
+    }
+
+    /**
+     * Human-readable class/age-bracket or arts-genre label for an item, for display
+     * next to the item's title in pickers. Sports events use age_group; everything
+     * else uses class_group, falling back to the arts category. Null when nothing
+     * more specific than the generic 'open'/'general' buckets applies.
+     *
+     * @param  array<string, string>  $classGroupLabels
+     * @param  array<string, string>  $ageGroupLabels
+     */
+    private function itemCategoryLabel(\App\Models\FestEventItem $item, array $classGroupLabels, array $ageGroupLabels): ?string
+    {
+        if ($item->age_group && $item->age_group !== 'open') {
+            return $ageGroupLabels[$item->age_group] ?? strtoupper($item->age_group);
+        }
+
+        if ($item->class_group && $item->class_group !== 'open') {
+            return $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
+        }
+
+        if ($item->category && $item->category !== 'general') {
+            return config("fest_item_taxonomy.arts_category.{$item->category}")
+                ?? ucwords(str_replace(['_', '-'], ' ', $item->category));
+        }
+
+        return null;
     }
 }

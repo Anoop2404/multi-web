@@ -19,19 +19,13 @@
                           @apply="applyFilter">
             <template #extra>
                 <FormField label="School" class-extra="mb-0 min-w-[12rem]">
-                    <select v-model="schoolFilter" class="field text-sm">
-                        <option value="">All schools</option>
-                        <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <SearchableSelect v-model="schoolFilter" :options="schools" :all-option="true" all-label="All schools" />
                 </FormField>
             </template>
         </ReportHeadFilter>
 
         <form v-else @submit.prevent="applyFilter" class="flex flex-wrap gap-2 my-4">
-            <select v-model="schoolFilter" class="field">
-                <option value="">All schools</option>
-                <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
+            <SearchableSelect v-model="schoolFilter" :options="schools" :all-option="true" all-label="All schools" />
             <button type="submit" class="btn-primary">Filter</button>
         </form>
 
@@ -110,6 +104,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadFilter from '@/Components/reports/ReportHeadFilter.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { filterClashRows, useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
 
 const props = defineProps({

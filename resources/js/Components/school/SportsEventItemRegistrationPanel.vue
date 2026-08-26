@@ -44,10 +44,8 @@
                 <div class="flex flex-wrap gap-2 items-center sticky top-0 z-10 px-4 py-2 bg-white/95 backdrop-blur border-b border-emerald-100">
                     <input v-model="sportsSearch" type="search" class="field flex-1 min-w-[10rem] !py-1.5 text-sm"
                            placeholder="Search items…" autocomplete="off">
-                    <select v-if="itemOptions.length" v-model="itemFilter" class="field text-xs !py-1.5 max-w-[12rem]">
-                        <option value="">All items</option>
-                        <option v-for="it in itemOptions" :key="it.id" :value="it.id">{{ it.title }}</option>
-                    </select>
+                    <SearchableSelect v-if="itemOptions.length" v-model="itemFilter" :options="itemFilterOptions"
+                                      :all-option="true" all-label="All items" class="max-w-[12rem]" />
                     <div class="flex flex-wrap gap-1">
                         <button type="button" class="text-xs px-2.5 py-1 rounded-full border transition-colors"
                                 :class="!ageFilter ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'"

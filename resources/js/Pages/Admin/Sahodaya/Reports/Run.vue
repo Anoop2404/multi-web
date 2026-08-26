@@ -12,15 +12,12 @@
         <form v-if="meta.filters?.length" class="card !p-4 mb-4" @submit.prevent="applyFilters">
             <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
                 <FormField v-for="f in meta.filters" :key="f.key" :label="f.label">
-                    <select v-if="f.type === 'select'"
+                    <SearchableSelect v-if="f.type === 'select'"
                             v-model="filterForm[f.key]"
-                            class="field"
-                            :disabled="f.key === 'head_id' && !filterForm.event_id">
-                        <option value="">{{ selectPlaceholder(f.key) }}</option>
-                        <option v-for="opt in optionsFor(f.key)" :key="opt.id" :value="String(opt.id)">
-                            {{ opt.label }}
-                        </option>
-                    </select>
+                            :options="optionsFor(f.key)"
+                            :all-option="true"
+                            :all-label="selectPlaceholder(f.key)"
+                            :disabled="f.key === 'head_id' && !filterForm.event_id" />
                     <input v-else
                            v-model="filterForm[f.key]"
                            :type="f.type === 'date' ? 'date' : 'text'"
@@ -66,6 +63,7 @@ import { computed, reactive, watch } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import FormField from '@/Components/ui/FormField.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,

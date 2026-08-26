@@ -102,20 +102,25 @@
                 <!-- ACADEMIC YEAR -->
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Academic Year</label>
-                    <select v-model="selectedYear" class="field text-xs bg-white font-semibold" @change="applyServerFilters">
-                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                            {{ ay.label }}{{ ay.status === 'active' ? ' (Active)' : '' }}
-                        </option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedYear"
+                        :options="academicYearSelectOptions"
+                        :all-option="false"
+                        placeholder="Select academic year"
+                        @change="applyServerFilters"
+                    />
                 </div>
 
                 <!-- CLASS -->
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Class</label>
-                    <select v-model="selectedClass" class="field text-xs bg-white font-semibold" @change="applyServerFilters">
-                        <option :value="null">All Classes (10 & 12)</option>
-                        <option v-for="c in classOptions" :key="c" :value="c">Class {{ c }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedClass"
+                        :options="classSelectOptions"
+                        :all-option="true"
+                        all-label="All Classes (10 & 12)"
+                        @change="applyServerFilters"
+                    />
                 </div>
 
                 <!-- SUBJECT FILTER -->
@@ -173,33 +178,33 @@
                 <!-- MEMBER SCHOOL FILTER -->
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Member School</label>
-                    <select v-model="selectedSchoolId" class="field text-xs bg-white">
-                        <option value="">All Member Schools</option>
-                        <option v-for="sch in schoolOptions" :key="sch.id" :value="sch.id">{{ sch.name }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedSchoolId"
+                        :options="schoolOptions"
+                        :all-option="true"
+                        all-label="All Member Schools"
+                    />
                 </div>
 
                 <!-- STREAM FILTER -->
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Stream</label>
-                    <select v-model="selectedStream" class="field text-xs bg-white">
-                        <option value="">All Streams</option>
-                        <option value="Science">Science</option>
-                        <option value="Commerce">Commerce</option>
-                        <option value="Humanities">Humanities / Arts</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedStream"
+                        :options="[{ value: 'Science', label: 'Science' }, { value: 'Commerce', label: 'Commerce' }, { value: 'Humanities', label: 'Humanities / Arts' }]"
+                        :all-option="true"
+                        all-label="All Streams"
+                    />
                 </div>
 
                 <!-- RANK LIMIT FILTER -->
                 <div>
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Rank Limit</label>
-                    <select v-model.number="selectedRankCap" class="field text-xs bg-white font-bold text-indigo-700">
-                        <option :value="0">All Ranks</option>
-                        <option :value="1">🥇 Rank 1 Only</option>
-                        <option :value="3">Top 3 Ranks</option>
-                        <option :value="5">Top 5 Ranks</option>
-                        <option :value="10">Top 10 Ranks</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="selectedRankCap"
+                        :options="[{ value: 0, label: 'All Ranks' }, { value: 1, label: '🥇 Rank 1 Only' }, { value: 3, label: 'Top 3 Ranks' }, { value: 5, label: 'Top 5 Ranks' }, { value: 10, label: 'Top 10 Ranks' }]"
+                        :all-option="false"
+                    />
                 </div>
             </div>
         </div>
@@ -490,6 +495,7 @@ import PageHeader from '@/Components/ui/PageHeader.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
 import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
 import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const showHistoryModal = ref(false);
 const historyStudent = ref(null);
@@ -534,6 +540,13 @@ const previewMode = ref('single');
 const distinctSubjectCount = computed(() => new Set(props.rows.map(r => r.subject || r.subject_label)).size);
 const distinctSchoolCount = computed(() => new Set(props.rows.map(r => r.school_id || r.school_name)).size);
 const perfectScorerCount = computed(() => props.rows.filter(r => r.marks === 100 || r.marks_obtained === 100).length);
+
+const academicYearSelectOptions = computed(() => props.academicYearOptions.map(ay => ({
+    value: ay.label,
+    label: `${ay.label}${ay.status === 'active' ? ' (Active)' : ''}`,
+})));
+
+const classSelectOptions = computed(() => props.classOptions.map(c => ({ value: c, label: `Class ${c}` })));
 
 const pdfDownloadUrl = computed(() => {
     let url = `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/subject-merit/pdf?academic_year=${encodeURIComponent(selectedYear.value)}`;

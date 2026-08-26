@@ -4,7 +4,7 @@
 </head><body>
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
-<h2 style="text-align:center">{{ $event->title }} — {{ $item?->title ?? 'Item' }} (Top {{ $topN }})</h2>
+<h2 style="text-align:center">{{ $event->title }} — {{ $item?->title ?? 'Item' }}{{ !empty($categoryLabel) ? ' — '.$categoryLabel : '' }} (Top {{ $topN }})</h2>
 <table><thead><tr><th>Sl No</th><th>Pos</th><th>Participant</th><th>School</th><th>Grade</th><th>Score</th></tr></thead>
 <tbody>
 @foreach($marks as $m)

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\CsvSafety;
 use App\Models\AccountHead;
 use App\Models\AcademicYearRecord;
 use App\Models\LedgerTransaction;
@@ -128,9 +129,9 @@ class LedgerController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($transactions) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Date', 'Category', 'Head Code', 'Account Head', 'Type', 'Amount', 'Description']);
+            CsvSafety::fputcsv($out, ['Date', 'Category', 'Head Code', 'Account Head', 'Type', 'Amount', 'Description']);
             foreach ($transactions as $t) {
-                fputcsv($out, [
+                CsvSafety::fputcsv($out, [
                     $t->transaction_date,
                     $t->accountHead?->category ?? '',
                     $t->accountHead?->code ?? '',

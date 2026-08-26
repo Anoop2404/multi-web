@@ -43,20 +43,13 @@
                                         <input v-model="row.name" type="text" class="field !py-2" required placeholder="Student name">
                                     </td>
                                     <td class="px-2 py-2 align-middle">
-                                        <select v-model="row.school_class_id" class="field !py-2" required>
-                                            <option value="">Class</option>
-                                            <option v-for="c in schoolClassesSorted" :key="c.id" :value="c.id">
-                                                {{ classShortLabel(c) }}
-                                            </option>
-                                        </select>
+                                        <SearchableSelect v-model="row.school_class_id" :options="schoolClassOptions"
+                                            :all-option="true" all-label="Class" :required="true" />
                                     </td>
                                     <td class="px-2 py-2 align-middle">
-                                        <select v-model="row.gender" class="field !py-2" required>
-                                            <option value="">—</option>
-                                            <option value="male">Male</option>
-                                            <option value="female">Female</option>
-                                            <option value="other">Other</option>
-                                        </select>
+                                        <SearchableSelect v-model="row.gender"
+                                            :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
+                                            :all-option="true" all-label="—" :required="true" />
                                     </td>
                                     <td class="px-2 py-2 align-middle">
                                         <input v-model="row.dob" type="date" class="field !py-2" required>
@@ -94,6 +87,7 @@
 
 <script setup>
 import BulkRowPhotoInput from '@/Components/school/BulkRowPhotoInput.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -131,6 +125,10 @@ const schoolClassesSorted = computed(() =>
         (a.display_order ?? 0) - (b.display_order ?? 0)
         || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }),
     ),
+);
+
+const schoolClassOptions = computed(() =>
+    schoolClassesSorted.value.map(c => ({ value: c.id, label: classShortLabel(c) })),
 );
 
 const filledRowCount = computed(() =>

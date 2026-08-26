@@ -8,18 +8,12 @@
             <form @submit.prevent="addComboRule" class="grid gap-3 sm:grid-cols-2">
                 <FormField label="School">
                     <template #default="{ id }">
-                        <select :id="id" v-model="comboForm.school_id" class="field">
-                            <option value="">All schools</option>
-                            <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="comboForm.school_id" :options="schools" :all-option="true" all-label="All schools" />
                     </template>
                 </FormField>
                 <FormField label="Class category">
                     <template #default="{ id }">
-                        <select :id="id" v-model="comboForm.class_group" class="field">
-                            <option value="">All classes</option>
-                            <option v-for="(label, key) in classGroups" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect :id="id" v-model="comboForm.class_group" :options="classGroupOptions" :all-option="true" all-label="All classes" />
                     </template>
                 </FormField>
                 <FormField label="Max arts events">
@@ -79,7 +73,10 @@
 </template>
 
 <script setup>
-import { inject } from 'vue';
+import { inject, computed } from 'vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const { comboForm, comboRules, schools, classGroups, addComboRule, removeComboRule, event } = inject('eventSettings');
+
+const classGroupOptions = computed(() => Object.entries(classGroups).map(([value, label]) => ({ value, label })));
 </script>

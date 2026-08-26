@@ -33,13 +33,14 @@
             </div>
             <div class="bg-white rounded-2xl border border-indigo-200 p-5 shadow-2xs ring-1 ring-indigo-100">
                 <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Academic Year</p>
-                <select
-                    :value="filters.academic_year"
-                    @change="changeYear($event.target.value)"
-                    class="w-full text-sm font-bold text-slate-900 font-mono bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
-                >
-                    <option v-for="yr in availableYears" :key="yr" :value="yr">{{ yr }}</option>
-                </select>
+                <SearchableSelect
+                    :model-value="filters.academic_year"
+                    @update:model-value="changeYear"
+                    :options="availableYears"
+                    :all-option="false"
+                    placeholder="Select academic year"
+                    class="w-full"
+                />
                 <p class="text-xs text-slate-400 mt-1.5">Switch academic session</p>
             </div>
         </div>
@@ -111,6 +112,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
 import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\CsvSafety;
 use App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
 use App\Models\FestAttendance;
 use App\Models\FestEvent;
@@ -225,8 +226,8 @@ class FestAttendanceController extends SahodayaAdminController
 
         return response()->streamDownload(function () {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['reg_no', 'item_title', 'participant_id', 'status']);
-            fputcsv($out, ['S2024001', 'Mono Act', '', 'present']);
+            CsvSafety::fputcsv($out, ['reg_no', 'item_title', 'participant_id', 'status']);
+            CsvSafety::fputcsv($out, ['S2024001', 'Mono Act', '', 'present']);
             fclose($out);
         }, "fest-attendance-{$event->id}-template.csv", ['Content-Type' => 'text/csv']);
     }

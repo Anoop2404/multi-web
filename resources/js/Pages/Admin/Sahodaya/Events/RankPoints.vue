@@ -16,11 +16,7 @@
 
         <div v-if="childEvents.length" class="card !p-4 mb-5 flex flex-wrap items-center gap-2">
             <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ isSports ? 'Sport Event / Region:' : 'Region:' }}</label>
-            <select :value="String(event.id)" @change="switchSportEvent" class="field text-xs !py-1 w-64 font-semibold">
-                <option v-for="ev in childEvents" :key="ev.id" :value="String(ev.id)">
-                    {{ ev.short_title || ev.title }}
-                </option>
-            </select>
+            <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent" :options="childEventOptions" :all-option="false" class="w-64" />
         </div>
 
         <div class="space-y-6">
@@ -144,19 +140,11 @@
                     <div class="grid gap-3 sm:grid-cols-3">
                         <div>
                             <label class="form-label text-xs">Grade</label>
-                            <select v-model="pointForm.grade" class="field text-xs">
-                                <option value="">Any Grade</option>
-                                <option v-for="g in gradeOptions" :key="g" :value="g">Grade {{ g }}</option>
-                            </select>
+                            <SearchableSelect v-model="pointForm.grade" :options="gradeSelectOptions" :all-option="true" all-label="Any Grade" />
                         </div>
                         <div>
                             <label class="form-label text-xs">Position / Rank</label>
-                            <select v-model="pointForm.position" class="field text-xs">
-                                <option value="">Any Position</option>
-                                <option value="1">1st Place</option>
-                                <option value="2">2nd Place</option>
-                                <option value="3">3rd Place</option>
-                            </select>
+                            <SearchableSelect v-model="pointForm.position" :options="[{ value: '1', label: '1st Place' }, { value: '2', label: '2nd Place' }, { value: '3', label: '3rd Place' }]" :all-option="true" all-label="Any Position" />
                         </div>
                         <div>
                             <label class="form-label text-xs">Points Awarded *</label>
@@ -219,6 +207,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -239,9 +228,11 @@ const props = defineProps({
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`);
 const isSports = computed(() => props.event?.event_type === 'sports');
 
-function switchSportEvent(evt) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/rank-points`);
+function switchSportEvent(value) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/rank-points`);
 }
+
+const childEventOptions = computed(() => (props.childEvents ?? []).map((ev) => ({ value: String(ev.id), label: ev.short_title || ev.title })));
 
 const recalculating = ref(false);
 async function recalculateMarks() {
@@ -263,6 +254,8 @@ const gradeOptions = computed(() => {
     const used = [...new Set((props.gradeConfigs ?? []).map((g) => String(g.grade || '').replace('_plus', '+')).filter(Boolean))];
     return used.length ? used : ['A+', 'A', 'B', 'C'];
 });
+
+const gradeSelectOptions = computed(() => gradeOptions.value.map((g) => ({ value: g, label: `Grade ${g}` })));
 
 const pointForm = useForm({ grade: '', position: null, points: null, is_group: false });
 const editingRuleId = ref(null);

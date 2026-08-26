@@ -37,24 +37,24 @@
                        @input="patch('max_teams', $event.target.value)">
             </FormField>
             <FormField label="Students eligible">
-                <select :value="modelValue.verification_policy || 'all_students'" class="field"
-                        @change="patch('verification_policy', $event.target.value)">
-                    <option value="all_students">All students</option>
-                    <option value="verified_only">Verified students only</option>
-                </select>
+                <SearchableSelect :model-value="modelValue.verification_policy || 'all_students'"
+                        :all-option="false" placeholder="Select eligibility"
+                        :options="[{ value: 'all_students', label: 'All students' }, { value: 'verified_only', label: 'Verified students only' }]"
+                        @update:model-value="value => patch('verification_policy', value)" />
             </FormField>
             <FormField label="Approval">
-                <select :value="modelValue.approval_policy || 'auto'" class="field"
-                        @change="patch('approval_policy', $event.target.value)">
-                    <option value="auto">Auto (on full payment)</option>
-                    <option value="manual">Manual review</option>
-                </select>
+                <SearchableSelect :model-value="modelValue.approval_policy || 'auto'"
+                        :all-option="false" placeholder="Select approval policy"
+                        :options="[{ value: 'auto', label: 'Auto (on full payment)' }, { value: 'manual', label: 'Manual review' }]"
+                        @update:model-value="value => patch('approval_policy', value)" />
             </FormField>
         </div>
     </div>
 </template>
 
 <script setup>
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+
 const props = defineProps({
     modelValue: { type: Object, required: true },
     showHelp: { type: Boolean, default: true },

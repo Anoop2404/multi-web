@@ -6,7 +6,7 @@
         @include('public.fest.partials.page-hero', [
             'eyebrow' => 'Item schedule',
             'title' => $item->title,
-            'subtitle' => $event->title,
+            'subtitle' => $categoryLabel ? $event->title.' · '.$categoryLabel : $event->title,
         ])
 
         <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto mt-6">

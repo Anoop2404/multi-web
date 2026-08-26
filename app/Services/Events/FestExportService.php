@@ -10,6 +10,7 @@ use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Models\Tenant;
 use App\Support\ExcelExport;
+use App\Support\FestItemCategoryLabel;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Services\Events\Reports\FestReportScope;
@@ -119,16 +120,7 @@ class FestExportService
                 $schoolName = $schools[$p->registration?->school_id] ?? $p->registration?->school_id ?? '';
 
                 $item = $p->registration?->item;
-                $category = null;
-                if ($item?->class_group && $item->class_group !== 'open') {
-                    $category = $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
-                } elseif ($item?->age_group) {
-                    $category = $item->age_group;
-                } elseif ($item?->category && $item->category !== 'general') {
-                    $category = ucwords(str_replace(['_', '-'], ' ', $item->category));
-                } else {
-                    $category = 'General';
-                }
+                $category = FestItemCategoryLabel::resolve($item, $classGroupLabels) ?? 'General';
 
                 $type = match (strtolower((string) $item?->participant_type)) {
                     'group' => 'Group',

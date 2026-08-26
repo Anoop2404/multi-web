@@ -60,15 +60,11 @@
             <div class="flex flex-wrap gap-3 items-center">
                 <input v-model="searchQuery" type="search" class="field flex-1 min-w-[12rem] max-w-md"
                        placeholder="Search by item, code, venue, discipline…" autocomplete="off">
-                <select v-if="isSports" v-model="ageFilter" class="field max-w-[11rem]">
-                    <option value="">All ages</option>
-                    <option v-for="(label, key) in taxonomy?.age_group ?? {}" :key="key" :value="key">{{ label }}</option>
-                </select>
-                <select v-model="statusFilter" class="field max-w-[10rem]">
-                    <option value="">All statuses</option>
-                    <option value="on">Enabled</option>
-                    <option value="off">Disabled</option>
-                </select>
+                <SearchableSelect v-if="isSports" v-model="ageFilter" class="max-w-[11rem]"
+                                  :options="ageGroupOptions" :all-option="true" all-label="All ages" />
+                <SearchableSelect v-model="statusFilter" class="max-w-[10rem]"
+                                  :options="[{ value: 'on', label: 'Enabled' }, { value: 'off', label: 'Disabled' }]"
+                                  :all-option="true" all-label="All statuses" />
                 <button v-if="hasFilters" type="button" class="btn-secondary text-sm" @click="clearFilters">
                     Clear
                 </button>
@@ -227,61 +223,43 @@
                     </FormField>
                     <template v-if="isSports">
                         <FormField label="Age group">
-                            <select v-model="addForm.age_group" class="field">
-                                <option value="">Age group</option>
-                                <option v-for="(label, key) in taxonomy?.age_group ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="addForm.age_group"
+                                              :options="ageGroupOptions" :all-option="true" all-label="Age group" />
                         </FormField>
                         <FormField label="Gender">
-                            <select v-model="addForm.gender" class="field">
-                                <option value="open">Open</option>
-                                <option v-for="(label, key) in taxonomy?.gender ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="addForm.gender" :options="genderOptions" :all-option="false" />
                         </FormField>
                         <FormField label="Venue type">
-                            <select v-model="addForm.venue_type" class="field">
-                                <option value="">Venue type</option>
-                                <option v-for="(label, key) in taxonomy?.venue_type ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="addForm.venue_type"
+                                              :options="venueTypeOptions" :all-option="true" all-label="Venue type" />
                         </FormField>
                         <FormField label="Discipline">
-                            <select v-model="addForm.sport_discipline" class="field">
-                                <option value="">Discipline</option>
-                                <option v-for="(label, key) in taxonomy?.sport_discipline ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="addForm.sport_discipline"
+                                              :options="sportDisciplineOptions" :all-option="true" all-label="Discipline" />
                         </FormField>
                         <FormField label="Format">
-                            <select v-model="addForm.competition_format" class="field">
-                                <option value="">Format</option>
-                                <option v-for="(label, key) in taxonomy?.competition_format ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="addForm.competition_format"
+                                              :options="competitionFormatOptions" :all-option="true" all-label="Format" />
                         </FormField>
                     </template>
 
                     <FormField v-if="!isSports" label="Category">
-                        <select v-model="addForm.category" class="field">
-                            <option value="">No category</option>
-                            <option v-for="(label, key) in taxonomy?.arts_category ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect v-model="addForm.category"
+                                          :options="artsCategoryOptions" :all-option="true" all-label="No category" />
                     </FormField>
 
                     <FormField v-if="event.event_type === 'kids_fest'" label="Kids Fest band">
-                        <select v-model="addForm.kids_band" class="field">
-                            <option value="">Kids Fest band</option>
-                            <option v-for="(label, key) in taxonomy?.kids_band ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect v-model="addForm.kids_band"
+                                          :options="kidsBandOptions" :all-option="true" all-label="Kids Fest band" />
                     </FormField>
                     <FormField v-else-if="!isSports" label="Class category">
-                        <select v-model="addForm.class_group" class="field">
-                            <option value="">Class category</option>
-                            <option v-for="(label, key) in taxonomy?.class_group ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect v-model="addForm.class_group"
+                                          :options="classGroupOptions" :all-option="true" all-label="Class category" />
                     </FormField>
 
                     <FormField label="Participant type">
-                        <select v-model="addForm.participant_type" class="field">
-                            <option v-for="(label, key) in taxonomy?.participant_type ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect v-model="addForm.participant_type"
+                                          :options="participantTypeOptions" :all-option="false" />
                     </FormField>
                     <FormField label="Qualifiers to next level">
                         <input v-model.number="addForm.qualify_count" type="number" min="1" class="field">
@@ -323,61 +301,43 @@
 
                     <template v-if="isSports">
                         <FormField label="Age group">
-                            <select v-model="editForm.age_group" class="field">
-                                <option value="">Age group</option>
-                                <option v-for="(label, key) in taxonomy?.age_group ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="editForm.age_group"
+                                              :options="ageGroupOptions" :all-option="true" all-label="Age group" />
                         </FormField>
                         <FormField label="Gender">
-                            <select v-model="editForm.gender" class="field">
-                                <option value="open">Open</option>
-                                <option v-for="(label, key) in taxonomy?.gender ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="editForm.gender" :options="genderOptions" :all-option="false" />
                         </FormField>
                         <FormField label="Venue type">
-                            <select v-model="editForm.venue_type" class="field">
-                                <option value="">Venue type</option>
-                                <option v-for="(label, key) in taxonomy?.venue_type ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="editForm.venue_type"
+                                              :options="venueTypeOptions" :all-option="true" all-label="Venue type" />
                         </FormField>
                         <FormField label="Discipline">
-                            <select v-model="editForm.sport_discipline" class="field">
-                                <option value="">Discipline</option>
-                                <option v-for="(label, key) in taxonomy?.sport_discipline ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="editForm.sport_discipline"
+                                              :options="sportDisciplineOptions" :all-option="true" all-label="Discipline" />
                         </FormField>
                         <FormField label="Format">
-                            <select v-model="editForm.competition_format" class="field">
-                                <option value="">Format</option>
-                                <option v-for="(label, key) in taxonomy?.competition_format ?? {}" :key="key" :value="key">{{ label }}</option>
-                            </select>
+                            <SearchableSelect v-model="editForm.competition_format"
+                                              :options="competitionFormatOptions" :all-option="true" all-label="Format" />
                         </FormField>
                     </template>
 
                     <FormField v-if="!isSports" label="Category">
-                        <select v-model="editForm.category" class="field">
-                            <option value="">No category</option>
-                            <option v-for="(label, key) in taxonomy?.arts_category ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect v-model="editForm.category"
+                                          :options="artsCategoryOptions" :all-option="true" all-label="No category" />
                     </FormField>
 
                     <FormField v-if="event.event_type === 'kids_fest'" label="Kids Fest band">
-                        <select v-model="editForm.kids_band" class="field">
-                            <option value="">Kids Fest band</option>
-                            <option v-for="(label, key) in taxonomy?.kids_band ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect v-model="editForm.kids_band"
+                                          :options="kidsBandOptions" :all-option="true" all-label="Kids Fest band" />
                     </FormField>
                     <FormField v-else-if="!isSports" label="Class category">
-                        <select v-model="editForm.class_group" class="field">
-                            <option value="">Class category</option>
-                            <option v-for="(label, key) in taxonomy?.class_group ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect v-model="editForm.class_group"
+                                          :options="classGroupOptions" :all-option="true" all-label="Class category" />
                     </FormField>
 
                     <FormField label="Participant type">
-                        <select v-model="editForm.participant_type" class="field">
-                            <option v-for="(label, key) in taxonomy?.participant_type ?? {}" :key="key" :value="key">{{ label }}</option>
-                        </select>
+                        <SearchableSelect v-model="editForm.participant_type"
+                                          :options="participantTypeOptions" :all-option="false" />
                     </FormField>
                     <FormField label="Qualifiers to next level">
                         <input v-model.number="editForm.qualify_count" type="number" min="1" class="field">
@@ -412,6 +372,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import FestItemMetaIcons from '@/Components/sahodaya/FestItemMetaIcons.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 import {
     festItemGenderLabel,
@@ -508,6 +469,20 @@ const flatItems = computed(() => {
 });
 
 const hasFilters = computed(() => Boolean(searchQuery.value.trim() || ageFilter.value || statusFilter.value));
+
+function taxonomyDimensionOptions(dimension) {
+    return Object.entries(props.taxonomy?.[dimension] ?? {}).map(([value, label]) => ({ value, label }));
+}
+
+const ageGroupOptions = computed(() => taxonomyDimensionOptions('age_group'));
+const genderOptions = computed(() => [{ value: 'open', label: 'Open' }, ...taxonomyDimensionOptions('gender')]);
+const venueTypeOptions = computed(() => taxonomyDimensionOptions('venue_type'));
+const sportDisciplineOptions = computed(() => taxonomyDimensionOptions('sport_discipline'));
+const competitionFormatOptions = computed(() => taxonomyDimensionOptions('competition_format'));
+const artsCategoryOptions = computed(() => taxonomyDimensionOptions('arts_category'));
+const kidsBandOptions = computed(() => taxonomyDimensionOptions('kids_band'));
+const classGroupOptions = computed(() => taxonomyDimensionOptions('class_group'));
+const participantTypeOptions = computed(() => taxonomyDimensionOptions('participant_type'));
 
 function itemMetaOptions() {
     return { taxonomy: props.taxonomy, eventType: props.event.event_type };

@@ -28,22 +28,14 @@
                 <form @submit.prevent="submitCreateRequest" class="p-6 space-y-4 overflow-y-auto">
                     <ProfilePhotoCropper v-model="photoFile" required />
                     <FormField label="Class" required>
-                        <select v-model="requestForm.school_class_id" class="field" required>
-                            <option value="">Select class</option>
-                            <option v-for="c in sortedClasses" :key="c.id" :value="c.id">{{ formatClassOption(c) }}</option>
-                        </select>
+                        <SearchableSelect v-model="requestForm.school_class_id" :options="classOptions" :all-option="true" all-label="Select class" :required="true" />
                     </FormField>
                     <FormField label="Full name" required>
                         <input v-model="requestForm.name" type="text" class="field" required placeholder="Student name" autofocus>
                     </FormField>
                     <FormGrid>
                         <FormField label="Gender" required>
-                            <select v-model="requestForm.gender" class="field" required>
-                                <option value="">Select</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                            </select>
+                            <SearchableSelect v-model="requestForm.gender" :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]" :all-option="true" all-label="Select" :required="true" />
                         </FormField>
                         <FormField label="Date of birth" required>
                             <input v-model="requestForm.dob" type="date" class="field" required>
@@ -77,10 +69,7 @@
                 <form v-if="mode === 'single'" @submit.prevent="submitSingle" class="p-6 space-y-4 overflow-y-auto">
                     <ProfilePhotoCropper v-model="photoFile" required />
                     <FormField label="Class" required>
-                        <select v-model="form.school_class_id" class="field" required>
-                            <option value="">Select class</option>
-                            <option v-for="c in sortedClasses" :key="c.id" :value="c.id">{{ formatClassOption(c) }}</option>
-                        </select>
+                        <SearchableSelect v-model="form.school_class_id" :options="classOptions" :all-option="true" all-label="Select class" :required="true" />
                         <p v-if="form.errors.school_class_id" class="form-error">{{ form.errors.school_class_id }}</p>
                     </FormField>
                     <FormField label="Full name" required>
@@ -89,12 +78,7 @@
                     </FormField>
                     <FormGrid>
                         <FormField label="Gender" required>
-                            <select v-model="form.gender" class="field" required>
-                                <option value="">Select</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                            </select>
+                            <SearchableSelect v-model="form.gender" :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]" :all-option="true" all-label="Select" :required="true" />
                         </FormField>
                         <FormField label="Date of birth" required>
                             <input v-model="form.dob" type="date" class="field" required>
@@ -136,18 +120,10 @@
                                             <input v-model="row.name" type="text" class="field !py-1.5 text-sm" required placeholder="Name">
                                         </td>
                                         <td class="px-2 py-1.5 align-middle">
-                                            <select v-model="row.school_class_id" class="field !py-1.5 text-sm" required>
-                                                <option value="">Class</option>
-                                                <option v-for="c in sortedClasses" :key="c.id" :value="c.id">{{ classShortLabel(c) }}</option>
-                                            </select>
+                                            <SearchableSelect v-model="row.school_class_id" :options="classOptionsShort" :all-option="true" all-label="Class" :required="true" />
                                         </td>
                                         <td class="px-2 py-1.5 align-middle">
-                                            <select v-model="row.gender" class="field !py-1.5 text-sm" required>
-                                                <option value="">—</option>
-                                                <option value="male">Male</option>
-                                                <option value="female">Female</option>
-                                                <option value="other">Other</option>
-                                            </select>
+                                            <SearchableSelect v-model="row.gender" :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]" :all-option="true" all-label="—" :required="true" />
                                         </td>
                                         <td class="px-2 py-1.5 align-middle">
                                             <input v-model="row.dob" type="date" class="field !py-1.5 text-sm" required>
@@ -181,6 +157,7 @@ import { computed, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import ProfilePhotoCropper from '@/Components/school/ProfilePhotoCropper.vue';
 import BulkRowPhotoInput from '@/Components/school/BulkRowPhotoInput.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     modelValue: { type: Boolean, default: false },
@@ -274,6 +251,14 @@ function classShortLabel(c) {
     const cat = c.class_category?.label ?? c.class_category?.name;
     return cat ? `${c.name} · ${cat}` : String(c.name);
 }
+
+const classOptions = computed(() =>
+    sortedClasses.value.map((c) => ({ value: c.id, label: formatClassOption(c) })),
+);
+
+const classOptionsShort = computed(() =>
+    sortedClasses.value.map((c) => ({ value: c.id, label: classShortLabel(c) })),
+);
 
 function resetBulkRows() {
     bulkRows.value = [createBulkRow()];

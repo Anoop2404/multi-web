@@ -55,11 +55,13 @@
                     Class XII
                 </Link>
                 <span class="text-xs text-slate-300 mx-1">|</span>
-                <select class="field text-xs py-1.5" :value="filters.academic_year" @change="switchYear($event.target.value)">
-                    <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label" :disabled="ay.status === 'closed'">
-                        {{ ay.label }}
-                    </option>
-                </select>
+                <SearchableSelect
+                    :model-value="filters.academic_year"
+                    @update:model-value="switchYear"
+                    :options="academicYearSelectOptions"
+                    :all-option="false"
+                    placeholder="Select academic year"
+                />
             </div>
             <div class="flex flex-wrap gap-2">
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/subject-wise?academic_year=${filters.academic_year}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
@@ -137,6 +139,7 @@ import { computed, ref, watch } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import PdfPreviewModal from '@/Components/ui/PdfPreviewModal.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -226,6 +229,17 @@ function sortArrow(key) {
 }
 
 const streamEntries = computed(() => Object.entries(props.streamOptions ?? {}));
+
+// SearchableSelect uses opt.id as the option value when normalizing {id, name}-shaped
+// objects, but this select's original native <option :value="ay.label"> used the label
+// itself as the value — so we map explicitly to {value, label} pairs instead of passing
+// academicYearOptions straight through. Note: per-option disabling of closed academic
+// years (native `:disabled="ay.status === 'closed'"`) has no equivalent in SearchableSelect
+// and is not preserved here.
+const academicYearSelectOptions = computed(() => (props.academicYearOptions ?? []).map((ay) => ({
+    value: ay.label,
+    label: ay.label,
+})));
 
 const flatRows = computed(() => props.rows ?? []);
 

@@ -93,12 +93,8 @@
                                     </p>
                                 </div>
                                 <div class="flex flex-wrap gap-2 items-center">
-                                    <select v-model="classFilter" class="field text-sm min-w-[160px]" @change="registerPage = 1">
-                                        <option value="">All classes</option>
-                                        <option v-for="c in classOptions" :key="c.id" :value="String(c.id)">
-                                            {{ c.name }}<template v-if="c.eligible_count !== null"> ({{ c.eligible_count }} to add)</template>
-                                        </option>
-                                    </select>
+                                    <SearchableSelect v-model="classFilter" class="min-w-[160px]" :options="classFilterOptions"
+                                                      :all-option="true" all-label="All classes" @change="registerPage = 1" />
                                     <input v-model="studentSearch" type="search" class="field text-sm min-w-[200px]"
                                            placeholder="Search name or reg. no…" @input="registerPage = 1">
                                 </div>
@@ -367,19 +363,13 @@
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <select v-model="registeredClassFilter" class="field text-xs bg-slate-50 border-slate-300 py-2 rounded-lg">
-                        <option value="">All classes</option>
-                        <option v-for="c in classOptions" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
-                    </select>
-                    <select v-model="registeredPaymentFilter" class="field text-xs bg-slate-50 border-slate-300 py-2 rounded-lg">
-                        <option value="">All payment status</option>
-                        <option value="paid">Paid</option>
-                        <option value="unpaid">Unpaid</option>
-                    </select>
-                    <select v-model="registeredDuplicateFilter" class="field text-xs bg-slate-50 border-slate-300 py-2 rounded-lg">
-                        <option value="">All candidates</option>
-                        <option value="duplicates">⚠️ Duplicates only</option>
-                    </select>
+                    <SearchableSelect v-model="registeredClassFilter" :options="classIdOptions" :all-option="true" all-label="All classes" />
+                    <SearchableSelect v-model="registeredPaymentFilter"
+                                      :options="[{ value: 'paid', label: 'Paid' }, { value: 'unpaid', label: 'Unpaid' }]"
+                                      :all-option="true" all-label="All payment status" />
+                    <SearchableSelect v-model="registeredDuplicateFilter"
+                                      :options="[{ value: 'duplicates', label: '⚠️ Duplicates only' }]"
+                                      :all-option="true" all-label="All candidates" />
                     <input v-model="registeredSearchQuery" type="text" placeholder="Search name, adm no, hall ticket..." class="field text-xs min-w-[200px] bg-slate-50 border-slate-300 py-2 rounded-lg" />
                 </div>
             </div>
@@ -810,10 +800,8 @@
                         <input v-model="reportSearchQuery" type="text" placeholder="Search name, adm no, hall ticket..." class="field text-xs min-w-[220px] bg-slate-50 font-medium border-slate-300 focus:bg-white py-2 rounded-lg" />
                     </div>
                     <div class="relative">
-                        <select v-model="reportClassFilter" class="field text-xs min-w-[180px] bg-slate-50 font-bold text-slate-800 border-slate-300 focus:bg-white pr-8 py-2 rounded-lg">
-                            <option value="">All Classes (Full School)</option>
-                            <option v-for="c in classOptions" :key="c.id" :value="c.name">Class {{ c.name }}</option>
-                        </select>
+                        <SearchableSelect v-model="reportClassFilter" class="min-w-[180px]" :options="classNameOptions"
+                                          :all-option="true" all-label="All Classes (Full School)" />
                     </div>
                     <button v-if="reportClassFilter || reportSearchQuery" type="button" @click="reportClassFilter = ''; reportSearchQuery = '';" class="btn-secondary text-xs py-2 px-3 text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-100 font-medium">
                         ✕ Clear Filters
@@ -1204,6 +1192,7 @@ import SchoolMcqSubNav from '@/Components/school/SchoolMcqSubNav.vue';
 import McqSchoolWorkflowStepper from '@/Components/school/McqSchoolWorkflowStepper.vue';
 import { TALENT_SEARCH_EXAMS_LABEL } from '@/support/mcqSchoolLabels.js';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 import { useConfirm } from '@/composables/useConfirm';
 const { confirm, prompt } = useConfirm();
@@ -1238,6 +1227,15 @@ const props = defineProps({
     lazyLoadStudents: { type: Boolean, default: false },
     studentCount: { type: Number, default: 0 },
 });
+
+// Option lists for the SearchableSelect class filters (values kept as strings to match
+// the equality checks against student.school_class_id elsewhere in this component).
+const classIdOptions = computed(() => props.classOptions.map(c => ({ value: String(c.id), label: c.name })));
+const classFilterOptions = computed(() => props.classOptions.map(c => ({
+    value: String(c.id),
+    label: c.name + (c.eligible_count !== null ? ` (${c.eligible_count} to add)` : ''),
+})));
+const classNameOptions = computed(() => props.classOptions.map(c => ({ value: c.name, label: `Class ${c.name}` })));
 
 const activeReportPreviewTab = ref('registration');
 const reportClassFilter = ref('');

@@ -12,35 +12,51 @@
         <form @submit.prevent="createRule" class="card mb-6 space-y-3">
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <FormField label="Scope">
-                    <select v-model="form.scope_type" class="field" required>
-                        <option value="event">Whole event</option>
-                        <option value="area">Area</option>
-                        <option value="item">Item</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="form.scope_type"
+                        :options="[{ value: 'event', label: 'Whole event' }, { value: 'area', label: 'Area' }, { value: 'item', label: 'Item' }]"
+                        :all-option="false"
+                        placeholder="Select scope"
+                        :required="true"
+                    />
                 </FormField>
                 <FormField v-if="form.scope_type === 'event'" label="Event">
                     <input class="field" :value="event.title" disabled>
                 </FormField>
                 <FormField v-else-if="form.scope_type === 'area'" label="Area">
-                    <select v-model.number="form.scope_id" class="field" required>
-                        <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.name }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model.number="form.scope_id"
+                        :options="areas"
+                        :all-option="false"
+                        placeholder="Select area"
+                        :required="true"
+                    />
                 </FormField>
                 <FormField v-else label="Item">
-                    <select v-model.number="form.scope_id" class="field" required>
-                        <option v-for="i in items" :key="i.id" :value="i.id">{{ i.title }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model.number="form.scope_id"
+                        :options="itemOptions"
+                        :all-option="false"
+                        placeholder="Select item"
+                        :required="true"
+                    />
                 </FormField>
                 <FormField label="Rule type">
-                    <select v-model="form.rule_type" class="field" required>
-                        <option v-for="(label, key) in ruleTypes" :key="key" :value="key">{{ label }}</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="form.rule_type"
+                        :options="ruleTypeOptions"
+                        :all-option="false"
+                        placeholder="Select rule type"
+                        :required="true"
+                    />
                 </FormField>
                 <FormField label="Operator">
-                    <select v-model="form.operator" class="field">
-                        <option value="in">Allow (in)</option>
-                        <option value="not_in">Deny (not in)</option>
-                    </select>
+                    <SearchableSelect
+                        v-model="form.operator"
+                        :options="[{ value: 'in', label: 'Allow (in)' }, { value: 'not_in', label: 'Deny (not in)' }]"
+                        :all-option="false"
+                        placeholder="Select operator"
+                    />
                 </FormField>
                 <FormField label="Values (comma-separated)" classExtra="sm:col-span-2" hint="e.g. male,female or school UUIDs">
                     <input v-model="valuesText" class="field" placeholder="male, female">
@@ -89,9 +105,10 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -122,6 +139,16 @@ watch(() => form.scope_type, (type) => {
     else if (type === 'area') form.scope_id = props.areas[0]?.id ?? null;
     else form.scope_id = props.items[0]?.id ?? null;
 });
+
+const itemOptions = computed(() => props.items.map((i) => ({
+    value: i.id,
+    label: i.category_label ? `${i.title} — ${i.category_label}` : i.title,
+})));
+
+const ruleTypeOptions = computed(() => Object.entries(props.ruleTypes).map(([key, label]) => ({
+    value: key,
+    label,
+})));
 
 function buildValueJson() {
     const parts = valuesText.value.split(',').map((s) => s.trim()).filter(Boolean);

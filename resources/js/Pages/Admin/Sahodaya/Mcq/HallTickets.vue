@@ -60,10 +60,7 @@
                         <input v-model="designForm.accent_color" type="color" class="field h-10 p-1">
                     </FormField>
                     <FormField label="Layout">
-                        <select v-model="designForm.layout" class="field">
-                            <option value="standard">Standard</option>
-                            <option value="compact">Compact (2-up print)</option>
-                        </select>
+                        <SearchableSelect v-model="designForm.layout" :options="[{ value: 'standard', label: 'Standard' }, { value: 'compact', label: 'Compact (2-up print)' }]" :all-option="false" />
                     </FormField>
                     <FormField label="Logo">
                         <input ref="logoInput" type="file" accept=".jpg,.jpeg,.png,.webp,.svg" class="text-sm">
@@ -192,6 +189,7 @@ import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqHallTicketPreview from '@/Components/sahodaya/McqHallTicketPreview.vue';
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
 import FormField from '@/Components/ui/FormField.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
