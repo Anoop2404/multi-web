@@ -9,10 +9,15 @@ use Illuminate\Support\Facades\DB;
 class CertificateBatch extends Model
 {
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_PROCESSING = 'processing';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_COMPLETED_WITH_ERRORS = 'completed_with_errors';
+
     public const STATUS_FAILED = 'failed';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     public const TERMINAL_STATUSES = [
@@ -23,8 +28,8 @@ class CertificateBatch extends Model
     ];
 
     protected $fillable = [
-        'tenant_id', 'event_id', 'batch_type', 'cert_type', 'item_id', 'school_id',
-        'certificate_ids_json', 'scope_description', 'total_count', 'processed_count',
+        'tenant_id', 'event_id', 'training_program_id', 'batch_type', 'cert_type', 'item_id', 'school_id',
+        'certificate_ids_json', 'registration_ids_json', 'scope_description', 'total_count', 'processed_count',
         'succeeded_count', 'failed_count', 'status', 'error', 'failed_items_json',
         'file_path', 'storage_disk', 'queued_job_batch_id', 'created_by_user_id',
         'started_at', 'completed_at',
@@ -32,18 +37,24 @@ class CertificateBatch extends Model
 
     protected $casts = [
         'certificate_ids_json' => 'array',
-        'failed_items_json'    => 'array',
-        'total_count'           => 'integer',
-        'processed_count'       => 'integer',
-        'succeeded_count'       => 'integer',
-        'failed_count'          => 'integer',
-        'started_at'            => 'datetime',
-        'completed_at'          => 'datetime',
+        'registration_ids_json' => 'array',
+        'failed_items_json' => 'array',
+        'total_count' => 'integer',
+        'processed_count' => 'integer',
+        'succeeded_count' => 'integer',
+        'failed_count' => 'integer',
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
     ];
 
     public function event(): BelongsTo
     {
         return $this->belongsTo(FestEvent::class, 'event_id');
+    }
+
+    public function trainingProgram(): BelongsTo
+    {
+        return $this->belongsTo(TrainingProgram::class, 'training_program_id');
     }
 
     public function createdBy(): BelongsTo
@@ -66,8 +77,8 @@ class CertificateBatch extends Model
         DB::table('certificate_batches')->where('id', $this->id)->update([
             'processed_count' => DB::raw('processed_count + '.max(0, $processed)),
             'succeeded_count' => DB::raw('succeeded_count + '.max(0, $succeeded)),
-            'failed_count'    => DB::raw('failed_count + '.max(0, $failed)),
-            'updated_at'      => now(),
+            'failed_count' => DB::raw('failed_count + '.max(0, $failed)),
+            'updated_at' => now(),
         ]);
     }
 

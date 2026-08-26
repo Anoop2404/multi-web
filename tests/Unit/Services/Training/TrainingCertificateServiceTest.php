@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services\Training;
 
+use App\Models\Certificate;
 use App\Models\CertificateTemplate;
 use App\Models\Teacher;
 use App\Models\Tenant;
@@ -10,7 +11,9 @@ use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
 use App\Models\TrainingSession;
 use App\Services\Training\TrainingCertificateService;
+use App\Support\TenantStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -41,6 +44,112 @@ class TrainingCertificateServiceTest extends TestCase
         ]);
 
         return [$sahodaya, $school];
+    }
+
+    /** @return array{0: Tenant, 1: TrainingRegistration} a confirmed registration that already satisfies attendance, with relations pre-loaded. */
+    private function makeEligibleRegistration(string $email = 'teacher@example.com'): array
+    {
+        [$sahodaya, $school] = $this->seedTenants();
+        $teacher = Teacher::create([
+            'tenant_id' => $school->id,
+            'name'      => 'Cache Teacher',
+            'email'     => $email,
+            'status'    => 'active',
+        ]);
+
+        $program = TrainingProgram::create([
+            'tenant_id' => $sahodaya->id,
+            'title'     => 'Synergy 26',
+            'venue'     => 'Test Venue',
+            'status'    => 'completed',
+            'fee_type'  => 'none',
+        ]);
+        $session = TrainingSession::create(['program_id' => $program->id, 'title' => 'Day 1']);
+        $registration = TrainingRegistration::create([
+            'program_id' => $program->id,
+            'teacher_id' => $teacher->id,
+            'school_id'  => $school->id,
+            'status'     => 'confirmed',
+        ]);
+        TrainingAttendance::create([
+            'session_id'      => $session->id,
+            'registration_id' => $registration->id,
+            'status'          => 'present',
+        ]);
+
+        return [$sahodaya, $registration->fresh(['program', 'teacher', 'school'])];
+    }
+
+    public function test_cached_or_fresh_pdf_populates_caching_columns_on_first_render(): void
+    {
+        [$sahodaya, $registration] = $this->makeEligibleRegistration();
+        $service = app(TrainingCertificateService::class);
+        $certificate = $service->issue($registration, notify: false);
+
+        $this->assertNull($certificate->file_path);
+
+        $pdf = $service->cachedOrFreshPdf($registration, $certificate, $sahodaya);
+
+        $this->assertNotEmpty($pdf);
+        $this->assertNotNull($certificate->file_path);
+        $this->assertNotNull($certificate->storage_disk);
+        $this->assertNotNull($certificate->content_hash);
+        $this->assertNotNull($certificate->rendered_at);
+        $this->assertFalse($certificate->is_stale);
+    }
+
+    public function test_cached_or_fresh_pdf_serves_cached_bytes_without_re_rendering(): void
+    {
+        [$sahodaya, $registration] = $this->makeEligibleRegistration();
+        $service = app(TrainingCertificateService::class);
+        $certificate = $service->issue($registration, notify: false);
+
+        $service->cachedOrFreshPdf($registration, $certificate, $sahodaya);
+        $this->assertNotNull($certificate->file_path, 'First call should have cached a file.');
+
+        TenantStorage::put($certificate->file_path, "%PDF-MARKER\n", $certificate->storage_disk);
+
+        $pdf = $service->cachedOrFreshPdf($registration, $certificate, $sahodaya);
+
+        $this->assertSame("%PDF-MARKER\n", $pdf);
+    }
+
+    public function test_stale_certificate_re_renders_instead_of_serving_cached_bytes(): void
+    {
+        [$sahodaya, $registration] = $this->makeEligibleRegistration();
+        $service = app(TrainingCertificateService::class);
+        $certificate = $service->issue($registration, notify: false);
+
+        $service->cachedOrFreshPdf($registration, $certificate, $sahodaya);
+        TenantStorage::put($certificate->file_path, "%PDF-MARKER\n", $certificate->storage_disk);
+        $certificate->update(['is_stale' => true]);
+
+        $pdf = $service->cachedOrFreshPdf($registration, $certificate, $sahodaya);
+
+        $this->assertNotSame("%PDF-MARKER\n", $pdf, 'A stale certificate must re-render, not serve the stale cached file.');
+    }
+
+    /**
+     * Regression guard: sendCertificateEmailToRegistration() -> issue() ->
+     * notifyCertificateAvailable() -> emailCertificatePdf() used to recurse back into
+     * sendCertificateEmailToRegistration() and send a first email before the outer call
+     * sent its own second one — every first-ever send (bulk or single) double-sent.
+     */
+    public function test_send_certificate_email_does_not_double_send_for_a_newly_issued_certificate(): void
+    {
+        [$sahodaya, $registration] = $this->makeEligibleRegistration('newteacher@example.com');
+        $service = app(TrainingCertificateService::class);
+
+        $this->assertNull(
+            Certificate::where('entity_type', TrainingRegistration::class)->where('entity_id', $registration->id)->first(),
+            'Precondition: no certificate should exist yet — this is exactly when the recursion used to fire.'
+        );
+
+        Mail::shouldReceive('send')->once();
+
+        $sent = $service->sendCertificateEmailToRegistration($registration, $sahodaya);
+
+        $this->assertTrue($sent);
     }
 
     public function test_requires_at_least_one_present_day(): void

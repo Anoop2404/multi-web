@@ -8,10 +8,16 @@ use App\Models\Tenant;
 use App\Models\TrainingAttendance;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
+use App\Models\TrainingSession;
 use App\Models\User;
+use App\Services\Mail\SahodayaMailer;
 use App\Services\Notifications\NotificationService;
+use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -58,7 +64,7 @@ class TrainingCertificateService
         return max(1, (int) ceil($totalDays * ((int) $percent) / 100));
     }
 
-    public function issue(TrainingRegistration $registration): Certificate
+    public function issue(TrainingRegistration $registration, bool $notify = true): Certificate
     {
         $this->assertEligible($registration);
         $registration->load(['program', 'teacher', 'school']);
@@ -75,15 +81,17 @@ class TrainingCertificateService
         $certType = $this->resolveCertificateType($registration);
 
         $certificate = Certificate::create([
-            'entity_type'       => TrainingRegistration::class,
-            'entity_id'         => $registration->id,
-            'template_id'       => $template?->id,
-            'cert_type'         => $certType,
+            'entity_type' => TrainingRegistration::class,
+            'entity_id' => $registration->id,
+            'template_id' => $template?->id,
+            'cert_type' => $certType,
             'verification_uuid' => (string) Str::uuid(),
-            'generated_at'      => now(),
+            'generated_at' => now(),
         ]);
 
-        $this->notifyCertificateAvailable($registration, $certificate);
+        if ($notify) {
+            $this->notifyCertificateAvailable($registration, $certificate);
+        }
 
         return $certificate;
     }
@@ -164,21 +172,21 @@ class TrainingCertificateService
         );
 
         $defaults = [
-            'salutation'           => $nameFields['salutation'],
-            'recipient_name'       => $nameFields['recipient_name'],
+            'salutation' => $nameFields['salutation'],
+            'recipient_name' => $nameFields['recipient_name'],
             'recipient_with_title' => $nameFields['recipient_with_title'],
-            'program_title'        => $registration->program?->title ?? '',
-            'sahodaya_name'        => strtoupper($sahodaya->name),
-            'conducted_on'         => $conductedOn,
-            'designation'          => $registration->teacher?->designation ?? '',
-            'school_name'          => $registration->displaySchoolName() === '—'
+            'program_title' => $registration->program?->title ?? '',
+            'sahodaya_name' => strtoupper($sahodaya->name),
+            'conducted_on' => $conductedOn,
+            'designation' => $registration->teacher?->designation ?? '',
+            'school_name' => $registration->displaySchoolName() === '—'
                 ? ''
                 : $registration->displaySchoolName(),
-            'venue'                => $venue,
-            'days_attended'        => (string) $daysAttended,
-            'total_days'           => (string) $totalDays,
-            'training_hours'       => (string) $trainingHours,
-            'certificate_date'     => now()->format('j F Y'),
+            'venue' => $venue,
+            'days_attended' => (string) $daysAttended,
+            'total_days' => (string) $totalDays,
+            'training_hours' => (string) $trainingHours,
+            'certificate_date' => now()->format('j F Y'),
         ];
 
         $template = $this->resolveTemplate($registration);
@@ -243,8 +251,8 @@ class TrainingCertificateService
 
         $signatories = collect($template?->signatories ?? CertificateTemplate::defaultTrainingSignatories())
             ->map(fn ($s) => [
-                'name'          => $s['name'] ?? '',
-                'designation'   => $s['designation'] ?? '',
+                'name' => $s['name'] ?? '',
+                'designation' => $s['designation'] ?? '',
                 'signature_url' => self::toAbsoluteUrl(! empty($s['signature_path'])
                     ? TenantStorage::logoUrl($sahodaya, $s['signature_path'])
                     : null),
@@ -271,15 +279,15 @@ class TrainingCertificateService
         return $this->buildSampleContext($template, $sahodaya, array_merge(
             self::recipientNameFields('Sample Teacher', 'female'),
             [
-                'designation'      => 'PGT Mathematics',
-                'school_name'      => 'Sample Model School',
-                'program_title'    => $program->title,
-                'sahodaya_name'    => strtoupper($sahodaya->name),
-                'conducted_on'     => $conductedOn,
-                'venue'            => $program->venue ?? 'St. Alphonsa Public School, Oorakam',
-                'days_attended'    => '1',
-                'total_days'       => (string) max(1, $program->dayCount() ?: 1),
-                'training_hours'   => '6',
+                'designation' => 'PGT Mathematics',
+                'school_name' => 'Sample Model School',
+                'program_title' => $program->title,
+                'sahodaya_name' => strtoupper($sahodaya->name),
+                'conducted_on' => $conductedOn,
+                'venue' => $program->venue ?? 'St. Alphonsa Public School, Oorakam',
+                'days_attended' => '1',
+                'total_days' => (string) max(1, $program->dayCount() ?: 1),
+                'training_hours' => '6',
                 'certificate_date' => now()->format('j F Y'),
             ],
         ));
@@ -292,15 +300,15 @@ class TrainingCertificateService
         return $this->buildSampleContext($template, $sahodaya, array_merge(
             self::recipientNameFields('Sample Teacher', 'female'),
             [
-                'designation'      => 'PGT Mathematics',
-                'school_name'      => 'Sample Model School',
-                'program_title'    => $template->title ?: 'Sample Training Program',
-                'sahodaya_name'    => strtoupper($sahodaya->name),
-                'conducted_on'     => now()->format('j F Y'),
-                'venue'            => 'Sample Venue',
-                'days_attended'    => '1',
-                'total_days'       => '1',
-                'training_hours'   => '6',
+                'designation' => 'PGT Mathematics',
+                'school_name' => 'Sample Model School',
+                'program_title' => $template->title ?: 'Sample Training Program',
+                'sahodaya_name' => strtoupper($sahodaya->name),
+                'conducted_on' => now()->format('j F Y'),
+                'venue' => 'Sample Venue',
+                'days_attended' => '1',
+                'total_days' => '1',
+                'training_hours' => '6',
                 'certificate_date' => now()->format('j F Y'),
             ],
         ));
@@ -318,8 +326,8 @@ class TrainingCertificateService
         $salutation = self::salutationForGender($gender);
 
         return [
-            'salutation'           => $salutation,
-            'recipient_name'       => $stripped,
+            'salutation' => $salutation,
+            'recipient_name' => $stripped,
             'recipient_with_title' => trim($salutation.' '.$stripped),
         ];
     }
@@ -400,8 +408,8 @@ class TrainingCertificateService
 
         $signatories = collect($template?->signatories ?? CertificateTemplate::defaultTrainingSignatories())
             ->map(fn ($s) => [
-                'name'          => $s['name'] ?? '',
-                'designation'   => $s['designation'] ?? '',
+                'name' => $s['name'] ?? '',
+                'designation' => $s['designation'] ?? '',
                 'signature_url' => self::toAbsoluteUrl(! empty($s['signature_path'])
                     ? TenantStorage::logoUrl($sahodaya, $s['signature_path'])
                     : null),
@@ -444,7 +452,7 @@ class TrainingCertificateService
                 'training.certificate.available',
                 [
                     'program_title' => $programTitle,
-                    'teacher_name'  => $teacher->name ?? '',
+                    'teacher_name' => $teacher->name ?? '',
                 ],
                 $actionUrl,
             );
@@ -458,6 +466,83 @@ class TrainingCertificateService
         }
     }
 
+    /**
+     * Serve a certificate's cached PDF when available, else render fresh and persist it
+     * for next time. Unlike the Fest side's read-only-on-miss equivalent, this writes
+     * back on a miss — Training has no separate bulk "render & cache" action, so the
+     * per-teacher PDF/email links are the only render trigger there is.
+     */
+    public function cachedOrFreshPdf(TrainingRegistration $registration, Certificate $certificate, Tenant $sahodaya): string
+    {
+        if ($certificate->file_path && ! $certificate->is_stale) {
+            $cached = TenantStorage::get($certificate->file_path, $certificate->storage_disk);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
+
+        $registration->loadMissing(['program', 'teacher', 'school']);
+        $render = $this->renderContext($registration, $sahodaya);
+        $fieldValues = $this->resolveFieldValues($registration, $sahodaya);
+
+        $html = view('training.certificate', array_merge($render, [
+            'registration' => $registration,
+            'certificate' => $certificate,
+            'sahodaya' => $sahodaya,
+            'fieldValues' => $fieldValues,
+            'isPdf' => true,
+        ]))->render();
+
+        $pdf = PdfGenerator::render($html, true);
+
+        $this->persistRenderedPdf($certificate, $sahodaya, $pdf, array_merge($render, ['fieldValues' => $fieldValues]));
+
+        return $pdf;
+    }
+
+    /** Best-effort cache write — a storage hiccup must degrade to "served, not cached," never fail the request that already has a good PDF in hand. */
+    private function persistRenderedPdf(Certificate $certificate, Tenant $sahodaya, string $pdf, array $context): void
+    {
+        if (! $certificate->exists) {
+            return;
+        }
+
+        $path = 'certificates/'.$sahodaya->id.'/training/'.$certificate->entity_id.'/'.$certificate->id.'-'.$certificate->verification_uuid.'.pdf';
+        $disk = TenantStorage::uploadDisk();
+
+        try {
+            TenantStorage::put($path, $pdf, $disk);
+        } catch (\Throwable $e) {
+            Log::warning("Could not cache training certificate PDF for certificate {$certificate->id}: ".$e->getMessage());
+
+            return;
+        }
+
+        $certificate->update([
+            'file_path' => $path,
+            'storage_disk' => $disk,
+            'content_hash' => $this->contentHash($context),
+            'is_stale' => false,
+            'stale_checked_at' => now(),
+            'rendered_at' => now(),
+        ]);
+    }
+
+    /** Structural mirror of FestCertificateService::contentHash() — sha256 of the resolved render inputs, excluding certificate_date (recomputed fresh every call, would otherwise change the hash daily for no real content change). */
+    public function contentHash(array $context): string
+    {
+        $fieldValues = $context['fieldValues'] ?? [];
+        unset($fieldValues['certificate_date']);
+
+        $template = $context['template'] ?? null;
+
+        return hash('sha256', json_encode([
+            'template_id' => $template?->id,
+            'template_updated_at' => $template?->updated_at?->toISOString(),
+            'fieldValues' => $fieldValues,
+        ]));
+    }
+
     public function downloadPdfResponse(TrainingRegistration $registration, Tenant $sahodaya)
     {
         $registration->loadMissing(['program', 'teacher', 'school']);
@@ -469,20 +554,13 @@ class TrainingCertificateService
             $certificate = $this->issue($registration);
         }
 
-        $render = $this->renderContext($registration, $sahodaya);
-        $fieldValues = $this->resolveFieldValues($registration, $sahodaya);
-
-        $html = view('training.certificate', array_merge($render, [
-            'registration' => $registration,
-            'certificate'  => $certificate,
-            'sahodaya'     => $sahodaya,
-            'fieldValues'  => $fieldValues,
-            'isPdf'        => true,
-        ]))->render();
-
+        $pdf = $this->cachedOrFreshPdf($registration, $certificate, $sahodaya);
         $filename = Str::slug($registration->teacher?->name ?? 'certificate').'-training-certificate.pdf';
 
-        return \App\Support\PdfGenerator::download($html, $filename, false, true);
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 
     public function sendCertificateEmailToRegistration(TrainingRegistration $registration, Tenant $sahodaya, ?string $overrideEmail = null): bool
@@ -510,7 +588,11 @@ class TrainingCertificateService
                 ]);
             } else {
                 try {
-                    $certificate = $this->issue($registration);
+                    // notify: false — this method is itself about to send the certificate
+                    // email; without this, issue() -> notifyCertificateAvailable() ->
+                    // emailCertificatePdf() recurses back into this same method and sends
+                    // a first email before this (outer) call sends its own second one.
+                    $certificate = $this->issue($registration, notify: false);
                 } catch (\Throwable $e) {
                     return false;
                 }
@@ -519,16 +601,6 @@ class TrainingCertificateService
 
         $programTitle = $registration->program?->title ?? 'Training Program';
         $printUrl = url("/certificates/verify/{$certificate->verification_uuid}");
-        $render = $this->renderContext($registration, $sahodaya);
-        $fieldValues = $this->resolveFieldValues($registration, $sahodaya);
-
-        $html = view('training.certificate', array_merge($render, [
-            'registration' => $registration,
-            'certificate'  => $certificate,
-            'sahodaya'     => $sahodaya,
-            'fieldValues'  => $fieldValues,
-            'isPdf'        => true,
-        ]))->render();
 
         $isTest = ! empty($overrideEmail);
         $recipientName = $registration->teacher?->name ?? 'Participant';
@@ -537,26 +609,26 @@ class TrainingCertificateService
 
         $attachmentName = Str::slug($recipientName).'-certificate.pdf';
         $attachment = [
-            'content' => \App\Support\PdfGenerator::render($html, true),
-            'name'    => $attachmentName,
-            'mime'    => 'application/pdf',
+            'content' => $this->cachedOrFreshPdf($registration, $certificate, $sahodaya),
+            'name' => $attachmentName,
+            'mime' => 'application/pdf',
         ];
 
         $viewData = [
-            'subject'        => $subject,
-            'recipientName'  => $recipientName,
-            'programTitle'   => $programTitle,
-            'printUrl'       => $printUrl,
-            'certificate'    => $certificate,
-            'sahodayaName'   => $sahodaya->name,
-            'headerTitle'    => $sahodaya->name,
+            'subject' => $subject,
+            'recipientName' => $recipientName,
+            'programTitle' => $programTitle,
+            'printUrl' => $printUrl,
+            'certificate' => $certificate,
+            'sahodayaName' => $sahodaya->name,
+            'headerTitle' => $sahodaya->name,
             'headerSubtitle' => 'Training Program Certificate',
-            'logoUrl'        => \App\Support\TenantBranding::logoUrl($sahodaya),
-            'portalUrl'      => url('/'),
+            'logoUrl' => TenantBranding::logoUrl($sahodaya),
+            'portalUrl' => url('/'),
         ];
 
         try {
-            $mailer = \App\Services\Mail\SahodayaMailer::for($sahodaya->id);
+            $mailer = SahodayaMailer::for($sahodaya->id);
             if ($mailer->isConfigured()) {
                 $mailer->sendViewWithAttachments(
                     $targetEmail,
@@ -566,13 +638,14 @@ class TrainingCertificateService
                     [$attachment],
                 );
             } else {
-                \Illuminate\Support\Facades\Mail::send('emails.training-certificate', $viewData, function ($message) use ($targetEmail, $subject, $attachment) {
+                Mail::send('emails.training-certificate', $viewData, function ($message) use ($targetEmail, $subject, $attachment) {
                     $message->to($targetEmail)->subject($subject)
                         ->attachData($attachment['content'], $attachment['name'], ['mime' => $attachment['mime']]);
                 });
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error("Failed to send certificate email to {$targetEmail}: ".$e->getMessage());
+            Log::error("Failed to send certificate email to {$targetEmail}: ".$e->getMessage());
+
             return false;
         }
 
@@ -625,7 +698,7 @@ class TrainingCertificateService
     /**
      * Prefer CPD hours from present session durations; fall back to days × assumed day length.
      *
-     * @param  \Illuminate\Support\Collection<int, \App\Models\TrainingSession>  $presentSessions
+     * @param  Collection<int, TrainingSession>  $presentSessions
      */
     private function resolveTrainingHours(TrainingRegistration $registration, $presentSessions): float
     {
@@ -642,7 +715,7 @@ class TrainingCertificateService
         return 0.0;
     }
 
-    /** @return \Illuminate\Support\Collection<int, \App\Models\TrainingSession> */
+    /** @return Collection<int, TrainingSession> */
     private function presentSessions(TrainingRegistration $registration)
     {
         $registration->loadMissing('program.sessions');
@@ -663,7 +736,7 @@ class TrainingCertificateService
         return $sessions->whereIn('id', $presentSessionIds)->sortBy('scheduled_at')->values();
     }
 
-    /** @param  \Illuminate\Support\Collection<int, \App\Models\TrainingSession>  $presentSessions */
+    /** @param  Collection<int, TrainingSession>  $presentSessions */
     private function formatConductedDates($presentSessions, ?TrainingProgram $program): string
     {
         if ($presentSessions->isNotEmpty()) {

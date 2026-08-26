@@ -1620,6 +1620,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{program}/registrations/{registration}/certificate', [TrainingProgramController::class, 'issueCertificate'])->name('registrations.certificate.issue');
             Route::post('/{program}/certificates/send-test-email', [TrainingProgramController::class, 'sendTestCertificateEmail'])->name('certificates.send-test-email');
             Route::post('/{program}/certificates/bulk-send-email', [TrainingProgramController::class, 'bulkSendCertificatesEmail'])->name('certificates.bulk-send-email');
+            Route::get('/{program}/certificates/batches/{batch}/progress', [TrainingProgramController::class, 'certificateBatchProgress'])->name('certificates.batches.progress');
             Route::post('/{program}/certificates/{registration}/send-single-email', [TrainingProgramController::class, 'sendSingleCertificateEmail'])->name('certificates.send-single-email');
             Route::get('/{program}/certificates/{registration}/download-pdf', [TrainingProgramController::class, 'downloadSingleCertificatePdf'])->name('certificates.download-pdf');
             Route::get('/{program}/certificates/export', [TrainingProgramController::class, 'exportCertificatesZip'])->name('certificates.export');
