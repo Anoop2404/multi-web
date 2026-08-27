@@ -6,6 +6,7 @@ use App\Support\CsvSafety;
 use App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
 use App\Models\FestAttendance;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestAttendanceImportService;
