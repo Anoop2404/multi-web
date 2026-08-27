@@ -291,6 +291,26 @@ class FestCertificateController extends SahodayaAdminController
         return back()->with('success', count($created).' certificate(s) generated.');
     }
 
+    /**
+     * Sets or clears the event's certificate_date override — FestCertificateService::
+     * resolveFieldValues() falls back to event_end/event_start (then now()) when this is
+     * null. Doesn't proactively mark existing certificates stale; that follows the same
+     * lazy, scheduled staleness check every other upstream-data change already relies on
+     * (see contentHash()'s docblock) rather than a special case for this one field.
+     */
+    public function updateCertificateDate(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $validated = $request->validate(['certificate_date' => 'nullable|date']);
+
+        $event->update(['certificate_date' => $validated['certificate_date'] ?? null]);
+
+        return back()->with('success', $validated['certificate_date']
+            ? 'Certificate date updated.'
+            : 'Certificate date cleared — back to the event\'s own dates.');
+    }
+
     public function downloadZip(Request $request, string $tenantId, FestEvent $event)
     {
         @ini_set('memory_limit', '1024M');

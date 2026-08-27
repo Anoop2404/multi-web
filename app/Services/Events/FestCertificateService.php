@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\Certificate;
 use App\Models\CertificateTemplate;
+use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
@@ -122,15 +123,30 @@ class FestCertificateService
      * Base eligible-for-participation-certificate query, shared by
      * generateParticipationForEvent(), certificateTally(), and resolveFieldValues()'s
      * per-person item list — so all three can never drift out of sync on what counts as
-     * "eligible" (approved registration, not disqualified, not standby).
+     * "eligible" (approved registration, not disqualified, not standby, not marked absent
+     * for their item). A FestParticipant row is already scoped to one item (via its
+     * registration), and fest_attendance has a unique [item_id, participant_id] — so
+     * excluding by participant id here correctly drops just the absent item for someone
+     * who attended some of their items and missed others, not their whole certificate;
+     * participationGroupsForEvent() only stops generating one for a person at all once
+     * every one of their FestParticipant rows is excluded (i.e. absent everywhere).
+     * Attendance is opt-in per item (marked via the mark-entry screen or the dedicated
+     * attendance page, both writing the same table) — someone with no attendance record
+     * at all is treated as present, not excluded.
      */
     private function eligibleParticipantsForEvent(FestEvent $event): \Illuminate\Support\Collection
     {
+        $absentParticipantIds = FestAttendance::query()
+            ->whereIn('event_id', $event->reportableEventIds())
+            ->where('status', 'absent')
+            ->pluck('participant_id');
+
         return FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'approved'))
             ->whereNull('disqualified_at')
             ->where('participant_role', '!=', 'standby')
+            ->whereNotIn('id', $absentParticipantIds)
             ->with(['registration.item', 'group'])
             ->get();
     }
@@ -599,15 +615,17 @@ class FestCertificateService
      * to enumerate every upstream row (participant, mark, registration, template) that
      * could have changed — any real change to name/school/items/template necessarily
      * changes this hash, since it's the same resolved fieldValues being hashed, not a
-     * proxy for them. certificate_date is deliberately excluded: it's `now()`-derived at
-     * render time, so including it would flag every certificate stale every single day.
+     * proxy for them. certificate_date is included now that it's stable (event_end/
+     * event_start, or an explicit override) rather than always now()-derived, so setting
+     * or changing it correctly flags already-cached certificates stale — the one
+     * remaining edge case is an event with no dates configured at all (still falls back
+     * to now() in resolveFieldValues()), which stays permanently stale until it has one.
      *
      * @param  array<string, mixed>  $context  A renderContext() return value.
      */
     public function contentHash(array $context): string
     {
         $fieldValues = $context['fieldValues'] ?? [];
-        unset($fieldValues['certificate_date']);
 
         $template = $context['template'] ?? null;
 
@@ -677,6 +695,13 @@ class FestCertificateService
                 $event->event_end && $event->event_end->ne($event->event_start) ? $event->event_end->format('d M Y') : null,
             ])->filter()->implode(' - '))
             : '';
+
+        // certificate_date: an explicit per-event override (FestEventSettingsController's
+        // certificate tab) takes priority, then the event's own end/start date, then
+        // now() as a last resort for an event with no dates configured at all. Was
+        // unconditionally now() before — every re-render silently back-dated already-
+        // issued certificates to whatever day an admin happened to regenerate them on.
+        $certDate = $event?->certificate_date ?? $event?->event_end ?? $event?->event_start ?? now();
 
         // Participation certificates are aggregated per person (see
         // generateParticipationForEvent()) — these become every item this person took
@@ -764,7 +789,7 @@ class FestCertificateService
             // of their own), so giving numbers a distinct accent color made them read as
             // a mismatched, separate style rather than consistent emphasis. Bold alone
             // matches how every other emphasized token in the sentence is already styled.
-            'certificate_date'    => '<strong>'.now()->format('j').'</strong><sup>'.now()->format('S').'</sup> '.now()->format('F').' <strong>'.now()->format('Y').'</strong>',
+            'certificate_date'    => '<strong>'.$certDate->format('j').'</strong><sup>'.$certDate->format('S').'</sup> '.$certDate->format('F').' <strong>'.$certDate->format('Y').'</strong>',
         ];
     }
 

@@ -1403,6 +1403,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/certificates/participants', [FestCertificateController::class, 'participationCertificatesPage'])->name('certificates.participants');
             Route::get('/{event}/certificates/tally', [FestCertificateController::class, 'tally'])->name('certificates.tally');
             Route::post('/{event}/certificates/generate', [FestCertificateController::class, 'generate'])->name('certificates.generate');
+            Route::post('/{event}/certificates/certificate-date', [FestCertificateController::class, 'updateCertificateDate'])->name('certificates.certificate-date');
             Route::get('/{event}/certificates/download-zip', [FestCertificateController::class, 'downloadZip'])->name('certificates.download-zip');
             Route::post('/{event}/certificates/download-zip/queue', [FestCertificateController::class, 'queueZipExport'])->name('certificates.download-zip.queue');
             Route::get('/{event}/certificates/print-all', [FestCertificateController::class, 'printAll'])->name('certificates.print-all');

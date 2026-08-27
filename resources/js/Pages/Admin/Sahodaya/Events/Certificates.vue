@@ -13,6 +13,19 @@
             </Link>
         </div>
 
+        <!-- Certificate date -->
+        <div class="card !p-3 mb-6 flex flex-wrap items-center gap-3 text-xs">
+            <span class="font-semibold text-gray-700">📅 Certificate date:</span>
+            <input type="date" v-model="certificateDateInput" class="field text-xs py-1 px-2 w-40" />
+            <button @click="saveCertificateDate" class="btn-secondary py-1 px-3 text-xs">Save</button>
+            <button v-if="event.certificate_date" @click="clearCertificateDate" class="btn-subtle text-xs text-gray-500">
+                Clear (use event date)
+            </button>
+            <span class="text-gray-400">
+                {{ event.certificate_date ? 'Custom override — printed on every certificate.' : `Defaults to ${defaultCertificateDateLabel} (the event's own date).` }}
+            </span>
+        </div>
+
         <!-- Certificate pipeline: generate rows, render & cache the files, then download.
              Three explicit stages rather than one flat button row — rendering is now a
              separate, deliberate step from both generation and download (see
@@ -587,6 +600,23 @@ const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/cert
 const activeTab = ref('winners_item');
 const plainMode = ref(false);
 const selectedItemId = ref(null);
+
+const certificateDateInput = ref(props.event.certificate_date || '');
+
+const defaultCertificateDateLabel = computed(() => {
+    const raw = props.event.event_end || props.event.event_start;
+    if (!raw) return 'today (no event dates set)';
+    return new Date(raw).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+});
+
+function saveCertificateDate() {
+    router.post(`${base}/certificate-date`, { certificate_date: certificateDateInput.value || null }, { preserveScroll: true });
+}
+
+function clearCertificateDate() {
+    certificateDateInput.value = '';
+    saveCertificateDate();
+}
 
 const publishedItemOptions = computed(() => props.publishedItems.map(item => ({
     value: item.id,
