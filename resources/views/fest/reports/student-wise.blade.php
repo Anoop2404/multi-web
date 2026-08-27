@@ -158,7 +158,15 @@
                 <tr>
                     <td style="color: #94a3b8; font-size: 10.5px;">{{ $itemIdx + 1 }}</td>
                     <td><strong>{{ $item['item_title'] }}</strong></td>
-                    <td>{{ $item['head_name'] ?? '—' }}</td>
+                    <td>
+                        @if(!empty($item['category_label']) && !empty($item['head_name']))
+                            {{ $item['category_label'] }} · {{ $item['head_name'] }}
+                        @elseif(!empty($item['category_label']))
+                            {{ $item['category_label'] }}
+                        @else
+                            {{ $item['head_name'] ?? '—' }}
+                        @endif
+                    </td>
                     @if($showChestNo ?? true)
                     <td style="text-align: center; font-family: monospace; font-weight: bold;">{{ $item['chest_no'] ?? '—' }}</td>
                     @endif

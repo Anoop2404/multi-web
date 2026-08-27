@@ -44,18 +44,25 @@
                     <button type="button" @click="applyFilters" class="btn-secondary text-xs">Filter</button>
                     <button v-if="searchQuery || selectedSchoolId" type="button" @click="clearFilters" class="btn-subtle text-xs text-slate-500">Clear</button>
                 </div>
-                <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-1.5 text-xs text-slate-600">
+                        <span>Show:</span>
+                        <SearchableSelect v-model="perPage" :all-option="false"
+                                          :options="[{ value: 25, label: '25' }, { value: 50, label: '50' }, { value: 100, label: '100' }, { value: 'all', label: 'All' }]" />
+                    </div>
+                    <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
+                </div>
             </div>
         </div>
 
         <!-- Student Cards List -->
         <div class="space-y-4">
-            <div v-for="(st, index) in filteredRows" :key="st.student_id" class="card p-0 overflow-hidden shadow-sm border border-slate-200 hover:border-slate-300 transition-all">
+            <div v-for="(st, index) in paginatedRows" :key="st.student_id" class="card p-0 overflow-hidden shadow-sm border border-slate-200 hover:border-slate-300 transition-all">
                 <!-- Card Header -->
                 <div class="px-5 py-3.5 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-3.5">
                         <span class="shrink-0 w-7 h-7 rounded-full bg-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center">
-                            {{ index + 1 }}
+                            {{ pageOffset + index + 1 }}
                         </span>
                         <!-- Photo or Avatar -->
                         <div class="relative">
@@ -99,9 +106,6 @@
                                 <td class="text-center text-slate-400 font-mono">{{ idx + 1 }}</td>
                                 <td class="font-semibold text-slate-900">{{ item.item_title }}</td>
                                 <td class="text-slate-600">
-                                    <!-- studentWiseBrowserRows() only eager-loads item:id,title,head_id,event_id
-                                         today, so there's no class_group/age_group to fall back on here yet —
-                                         show category_label if a future backend change attaches it, else head. -->
                                     <span v-if="item.category_label">{{ item.category_label }}</span>
                                     <span v-if="item.category_label && item.head_name" class="text-slate-300"> · </span>
                                     <span v-if="item.head_name">{{ item.head_name }}</span>
@@ -123,6 +127,24 @@
                 <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 <p class="font-semibold">No student participants match the selected filters.</p>
             </div>
+
+            <!-- Pagination Footer -->
+            <div v-if="totalPages > 1" class="card !py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+                <span>
+                    Showing {{ pageOffset + 1 }} to {{ Math.min(pageOffset + perPageNum, filteredRows.length) }} of {{ filteredRows.length }} students
+                </span>
+                <div class="flex items-center gap-1">
+                    <button @click="currentPage = Math.max(1, currentPage - 1)" :disabled="currentPage === 1"
+                            class="px-2.5 py-1 rounded border border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50">
+                        Previous
+                    </button>
+                    <span class="px-2 font-medium">Page {{ currentPage }} of {{ totalPages }}</span>
+                    <button @click="currentPage = Math.min(totalPages, currentPage + 1)" :disabled="currentPage === totalPages"
+                            class="px-2.5 py-1 rounded border border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50">
+                        Next
+                    </button>
+                </div>
+            </div>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
@@ -130,7 +152,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
@@ -168,6 +190,22 @@ const filteredRows = computed(() => {
         );
     }
     return result;
+});
+
+const perPage = ref(25);
+const currentPage = ref(1);
+
+const perPageNum = computed(() => perPage.value === 'all' ? filteredRows.value.length || 1 : Number(perPage.value));
+const totalPages = computed(() => Math.ceil(filteredRows.value.length / perPageNum.value) || 1);
+const pageOffset = computed(() => (currentPage.value - 1) * perPageNum.value);
+
+const paginatedRows = computed(() => {
+    if (perPage.value === 'all') return filteredRows.value;
+    return filteredRows.value.slice(pageOffset.value, pageOffset.value + perPageNum.value);
+});
+
+watch([searchQuery, selectedSchoolId, perPage], () => {
+    currentPage.value = 1;
 });
 
 const sportEventOptions = computed(() => props.childEvents.map((ev) => ({

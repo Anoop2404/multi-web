@@ -1764,7 +1764,7 @@ class FestEventReportAnalyticsService
             ->with([
                 'student:id,tenant_id,name,reg_no,gender,photo',
                 'registration.school:id,name,school_prefix',
-                'registration.item:id,title,head_id,event_id',
+                'registration.item:id,title,head_id,event_id,class_group,age_group,category',
                 'registration.item.head:id,name',
                 'registration.item.event:id,title',
             ])
@@ -1775,6 +1775,9 @@ class FestEventReportAnalyticsService
             ->whereIn('participant_id', $participants->pluck('id'))
             ->get()
             ->keyBy('participant_id');
+
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         $rows = [];
         foreach ($participants->groupBy('student_id') as $studentId => $entries) {
@@ -1794,13 +1797,14 @@ class FestEventReportAnalyticsService
                 }
             }
 
-            $items = $entries->map(function (FestParticipant $p) use ($marksByParticipant) {
+            $items = $entries->map(function (FestParticipant $p) use ($marksByParticipant, $classGroupLabels, $artsCategoryLabels) {
                 $mark = $marksByParticipant->get($p->id);
 
                 return [
                     'item_id'           => $p->registration?->item_id,
                     'item_title'        => $p->registration?->item?->title,
                     'head_name'         => $p->registration?->item?->head?->name,
+                    'category_label'    => FestItemCategoryLabel::shortLabel($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
                     'status'            => $p->registration?->status,
                     'fest_id'           => $p->level_registration_number,
                     'item_reg'          => $p->item_registration_number,

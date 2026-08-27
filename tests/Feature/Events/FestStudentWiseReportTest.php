@@ -51,7 +51,7 @@ class FestStudentWiseReportTest extends TestCase
         $admin->assignRole('sahodaya_admin');
 
         $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Student Wise Event', 'event_type' => 'kalolsavam']);
-        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'SW1']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'SW1', 'class_group' => 'up']);
 
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '10']);
         $student = Student::create([
@@ -82,6 +82,23 @@ class FestStudentWiseReportTest extends TestCase
             $rows = $page->toArray()['props']['rows'];
             $this->assertCount(1, $rows);
             $this->assertSame('SWS', $rows[0]['school_code']);
+
+            return $page->has('rows', 1);
+        });
+    }
+
+    public function test_student_wise_rows_carry_the_items_category_label(): void
+    {
+        $f = $this->fixture();
+
+        $response = $this->actingAs($f['admin'])->get(route('sahodaya.events.reports.student-wise', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertInertia(function ($page) {
+            $rows = $page->toArray()['props']['rows'];
+            $this->assertNotEmpty($rows[0]['items'][0]['category_label'], 'The class_group=up item should resolve to a non-empty category label.');
 
             return $page->has('rows', 1);
         });
