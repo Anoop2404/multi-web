@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
-use App\Jobs\BuildCertificateZipJob;
+use App\Jobs\BuildCertificateZipChunkJob;
 use App\Jobs\RenderCertificateChunkJob;
 use App\Models\Certificate;
 use App\Models\CertificateBatch;
@@ -398,17 +398,34 @@ class FestCertificateController extends SahodayaAdminController
             'started_at' => now(),
         ]);
 
-        BuildCertificateZipJob::dispatch(
+        $resultFilename = str($event->title)->slug()
+            .($publishedOnly ? '-published-winners' : ($certType ? '-'.$certType : '-certificates'))
+            .($plain ? '-plain' : '').'.zip';
+
+        // Bus::chain(), not Bus::batch() — chunks must append to the same on-disk ZIP
+        // sequentially (see BuildCertificateZipChunkJob's docblock), never concurrently.
+        $sahodayaId = $this->sahodaya->id;
+        $eventId = $event->id;
+        $chunks = $certificates->pluck('id')->chunk(40)->values();
+        $jobs = $chunks->map(fn ($chunk, $index) => new BuildCertificateZipChunkJob(
             $batchRow->id,
-            $this->sahodaya->id,
-            $event->id,
-            $publishedOnly,
-            $itemId,
-            $schoolId,
-            $certType,
-            $certIds,
+            $sahodayaId,
+            $eventId,
+            $chunk->values()->all(),
+            $index === $chunks->count() - 1,
             $plain,
-        );
+            $resultFilename,
+        ))->all();
+
+        Bus::chain($jobs)
+            ->catch(function (\Throwable $e) use ($batchRow) {
+                $batchRow->update([
+                    'status' => CertificateBatch::STATUS_FAILED,
+                    'error' => mb_substr($e->getMessage(), 0, 2000),
+                    'completed_at' => now(),
+                ]);
+            })
+            ->dispatch();
 
         return back()
             ->with('success', "Preparing a ZIP of {$certificates->count()} certificate(s) in the background.")

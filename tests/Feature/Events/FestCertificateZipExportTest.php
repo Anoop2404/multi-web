@@ -137,6 +137,53 @@ class FestCertificateZipExportTest extends TestCase
         ]);
     }
 
+    /**
+     * Regression guard for a real production failure: the first version of this feature
+     * used one long-running job for a whole export, and it died on a 906-certificate
+     * event with "has been attempted too many times" — a queue connection's retry_after
+     * (90s by default) elapsed while the job was still genuinely running, so the queue
+     * driver handed it to a second worker and burned through $tries, even though nothing
+     * had actually crashed. The fix chunks the export via Bus::chain() (40 certificates
+     * per job). Every other test in this file uses 3 certificates or fewer — well under
+     * the 40-per-chunk threshold — so none of them exercise a second chunk actually
+     * reopening and appending to the first chunk's ZIP rather than truncating it. This
+     * one forces exactly that by using 45 certificates (two chunks: 40 + 5).
+     */
+    public function test_queue_zip_export_correctly_appends_across_multiple_chunks(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = $this->makeSahodaya();
+        $school = $this->makeSchool($sahodaya->id);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Multi Chunk Zip Event', 'event_type' => 'kalolsavam']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'MC1']);
+        $certificates = $this->makeCertificates($event, $item, $school->id, 45);
+
+        $response = $this->actingAs($admin)->post(route('sahodaya.events.certificates.download-zip.queue', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]));
+
+        $response->assertRedirect();
+        $batch = CertificateBatch::findOrFail(session('certificate_batch_id'));
+
+        $this->assertSame(CertificateBatch::STATUS_COMPLETED, $batch->status);
+        $this->assertSame(45, $batch->total_count);
+        $this->assertSame(45, $batch->processed_count);
+        $this->assertSame(45, $batch->succeeded_count);
+        $this->assertSame(0, $batch->failed_count);
+
+        $names = $this->zipEntryNames($batch);
+        $this->assertCount(45, $names, 'The second chunk must append to the first chunk\'s ZIP, not overwrite it.');
+        foreach ($certificates as $certificate) {
+            $this->assertTrue(
+                collect($names)->contains(fn ($n) => str_contains($n, $certificate->verification_uuid)),
+                "Expected the ZIP to contain certificate {$certificate->verification_uuid}."
+            );
+        }
+    }
+
     public function test_queue_zip_export_published_only_scopes_to_visible_winners(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
