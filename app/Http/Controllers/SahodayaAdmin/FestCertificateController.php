@@ -526,7 +526,7 @@ class FestCertificateController extends SahodayaAdminController
     }
 
     /**
-     * Creates the tracking row, chunks the certificate set into ~150-id slices (see
+     * Creates the tracking row, chunks the certificate set into ~30-id slices (see
      * RenderCertificateChunkJob), and dispatches them as one Bus::batch() run — per-chunk
      * failure isolation and progress counters come from Laravel's own job_batches
      * machinery rather than anything bespoke here.
@@ -557,7 +557,7 @@ class FestCertificateController extends SahodayaAdminController
         ]);
 
         $tenantId = $this->sahodaya->id;
-        $jobs = $certificates->pluck('id')->chunk(150)
+        $jobs = $certificates->pluck('id')->chunk(30)
             ->map(fn ($chunk) => new RenderCertificateChunkJob($batchRow->id, $chunk->values()->all(), $tenantId))
             ->all();
 

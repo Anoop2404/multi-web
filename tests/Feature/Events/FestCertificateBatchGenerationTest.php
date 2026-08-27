@@ -179,4 +179,48 @@ class FestCertificateBatchGenerationTest extends TestCase
 
         $this->assertNotSame($cachedBytes, "%PDF-MARKER\n");
     }
+
+    /**
+     * Regression guard for RenderCertificateChunkJob's incremental-flush rework: it used
+     * to call CertificateBatch::recordChunkResult() exactly once, at the very end of a
+     * whole ~150-certificate chunk — this now flushes every PROGRESS_FLUSH_EVERY (5)
+     * certificates instead, to avoid a slow render service leaving processed_count stuck
+     * at 0 for longer than a queue connection's retry_after (the failure mode found in
+     * production for a sibling pipeline, BuildCertificateZipChunkJob, before that one got
+     * the same treatment). 37 certificates against a 30-per-job chunk size and a 5-per-
+     * flush cadence forces exactly the cases worth proving don't double- or under-count:
+     * two Bus::batch() chunks (30 + 7), and — within that second chunk — one clean 5-cert
+     * flush followed by one partial 2-cert flush after the loop ends.
+     */
+    public function test_batch_totals_are_exact_across_multiple_chunks_and_flush_boundaries(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = $this->makeSahodaya();
+        $school = $this->makeSchool($sahodaya->id);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Flush Boundary Event', 'event_type' => 'kalolsavam']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'FB1']);
+        $certificates = $this->makeCertificates($event, $item, $school->id, 37);
+
+        $response = $this->actingAs($admin)->post(route('sahodaya.events.certificates.batches.store', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]));
+
+        $response->assertRedirect();
+        $batch = CertificateBatch::findOrFail(session('certificate_batch_id'));
+
+        $this->assertSame(CertificateBatch::STATUS_COMPLETED, $batch->status);
+        $this->assertSame(37, $batch->total_count);
+        $this->assertSame(37, $batch->processed_count);
+        $this->assertSame(37, $batch->succeeded_count);
+        $this->assertSame(0, $batch->failed_count);
+
+        foreach ($certificates as $certificate) {
+            $certificate->refresh();
+            $this->assertNotNull($certificate->rendered_at, "Certificate {$certificate->id} was never rendered.");
+        }
+    }
 }

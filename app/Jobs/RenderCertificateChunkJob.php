@@ -18,7 +18,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
 
 /**
- * Renders and caches one ~150-certificate slice of a CertificateBatch run (see
+ * Renders and caches one ~30-certificate slice of a CertificateBatch run (see
  * FestCertificateController::generateAndRenderBatch(), which chunks and dispatches these
  * via Bus::batch()). Each certificate gets both a with-background and a plain (no-
  * background) PDF, persisted via TenantStorage — closing the gap where fest certificates
@@ -43,6 +43,17 @@ class RenderCertificateChunkJob implements ShouldQueue
     // distinguishes "the render service is down" (abort chunk, retry later) from "this
     // one certificate's own data is bad" (isolate, keep going). See renderChunk().
     private const MAX_CONSECUTIVE_CONNECTION_FAILURES = 3;
+
+    // How many certificates to render between progress-counter flushes — the original
+    // design only called CertificateBatch::recordChunkResult() once, at the very end of
+    // the whole ~150-certificate chunk. Each certificate does two external Chromium
+    // render calls (renderOne(), below), so a slow render service could keep a chunk's
+    // processed_count sitting at 0 for well past a queue connection's retry_after before
+    // ever writing anything — indistinguishable, from the batch row's own perspective,
+    // from a chunk that's actually dead. That's the exact failure BuildCertificateZipChunkJob's
+    // docblock describes hitting in production for a sibling pipeline (a single job that
+    // only reported progress at the very end); this closes the same gap here.
+    private const PROGRESS_FLUSH_EVERY = 5;
 
     public function __construct(
         public int $certificateBatchId,
@@ -86,47 +97,72 @@ class RenderCertificateChunkJob implements ShouldQueue
         $participantsCache = [];
         $assetCache = [];
 
-        $succeeded = 0;
-        $failed = 0;
-        $failedItems = [];
         $consecutiveConnectionFailures = 0;
-        $processedBeforeAbort = 0;
+
+        $processedSinceFlush = 0;
+        $succeededSinceFlush = 0;
+        $failedSinceFlush = 0;
+        $failedItemsSinceFlush = [];
 
         foreach ($certificates as $certificate) {
-            $processedBeforeAbort++;
+            $processedSinceFlush++;
 
             try {
                 $this->renderOne($certificate, $service, $qrService, $payloads, $templateCache, $participantsCache, $assetCache);
-                $succeeded++;
+                $succeededSinceFlush++;
                 $consecutiveConnectionFailures = 0;
             } catch (ConnectionException $e) {
                 $consecutiveConnectionFailures++;
+                $failedSinceFlush++;
+                $failedItemsSinceFlush[] = $this->failureEntry($certificate, $payloads, $e);
 
                 if ($consecutiveConnectionFailures >= self::MAX_CONSECUTIVE_CONNECTION_FAILURES) {
                     // The render service itself looks down, not this one certificate —
-                    // record progress for what actually ran, then let tries/backoff retry
+                    // flush progress for what actually ran, then let tries/backoff retry
                     // the remainder as a fresh chunk attempt once it recovers, rather than
                     // mass-recording everything still unattempted as individually failed.
-                    $batch->recordChunkResult($processedBeforeAbort, $succeeded, $failed);
-                    if ($failedItems) {
-                        $batch->appendFailedItems($failedItems);
-                    }
+                    $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
 
                     throw $e;
                 }
 
-                $failed++;
-                $failedItems[] = $this->failureEntry($certificate, $payloads, $e);
+                continue;
             } catch (\Throwable $e) {
-                $failed++;
-                $failedItems[] = $this->failureEntry($certificate, $payloads, $e);
+                $failedSinceFlush++;
+                $failedItemsSinceFlush[] = $this->failureEntry($certificate, $payloads, $e);
+
+                continue;
+            }
+
+            if ($processedSinceFlush >= self::PROGRESS_FLUSH_EVERY) {
+                $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
             }
         }
 
-        $batch->recordChunkResult(count($certificates), $succeeded, $failed);
+        $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
+    }
+
+    /**
+     * Atomically bumps the batch's counters by whatever's accumulated since the last
+     * flush and resets those accumulators — called periodically (every
+     * PROGRESS_FLUSH_EVERY certificates) rather than once at the end, and takes its
+     * counters by reference so callers don't need to duplicate the reset logic.
+     */
+    private function flushProgress(CertificateBatch $batch, int &$processed, int &$succeeded, int &$failed, array &$failedItems): void
+    {
+        if ($processed === 0) {
+            return;
+        }
+
+        $batch->recordChunkResult($processed, $succeeded, $failed);
         if ($failedItems) {
             $batch->appendFailedItems($failedItems);
         }
+
+        $processed = 0;
+        $succeeded = 0;
+        $failed = 0;
+        $failedItems = [];
     }
 
     private function renderOne(
