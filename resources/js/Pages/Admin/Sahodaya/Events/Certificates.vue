@@ -59,9 +59,18 @@
                                 📦 Download / print ▾
                             </summary>
                             <div class="absolute z-20 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1">
-                                <a :href="downloadZipUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 All certificates (ZIP)</a>
-                                <a v-if="winnersByItem.length" :href="downloadPublishedZipUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Merit winners only (ZIP)</a>
-                                <a v-if="participationByItem.length" :href="downloadParticipationZipUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Participation only (ZIP)</a>
+                                <button @click="queueZipDownload({}, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 All certificates (ZIP)
+                                </button>
+                                <button v-if="winnersByItem.length" @click="queueZipDownload({ published_only: '1' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 Merit winners only (ZIP)
+                                </button>
+                                <button v-if="participationByItem.length" @click="queueZipDownload({ cert_type: 'participation' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 Participation only (ZIP)
+                                </button>
                                 <div class="border-t border-gray-100 my-1"></div>
                                 <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (with background) ↗</a>
                                 <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?plain=1`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (plain) ↗</a>
@@ -74,11 +83,11 @@
                 </div>
             </div>
 
-            <!-- Render/cache batch progress -->
+            <!-- Render/cache/ZIP-export batch progress -->
             <div v-if="jobStatus" class="mt-4 pt-4 border-t border-gray-100 text-sm">
                 <div class="flex items-center justify-between gap-3 mb-2">
                     <p class="font-semibold capitalize">
-                        {{ jobStatus.batch_type === 'regenerate_stale' ? 'Regenerating stale certificates' : 'Rendering certificates' }}: {{ jobStatus.status.replace('_', ' ') }}
+                        {{ jobStatusLabel }}: {{ jobStatus.status.replace('_', ' ') }}
                     </p>
                     <span class="text-xs text-gray-500 tabular-nums">{{ jobStatus.processed_count }} / {{ jobStatus.total_count }}</span>
                 </div>
@@ -89,6 +98,11 @@
                 <p v-if="['completed', 'completed_with_errors'].includes(jobStatus.status)" class="mt-2 text-xs text-gray-600">
                     {{ jobStatus.succeeded_count }} succeeded<span v-if="jobStatus.failed_count"> · {{ jobStatus.failed_count }} failed</span>
                 </p>
+                <a v-if="jobStatus.batch_type === 'zip_export' && ['completed', 'completed_with_errors'].includes(jobStatus.status)"
+                   :href="`${base}/batches/${jobStatus.id}/download`"
+                   class="btn-primary mt-2 inline-flex py-1.5 px-3 text-xs">
+                    ⬇️ Download ZIP
+                </a>
                 <p v-if="jobStatus.error" class="mt-2 text-xs text-red-600">{{ jobStatus.error }}</p>
             </div>
         </div>
@@ -410,11 +424,10 @@
 
                 <!-- Page Size & Download School ZIP -->
                 <div class="flex items-center gap-3 text-xs text-gray-600 shrink-0">
-                    <a v-if="selectedSchoolId"
-                       :href="`${base}/download-zip?school_id=${selectedSchoolId}`"
-                       class="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1">
+                    <button v-if="selectedSchoolId" @click="queueZipDownload({ school_id: selectedSchoolId })" :disabled="isBatchRunning"
+                            class="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
                         📦 Download School ZIP
-                    </a>
+                    </button>
                     <div class="flex items-center gap-1.5">
                         <span>Show:</span>
                         <SearchableSelect v-model="perPage" :options="[{ value: 25, label: '25' }, { value: 50, label: '50' }, { value: 100, label: '100' }, { value: 'all', label: 'All' }]" :all-option="false" />
@@ -434,7 +447,7 @@
                     <button @click="bulkPrint(true)" class="btn-secondary py-1 px-3 text-xs">
                         📄 Bulk Print Plain (No BG)
                     </button>
-                    <button @click="bulkDownload" class="btn-secondary py-1 px-3 text-xs">
+                    <button @click="bulkDownload" :disabled="isBatchRunning" class="btn-secondary py-1 px-3 text-xs disabled:opacity-40 disabled:cursor-not-allowed">
                         📦 Bulk Download ZIP
                     </button>
                     <button @click="selectedCertIds = []" class="text-gray-500 hover:text-gray-700 ml-2">
@@ -514,16 +527,20 @@
             </div>
         </div>
 
-        <!-- Recent render/regenerate runs -->
+        <!-- Recent render/regenerate/export runs -->
         <div v-if="recentBatches.length" class="card p-4 mt-8">
-            <h3 class="text-sm font-semibold text-gray-800 mb-3">Recent render runs</h3>
+            <h3 class="text-sm font-semibold text-gray-800 mb-3">Recent render &amp; export runs</h3>
             <div class="divide-y divide-gray-100 text-xs">
                 <div v-for="b in recentBatches" :key="b.id" class="py-2 flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                        <span class="font-medium text-gray-800">{{ b.batch_type === 'regenerate_stale' ? 'Regenerate stale' : 'Render' }}</span>
+                        <span class="font-medium text-gray-800">{{ batchTypeLabel(b.batch_type) }}</span>
                         <span class="text-gray-500"> · {{ b.scope_description ?? 'Whole event' }}</span>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
+                        <a v-if="b.batch_type === 'zip_export' && ['completed', 'completed_with_errors'].includes(b.status)"
+                           :href="`${base}/batches/${b.id}/download`" class="font-semibold text-indigo-600 hover:underline">
+                            ⬇️ Download
+                        </a>
                         <span class="text-gray-500">{{ b.succeeded_count }}/{{ b.total_count }}<span v-if="b.failed_count" class="text-red-600"> ({{ b.failed_count }} failed)</span></span>
                         <span class="px-2 py-0.5 rounded font-semibold capitalize"
                               :class="{
@@ -615,8 +632,38 @@ function regenerateStale() {
     });
 }
 
+// Queues a ZIP export instead of downloading synchronously — an event with hundreds to
+// thousands of certificates could blow past the web server/proxy's own request timeout
+// long before it finished. Shares the same dispatch -> flash key -> poll /progress ->
+// download-when-ready flow as renderAndCache()/regenerateStale() above.
+function queueZipDownload(scope = {}, closeEvent = null) {
+    const payload = { ...scope };
+    if (plainMode.value) payload.plain = '1';
+    router.post(`${base}/download-zip/queue`, payload, {
+        preserveScroll: true,
+        onSuccess: () => startPolling(page.props.flash?.certificate_batch_id),
+    });
+    // The dropdown is a native <details>, which only auto-closes on a real navigation —
+    // this is an AJAX dispatch, so close it explicitly rather than leaving it open on the
+    // option the admin just clicked.
+    closeEvent?.target?.closest('details')?.removeAttribute('open');
+}
+
 const previewSampleUrl = computed(() => `${base}/preview-sample?cert_type=participation`);
 const isBatchRunning = computed(() => jobStatus.value && !['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(jobStatus.value.status));
+
+const jobStatusLabel = computed(() => {
+    if (!jobStatus.value) return '';
+    if (jobStatus.value.batch_type === 'zip_export') return 'Preparing ZIP download';
+    if (jobStatus.value.batch_type === 'regenerate_stale') return 'Regenerating stale certificates';
+    return 'Rendering certificates';
+});
+
+function batchTypeLabel(batchType) {
+    if (batchType === 'zip_export') return 'ZIP export';
+    if (batchType === 'regenerate_stale') return 'Regenerate stale';
+    return 'Render';
+}
 
 onMounted(() => {
     const lastBatch = props.recentBatches?.[0];
@@ -695,22 +742,9 @@ function bulkPrint(plain = false) {
 
 function bulkDownload() {
     if (!selectedCertIds.value.length) return;
-    const ids = selectedCertIds.value.join(',');
-    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip?certificate_ids=${ids}`;
+    queueZipDownload({ certificate_ids: selectedCertIds.value.join(',') });
 }
 
-const downloadZipUrl = computed(() =>
-    `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip${plainMode.value ? '?plain=1' : ''}`);
-const downloadPublishedZipUrl = computed(() => {
-    const params = new URLSearchParams({ published_only: '1' });
-    if (plainMode.value) params.set('plain', '1');
-    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip?${params}`;
-});
-const downloadParticipationZipUrl = computed(() => {
-    const params = new URLSearchParams({ cert_type: 'participation' });
-    if (plainMode.value) params.set('plain', '1');
-    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip?${params}`;
-});
 const printAllUrl = computed(() =>
     `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/print-all${plainMode.value ? '?plain=1' : ''}`);
 

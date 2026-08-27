@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Jobs\BuildCertificateZipJob;
 use App\Jobs\RenderCertificateChunkJob;
 use App\Models\Certificate;
 use App\Models\CertificateBatch;
@@ -12,12 +13,11 @@ use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestCertificateService;
 use App\Services\Events\FestEventNotifier;
-use App\Services\Events\FestIdCardQrService;
-use App\Services\Events\FestItemResultsService;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
 use App\Support\FestPageActivity;
 use App\Support\PdfGenerator;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
@@ -306,7 +306,8 @@ class FestCertificateController extends SahodayaAdminController
             ? array_filter(array_map('intval', explode(',', (string) $request->query('certificate_ids'))))
             : null;
 
-        $payloads = $this->exportPayloadsForEvent(
+        $service = app(FestCertificateService::class);
+        $payloads = $service->exportPayloadsForEvent(
             $event,
             embedAssets: true,
             plain: $request->boolean('plain'),
@@ -326,7 +327,6 @@ class FestCertificateController extends SahodayaAdminController
         $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
 
         $plain = $request->boolean('plain');
-        $service = app(FestCertificateService::class);
 
         foreach ($payloads as $payload) {
             $certificate = $payload['certificate'];
@@ -350,6 +350,85 @@ class FestCertificateController extends SahodayaAdminController
         return response()->download($zipPath, $filename)->deleteFileAfterSend();
     }
 
+    /**
+     * Async counterpart to downloadZip() above, for the scopes big enough to blow past the
+     * web request/proxy timeout — the whole-event and merit/participation-only dropdown
+     * options, the school-filtered ZIP, and ad-hoc bulk selection. The small per-item/
+     * per-school download-zip links in the grouped views stay on the synchronous route,
+     * since those scopes are naturally small (a handful to a few dozen certificates).
+     */
+    public function queueZipExport(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $publishedOnly = $request->boolean('published_only');
+        $itemId = $request->input('item_id') ? (int) $request->input('item_id') : null;
+        $schoolId = $request->input('school_id') ? (int) $request->input('school_id') : null;
+        $certType = $request->input('cert_type') ?: null;
+        $certIds = $request->input('certificate_ids')
+            ? array_values(array_filter(array_map('intval', explode(',', (string) $request->input('certificate_ids')))))
+            : null;
+        $plain = $request->boolean('plain');
+
+        $service = app(FestCertificateService::class);
+        $certificates = $service->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
+
+        // Mirrors downloadZip()/exportPayloadsForEvent()'s own publishedOnly filter, just
+        // up front — so total_count (and the empty-scope 404 below) reflect the same set
+        // the job will actually export, not the pre-filter winner count.
+        if ($publishedOnly) {
+            $payloads = $service->payloadsFor($certificates);
+            $certificates = $service->publishedOnlyWinners($certificates, $payloads);
+        }
+
+        abort_if($certificates->isEmpty(), 404, $publishedOnly ? 'No published winner certificates to download.' : 'No certificates to download.');
+
+        $batchRow = CertificateBatch::create([
+            'tenant_id' => $this->sahodaya->id,
+            'event_id' => $event->id,
+            'batch_type' => 'zip_export',
+            'cert_type' => $certType,
+            'item_id' => $itemId,
+            'school_id' => $schoolId,
+            'certificate_ids_json' => $certIds,
+            'scope_description' => $this->describeScope($event, $itemId, $schoolId, $certType, $certIds),
+            'total_count' => $certificates->count(),
+            'status' => CertificateBatch::STATUS_PROCESSING,
+            'created_by_user_id' => $request->user()?->id,
+            'started_at' => now(),
+        ]);
+
+        BuildCertificateZipJob::dispatch(
+            $batchRow->id,
+            $this->sahodaya->id,
+            $event->id,
+            $publishedOnly,
+            $itemId,
+            $schoolId,
+            $certType,
+            $certIds,
+            $plain,
+        );
+
+        return back()
+            ->with('success', "Preparing a ZIP of {$certificates->count()} certificate(s) in the background.")
+            ->with('certificate_batch_id', $batchRow->id);
+    }
+
+    public function downloadZipResult(string $tenantId, FestEvent $event, CertificateBatch $batch)
+    {
+        abort_if($batch->tenant_id !== $this->sahodaya->id || $batch->event_id !== $event->id, 403);
+        abort_if($batch->batch_type !== 'zip_export', 404);
+        abort_if(
+            ! in_array($batch->status, [CertificateBatch::STATUS_COMPLETED, CertificateBatch::STATUS_COMPLETED_WITH_ERRORS], true)
+                || ! $batch->file_path,
+            404,
+            'This export is not ready yet.'
+        );
+
+        return TenantStorage::downloadPrivate($batch->file_path, $batch->storage_disk, $batch->result_filename);
+    }
+
     public function printAll(Request $request, string $tenantId, FestEvent $event)
     {
         @ini_set('memory_limit', '1024M');
@@ -365,7 +444,7 @@ class FestCertificateController extends SahodayaAdminController
             ? array_filter(array_map('intval', explode(',', (string) $request->query('certificate_ids'))))
             : null;
 
-        $payloads = $this->exportPayloadsForEvent(
+        $payloads = app(FestCertificateService::class)->exportPayloadsForEvent(
             $event,
             embedAssets: false,
             plain: $request->boolean('plain'),
@@ -384,95 +463,6 @@ class FestCertificateController extends SahodayaAdminController
         ]);
     }
 
-    private function exportPayloadsForEvent(
-        FestEvent $event,
-        bool $embedAssets,
-        bool $plain,
-        bool $publishedOnly = false,
-        ?int $itemId = null,
-        ?int $schoolId = null,
-        ?string $certType = null,
-        ?array $certIds = null
-    ): Collection {
-        $certificates = $this->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
-
-        $service = app(FestCertificateService::class);
-
-        // Batched instead of a per-certificate payloadFor() + resolveTemplate() (up to
-        // 3 queries, doubled on fallback) inside the loop below — see
-        // FestCertificateService::payloadsFor() and renderContext()'s $templateCache param.
-        $payloads = $service->payloadsFor($certificates);
-
-        if ($publishedOnly) {
-            // Same "winner cert existing doesn't mean the item is published" caveat as
-            // winnersByItem() above — filter on the item/event's own publish state, not
-            // just cert_type.
-            $itemResults = app(FestItemResultsService::class);
-            $certificates = $certificates->filter(function ($certificate) use ($payloads, $itemResults) {
-                $payload = $payloads->get($certificate->id) ?? [];
-                $item = $payload['item'] ?? null;
-                $itemEvent = $payload['event'] ?? null;
-
-                return $certificate->cert_type === 'winner'
-                    && $item && $itemEvent
-                    && $itemResults->isItemVisible($item, $itemEvent);
-            });
-        }
-
-        $templateCache = [];
-        $participantsCache = [];
-
-        return $certificates->map(function ($certificate) use ($service, $payloads, &$templateCache, &$participantsCache, $embedAssets, $plain) {
-            $payload = $service->renderContext($certificate, $payloads->get($certificate->id), $templateCache, $participantsCache, embedAssets: $embedAssets);
-            $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
-
-            // "Plain" drops the uploaded background image only — the template's own
-            // title/body/logo/seal/signatories still render via the same partial's
-            // existing no-background branch, just without the ink-heavy backdrop, for
-            // admins printing physical copies in bulk.
-            if ($plain) {
-                $payload['plainMode'] = true;
-            }
-
-            return $payload;
-        });
-    }
-
-    /**
-     * Shared certificate-set resolution behind exportPayloadsForEvent() (single/bulk
-     * print+download) and the batch-rendering actions below — item-wise, school-wise,
-     * whole-event, and ad-hoc-selection all resolve through the exact same scope logic,
-     * so "what a Generate/Render run covers" and "what a Download covers" never drift
-     * apart for the same filters.
-     */
-    private function resolveCertificateScope(
-        FestEvent $event,
-        ?int $itemId = null,
-        ?int $schoolId = null,
-        ?string $certType = null,
-        ?array $certIds = null,
-    ): Collection {
-        if (! empty($certIds)) {
-            return Certificate::whereIn('id', $certIds)->get();
-        }
-
-        $participantIds = FestParticipant::where(function ($q) use ($event) {
-            $q->whereIn('event_id', $event->reportableEventIds())
-                ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
-        })
-            ->when($itemId, fn ($q) => $q->where(function ($iq) use ($itemId) {
-                $iq->whereHas('registration', fn ($rq) => $rq->where('item_id', $itemId))
-                    ->orWhereHas('mark', fn ($mq) => $mq->where('item_id', $itemId));
-            }))
-            ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
-            ->pluck('id');
-
-        return Certificate::where('entity_type', FestParticipant::class)
-            ->whereIn('entity_id', $participantIds)
-            ->when($certType, fn ($q) => $q->where('cert_type', $certType))
-            ->get();
-    }
-
     public function generateAndRenderBatch(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -484,7 +474,7 @@ class FestCertificateController extends SahodayaAdminController
             ? array_values(array_filter(array_map('intval', explode(',', (string) $request->input('certificate_ids')))))
             : null;
 
-        $certificates = $this->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
+        $certificates = app(FestCertificateService::class)->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
 
         abort_if($certificates->isEmpty(), 404, 'No certificates match this scope — generate the certificate rows first.');
 

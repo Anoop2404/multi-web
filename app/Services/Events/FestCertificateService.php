@@ -15,6 +15,7 @@ use App\Models\Tenant;
 use App\Support\FestClassGroupScheme;
 use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
+use App\Support\TenantDomainSync;
 use App\Support\TenantStorage;
 use Illuminate\Support\Str;
 
@@ -1081,5 +1082,119 @@ class FestCertificateService
             'mark'        => null,
             'recordBreak' => $break,
         ];
+    }
+
+    /**
+     * Certificate rows matching an export scope (whole event, one item, one school, or an
+     * explicit id list) — shared by the synchronous small-scope ZIP/print routes
+     * (FestCertificateController::downloadZip()/printAll()) and the queued whole-event
+     * export job (BuildCertificateZipJob), so "what a Generate/Render run covers" and
+     * "what a Download covers" never drift apart for the same filters.
+     */
+    public function resolveCertificateScope(
+        FestEvent $event,
+        ?int $itemId = null,
+        ?int $schoolId = null,
+        ?string $certType = null,
+        ?array $certIds = null,
+    ): \Illuminate\Support\Collection {
+        if (! empty($certIds)) {
+            return Certificate::whereIn('id', $certIds)->get();
+        }
+
+        $participantIds = FestParticipant::where(function ($q) use ($event) {
+            $q->whereIn('event_id', $event->reportableEventIds())
+                ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+        })
+            ->when($itemId, fn ($q) => $q->where(function ($iq) use ($itemId) {
+                $iq->whereHas('registration', fn ($rq) => $rq->where('item_id', $itemId))
+                    ->orWhereHas('mark', fn ($mq) => $mq->where('item_id', $itemId));
+            }))
+            ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
+            ->pluck('id');
+
+        return Certificate::where('entity_type', FestParticipant::class)
+            ->whereIn('entity_id', $participantIds)
+            ->when($certType, fn ($q) => $q->where('cert_type', $certType))
+            ->get();
+    }
+
+    /**
+     * Winner certificates whose item is actually publish-visible (its own
+     * results_published_at, or the whole event's results_published flag) — a winner
+     * Certificate row can already exist before either flag is set (generateForEvent()
+     * doesn't itself gate on publish state), so cert_type='winner' alone doesn't mean
+     * "published winner". Shared between exportPayloadsForEvent()'s inline filter and
+     * BuildCertificateZipJob's own up-front count, so the two never disagree on what
+     * counts.
+     */
+    public function publishedOnlyWinners(\Illuminate\Support\Collection $certificates, \Illuminate\Support\Collection $payloads): \Illuminate\Support\Collection
+    {
+        $itemResults = app(FestItemResultsService::class);
+
+        return $certificates->filter(function ($certificate) use ($payloads, $itemResults) {
+            $payload = $payloads->get($certificate->id) ?? [];
+            $item = $payload['item'] ?? null;
+            $itemEvent = $payload['event'] ?? null;
+
+            return $certificate->cert_type === 'winner'
+                && $item && $itemEvent
+                && $itemResults->isItemVisible($item, $itemEvent);
+        });
+    }
+
+    /**
+     * Full render payloads for an export scope — used by the synchronous small-scope
+     * download/print routes directly, and by BuildCertificateZipJob for the queued
+     * whole-event export. $sahodaya, when given, builds each certificate's QR verify URL
+     * from the tenant's own domain (TenantDomainSync::publicUrl()) instead of
+     * route(..., absolute: true) — required for the job, which runs on a queue worker
+     * with no HTTP request to derive a host from (route() would fall back to
+     * config('app.url'), the platform's own domain, not the issuing Sahodaya's — the same
+     * bug already fixed this session for RenderCertificateChunkJob/
+     * TrainingCertificateService). Left null (the default) for the existing controller
+     * call sites, which already run inside a real request on the tenant's own domain —
+     * route(absolute: true) is correct there as-is.
+     */
+    public function exportPayloadsForEvent(
+        FestEvent $event,
+        bool $embedAssets,
+        bool $plain,
+        bool $publishedOnly = false,
+        ?int $itemId = null,
+        ?int $schoolId = null,
+        ?string $certType = null,
+        ?array $certIds = null,
+        ?Tenant $sahodaya = null,
+    ): \Illuminate\Support\Collection {
+        $certificates = $this->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
+
+        $payloads = $this->payloadsFor($certificates);
+
+        if ($publishedOnly) {
+            $certificates = $this->publishedOnlyWinners($certificates, $payloads);
+        }
+
+        $templateCache = [];
+        $participantsCache = [];
+
+        return $certificates->map(function ($certificate) use ($payloads, &$templateCache, &$participantsCache, $embedAssets, $plain, $sahodaya) {
+            $payload = $this->renderContext($certificate, $payloads->get($certificate->id), $templateCache, $participantsCache, embedAssets: $embedAssets);
+
+            $verifyUrl = $sahodaya
+                ? (TenantDomainSync::publicUrl($sahodaya) ?? url('/')).'/certificates/verify/'.$certificate->verification_uuid
+                : route('certificates.verify', $certificate->verification_uuid, absolute: true);
+            $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri($verifyUrl);
+
+            // "Plain" drops the uploaded background image only — the template's own
+            // title/body/logo/seal/signatories still render via the same partial's
+            // existing no-background branch, just without the ink-heavy backdrop, for
+            // admins printing physical copies in bulk.
+            if ($plain) {
+                $payload['plainMode'] = true;
+            }
+
+            return $payload;
+        });
     }
 }

@@ -31,7 +31,7 @@ class CertificateBatch extends Model
         'tenant_id', 'event_id', 'training_program_id', 'batch_type', 'cert_type', 'item_id', 'school_id',
         'certificate_ids_json', 'registration_ids_json', 'scope_description', 'total_count', 'processed_count',
         'succeeded_count', 'failed_count', 'status', 'error', 'failed_items_json',
-        'file_path', 'storage_disk', 'queued_job_batch_id', 'created_by_user_id',
+        'file_path', 'storage_disk', 'result_filename', 'queued_job_batch_id', 'created_by_user_id',
         'started_at', 'completed_at',
     ];
 

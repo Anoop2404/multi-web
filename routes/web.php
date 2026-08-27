@@ -1404,10 +1404,12 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/certificates/tally', [FestCertificateController::class, 'tally'])->name('certificates.tally');
             Route::post('/{event}/certificates/generate', [FestCertificateController::class, 'generate'])->name('certificates.generate');
             Route::get('/{event}/certificates/download-zip', [FestCertificateController::class, 'downloadZip'])->name('certificates.download-zip');
+            Route::post('/{event}/certificates/download-zip/queue', [FestCertificateController::class, 'queueZipExport'])->name('certificates.download-zip.queue');
             Route::get('/{event}/certificates/print-all', [FestCertificateController::class, 'printAll'])->name('certificates.print-all');
             Route::post('/{event}/certificates/batches', [FestCertificateController::class, 'generateAndRenderBatch'])->name('certificates.batches.store');
             Route::get('/{event}/certificates/batches', [FestCertificateController::class, 'batches'])->name('certificates.batches.index');
             Route::get('/{event}/certificates/batches/{batch}/progress', [FestCertificateController::class, 'batchProgress'])->name('certificates.batches.progress');
+            Route::get('/{event}/certificates/batches/{batch}/download', [FestCertificateController::class, 'downloadZipResult'])->name('certificates.batches.download');
             Route::post('/{event}/certificates/regenerate-stale', [FestCertificateController::class, 'regenerateStale'])->name('certificates.regenerate-stale');
             Route::get('/{event}/certificates/preview-sample', [FestCertificateController::class, 'previewSample'])->name('certificates.preview-sample');
             Route::get('/{event}/certificates/preview-sample-pdf', [FestCertificateController::class, 'previewSamplePdf'])->name('certificates.preview-sample-pdf');
