@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Certificate;
+use App\Models\CertificateIndex;
+use App\Models\CertificateTemplate;
 use App\Models\FestParticipant;
 use App\Models\McqCertificate;
 use App\Models\Tenant;
@@ -14,100 +16,96 @@ use App\Services\Events\FestIdCardQrService;
 use App\Services\Mcq\McqCertificateService;
 use App\Services\Training\TrainingCertificateService;
 use App\Support\TenancyDatabase;
+use App\Support\TenantDomainSync;
 use Illuminate\Http\Request;
 
 class PublicCertificateController extends Controller
 {
     public function verify(string $uuid)
     {
-        if ($found = $this->findMcqCertificate($uuid)) {
-            return $this->verifyMcq($found, $uuid);
-        }
+        $owner = $this->resolveCertificateOwner($uuid);
 
-        if ($found = $this->findTopperCertificate($uuid)) {
-            return $this->verifyTopperFound($found);
-        }
-
-        $certificate = Certificate::where('verification_uuid', $uuid)->first();
-
-        if (! $certificate) {
+        if (! $owner) {
             return view('mcq.certificate-verify', [
                 'valid' => false,
-                'uuid'  => $uuid,
+                'uuid' => $uuid,
             ]);
         }
 
-        if ($certificate->entity_type === TrainingRegistration::class) {
-            $registration = TrainingRegistration::with(['program', 'teacher', 'school'])->findOrFail($certificate->entity_id);
-            $sahodaya = Tenant::findOrFail($registration->program->tenant_id);
-            $service = app(TrainingCertificateService::class);
-
-            return view('training.certificate-verify', [
-                'certificate'  => $certificate,
-                'registration' => $registration,
-                'sahodaya'     => $sahodaya,
-                'fieldValues'  => $service->resolveFieldValues($registration, $sahodaya),
-                'daysPresent'  => $service->presentDaysCount($registration),
-            ]);
+        if ($owner['source'] === CertificateIndex::SOURCE_MCQ) {
+            return $this->verifyMcq($owner, $uuid);
         }
 
-        if ($certificate->entity_type === TopperCertificateService::ENTITY_TYPE) {
-            return $this->verifyTopper($certificate);
-        }
+        $sahodaya = $owner['sahodaya'];
 
-        $payload = app(FestCertificateService::class)->payloadFor($certificate);
-        $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
+        return TenancyDatabase::withTenantDatabase($sahodaya, function () use ($uuid, $sahodaya) {
+            $certificate = Certificate::where('verification_uuid', $uuid)->firstOrFail();
 
-        return view('fest.certificate-verify', $payload);
+            if ($certificate->entity_type === TrainingRegistration::class) {
+                $registration = TrainingRegistration::with(['program', 'teacher', 'school'])->findOrFail($certificate->entity_id);
+                $service = app(TrainingCertificateService::class);
+
+                return view('training.certificate-verify', [
+                    'certificate' => $certificate,
+                    'registration' => $registration,
+                    'sahodaya' => $sahodaya,
+                    'fieldValues' => $service->resolveFieldValues($registration, $sahodaya),
+                    'daysPresent' => $service->presentDaysCount($registration),
+                ]);
+            }
+
+            if ($certificate->entity_type === TopperCertificateService::ENTITY_TYPE) {
+                return $this->verifyTopperFound(['uuid' => $certificate->verification_uuid, 'sahodaya' => $sahodaya]);
+            }
+
+            $payload = app(FestCertificateService::class)->payloadFor($certificate);
+            $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri((TenantDomainSync::publicUrl($sahodaya) ?? url('/')).'/certificates/verify/'.$certificate->verification_uuid);
+
+            return view('fest.certificate-verify', $payload);
+        });
     }
 
     public function print(string $uuid, Request $request)
     {
-        if ($found = $this->findMcqCertificate($uuid)) {
-            return $this->printMcq($found);
+        $owner = $this->resolveCertificateOwner($uuid);
+        abort_unless($owner, 404);
+
+        if ($owner['source'] === CertificateIndex::SOURCE_MCQ) {
+            return $this->printMcq($owner);
         }
 
-        if ($found = $this->findTopperCertificate($uuid)) {
-            return $this->printTopperFound($found);
-        }
+        $sahodaya = $owner['sahodaya'];
 
-        $certificate = Certificate::where('verification_uuid', $uuid)->firstOrFail();
+        return TenancyDatabase::withTenantDatabase($sahodaya, function () use ($uuid, $sahodaya, $request) {
+            $certificate = Certificate::where('verification_uuid', $uuid)->firstOrFail();
 
-        if ($certificate->entity_type === TrainingRegistration::class) {
-            $registration = TrainingRegistration::with(['program', 'teacher'])->findOrFail($certificate->entity_id);
-            $sahodaya = Tenant::findOrFail($registration->program->tenant_id);
-            $service = app(TrainingCertificateService::class);
-            $render = $service->renderContext($registration, $sahodaya);
+            if ($certificate->entity_type === TrainingRegistration::class) {
+                $registration = TrainingRegistration::with(['program', 'teacher'])->findOrFail($certificate->entity_id);
+                $service = app(TrainingCertificateService::class);
+                $render = $service->renderContext($registration, $sahodaya);
 
-            return view('training.certificate', array_merge($render, [
-                'registration' => $registration,
-                'certificate'  => $certificate,
-                'sahodaya'     => $sahodaya,
-                'fieldValues'  => $service->resolveFieldValues($registration, $sahodaya),
-            ]));
-        }
+                return view('training.certificate', array_merge($render, [
+                    'registration' => $registration,
+                    'certificate' => $certificate,
+                    'sahodaya' => $sahodaya,
+                    'fieldValues' => $service->resolveFieldValues($registration, $sahodaya),
+                ]));
+            }
 
-        if ($certificate->entity_type === TopperCertificateService::ENTITY_TYPE) {
-            $topper = Topper::findOrFail($certificate->entity_id);
-            $school = Tenant::find($topper->tenant_id);
-            $sahodaya = $school?->parent_id ? Tenant::find($school->parent_id) : null;
-            abort_unless($sahodaya, 404);
+            if ($certificate->entity_type === TopperCertificateService::ENTITY_TYPE) {
+                return $this->printTopperFound(['uuid' => $certificate->verification_uuid, 'sahodaya' => $sahodaya]);
+            }
 
-            return $this->printTopperFound([
-                'uuid' => $certificate->verification_uuid,
-                'sahodaya' => $sahodaya,
-            ]);
-        }
+            $payload = app(FestCertificateService::class)->renderContext($certificate);
+            $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri((TenantDomainSync::publicUrl($sahodaya) ?? url('/')).'/certificates/verify/'.$certificate->verification_uuid);
+            // ?preview=1 (from the Sahodaya admin's own Certificates page) reuses this same
+            // public print view but hides the Print/Save button and auto-fits the page to
+            // the viewport — the same isSample behavior the template-preview screens use,
+            // just applied to a real generated certificate instead of mock data.
+            $payload['isSample'] = $request->boolean('preview');
 
-        $payload = app(FestCertificateService::class)->renderContext($certificate);
-        $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
-        // ?preview=1 (from the Sahodaya admin's own Certificates page) reuses this same
-        // public print view but hides the Print/Save button and auto-fits the page to
-        // the viewport — the same isSample behavior the template-preview screens use,
-        // just applied to a real generated certificate instead of mock data.
-        $payload['isSample'] = $request->boolean('preview');
-
-        return view('fest.certificate-print', $payload);
+            return view('fest.certificate-print', $payload);
+        });
     }
 
     /**
@@ -120,30 +118,37 @@ class PublicCertificateController extends Controller
      */
     public function pdf(string $uuid, Request $request)
     {
-        $certificate = Certificate::where('verification_uuid', $uuid)->firstOrFail();
+        $owner = $this->resolveCertificateOwner($uuid);
+        abort_unless($owner && $owner['source'] === CertificateIndex::SOURCE_CERTIFICATE, 404);
 
-        // file_path/plain_file_path (what this route serves) are only ever populated for
-        // Fest certificates via RenderCertificateChunkJob — training/topper/mcq certs have
-        // their own dedicated print/verify flows above and never populate these columns.
-        abort_unless($certificate->entity_type === FestParticipant::class, 404);
+        $sahodaya = $owner['sahodaya'];
 
-        $service = app(FestCertificateService::class);
-        $plain = $request->boolean('plain');
+        return TenancyDatabase::withTenantDatabase($sahodaya, function () use ($uuid, $sahodaya, $request) {
+            $certificate = Certificate::where('verification_uuid', $uuid)->firstOrFail();
 
-        $pdf = $service->cachedOrFreshPdf($certificate, function () use ($certificate, $service) {
-            $payload = $service->renderContext($certificate, embedAssets: true);
-            $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
+            // file_path/plain_file_path (what this route serves) are only ever populated for
+            // Fest certificates via RenderCertificateChunkJob — training/topper/mcq certs have
+            // their own dedicated print/verify flows above and never populate these columns.
+            abort_unless($certificate->entity_type === FestParticipant::class, 404);
 
-            return $payload;
-        }, $plain);
+            $service = app(FestCertificateService::class);
+            $plain = $request->boolean('plain');
 
-        $studentName = $service->payloadFor($certificate)['student']?->name ?? 'certificate';
-        $filename = str($studentName)->slug().'-'.$certificate->verification_uuid.($plain ? '-plain' : '').'.pdf';
+            $pdf = $service->cachedOrFreshPdf($certificate, function () use ($certificate, $service, $sahodaya) {
+                $payload = $service->renderContext($certificate, embedAssets: true);
+                $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri((TenantDomainSync::publicUrl($sahodaya) ?? url('/')).'/certificates/verify/'.$certificate->verification_uuid);
 
-        return response($pdf, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => ($request->boolean('download') ? 'attachment' : 'inline').'; filename="'.$filename.'"',
-        ]);
+                return $payload;
+            }, $plain);
+
+            $studentName = $service->payloadFor($certificate)['student']?->name ?? 'certificate';
+            $filename = str($studentName)->slug().'-'.$certificate->verification_uuid.($plain ? '-plain' : '').'.pdf';
+
+            return response($pdf, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => ($request->boolean('download') ? 'attachment' : 'inline').'; filename="'.$filename.'"',
+            ]);
+        });
     }
 
     /** @param  array{uuid: string, sahodaya: Tenant}  $found */
@@ -163,7 +168,7 @@ class PublicCertificateController extends Controller
                 'certificate' => $certificate,
                 'fieldValues' => $ctx['fieldValues'],
                 'sahodaya' => $sahodaya,
-                'printUrl' => route('certificates.print', $uuid, absolute: true),
+                'printUrl' => (TenantDomainSync::publicUrl($sahodaya) ?? url('/')).'/certificates/print/'.$uuid,
             ]);
         });
     }
@@ -179,7 +184,7 @@ class PublicCertificateController extends Controller
             $topper = Topper::with(['boardResult', 'tenant'])->findOrFail($certificate->entity_id);
             $service = app(TopperCertificateService::class);
             $ctx = $service->renderContext($topper, $sahodaya);
-            $body = $ctx['template']?->body ?? \App\Models\CertificateTemplate::defaultTopperBody();
+            $body = $ctx['template']?->body ?? CertificateTemplate::defaultTopperBody();
             foreach ($ctx['fieldValues'] as $key => $value) {
                 $body = str_replace('{'.$key.'}', (string) $value, $body);
             }
@@ -189,53 +194,6 @@ class PublicCertificateController extends Controller
                 'bodyHtml' => nl2br(e($body)),
             ]));
         });
-    }
-
-    private function verifyTopper(Certificate $certificate)
-    {
-        $topper = Topper::with(['boardResult', 'tenant'])->findOrFail($certificate->entity_id);
-        $school = Tenant::find($topper->tenant_id);
-        $sahodaya = $school?->parent_id ? Tenant::find($school->parent_id) : null;
-        abort_unless($sahodaya, 404);
-
-        return $this->verifyTopperFound([
-            'uuid' => $certificate->verification_uuid,
-            'sahodaya' => $sahodaya,
-        ]);
-    }
-
-    /** @return array{uuid: string, sahodaya: Tenant}|null */
-    private function findTopperCertificate(string $uuid): ?array
-    {
-        if (tenancy()->initialized) {
-            $exists = Certificate::where('verification_uuid', $uuid)
-                ->where('entity_type', TopperCertificateService::ENTITY_TYPE)
-                ->exists();
-            if ($exists) {
-                $tenant = tenancy()->tenant;
-
-                return [
-                    'uuid' => $uuid,
-                    'sahodaya' => $tenant instanceof Tenant ? $tenant : Tenant::findOrFail($tenant->getTenantKey()),
-                ];
-            }
-
-            return null;
-        }
-
-        foreach (Tenant::query()->sahodayas()->where('is_active', true)->cursor() as $sahodaya) {
-            $exists = TenancyDatabase::whenDatabaseReady($sahodaya, function () use ($uuid) {
-                return Certificate::where('verification_uuid', $uuid)
-                    ->where('entity_type', TopperCertificateService::ENTITY_TYPE)
-                    ->exists();
-            }, false);
-
-            if ($exists) {
-                return ['uuid' => $uuid, 'sahodaya' => $sahodaya];
-            }
-        }
-
-        return null;
     }
 
     /** @param  array{uuid: string, sahodaya: Tenant}  $found */
@@ -249,15 +207,15 @@ class PublicCertificateController extends Controller
             $exam = $registration?->exam;
 
             return view('mcq.certificate-verify', [
-                'valid'        => true,
-                'uuid'         => $uuid,
-                'recipient'    => $registration?->participantName() ?: '—',
-                'examTitle'    => $exam?->title ?: '—',
-                'examCode'     => $exam?->code,
-                'schoolName'   => $registration?->school?->name ?: '—',
+                'valid' => true,
+                'uuid' => $uuid,
+                'recipient' => $registration?->participantName() ?: '—',
+                'examTitle' => $exam?->title ?: '—',
+                'examCode' => $exam?->code,
+                'schoolName' => $registration?->school?->name ?: '—',
                 'sahodayaName' => $sahodaya->name,
-                'issuedAt'     => $certificate->generated_at?->format('d M Y') ?: '—',
-                'printUrl'     => route('certificates.print', $uuid, absolute: true),
+                'issuedAt' => $certificate->generated_at?->format('d M Y') ?: '—',
+                'printUrl' => (TenantDomainSync::publicUrl($sahodaya) ?? url('/')).'/certificates/print/'.$uuid,
             ]);
         });
     }
@@ -274,37 +232,58 @@ class PublicCertificateController extends Controller
 
             return view('mcq.certificate', [
                 'registration' => $registration,
-                'certificate'  => $certificate,
-                'sahodaya'     => $sahodaya,
-                'fields'       => app(McqCertificateService::class)->fieldValues($registration, $sahodaya),
-                'design'       => $certificate->design_snapshot_json ?? [],
+                'certificate' => $certificate,
+                'sahodaya' => $sahodaya,
+                'fields' => app(McqCertificateService::class)->fieldValues($registration, $sahodaya),
+                'design' => $certificate->design_snapshot_json ?? [],
             ]);
         });
     }
 
-    /** @return array{uuid: string, sahodaya: Tenant}|null */
-    private function findMcqCertificate(string $uuid): ?array
+    /**
+     * Finds which Sahodaya's database a certificate uuid belongs to, without depending on
+     * the request's domain (these routes are public and uuid-keyed — the host carries no
+     * tenant information, and per the bug this fixes, is not even reliably the right
+     * tenant's own domain). Central-index lookup first (O(1)); falls back to scanning
+     * every active Sahodaya's database for pre-index certificates, self-healing the index
+     * on a hit so that cost is paid at most once per certificate, ever.
+     *
+     * @return array{uuid: string, sahodaya: Tenant, source: string}|null
+     */
+    private function resolveCertificateOwner(string $uuid): ?array
     {
         if (tenancy()->initialized) {
-            if (McqCertificate::where('verification_uuid', $uuid)->exists()) {
-                $tenant = tenancy()->tenant;
+            $tenant = tenancy()->tenant;
+            $sahodaya = $tenant instanceof Tenant ? $tenant : Tenant::findOrFail($tenant->getTenantKey());
 
-                return [
-                    'uuid'     => $uuid,
-                    'sahodaya' => $tenant instanceof Tenant ? $tenant : Tenant::findOrFail($tenant->getTenantKey()),
-                ];
+            return match (true) {
+                McqCertificate::where('verification_uuid', $uuid)->exists() => ['uuid' => $uuid, 'sahodaya' => $sahodaya, 'source' => CertificateIndex::SOURCE_MCQ],
+                Certificate::where('verification_uuid', $uuid)->exists() => ['uuid' => $uuid, 'sahodaya' => $sahodaya, 'source' => CertificateIndex::SOURCE_CERTIFICATE],
+                default => null,
+            };
+        }
+
+        if ($indexed = CertificateIndex::where('verification_uuid', $uuid)->first()) {
+            if ($sahodaya = Tenant::find($indexed->tenant_id)) {
+                return ['uuid' => $uuid, 'sahodaya' => $sahodaya, 'source' => $indexed->source_table];
             }
-
-            return null;
+            // Tenant deleted since indexing — fall through to the scan, which will also
+            // fail and produce the normal "not found" response.
         }
 
         foreach (Tenant::query()->sahodayas()->where('is_active', true)->cursor() as $sahodaya) {
-            $exists = TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($uuid) {
-                return McqCertificate::where('verification_uuid', $uuid)->exists();
-            });
+            $source = TenancyDatabase::whenDatabaseReady($sahodaya, function () use ($uuid) {
+                return match (true) {
+                    McqCertificate::where('verification_uuid', $uuid)->exists() => CertificateIndex::SOURCE_MCQ,
+                    Certificate::where('verification_uuid', $uuid)->exists() => CertificateIndex::SOURCE_CERTIFICATE,
+                    default => null,
+                };
+            }, null);
 
-            if ($exists) {
-                return ['uuid' => $uuid, 'sahodaya' => $sahodaya];
+            if ($source) {
+                CertificateIndex::recordFor($uuid, $sahodaya->id, $source);
+
+                return ['uuid' => $uuid, 'sahodaya' => $sahodaya, 'source' => $source];
             }
         }
 

@@ -2,10 +2,14 @@
 
 namespace App\Providers;
 
+use App\Models\Certificate;
 use App\Models\FeeReceipt;
-use App\Models\Tenant;
+use App\Models\McqCertificate;
 use App\Models\PersonalAccessToken;
+use App\Models\Tenant;
+use App\Observers\CertificateObserver;
 use App\Observers\FeeReceiptObserver;
+use App\Observers\McqCertificateObserver;
 use App\Observers\TenantObserver;
 use App\Services\BoardResults\TopperCountService;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -43,6 +47,8 @@ class AppServiceProvider extends ServiceProvider
 
         Tenant::observe(TenantObserver::class);
         FeeReceipt::observe(FeeReceiptObserver::class);
+        Certificate::observe(CertificateObserver::class);
+        McqCertificate::observe(McqCertificateObserver::class);
 
         if ($this->app->environment('testing') && ! config('tenancy.database_per_sahodaya', true)) {
             $this->loadMigrationsFrom(database_path('migrations/tenant'));

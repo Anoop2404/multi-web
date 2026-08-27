@@ -27,13 +27,28 @@ class TenancyDatabase
     public static function usingDatabase(string $databaseName, callable $callback, ?array $credentials = null): mixed
     {
         $connectionName = self::RUNTIME_CONNECTION;
+
+        // Already inside an active swap to this exact database — e.g. this method (or
+        // withTenantDatabase(), or a nested caller like
+        // SahodayaDatabaseProvisioner::schemaIsReady()) invoked again while an outer call
+        // for the same tenant is still running. RUNTIME_CONNECTION is a single global
+        // config slot, not one per call — re-swapping would still technically work, but
+        // this (inner) call's own `finally` cleanup would null out
+        // database.connections.tenant_runtime the moment it returns, out from under the
+        // outer call, which may still need to query on it afterward. Just run the
+        // callback on the connection that's already active instead of swapping again.
+        if (config('database.default') === $connectionName
+            && config("database.connections.{$connectionName}.database") === $databaseName) {
+            return $callback($connectionName);
+        }
+
         $central = (string) config('tenancy.database.central_connection', 'central');
         $previousDefault = config('database.default');
         $template = config("database.connections.{$central}")
             ?? config('database.connections.'.($previousDefault ?: 'pgsql'));
 
         if (! is_array($template)) {
-            throw new InvalidArgumentException("No database connection template found for tenant runtime.");
+            throw new InvalidArgumentException('No database connection template found for tenant runtime.');
         }
 
         $overrides = ['database' => $databaseName];
@@ -77,6 +92,19 @@ class TenancyDatabase
         }
 
         if (tenancy()->initialized) {
+            return $callback();
+        }
+
+        // Already inside an active usingDatabase() swap — e.g. this method called again,
+        // directly or via a helper like TenantBranding::logoUrl()/whenDatabaseReady(),
+        // while an outer withTenantDatabase() call is still running. usingDatabase()'s
+        // RUNTIME_CONNECTION name is a single global slot, not one per call — a nested
+        // invocation's own cleanup would null out database.connections.tenant_runtime out
+        // from under the outer call the moment the nested call returns, breaking any
+        // query the outer call still needs to make afterward. Since there is only ever
+        // one tenant_runtime slot, a nested call is always for the same tenant already
+        // active — just run it on the connection that's already there.
+        if (config('database.default') === self::RUNTIME_CONNECTION) {
             return $callback();
         }
 
@@ -254,6 +282,41 @@ MSG);
         }
 
         return self::withTenantDatabase($tenant, $callback);
+    }
+
+    /**
+     * The Sahodaya whose database is currently active, across both tenant-context
+     * mechanisms this app uses: real Stancl tenancy (HTTP admin requests, via
+     * initializeForTenant()) and the raw connection swap withTenantDatabase() does when
+     * tenancy isn't already initialized (queued jobs — no tenancy()->tenant to read).
+     * Only used off the hot path (certificate creation, to populate CertificateIndex), so
+     * looping "tens" of Sahodayas in the second branch is not a real cost.
+     */
+    public static function currentTenant(): ?Tenant
+    {
+        if (tenancy()->initialized) {
+            $tenant = tenancy()->tenant;
+
+            return $tenant instanceof Tenant ? $tenant : ($tenant ? Tenant::find($tenant->getTenantKey()) : null);
+        }
+
+        $connectionName = config('database.default');
+        if ($connectionName === (string) config('tenancy.database.central_connection', 'central')) {
+            return null;
+        }
+
+        $currentDbName = config("database.connections.{$connectionName}.database");
+        if (! $currentDbName) {
+            return null;
+        }
+
+        foreach (Tenant::query()->sahodayas()->cursor() as $sahodaya) {
+            if ($sahodaya->getInternal('db_name') === $currentDbName) {
+                return $sahodaya;
+            }
+        }
+
+        return null;
     }
 
     /**

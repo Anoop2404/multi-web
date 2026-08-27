@@ -9,11 +9,13 @@ use App\Services\Events\FestCertificateService;
 use App\Services\Events\FestIdCardQrService;
 use App\Support\PdfGenerator;
 use App\Support\TenancyDatabase;
+use App\Support\TenantDomainSync;
 use App\Support\TenantStorage;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Collection;
 
 /**
  * Renders and caches one ~150-certificate slice of a CertificateBatch run (see
@@ -25,7 +27,7 @@ use Illuminate\Http\Client\ConnectionException;
  */
 class RenderCertificateChunkJob implements ShouldQueue
 {
-    use Queueable, Batchable;
+    use Batchable, Queueable;
 
     // Generous relative to a web request's timeout — this runs on a queue worker, not
     // behind a browser. Matches the one existing precedent for a job of comparable scope,
@@ -131,7 +133,7 @@ class RenderCertificateChunkJob implements ShouldQueue
         Certificate $certificate,
         FestCertificateService $service,
         FestIdCardQrService $qrService,
-        \Illuminate\Support\Collection $payloads,
+        Collection $payloads,
         array &$templateCache,
         array &$participantsCache,
         array &$assetCache,
@@ -144,7 +146,13 @@ class RenderCertificateChunkJob implements ShouldQueue
             embedAssets: true,
             assetCache: $assetCache,
         );
-        $context['qr_src'] = $qrService->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
+        // route(..., absolute: true) would use config('app.url') here — this job has no
+        // HTTP request to derive a host from, since it runs on a queue worker — which
+        // bakes the platform's own default domain into every certificate's QR code
+        // instead of the issuing Sahodaya's own domain. Build it from the tenant directly.
+        $sahodaya = $context['sahodaya'] ?? null;
+        $verifyUrl = ($sahodaya ? TenantDomainSync::publicUrl($sahodaya) : null) ?? url('/');
+        $context['qr_src'] = $qrService->dataUri($verifyUrl.'/certificates/verify/'.$certificate->verification_uuid);
 
         $event = $context['event'] ?? null;
         $tenantId = $context['sahodaya']?->id ?? $this->tenantId;
@@ -165,26 +173,26 @@ class RenderCertificateChunkJob implements ShouldQueue
         TenantStorage::put($plainPath, $plainPdf, $disk);
 
         $certificate->update([
-            'file_path'        => $withBgPath,
-            'plain_file_path'  => $plainPath,
-            'storage_disk'     => $disk,
-            'content_hash'     => $service->contentHash($context),
-            'is_stale'         => false,
+            'file_path' => $withBgPath,
+            'plain_file_path' => $plainPath,
+            'storage_disk' => $disk,
+            'content_hash' => $service->contentHash($context),
+            'is_stale' => false,
             'stale_checked_at' => now(),
-            'rendered_at'      => now(),
+            'rendered_at' => now(),
         ]);
     }
 
     /** @return array{certificate_id: int, name: string, reason: string} */
-    private function failureEntry(Certificate $certificate, \Illuminate\Support\Collection $payloads, \Throwable $e): array
+    private function failureEntry(Certificate $certificate, Collection $payloads, \Throwable $e): array
     {
         $payload = $payloads->get($certificate->id) ?? [];
         $name = $payload['student']?->name ?? 'Participant #'.$certificate->entity_id;
 
         return [
             'certificate_id' => $certificate->id,
-            'name'           => $name,
-            'reason'         => mb_substr($e->getMessage(), 0, 500),
+            'name' => $name,
+            'reason' => mb_substr($e->getMessage(), 0, 500),
         ];
     }
 }

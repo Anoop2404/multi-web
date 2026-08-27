@@ -14,6 +14,7 @@ use App\Services\Mail\SahodayaMailer;
 use App\Services\Notifications\NotificationService;
 use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
+use App\Support\TenantDomainSync;
 use App\Support\TenantStorage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -436,7 +437,12 @@ class TrainingCertificateService
         }
 
         $programTitle = $registration->program?->title ?? 'Training';
-        $printUrl = route('certificates.print', $certificate->verification_uuid, absolute: true);
+        // Not route(..., absolute: true) — this can run from a queued job with no HTTP
+        // request to derive a host from, which would bake in config('app.url') (the
+        // platform's own default domain) instead of this Sahodaya's own domain.
+        $notifySahodaya = $registration->program ? Tenant::find($registration->program->tenant_id) : null;
+        $printUrl = ($notifySahodaya ? TenantDomainSync::publicUrl($notifySahodaya) : null) ?? url('/');
+        $printUrl .= '/certificates/print/'.$certificate->verification_uuid;
 
         // Portal in-app card, only meaningful for teachers who have a linked
         // portal login — keeps the existing bell-notification behavior.
@@ -600,7 +606,11 @@ class TrainingCertificateService
         }
 
         $programTitle = $registration->program?->title ?? 'Training Program';
-        $printUrl = url("/certificates/verify/{$certificate->verification_uuid}");
+        // Not url(...) — this is the method the "Email Certificates to All Teachers"
+        // background job calls, with no HTTP request to derive a host from. $sahodaya is
+        // already the correct tenant (a parameter), so build the link from its own domain
+        // rather than config('app.url').
+        $printUrl = (TenantDomainSync::publicUrl($sahodaya) ?? url('/')).'/certificates/verify/'.$certificate->verification_uuid;
 
         $isTest = ! empty($overrideEmail);
         $recipientName = $registration->teacher?->name ?? 'Participant';
