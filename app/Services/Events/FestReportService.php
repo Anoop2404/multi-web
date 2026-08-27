@@ -639,6 +639,7 @@ class FestReportService
         return $this->renderPdf('fest.reports.student-wise', [
             'event' => $this->event,
             'students' => $rows,
+            'showChestNo' => false,
             ...$this->brandingData(),
         ], $this->slug().'-student-wise-report.pdf');
     }
@@ -664,6 +665,7 @@ class FestReportService
 
                 return [
                     $first->registration?->school?->name,
+                    $first->registration?->school?->school_prefix,
                     $first->student?->reg_no,
                     $first->student?->admission_number,
                     $first->student?->name,
@@ -674,12 +676,12 @@ class FestReportService
                     $items->implode(', '),
                 ];
             })
-            ->sortBy(fn (array $row) => [$row[0] ?? '', $row[5] ?? '', $row[3] ?? ''])
+            ->sortBy(fn (array $row) => [$row[0] ?? '', $row[6] ?? '', $row[4] ?? ''])
             ->values()
             ->all();
 
         return ExcelExport::download($this->slug().'-student-wise-report', [
-            'School', 'Reg No', 'Admission No', 'Student', 'Gender', 'Class',
+            'School', 'School Code', 'Reg No', 'Admission No', 'Student', 'Gender', 'Class',
             'Category', 'Item Count', 'Items',
         ], $rows);
     }

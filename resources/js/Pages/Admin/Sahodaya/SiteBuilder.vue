@@ -13,9 +13,12 @@
                     <label for="website-site-selector" class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
                         Editing website
                     </label>
-                    <SearchableSelect id="website-site-selector" :model-value="currentSite?.id" @update:model-value="switchSite"
-                            :options="siteOptions" :all-option="false" placeholder="Select website"
-                            class="w-full max-w-lg" />
+                    <select id="website-site-selector" :value="currentSite?.id" @change="switchSite($event.target.value)"
+                            class="w-full max-w-lg border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                        <option v-for="site in sites" :key="site.id" :value="site.id">
+                            {{ site.name }}{{ site.is_primary ? ' — Primary website' : ' — Microsite' }}
+                        </option>
+                    </select>
                     <p class="text-xs text-gray-500 mt-2">
                         Sections, experience and V2 design belong to this website. Navigation links and footer contact content remain shared by this Sahodaya.
                     </p>
@@ -54,68 +57,6 @@
                               :class="publicWebsiteEnabled ? 'translate-x-6' : 'translate-x-1'"></span>
                     </button>
                 </label>
-            </div>
-
-            <!-- Website Version Experience Selector Card -->
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-                <div class="flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="font-bold text-gray-900 flex items-center gap-2">
-                            <span>🌐 Website Design Version</span>
-                        </h2>
-                        <p class="text-sm text-gray-500 mt-1">
-                            Choose which public layout version is active for your Sahodaya portal visitors.
-                        </p>
-                    </div>
-                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold shrink-0"
-                          :class="activeExperienceVersion === 'v2' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-800'">
-                        Active: {{ activeExperienceVersion === 'v2' ? 'V2 Modern Layout' : 'V1 Classic Layout' }}
-                    </span>
-                </div>
-
-                <div class="grid sm:grid-cols-2 gap-4 pt-1">
-                    <!-- Option 1: Classic V1 -->
-                    <div @click="setExperienceVersion('v1')"
-                         :class="['p-4 rounded-xl border-2 transition cursor-pointer flex flex-col justify-between space-y-3',
-                                  activeExperienceVersion === 'v1' ? 'border-indigo-600 bg-indigo-50/40 shadow-xs' : 'border-gray-200 bg-white hover:border-gray-300']">
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                                    🏛️ Classic Website (V1)
-                                </span>
-                                <input type="radio" name="sb_exp_ver" value="v1" :checked="activeExperienceVersion === 'v1'" class="text-indigo-600 focus:ring-indigo-500">
-                            </div>
-                            <p class="text-xs text-slate-600">
-                                Standard traditional layout with basic hero header, about section, circulars list, and portal links.
-                            </p>
-                        </div>
-                        <span v-if="activeExperienceVersion === 'v1'" class="text-[11px] font-bold text-indigo-700">✓ Currently Active</span>
-                        <span v-else class="text-[11px] font-semibold text-slate-400">Click to activate V1</span>
-                    </div>
-
-                    <!-- Option 2: Modern V2 -->
-                    <div @click="setExperienceVersion('v2')"
-                         :class="['p-4 rounded-xl border-2 transition cursor-pointer flex flex-col justify-between space-y-3',
-                                  activeExperienceVersion === 'v2' ? 'border-indigo-600 bg-indigo-50/40 shadow-xs' : 'border-gray-200 bg-white hover:border-gray-300']">
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                                    ✨ Modern Website (V2)
-                                </span>
-                                <input type="radio" name="sb_exp_ver" value="v2" :checked="activeExperienceVersion === 'v2'" class="text-indigo-600 focus:ring-indigo-500">
-                            </div>
-                            <p class="text-xs text-slate-600">
-                                Next-gen experience featuring seasonal action hubs, live event tickers, directory maps, and microsites.
-                            </p>
-                        </div>
-                        <span v-if="activeExperienceVersion === 'v2'" class="text-[11px] font-bold text-indigo-700">✓ Currently Active</span>
-                        <span v-else class="text-[11px] font-semibold text-slate-400">Click to activate V2</span>
-                    </div>
-                </div>
-
-                <div v-if="experienceVersionError" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
-                    {{ experienceVersionError }}
-                </div>
             </div>
 
             <div v-if="experienceDraft" class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white bg-gradient-to-r from-indigo-950 to-purple-800">
@@ -164,9 +105,10 @@
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-600 mb-1.5">Navbar style</label>
-                        <SearchableSelect v-model="navConfig.layout_variant" :options="navLayoutOptions"
-                                :all-option="false" placeholder="Select navbar style"
-                                class="w-full max-w-md" />
+                        <select v-model="navConfig.layout_variant"
+                                class="w-full max-w-md border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                            <option v-for="opt in navLayoutOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                        </select>
                     </div>
                 </div>
 
@@ -376,32 +318,36 @@
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-gray-600 mb-1.5">Heading font</label>
-                            <SearchableSelect v-model="themeConfig.font_heading" :all-option="false"
-                                    placeholder="Select heading font"
-                                    :options="[{ value: 'Inter', label: 'Inter' }, { value: 'Roboto', label: 'Roboto' }, { value: 'Poppins', label: 'Poppins' }, { value: 'Montserrat', label: 'Montserrat' }]"
-                                    class="w-full" />
+                            <select v-model="themeConfig.font_heading"
+                                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+                                <option value="Inter">Inter</option>
+                                <option value="Roboto">Roboto</option>
+                                <option value="Poppins">Poppins</option>
+                                <option value="Montserrat">Montserrat</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-600 mb-1.5">Body font</label>
-                            <SearchableSelect v-model="themeConfig.font_body" :all-option="false"
-                                    placeholder="Select body font"
-                                    :options="[{ value: 'Inter', label: 'Inter' }, { value: 'Roboto', label: 'Roboto' }, { value: 'Poppins', label: 'Poppins' }, { value: 'Montserrat', label: 'Montserrat' }]"
-                                    class="w-full" />
+                            <select v-model="themeConfig.font_body"
+                                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+                                <option value="Inter">Inter</option>
+                                <option value="Roboto">Roboto</option>
+                                <option value="Poppins">Poppins</option>
+                                <option value="Montserrat">Montserrat</option>
+                            </select>
                         </div>
                     </div>
 
                     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-gray-100">
-                        <label class="text-xs font-bold text-gray-600">Type scale<SearchableSelect v-model="designConfig.type_scale" :all-option="false" placeholder="Select type scale" :options="[{ value: 'compact', label: 'Compact' }, { value: 'balanced', label: 'Balanced' }, { value: 'editorial', label: 'Editorial' }]" class="mt-1.5 w-full" /></label>
-                        <label class="text-xs font-bold text-gray-600">Density<SearchableSelect v-model="designConfig.density" :all-option="false" placeholder="Select density" :options="[{ value: 'compact', label: 'Compact' }, { value: 'comfortable', label: 'Comfortable' }, { value: 'spacious', label: 'Spacious' }]" class="mt-1.5 w-full" /></label>
-                        <label class="text-xs font-bold text-gray-600">Surface<SearchableSelect v-model="designConfig.surface" :all-option="false" placeholder="Select surface" :options="[{ value: 'flat', label: 'Flat' }, { value: 'bordered', label: 'Bordered' }, { value: 'soft', label: 'Soft' }, { value: 'elevated', label: 'Elevated' }]" class="mt-1.5 w-full" /></label>
-                        <label class="text-xs font-bold text-gray-600">Corners<SearchableSelect v-model="designConfig.corners" :all-option="false" placeholder="Select corners" :options="[{ value: 'square', label: 'Square' }, { value: 'soft', label: 'Soft' }, { value: 'rounded', label: 'Rounded' }]" class="mt-1.5 w-full" /></label>
-                        <label class="text-xs font-bold text-gray-600">Buttons<SearchableSelect v-model="designConfig.buttons" :all-option="false" placeholder="Select buttons" :options="[{ value: 'solid', label: 'Solid' }, { value: 'bordered', label: 'Bordered' }, { value: 'understated', label: 'Understated' }]" class="mt-1.5 w-full" /></label>
-                        <label class="text-xs font-bold text-gray-600">Images<SearchableSelect v-model="designConfig.images" :all-option="false" placeholder="Select images" :options="[{ value: 'documentary', label: 'Documentary' }, { value: 'vibrant', label: 'Vibrant' }, { value: 'formal', label: 'Formal' }, { value: 'monochrome', label: 'Monochrome' }]" class="mt-1.5 w-full" /></label>
-                        <label class="text-xs font-bold text-gray-600">Motion<SearchableSelect v-model="designConfig.motion" :all-option="false" placeholder="Select motion" :options="[{ value: 'none', label: 'None' }, { value: 'restrained', label: 'Restrained' }, { value: 'expressive', label: 'Expressive' }]" class="mt-1.5 w-full" /></label>
-                        <label class="text-xs font-bold text-gray-600">Homepage mode<SearchableSelect v-model="designConfig.homepage_mode" :all-option="false" placeholder="Select homepage mode" :options="[{ value: 'evergreen', label: 'Evergreen' }, { value: 'registration_open', label: 'Registration open' }, { value: 'event_live', label: 'Event live' }, { value: 'results_published', label: 'Results published' }]" class="mt-1.5 w-full" /></label>
+                        <label class="text-xs font-bold text-gray-600">Type scale<select v-model="designConfig.type_scale" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="compact">Compact</option><option value="balanced">Balanced</option><option value="editorial">Editorial</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Density<select v-model="designConfig.density" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Surface<select v-model="designConfig.surface" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="flat">Flat</option><option value="bordered">Bordered</option><option value="soft">Soft</option><option value="elevated">Elevated</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Corners<select v-model="designConfig.corners" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="square">Square</option><option value="soft">Soft</option><option value="rounded">Rounded</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Buttons<select v-model="designConfig.buttons" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="solid">Solid</option><option value="bordered">Bordered</option><option value="understated">Understated</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Images<select v-model="designConfig.images" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="documentary">Documentary</option><option value="vibrant">Vibrant</option><option value="formal">Formal</option><option value="monochrome">Monochrome</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Motion<select v-model="designConfig.motion" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="none">None</option><option value="restrained">Restrained</option><option value="expressive">Expressive</option></select></label>
+                        <label class="text-xs font-bold text-gray-600">Homepage mode<select v-model="designConfig.homepage_mode" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="evergreen">Evergreen</option><option value="registration_open">Registration open</option><option value="event_live">Event live</option><option value="results_published">Results published</option></select></label>
                         <label class="text-xs font-bold text-gray-600">Manual mode expires<input v-model="designConfig.homepage_mode_override_until" type="datetime-local" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><span class="block mt-1 font-normal text-gray-400">Leave blank to follow ERP event status.</span></label>
-                        <label class="text-xs font-bold text-gray-600">Navigation layout<SearchableSelect v-model="designConfig.navigation" :all-option="false" placeholder="Select navigation layout" :options="[{ value: 'directory', label: 'Directory (logo left)' }, { value: 'event', label: 'Event (dark)' }, { value: 'editorial', label: 'Editorial (centered)' }, { value: 'institutional', label: 'Institutional (pill)' }]" class="mt-1.5 w-full" /></label>
-                        <label class="text-xs font-bold text-gray-600">Footer layout<SearchableSelect v-model="designConfig.footer" :all-option="false" placeholder="Select footer layout" :options="[{ value: 'directory', label: 'Directory (four column)' }, { value: 'event', label: 'Event (minimal row)' }, { value: 'editorial', label: 'Editorial (two column)' }, { value: 'institutional', label: 'Institutional (three column)' }]" class="mt-1.5 w-full" /></label>
                     </div>
 
                     <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
@@ -527,13 +473,17 @@
                                 </div>
                             </div>
                             <div v-if="(section.archived_configs || []).length" class="ml-auto">
-                                <SearchableSelect :model-value="''" @update:model-value="val => restoreArchived(section, val)"
-                                        :options="archivedConfigOptions(section)" :all-option="true"
-                                        all-label="↩ Restore previous content…"
-                                        class="text-xs" />
+                                <select @change="restoreArchived(section, $event.target.value)"
+                                        class="text-xs border border-gray-200 rounded-xl px-3 py-2 text-gray-500 bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                                    <option value="">↩ Restore previous content…</option>
+                                    <option v-for="(arc, ai) in section.archived_configs" :key="ai"
+                                            :value="ai">
+                                        {{ arc.variant }} — {{ formatDate(arc.archived_at) }}
+                                    </option>
+                                </select>
                             </div>
                             <div v-if="sectionVersions[section.id]?.length" :class="(section.archived_configs || []).length ? '' : 'ml-auto'">
-                                <SearchableSelect :model-value="''" @update:model-value="val => restorePublishedVersion(section, val)" :options="sectionVersionOptions(section)" :all-option="true" all-label="Restore saved version…" class="text-xs" />
+                                <select @change="restorePublishedVersion(section, $event.target.value)" class="text-xs border border-gray-200 rounded-xl px-3 py-2 text-gray-500 bg-white"><option value="">Restore saved version…</option><option v-for="version in sectionVersions[section.id]" :key="version.id" :value="version.id">{{ version.note || 'Saved' }} — {{ formatDate(version.created_at) }}</option></select>
                             </div>
                         </div>
 
@@ -586,9 +536,17 @@
         </div>
 
         <!-- Add section modal -->
-        <Modal :show="addModal.open" title="Add Section" size="lg" @close="addModal.open = false">
+        <Teleport to="body">
+            <div v-if="addModal.open" class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <div class="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between z-10">
+                        <h3 class="font-bold text-gray-900 text-lg">Add Section</h3>
+                        <button @click="addModal.open = false"
+                                class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition text-gray-400 text-xl">×</button>
+                    </div>
+
                     <!-- Section type grid -->
-                    <div class="space-y-5">
+                    <div class="p-6 space-y-5">
                         <div v-if="!addModal.selectedType">
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Choose a section type</p>
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -640,7 +598,9 @@
                             </div>
                         </div>
                     </div>
-        </Modal>
+                </div>
+            </div>
+        </Teleport>
     </SahodayaAdminLayout>
 </template>
 
@@ -651,7 +611,6 @@ import ExperiencePicker from '@/Components/sahodaya/website/ExperiencePicker.vue
 import ReadinessPanel from '@/Components/sahodaya/website/ReadinessPanel.vue';
 import SectionLayoutEditor from '@/Components/sahodaya/website/SectionLayoutEditor.vue';
 import PreviewToolbar from '@/Components/sahodaya/website/PreviewToolbar.vue';
-import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -722,32 +681,6 @@ const footerSaved = ref(false);
 const portalSaving = ref(false);
 const publicWebsiteEnabled = ref(props.publicWebsiteEnabled ?? true);
 const publicWebsiteSaving = ref(false);
-const activeExperienceVersion = ref(props.currentSite?.experience_version ?? 'v1');
-const experienceVersionSaving = ref(false);
-const experienceVersionError = ref('');
-
-async function setExperienceVersion(version) {
-    if (!props.currentSite?.id || experienceVersionSaving.value) return;
-    experienceVersionSaving.value = true;
-    experienceVersionError.value = '';
-    try {
-        const res = await apiPost('/site-builder/api/experience-version', {
-            site_id: props.currentSite.id,
-            experience_version: version,
-        });
-        if (res.saved) {
-            activeExperienceVersion.value = version;
-            if (props.currentSite) {
-                props.currentSite.experience_version = version;
-            }
-        }
-    } catch (e) {
-        console.error('Failed to set experience version:', e);
-        experienceVersionError.value = e.message || 'Unable to switch website version.';
-    } finally {
-        experienceVersionSaving.value = false;
-    }
-}
 const defaultNavSaving = ref(false);
 const ckscTemplateSaving = ref(false);
 const themeSaving = ref(false);
@@ -781,10 +714,6 @@ const readinessReport = ref({ ...(props.readiness ?? {}) });
 const experienceSaving = ref(false);
 const siteVersions = ref([]);
 const currentSite = computed(() => props.currentSite ?? props.sites?.[0] ?? null);
-const siteOptions = computed(() => (props.sites ?? []).map(site => ({
-    value: site.id,
-    label: `${site.name}${site.is_primary ? ' — Primary website' : ' — Microsite'}`,
-})));
 const selectedPublicUrl = computed(() => {
     if (!props.publicUrl || !currentSite.value) return null;
     const base = props.publicUrl.replace(/\/$/, '');
@@ -807,7 +736,6 @@ const iconMap = {
     statistics: '📊', programmes: '🎓', academic_quicklinks: '🔗', downloads_sahodaya: '📥',
     circulars: '📄', testimonials_sahodaya: '💬', useful_links: '🌐', gallery: '🖼',
     contact: '📞', newsletter: '📧', sahodaya_home: '🏠',
-    faq: '❓', sponsors: '🤝', awards: '🏵️', membership_cta: '📝', video_gallery: '🎬',
 };
 const colorMap = {
     hero: '#f3f0ff', about_sahodaya: '#f0fdf4', office_bearers: '#fdf4ff',
@@ -815,16 +743,11 @@ const colorMap = {
     kalotsav: '#fdf4ff', sports_meet: '#f0fdfa', statistics: '#eff6ff',
     programmes: '#faf5ff', circulars: '#fefce8', contact: '#f0fdf4',
     newsletter: '#fdf2f8', gallery: '#f5f3ff',
-    faq: '#eef2ff', sponsors: '#fff7ed', awards: '#fefce8', membership_cta: '#ecfdf5', video_gallery: '#fef2f2',
-};
-const labelOverrides = {
-    faq: 'FAQ', membership_cta: 'Membership / Join Us', video_gallery: 'Video Gallery',
 };
 
 function sectionIcon(type)  { return iconMap[type] ?? '⚡'; }
 function sectionColor(type) { return colorMap[type] ?? '#f9fafb'; }
 function sectionTypeLabel(type) {
-    if (labelOverrides[type]) return labelOverrides[type];
     return (type ?? '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 function variantsFor(type) { return props.sectionTypes[type] ?? []; }
@@ -841,18 +764,6 @@ function sourceBadge(type) {
 function formatDate(d) {
     if (!d) return '';
     try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return ''; }
-}
-function archivedConfigOptions(section) {
-    return (section.archived_configs ?? []).map((arc, ai) => ({
-        value: ai,
-        label: `${arc.variant} — ${formatDate(arc.archived_at)}`,
-    }));
-}
-function sectionVersionOptions(section) {
-    return (sectionVersions[section.id] ?? []).map(version => ({
-        value: version.id,
-        label: `${version.note || 'Saved'} — ${formatDate(version.created_at)}`,
-    }));
 }
 
 // ── API calls (using fetch directly — same pattern as super-admin builder) ───

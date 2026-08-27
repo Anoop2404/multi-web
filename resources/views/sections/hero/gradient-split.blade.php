@@ -6,6 +6,7 @@
     $previewTotal = $previewSchools->count();
     $districts = $previewSchools->pluck('district')->filter()->unique()->sort()->values();
     $statSchools = $previewTotal > 0 ? (string) $previewTotal : null;
+    $bearerCount = \App\Support\SahodayaPublicData::officeBearers($tenant->id)->flatten(1)->count();
     $watermarkLogo = \App\Support\TenantBranding::logoUrl($tenant);
 
     // Media slides (photo or video) follow the data slide, in the order configured
@@ -26,7 +27,7 @@
                     <div class="absolute inset-0 opacity-[0.07] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:28px_28px] pointer-events-none"></div>
                     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[38rem] h-[38rem] rounded-full opacity-[0.22] pointer-events-none" style="background: radial-gradient(circle, var(--color-accent), transparent 62%);"></div>
 
-                    {{-- Network-of-schools motif, redrawn as a clear hub-and-spoke: the tenant sits at the center of its own network --}}
+                    {{-- Network-of-schools motif, drawn as a clear hub-and-spoke: the tenant sits at the center of its own network --}}
                     <svg class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[30rem] h-[30rem] pointer-events-none" viewBox="0 0 520 520" fill="none" aria-hidden="true">
                         <g stroke="var(--color-accent)" stroke-width="1.5" opacity="0.45">
                             <line x1="260" y1="260" x2="130" y2="150"/>
@@ -149,8 +150,8 @@
             </div>
             @endif
 
-            {{-- Structured fact cards — real network data, only on the static slide — admin can turn this off --}}
-            @if(($config['show_stats'] ?? true) && ($statSchools || !empty($config['years_active']) || $districts->isNotEmpty()))
+            {{-- Network at a glance — real network data, only on the static slide — admin can turn this off --}}
+            @if(($config['show_stats'] ?? true) && ($statSchools || $bearerCount || !empty($config['years_active']) || $districts->isNotEmpty()))
             <div class="flex flex-wrap gap-3 pt-4">
                 @if($statSchools)
                 <div class="flex items-center gap-3 bg-white/[0.07] border border-white/15 rounded-xl px-4 py-3 backdrop-blur-sm">
@@ -160,6 +161,17 @@
                     <div>
                         <p class="text-xl font-extrabold font-heading text-white leading-none">{{ $statSchools }}</p>
                         <p class="text-[11px] text-slate-300 font-medium mt-1">CBSE Schools</p>
+                    </div>
+                </div>
+                @endif
+                @if($bearerCount)
+                <div class="flex items-center gap-3 bg-white/[0.07] border border-white/15 rounded-xl px-4 py-3 backdrop-blur-sm">
+                    <div class="w-9 h-9 rounded-lg bg-accent/20 flex items-center justify-center shrink-0">
+                        <svg class="w-4.5 h-4.5 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m5-4.13a4 4 0 100-8 4 4 0 000 8zm6 0a4 4 0 10-.75-7.94"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-xl font-extrabold font-heading text-white leading-none">{{ $bearerCount }}</p>
+                        <p class="text-[11px] text-slate-300 font-medium mt-1">Office Bearers</p>
                     </div>
                 </div>
                 @endif

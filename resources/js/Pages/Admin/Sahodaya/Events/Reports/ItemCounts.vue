@@ -38,7 +38,7 @@
                           @apply="applyFilter" />
 
         <!-- Stat Cards Grid -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div class="card !py-4 px-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Items</p>
@@ -73,6 +73,16 @@
                 </div>
                 <span class="p-2.5 rounded-lg bg-amber-100 text-amber-700">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </span>
+            </div>
+            <div class="card !py-4 px-5 border border-violet-100 bg-violet-50/20 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wider text-violet-600">Unique Students</p>
+                    <p class="text-2xl font-extrabold text-violet-900 mt-1">{{ totals.unique_students ?? 0 }}</p>
+                    <p class="text-[10px] text-slate-400 mt-0.5">across all items, not per-item filter</p>
+                </div>
+                <span class="p-2.5 rounded-lg bg-violet-100 text-violet-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-3.87-5"/></svg>
                 </span>
             </div>
         </div>

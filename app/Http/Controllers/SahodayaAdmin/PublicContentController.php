@@ -2,32 +2,30 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
-use App\Services\Website\SahodayaContentReadiness;
-use App\Services\Website\SahodayaTemplateApplier;
 use App\Support\FeatureFlags;
 use App\Support\SahodayaHomepageContent;
 use App\Support\SahodayaTenantBranding;
 use App\Support\SahodayaWebsiteTemplateCatalog;
 use App\Support\TenantPublicSite;
+use App\Models\WebsiteSite;
+use App\Services\Website\SahodayaContentReadiness;
+use App\Services\Website\SahodayaTemplateApplier;
 use Illuminate\Http\Request;
 
 class PublicContentController extends SahodayaAdminController
 {
     public function index()
     {
-        $primarySite = \App\Models\WebsiteSite::ensurePrimary($this->sahodaya->id);
-
         return $this->inertia('Sahodaya/PublicContent/Index', [
             'content'              => SahodayaHomepageContent::get($this->sahodaya),
             'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->sahodaya),
-            'experienceVersion'    => $primarySite->experience_version ?? 'v1',
-            'templateKey'          => $primarySite->template_key,
         ]);
     }
 
     public function update(Request $request, SahodayaTemplateApplier $applier, SahodayaContentReadiness $readiness)
     {
         $data = $request->validate([
+            'experience_version' => 'nullable|in:v1,v2',
             'heading'            => 'nullable|string|max:255',
             'tagline'            => 'nullable|string|max:500',
             'eyebrow'            => 'nullable|string|max:100',
@@ -63,7 +61,6 @@ class PublicContentController extends SahodayaAdminController
             'links.*.url'        => 'nullable|string|max:500',
             'links.*.icon'       => 'nullable|string|max:10',
             'public_website_enabled' => 'nullable|boolean',
-            'experience_version'     => 'nullable|string|in:v1,v2',
         ]);
 
         if ($request->has('public_website_enabled')) {
@@ -76,7 +73,7 @@ class PublicContentController extends SahodayaAdminController
         SahodayaHomepageContent::update($this->sahodaya, $data);
 
         if ($request->filled('experience_version')) {
-            $site = \App\Models\WebsiteSite::ensurePrimary($this->sahodaya->id);
+            $site = WebsiteSite::ensurePrimary($this->sahodaya->id);
             $newVer = $request->input('experience_version');
 
             if ($newVer === 'v2' && ! $site->sections()->exists()) {

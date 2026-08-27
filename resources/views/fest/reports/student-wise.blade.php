@@ -137,7 +137,7 @@
                             <span style="font-size: 11px; font-weight: normal; color: #64748b;">({{ $st['reg_no'] }})</span>
                         @endif
                     </div>
-                    <div class="school-name">🏫 {{ $st['school_name'] ?? '—' }} · {{ $st['item_count'] }} item(s) registered</div>
+                    <div class="school-name">🏫 {{ $st['school_name'] ?? '—' }}@if(!empty($st['school_code'])) ({{ $st['school_code'] }})@endif · {{ $st['item_count'] }} item(s) registered</div>
                 </div>
             </div>
         </div>

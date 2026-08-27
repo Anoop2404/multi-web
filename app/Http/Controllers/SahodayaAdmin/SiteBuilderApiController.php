@@ -37,9 +37,7 @@ class SiteBuilderApiController extends SahodayaAdminController
             'mode' => 'nullable|in:full,style',
         ]);
         $site = WebsiteSite::resolveForTenant($this->sahodaya->id, (int) $data['site_id']);
-        $template = SahodayaWebsiteTemplateCatalog::get($data['template_key']);
-        $context = SahodayaTenantBranding::context($this->sahodaya);
-        $draft = $applier->applyDraft($this->sahodaya, $site, $data['template_key'], $template, $context, $data['mode'] ?? 'full');
+        $draft = $applier->applyDraft($this->sahodaya, $site, $data['template_key'], $data['mode'] ?? 'full');
         $this->sahodaya->invalidateCache();
 
         return response()->json([

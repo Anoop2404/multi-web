@@ -50,10 +50,13 @@
 
         <!-- Student Cards List -->
         <div class="space-y-4">
-            <div v-for="st in filteredRows" :key="st.student_id" class="card p-0 overflow-hidden shadow-sm border border-slate-200 hover:border-slate-300 transition-all">
+            <div v-for="(st, index) in filteredRows" :key="st.student_id" class="card p-0 overflow-hidden shadow-sm border border-slate-200 hover:border-slate-300 transition-all">
                 <!-- Card Header -->
                 <div class="px-5 py-3.5 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-3.5">
+                        <span class="shrink-0 w-7 h-7 rounded-full bg-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center">
+                            {{ index + 1 }}
+                        </span>
                         <!-- Photo or Avatar -->
                         <div class="relative">
                             <img v-if="st.photo_url" :src="st.photo_url" :alt="st.name" class="w-11 h-11 rounded-full object-cover border-2 border-white shadow-sm ring-1 ring-slate-200" />
@@ -67,7 +70,7 @@
                                 <span v-if="st.reg_no" class="text-xs font-mono font-normal text-slate-500">({{ st.reg_no }})</span>
                             </h4>
                             <p class="text-xs text-slate-600 font-medium mt-0.5 flex items-center gap-1.5">
-                                <span>🏫 {{ st.school_name || '—' }}</span>
+                                <span>🏫 {{ st.school_name || '—' }}<template v-if="st.school_code"> ({{ st.school_code }})</template></span>
                                 <span v-if="st.gender" class="text-slate-400">·</span>
                                 <span v-if="st.gender" class="capitalize text-slate-500">{{ st.gender }}</span>
                             </p>
@@ -88,7 +91,6 @@
                                 <th class="w-10 text-center">#</th>
                                 <th>Item Title</th>
                                 <th>Category / Head</th>
-                                <th class="text-center">Chest No</th>
                                 <th class="text-center">Status</th>
                             </tr>
                         </thead>
@@ -105,7 +107,6 @@
                                     <span v-if="item.head_name">{{ item.head_name }}</span>
                                     <span v-if="!item.category_label && !item.head_name">—</span>
                                 </td>
-                                <td class="text-center font-mono font-bold text-slate-800">{{ item.chest_no || '—' }}</td>
                                 <td class="text-center">
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block"
                                           :class="item.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'">

@@ -707,13 +707,34 @@ class FestEventReportAnalyticsService
     public function itemRegistrationTotals(array $rows): array
     {
         return [
-            'items'         => count($rows),
-            'approved'      => array_sum(array_column($rows, 'approved')),
-            'pending'       => array_sum(array_column($rows, 'pending')),
-            'registrations' => array_sum(array_column($rows, 'registration_count')),
-            'participants'  => array_sum(array_column($rows, 'participant_count')),
-            'estimated_fee' => round(collect($rows)->sum(fn ($r) => (float) ($r['line_fee'] ?? 0)), 2),
+            'items'           => count($rows),
+            'approved'        => array_sum(array_column($rows, 'approved')),
+            'pending'         => array_sum(array_column($rows, 'pending')),
+            'registrations'   => array_sum(array_column($rows, 'registration_count')),
+            'participants'    => array_sum(array_column($rows, 'participant_count')),
+            'unique_students' => $this->uniqueStudentCount(),
+            'estimated_fee'   => round(collect($rows)->sum(fn ($r) => (float) ($r['line_fee'] ?? 0)), 2),
         ];
+    }
+
+    /**
+     * Distinct student headcount across the report's scope — 'participants' above sums
+     * participant_count per item, so a student registered for 5 items counts 5 times
+     * there; this counts them once. Same active-registration/enabled-item filter as
+     * itemRegistrationRows() so the two numbers stay comparable.
+     */
+    public function uniqueStudentCount(?string $schoolId = null): int
+    {
+        return FestParticipant::query()
+            ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
+            ->join('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
+            ->whereIn('fest_registrations.event_id', $this->eventIds())
+            ->whereIn('fest_registrations.status', FestRegistration::ACTIVE_STATUSES)
+            ->where('fest_event_items.is_enabled', true)
+            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+            ->whereNotNull('fest_participants.student_id')
+            ->distinct('fest_participants.student_id')
+            ->count('fest_participants.student_id');
     }
 
     /** @return list<array<string, mixed>> */
@@ -1742,7 +1763,7 @@ class FestEventReportAnalyticsService
             ->whereNotNull('student_id')
             ->with([
                 'student:id,tenant_id,name,reg_no,gender,photo',
-                'registration.school:id,name',
+                'registration.school:id,name,school_prefix',
                 'registration.item:id,title,head_id,event_id',
                 'registration.item.head:id,name',
                 'registration.item.event:id,title',
@@ -1798,6 +1819,7 @@ class FestEventReportAnalyticsService
                 'student_id'  => (int) $studentId,
                 'school_id'   => $first->registration?->school_id,
                 'school_name' => $first->registration?->school?->name,
+                'school_code' => $first->registration?->school?->school_prefix,
                 'name'        => $name,
                 'reg_no'      => $regNo,
                 'gender'      => $student->gender,
