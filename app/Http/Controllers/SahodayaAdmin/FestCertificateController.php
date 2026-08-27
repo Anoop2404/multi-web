@@ -21,6 +21,7 @@ use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Storage;
 
 class FestCertificateController extends SahodayaAdminController
 {
@@ -403,15 +404,18 @@ class FestCertificateController extends SahodayaAdminController
 
         abort_if($certificates->isEmpty(), 404, $publishedOnly ? 'No published winner certificates to download.' : 'No certificates to download.');
 
+        $this->deleteSupersededBatches($event, 'zip_export', $certType, $itemId, $schoolId, $certIds, $publishedOnly);
+
         $batchRow = CertificateBatch::create([
             'tenant_id' => $this->sahodaya->id,
             'event_id' => $event->id,
             'batch_type' => 'zip_export',
             'cert_type' => $certType,
+            'published_only' => $publishedOnly,
             'item_id' => $itemId,
             'school_id' => $schoolId,
             'certificate_ids_json' => $certIds,
-            'scope_description' => $this->describeScope($event, $itemId, $schoolId, $certType, $certIds),
+            'scope_description' => $this->describeScope($event, $itemId, $schoolId, $certType, $certIds, $publishedOnly),
             'total_count' => $certificates->count(),
             'status' => CertificateBatch::STATUS_PROCESSING,
             'created_by_user_id' => $request->user()?->id,
@@ -561,6 +565,8 @@ class FestCertificateController extends SahodayaAdminController
         ?string $certType,
         ?array $certIds,
     ): CertificateBatch {
+        $this->deleteSupersededBatches($event, $batchType, $certType, $itemId, $schoolId, $certIds);
+
         $batchRow = CertificateBatch::create([
             'tenant_id' => $this->sahodaya->id,
             'event_id' => $event->id,
@@ -607,26 +613,86 @@ class FestCertificateController extends SahodayaAdminController
         return $batchRow;
     }
 
-    private function describeScope(FestEvent $event, ?int $itemId, ?int $schoolId, ?string $certType, ?array $certIds): string
+    /**
+     * Removes any FINISHED batch(es) that match the exact same signature as the one
+     * about to be created — re-running "the same kind" of operation (e.g. "Render whole
+     * event" a second time, or "Merit winners only (ZIP)" again) replaces its own entry
+     * in Recent render & export runs instead of piling up alongside every earlier run of
+     * it. Deliberately narrow — matches every scope-defining column, including an exact
+     * (order-independent) match on an ad-hoc certificate_ids_json selection — so a
+     * genuinely different scope (a different item, a different bulk selection) is never
+     * touched. Only CertificateBatch::TERMINAL_STATUSES rows are candidates: a batch
+     * that's still STATUS_PROCESSING is left alone, since deleting its row out from
+     * under the still-running job would silently abandon it rather than replace it. A
+     * superseded zip_export's underlying storage file is deleted too — nothing else
+     * references it once the batch row is gone, so leaving it would just orphan it.
+     */
+    private function deleteSupersededBatches(
+        FestEvent $event,
+        string $batchType,
+        ?string $certType,
+        ?int $itemId,
+        ?string $schoolId,
+        ?array $certIds,
+        bool $publishedOnly = false,
+    ): void {
+        $candidates = CertificateBatch::where('event_id', $event->id)
+            ->where('batch_type', $batchType)
+            ->where('cert_type', $certType)
+            ->where('published_only', $publishedOnly)
+            ->where('item_id', $itemId)
+            ->where('school_id', $schoolId)
+            ->whereIn('status', CertificateBatch::TERMINAL_STATUSES)
+            ->get();
+
+        $normalizedCertIds = $certIds ? collect($certIds)->sort()->values()->all() : null;
+
+        foreach ($candidates as $candidate) {
+            $candidateCertIds = $candidate->certificate_ids_json
+                ? collect($candidate->certificate_ids_json)->sort()->values()->all()
+                : null;
+
+            if ($candidateCertIds !== $normalizedCertIds) {
+                continue;
+            }
+
+            if ($candidate->batch_type === 'zip_export' && $candidate->file_path) {
+                try {
+                    Storage::disk($candidate->storage_disk ?? TenantStorage::uploadDisk())->delete($candidate->file_path);
+                } catch (\Throwable) {
+                    // Best-effort cleanup — an orphaned storage object isn't worth
+                    // failing the new run over.
+                }
+            }
+
+            $candidate->delete();
+        }
+    }
+
+    private function describeScope(FestEvent $event, ?int $itemId, ?int $schoolId, ?string $certType, ?array $certIds, bool $publishedOnly = false): string
     {
         if (! empty($certIds)) {
-            return count($certIds).' selected certificate(s)';
-        }
-        if ($itemId) {
+            $description = count($certIds).' selected certificate(s)';
+        } elseif ($itemId) {
             $item = FestEventItem::find($itemId);
-
-            return 'Item: '.($item?->title ?? "#{$itemId}");
-        }
-        if ($schoolId) {
+            $description = 'Item: '.($item?->title ?? "#{$itemId}");
+        } elseif ($schoolId) {
             $school = Tenant::find($schoolId);
-
-            return 'School: '.($school?->name ?? $schoolId);
+            $description = 'School: '.($school?->name ?? $schoolId);
+        } elseif ($certType) {
+            $description = ucfirst($certType).' certificates — whole event';
+        } else {
+            $description = 'Whole event';
         }
-        if ($certType) {
-            return ucfirst($certType).' certificates — whole event';
-        }
 
-        return 'Whole event';
+        // published_only isn't its own cert_type — it filters winner certs down to
+        // publish-visible ones (see publishedOnlyWinners()) — so without this suffix,
+        // "Merit winners only (ZIP)" and "All certificates (ZIP)" produced the identical
+        // "Whole event" description, indistinguishable in the Recent runs list and (more
+        // importantly) in dispatchRenderBatch()/queueZipExport()'s own superseded-batch
+        // lookup, which would otherwise treat the two as the same run and delete one for
+        // the other.
+        return $publishedOnly ? $description.' (published winners only)' : $description;
     }
 
     public function batchProgress(string $tenantId, FestEvent $event, CertificateBatch $batch)
