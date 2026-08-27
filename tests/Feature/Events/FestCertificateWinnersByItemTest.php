@@ -63,11 +63,11 @@ class FestCertificateWinnersByItemTest extends TestCase
         ]);
 
         return Certificate::create([
-            'entity_type'        => FestParticipant::class,
-            'entity_id'          => $participant->id,
-            'cert_type'          => 'winner',
-            'verification_uuid'  => (string) Str::uuid(),
-            'generated_at'       => now(),
+            'entity_type' => FestParticipant::class,
+            'entity_id' => $participant->id,
+            'cert_type' => 'winner',
+            'verification_uuid' => (string) Str::uuid(),
+            'generated_at' => now(),
         ]);
     }
 
@@ -163,6 +163,102 @@ class FestCertificateWinnersByItemTest extends TestCase
         $this->assertTrue($zip->open($zipPath) === true);
         $this->assertSame(1, $zip->numFiles);
         $this->assertStringContainsString($publishedWinner->verification_uuid, $zip->getNameIndex(0));
+        $zip->close();
+    }
+
+    /**
+     * Regression guard for a real admin-facing bug: items sharing the same title with no
+     * item_code (e.g. three separate "Book Review" items, one per class-group category)
+     * showed as indistinguishable entries in the grouped-by-item view and the item
+     * dropdown — an admin couldn't tell which was which, or reliably pick the right one.
+     * category_label (FestItemCategoryLabel::shortLabel(), sourced from class_group) is
+     * the fix; this proves it actually differs between the two groups, not just that both
+     * happen to be non-null.
+     */
+    public function test_winners_by_item_disambiguates_same_titled_items_via_category_label(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = $this->makeSahodaya();
+        $school = $this->makeSchool($sahodaya->id);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Same Title Event', 'event_type' => 'kalolsavam',
+            'results_published' => true,
+        ]);
+        $itemLp = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Book Review', 'item_code' => null, 'class_group' => 'lp',
+        ]);
+        $itemUp = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Book Review', 'item_code' => null, 'class_group' => 'up',
+        ]);
+
+        $this->makeWinner($event, $itemLp, $school->id, 1, 401);
+        $this->makeWinner($event, $itemUp, $school->id, 1, 402);
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.certificates.index', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertInertia(function ($page) {
+            $groups = $page->toArray()['props']['winnersByItem'];
+
+            $this->assertCount(2, $groups, 'Same-titled items must still group separately by item_id, not merge.');
+            $this->assertSame('Book Review', $groups[0]['item_title']);
+            $this->assertSame('Book Review', $groups[1]['item_title']);
+            $this->assertNotEmpty($groups[0]['category_label']);
+            $this->assertNotEmpty($groups[1]['category_label']);
+            $this->assertNotSame(
+                $groups[0]['category_label'],
+                $groups[1]['category_label'],
+                'The whole point of category_label is to tell two same-titled items apart.'
+            );
+
+            return $page->has('winnersByItem', 2);
+        });
+    }
+
+    public function test_download_zip_participation_only_filters_out_winner_certificates(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = $this->makeSahodaya();
+        $school = $this->makeSchool($sahodaya->id);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Participation Zip Event', 'event_type' => 'kalolsavam',
+        ]);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'SS1']);
+
+        $winner = $this->makeWinner($event, $item, $school->id, 1, 501);
+
+        $participantRegistration = FestRegistration::create([
+            'event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved',
+        ]);
+        $participant = FestParticipant::create([
+            'registration_id' => $participantRegistration->id, 'event_id' => $event->id, 'student_id' => 502,
+            'participant_type' => 'student', 'participant_role' => 'performer',
+        ]);
+        $participationCert = Certificate::create([
+            'entity_type' => FestParticipant::class, 'entity_id' => $participant->id,
+            'cert_type' => 'participation', 'verification_uuid' => (string) Str::uuid(), 'generated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.certificates.download-zip', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]).'?cert_type=participation');
+
+        $response->assertOk();
+
+        $zipPath = $response->baseResponse->getFile()->getPathname();
+        $zip = new \ZipArchive;
+        $this->assertTrue($zip->open($zipPath) === true);
+        $this->assertSame(1, $zip->numFiles);
+        $this->assertStringContainsString($participationCert->verification_uuid, $zip->getNameIndex(0));
+        $this->assertStringNotContainsString($winner->verification_uuid, $zip->getNameIndex(0));
         $zip->close();
     }
 }

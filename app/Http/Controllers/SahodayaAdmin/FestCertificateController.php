@@ -2,19 +2,24 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
-use App\Support\FestPageActivity;
-use App\Support\PdfGenerator;
+use App\Jobs\RenderCertificateChunkJob;
 use App\Models\Certificate;
 use App\Models\CertificateBatch;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
-use App\Jobs\RenderCertificateChunkJob;
+use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestCertificateService;
+use App\Services\Events\FestEventNotifier;
 use App\Services\Events\FestIdCardQrService;
 use App\Services\Events\FestItemResultsService;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
+use App\Support\FestPageActivity;
+use App\Support\PdfGenerator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 
 class FestCertificateController extends SahodayaAdminController
@@ -26,16 +31,16 @@ class FestCertificateController extends SahodayaAdminController
         $certificates = $this->certificatesForEvent($event);
 
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
-            'event'           => $event,
-            'certificates'    => $certificates,
-            'publishedItems'  => $this->publishedItemsForEvent($event),
-            'schools'         => $this->schoolsFromCertificates($certificates),
-            'winnersByItem'   => $this->winnersByItem($certificates, $event),
+            'event' => $event,
+            'certificates' => $certificates,
+            'publishedItems' => $this->publishedItemsForEvent($event),
+            'schools' => $this->schoolsFromCertificates($certificates),
+            'winnersByItem' => $this->winnersByItem($certificates, $event),
             'winnersBySchool' => $this->winnersBySchool($certificates, $event),
-            'participationByItem'   => $this->participationByItem($certificates, $event),
+            'participationByItem' => $this->participationByItem($certificates, $event),
             'participationBySchool' => $this->participationBySchool($certificates, $event),
-            'recentBatches'   => $this->recentBatchesForEvent($event),
-            'staleCount'      => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
+            'recentBatches' => $this->recentBatchesForEvent($event),
+            'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
         ]));
     }
 
@@ -51,12 +56,12 @@ class FestCertificateController extends SahodayaAdminController
         $certificates = $this->certificatesForEvent($event, 'winner');
 
         return $this->inertia('Sahodaya/Events/MeritCertificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
-            'event'          => $event,
-            'certificates'   => $certificates,
+            'event' => $event,
+            'certificates' => $certificates,
             'publishedItems' => $this->publishedItemsForEvent($event),
-            'schools'        => $this->schoolsFromCertificates($certificates),
-            'recentBatches'  => $this->recentBatchesForEvent($event, 'winner'),
-            'staleCount'     => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
+            'schools' => $this->schoolsFromCertificates($certificates),
+            'recentBatches' => $this->recentBatchesForEvent($event, 'winner'),
+            'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
         ]));
     }
 
@@ -68,21 +73,21 @@ class FestCertificateController extends SahodayaAdminController
         $certificates = $this->certificatesForEvent($event, 'participation');
 
         return $this->inertia('Sahodaya/Events/ParticipationCertificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
-            'event'          => $event,
-            'certificates'   => $certificates,
+            'event' => $event,
+            'certificates' => $certificates,
             'publishedItems' => $this->publishedItemsForEvent($event),
-            'schools'        => $this->schoolsFromCertificates($certificates),
-            'recentBatches'  => $this->recentBatchesForEvent($event, 'participation'),
-            'staleCount'     => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
+            'schools' => $this->schoolsFromCertificates($certificates),
+            'recentBatches' => $this->recentBatchesForEvent($event, 'participation'),
+            'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
         ]));
     }
 
-    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
-    private function certificatesForEvent(FestEvent $event, ?string $certType = null): \Illuminate\Support\Collection
+    /** @return Collection<int, array<string, mixed>> */
+    private function certificatesForEvent(FestEvent $event, ?string $certType = null): Collection
     {
         $participantIds = FestParticipant::where(function ($q) use ($event) {
             $q->whereIn('event_id', $event->reportableEventIds())
-              ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+                ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
         })->pluck('id');
 
         $service = app(FestCertificateService::class);
@@ -109,9 +114,9 @@ class FestCertificateController extends SahodayaAdminController
         ));
     }
 
-    private function publishedItemsForEvent(FestEvent $event): \Illuminate\Support\Collection
+    private function publishedItemsForEvent(FestEvent $event): Collection
     {
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         return FestEventItem::whereIn('event_id', $event->reportableEventIds())
@@ -119,28 +124,28 @@ class FestCertificateController extends SahodayaAdminController
             ->orderBy('title')
             ->get(['id', 'title', 'item_code', 'class_group', 'category'])
             ->map(fn ($item) => [
-                'id'              => $item->id,
-                'title'           => $item->title,
-                'item_code'       => $item->item_code,
-                'category_label'  => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels),
+                'id' => $item->id,
+                'title' => $item->title,
+                'item_code' => $item->item_code,
+                'category_label' => FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
             ])
             ->values();
     }
 
-    /** @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $certificates */
-    private function schoolsFromCertificates(\Illuminate\Support\Collection $certificates): \Illuminate\Support\Collection
+    /** @param  Collection<int, array<string, mixed>>  $certificates */
+    private function schoolsFromCertificates(Collection $certificates): Collection
     {
         return $certificates->map(fn ($c) => [
-            'id'   => $c['registration']?->school?->id ?? $c['participant']?->registration?->school?->id,
+            'id' => $c['registration']?->school?->id ?? $c['participant']?->registration?->school?->id,
             'name' => $c['registration']?->school?->name ?? $c['participant']?->registration?->school?->name ?? 'Unknown School',
         ])
-        ->filter(fn ($s) => ! empty($s['id']))
-        ->unique('id')
-        ->sortBy('name')
-        ->values();
+            ->filter(fn ($s) => ! empty($s['id']))
+            ->unique('id')
+            ->sortBy('name')
+            ->values();
     }
 
-    private function recentBatchesForEvent(FestEvent $event, ?string $certType = null): \Illuminate\Support\Collection
+    private function recentBatchesForEvent(FestEvent $event, ?string $certType = null): Collection
     {
         return CertificateBatch::where('event_id', $event->id)
             ->when($certType, fn ($q) => $q->where('cert_type', $certType))
@@ -152,14 +157,14 @@ class FestCertificateController extends SahodayaAdminController
             ]);
     }
 
-    private function winnersByItem(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
+    private function winnersByItem(Collection $certificates, FestEvent $currentEvent): Collection
     {
-        return $this->groupCertificatesByItem($certificates, 'winner');
+        return $this->groupCertificatesByItem($certificates, 'winner', $currentEvent);
     }
 
-    private function winnersBySchool(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
+    private function winnersBySchool(Collection $certificates, FestEvent $currentEvent): Collection
     {
-        return $this->groupCertificatesBySchool($certificates, 'winner');
+        return $this->groupCertificatesBySchool($certificates, 'winner', $currentEvent);
     }
 
     /**
@@ -169,35 +174,47 @@ class FestCertificateController extends SahodayaAdminController
      * ParticipationCertificates.vue's item filter already makes — not every item they
      * participated in. Multi-item participants aren't fanned out into multiple groups.
      */
-    private function participationByItem(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
+    private function participationByItem(Collection $certificates, FestEvent $currentEvent): Collection
     {
-        return $this->groupCertificatesByItem($certificates, 'participation');
+        return $this->groupCertificatesByItem($certificates, 'participation', $currentEvent);
     }
 
-    private function participationBySchool(\Illuminate\Support\Collection $certificates, FestEvent $currentEvent): \Illuminate\Support\Collection
+    private function participationBySchool(Collection $certificates, FestEvent $currentEvent): Collection
     {
-        return $this->groupCertificatesBySchool($certificates, 'participation');
+        return $this->groupCertificatesBySchool($certificates, 'participation', $currentEvent);
     }
 
-    private function groupCertificatesByItem(\Illuminate\Support\Collection $certificates, string $certType): \Illuminate\Support\Collection
+    /**
+     * Distinguishes same-titled items (e.g. three separate "Book Review" items, one per
+     * class-group category) that would otherwise be indistinguishable in the grouped-by-
+     * item admin view — see FestItemCategoryLabel's own docblock for why class_group
+     * takes priority. shortLabel(), not resolve() — this is exactly the "compact,
+     * certificate-context" use case its own docblock calls out.
+     */
+    private function groupCertificatesByItem(Collection $certificates, string $certType, FestEvent $event): Collection
     {
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
         return $certificates
             ->filter(fn ($c) => ($c['cert_type'] ?? null) === $certType && ! empty($c['item']))
             ->groupBy(fn ($c) => $c['item']->id)
-            ->map(function ($group) {
+            ->map(function ($group) use ($classGroupLabels, $artsCategoryLabels) {
                 $first = $group->first();
 
                 return [
-                    'item_id'    => $first['item']->id,
+                    'item_id' => $first['item']->id,
                     'item_title' => $first['item']->title,
-                    'winners'    => $group->sortBy(fn ($c) => $c['mark']?->position ?? $c['position'] ?? 99)
+                    'item_code' => $first['item']->item_code,
+                    'category_label' => FestItemCategoryLabel::shortLabel($first['item'], $classGroupLabels, $artsCategoryLabels),
+                    'winners' => $group->sortBy(fn ($c) => $c['mark']?->position ?? $c['position'] ?? 99)
                         ->map(fn ($c) => [
-                            'id'          => $c['id'],
-                            'uuid'        => $c['uuid'],
-                            'name'        => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
-                            'position'    => $c['mark']?->position ?? $c['position'] ?? null,
+                            'id' => $c['id'],
+                            'uuid' => $c['uuid'],
+                            'name' => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
+                            'position' => $c['mark']?->position ?? $c['position'] ?? null,
                             'is_rendered' => $c['is_rendered'] ?? false,
-                            'is_stale'    => $c['is_stale'] ?? false,
+                            'is_stale' => $c['is_stale'] ?? false,
                         ])
                         ->values(),
                 ];
@@ -206,27 +223,31 @@ class FestCertificateController extends SahodayaAdminController
             ->values();
     }
 
-    private function groupCertificatesBySchool(\Illuminate\Support\Collection $certificates, string $certType): \Illuminate\Support\Collection
+    private function groupCertificatesBySchool(Collection $certificates, string $certType, FestEvent $event): Collection
     {
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
         return $certificates
             ->filter(fn ($c) => ($c['cert_type'] ?? null) === $certType && ! empty($c['item']))
             ->groupBy(fn ($c) => $c['registration']?->school_id ?? $c['participant']?->registration?->school_id ?? 0)
-            ->map(function ($group) {
+            ->map(function ($group) use ($classGroupLabels, $artsCategoryLabels) {
                 $first = $group->first();
                 $school = $first['registration']?->school ?? $first['participant']?->registration?->school;
 
                 return [
-                    'school_id'   => $school?->id ?? 0,
+                    'school_id' => $school?->id ?? 0,
                     'school_name' => $school?->name ?? 'Unknown School',
-                    'winners'     => $group->sortBy(fn ($c) => $c['mark']?->position ?? $c['position'] ?? 99)
+                    'winners' => $group->sortBy(fn ($c) => $c['mark']?->position ?? $c['position'] ?? 99)
                         ->map(fn ($c) => [
-                            'id'          => $c['id'],
-                            'uuid'        => $c['uuid'],
-                            'name'        => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
-                            'item_title'  => $c['item']?->title ?? '',
-                            'position'    => $c['mark']?->position ?? $c['position'] ?? null,
+                            'id' => $c['id'],
+                            'uuid' => $c['uuid'],
+                            'name' => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
+                            'item_title' => $c['item']?->title ?? '',
+                            'category_label' => FestItemCategoryLabel::shortLabel($c['item'], $classGroupLabels, $artsCategoryLabels),
+                            'position' => $c['mark']?->position ?? $c['position'] ?? null,
                             'is_rendered' => $c['is_rendered'] ?? false,
-                            'is_stale'    => $c['is_stale'] ?? false,
+                            'is_stale' => $c['is_stale'] ?? false,
                         ])
                         ->values(),
                 ];
@@ -242,9 +263,9 @@ class FestCertificateController extends SahodayaAdminController
         $tally = app(FestCertificateService::class)->certificateTally($event);
 
         return $this->inertia('Sahodaya/Events/CertificateTally', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
-            'event'       => $event,
-            'rows'        => $tally['rows'],
-            'totals'      => $tally['totals'],
+            'event' => $event,
+            'rows' => $tally['rows'],
+            'totals' => $tally['totals'],
             'childEvents' => $event->sportEventDropdownOptions(),
         ]));
     }
@@ -257,12 +278,12 @@ class FestCertificateController extends SahodayaAdminController
         $created = app(FestCertificateService::class)->generateForEvent($event, $itemId);
 
         $audit->festEvent($event, FestPageActivity::CERTIFICATES, 'fest.certificates.generated', count($created).' certificate(s) generated', [
-            'count'   => count($created),
+            'count' => count($created),
             'item_id' => $itemId,
         ]);
 
         try {
-            app(\App\Services\Events\FestEventNotifier::class)->certificatesAvailable($event, count($created));
+            app(FestEventNotifier::class)->certificatesAvailable($event, count($created));
         } catch (\Throwable) {
             // ignore notification failures
         }
@@ -323,7 +344,7 @@ class FestCertificateController extends SahodayaAdminController
         $zip->close();
 
         $filename = str($event->title)->slug()
-            .($publishedOnly ? '-published-winners' : '-certificates')
+            .($publishedOnly ? '-published-winners' : ($certType ? '-'.$certType : '-certificates'))
             .($request->boolean('plain') ? '-plain' : '').'.zip';
 
         return response()->download($zipPath, $filename)->deleteFileAfterSend();
@@ -358,7 +379,7 @@ class FestCertificateController extends SahodayaAdminController
         abort_if($payloads->isEmpty(), 404, 'No certificates to print.');
 
         return view('fest.certificate-print-all', [
-            'event'        => $event,
+            'event' => $event,
             'certificates' => $payloads,
         ]);
     }
@@ -372,7 +393,7 @@ class FestCertificateController extends SahodayaAdminController
         ?int $schoolId = null,
         ?string $certType = null,
         ?array $certIds = null
-    ): \Illuminate\Support\Collection {
+    ): Collection {
         $certificates = $this->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
 
         $service = app(FestCertificateService::class);
@@ -430,21 +451,21 @@ class FestCertificateController extends SahodayaAdminController
         ?int $schoolId = null,
         ?string $certType = null,
         ?array $certIds = null,
-    ): \Illuminate\Support\Collection {
+    ): Collection {
         if (! empty($certIds)) {
             return Certificate::whereIn('id', $certIds)->get();
         }
 
         $participantIds = FestParticipant::where(function ($q) use ($event) {
             $q->whereIn('event_id', $event->reportableEventIds())
-              ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+                ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
         })
-        ->when($itemId, fn ($q) => $q->where(function ($iq) use ($itemId) {
-            $iq->whereHas('registration', fn ($rq) => $rq->where('item_id', $itemId))
-               ->orWhereHas('mark', fn ($mq) => $mq->where('item_id', $itemId));
-        }))
-        ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
-        ->pluck('id');
+            ->when($itemId, fn ($q) => $q->where(function ($iq) use ($itemId) {
+                $iq->whereHas('registration', fn ($rq) => $rq->where('item_id', $itemId))
+                    ->orWhereHas('mark', fn ($mq) => $mq->where('item_id', $itemId));
+            }))
+            ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
+            ->pluck('id');
 
         return Certificate::where('entity_type', FestParticipant::class)
             ->whereIn('entity_id', $participantIds)
@@ -480,7 +501,7 @@ class FestCertificateController extends SahodayaAdminController
 
         $participantIds = FestParticipant::where(function ($q) use ($event) {
             $q->whereIn('event_id', $event->reportableEventIds())
-              ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+                ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
         })->pluck('id');
 
         $certificates = Certificate::where('entity_type', FestParticipant::class)
@@ -506,7 +527,7 @@ class FestCertificateController extends SahodayaAdminController
     private function dispatchRenderBatch(
         Request $request,
         FestEvent $event,
-        \Illuminate\Support\Collection $certificates,
+        Collection $certificates,
         string $batchType,
         ?int $itemId,
         ?int $schoolId,
@@ -514,18 +535,18 @@ class FestCertificateController extends SahodayaAdminController
         ?array $certIds,
     ): CertificateBatch {
         $batchRow = CertificateBatch::create([
-            'tenant_id'            => $this->sahodaya->id,
-            'event_id'             => $event->id,
-            'batch_type'           => $batchType,
-            'cert_type'            => $certType,
-            'item_id'              => $itemId,
-            'school_id'            => $schoolId,
+            'tenant_id' => $this->sahodaya->id,
+            'event_id' => $event->id,
+            'batch_type' => $batchType,
+            'cert_type' => $certType,
+            'item_id' => $itemId,
+            'school_id' => $schoolId,
             'certificate_ids_json' => $certIds,
-            'scope_description'    => $this->describeScope($event, $itemId, $schoolId, $certType, $certIds),
-            'total_count'          => $certificates->count(),
-            'status'               => CertificateBatch::STATUS_PROCESSING,
-            'created_by_user_id'   => $request->user()?->id,
-            'started_at'           => now(),
+            'scope_description' => $this->describeScope($event, $itemId, $schoolId, $certType, $certIds),
+            'total_count' => $certificates->count(),
+            'status' => CertificateBatch::STATUS_PROCESSING,
+            'created_by_user_id' => $request->user()?->id,
+            'started_at' => now(),
         ]);
 
         $tenantId = $this->sahodaya->id;
@@ -538,7 +559,7 @@ class FestCertificateController extends SahodayaAdminController
             ->then(function () use ($batchRow) {
                 $batchRow->refresh();
                 $batchRow->update([
-                    'status'       => $batchRow->failed_count > 0
+                    'status' => $batchRow->failed_count > 0
                         ? CertificateBatch::STATUS_COMPLETED_WITH_ERRORS
                         : CertificateBatch::STATUS_COMPLETED,
                     'completed_at' => now(),
@@ -546,8 +567,8 @@ class FestCertificateController extends SahodayaAdminController
             })
             ->catch(function ($_, \Throwable $e) use ($batchRow) {
                 $batchRow->update([
-                    'status'       => CertificateBatch::STATUS_FAILED,
-                    'error'        => mb_substr($e->getMessage(), 0, 2000),
+                    'status' => CertificateBatch::STATUS_FAILED,
+                    'error' => mb_substr($e->getMessage(), 0, 2000),
                     'completed_at' => now(),
                 ]);
             })
@@ -570,7 +591,7 @@ class FestCertificateController extends SahodayaAdminController
             return 'Item: '.($item?->title ?? "#{$itemId}");
         }
         if ($schoolId) {
-            $school = \App\Models\Tenant::find($schoolId);
+            $school = Tenant::find($schoolId);
 
             return 'School: '.($school?->name ?? $schoolId);
         }
@@ -586,15 +607,15 @@ class FestCertificateController extends SahodayaAdminController
         abort_if($batch->tenant_id !== $this->sahodaya->id || $batch->event_id !== $event->id, 403);
 
         return response()->json([
-            'id'              => $batch->id,
-            'status'          => $batch->status,
-            'batch_type'      => $batch->batch_type,
-            'scope'           => $batch->scope_description,
-            'total_count'     => $batch->total_count,
+            'id' => $batch->id,
+            'status' => $batch->status,
+            'batch_type' => $batch->batch_type,
+            'scope' => $batch->scope_description,
+            'total_count' => $batch->total_count,
             'processed_count' => $batch->processed_count,
             'succeeded_count' => $batch->succeeded_count,
-            'failed_count'    => $batch->failed_count,
-            'error'           => $batch->error,
+            'failed_count' => $batch->failed_count,
+            'error' => $batch->error,
         ]);
     }
 
@@ -662,10 +683,10 @@ class FestCertificateController extends SahodayaAdminController
         $template = $service->resolveTemplate($event, $certType === 'winner' ? $itemId : null, $certType);
 
         $certificate = new Certificate([
-            'entity_type'       => FestParticipant::class,
-            'entity_id'         => $participant->id,
-            'cert_type'         => $certType,
-            'template_id'       => $template?->id,
+            'entity_type' => FestParticipant::class,
+            'entity_id' => $participant->id,
+            'cert_type' => $certType,
+            'template_id' => $template?->id,
             'verification_uuid' => 'PREVIEW-'.$participant->id,
         ]);
 

@@ -61,6 +61,7 @@
                             <div class="absolute z-20 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1">
                                 <a :href="downloadZipUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 All certificates (ZIP)</a>
                                 <a v-if="winnersByItem.length" :href="downloadPublishedZipUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Merit winners only (ZIP)</a>
+                                <a v-if="participationByItem.length" :href="downloadParticipationZipUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Participation only (ZIP)</a>
                                 <div class="border-t border-gray-100 my-1"></div>
                                 <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (with background) ↗</a>
                                 <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?plain=1`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (plain) ↗</a>
@@ -146,7 +147,9 @@
                 <div v-for="group in winnersByItem" :key="group.item_id" class="py-3 first:pt-0 last:pb-0">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="min-w-0 flex items-center gap-3">
-                            <p class="font-semibold text-sm text-gray-900">{{ group.item_title }}</p>
+                            <p class="font-semibold text-sm text-gray-900">
+                                {{ group.item_title }}<span v-if="group.category_label" class="font-normal text-gray-500"> ({{ group.category_label }})</span>
+                            </p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
                                 {{ group.winners.length }} merit winner{{ group.winners.length === 1 ? '' : 's' }}
                             </span>
@@ -240,7 +243,7 @@
                                 {{ w.position ?? '—' }}
                             </span>
                             <span class="font-medium text-gray-800">{{ w.name }}</span>
-                            <span class="text-[11px] text-gray-500">{{ w.item_title }}</span>
+                            <span class="text-[11px] text-gray-500">{{ w.item_title }}<template v-if="w.category_label"> ({{ w.category_label }})</template></span>
                             <span class="flex items-center gap-2 text-[11px]">
                                 <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
                                 <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
@@ -271,7 +274,9 @@
                 <div v-for="group in participationByItem" :key="group.item_id" class="py-3 first:pt-0 last:pb-0">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="min-w-0 flex items-center gap-3">
-                            <p class="font-semibold text-sm text-gray-900">{{ group.item_title }}</p>
+                            <p class="font-semibold text-sm text-gray-900">
+                                {{ group.item_title }}<span v-if="group.category_label" class="font-normal text-gray-500"> ({{ group.category_label }})</span>
+                            </p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-medium">
                                 {{ group.winners.length }} participant{{ group.winners.length === 1 ? '' : 's' }}
                             </span>
@@ -365,7 +370,7 @@
                         <ul class="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
                             <li v-for="w in group.winners" :key="w.id" class="flex items-center gap-2 text-xs">
                                 <span class="font-medium text-gray-800">{{ w.name }}</span>
-                                <span class="text-[11px] text-gray-500">{{ w.item_title }}</span>
+                                <span class="text-[11px] text-gray-500">{{ w.item_title }}<template v-if="w.category_label"> ({{ w.category_label }})</template></span>
                                 <span class="flex items-center gap-2 text-[11px]">
                                     <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
                                     <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
@@ -568,7 +573,12 @@ const selectedItemId = ref(null);
 
 const publishedItemOptions = computed(() => props.publishedItems.map(item => ({
     value: item.id,
-    label: item.item_code ? `[${item.item_code}] ${item.title}` : item.title,
+    // Same-titled items with no item_code (e.g. three separate "Book Review" items, one
+    // per class-group category) are otherwise indistinguishable in this dropdown —
+    // category_label (Category 1/LP/UP/...) is the fallback disambiguator.
+    label: item.item_code
+        ? `[${item.item_code}] ${item.title}`
+        : (item.category_label ? `${item.title} (${item.category_label})` : item.title),
 })));
 
 // Render/cache batch progress — same dispatch -> flash key -> poll /progress pattern as
@@ -693,6 +703,11 @@ const downloadZipUrl = computed(() =>
     `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip${plainMode.value ? '?plain=1' : ''}`);
 const downloadPublishedZipUrl = computed(() => {
     const params = new URLSearchParams({ published_only: '1' });
+    if (plainMode.value) params.set('plain', '1');
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip?${params}`;
+});
+const downloadParticipationZipUrl = computed(() => {
+    const params = new URLSearchParams({ cert_type: 'participation' });
     if (plainMode.value) params.set('plain', '1');
     return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/download-zip?${params}`;
 });
