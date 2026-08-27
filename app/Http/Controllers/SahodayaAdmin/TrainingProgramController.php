@@ -1548,10 +1548,24 @@ class TrainingProgramController extends SahodayaAdminController
             ->where('status', 'confirmed');
 
         if (is_array($selectedIds) && count($selectedIds)) {
+            // An explicit hand-picked selection is respected as-is — the admin chose
+            // these specific teachers, ineligible or not.
             $query->whereIn('id', $selectedIds);
+            $registrations = $query->with(['teacher', 'school'])->get();
+        } else {
+            // "Email Certificates to All Teachers" must match certificatesHub()'s own
+            // "Eligible for Certificate" count, not every confirmed registration — a
+            // teacher who hasn't met the attendance requirement would just fail
+            // eligibility inside issue() anyway, so filtering here avoids burning a
+            // queue attempt on a send that can never succeed.
+            $certService = app(TrainingCertificateService::class);
+            $reqPresent = $certService->requiredPresentDays($program);
+
+            $registrations = $query->with(['teacher', 'school'])->get()
+                ->filter(fn (TrainingRegistration $r) => $certService->presentDaysCount($r) >= $reqPresent)
+                ->values();
         }
 
-        $registrations = $query->with(['teacher', 'school'])->get();
         abort_if($registrations->isEmpty(), 422, 'No eligible registrations found to send.');
 
         $batch = $this->dispatchSendEmailBatch($request, $program, $registrations);

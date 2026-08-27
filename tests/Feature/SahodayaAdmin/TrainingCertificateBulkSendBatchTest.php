@@ -83,6 +83,90 @@ class TrainingCertificateBulkSendBatchTest extends TestCase
         return $registration;
     }
 
+    private function makeIneligibleRegistration(TrainingProgram $program, Tenant $school, string $email): TrainingRegistration
+    {
+        $teacher = Teacher::create([
+            'tenant_id' => $school->id, 'name' => 'Teacher '.$email, 'email' => $email, 'status' => 'active',
+        ]);
+
+        // Confirmed but with no attendance recorded at all — presentDaysCount() = 0,
+        // below whatever requiredPresentDays() resolves to (at least 1).
+        return TrainingRegistration::create([
+            'program_id' => $program->id, 'teacher_id' => $teacher->id, 'school_id' => $school->id, 'status' => 'confirmed',
+        ]);
+    }
+
+    /**
+     * Regression guard for a gap noticed directly on production: "Email Certificates to
+     * All Teachers" dispatched a batch scoped to every confirmed registration (420),
+     * not the smaller eligible-for-certificate count (419) shown right above it on the
+     * same page — burning a queue attempt on a send that could only ever fail eligibility
+     * inside issue().
+     */
+    public function test_bulk_send_all_excludes_ineligible_registrations(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = $this->makeSahodaya();
+        $school = $this->makeSchool($sahodaya->id);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        [$program, $session, $school] = $this->makeProgram($sahodaya, $school);
+        $eligible = $this->makeEligibleRegistration($program, $session, $school, 'eligible@example.com');
+        $ineligible = $this->makeIneligibleRegistration($program, $school, 'ineligible@example.com');
+
+        Mail::shouldReceive('send')->once();
+
+        $response = $this->actingAs($admin)->post(route('sahodaya.training.certificates.bulk-send-email', [
+            'tenantId' => $sahodaya->id,
+            'program' => $program->id,
+        ]));
+
+        $response->assertRedirect();
+        $batch = CertificateBatch::findOrFail(session('certificate_batch_id'));
+        $this->assertSame(1, $batch->total_count, '"Email All" must only target the eligible registration, not the ineligible one too.');
+        $this->assertSame([$eligible->id], $batch->registration_ids_json);
+
+        $ineligibleCert = Certificate::where('entity_type', TrainingRegistration::class)->where('entity_id', $ineligible->id)->first();
+        $this->assertNull($ineligibleCert, 'The ineligible registration should not have been touched by "Email All".');
+    }
+
+    /**
+     * An explicit registration_ids selection (the "Email Selected" button) is a
+     * deliberate admin override and must NOT be silently filtered by eligibility the
+     * way "Email All" is — assertEligible() inside issue() is still what actually
+     * rejects an ineligible send, counted as a batch failure, not a silent pre-filter.
+     */
+    public function test_bulk_send_explicit_selection_still_attempts_an_ineligible_registration(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = $this->makeSahodaya();
+        $school = $this->makeSchool($sahodaya->id);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        [$program, , $school] = $this->makeProgram($sahodaya, $school);
+        $ineligible = $this->makeIneligibleRegistration($program, $school, 'ineligible@example.com');
+
+        Mail::shouldReceive('send')->never();
+
+        $response = $this->actingAs($admin)->post(route('sahodaya.training.certificates.bulk-send-email', [
+            'tenantId' => $sahodaya->id,
+            'program' => $program->id,
+        ]), [
+            'registration_ids' => [$ineligible->id],
+        ]);
+
+        $response->assertRedirect();
+        $batch = CertificateBatch::findOrFail(session('certificate_batch_id'));
+        $this->assertSame(1, $batch->total_count);
+        $this->assertSame([$ineligible->id], $batch->registration_ids_json);
+        $this->assertSame(0, $batch->succeeded_count);
+        $this->assertSame(1, $batch->failed_count);
+    }
+
     public function test_bulk_send_dispatches_a_batch_and_emails_each_eligible_registration_exactly_once(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
@@ -103,7 +187,7 @@ class TrainingCertificateBulkSendBatchTest extends TestCase
 
         $response = $this->actingAs($admin)->post(route('sahodaya.training.certificates.bulk-send-email', [
             'tenantId' => $sahodaya->id,
-            'program'  => $program->id,
+            'program' => $program->id,
         ]));
 
         $response->assertRedirect();
@@ -134,16 +218,16 @@ class TrainingCertificateBulkSendBatchTest extends TestCase
 
         $progress = $this->actingAs($admin)->getJson(route('sahodaya.training.certificates.batches.progress', [
             'tenantId' => $sahodaya->id,
-            'program'  => $program->id,
-            'batch'    => $batch->id,
+            'program' => $program->id,
+            'batch' => $batch->id,
         ]));
         $progress->assertOk();
         $progress->assertJson([
-            'status'          => CertificateBatch::STATUS_COMPLETED,
-            'batch_type'      => 'send_email',
-            'total_count'     => 3,
+            'status' => CertificateBatch::STATUS_COMPLETED,
+            'batch_type' => 'send_email',
+            'total_count' => 3,
             'succeeded_count' => 3,
-            'failed_count'    => 0,
+            'failed_count' => 0,
         ]);
     }
 
@@ -164,7 +248,7 @@ class TrainingCertificateBulkSendBatchTest extends TestCase
 
         $response = $this->actingAs($admin)->post(route('sahodaya.training.certificates.bulk-send-email', [
             'tenantId' => $sahodaya->id,
-            'program'  => $program->id,
+            'program' => $program->id,
         ]), [
             'registration_ids' => [$selected->id],
         ]);
