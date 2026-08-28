@@ -99,6 +99,9 @@
                                 <th>Item Title</th>
                                 <th>Category / Head</th>
                                 <th class="text-center">Status</th>
+                                <th class="text-center">Rank</th>
+                                <th class="text-center">Mark</th>
+                                <th class="text-center">Grade</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -117,6 +120,18 @@
                                         {{ item.status || '—' }}
                                     </span>
                                 </td>
+                                <template v-if="item.results_published">
+                                    <td class="text-center font-bold text-slate-900">{{ item.position ?? '—' }}</td>
+                                    <td class="text-center text-slate-700">{{ item.score ?? '—' }}</td>
+                                    <td class="text-center font-bold text-slate-900">{{ item.grade ?? '—' }}</td>
+                                </template>
+                                <template v-else>
+                                    <td class="text-center text-slate-400" colspan="3">
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block bg-slate-100 text-slate-500 border border-slate-200">
+                                            Result Pending
+                                        </span>
+                                    </td>
+                                </template>
                             </tr>
                         </tbody>
                     </table>

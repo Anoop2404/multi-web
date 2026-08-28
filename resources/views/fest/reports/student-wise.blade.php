@@ -111,6 +111,7 @@
         }
         .badge-approved { background-color: #dcfce7; color: #15803d; }
         .badge-pending { background-color: #fef3c7; color: #b45309; }
+        .badge-result-pending { background-color: #f1f5f9; color: #64748b; }
     </style>
 </head>
 <body>
@@ -124,8 +125,8 @@
         <div class="card-header">
             <div class="student-info">
                 <div class="student-photo-cell">
-                    @if(!empty($st['photo_url']))
-                        <img src="{{ $st['photo_url'] }}" class="student-photo" alt="{{ $st['name'] }}">
+                    @if(!empty($st['photo_data_uri']) || !empty($st['photo_url']))
+                        <img src="{{ $st['photo_data_uri'] ?? $st['photo_url'] }}" class="student-photo" alt="{{ $st['name'] }}">
                     @else
                         <div class="avatar-placeholder">{{ strtoupper(substr($st['name'] ?? 'S', 0, 1)) }}</div>
                     @endif
@@ -144,13 +145,16 @@
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 5%;">#</th>
-                    <th style="width: {{ ($showChestNo ?? true) ? '45' : '55' }}%;">Item Name</th>
-                    <th style="width: 25%;">Category / Head</th>
+                    <th style="width: 4%;">#</th>
+                    <th style="width: {{ ($showChestNo ?? true) ? '25' : '30' }}%;">Item Name</th>
+                    <th style="width: 16%;">Category / Head</th>
                     @if($showChestNo ?? true)
-                    <th style="width: 15%; text-align: center;">Chest No</th>
+                    <th style="width: 9%; text-align: center;">Chest No</th>
                     @endif
-                    <th style="width: 10%; text-align: center;">Status</th>
+                    <th style="width: 8%; text-align: center;">Status</th>
+                    <th style="width: 8%; text-align: center;">Rank</th>
+                    <th style="width: 8%; text-align: center;">Mark</th>
+                    <th style="width: 8%; text-align: center;">Grade</th>
                 </tr>
             </thead>
             <tbody>
@@ -175,6 +179,15 @@
                             {{ $item['status'] ?? '—' }}
                         </span>
                     </td>
+                    @if($item['results_published'] ?? false)
+                        <td style="text-align: center; font-weight: bold;">{{ $item['position'] ?? '—' }}</td>
+                        <td style="text-align: center;">{{ $item['score'] ?? '—' }}</td>
+                        <td style="text-align: center; font-weight: bold;">{{ $item['grade'] ?? '—' }}</td>
+                    @else
+                        <td style="text-align: center;" colspan="3">
+                            <span class="badge badge-result-pending">Result Pending</span>
+                        </td>
+                    @endif
                 </tr>
                 @endforeach
             </tbody>

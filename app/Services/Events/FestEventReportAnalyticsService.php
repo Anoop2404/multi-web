@@ -1751,7 +1751,7 @@ class FestEventReportAnalyticsService
     }
 
     /** @return list<array<string, mixed>> */
-    public function studentWiseBrowserRows(?string $schoolId = null, ?string $search = null): array
+    public function studentWiseBrowserRows(?string $schoolId = null, ?string $search = null, bool $includePhotoDataUri = false): array
     {
         $eventIds = $this->eventIds();
 
@@ -1764,9 +1764,9 @@ class FestEventReportAnalyticsService
             ->with([
                 'student:id,tenant_id,name,reg_no,gender,photo',
                 'registration.school:id,name,school_prefix',
-                'registration.item:id,title,head_id,event_id,class_group,age_group,category',
+                'registration.item:id,title,head_id,event_id,class_group,age_group,category,results_published_at',
                 'registration.item.head:id,name',
-                'registration.item.event:id,title',
+                'registration.item.event:id,title,results_published',
             ])
             ->get();
 
@@ -1799,38 +1799,48 @@ class FestEventReportAnalyticsService
 
             $items = $entries->map(function (FestParticipant $p) use ($marksByParticipant, $classGroupLabels, $artsCategoryLabels) {
                 $mark = $marksByParticipant->get($p->id);
+                $item = $p->registration?->item;
+                $itemEvent = $item?->event;
+                // Rank/mark/grade must stay hidden until this item's results are actually
+                // published — same gate FestItemResultsService::isItemVisible() already
+                // applies on the dedicated results-entry/publish pages — so this report
+                // (which schools may receive as a PDF/Excel) never leaks a draft result.
+                $resultsPublished = $item && $itemEvent
+                    && app(FestItemResultsService::class)->isItemVisible($item, $itemEvent);
 
                 return [
                     'item_id'           => $p->registration?->item_id,
-                    'item_title'        => $p->registration?->item?->title,
-                    'head_name'         => $p->registration?->item?->head?->name,
-                    'category_label'    => FestItemCategoryLabel::shortLabel($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
+                    'item_title'        => $item?->title,
+                    'head_name'         => $item?->head?->name,
+                    'category_label'    => FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
                     'status'            => $p->registration?->status,
                     'fest_id'           => $p->level_registration_number,
                     'item_reg'          => $p->item_registration_number,
                     'chest_no'          => $p->chest_no,
-                    'grade'             => $mark?->grade,
-                    'position'          => $mark?->position,
-                    'score'             => $mark?->score,
-                    'mark_value'        => $mark?->measurement_value,
-                    'mark_unit'         => $mark?->measurement_unit,
+                    'results_published' => $resultsPublished,
+                    'grade'             => $resultsPublished ? $mark?->grade : null,
+                    'position'          => $resultsPublished ? $mark?->position : null,
+                    'score'             => $resultsPublished ? $mark?->score : null,
+                    'mark_value'        => $resultsPublished ? $mark?->measurement_value : null,
+                    'mark_unit'         => $resultsPublished ? $mark?->measurement_unit : null,
                     'sport_event_id'    => $p->registration?->event_id,
-                    'sport_event_title' => $p->registration?->item?->event?->title,
+                    'sport_event_title' => $item?->event?->title,
                 ];
             })->values()->all();
 
             $rows[] = [
-                'student_id'  => (int) $studentId,
-                'school_id'   => $first->registration?->school_id,
-                'school_name' => $first->registration?->school?->name,
-                'school_code' => $first->registration?->school?->school_prefix,
-                'name'        => $name,
-                'reg_no'      => $regNo,
-                'gender'      => $student->gender,
-                'photo_url'   => $student->photoUrl(),
-                'item_count'  => count($items),
-                'total_score' => collect($items)->sum(fn ($i) => (float) ($i['score'] ?? 0)),
-                'items'       => $items,
+                'student_id'     => (int) $studentId,
+                'school_id'      => $first->registration?->school_id,
+                'school_name'    => $first->registration?->school?->name,
+                'school_code'    => $first->registration?->school?->school_prefix,
+                'name'           => $name,
+                'reg_no'         => $regNo,
+                'gender'         => $student->gender,
+                'photo_url'      => $student->photoUrl(),
+                'photo_data_uri' => $includePhotoDataUri ? $student->photoDataUri() : null,
+                'item_count'     => count($items),
+                'total_score'    => collect($items)->sum(fn ($i) => (float) ($i['score'] ?? 0)),
+                'items'          => $items,
             ];
         }
 

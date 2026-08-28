@@ -634,7 +634,7 @@ class FestReportService
         $schoolId = $request->input('school_id');
         $search = $request->input('search');
         $analytics = app(FestEventReportAnalyticsService::class, ['event' => $this->event]);
-        $rows = $analytics->studentWiseBrowserRows($schoolId, $search);
+        $rows = $analytics->studentWiseBrowserRows($schoolId, $search, includePhotoDataUri: true);
 
         return $this->renderPdf('fest.reports.student-wise', [
             'event' => $this->event,
@@ -646,43 +646,33 @@ class FestReportService
 
     private function studentWiseReportXls(Request $request): StreamedResponse
     {
-        $participants = $this->participantsFlat(
-            null,
-            null,
-            $request->input('school_id'),
-        )->filter(fn (FestParticipant $p) => $p->student !== null);
+        $analytics = app(FestEventReportAnalyticsService::class, ['event' => $this->event]);
+        $students = $analytics->studentWiseBrowserRows($request->input('school_id'), $request->input('search'));
 
-        $rows = $participants
-            ->groupBy('student_id')
-            ->map(function (Collection $entries) {
-                /** @var FestParticipant $first */
-                $first = $entries->first();
-                $items = $entries
-                    ->map(fn (FestParticipant $p) => $p->registration?->item?->title)
-                    ->filter()
-                    ->unique()
-                    ->values();
-
-                return [
-                    $first->registration?->school?->name,
-                    $first->registration?->school?->school_prefix,
-                    $first->student?->reg_no,
-                    $first->student?->admission_number,
-                    $first->student?->name,
-                    $first->student?->gender,
-                    $first->student?->schoolClass?->name,
-                    $first->student?->schoolClass?->classCategory?->label,
-                    $items->count(),
-                    $items->implode(', '),
+        // One row per student × item (not one row per student) so rank/mark/grade — which
+        // are per-item — have somewhere to go; the old one-row-per-student shape only had
+        // room for a concatenated item-title list.
+        $rows = [];
+        foreach ($students as $student) {
+            foreach ($student['items'] as $item) {
+                $rows[] = [
+                    $student['school_name'],
+                    $student['school_code'],
+                    $student['reg_no'],
+                    $student['name'],
+                    $student['gender'],
+                    $item['item_title'],
+                    $item['category_label'],
+                    $item['results_published'] ? $item['position'] : null,
+                    $item['results_published'] ? $item['score'] : null,
+                    $item['results_published'] ? $item['grade'] : ($item['results_published'] === false ? 'Pending' : null),
                 ];
-            })
-            ->sortBy(fn (array $row) => [$row[0] ?? '', $row[6] ?? '', $row[4] ?? ''])
-            ->values()
-            ->all();
+            }
+        }
 
         return ExcelExport::download($this->slug().'-student-wise-report', [
-            'School', 'School Code', 'Reg No', 'Admission No', 'Student', 'Gender', 'Class',
-            'Category', 'Item Count', 'Items',
+            'School', 'School Code', 'Reg No', 'Student', 'Gender', 'Item', 'Category',
+            'Rank', 'Mark', 'Grade',
         ], $rows);
     }
 
