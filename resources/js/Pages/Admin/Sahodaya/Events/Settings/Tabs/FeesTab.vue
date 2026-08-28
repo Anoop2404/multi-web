@@ -330,10 +330,18 @@
 
                 <div v-else-if="feeSettingsForm.fee_model === 'student_count_slab'" class="space-y-3 border-t border-slate-100 pt-4">
                     <p class="text-xs text-slate-600">
-                        Bills each school a single stepped amount based on its total registered student count for
-                        this event. Slabs are scoped to this event only — configure them below.
+                        Bills each school a single stepped amount based on a student count, per the slab table below.
+                        Slabs are scoped to this event only — configure them below.
                     </p>
-                    <FormField label="Amount per participating student (₹) (optional)" hint="Charged per unique student in addition to the slab fee (e.g. ₹450 per student for Malabar Sahodaya)">
+                    <FormField label="Slab is based on" hint="Which student count decides the slab bracket a school falls into">
+                        <template #default="{ id }">
+                            <select :id="id" v-model="feeSettingsForm.student_count_slab_basis" class="field max-w-sm">
+                                <option value="event_registrations">Students registered for this event</option>
+                                <option value="school_total_enrollment">School's total student enrollment</option>
+                            </select>
+                        </template>
+                    </FormField>
+                    <FormField label="Amount per participating student (₹) (optional)" hint="Charged per unique student registered for this event, in addition to the slab fee — always based on actual registrations, regardless of the slab basis above (e.g. ₹450 per student for Malabar Sahodaya)">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.per_student_amount" type="number" min="0" class="field max-w-xs" placeholder="e.g. 450">
                         </template>

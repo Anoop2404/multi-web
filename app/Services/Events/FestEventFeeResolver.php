@@ -394,6 +394,14 @@ class FestEventFeeResolver
                 'per_student_amount' => isset($input['per_student_amount']) && $input['per_student_amount'] !== ''
                     ? (float) $input['per_student_amount'] : null,
                 'student_count_slabs' => $this->normalizeStudentCountSlabs($input['student_count_slabs'] ?? []),
+                // Which count the slab bracket is looked up by: the school's students actually
+                // registered for this event (default, unchanged behavior), or the school's whole
+                // active-student enrollment regardless of how many it registers for this event.
+                // Only the slab bracket lookup switches basis — the per_student_amount surcharge
+                // above always stays keyed to actual registered students (see
+                // FestSchoolEventFeeService::recalculate()).
+                'student_count_slab_basis' => ($input['student_count_slab_basis'] ?? null) === 'school_total_enrollment'
+                    ? 'school_total_enrollment' : 'event_registrations',
             ];
 
             return $this->applySchoolFeeCap($normalized, $input);

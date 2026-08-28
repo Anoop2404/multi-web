@@ -93,6 +93,7 @@ class FestParticipationPolicyService
             ], array_intersect_key($preset, array_flip([
                 'max_onstage_per_school', 'max_offstage_per_school', 'max_group_per_school',
                 'max_onstage_per_student', 'max_offstage_per_student', 'max_group_per_student',
+                'max_offstage_writing_per_student', 'max_offstage_drawing_per_student',
                 'max_total_per_student', 'one_entry_per_item_per_school',
                 'count_submitted_registrations', 'exclude_standbys_from_limits',
             ])))
@@ -125,6 +126,7 @@ class FestParticipationPolicyService
             ], array_intersect_key($attrs, array_flip([
                 'max_onstage_per_school', 'max_offstage_per_school', 'max_group_per_school',
                 'max_onstage_per_student', 'max_offstage_per_student', 'max_group_per_student',
+                'max_offstage_writing_per_student', 'max_offstage_drawing_per_student',
                 'max_total_per_student', 'one_entry_per_item_per_school',
                 'count_submitted_registrations', 'exclude_standbys_from_limits',
                 'require_fee_before_approval',

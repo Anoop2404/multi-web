@@ -35,8 +35,8 @@
                         </p>
                     </div>
                     <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold shrink-0"
-                          :class="form.experience_version === 'v2' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-800'">
-                        Active: {{ form.experience_version === 'v2' ? 'V2 Modern Layout' : 'V1 Classic Layout' }}
+                          :class="activeExperienceVersion === 'v2' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-800'">
+                        Active: {{ activeExperienceVersion === 'v2' ? 'V2 Modern Layout' : 'V1 Classic Layout' }}
                     </span>
                 </div>
 
@@ -56,7 +56,8 @@
                                 Standard traditional layout with basic hero header, about section, circulars list, and portal links.
                             </p>
                         </div>
-                        <span v-if="form.experience_version === 'v1'" class="text-[11px] font-bold text-indigo-700">✓ Currently Active</span>
+                        <span v-if="activeExperienceVersion === 'v1'" class="text-[11px] font-bold text-indigo-700">✓ Currently Active</span>
+                        <span v-else-if="form.experience_version === 'v1'" class="text-[11px] font-semibold text-amber-600">Selected — click Save to apply</span>
                         <span v-else class="text-[11px] font-semibold text-slate-400">Click to activate V1</span>
                     </div>
 
@@ -75,10 +76,18 @@
                                 Next-gen experience featuring seasonal action hubs, live event tickers, directory maps, and microsites.
                             </p>
                         </div>
-                        <span v-if="form.experience_version === 'v2'" class="text-[11px] font-bold text-indigo-700">✓ Currently Active</span>
+                        <span v-if="activeExperienceVersion === 'v2'" class="text-[11px] font-bold text-indigo-700">✓ Currently Active</span>
+                        <span v-else-if="form.experience_version === 'v2'" class="text-[11px] font-semibold text-amber-600">Selected — click Save to apply</span>
                         <span v-else class="text-[11px] font-semibold text-slate-400">Click to activate V2</span>
                     </div>
                 </div>
+
+                <p v-if="form.errors.experience_version" class="text-xs text-red-600 -mt-1">
+                    {{ form.errors.experience_version }}
+                    <a :href="`/sahodaya-admin/${props.sahodaya.id}/membership/settings`" class="font-semibold underline">
+                        Add a logo in Membership Settings ↗
+                    </a>, and a phone/email under the Portal & Contact tab below.
+                </p>
             </div>
 
             <!-- Save bar -->
@@ -291,6 +300,12 @@ const props = defineProps({
 });
 
 const publicSiteEnabled = ref(props.publicWebsiteEnabled ?? true);
+
+// Server-confirmed version, kept separate from `form.experience_version` (the user's pending
+// selection) — Inertia preserves submitted form values across a validation-error redirect, so
+// the form alone can't be trusted to reflect what's actually live. `props` stays reactive across
+// redirects even though this component isn't remounted, so this always tracks the true DB state.
+const activeExperienceVersion = computed(() => props.experienceVersion ?? 'v1');
 
 const activeTab = ref('hero');
 

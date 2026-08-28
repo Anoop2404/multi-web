@@ -112,4 +112,37 @@ class FestParticipationLimitServiceTest extends TestCase
         $this->assertSame(1, $usage['used']['on_stage'], 'only the individual item should count as on-stage');
         $this->assertSame(1, $usage['used']['group'], 'the group item should count as group');
     }
+
+    public function test_offstage_writing_submax_blocks_a_second_writing_item_even_under_the_general_offstage_cap(): void
+    {
+        [$event, $schoolId] = $this->fixture(['max_offstage_writing_per_student' => 1]);
+        $studentId = 1;
+
+        $essay = FestEventItem::create(['event_id' => $event->id, 'title' => 'Essay Writing', 'item_code' => 'WR1', 'category' => 'literary', 'stage_type' => 'off_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $this->registerStudentFor($event, $schoolId, $studentId, $essay);
+
+        $story = FestEventItem::create(['event_id' => $event->id, 'title' => 'Story Writing', 'item_code' => 'WR2', 'category' => 'literary', 'stage_type' => 'off_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+
+        $service = new FestParticipationLimitService($event);
+        $errors = $service->validateRegistration($story, $schoolId, [$studentId]);
+
+        $this->assertNotEmpty($errors, 'a second writing item must be blocked once the writing sub-cap is reached');
+        $this->assertStringContainsString('writing items', implode(' ', $errors));
+    }
+
+    public function test_offstage_drawing_submax_does_not_block_a_writing_item(): void
+    {
+        [$event, $schoolId] = $this->fixture(['max_offstage_drawing_per_student' => 1]);
+        $studentId = 1;
+
+        $drawing = FestEventItem::create(['event_id' => $event->id, 'title' => 'Pencil Drawing', 'item_code' => 'DR1', 'category' => 'fine_arts', 'stage_type' => 'off_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $this->registerStudentFor($event, $schoolId, $studentId, $drawing);
+
+        $essay = FestEventItem::create(['event_id' => $event->id, 'title' => 'Essay Writing', 'item_code' => 'WR3', 'category' => 'literary', 'stage_type' => 'off_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+
+        $service = new FestParticipationLimitService($event);
+        $errors = $service->validateRegistration($essay, $schoolId, [$studentId]);
+
+        $this->assertSame([], $errors, 'a filled drawing sub-cap must not block a writing item: '.implode(' | ', $errors));
+    }
 }

@@ -40,6 +40,8 @@ export function useEventSettingsForms(props) {
         max_total_per_student: props.participationPolicy?.max_total_per_student ?? '',
         max_onstage_per_student: props.participationPolicy?.max_onstage_per_student ?? '',
         max_offstage_per_student: props.participationPolicy?.max_offstage_per_student ?? '',
+        max_offstage_writing_per_student: props.participationPolicy?.max_offstage_writing_per_student ?? '',
+        max_offstage_drawing_per_student: props.participationPolicy?.max_offstage_drawing_per_student ?? '',
         max_group_per_student: props.participationPolicy?.max_group_per_student ?? '',
         // Per-school caps: the controller/service already validate and enforce these
         // (FestParticipationPolicyController, FestParticipationLimitService) — they just
@@ -203,6 +205,7 @@ export function useEventSettingsForms(props) {
         per_item_amount: existingFeeSettings.per_item_amount ?? schedule.per_item_amount ?? '',
         per_student_amount: existingFeeSettings.per_student_amount ?? schedule.per_student_amount ?? '',
         student_count_slabs: initialStudentCountSlabs,
+        student_count_slab_basis: existingFeeSettings.student_count_slab_basis ?? schedule.student_count_slab_basis ?? 'event_registrations',
         school_registration_flat: existingFeeSettings.school_registration_flat ?? schedule.school_registration_flat ?? '',
         included_items_per_student: existingFeeSettings.included_items_per_student ?? schedule.included_items_per_student ?? '',
         school_fee_cap: existingFeeSettings.school_fee_cap ?? schedule.school_fee_cap ?? '',

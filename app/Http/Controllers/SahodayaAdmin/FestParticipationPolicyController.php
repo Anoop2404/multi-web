@@ -24,6 +24,8 @@ class FestParticipationPolicyController extends SahodayaAdminController
             'max_group_per_school' => 'nullable|integer|min:0',
             'max_onstage_per_student' => 'nullable|integer|min:0',
             'max_offstage_per_student' => 'nullable|integer|min:0',
+            'max_offstage_writing_per_student' => 'nullable|integer|min:0',
+            'max_offstage_drawing_per_student' => 'nullable|integer|min:0',
             'max_group_per_student' => 'nullable|integer|min:0',
             'max_total_per_student' => 'nullable|integer|min:0',
             'one_entry_per_item_per_school' => 'nullable|boolean',

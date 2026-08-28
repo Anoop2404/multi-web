@@ -13,6 +13,7 @@ use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Models\FestSchoolEventFeeLine;
 use App\Models\FestStateProgram;
+use App\Models\Student;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Fees\FeeReceiptAttachmentService;
@@ -392,12 +393,15 @@ class FestSchoolEventFeeService
     }
 
     /**
-     * 'student_count_slab' fee model — bills a school a single stepped amount based on
-     * its total registered student count for the event, per a slab table configured in
-     * fee_settings.student_count_slabs (list of {min_count, max_count, amount}; a null
-     * max_count means "and above"). Per-Sahodaya, per-event-type by construction, since
-     * it's just more of that event's own fee_settings JSON — see
-     * docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §7.4.
+     * 'student_count_slab' fee model — bills a school a single stepped amount based on a
+     * student count, per a slab table configured in fee_settings.student_count_slabs (list
+     * of {min_count, max_count, amount}; a null max_count means "and above"). Per-Sahodaya,
+     * per-event-type by construction, since it's just more of that event's own fee_settings
+     * JSON — see docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §7.4.
+     *
+     * $studentCount's source depends on fee_settings.student_count_slab_basis — either the
+     * school's students registered for this event (default) or its whole active-student
+     * enrollment — resolved by callers via studentCountSlabBasisCount() before this is called.
      *
      * A count landing outside every configured range (gaps, or slabs that don't cover
      * 0..∞) falls back to the highest configured slab rather than silently billing ₹0 —
@@ -426,6 +430,23 @@ class FestSchoolEventFeeService
             && ($slab['max_count'] === null || $studentCount <= $slab['max_count']));
 
         return (float) ($match['amount'] ?? $slabs->last()['amount']);
+    }
+
+    /**
+     * Which count to look up a 'student_count_slab' bracket by, per
+     * fee_settings.student_count_slab_basis: the school's students registered for this event
+     * (default — same $eventRegisteredCount already computed by the caller), or the school's
+     * whole active-student enrollment regardless of event registration. Only the slab bracket
+     * changes basis this way — the optional per-student surcharge always bills against actual
+     * registered students, so callers keep using $eventRegisteredCount for that term.
+     */
+    private function studentCountSlabBasisCount(string $schoolId, array $schedule, int $eventRegisteredCount): int
+    {
+        if (($schedule['student_count_slab_basis'] ?? 'event_registrations') !== 'school_total_enrollment') {
+            return $eventRegisteredCount;
+        }
+
+        return Student::where('tenant_id', $schoolId)->where('status', 'active')->count();
     }
 
     /** @param  ?int  $phaseId  When given, count only items assigned to this FestEventPhase (see recalculateForPhase()). */
@@ -885,8 +906,10 @@ class FestSchoolEventFeeService
                 'cksc_tiered' => $this->participationFee($itemCount, $schedule),
                 'per_item' => $itemCount * (float) ($schedule['per_item_amount'] ?? 0),
                 'per_student' => $studentCount * (float) ($schedule['per_student_amount'] ?? 0),
-                'student_count_slab' => $this->studentCountSlabFee($studentCount, $schedule)
-                    + ($studentCount * (float) ($schedule['per_student_amount'] ?? 0)),
+                'student_count_slab' => $this->studentCountSlabFee(
+                    $this->studentCountSlabBasisCount($schoolId, $schedule, $studentCount),
+                    $schedule
+                ) + ($studentCount * (float) ($schedule['per_student_amount'] ?? 0)),
                 // flat_school isn't part of per-phase billing today — a flat-school event has
                 // nothing to split by phase (see plan doc's "Explicitly not changing" note).
                 default => 0.0,
@@ -1113,7 +1136,10 @@ class FestSchoolEventFeeService
                 'per_item' => $itemCount * (float) ($schedule['per_item_amount'] ?? 0),
                 'flat_school' => (float) ($schedule['flat_amount'] ?? $schedule['fee_amount'] ?? 0),
                 'per_student' => $studentCount * (float) ($schedule['per_student_amount'] ?? 0),
-                'student_count_slab' => $this->studentCountSlabFee($studentCount, $schedule) + ($studentCount * (float) ($schedule['per_student_amount'] ?? 0)),
+                'student_count_slab' => $this->studentCountSlabFee(
+                    $this->studentCountSlabBasisCount($schoolId, $schedule, $studentCount),
+                    $schedule
+                ) + ($studentCount * (float) ($schedule['per_student_amount'] ?? 0)),
                 default => 0,
             };
 

@@ -36,20 +36,23 @@ class FestParticipationLimitService
      * this instead of re-deriving the same three flags independently, which is what let
      * on-stage-group items silently double-count against both buckets before.
      *
-     * @return array{on_stage: bool, off_stage: bool, group: bool}
+     * @return array{on_stage: bool, off_stage: bool, group: bool, offstage_writing: bool, offstage_drawing: bool}
      */
     private function itemDimensions(?FestEventItem $item): array
     {
         if (! $item) {
-            return ['on_stage' => false, 'off_stage' => false, 'group' => false];
+            return ['on_stage' => false, 'off_stage' => false, 'group' => false, 'offstage_writing' => false, 'offstage_drawing' => false];
         }
 
         $isGroup = $item->isTeamItem();
+        $isOffStage = ! $isGroup && ($item->stage_type ?? '') === 'off_stage';
 
         return [
             'on_stage' => ! $isGroup && ($item->stage_type ?? '') === 'on_stage',
-            'off_stage' => ! $isGroup && ($item->stage_type ?? '') === 'off_stage',
+            'off_stage' => $isOffStage,
             'group' => $isGroup,
+            'offstage_writing' => $isOffStage && ($item->category ?? '') === 'literary',
+            'offstage_drawing' => $isOffStage && ($item->category ?? '') === 'fine_arts',
         ];
     }
 
@@ -436,6 +439,22 @@ class FestParticipationLimitService
             if ($count > (int) $policy['max_offstage_per_student']) {
                 $name = Student::where('id', $studentId)->value('name') ?? 'Student';
                 $errors[] = "{$name} exceeds max {$policy['max_offstage_per_student']} off-stage items.";
+            }
+        }
+
+        if ($dims['offstage_writing'] && ! empty($policy['max_offstage_writing_per_student'])) {
+            $count = $this->filterRegs($studentRegs, 'offstage_writing')->count() + 1;
+            if ($count > (int) $policy['max_offstage_writing_per_student']) {
+                $name = Student::where('id', $studentId)->value('name') ?? 'Student';
+                $errors[] = "{$name} exceeds max {$policy['max_offstage_writing_per_student']} off-stage writing items.";
+            }
+        }
+
+        if ($dims['offstage_drawing'] && ! empty($policy['max_offstage_drawing_per_student'])) {
+            $count = $this->filterRegs($studentRegs, 'offstage_drawing')->count() + 1;
+            if ($count > (int) $policy['max_offstage_drawing_per_student']) {
+                $name = Student::where('id', $studentId)->value('name') ?? 'Student';
+                $errors[] = "{$name} exceeds max {$policy['max_offstage_drawing_per_student']} off-stage drawing items.";
             }
         }
 

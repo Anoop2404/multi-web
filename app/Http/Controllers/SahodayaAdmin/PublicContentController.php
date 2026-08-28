@@ -16,9 +16,12 @@ class PublicContentController extends SahodayaAdminController
 {
     public function index()
     {
+        $site = WebsiteSite::ensurePrimary($this->sahodaya->id);
+
         return $this->inertia('Sahodaya/PublicContent/Index', [
             'content'              => SahodayaHomepageContent::get($this->sahodaya),
             'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->sahodaya),
+            'experienceVersion'    => $site->experience_version,
         ]);
     }
 

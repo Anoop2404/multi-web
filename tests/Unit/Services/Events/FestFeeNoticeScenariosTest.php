@@ -488,6 +488,55 @@ class FestFeeNoticeScenariosTest extends TestCase
     }
 
     /**
+     * student_count_slab_basis = 'school_total_enrollment' bills the slab bracket off the
+     * school's whole active-student roll, not how many it happens to register for this one
+     * event — the school below has 5 active students but registers only 2 for the event, so
+     * the slab must land on the 5-student band (₹8,000), not the 2-student band (₹6,000).
+     * The per-student surcharge stays keyed to actual registrations (2 × ₹450 = ₹900)
+     * regardless of the slab basis, so combined total is 8000 + 900 = ₹8,900.
+     */
+    public function test_student_count_slab_basis_uses_school_total_enrollment_not_event_registrations(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school] = $this->makeSahodayaAndSchool('SlabBasis');
+
+        // 5 active students on the school's roll in total...
+        $registeredStudents = [];
+        foreach (range(1, 5) as $i) {
+            $student = $this->makeStudent($school, "Roll Student {$i}");
+            if ($i <= 2) {
+                $registeredStudents[] = $student;
+            }
+        }
+
+        $event = FestEvent::create([
+            'tenant_id'    => $sahodaya->id,
+            'title'        => 'Slab Basis Kalolsav',
+            'event_type'   => 'kalolsavam',
+            'level_round'  => 'sahodaya',
+            'status'       => 'registration_open',
+            'fee_settings' => [
+                'fee_model'                 => 'student_count_slab',
+                'student_count_slab_basis'  => 'school_total_enrollment',
+                'per_student_amount'        => 450,
+                'student_count_slabs'       => [
+                    ['min_count' => 1, 'max_count' => 4, 'amount' => 6000],
+                    ['min_count' => 5, 'max_count' => 9, 'amount' => 8000],
+                ],
+            ],
+        ]);
+
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        // ...but only 2 of them are registered for this event.
+        foreach ($registeredStudents as $i => $student) {
+            $this->approvedRegistration($event, $item, $school, $student);
+        }
+
+        $fee = app(FestSchoolEventFeeService::class)->recalculate($event->fresh(), $school->id);
+
+        $this->assertSame(8900.0, (float) $fee->total_due, '5-student band (₹8,000) + 2 registered × ₹450 = ₹8,900');
+    }
+
+    /**
      * MCS's actual full structure (school registration + per-student + 1 included item, ₹50/extra —
      * i.e. kalolsavam_composite's shape) split across "Level 1"/"Level 2" phases. Distinct from
      * test_mcs_two_level_registration_notice() above, which only exercised the flat registration

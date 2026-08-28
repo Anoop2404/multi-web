@@ -492,6 +492,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'student_count_slabs.*.min_count' => 'nullable|integer|min:0',
             'student_count_slabs.*.max_count' => 'nullable|integer|min:0',
             'student_count_slabs.*.amount' => 'nullable|numeric|min:0',
+            'student_count_slab_basis' => 'nullable|in:event_registrations,school_total_enrollment',
             'school_fee_cap' => 'nullable|numeric|min:0',
             'school_fee_min' => 'nullable|numeric|min:0',
             'include_school_registration' => 'nullable|boolean',

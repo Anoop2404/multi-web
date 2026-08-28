@@ -32,6 +32,19 @@
                             <input v-model.number="policyForm.max_offstage_per_student" type="number" min="0" class="field" placeholder="0 (No cap)">
                         </FormField>
                     </FormGrid>
+
+                    <FormGrid>
+                        <FormField label="Writing / Student" hint="Max off-stage writing items (essay, story, versification)">
+                            <input v-model.number="policyForm.max_offstage_writing_per_student" type="number" min="0" class="field" placeholder="0 (No cap)">
+                        </FormField>
+                        <FormField label="Drawing / Student" hint="Max off-stage drawing items (pencil, painting, cartoon)">
+                            <input v-model.number="policyForm.max_offstage_drawing_per_student" type="number" min="0" class="field" placeholder="0 (No cap)">
+                        </FormField>
+                    </FormGrid>
+                    <p class="text-[11px] text-slate-500">
+                        Writing and Drawing are sub-limits within the Off-Stage cap above — they narrow how many of
+                        the off-stage total a student can spend on that item type, not an additional allowance.
+                    </p>
                 </div>
 
                 <!-- Group & Team Items Policy Card -->
@@ -60,6 +73,7 @@
                         <ul class="list-disc list-inside space-y-0.5 text-indigo-800 text-[11.5px]">
                             <li><strong>Individual Cap:</strong> Overall limit for solo items (On-stage + Off-stage combined).</li>
                             <li><strong>On-Stage & Off-Stage:</strong> Max allowed items from each menu.</li>
+                            <li><strong>Writing & Drawing:</strong> Optional sub-limits inside the Off-Stage cap for literary and fine-arts items specifically.</li>
                             <li><strong>Group Cap:</strong> Separate limit for group/team/pair items per student.</li>
                         </ul>
                     </div>
