@@ -34,6 +34,18 @@ class FestRegistrationBulkService
             ->when($itemId, fn ($q) => $q->whereIn('item_id', $event->reportableItemIds([$itemId])));
 
         foreach ($query->with(['participants', 'item', 'event'])->get() as $registration) {
+            // Each registration in a bulk batch can belong to a different item, so the
+            // item-level freeze (EventLifecycleGate::assertItemRosterNotFrozen()) can't be
+            // checked once for the whole batch like the event-level call above — it must be
+            // evaluated per registration. Skipped (not aborted) so one already-published
+            // item doesn't block the rest of an otherwise-valid batch.
+            if (! $overrideLifecycle && $registration->item?->results_published_at) {
+                $errors[] = "Registration #{$registration->id}: this item's results are already published.";
+                $skipped++;
+
+                continue;
+            }
+
             if (! $overrideLifecycle && ($policy['require_fee_before_approval'] ?? false) && $feeService->feeRequired($event)) {
                 if (! $feeService->isPaidForRegistration($event, $registration)) {
                     $feeLabel = $feeService->usesPerHeadBilling($event) ? 'Event Head fee' : 'Event fee';
@@ -79,7 +91,17 @@ class FestRegistrationBulkService
         // a row that never exists for a partitioned child.
         $feeOwnerEventId = $feeService->feeOwnerEvent($event)->id;
 
-        foreach ($query->with('participants')->get() as $registration) {
+        foreach ($query->with(['participants', 'item'])->get() as $registration) {
+            // See the identical per-registration check in approveMany() above for why this
+            // can't be a single check up front — each registration here can belong to a
+            // different item.
+            if (! $overrideLifecycle && $registration->item?->results_published_at) {
+                $errors[] = "Registration #{$registration->id}: this item's results are already published.";
+                $skipped++;
+
+                continue;
+            }
+
             // Only the DB-mutating snapshot/update/credit critical section is locked and
             // transactional — notifier/audit calls happen after commit, outside the lock, so a
             // slow mail/notification dispatch never holds the row lock open. See

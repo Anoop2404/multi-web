@@ -142,7 +142,7 @@ class FestEventOpsController extends Controller
         abort_if($registration->event_id !== $event->id, 403);
         $this->authorizeDuty($request, $event->id, 'registration');
 
-        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
+        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'), $registration->item);
 
         $feeService = app(FestSchoolEventFeeService::class);
         if ($feeService->feeRequired($event)) {
@@ -172,7 +172,7 @@ class FestEventOpsController extends Controller
         abort_if($registration->event_id !== $event->id, 403);
         $this->authorizeDuty($request, $event->id, 'registration');
 
-        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
+        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'), $registration->item);
 
         $reason = $request->string('rejection_reason', '')->toString();
 

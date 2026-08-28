@@ -17,7 +17,7 @@ class FestRegistrationsWriteApiController extends SahodayaApiController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($registration->event_id !== $event->id, 403);
 
-        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
+        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'), $registration->item);
 
         $feeService = app(FestSchoolEventFeeService::class);
         if ($feeService->feeRequired($event)) {
@@ -38,7 +38,7 @@ class FestRegistrationsWriteApiController extends SahodayaApiController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($registration->event_id !== $event->id, 403);
 
-        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
+        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'), $registration->item);
 
         $registration->loadMissing('item', 'participants');
         $headId = $registration->item?->head_id;

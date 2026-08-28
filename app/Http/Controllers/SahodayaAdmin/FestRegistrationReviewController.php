@@ -349,7 +349,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         // entry). Matches the bulk service's scope exactly.
         abort_unless($registration->status === 'submitted', 422, 'This registration is not awaiting approval — it is already '.$registration->status.'.');
 
-        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
+        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'), $registration->item);
 
         $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
         $feeService = app(FestSchoolEventFeeService::class);
@@ -390,7 +390,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         // reportableEventIds() correctly; this brings the individual actions in line.
         abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
 
-        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
+        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'), $registration->item);
 
         // The UI only ever shows "Reject" for a still-submitted registration (never an
         // approved/paid one — see Registrations.vue), but this endpoint doesn't otherwise

@@ -37,6 +37,12 @@ class FestRegistrationService
         // mutation so it can't be bypassed by a caller forgetting the
         // separate check.
         abort_if($event->results_published, 422, 'Results have already been published for this event — this registration can no longer be cancelled.');
+        // Same reasoning as the check above — moved into the mutating method itself
+        // rather than left solely in canSchoolCancel()/canAdminCancel(), so it can't be
+        // bypassed by a caller that forgets the separate check. See
+        // EventLifecycleGate::assertItemRosterNotFrozen()'s own docblock for why an
+        // item can be published independently of the whole event.
+        abort_if($registration->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to cancel this registration.');
 
         $registration->loadMissing('item', 'participants');
         $headId = $registration->item?->head_id;
@@ -95,6 +101,10 @@ class FestRegistrationService
         }
 
         if ($event->results_published) {
+            return false;
+        }
+
+        if ($registration->item?->results_published_at) {
             return false;
         }
 
@@ -245,6 +255,10 @@ class FestRegistrationService
             return false;
         }
 
+        if ($registration->item?->results_published_at) {
+            return false;
+        }
+
         if (app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration)) {
             return false;
         }
@@ -278,6 +292,10 @@ class FestRegistrationService
             return false;
         }
 
+        if ($registration->item?->results_published_at) {
+            return false;
+        }
+
         // "Block new registrations" is meant to freeze rosters too (e.g. before chest
         // numbers/printing) — previously only allowRegistration() (new submissions)
         // checked this, so an already-approved roster stayed editable regardless.
@@ -298,15 +316,26 @@ class FestRegistrationService
             return false;
         }
 
+        if ($registration->item?->results_published_at) {
+            return false;
+        }
+
         return ! app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration);
     }
 
-    /** Swap a performer with a standby on the same registration (pre-stage emergency). */
+    /**
+     * Swap a performer with a standby on the same registration (pre-stage emergency).
+     * Previously had no lifecycle check at all — every other roster-write action in this
+     * file blocks once the event or item is published, but a substitution could still
+     * silently change who the recorded winner/participant actually was after the fact.
+     */
     public function substitutePerformer(FestParticipant $performer, FestParticipant $standby): void
     {
         abort_if($performer->registration_id !== $standby->registration_id, 422, 'Participants must belong to the same registration.');
         abort_if($standby->participant_role !== 'standby', 422, 'Target must be a standby.');
         abort_if($performer->participant_role === 'standby', 422, 'Cannot substitute a standby performer.');
+        abort_if($performer->registration?->event?->results_published, 422, 'Results have already been published for this event.');
+        abort_if($performer->registration?->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to substitute participants.');
 
         $performer->update(['participant_role' => 'standby']);
         $standby->update(['participant_role' => 'performer']);
@@ -325,6 +354,7 @@ class FestRegistrationService
     {
         abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 422);
         abort_if($event->results_published, 422, 'Results have already been published for this event.');
+        abort_if($registration->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to add a participant.');
         abort_unless(in_array($role, ['performer', 'standby'], true), 422, 'Invalid role.');
         abort_if((string) $student->tenant_id !== (string) $registration->school_id, 422, "The student's school does not match this registration.");
 
@@ -397,6 +427,7 @@ class FestRegistrationService
         $registration = $participant->registration;
         abort_unless($registration && in_array($registration->event_id, $event->reportableEventIds(), true), 422);
         abort_if($event->results_published, 422, 'Results have already been published for this event.');
+        abort_if($registration->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to remove a participant.');
 
         $registration->loadMissing('participants');
         abort_if($registration->participants->count() <= 1, 422, 'Cannot remove the last participant on a registration — cancel the registration instead.');

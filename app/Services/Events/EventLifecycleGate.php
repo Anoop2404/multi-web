@@ -47,6 +47,8 @@ class EventLifecycleGate
             throw new HttpException(403, 'The item does not belong to this event.');
         }
 
+        self::assertItemRosterNotFrozen($item);
+
         if (! $event->phase_mode_enabled || ! $item) {
             self::allowRegistration($event);
 
@@ -76,8 +78,14 @@ class EventLifecycleGate
         }
     }
 
-    /** Staff review of submitted registrations (approve/reject). Pass override=true to bypass closed registration. */
-    public static function allowRegistrationReview(FestEvent $event, bool $override = false): void
+    /**
+     * Staff review of submitted registrations (approve/reject). Pass override=true to
+     * bypass closed registration — including, deliberately, the item-level roster freeze
+     * below: an admin who's already consciously opting out of lifecycle checks for one
+     * late correction shouldn't then be blocked by a second, narrower check inside the
+     * same method.
+     */
+    public static function allowRegistrationReview(FestEvent $event, bool $override = false, ?FestEventItem $item = null): void
     {
         if ($override) {
             return;
@@ -89,6 +97,28 @@ class EventLifecycleGate
 
         if ($event->results_published || $event->status === 'completed') {
             throw new HttpException(422, 'Registration review is closed after results are published.');
+        }
+
+        self::assertItemRosterNotFrozen($item);
+    }
+
+    /**
+     * Once an item's results are published, its roster is frozen — same principle as
+     * allowMarkEntryForItem()'s own guard on marks (above), applied to registration
+     * writes. Deliberately independent of phase_mode_enabled/allowRegistrationForItem()'s
+     * phase-lifecycle branch: FestItemResultsService::publishItem() lets a non-phased
+     * event publish one item's results on its own, and every registration-write path
+     * (school AND admin — new registrations, roster edits, withdraw, admin cancel,
+     * add/remove participant, substitute) previously checked only the event-wide
+     * results_published flag, leaving an already-published item's own roster fully
+     * editable until the WHOLE event was published too. Confirmed as the likely cause of
+     * a real production certificate discrepancy this session (a team's registration
+     * changed after its own item was published but before the event was).
+     */
+    public static function assertItemRosterNotFrozen(?FestEventItem $item): void
+    {
+        if ($item && $item->results_published_at) {
+            throw new HttpException(422, 'This item\'s results are already published. Unpublish it first to edit its registrations.');
         }
     }
 
