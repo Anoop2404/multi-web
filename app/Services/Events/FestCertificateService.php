@@ -679,7 +679,8 @@ class FestCertificateService
             3 => 'Third Prize',
             default => null,
         };
-        $gradeSuffix = ($certType === 'winner' && $mark?->grade) ? ' with '.$mark->grade.' Grade' : '';
+        $winnerGrade = ($certType === 'winner' && $event && $item) ? $this->effectiveGrade($mark, $event, $item->id) : $mark?->grade;
+        $gradeSuffix = ($certType === 'winner' && $winnerGrade) ? ' with '.$winnerGrade.' Grade' : '';
 
         $achievementLine = match (true) {
             $recordBreak !== null => 'set a new record',
@@ -727,7 +728,7 @@ class FestCertificateService
         // this only ever holds entries for items that actually have one.
         $itemGrades = ($certType === 'participation' && $participant && $event)
             ? $this->participationGradesByItem($participant, $event, $eventParticipants)
-            : (($item && $mark?->grade) ? collect([$item->id => $mark->grade]) : collect());
+            : (($item && $event) ? collect(array_filter([$item->id => $this->effectiveGrade($mark, $event, $item->id)])) : collect());
 
         // Same gender-normalization pattern as participantPhotoUrl() above, applied to a
         // Master/Miss honorific instead of an avatar choice. Falls back to the
@@ -831,15 +832,42 @@ class FestCertificateService
             ? $p->student_id === $participant->student_id
             : $p->teacher_id === $participant->teacher_id);
 
+        // Not pre-filtered to whereNotNull('grade') — a mark can carry a real score/
+        // position with grade left blank (see effectiveGrade()'s own docblock), so
+        // fetch every mark for the group and let effectiveGrade() decide per row.
         return FestMark::whereIn('participant_id', $group->pluck('id'))
-            ->whereNotNull('grade')
-            ->where('grade', '!=', '')
-            ->get(['participant_id', 'grade'])
-            ->mapWithKeys(function (FestMark $mark) use ($group) {
+            ->get(['participant_id', 'item_id', 'grade', 'score'])
+            ->mapWithKeys(function (FestMark $mark) use ($group, $event) {
                 $itemId = $group->firstWhere('id', $mark->participant_id)?->registration?->item_id;
+                $grade = $itemId ? $this->effectiveGrade($mark, $event, $itemId) : null;
 
-                return $itemId ? [$itemId => $mark->grade] : [];
+                return $grade ? [$itemId => $grade] : [];
             });
+    }
+
+    /**
+     * The grade a results screen would actually show for this mark — FestItemResultsService
+     * ::resultRowsForItem() derives it live from score via FestGradePointService
+     * ::resolveGradeFromScore() whenever a score is present, falling back to the raw
+     * grade column only if that derivation comes back empty. FestMark.grade itself is
+     * NOT reliably populated: a mark saved with only a score/position (no explicit
+     * grade) can sit with grade='' indefinitely — confirmed against a real production
+     * mark (score 168, position 4, grade '') whose results page still correctly showed
+     * "Grade A", computed the same way this method now does. Certificates previously
+     * read $mark->grade directly, so an item like that showed on the certificate with
+     * no grade at all even though every results view for the same mark showed one.
+     */
+    private function effectiveGrade(?FestMark $mark, FestEvent $event, int $itemId): ?string
+    {
+        if (! $mark) {
+            return null;
+        }
+
+        if ($mark->score !== null) {
+            return app(FestGradePointService::class)->resolveGradeFromScore($event, $itemId, (float) $mark->score) ?: $mark->grade;
+        }
+
+        return $mark->grade;
     }
 
     /**
