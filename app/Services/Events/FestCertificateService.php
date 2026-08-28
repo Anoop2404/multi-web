@@ -36,6 +36,7 @@ class FestCertificateService
         }
 
         $created = [];
+        $qualifyingParticipantIds = [];
 
         $marks = FestMark::whereIn('event_id', $event->reportableEventIds())
             ->when($itemId, fn ($q) => $q->where('item_id', $itemId))
@@ -49,6 +50,8 @@ class FestCertificateService
             if (! $participant || $participant->disqualified_at || $participant->participant_role === 'standby') {
                 continue;
             }
+
+            $qualifyingParticipantIds[] = $participant->id;
 
             $template = $this->resolveTemplate($event, $participant->registration?->item?->id, 'winner');
 
@@ -72,7 +75,93 @@ class FestCertificateService
             $created[] = $cert;
         }
 
+        $this->revokeStaleWinnerCertificates($event, $itemId, $qualifyingParticipantIds);
+
         return $created;
+    }
+
+    /**
+     * Deletes winner Certificate rows for participants who no longer qualify — their
+     * mark's position moved past 3rd, they were disqualified, or their mark was removed
+     * entirely, all AFTER their certificate was originally generated. generateForEvent()
+     * previously only ever ADDED certificates for whoever currently qualifies; nothing
+     * re-checked an already-issued one against a later mark correction, so a team bumped
+     * from 3rd to 4th (to make room for a newly-corrected tie, for example) kept an
+     * incorrect "winner" certificate indefinitely — confirmed against real production
+     * data: an event where an 11-member team newly at position 3 had no certificate at
+     * all, while two teams at position 4 (evidently 3rd before a correction) still held
+     * one. Scoped the same way generateForEvent() itself is — the whole event, or one
+     * item when $itemId is given — so a single-item regenerate doesn't reach into
+     * unrelated items' certificates.
+     *
+     * @param  list<int>  $qualifyingParticipantIds
+     */
+    private function revokeStaleWinnerCertificates(FestEvent $event, ?int $itemId, array $qualifyingParticipantIds): void
+    {
+        $participantIdsInScope = FestParticipant::whereHas('registration', fn ($q) => $q
+            ->whereIn('event_id', $event->reportableEventIds())
+            ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId)))
+            ->pluck('id');
+
+        $staleCertificates = Certificate::where('entity_type', FestParticipant::class)
+            ->where('cert_type', 'winner')
+            ->whereIn('entity_id', $participantIdsInScope)
+            ->whereNotIn('entity_id', $qualifyingParticipantIds)
+            ->get();
+
+        $this->deleteCertificatesWithFiles($staleCertificates);
+    }
+
+    /**
+     * Deletes participation Certificate rows for people no longer represented by any
+     * current group anchor — either because they're no longer eligible at all (every one
+     * of their items was dropped, they were disqualified, or marked absent everywhere),
+     * or because their anchor shifted to a different FestParticipant row (the specific
+     * row that used to sort first by id was excluded, but the person is still eligible
+     * via a later one) — firstOrCreate() above already created/found the certificate at
+     * the new anchor, so the old one is now a duplicate, not just stale.
+     *
+     * @param  list<int>  $currentAnchorIds
+     */
+    private function revokeStaleParticipationCertificates(FestEvent $event, array $currentAnchorIds): void
+    {
+        $participantIdsInScope = FestParticipant::where(function ($q) use ($event) {
+            $q->whereIn('event_id', $event->reportableEventIds())
+                ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+        })->pluck('id');
+
+        $staleCertificates = Certificate::where('entity_type', FestParticipant::class)
+            ->where('cert_type', 'participation')
+            ->whereIn('entity_id', $participantIdsInScope)
+            ->whereNotIn('entity_id', $currentAnchorIds)
+            ->get();
+
+        $this->deleteCertificatesWithFiles($staleCertificates);
+    }
+
+    /**
+     * Deletes each certificate's cached PDF files (best-effort — an orphaned storage
+     * object isn't worth failing the revocation over) before deleting the row itself, so
+     * a revoked certificate doesn't leave its rendered files behind indefinitely.
+     */
+    private function deleteCertificatesWithFiles(\Illuminate\Support\Collection $certificates): void
+    {
+        foreach ($certificates as $certificate) {
+            foreach (['file_path', 'plain_file_path'] as $pathField) {
+                if (! $certificate->{$pathField}) {
+                    continue;
+                }
+
+                try {
+                    \Illuminate\Support\Facades\Storage::disk($certificate->storage_disk ?? TenantStorage::uploadDisk())
+                        ->delete($certificate->{$pathField});
+                } catch (\Throwable) {
+                    // Best-effort cleanup only.
+                }
+            }
+
+            $certificate->delete();
+        }
     }
 
     /**
@@ -92,6 +181,7 @@ class FestCertificateService
         }
 
         $created = [];
+        $currentAnchorIds = [];
 
         // itemId is deliberately null: an aggregate cert must resolve the event-level
         // (or tenant-wide) participation template, never one item's narrow one.
@@ -99,6 +189,7 @@ class FestCertificateService
 
         foreach ($this->participationGroupsForEvent($event) as $group) {
             $anchor = $group->sortBy('id')->first();
+            $currentAnchorIds[] = $anchor->id;
 
             $cert = Certificate::firstOrCreate(
                 [
@@ -115,6 +206,8 @@ class FestCertificateService
 
             $created[] = $cert;
         }
+
+        $this->revokeStaleParticipationCertificates($event, $currentAnchorIds);
 
         return $created;
     }
