@@ -8,6 +8,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
+use App\Support\CertificateStalenessMarker;
 use Illuminate\Validation\ValidationException;
 
 class FestMarkSaveService
@@ -109,6 +110,18 @@ class FestMarkSaveService
         if (($mark->score ?? '') === '' && ($mark->grade || $mark->position)) {
             $mark->update(['score' => $this->gradePointService->pointsForMark($event, $mark->fresh())]);
         }
+
+        // A certificate already rendered before this mark existed (or with a different
+        // grade/position) would otherwise keep serving its cached PDF indefinitely —
+        // cachedOrFreshPdf() only re-renders when is_stale is true, and nothing else on
+        // this save path ever flips it (confirmed: CertificateStalenessMarker had zero
+        // call sites anywhere before this one). markStaleForParticipant() covers this
+        // participant's own winner certificate, if any; the aggregate call covers their
+        // participation certificate, which is anchored to a different FestParticipant
+        // row (generateParticipationForEvent()'s "first by id" anchor) and lists every
+        // item + grade they have across the whole event, not just this one.
+        CertificateStalenessMarker::markStaleForParticipant($participant->id);
+        CertificateStalenessMarker::markStaleForParticipationAggregate($event->id, $participant->student_id, $participant->teacher_id);
 
         $recordResult = $this->recordService->evaluateMark($mark->fresh());
 

@@ -11,6 +11,7 @@ use App\Models\FestParticipant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestAttendanceImportService;
 use App\Services\Events\FestNumberingService;
+use App\Support\CertificateStalenessMarker;
 use App\Support\FestPageActivity;
 use Illuminate\Http\Request;
 
@@ -123,6 +124,8 @@ class FestAttendanceController extends SahodayaAdminController
             );
         }
 
+        $this->markCertificatesStaleFor($event, $participantIds);
+
         $personName = $participant->student?->name ?? $participant->teacher?->name ?? $participant->group?->name ?? "Participant #{$data['participant_id']}";
         $chestNo = $participant->group?->chest_no ?? $participant->chest_no;
         $chestLabel = $chestNo ? "Chest #{$chestNo}" : "Participant #{$data['participant_id']}";
@@ -170,6 +173,24 @@ class FestAttendanceController extends SahodayaAdminController
             ->all();
     }
 
+    /**
+     * Marking someone absent (or reverting them to present) can change whether they're
+     * eligible for a participation certificate at all, or which of their items appear on
+     * it (see FestCertificateService::eligibleParticipantsForEvent()) — without this, a
+     * certificate already rendered before an attendance change would keep serving its
+     * stale cached PDF indefinitely, exactly like the equivalent gap on the mark-entry
+     * save path (see FestMarkSaveService::save()'s own call to this same marker).
+     *
+     * @param  list<int>  $participantIds
+     */
+    private function markCertificatesStaleFor(FestEvent $event, array $participantIds): void
+    {
+        foreach (FestParticipant::whereIn('id', $participantIds)->get(['id', 'student_id', 'teacher_id']) as $participant) {
+            CertificateStalenessMarker::markStaleForParticipant($participant->id);
+            CertificateStalenessMarker::markStaleForParticipationAggregate($event->id, $participant->student_id, $participant->teacher_id);
+        }
+    }
+
     private function bulkStore(Request $request, FestEvent $event, array $eventIds, PlatformAuditLogger $audit)
     {
         $data = $request->validate([
@@ -205,6 +226,8 @@ class FestAttendanceController extends SahodayaAdminController
                 ]
             );
         }
+
+        $this->markCertificatesStaleFor($event, $data['participant_ids']);
 
         $itemModel = FestEventItem::find($data['item_id']);
         $itemTitle = $itemModel?->title ? " in {$itemModel->title}" : '';
