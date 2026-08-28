@@ -69,7 +69,7 @@ class TenantUserController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Users/Index', [
             'users'           => $users,
             'assignableRoles' => $this->roleOptions($roles),
-            'regions'         => Region::forTenant($this->sahodaya->id)->active()->orderBy('sort_order')->get(['id', 'name']),
+            'regions'         => Region::forTenant($this->sahodaya->id)->active()->globalOnly()->orderBy('sort_order')->get(['id', 'name']),
             'permissions'     => TenantUserCatalog::allPermissions(),
             'permissionLabels'=> $this->permissionLabels(),
             'permissionRoles' => TenantUserCatalog::sahodayaPermissionRoles(),

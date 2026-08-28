@@ -145,6 +145,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
             $regionOptions = \App\Models\Region::forTenant($this->sahodaya->id)
                 ->active()
+                ->globalOnly()
                 ->orderBy('name')
                 ->get(['id', 'name']);
         }

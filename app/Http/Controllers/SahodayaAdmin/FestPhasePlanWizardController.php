@@ -36,7 +36,7 @@ class FestPhasePlanWizardController extends SahodayaAdminController
             'event' => $event,
             'items' => $event->items()->where('is_enabled', true)->orderBy('display_order')->orderBy('title')
                 ->get(['id', 'title', 'item_code']),
-            'regions' => Region::forTenant($event->tenant_id)->active()->orderBy('sort_order')->get(['id', 'name', 'code']),
+            'regions' => Region::forTenant($event->tenant_id)->active()->visibleToEvent($event->id)->orderBy('sort_order')->get(['id', 'name', 'code']),
             'existingBatches' => FestRegistrationBatch::where('event_id', $event->id)->orderBy('sort_order')
                 ->get(['id', 'code', 'name', 'school_base_fee']),
             'existingPhases' => FestEventPhase::where('event_id', $event->id)->with('registrationBatch:id,code')

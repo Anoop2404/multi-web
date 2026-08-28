@@ -238,7 +238,7 @@ class TrainingProgramController extends SahodayaAdminController
                 'teaching_types' => $resolver->teachingTypes($this->sahodaya->id)->map->only(['id', 'label'])->values(),
                 'subjects' => $resolver->subjects($this->sahodaya->id)->map->only(['id', 'label'])->values(),
                 'designations' => $resolver->designations($this->sahodaya->id)->map->only(['id', 'label'])->values(),
-                'regions' => Region::forTenant($this->sahodaya->id)->active()->orderBy('sort_order')->orderBy('name')
+                'regions' => Region::forTenant($this->sahodaya->id)->active()->globalOnly()->orderBy('sort_order')->orderBy('name')
                     ->get(['id', 'name']),
                 'prior_programs' => $eligibilityPrograms,
             ],

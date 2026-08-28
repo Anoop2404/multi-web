@@ -54,6 +54,7 @@ class FestSportsRegionPartitionService
 
         $regions = Region::forTenant($season->tenant_id)
             ->active()
+            ->globalOnly()
             ->when($regionIds !== null, fn ($q) => $q->whereIn('id', $regionIds))
             ->get();
 

@@ -1152,6 +1152,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/phases/{phase}/quick-status', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'quickStatus'])->name('phases.quick-status');
             Route::delete('/{event}/phases/{phase}', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'destroy'])->name('phases.destroy');
             Route::post('/{event}/phases/assign-items', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'assignItems'])->name('phases.assign-items');
+            Route::post('/{event}/phases/regions', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'storeRegion'])->name('phases.regions.store');
             Route::post('/{event}/registration-batches', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'store'])->name('registration-batches.store');
             Route::put('/{event}/registration-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'update'])->name('registration-batches.update');
             Route::delete('/{event}/registration-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'destroy'])->name('registration-batches.destroy');

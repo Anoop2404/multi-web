@@ -60,6 +60,7 @@ class FestReportController extends SahodayaAdminController
         $headContext = $this->itemHeadReportContext($event, null, $tenantId);
 
         $regions = \App\Models\Region::forTenant($tenantId)
+            ->globalOnly()
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'name', 'code'])

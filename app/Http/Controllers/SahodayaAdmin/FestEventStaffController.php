@@ -40,6 +40,7 @@ class FestEventStaffController extends SahodayaAdminController
 
         $regionOptions = \App\Models\Region::forTenant($this->sahodaya->id)
             ->active()
+            ->globalOnly()
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -106,7 +107,7 @@ class FestEventStaffController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $regionIds = \App\Models\Region::forTenant($this->sahodaya->id)->pluck('id')->all();
+        $regionIds = \App\Models\Region::forTenant($this->sahodaya->id)->globalOnly()->pluck('id')->all();
 
         $data = $request->validate([
             'user_id' => [

@@ -38,7 +38,7 @@ class FestEventPhaseController extends SahodayaAdminController
             'phases' => $phases,
             'items' => $items,
             'registrationBatches' => $registrationBatches,
-            'regions' => Region::forTenant($event->tenant_id)->active()->orderBy('sort_order')->get(),
+            'regions' => Region::forTenant($event->tenant_id)->active()->visibleToEvent($event->id)->orderBy('sort_order')->get(),
             // Informational only on this page -- only batch creation actually flips
             // routing (FestRegistrationBatchController::store()), so phase/item setup
             // stays usable while old-system partitions exist without registrations; that
@@ -200,6 +200,37 @@ class FestEventPhaseController extends SahodayaAdminController
         ]);
 
         return back()->with('success', "Phase '{$name}' deleted.");
+    }
+
+    /**
+     * Creates a Region scoped to this event only (fest_event_id set) -- for a new region
+     * that should be selectable in this event's phase "Allowed regions" picker without
+     * showing up in Membership -> Regions, Rounds & Levels, or any other Sahodaya-wide
+     * region consumer. See docs/MCS_FOUR_PHASE_COMPLETION_PLAN.md and Region::visibleToEvent().
+     */
+    public function storeRegion(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->parent_event_id, 422, 'Configure the root event, not an operational leaf.');
+
+        $data = $request->validate([
+            'name' => 'required|string|max:120',
+        ]);
+
+        $region = Region::create([
+            'tenant_id' => $event->tenant_id,
+            'fest_event_id' => $event->id,
+            'name' => $data['name'],
+            'code' => Region::generateUniqueCode($event->tenant_id, $data['name'], $event->id),
+            'is_active' => true,
+            'sort_order' => (int) (Region::forTenant($event->tenant_id)->where('fest_event_id', $event->id)->max('sort_order') ?? 0) + 1,
+        ]);
+
+        $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.phase.region_created', "Created event-scoped region: {$region->name}", [
+            'region_id' => $region->id,
+        ]);
+
+        return back()->with('success', "Region \"{$region->name}\" created for this event.");
     }
 
     public function assignItems(Request $request, string $tenantId, FestEvent $event, FestEventPhaseService $service, PlatformAuditLogger $audit)

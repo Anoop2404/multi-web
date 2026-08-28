@@ -41,7 +41,7 @@ class FestPhasedStructureConfigurator
 
         $this->validateShape($config);
 
-        $regionsByCode = Region::forTenant($root->tenant_id)->active()->get()->keyBy('code');
+        $regionsByCode = Region::forTenant($root->tenant_id)->active()->visibleToEvent($root->id)->get()->keyBy('code');
         $itemsByCode = FestEventItem::where('event_id', $root->id)->get()->keyBy('item_code');
 
         $this->validateReferences($config, $regionsByCode, $itemsByCode);

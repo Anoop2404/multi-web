@@ -88,6 +88,7 @@ class AnnualRegistrationController extends SchoolAdminController
 
         $regions = Region::forTenant($sahodaya->id)
             ->active()
+            ->globalOnly()
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'name', 'description']);
@@ -204,7 +205,7 @@ class AnnualRegistrationController extends SchoolAdminController
         $sahodayaId = $this->school->parent_id;
         $academicYear = AcademicYear::forSchool($this->school);
 
-        $regionIds = Region::forTenant($sahodayaId)->active()->pluck('id')->all();
+        $regionIds = Region::forTenant($sahodayaId)->active()->globalOnly()->pluck('id')->all();
         $regionalGroups = $this->regionalPhaseGroups($sahodayaId);
 
         if (count($regionalGroups) >= 2) {

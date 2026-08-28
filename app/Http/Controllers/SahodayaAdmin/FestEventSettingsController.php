@@ -137,7 +137,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'ageGroupLabels' => FestSportsAgeGroup::labels($this->sahodaya->id),
             'defaultAgeGroupFees' => FestSportsAgeGroup::defaultFees($this->sahodaya->id),
             'venues'       => FestVenue::where('event_id', $event->id)->with('region:id,name')->orderBy('name')->get(),
-            'regions'      => \App\Models\Region::forTenant($this->sahodaya->id)->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+            'regions'      => \App\Models\Region::forTenant($this->sahodaya->id)->active()->globalOnly()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
             'stages'       => FestStage::where('event_id', $event->id)
                 ->with('venue:id,name')
                 ->orderBy('sort_order')

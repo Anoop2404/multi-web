@@ -179,7 +179,7 @@ class FestRegionRoundMigrationService
             abort_unless($phaseConfig, 422, "legacy_adoption references unknown phase code '{$phaseCode}'.");
             abort_unless($phaseConfig['is_regional'] ?? false, 422, "Phase '{$phaseCode}' is not regional — a legacy region child can only be adopted by a regional phase.");
 
-            $region = Region::forTenant($root->tenant_id)->findOrFail($child->region_id);
+            $region = Region::forTenant($root->tenant_id)->globalOnly()->findOrFail($child->region_id);
             abort_unless(
                 in_array($region->code, $phaseConfig['region_codes'] ?? [], true),
                 422,

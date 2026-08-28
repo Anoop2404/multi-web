@@ -239,7 +239,7 @@ class FestRegistrationController extends SchoolAdminController
         }
 
         $sahodayaId = $this->school->parent_id;
-        $regions = \App\Models\Region::forTenant($sahodayaId)->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']);
+        $regions = \App\Models\Region::forTenant($sahodayaId)->active()->globalOnly()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']);
         
         if ($regions->isEmpty()) {
             return null;
@@ -1569,7 +1569,7 @@ class FestRegistrationController extends SchoolAdminController
             'group_key' => 'nullable|string',
         ]);
 
-        $region = \App\Models\Region::forTenant($sahodayaId)->findOrFail($data['region_id']);
+        $region = \App\Models\Region::forTenant($sahodayaId)->globalOnly()->findOrFail($data['region_id']);
         $year = \App\Support\AcademicYear::forSahodaya($sahodayaId);
         $groupKey = filled($data['group_key'] ?? null) ? $data['group_key'] : null;
 

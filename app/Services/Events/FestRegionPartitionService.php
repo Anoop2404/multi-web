@@ -37,7 +37,7 @@ class FestRegionPartitionService
         }
 
         return self::$regionsApplyCache[$sahodayaId] ??=
-            Region::forTenant($sahodayaId)->active()->exists();
+            Region::forTenant($sahodayaId)->active()->globalOnly()->exists();
     }
 
     /**
@@ -267,7 +267,7 @@ class FestRegionPartitionService
         abort_if($hub->event_type === 'sports', 422, 'Sports regions must be synced below each sport discipline.');
         $this->partitions->assertLegacyPartitioningAllowed($hub);
 
-        $regions = Region::forTenant($hub->tenant_id)->active()->orderBy('sort_order')->orderBy('name')->get();
+        $regions = Region::forTenant($hub->tenant_id)->active()->globalOnly()->orderBy('sort_order')->orderBy('name')->get();
         abort_if($regions->isEmpty(), 422, 'No active regions configured for this Sahodaya.');
 
         if (($hub->conduct_mode ?? 'standard') !== 'partitioned') {
@@ -382,7 +382,7 @@ class FestRegionPartitionService
         $partitionGroup = $phase->region_partition_group;
         abort_if(! filled($partitionGroup), 422, 'Phase is not configured as a regional phase (region_partition_group is not set).');
 
-        $regions = Region::forTenant($hub->tenant_id)->active()->orderBy('sort_order')->orderBy('name')->get();
+        $regions = Region::forTenant($hub->tenant_id)->active()->globalOnly()->orderBy('sort_order')->orderBy('name')->get();
         abort_if($regions->isEmpty(), 422, 'No active regions configured for this Sahodaya.');
 
         if (($hub->conduct_mode ?? 'standard') !== 'partitioned') {

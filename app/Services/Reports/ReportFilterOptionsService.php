@@ -114,6 +114,7 @@ class ReportFilterOptionsService
     {
         return \App\Models\Region::forTenant($sahodayaId)
             ->active()
+            ->globalOnly()
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'name'])

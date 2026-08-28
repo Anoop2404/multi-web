@@ -24,6 +24,7 @@ class RegionController extends SahodayaAdminController
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
 
         $regions = Region::forTenant($this->sahodaya->id)
+            ->globalOnly()
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
@@ -71,10 +72,10 @@ class RegionController extends SahodayaAdminController
         $region = Region::create([
             'tenant_id'   => $this->sahodaya->id,
             'name'        => $data['name'],
-            'code'        => $this->uniqueCode($data['code'] ?? null, $data['name']),
+            'code'        => Region::generateUniqueCode($this->sahodaya->id, ($data['code'] ?? null) ?: $data['name']),
             'description' => $data['description'] ?? null,
             'is_active'   => $data['is_active'] ?? true,
-            'sort_order'  => (int) (Region::forTenant($this->sahodaya->id)->max('sort_order') ?? 0) + 1,
+            'sort_order'  => (int) (Region::forTenant($this->sahodaya->id)->globalOnly()->max('sort_order') ?? 0) + 1,
         ]);
 
         $audit->log('region.created', "Region created: {$region->name}", $region, [
@@ -97,7 +98,7 @@ class RegionController extends SahodayaAdminController
 
         $region->update([
             'name'        => $data['name'],
-            'code'        => $this->uniqueCode($data['code'] ?? null, $data['name'], $region->id),
+            'code'        => Region::generateUniqueCode($this->sahodaya->id, ($data['code'] ?? null) ?: $data['name'], null, $region->id),
             'description' => $data['description'] ?? null,
             'is_active'   => $data['is_active'] ?? $region->is_active,
         ]);
@@ -151,7 +152,7 @@ class RegionController extends SahodayaAdminController
 
     public function assign(Request $request, PlatformAuditLogger $audit)
     {
-        $regionIds = Region::forTenant($this->sahodaya->id)->pluck('id')->all();
+        $regionIds = Region::forTenant($this->sahodaya->id)->globalOnly()->pluck('id')->all();
 
         $data = $request->validate([
             'assignments'               => 'required|array',
@@ -270,6 +271,7 @@ class RegionController extends SahodayaAdminController
             ->pluck('region_id', 'school_id');
 
         $allRegions = Region::forTenant($this->sahodaya->id)
+            ->globalOnly()
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -305,21 +307,5 @@ class RegionController extends SahodayaAdminController
         ];
 
         return [$regions, $unassigned, $totals];
-    }
-
-    private function uniqueCode(?string $code, string $name, ?int $ignoreId = null): string
-    {
-        $base = Str::slug($code ?: $name) ?: 'region';
-        $candidate = $base;
-        $i = 1;
-
-        while (Region::forTenant($this->sahodaya->id)
-            ->where('code', $candidate)
-            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
-            ->exists()) {
-            $candidate = $base.'-'.(++$i);
-        }
-
-        return $candidate;
     }
 }

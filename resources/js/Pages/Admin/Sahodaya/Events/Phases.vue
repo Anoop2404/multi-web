@@ -310,9 +310,18 @@
                                        :class="regionEditIds.includes(region.id) ? 'bg-indigo-50 text-indigo-900 font-semibold' : 'text-slate-700'">
                                     <input type="checkbox" :value="region.id" v-model="regionEditIds" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-400">
                                     <span>{{ region.name }}</span>
+                                    <span v-if="region.fest_event_id" class="text-[10px] font-semibold text-indigo-500">Event-only</span>
                                 </label>
                             </div>
                             <p v-else class="text-xs text-slate-400">No active regions configured for this Sahodaya yet.</p>
+
+                            <div v-if="showAddRegionId === phase.id" class="flex items-center gap-2">
+                                <input v-model="addRegionForm.name" type="text" class="field !py-1 !text-xs flex-1" placeholder="New region name" @keyup.enter="createRegion(phase)">
+                                <button type="button" class="btn-primary text-xs shrink-0" :disabled="addRegionForm.processing || !addRegionForm.name" @click="createRegion(phase)">Add</button>
+                                <button type="button" class="btn-ghost text-xs shrink-0" @click="showAddRegionId = null">Cancel</button>
+                            </div>
+                            <button v-else type="button" class="text-xs font-semibold text-indigo-600" @click="showAddRegionId = phase.id">+ Add new region (for this event only)</button>
+
                             <div class="flex gap-2">
                                 <button type="button" class="btn-primary text-xs" :disabled="regionEditForm.processing" @click="saveRegionEdit(phase)">Save regions</button>
                                 <button type="button" class="btn-ghost text-xs" @click="regionEditId = null">Cancel</button>
@@ -459,6 +468,12 @@ const regionEditId = ref(null);
 const regionEditIds = ref([]);
 const regionEditForm = useForm({ region_ids: [] });
 
+// Inline "create a region scoped to this event only" -- posts to
+// FestEventPhaseController::storeRegion(), which sets fest_event_id so the new region
+// stays out of Membership -> Regions, Rounds & Levels, and every other Sahodaya-wide list.
+const showAddRegionId = ref(null);
+const addRegionForm = useForm({ name: '' });
+
 const topologyForm = useForm({});
 
 const allSelected = computed(() => filteredItems.value.length > 0 && filteredItems.value.every((item) => selectedItemIds.value.includes(item.id)));
@@ -582,6 +597,21 @@ function saveRegionEdit(phase) {
     regionEditForm.post(`${base}/phases/${phase.id}/regions`, {
         preserveScroll: true,
         onSuccess: () => { regionEditId.value = null; },
+    });
+}
+
+function createRegion(phase) {
+    const beforeIds = new Set(props.regions.map((r) => r.id));
+    addRegionForm.post(`${base}/phases/regions`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            const created = props.regions.find((r) => !beforeIds.has(r.id));
+            if (created) {
+                regionEditIds.value = [...regionEditIds.value, created.id];
+            }
+            addRegionForm.reset('name');
+            showAddRegionId.value = null;
+        },
     });
 }
 
