@@ -43,6 +43,10 @@ export function festItemListingDetails(item, { taxonomy = {}, eventType = 'custo
         });
     }
 
+    if (isArts && item.category && item.category !== 'general') {
+        fields.push({ label: 'Category', value: taxonomy.arts_category?.[item.category] ?? item.category });
+    }
+
     if (isSports && item.age_group) {
         fields.push({ label: 'Age group', value: taxonomy.age_group?.[item.age_group] ?? item.age_group });
     } else if (isKidsFest && item.kids_band) {
