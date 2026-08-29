@@ -393,6 +393,11 @@
                                               :all-option="true" all-label="Open / All Classes" />
                         </FormField>
 
+                        <FormField v-if="!isSports" label="Item Genre / Type">
+                            <SearchableSelect v-model="editForm.category" :options="artsCategoryOptions"
+                                              :all-option="true" all-label="Select genre (Literary, Drama...)" />
+                        </FormField>
+
                         <FormField label="Gender">
                             <SearchableSelect v-model="editForm.gender" :options="editGenderOptions" :all-option="false" />
                         </FormField>
@@ -720,6 +725,7 @@ function startEditItem(item) {
     editForm.age_group = item.age_group ?? '';
     editForm.kids_band = item.kids_band ?? '';
     editForm.stage_type = item.stage_type ?? '';
+    editForm.category = item.category ?? '';
     editForm.area_id = item.area_id ?? '';
     editForm.participant_type = item.participant_type ?? 'individual';
     editForm.result_method = item.result_method ?? '';
