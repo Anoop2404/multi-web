@@ -176,4 +176,53 @@ class FestStudentWiseReportResultsGatingTest extends TestCase
         $this->assertTrue($rows[0]['items'][0]['results_published']);
         $this->assertSame('B', $rows[0]['items'][0]['grade']);
     }
+
+    public function test_stage_type_and_participant_type_are_carried_through_for_the_report(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school] = $this->makeSahodayaAndSchool();
+        $student = $this->makeStudent($school);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Stage Type Kalolsav',
+            'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya',
+            'status' => 'registration_open',
+            'fee_settings' => ['fee_model' => 'none'],
+        ]);
+
+        $onStageItem = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Mono Act',
+            'participant_type' => 'individual', 'stage_type' => 'on_stage',
+            'class_group' => 'hs', 'is_enabled' => true,
+        ]);
+        $offStageItem = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Magazine Preparation',
+            'participant_type' => 'group', 'stage_type' => 'off_stage',
+            'class_group' => 'hs', 'is_enabled' => true,
+        ]);
+
+        foreach ([$onStageItem, $offStageItem] as $item) {
+            $registration = FestRegistration::create([
+                'event_id' => $event->id, 'item_id' => $item->id,
+                'school_id' => $school->id, 'status' => 'approved',
+            ]);
+            FestParticipant::create([
+                'registration_id' => $registration->id, 'student_id' => $student->id,
+                'participant_role' => 'performer',
+            ]);
+        }
+
+        $analytics = app(FestEventReportAnalyticsService::class, ['event' => $event]);
+        $rows = $analytics->studentWiseBrowserRows($school->id);
+        $itemsByTitle = collect($rows[0]['items'])->keyBy('item_title');
+
+        $mono = $itemsByTitle->get('Mono Act');
+        $this->assertSame('on_stage', $mono['stage_type']);
+        $this->assertSame('individual', $mono['participant_type']);
+
+        $magazine = $itemsByTitle->get('Magazine Preparation');
+        $this->assertSame('off_stage', $magazine['stage_type']);
+        $this->assertSame('group', $magazine['participant_type']);
+    }
 }

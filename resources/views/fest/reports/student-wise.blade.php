@@ -146,8 +146,9 @@
             <thead>
                 <tr>
                     <th style="width: 4%;">#</th>
-                    <th style="width: {{ ($showChestNo ?? true) ? '25' : '30' }}%;">Item Name</th>
-                    <th style="width: 16%;">Category / Head</th>
+                    <th style="width: {{ ($showChestNo ?? true) ? '19' : '23' }}%;">Item Name</th>
+                    <th style="width: 14%;">Category / Head</th>
+                    <th style="width: 12%; text-align: center;">Stage / Type</th>
                     @if($showChestNo ?? true)
                     <th style="width: 9%; text-align: center;">Chest No</th>
                     @endif
@@ -169,6 +170,20 @@
                             {{ $item['category_label'] }}
                         @else
                             {{ $item['head_name'] ?? '—' }}
+                        @endif
+                    </td>
+                    <td style="text-align: center;">
+                        @php
+                            $stageLabel = !empty($item['stage_type']) ? ($item['stage_type'] === 'on_stage' ? 'On stage' : 'Off stage') : null;
+                            $participantLabels = ['individual' => 'Individual', 'group' => 'Group', 'team' => 'Team'];
+                            $participantLabel = !empty($item['participant_type']) ? ($participantLabels[$item['participant_type']] ?? $item['participant_type']) : null;
+                        @endphp
+                        @if($stageLabel && $participantLabel)
+                            {{ $stageLabel }} · {{ $participantLabel }}
+                        @elseif($stageLabel || $participantLabel)
+                            {{ $stageLabel ?? $participantLabel }}
+                        @else
+                            —
                         @endif
                     </td>
                     @if($showChestNo ?? true)

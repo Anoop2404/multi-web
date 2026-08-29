@@ -1764,7 +1764,7 @@ class FestEventReportAnalyticsService
             ->with([
                 'student:id,tenant_id,name,reg_no,gender,photo',
                 'registration.school:id,name,school_prefix',
-                'registration.item:id,title,head_id,event_id,class_group,age_group,category,results_published_at',
+                'registration.item:id,title,head_id,event_id,class_group,age_group,category,stage_type,participant_type,results_published_at',
                 'registration.item.head:id,name',
                 'registration.item.event:id,title,results_published',
             ])
@@ -1813,6 +1813,8 @@ class FestEventReportAnalyticsService
                     'item_title'        => $item?->title,
                     'head_name'         => $item?->head?->name,
                     'category_label'    => FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
+                    'stage_type'        => $item?->stage_type,
+                    'participant_type'  => $item?->participant_type,
                     'status'            => $p->registration?->status,
                     'fest_id'           => $p->level_registration_number,
                     'item_reg'          => $p->item_registration_number,

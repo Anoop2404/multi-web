@@ -64,6 +64,7 @@
                                 <th class="w-10 text-center">#</th>
                                 <th>Item Title</th>
                                 <th>Category / Head</th>
+                                <th class="text-center">Stage / Type</th>
                                 <th class="text-center">Status</th>
                                 <th class="text-center">Grade / Rank</th>
                                 <th class="text-right pr-4">Score</th>
@@ -73,7 +74,18 @@
                             <tr v-for="(item, idx) in st.items" :key="item.item_id || idx" class="hover:bg-slate-50/50">
                                 <td class="text-center text-slate-400 font-mono">{{ idx + 1 }}</td>
                                 <td class="font-semibold text-slate-900">{{ item.item_title }}</td>
-                                <td class="text-slate-600">{{ item.head_name || '—' }}</td>
+                                <td class="text-slate-600">
+                                    <span v-if="item.category_label">{{ item.category_label }}</span>
+                                    <span v-if="item.category_label && item.head_name" class="text-slate-300"> · </span>
+                                    <span v-if="item.head_name">{{ item.head_name }}</span>
+                                    <span v-if="!item.category_label && !item.head_name">—</span>
+                                </td>
+                                <td class="text-center text-slate-600 whitespace-nowrap">
+                                    <span v-if="item.stage_type">{{ item.stage_type === 'on_stage' ? 'On stage' : 'Off stage' }}</span>
+                                    <span v-if="item.stage_type && item.participant_type" class="text-slate-300"> · </span>
+                                    <span v-if="item.participant_type">{{ participantTypeLabel(item.participant_type) }}</span>
+                                    <span v-if="!item.stage_type && !item.participant_type">—</span>
+                                </td>
                                 <td class="text-center">
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block"
                                           :class="item.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'">
@@ -109,6 +121,7 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
+import { festItemParticipantTypeLabel as participantTypeLabel } from '@/support/festItemListingMeta.js';
 
 const props = defineProps({
     school: Object,

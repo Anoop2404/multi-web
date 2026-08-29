@@ -98,6 +98,7 @@
                                 <th class="w-10 text-center">#</th>
                                 <th>Item Title</th>
                                 <th>Category / Head</th>
+                                <th class="text-center">Stage / Type</th>
                                 <th class="text-center">Status</th>
                                 <th class="text-center">Rank</th>
                                 <th class="text-center">Mark</th>
@@ -113,6 +114,12 @@
                                     <span v-if="item.category_label && item.head_name" class="text-slate-300"> · </span>
                                     <span v-if="item.head_name">{{ item.head_name }}</span>
                                     <span v-if="!item.category_label && !item.head_name">—</span>
+                                </td>
+                                <td class="text-center text-slate-600 whitespace-nowrap">
+                                    <span v-if="item.stage_type">{{ item.stage_type === 'on_stage' ? 'On stage' : 'Off stage' }}</span>
+                                    <span v-if="item.stage_type && item.participant_type" class="text-slate-300"> · </span>
+                                    <span v-if="item.participant_type">{{ participantTypeLabel(item.participant_type) }}</span>
+                                    <span v-if="!item.stage_type && !item.participant_type">—</span>
                                 </td>
                                 <td class="text-center">
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block"
@@ -174,6 +181,7 @@ import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import { festItemParticipantTypeLabel as participantTypeLabel } from '@/support/festItemListingMeta.js';
 
 const props = defineProps({
     sahodaya: Object,
