@@ -97,6 +97,22 @@
 
                 <!-- Filter Chips -->
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs pt-1">
+                    <div v-if="!isSports" class="flex flex-wrap items-center gap-1">
+                        <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400 shrink-0">Group by</span>
+                        <button type="button"
+                                class="text-xs px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
+                                :class="groupByMode === 'class_group'
+                                    ? 'bg-indigo-600 text-white border-indigo-600 font-semibold'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
+                                @click="groupByMode = 'class_group'">Class Category</button>
+                        <button type="button"
+                                class="text-xs px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
+                                :class="groupByMode === 'category'
+                                    ? 'bg-indigo-600 text-white border-indigo-600 font-semibold'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
+                                @click="groupByMode = 'category'">Genre</button>
+                    </div>
+
                     <div v-if="isSports && ageGroupOptions.length" class="flex flex-wrap items-center gap-1">
                         <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400 shrink-0">Age Group</span>
                         <button type="button"
@@ -634,39 +650,63 @@ const COLLAPSE_THRESHOLD = 15;
 // Sub-groups start collapsed; a key in this set has been explicitly expanded by the admin.
 const expandedGroups = ref(new Set());
 
+// Which field items are sub-grouped by — genre (arts_category, e.g. Music/Drawing/Writing)
+// or class category (class_group, e.g. "Category 1 — Classes 3 & 4"). Defaults to class
+// category since a 100+ item catalog is most often scanned by class level.
+const groupByMode = ref('class_group');
+
+/** Raw taxonomy key -> this Sahodaya's own current display label (picks up renames from Category Masters, e.g. fine_arts -> "Drawing") instead of showing the internal key. */
+function taxonomyLabel(dimension, key) {
+    if (!key) return null;
+    return props.taxonomy?.[dimension]?.[key] ?? key;
+}
+
 function categoryLabel(category) {
-    return category && category !== 'general' ? category : 'Uncategorized';
+    return category && category !== 'general' ? taxonomyLabel('arts_category', category) : 'Uncategorized';
 }
 
-function groupKey(level, category) {
-    return `${level}::${category ?? ''}`;
+function classGroupLabel(classGroup) {
+    return classGroup ? taxonomyLabel('class_group', classGroup) : 'Uncategorized';
 }
 
-function isGroupCollapsed(level, category) {
-    if (hasActiveFilters.value || category === null) return false;
-    return !expandedGroups.value.has(groupKey(level, category));
+function groupKey(level, groupLabel) {
+    return `${level}::${groupLabel ?? ''}`;
 }
 
-function toggleGroup(level, category) {
-    const key = groupKey(level, category);
+function isGroupCollapsed(level, groupLabel) {
+    if (hasActiveFilters.value || groupLabel === null) return false;
+    return !expandedGroups.value.has(groupKey(level, groupLabel));
+}
+
+function toggleGroup(level, groupLabel) {
+    const key = groupKey(level, groupLabel);
     const next = new Set(expandedGroups.value);
     if (next.has(key)) next.delete(key);
     else next.add(key);
     expandedGroups.value = next;
 }
 
-/** @returns {Array<{category: string, items: Array}>} sub-groups by category, collapsed by default once a level has enough items to benefit from it. */
+/** @returns {Array<{category: string, items: Array}>} sub-groups by the selected groupByMode field, collapsed by default once a level has enough items to benefit from it. Group order follows this Sahodaya's own taxonomy sort_order (the order class categories/genres are configured in Category Masters), not alphabetical. */
 function categorySubgroups(level, items) {
     if (items.length <= COLLAPSE_THRESHOLD) {
         return [{ category: null, items }];
     }
-    const byCategory = new Map();
+    const isClassGroup = groupByMode.value === 'class_group';
+    const rawKey = item => (isClassGroup ? item.class_group : item.category);
+    const labelFor = raw => (isClassGroup ? classGroupLabel(raw) : categoryLabel(raw));
+    const orderOptions = isClassGroup ? classGroupOptions.value : artsCategoryOptions.value;
+    const orderIndex = new Map(orderOptions.map((opt, idx) => [opt.value, idx]));
+
+    const byGroup = new Map();
     for (const item of items) {
-        const key = categoryLabel(item.category);
-        if (!byCategory.has(key)) byCategory.set(key, []);
-        byCategory.get(key).push(item);
+        const raw = rawKey(item);
+        const label = labelFor(raw);
+        if (!byGroup.has(label)) byGroup.set(label, { items: [], order: orderIndex.get(raw) ?? Infinity });
+        byGroup.get(label).items.push(item);
     }
-    return Array.from(byCategory.entries()).map(([category, groupItems]) => ({ category, items: groupItems }));
+    return Array.from(byGroup.entries())
+        .sort(([, a], [, b]) => a.order - b.order)
+        .map(([category, group]) => ({ category, items: group.items }));
 }
 
 function clearFilters() {
