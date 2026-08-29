@@ -202,6 +202,12 @@ class FestRegistrationCreateService
                         ->lockForRegistration($event, $item->phase, $school->id);
                 }
 
+                $feeSchedule = app(FestSchoolEventFeeService::class)->resolveSchedule($event->rootEvent());
+                if (($feeSchedule['school_fee_mode'] ?? null) === 'student_count_slab') {
+                    app(FestSchoolFeeSlabSelectionService::class)
+                        ->requireSelection($event->rootEvent(), $school->id);
+                }
+
                 $groupId = null;
                 if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
                     $group = FestGroup::create([
@@ -608,6 +614,12 @@ class FestRegistrationCreateService
                 if ($event->rootEvent()->usesPhasedRegionalBilling() && $item->phase) {
                     app(FestSchoolPhaseRegionService::class)
                         ->lockForRegistration($event, $item->phase, $school->id);
+                }
+
+                $feeSchedule = app(FestSchoolEventFeeService::class)->resolveSchedule($event->rootEvent());
+                if (($feeSchedule['school_fee_mode'] ?? null) === 'student_count_slab') {
+                    app(FestSchoolFeeSlabSelectionService::class)
+                        ->requireSelection($event->rootEvent(), $school->id);
                 }
 
                 foreach ($teacherIds as $teacherId) {

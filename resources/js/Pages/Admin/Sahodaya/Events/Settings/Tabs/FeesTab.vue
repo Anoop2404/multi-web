@@ -371,38 +371,7 @@
                             <button type="button" class="btn-secondary text-xs mb-2.5" @click="addSchoolRegistrationTier">+ Add tier</button>
                         </div>
                     </div>
-                    <div class="overflow-x-auto rounded-xl border border-slate-100">
-                        <table class="data-table">
-                            <thead class="bg-slate-50">
-                                <tr>
-                                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-slate-600">Min students</th>
-                                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-slate-600">Max students</th>
-                                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-slate-600">Amount (₹)</th>
-                                    <th class="px-4 py-2.5"></th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-50">
-                                <tr v-for="(slab, index) in feeSettingsForm.student_count_slabs" :key="index">
-                                    <td class="px-4 py-2">
-                                        <input v-model.number="slab.min_count" type="number" min="0" class="field w-24">
-                                    </td>
-                                    <td class="px-4 py-2">
-                                        <input v-model.number="slab.max_count" type="number" min="0" class="field w-24" placeholder="∞">
-                                    </td>
-                                    <td class="px-4 py-2 text-right">
-                                        <input v-model.number="slab.amount" type="number" min="0" class="field w-32 ml-auto text-right">
-                                    </td>
-                                    <td class="px-4 py-2 text-right">
-                                        <button type="button" class="text-xs text-red-400 hover:text-red-600" @click="removeStudentCountSlab(index)">Remove</button>
-                                    </td>
-                                </tr>
-                                <tr v-if="!feeSettingsForm.student_count_slabs.length">
-                                    <td colspan="4" class="px-4 py-3 text-sm text-slate-500">No slabs yet — add one below.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <button type="button" class="btn-secondary text-sm" @click="addStudentCountSlab">+ Add slab</button>
+                    <StudentCountSlabTable v-model="feeSettingsForm.student_count_slabs" />
                     <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field max-w-xs">
@@ -422,11 +391,6 @@
                         </ol>
                     </div>
                     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <FormField label="School registration (flat ₹)" hint="Fallback flat fee per school">
-                            <template #default="{ id }">
-                                <input :id="id" v-model.number="feeSettingsForm.school_registration_flat" type="number" min="0" class="field" placeholder="2000">
-                            </template>
-                        </FormField>
                         <FormField label="Student registration (₹)" hint="Per student in this event">
                             <template #default="{ id }">
                                 <input :id="id" v-model.number="feeSettingsForm.per_student_amount" type="number" min="0" class="field" placeholder="300">
@@ -445,34 +409,58 @@
                     </div>
 
                     <div class="border-t border-slate-100 pt-3 space-y-3">
-                        <h4 class="text-xs font-semibold text-slate-800 uppercase tracking-wide">Category-Tiered School Registration Fees (Optional)</h4>
-                        <p class="text-xs text-slate-500">
-                            Configure school registration fees by school category (e.g. Senior Secondary ₹8,000, Secondary ₹7,000, Other ₹7,000 for Kochi Metro).
-                            Overrides flat school fee above when configured.
-                        </p>
-                        <div class="space-y-2">
-                            <div v-for="tier in Object.keys(feeSettingsForm.school_registration)" :key="tier" class="flex items-end gap-2">
-                                <FormField :label="schoolRegistrationTierLabel(tier)" class-extra="flex-1 mb-0 max-w-sm">
-                                    <template #default="{ id }">
-                                        <input :id="id" v-model.number="feeSettingsForm.school_registration[tier]" type="number" min="0" class="field" placeholder="₹">
-                                    </template>
-                                </FormField>
-                                <button type="button" class="text-xs text-red-400 hover:text-red-600 mb-2.5" @click="removeSchoolRegistrationTier(tier)">Remove tier</button>
-                            </div>
-                            <div class="flex items-end gap-2">
-                                <FormField label="Add custom tier" hint="e.g. senior_secondary, secondary, other" class-extra="flex-1 mb-0 max-w-xs">
-                                    <template #default="{ id }">
-                                        <input :id="id" v-model="newSchoolRegistrationTierKey" type="text" class="field" placeholder="tier key">
-                                    </template>
-                                </FormField>
-                                <button type="button" class="btn-secondary text-xs mb-2.5" @click="addSchoolRegistrationTier">+ Add tier</button>
-                            </div>
-                            <FormField label="Secondary Tier Min Student Strength Threshold (optional)" hint="Secondary schools with student count ≤ this limit fall back to 'other' fee tier (e.g. Wayanad Sahodaya: Secondary > 300 students = ₹25,000, else Other Schools = ₹20,000)." class-extra="pt-2">
+                        <h4 class="text-xs font-semibold text-slate-800 uppercase tracking-wide">School Registration Fee</h4>
+                        <FormField label="How is the school fee decided?">
+                            <template #default="{ id }">
+                                <select :id="id" v-model="feeSettingsForm.school_fee_mode" class="field max-w-sm">
+                                    <option value="class_tier">Flat or category-tiered (default)</option>
+                                    <option value="student_count_slab">School self-selects a student-strength band</option>
+                                </select>
+                            </template>
+                        </FormField>
+
+                        <template v-if="feeSettingsForm.school_fee_mode === 'student_count_slab'">
+                            <p class="text-xs text-slate-500">
+                                Define the bands below (e.g. "Above 1500 students → ₹5000"). Each school picks the band
+                                that applies to them from their own portal — registration is blocked until they do.
+                            </p>
+                            <StudentCountSlabTable v-model="feeSettingsForm.student_count_slabs" />
+                        </template>
+
+                        <template v-else>
+                            <FormField label="School registration (flat ₹)" hint="Fallback flat fee per school">
                                 <template #default="{ id }">
-                                    <input :id="id" v-model.number="feeSettingsForm.secondary_min_students" type="number" min="0" class="field max-w-xs" placeholder="e.g. 300">
+                                    <input :id="id" v-model.number="feeSettingsForm.school_registration_flat" type="number" min="0" class="field max-w-xs" placeholder="2000">
                                 </template>
                             </FormField>
-                        </div>
+                            <p class="text-xs text-slate-500 pt-2">
+                                Optional category-tiered school registration fees (e.g. Senior Secondary ₹8,000, Secondary ₹7,000, Other ₹7,000 for Kochi Metro).
+                                Overrides flat school fee above when configured.
+                            </p>
+                            <div class="space-y-2">
+                                <div v-for="tier in Object.keys(feeSettingsForm.school_registration)" :key="tier" class="flex items-end gap-2">
+                                    <FormField :label="schoolRegistrationTierLabel(tier)" class-extra="flex-1 mb-0 max-w-sm">
+                                        <template #default="{ id }">
+                                            <input :id="id" v-model.number="feeSettingsForm.school_registration[tier]" type="number" min="0" class="field" placeholder="₹">
+                                        </template>
+                                    </FormField>
+                                    <button type="button" class="text-xs text-red-400 hover:text-red-600 mb-2.5" @click="removeSchoolRegistrationTier(tier)">Remove tier</button>
+                                </div>
+                                <div class="flex items-end gap-2">
+                                    <FormField label="Add custom tier" hint="e.g. senior_secondary, secondary, other" class-extra="flex-1 mb-0 max-w-xs">
+                                        <template #default="{ id }">
+                                            <input :id="id" v-model="newSchoolRegistrationTierKey" type="text" class="field" placeholder="tier key">
+                                        </template>
+                                    </FormField>
+                                    <button type="button" class="btn-secondary text-xs mb-2.5" @click="addSchoolRegistrationTier">+ Add tier</button>
+                                </div>
+                                <FormField label="Secondary Tier Min Student Strength Threshold (optional)" hint="Secondary schools with student count ≤ this limit fall back to 'other' fee tier (e.g. Wayanad Sahodaya: Secondary > 300 students = ₹25,000, else Other Schools = ₹20,000)." class-extra="pt-2">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="feeSettingsForm.secondary_min_students" type="number" min="0" class="field max-w-xs" placeholder="e.g. 300">
+                                    </template>
+                                </FormField>
+                            </div>
+                        </template>
                     </div>
 
                     <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
@@ -1051,6 +1039,7 @@ import { Link, useForm } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
 import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import StudentCountSlabTable from '@/Components/ui/StudentCountSlabTable.vue';
 
 const {
     feeSettingsForm, feeModels, feePresets, event, classGroupLabels,
@@ -1195,17 +1184,6 @@ function addSchoolRegistrationTier() {
 
 function removeSchoolRegistrationTier(key) {
     delete feeSettingsForm.school_registration[key];
-}
-
-// student_count_slab fee model's slab table (Phase J) — feeSettingsForm.student_count_slabs
-// is a plain client-side array edited here and submitted whole with the rest of the fee
-// settings form, same as feeSettingsForm.item_fees / head_fees above.
-function addStudentCountSlab() {
-    feeSettingsForm.student_count_slabs.push({ min_count: 0, max_count: '', amount: '' });
-}
-
-function removeStudentCountSlab(index) {
-    feeSettingsForm.student_count_slabs.splice(index, 1);
 }
 
 const ledgerForm = useForm({ name: ledgerAccount.value?.name ?? '' });

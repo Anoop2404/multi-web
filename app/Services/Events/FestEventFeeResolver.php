@@ -410,6 +410,15 @@ class FestEventFeeResolver
         if (in_array($feeModel, ['sports_composite', 'kalolsavam_composite'], true)) {
             return $this->applySchoolFeeCap([
                 'fee_model' => $feeModel,
+                // Which strategy computes the school registration fee below: the existing
+                // flat/class-tier logic (default, unchanged for every event that never sets
+                // this), or a school-self-selected student-count-strength band — see
+                // FestSchoolFeeSlabSelectionService. Kept as an explicit sub-field rather than
+                // a new fee_model value so this stays inside the same composite billing
+                // schema that already handles per-student item quotas and group-item fees.
+                'school_fee_mode' => ($input['school_fee_mode'] ?? null) === 'student_count_slab'
+                    ? 'student_count_slab' : 'class_tier',
+                'student_count_slabs' => $this->normalizeStudentCountSlabs($input['student_count_slabs'] ?? []),
                 'school_registration_flat' => isset($input['school_registration_flat']) && $input['school_registration_flat'] !== ''
                     ? (float) $input['school_registration_flat'] : 2000,
                 // N-tier school registration map — same shape/fallback as cksc_tiered/item_catalog

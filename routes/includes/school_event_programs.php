@@ -51,6 +51,9 @@ foreach ($festPrograms as $cfg) {
         Route::post('/events/{event}/phase-region', [\App\Http\Controllers\SchoolAdmin\FestPhaseRegionSelectionController::class, 'store'])
             ->defaults('program', $slug)
             ->name('event.phase-region');
+        Route::post('/events/{event}/fee-slab', [\App\Http\Controllers\SchoolAdmin\FestFeeSlabSelectionController::class, 'store'])
+            ->defaults('program', $slug)
+            ->name('event.fee-slab');
         Route::post('/select-region', [FestRegistrationController::class, 'selectSchoolRegion'])
             ->defaults('program', $slug)
             ->name('select-region');

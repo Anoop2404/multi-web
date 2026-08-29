@@ -1159,6 +1159,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/phased-workflow/sync-topology', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'syncTopology'])->name('phased-workflow.sync-topology');
             Route::post('/{event}/phases/{phase}/regions', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'syncPhaseRegions'])->name('phases.regions.sync');
             Route::post('/{event}/phases/{phase}/schools/{schoolId}/region', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'overrideSchoolRegion'])->name('phases.schools.region.override');
+            Route::post('/{event}/schools/{schoolId}/fee-slab', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'overrideSchoolFeeSlab'])->name('schools.fee-slab.override');
             Route::get('/{event}/phase-plan-wizard', [\App\Http\Controllers\SahodayaAdmin\FestPhasePlanWizardController::class, 'index'])->name('phase-plan-wizard.index');
             Route::post('/{event}/phase-plan-wizard/preview', [\App\Http\Controllers\SahodayaAdmin\FestPhasePlanWizardController::class, 'preview'])->name('phase-plan-wizard.preview');
             Route::post('/{event}/phase-plan-wizard/commit', [\App\Http\Controllers\SahodayaAdmin\FestPhasePlanWizardController::class, 'commit'])->name('phase-plan-wizard.commit');

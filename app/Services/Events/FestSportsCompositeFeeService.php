@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestItemHead;
 use App\Models\FestLevelRegistration;
 use App\Models\FestRegistration;
+use App\Models\FestSchoolFeeSlabSelection;
 use App\Models\Tenant;
 use App\Support\SchoolClassCategoryResolver;
 
@@ -567,7 +568,7 @@ class FestSportsCompositeFeeService
         // never drift apart — see that method for the tiered-vs-flat resolution.
         $school = Tenant::find($schoolId);
         $schoolReg = $school
-            ? $this->schoolRegistrationAmount($school, $schedule)
+            ? $this->schoolRegistrationAmount($school, $schedule, $event)
             : (float) ($schedule['school_registration_flat'] ?? $schedule['flat_amount'] ?? 2000);
 
         $perStudent = (float) ($schedule['per_student_amount'] ?? 300);
@@ -779,8 +780,21 @@ class FestSportsCompositeFeeService
         ];
     }
 
-    public function schoolRegistrationAmount(Tenant $school, array $schedule): float
+    public function schoolRegistrationAmount(Tenant $school, array $schedule, FestEvent $event): float
     {
+        // school_fee_mode='student_count_slab': the school self-selected one of the
+        // admin-configured strength bands (FestSchoolFeeSlabSelectionService) rather than
+        // being tiered by class category or a flat amount — see that service for why this
+        // is a self-declared choice, not a count the system computes automatically. No
+        // selection yet means no school registration fee line until they pick one.
+        if (($schedule['school_fee_mode'] ?? 'class_tier') === 'student_count_slab') {
+            $selection = FestSchoolFeeSlabSelection::where('event_id', $event->rootEvent()->id)
+                ->where('school_id', $school->id)
+                ->first();
+
+            return $selection ? (float) $selection->amount : 0.0;
+        }
+
         // Tiered-by-category takes over when a school_registration map is configured
         // (kalolsavam_composite; sports_composite events that never set one keep the flat
         // amount below unchanged) — same tier derivation and 'secondary' fallback as

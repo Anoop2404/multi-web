@@ -1106,7 +1106,7 @@ class FestSchoolEventFeeService
         $hasAnyRegistration = $hasEventRegistration || $itemCount > 0 || $studentCount > 0;
 
         $schoolRegFee = match ($feeModel) {
-            'sports_composite', 'kalolsavam_composite' => $this->sportsCompositeFeeService->schoolRegistrationAmount($school, $schedule),
+            'sports_composite', 'kalolsavam_composite' => $this->sportsCompositeFeeService->schoolRegistrationAmount($school, $schedule, $event),
             'cksc_tiered', 'item_catalog', 'per_student', 'per_item', 'student_count_slab' => $hasAnyRegistration ? $this->schoolRegistrationAmount($school, $schedule) : 0.0,
             default => 0,
         };

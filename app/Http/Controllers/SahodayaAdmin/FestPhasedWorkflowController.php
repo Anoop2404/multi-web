@@ -8,6 +8,7 @@ use App\Models\Region;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestPhaseTopologyService;
 use App\Services\Events\FestPhasedWorkflowService;
+use App\Services\Events\FestSchoolFeeSlabSelectionService;
 use App\Services\Events\FestSchoolPhaseRegionService;
 use App\Support\FestPageActivity;
 use Illuminate\Http\Request;
@@ -94,6 +95,41 @@ class FestPhasedWorkflowController extends SahodayaAdminController
         ]);
 
         return back()->with('success', 'School region updated and eligible registrations migrated.');
+    }
+
+    public function overrideSchoolFeeSlab(
+        Request $request,
+        string $tenantId,
+        FestEvent $event,
+        string $schoolId,
+        FestSchoolFeeSlabSelectionService $selections,
+        PlatformAuditLogger $audit,
+    ) {
+        $this->assertEvent($event);
+        $data = $request->validate([
+            'min_count' => 'required|integer|min:0',
+            'max_count' => 'nullable|integer|min:0',
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        $selection = $selections->select(
+            $event,
+            $schoolId,
+            (int) $data['min_count'],
+            isset($data['max_count']) ? (int) $data['max_count'] : null,
+            $request->user()?->id,
+            true,
+            $data['reason'],
+        );
+        $audit->festEvent($event, FestPageActivity::REGISTRATIONS, 'fest.fee_slab.overridden', 'Overrode school fee slab', [
+            'school_id' => $schoolId,
+            'min_count' => $selection->min_count,
+            'max_count' => $selection->max_count,
+            'amount' => $selection->amount,
+            'reason' => $data['reason'],
+        ]);
+
+        return back()->with('success', 'School fee band updated.');
     }
 
     private function assertEvent(FestEvent $event): void

@@ -114,7 +114,60 @@ class ProgramHubDataService
                 'results_published'   => $e->results_published,
             ])->values()->all(),
             'regionOptions' => $this->resolveRegionOptionsForSchool($school, $meta['eventType']),
+            'feeSlabOptions' => $this->resolveFeeSlabOptionsForSchool($school, $meta['eventType']),
         ], $extra);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function resolveFeeSlabOptionsForSchool(Tenant $school, string $eventType): array
+    {
+        $sahodayaId = $school->parent_id;
+        if (! $sahodayaId) {
+            return [];
+        }
+
+        $candidateEvents = FestEvent::where('tenant_id', $sahodayaId)
+            ->ofType($eventType)
+            ->whereNull('parent_event_id')
+            ->whereIn('status', ['published', 'registration_open', 'ongoing'])
+            ->get(['id', 'title', 'fee_settings']);
+
+        $slabEvents = $candidateEvents->filter(function (FestEvent $e) {
+            $settings = $e->fee_settings ?? [];
+
+            return ($settings['school_fee_mode'] ?? null) === 'student_count_slab'
+                && ! empty($settings['student_count_slabs']);
+        });
+
+        if ($slabEvents->isEmpty()) {
+            return [];
+        }
+
+        $selections = \App\Models\FestSchoolFeeSlabSelection::whereIn('event_id', $slabEvents->pluck('id'))
+            ->where('school_id', $school->id)
+            ->get()
+            ->keyBy('event_id');
+
+        return $slabEvents->map(function (FestEvent $e) use ($selections) {
+            $settings = $e->fee_settings ?? [];
+            $selection = $selections->get($e->id);
+
+            return [
+                'event_id'    => $e->id,
+                'event_title' => $e->title,
+                'slabs'       => collect($settings['student_count_slabs'])->map(fn ($s) => [
+                    'min_count' => (int) ($s['min_count'] ?? 0),
+                    'max_count' => isset($s['max_count']) && $s['max_count'] !== null ? (int) $s['max_count'] : null,
+                    'amount'    => (float) ($s['amount'] ?? 0),
+                ])->values()->all(),
+                'selection'   => $selection ? [
+                    'min_count' => $selection->min_count,
+                    'max_count' => $selection->max_count,
+                    'amount'    => (float) $selection->amount,
+                    'locked'    => $selection->locked_at !== null,
+                ] : null,
+            ];
+        })->values()->all();
     }
 
     /** @return array<string, mixed> */

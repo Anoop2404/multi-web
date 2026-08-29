@@ -466,6 +466,7 @@ class FestEventSettingsController extends SahodayaAdminController
 
         $data = $request->validate([
             'fee_model' => 'nullable|in:none,sports_composite,kalolsavam_composite,cksc_tiered,item_catalog,flat_school,per_item,per_student,student_count_slab',
+            'school_fee_mode' => 'nullable|in:class_tier,student_count_slab',
             'school_registration_flat' => 'nullable|numeric|min:0',
             'included_items_per_student' => 'nullable|integer|min:0|max:50',
             'first_item' => 'nullable|numeric|min:0',

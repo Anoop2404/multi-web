@@ -190,6 +190,11 @@ export function useEventSettingsForms(props) {
         fee_model: existingFeeSettings.fee_model
             || schedule.fee_model
             || (props.event?.event_type === 'sports' ? 'sports_composite' : (props.event?.event_type === 'kalolsavam' ? 'kalolsavam_composite' : 'none')),
+        // sports_composite/kalolsavam_composite only: whether the school registration fee is
+        // decided by the flat/category-tier fields below, or by a school self-selecting one of
+        // the student_count_slabs bands (see FestSchoolFeeSlabSelectionService). Defaulting to
+        // 'class_tier' preserves today's behavior for every event that never sets this.
+        school_fee_mode: existingFeeSettings.school_fee_mode ?? schedule.school_fee_mode ?? 'class_tier',
         first_item: existingFeeSettings.first_item ?? schedule.first_item ?? '',
         additional_item: existingFeeSettings.additional_item ?? schedule.additional_item ?? '',
         charge_standbys: existingFeeSettings.charge_standbys ?? schedule.charge_standbys ?? false,

@@ -154,6 +154,47 @@
             </div>
         </section>
 
+        <!-- School Registration Fee Band Selection -->
+        <section v-if="feeSlabOptions?.length" class="card mb-6 border-amber-300 bg-amber-50/90 shadow-sm p-4 space-y-4">
+            <div>
+                <h3 class="text-sm font-bold text-amber-950 flex items-center gap-1.5">
+                    <span>🎟️</span> Select Your School's Registration Fee Band
+                </h3>
+                <p class="text-xs text-amber-900 mt-1">
+                    Your school registration fee depends on your student strength. Choose the band that matches your school —
+                    once selected, registration for this event will open. This cannot be changed later without admin approval.
+                </p>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div v-for="opt in feeSlabOptions" :key="opt.event_id"
+                     class="bg-white p-4 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between space-y-3">
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <span class="font-bold text-sm text-slate-900">{{ opt.event_title }}</span>
+                            <span v-if="opt.selection?.locked" class="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">Locked</span>
+                            <span v-else-if="opt.selection" class="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">✓ Selected</span>
+                            <span v-else class="text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">Pending Selection</span>
+                        </div>
+                        <label class="block text-xs text-slate-600 font-medium mb-1">Select your school's strength band</label>
+                        <SearchableSelect v-model="hubFeeSlabChoices[opt.event_id]"
+                                class="w-full"
+                                :options="feeSlabSelectOptions(opt)"
+                                :all-option="false"
+                                placeholder="Select a band…"
+                                :disabled="opt.selection?.locked" />
+                    </div>
+                    <button v-if="!opt.selection?.locked"
+                            type="button"
+                            @click="saveHubFeeSlab(opt)"
+                            :disabled="!hubFeeSlabChoices[opt.event_id]"
+                            class="btn-primary text-xs w-full py-1.5 font-semibold">
+                        {{ opt.selection ? '✓ Change Fee Band' : 'Save Fee Band' }}
+                    </button>
+                </div>
+            </div>
+        </section>
+
         <section v-if="schoolEvents?.length" class="card card--flush overflow-hidden mb-6">
             <div class="p-4 border-b border-slate-100 bg-slate-50/80">
                 <h3 class="section-title !mb-0">My school events</h3>
@@ -210,6 +251,7 @@ const props = defineProps({
     ageGroups: { type: Object, default: null }, registeredAgeGroups: { type: Array, default: () => [] },
     studentEditLock: { type: Object, default: () => ({ locked: false }) },
     regionOptions: { type: Object, default: () => ({ has_regions: false, regions: [], assignments: {}, phase_region_options: [] }) },
+    feeSlabOptions: { type: Array, default: () => [] },
 });
 
 const { programLabel, programBase } = useSchoolProgramContext(props);
@@ -245,6 +287,42 @@ function phaseRegionOptions(phase) {
         value: r.id,
         label: `${r.name}${r.venue ? ` — ${r.venue}` : ''}`,
     }));
+}
+
+const hubFeeSlabChoices = reactive({});
+
+watch(() => props.feeSlabOptions, (options) => {
+    if (options && Array.isArray(options)) {
+        for (const opt of options) {
+            if (opt.event_id && hubFeeSlabChoices[opt.event_id] === undefined) {
+                hubFeeSlabChoices[opt.event_id] = opt.selection ? slabKey(opt.selection) : '';
+            }
+        }
+    }
+}, { immediate: true, deep: true });
+
+function slabKey(slab) {
+    return `${slab.min_count}:${slab.max_count ?? ''}`;
+}
+
+function feeSlabSelectOptions(opt) {
+    return (opt.slabs || []).map(s => ({
+        value: slabKey(s),
+        label: s.max_count != null
+            ? `${s.min_count}–${s.max_count} students — ₹${fmt(s.amount)}`
+            : `Above ${s.min_count} students — ₹${fmt(s.amount)}`,
+    }));
+}
+
+function saveHubFeeSlab(opt) {
+    const key = hubFeeSlabChoices[opt.event_id];
+    if (!key || !opt.event_id) return;
+    const slab = (opt.slabs || []).find(s => slabKey(s) === key);
+    if (!slab) return;
+    router.post(`${programBase.value}/events/${opt.event_id}/fee-slab`, {
+        min_count: slab.min_count,
+        max_count: slab.max_count,
+    }, { preserveScroll: true });
 }
 
 function getSelectedRegionDetails(phase) {
