@@ -154,7 +154,73 @@ class FestEventFeesController extends SahodayaAdminController
                         ? $feeService->itemPaymentAllocation($event, $fee->school_id)
                         : [],
                 ];
-            })
+            });
+
+        // Phased_regional_billing events produce one FestSchoolEventFee row PER PAYMENT
+        // LEVEL per school (registration_batch_id set) — shown here as separate table rows
+        // made the listing twice as long per school and scattered a school's payment proofs
+        // across rows. Combine those rows into one per school (itemized breakdown from every
+        // level concatenated, receipts merged so no proof goes missing), while leaving
+        // per-head billing rows (head_id set) and plain single-invoice rows untouched — those
+        // are a different, intentionally separate concept.
+        $batchRows = $schoolFees->filter(fn (array $r) => $r['registration_batch_id'] !== null);
+        $otherRows = $schoolFees->filter(fn (array $r) => $r['registration_batch_id'] === null);
+
+        $combinedBatchRows = $batchRows->groupBy('school_id')->map(function ($group) use ($event) {
+            $first = $group->first();
+            $schoolId = $first['school_id'];
+
+            // The rollup row (registration_batch_id/phase_id/head_id all NULL) is kept in
+            // sync with the combined total/paid/status by
+            // FestRegistrationBatchFeeService::syncRollup() — use it directly rather than
+            // re-deriving, so this listing always agrees with the school's own fee page.
+            $rollup = FestSchoolEventFee::where('event_id', $event->rootEvent()->id)
+                ->where('school_id', $schoolId)
+                ->whereNull('registration_batch_id')
+                ->whereNull('phase_id')
+                ->whereNull('head_id')
+                ->first();
+
+            $allReceipts = $group->flatMap(fn (array $r) => $r['all_receipts'])->sortByDesc('id')->values();
+
+            return [
+                'id' => $rollup?->id ?? $first['id'],
+                'school' => $first['school'],
+                'school_id' => $schoolId,
+                'head' => null,
+                'head_id' => null,
+                'registration_batch_id' => null,
+                'registration_batch' => null,
+                'status' => $rollup?->status ?? $first['status'],
+                'total_due' => $rollup ? (float) $rollup->total_due : round((float) $group->sum('total_due'), 2),
+                'amount_paid' => $rollup ? (float) $rollup->amount_paid : round((float) $group->sum('amount_paid'), 2),
+                'participation_item_count' => (int) $group->sum('participation_item_count'),
+                'school_registration_fee' => round((float) $group->sum('school_registration_fee'), 2),
+                'participation_fee' => round((float) $group->sum('participation_fee'), 2),
+                'breakdown' => ['items' => $group->flatMap(fn (array $r) => $r['breakdown']['items'] ?? [])->values()->all()],
+                'fee_receipt' => $group->pluck('fee_receipt')->filter()->sortByDesc(fn ($r) => $r->id ?? 0)->first(),
+                'all_receipts' => $allReceipts->all(),
+                'items' => $group->flatMap(fn (array $r) => $r['items'])->values()->all(),
+                'registered_students' => $group->flatMap(fn (array $r) => $r['registered_students'])->values()->all(),
+                'sports_participation' => null,
+                'available_credit' => round((float) $group->sum('available_credit'), 2),
+                'item_allocation' => [],
+                // Each level's own fee row — the Actions column approves/rejects/force-
+                // approves against the SPECIFIC level whose proof it belongs to, since a
+                // single combined row has no one fee record of its own to act on.
+                'batches' => $group->map(fn (array $r) => [
+                    'id' => $r['id'],
+                    'name' => $r['registration_batch'],
+                    'status' => $r['status'],
+                    'total_due' => $r['total_due'],
+                    'amount_paid' => $r['amount_paid'],
+                    'fee_receipt' => $r['fee_receipt'],
+                    'all_receipts' => $r['all_receipts'],
+                ])->values()->all(),
+            ];
+        })->values();
+
+        $schoolFees = $otherRows->concat($combinedBatchRows)
             ->filter(fn ($row) => ($row['participation_item_count'] ?? 0) > 0 || count($row['items'] ?? []) > 0 || (float) ($row['total_due'] ?? 0) > 0)
             ->sortBy(fn ($row) => strtolower($row['school']))
             ->values();

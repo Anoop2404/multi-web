@@ -339,32 +339,62 @@
                                     </button>
                                 </div>
 
-                                <!-- Action Buttons Based on Status -->
-                                <div v-if="row.status === 'proof_uploaded'" class="flex items-center justify-end gap-1 pt-1">
-                                    <button type="button" @click="approve(row.id, row.school)"
-                                            class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition">
-                                        Approve ✓
-                                    </button>
-                                    <button type="button" @click="reject(row.id, row.school)"
-                                            class="px-2 py-1 rounded-md text-[11px] font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition">
-                                        Reject
-                                    </button>
-                                </div>
+                                <!-- Action Buttons Based on Status — a combined (multi-level)
+                                     row has no single fee record of its own to approve/reject,
+                                     so each level that needs action gets its own compact
+                                     button group, scoped to that level's own fee id. -->
+                                <template v-if="row.batches?.length">
+                                    <div v-for="b in actionableBatches(row)" :key="b.id"
+                                         class="flex items-center justify-end gap-1 pt-1">
+                                        <span class="text-[10px] font-bold text-slate-400 mr-0.5">{{ b.name }}:</span>
+                                        <template v-if="b.status === 'proof_uploaded'">
+                                            <button type="button" @click="approve(b.id, row.school)"
+                                                    class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition">
+                                                Approve ✓
+                                            </button>
+                                            <button type="button" @click="reject(b.id, row.school)"
+                                                    class="px-2 py-1 rounded-md text-[11px] font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition">
+                                                Reject
+                                            </button>
+                                        </template>
+                                        <button v-else-if="b.status === 'rejected'" type="button" @click="approve(b.id, row.school)"
+                                                class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition">
+                                            Re-approve ✓
+                                        </button>
+                                        <button v-else-if="b.status === 'partial'" type="button" @click="forceApprove({ ...b, school: row.school })"
+                                                title="Waives the gap between total due and amount paid, then approves."
+                                                class="px-2 py-0.5 rounded-md text-[10px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition">
+                                            Force approve (waive ₹{{ partialShortfall(b) }})
+                                        </button>
+                                    </div>
+                                </template>
+                                <template v-else>
+                                    <div v-if="row.status === 'proof_uploaded'" class="flex items-center justify-end gap-1 pt-1">
+                                        <button type="button" @click="approve(row.id, row.school)"
+                                                class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition">
+                                            Approve ✓
+                                        </button>
+                                        <button type="button" @click="reject(row.id, row.school)"
+                                                class="px-2 py-1 rounded-md text-[11px] font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition">
+                                            Reject
+                                        </button>
+                                    </div>
 
-                                <div v-else-if="row.status === 'rejected'" class="flex items-center justify-end pt-1">
-                                    <button type="button" @click="approve(row.id, row.school)"
-                                            class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition">
-                                        Re-approve / Verify ✓
-                                    </button>
-                                </div>
+                                    <div v-else-if="row.status === 'rejected'" class="flex items-center justify-end pt-1">
+                                        <button type="button" @click="approve(row.id, row.school)"
+                                                class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition">
+                                            Re-approve / Verify ✓
+                                        </button>
+                                    </div>
 
-                                <div v-else-if="row.status === 'partial'" class="flex items-center justify-end pt-1">
-                                    <button type="button" @click="forceApprove(row)"
-                                            title="Waives the gap between total due and amount paid, then approves."
-                                            class="px-2 py-0.5 rounded-md text-[10px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition">
-                                        Force approve (waive ₹{{ partialShortfall(row) }})
-                                    </button>
-                                </div>
+                                    <div v-else-if="row.status === 'partial'" class="flex items-center justify-end pt-1">
+                                        <button type="button" @click="forceApprove(row)"
+                                                title="Waives the gap between total due and amount paid, then approves."
+                                                class="px-2 py-0.5 rounded-md text-[10px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition">
+                                            Force approve (waive ₹{{ partialShortfall(row) }})
+                                        </button>
+                                    </div>
+                                </template>
 
                                 <!-- Approved Receipt Badge & Reversal Link -->
                                 <div v-if="row.fee_receipt?.receipt_number && row.fee_receipt?.status === 'approved'"
@@ -732,6 +762,11 @@ async function recalculateFee(id, schoolName = '') {
 
 function partialShortfall(row) {
     return fmt(Math.max(0, Number(row.total_due) - Number(row.amount_paid ?? 0)));
+}
+
+/** Levels within a combined row that actually need an admin action right now. */
+function actionableBatches(row) {
+    return (row.batches ?? []).filter(b => ['proof_uploaded', 'rejected', 'partial'].includes(b.status));
 }
 
 async function forceApprove(row) {
