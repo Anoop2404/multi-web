@@ -158,7 +158,16 @@ class PaymentDueResolver
                 continue;
             }
 
-            $items->push($this->mapRegistration($registration, $school, $academicYear));
+            $mapped = $this->mapRegistration($registration, $school, $academicYear);
+
+            // registration_status can lag a just-completed final installment (see
+            // MembershipPaymentApprovalService::verify()), so a status/amount filter alone
+            // isn't enough — only rows with an actual remaining balance are "partial".
+            if (($mapped['membership_fee_amount'] ?? 0) <= 0) {
+                continue;
+            }
+
+            $items->push($mapped);
         }
 
         return $this->filterItems($items, $filters)->values();

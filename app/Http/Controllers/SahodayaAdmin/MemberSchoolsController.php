@@ -13,10 +13,12 @@ use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Auth\UserCredentialService;
 use App\Services\Membership\MembershipNotifier;
+use App\Services\Membership\MembershipPaymentApprovalService;
 use App\Services\Membership\SchoolMembershipCancellationService;
 use App\Services\Tenancy\SchoolDataPurger;
 use App\Services\Mail\SahodayaMailer;
 use App\Support\TenantAuth;
+use App\Support\TenantStorage;
 use App\Support\AcademicYear;
 use App\Support\ExcelExport;
 use App\Support\SchoolDetailFields;
@@ -236,7 +238,7 @@ class MemberSchoolsController extends SahodayaAdminController
         return back()->with('success', 'Admin note saved successfully.');
     }
 
-    public function uploadPaymentProof(Request $request, string $tenantId, Tenant $school, PlatformAuditLogger $audit)
+    public function uploadPaymentProof(Request $request, string $tenantId, Tenant $school, PlatformAuditLogger $audit, MembershipNotifier $notifier, MembershipPaymentApprovalService $approvalService)
     {
         abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
 
@@ -252,29 +254,46 @@ class MemberSchoolsController extends SahodayaAdminController
 
         $proofPath = null;
         if ($request->hasFile('proof')) {
-            $proofPath = TenantStorage::storeUploadedFile($school, $request->file('proof'), 'membership/payment_proofs');
+            $proofPath = TenantStorage::storeUploadedFile($request->file('proof'), 'membership/payment_proofs');
         }
 
+        $registration = Registration::where('school_id', $school->id)
+            ->where('academic_year', $year)
+            ->first();
+
+        // Always land the row as 'submitted' first and route a 'verified' request through
+        // the same MembershipPaymentApprovalService::verify() the school-submitted flow uses.
+        // Creating it as 'verified' directly (the old behavior) left Registration.amount_paid
+        // and registration_status untouched, so the payment-due tabs/notes (which read those
+        // cached columns, not the payment row) kept showing the school as unpaid.
         $payment = MembershipPayment::create([
             'school_id'            => $school->id,
             'academic_year'        => $year,
+            'registration_id'      => $registration?->id,
             'amount'               => $data['amount'],
             'payment_reference'    => $data['payment_reference'],
             'payment_proof_path'   => $proofPath,
-            'status'               => $data['status'],
+            'status'               => 'submitted',
             'notes'                => $data['notes'],
-            'verified_by_user_id'  => $data['status'] === 'verified' ? $request->user()?->id : null,
-            'verified_at'          => $data['status'] === 'verified' ? now() : null,
+            'uploaded_by_user_id'  => $request->user()?->id,
         ]);
+
+        if ($registration) {
+            $registration->update(['registration_status' => 'payment_submitted']);
+        }
+
+        if ($data['status'] === 'verified') {
+            $payment = $approvalService->verify($payment, $request->user(), $notifier, $audit);
+        }
 
         $audit->log(
             'membership.payment.uploaded_by_admin',
             "Payment proof uploaded by Sahodaya Admin for {$school->name} (₹{$data['amount']})",
             null,
-            ['school_id' => $school->id, 'payment_id' => $payment->id, 'status' => $data['status']],
+            ['school_id' => $school->id, 'payment_id' => $payment->id, 'status' => $payment->status],
         );
 
-        return back()->with('success', "Payment proof uploaded and set to {$data['status']} for {$school->name}.");
+        return back()->with('success', "Payment proof uploaded and set to {$payment->status} for {$school->name}.");
     }
 
     public function reject(Request $request, string $tenantId, Tenant $school, MembershipNotifier $notifier)
