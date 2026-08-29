@@ -230,11 +230,29 @@
                             </td>
                             <td class="p-3.5">
                                 <div v-if="row.breakdown?.items?.length" class="space-y-1">
-                                    <div v-for="(b, bIdx) in row.breakdown.items" :key="bIdx"
+                                    <!-- School/student registration lines — few, meaningful, always shown. -->
+                                    <div v-for="(b, bIdx) in breakdownSummaryLines(row)" :key="'s'+bIdx"
                                          class="flex items-center justify-between gap-3 text-[11px] py-0.5 border-b border-slate-100 last:border-0">
                                         <span class="text-slate-700 font-medium truncate max-w-[14rem]">{{ b.label }}</span>
                                         <span class="font-bold text-slate-900 shrink-0 tabular-nums">₹{{ fmt(b.amount) }}</span>
                                     </div>
+
+                                    <!-- Per-item charges — a school can register 100+ items,
+                                         so these collapse behind a toggle instead of always
+                                         rendering every line and blowing out row height. -->
+                                    <details v-if="breakdownItemLines(row).length">
+                                        <summary class="text-[10px] font-bold text-indigo-700 cursor-pointer select-none py-0.5">
+                                            {{ breakdownItemLines(row).length }} item charge{{ breakdownItemLines(row).length === 1 ? '' : 's' }}
+                                            (₹{{ fmt(breakdownItemLinesTotal(row)) }})
+                                        </summary>
+                                        <div class="mt-1 space-y-0.5 max-h-48 overflow-y-auto pr-1">
+                                            <div v-for="(b, bIdx) in breakdownItemLines(row)" :key="'i'+bIdx"
+                                                 class="flex items-center justify-between gap-3 text-[11px] py-0.5 border-b border-slate-100 last:border-0">
+                                                <span class="text-slate-700 font-medium truncate max-w-[14rem]">{{ b.label }}</span>
+                                                <span class="font-bold text-slate-900 shrink-0 tabular-nums">₹{{ fmt(b.amount) }}</span>
+                                            </div>
+                                        </div>
+                                    </details>
                                 </div>
                                 <div v-else class="text-slate-400 italic text-[11px]">No items configured</div>
 
@@ -767,6 +785,22 @@ function partialShortfall(row) {
 /** Levels within a combined row that actually need an admin action right now. */
 function actionableBatches(row) {
     return (row.batches ?? []).filter(b => ['proof_uploaded', 'rejected', 'partial'].includes(b.status));
+}
+
+const ITEM_LINE_TYPES = ['item_fee', 'extra_item'];
+
+/** School/student registration lines — few, always shown inline. */
+function breakdownSummaryLines(row) {
+    return (row.breakdown?.items ?? []).filter(b => !ITEM_LINE_TYPES.includes(b.line_type));
+}
+
+/** Per-item charges — can run into the hundreds for a school, so collapsed behind a toggle. */
+function breakdownItemLines(row) {
+    return (row.breakdown?.items ?? []).filter(b => ITEM_LINE_TYPES.includes(b.line_type));
+}
+
+function breakdownItemLinesTotal(row) {
+    return breakdownItemLines(row).reduce((sum, b) => sum + Number(b.amount ?? 0), 0);
 }
 
 async function forceApprove(row) {
