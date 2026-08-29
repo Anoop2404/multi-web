@@ -56,6 +56,140 @@ class FestParticipationLimitService
         ];
     }
 
+    /**
+     * Per-student limit-usage rows for the whole school — one row per student with at
+     * least one active registration, each showing on-stage, off-stage, their combined
+     * "individual" total, and the group count against the resolved policy limits.
+     * Reuses itemDimensions()/countableStatuses() so a row's "exceeds" flag agrees with
+     * what validateStudent() would have blocked at registration time, rather than
+     * re-deriving the classification separately. Search matches student name or reg no.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function studentLimitReportRows(string $schoolId, ?string $search = null): array
+    {
+        $registrations = FestRegistration::whereIn('event_id', $this->scopeEventIds())
+            ->where('school_id', $schoolId)
+            ->active()
+            ->with(['item', 'participants' => fn ($q) => $q
+                ->where('participant_role', 'performer')
+                ->whereNotNull('student_id')
+                ->with('student:id,name,reg_no')])
+            ->get();
+
+        $byStudent = [];
+        foreach ($registrations as $reg) {
+            foreach ($reg->participants as $participant) {
+                $student = $participant->student;
+                if (! $student) {
+                    continue;
+                }
+                $byStudent[$student->id]['student'] ??= $student;
+                $byStudent[$student->id]['regs'][] = $reg;
+            }
+        }
+
+        $rows = [];
+        foreach ($byStudent as $studentId => $entry) {
+            $student = $entry['student'];
+            if ($search) {
+                $needle = strtolower($search);
+                $haystack = strtolower(($student->name ?? '').' '.($student->reg_no ?? ''));
+                if (! str_contains($haystack, $needle)) {
+                    continue;
+                }
+            }
+
+            $policy = $this->policyFor($entry['regs'][0]->item?->class_group ?? null);
+            $countable = $this->countableStatuses($policy);
+
+            $onStageUsed = 0;
+            $offStageUsed = 0;
+            $groupUsed = 0;
+            $totalUsed = 0;
+            $items = [];
+
+            foreach ($entry['regs'] as $reg) {
+                $dims = $this->itemDimensions($reg->item);
+                $isCountable = in_array($reg->status, $countable, true);
+
+                if ($isCountable) {
+                    if ($dims['on_stage']) {
+                        $onStageUsed++;
+                    }
+                    if ($dims['off_stage']) {
+                        $offStageUsed++;
+                    }
+                    if ($dims['group']) {
+                        $groupUsed++;
+                    }
+                    if (! $dims['group'] && $reg->item && ! $this->excludedFromTotalCount($reg->item)) {
+                        $totalUsed++;
+                    }
+                }
+
+                $items[] = [
+                    'item_id'    => $reg->item_id,
+                    'item_title' => $reg->item?->title,
+                    'dimension'  => $dims['group'] ? 'group' : ($dims['on_stage'] ? 'on_stage' : ($dims['off_stage'] ? 'off_stage' : null)),
+                    'status'     => $reg->status,
+                    'countable'  => $isCountable,
+                ];
+            }
+
+            $onStageLimit = $policy['max_onstage_per_student'] ?? null;
+            $offStageLimit = $policy['max_offstage_per_student'] ?? null;
+            $individualLimit = (filled($onStageLimit) || filled($offStageLimit))
+                ? (int) ($onStageLimit ?: 0) + (int) ($offStageLimit ?: 0)
+                : null;
+
+            $dimension = fn (int $used, $limit) => [
+                'used'    => $used,
+                'limit'   => filled($limit) ? (int) $limit : null,
+                'exceeds' => filled($limit) && $used > (int) $limit,
+            ];
+
+            $onStage = $dimension($onStageUsed, $onStageLimit);
+            $offStage = $dimension($offStageUsed, $offStageLimit);
+            $individual = $dimension($onStageUsed + $offStageUsed, $individualLimit);
+            $group = $dimension($groupUsed, $policy['max_group_per_student'] ?? null);
+            $total = $dimension($totalUsed, $policy['max_total_per_student'] ?? null);
+
+            $rows[] = [
+                'student_id'  => (int) $studentId,
+                'name'        => $student->name,
+                'reg_no'      => $student->reg_no,
+                'on_stage'    => $onStage,
+                'off_stage'   => $offStage,
+                'individual'  => $individual,
+                'group'       => $group,
+                'total'       => $total,
+                'exceeds_any' => $onStage['exceeds'] || $offStage['exceeds'] || $individual['exceeds'] || $group['exceeds'] || $total['exceeds'],
+                'items'       => $items,
+            ];
+        }
+
+        usort($rows, fn ($a, $b) => strcasecmp($a['name'] ?? '', $b['name'] ?? ''));
+
+        return array_values($rows);
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    public function summarizeStudentLimitRows(array $rows): array
+    {
+        $collection = collect($rows);
+
+        return [
+            'total_students'      => $collection->count(),
+            'exceeding_students'  => $collection->filter(fn ($r) => $r['exceeds_any'])->count(),
+            'exceeding_on_stage'  => $collection->filter(fn ($r) => $r['on_stage']['exceeds'])->count(),
+            'exceeding_off_stage' => $collection->filter(fn ($r) => $r['off_stage']['exceeds'])->count(),
+            'exceeding_individual' => $collection->filter(fn ($r) => $r['individual']['exceeds'])->count(),
+            'exceeding_group'     => $collection->filter(fn ($r) => $r['group']['exceeds'])->count(),
+            'exceeding_total'     => $collection->filter(fn ($r) => $r['total']['exceeds'])->count(),
+        ];
+    }
+
     /** @return array{used: array<string, int>, limits: array<string, mixed>} */
     public function usageForSchool(string $schoolId, ?string $classGroup = null): array
     {

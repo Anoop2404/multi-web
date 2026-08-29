@@ -190,6 +190,72 @@ class FestSchoolReportController extends SchoolAdminController
         ]);
     }
 
+    /**
+     * Limits are per-student for the whole fest, not per-phase — a student's on-stage /
+     * off-stage / individual / group counts must be tallied across every phase and
+     * region under the root event, regardless of which phase's report page the school
+     * opened. FestParticipationLimitService's own scopeEventIds() only widens to the
+     * full tree for the root event itself (or a 'partitioned' child), so construct the
+     * service against event->rootEvent() here rather than the route-resolved $event —
+     * reportableEventIds() on the root always returns [root, ...children, ...grandchildren].
+     */
+    public function studentLimits(Request $request, string $tenantId, FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $service = new FestParticipationLimitService($event->rootEvent());
+        $rows = $service->studentLimitReportRows($this->school->id, $request->input('search'));
+        $summary = $service->summarizeStudentLimitRows($rows);
+
+        $base = $this->schoolReportsBase($program, $event);
+
+        return $this->inertia('School/Events/ReportStudentLimits', [
+            'program' => $program,
+            'school'  => $this->school->only('id', 'name'),
+            'event'   => $event->only('id', 'title'),
+            'rows'    => $rows,
+            'summary' => $summary,
+            'csvUrl'  => "{$base}/student-limits/export",
+        ]);
+    }
+
+    /** Same whole-fest scoping as studentLimits() above — see its docblock. */
+    public function exportStudentLimits(Request $request, string $tenantId, FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $service = new FestParticipationLimitService($event->rootEvent());
+        $rows = $service->studentLimitReportRows($this->school->id, $request->input('search'));
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, [
+                'Reg No', 'Name',
+                'On-stage used', 'On-stage limit',
+                'Off-stage used', 'Off-stage limit',
+                'Individual used', 'Individual limit',
+                'Group used', 'Group limit',
+                'Total used', 'Total limit',
+                'Exceeds limit', 'Items',
+            ]);
+            foreach ($rows as $row) {
+                $itemTitles = collect($row['items'])->pluck('item_title')->filter()->implode('; ');
+                CsvSafety::fputcsv($out, [
+                    $row['reg_no'] ?? '',
+                    $row['name'] ?? '',
+                    $row['on_stage']['used'], $row['on_stage']['limit'] ?? '',
+                    $row['off_stage']['used'], $row['off_stage']['limit'] ?? '',
+                    $row['individual']['used'], $row['individual']['limit'] ?? '',
+                    $row['group']['used'], $row['group']['limit'] ?? '',
+                    $row['total']['used'], $row['total']['limit'] ?? '',
+                    $row['exceeds_any'] ? 'Yes' : 'No',
+                    $itemTitles,
+                ]);
+            }
+            fclose($out);
+        }, "{$event->id}-student-limits.csv", ['Content-Type' => 'text/csv']);
+    }
+
     public function studentWise(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);

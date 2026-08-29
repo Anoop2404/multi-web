@@ -132,6 +132,12 @@ foreach ($festPrograms as $cfg) {
         Route::get('/reports/{event}/participation/pdf', [FestSchoolReportController::class, 'exportParticipationPdf'])
             ->defaults('program', $slug)
             ->name('reports.participation.pdf');
+        Route::get('/reports/{event}/student-limits', [FestSchoolReportController::class, 'studentLimits'])
+            ->defaults('program', $slug)
+            ->name('reports.student-limits');
+        Route::get('/reports/{event}/student-limits/export', [FestSchoolReportController::class, 'exportStudentLimits'])
+            ->defaults('program', $slug)
+            ->name('reports.student-limits.export');
         Route::get('/reports/{event}/student-wise', [FestSchoolReportController::class, 'studentWise'])
             ->defaults('program', $slug)
             ->name('reports.student-wise');

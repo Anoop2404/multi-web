@@ -116,6 +116,7 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
         // never linked from this per-event sidebar.
         { label: 'Results', href: `${reportsBase}/published-results`, icon: 'award' },
         { label: 'Reports', href: reportsBase, icon: 'file-text', exact: true },
+        { label: 'Student item limits', href: `${reportsBase}/student-limits`, icon: 'shield' },
         { label: 'Student-wise report', href: `${reportsBase}/student-wise`, icon: 'users' },
         { label: 'Item-wise report', href: `${reportsBase}/item-wise`, icon: 'list' },
         { label: 'Item counts', href: `${reportsBase}/item-counts`, icon: 'bar-chart' }
