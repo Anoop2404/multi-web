@@ -3,7 +3,7 @@
         <PageHeader :title="programLabel" :eyebrow="programLabel"
                     :description="`Registration, results, reports, and fees for ${programLabel}.`">
             <template #actions>
-                <Link v-if="!isTeacherFest" :href="`${programBase}/my-events`" class="btn-secondary text-sm">My school events</Link>
+                <Link v-if="!isTeacherFest && showSchoolEvents" :href="`${programBase}/my-events`" class="btn-secondary text-sm">My school events</Link>
                 <Link :href="`${programBase}/registration`" class="btn-primary text-sm">Register →</Link>
             </template>
         </PageHeader>
@@ -21,7 +21,7 @@
                 <p class="text-2xl font-bold text-emerald-700">{{ stats.open_events }}</p>
                 <p class="text-xs text-slate-500 mt-1">Open Sahodaya events</p>
             </div>
-            <div v-if="stats.school_events != null" class="card card--muted text-center !py-4">
+            <div v-if="showSchoolEvents" class="card card--muted text-center !py-4">
                 <p class="text-2xl font-bold text-indigo-700">{{ stats.school_events }}</p>
                 <p class="text-xs text-slate-500 mt-1">My school events</p>
             </div>
@@ -51,7 +51,7 @@
 
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
             <HubCard :href="`${programBase}/registration`" icon="📝" label="Register for Sahodaya" :hint="isSports ? 'Per sport: Chess, Aquatics, …' : `Register for ${programLabel}`" />
-            <HubCard v-if="isSports || (schoolEvents && schoolEvents.length > 0)" :href="`${programBase}/my-events`" icon="🏫" label="My school events" :hint="isSports ? 'Run your own sports day' : 'Internal school events'" />
+            <HubCard v-if="showSchoolEvents" :href="`${programBase}/my-events`" icon="🏫" label="My school events" :hint="isSports ? 'Run your own sports day' : 'Internal school events'" />
             <HubCard v-if="isSports" :href="`${programBase}/submit-winners`" icon="🏅" label="Submit winners" hint="Promote to Sahodaya meet" />
             <HubCard :href="`${programBase}/results`" icon="📊" label="Results" hint="Published scores" />
             <HubCard :href="`${programBase}/qualifiers`" icon="🎯" label="Qualifiers" hint="Promoted students" />
@@ -60,8 +60,19 @@
                      label="Assign coordinator" :hint="`Give a teacher access to ${programLabel} only`" />
         </div>
 
-        <!-- Phase-wise Region & Venue Selection Banner -->
-        <section v-if="regionOptions?.phase_region_options?.length" class="card mb-6 border-amber-300 bg-amber-50/90 shadow-sm p-4 space-y-4">
+        <!-- Phase-wise Region & Venue Selection — collapsed to a confirmation strip once
+             every phase is locked, since there's nothing left to act on. -->
+        <section v-if="regionOptions?.phase_region_options?.length && allPhaseRegionsLocked && !regionsSectionExpanded"
+                 class="card mb-6 border-slate-200 bg-slate-50/80 shadow-xs p-3.5 flex items-center justify-between gap-3">
+            <p class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <span>📍</span> Regions confirmed for {{ regionOptions.phase_region_options.length }} phase{{ regionOptions.phase_region_options.length === 1 ? '' : 's' }}
+            </p>
+            <button type="button" class="text-xs font-semibold text-indigo-700 hover:text-indigo-900" @click="regionsSectionExpanded = true">
+                View details
+            </button>
+        </section>
+
+        <section v-else-if="regionOptions?.phase_region_options?.length" class="card mb-6 border-amber-300 bg-amber-50/90 shadow-sm p-4 space-y-4">
             <div class="flex items-start justify-between gap-3">
                 <div>
                     <h3 class="text-sm font-bold text-amber-950 flex items-center gap-1.5">
@@ -71,6 +82,9 @@
                         Off Stage and Sargadhara phases operate independently. Please select your school's region based on venue location to view and register for items.
                     </p>
                 </div>
+                <button v-if="allPhaseRegionsLocked" type="button" class="text-xs font-semibold text-amber-800 hover:text-amber-950 shrink-0" @click="regionsSectionExpanded = false">
+                    Collapse
+                </button>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
@@ -238,7 +252,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { Link, usePage, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
@@ -259,9 +273,23 @@ const page = usePage();
 const isSports = computed(() => props.eventType === 'sports');
 const isTeacherFest = computed(() => props.eventType === 'teacher_fest');
 const canManageCoordinators = computed(() => !page.props.isStaff && !page.props.isEventCoordinator);
+// "My school events" (internal school-day events) only applies to sports (every school runs
+// its own sports day) or a non-sports program once the school has actually created one —
+// showing it unconditionally left a permanent "0" stat/button for every school that never
+// uses this feature.
+const showSchoolEvents = computed(() => isSports.value || (props.schoolEvents && props.schoolEvents.length > 0));
 function fmt(v) { return Number(v ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 }); }
 
 const hubPhaseChoices = reactive({});
+
+// Once every phase's region is locked there's nothing left to do here — collapse the banner
+// to a compact confirmation strip instead of a permanently-expanded form with disabled
+// selects, and let the school re-expand it if they want to double-check their venues.
+const regionsSectionExpanded = ref(false);
+const allPhaseRegionsLocked = computed(() => {
+    const options = props.regionOptions?.phase_region_options;
+    return !!options?.length && options.every((phase) => phase.selection?.locked);
+});
 
 watch(() => props.regionOptions?.phase_region_options, (options) => {
     if (options && Array.isArray(options)) {
