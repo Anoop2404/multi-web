@@ -57,7 +57,7 @@ class PlatformReportsControllerTest extends TestCase
             ->get('http://superadmin.test/admin/reports')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/Reports/Index', false)
+                ->component('Reports/Index', false)
                 ->where('snapshots.0.id', $newest->id)
                 ->where('snapshots.0.total_students', 20)
             );
@@ -92,7 +92,7 @@ class PlatformReportsControllerTest extends TestCase
             ->assertOk();
 
         $response->assertInertia(function (Assert $page) {
-            $page->component('Admin/Reports/Index', false)
+            $page->component('Reports/Index', false)
                 ->has('revenueByMonth', 12)
                 ->where('revenueByMonth.11.revenue_inr', fn ($v) => (float) $v === 1500.0)
                 ->where('revenueByMonth.11.month', now()->format('M Y'));
@@ -115,7 +115,7 @@ class PlatformReportsControllerTest extends TestCase
             ->get('http://superadmin.test/admin/reports')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/Reports/Index', false)
+                ->component('Reports/Index', false)
                 ->where('subscriptionStatusBreakdown.active', 2)
                 ->where('subscriptionStatusBreakdown.grace', 1)
                 ->where('subscriptionStatusBreakdown.suspended', 1)

@@ -82,7 +82,7 @@ class StateControllerTest extends TestCase
             ->get('http://superadmin.test/admin/states')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/States/Index', false)
+                ->component('States/Index', false)
                 ->where('states.0.platform_users_count', 1));
     }
 

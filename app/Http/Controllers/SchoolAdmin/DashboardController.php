@@ -25,7 +25,7 @@ class DashboardController extends SchoolAdminController
 {
     public function unassigned()
     {
-        return $this->inertia('Admin/School/Unassigned', [
+        return $this->inertia('School/Unassigned', [
             'schoolName' => $this->school->name,
         ]);
     }

@@ -30,7 +30,7 @@ class FailedMailQueueController extends SahodayaAdminController
 
         $allQuery = FailedEmailLog::where('sahodaya_id', $this->sahodaya->id);
 
-        return $this->inertia('Admin/Sahodaya/Settings/FailedMails', [
+        return $this->inertia('Sahodaya/Settings/FailedMails', [
             'logs' => $logs,
             'filters' => [
                 'status' => $status,

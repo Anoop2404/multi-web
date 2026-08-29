@@ -20,7 +20,7 @@ class PlatformAnnouncementController extends Controller
             ->latest('id')
             ->get();
 
-        return inertia('Admin/Announcements/Index', [
+        return inertia('Announcements/Index', [
             'announcements' => $announcements,
         ]);
     }

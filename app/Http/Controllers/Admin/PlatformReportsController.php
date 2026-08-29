@@ -21,7 +21,7 @@ class PlatformReportsController extends Controller
 {
     public function index(): Response
     {
-        return inertia('Admin/Reports/Index', [
+        return inertia('Reports/Index', [
             'snapshots' => PlatformDashboardSnapshot::query()->orderByDesc('computed_at')->limit(90)->get(),
             'revenueByMonth' => $this->revenueByMonth(),
             'subscriptionStatusBreakdown' => TenantSubscription::query()

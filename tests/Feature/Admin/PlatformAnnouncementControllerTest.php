@@ -132,7 +132,7 @@ class PlatformAnnouncementControllerTest extends TestCase
             ->get('http://superadmin.test/admin/announcements')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/Announcements/Index', false)
+                ->component('Announcements/Index', false)
                 ->where('announcements.0.title', 'Listed')
                 ->where('announcements.0.created_by.name', 'Announcement Super')
             );

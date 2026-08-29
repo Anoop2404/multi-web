@@ -21,7 +21,7 @@ class StateController extends Controller
             ->orderBy('name')
             ->get();
 
-        return inertia('Admin/States/Index', [
+        return inertia('States/Index', [
             'states' => $states,
         ]);
     }
