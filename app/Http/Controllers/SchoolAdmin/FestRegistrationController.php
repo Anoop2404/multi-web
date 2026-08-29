@@ -1324,13 +1324,24 @@ class FestRegistrationController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
         abort_if($registration->school_id !== $this->school->id, 403);
 
+        $registrationService = app(FestRegistrationService::class);
+
         abort_unless(
-            app(FestRegistrationService::class)->canSchoolCancel($registration, $event),
+            $registrationService->canSchoolCancel($registration, $event),
             422,
             'This registration can no longer be cancelled.'
         );
 
-        app(FestRegistrationService::class)->cancel($registration, $event);
+        // canSchoolCancel() no longer refuses an already-paid/approved registration — a
+        // school can cancel those too, but the mutation has to go through
+        // cancelWithRefund() (not the plain cancel(), which still hard-blocks on approved
+        // payment) so the resulting overpayment is tracked as a FestFeeCredit instead of
+        // silently left out of sync with the school's now-smaller roster.
+        if (app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration)) {
+            $registrationService->cancelWithRefund($registration, $event, 'Cancelled by school after payment.');
+        } else {
+            $registrationService->cancel($registration, $event);
+        }
 
         app(PlatformAuditLogger::class)->festRegistrationCancelled($registration->fresh());
 

@@ -241,6 +241,13 @@ class FestRegistrationService
         }
     }
 
+    /**
+     * A school may cancel even after its fee has been approved/paid — the withdraw()
+     * controller action detects that case via hasApprovedPaymentForRegistration() and
+     * routes the actual mutation through cancelWithRefund() instead of cancel(), so an
+     * overpayment still gets tracked as a proper FestFeeCredit rather than silently
+     * leaving the school's fee record out of sync with its (now smaller) roster.
+     */
     public function canSchoolCancel(FestRegistration $registration, FestEvent $event): bool
     {
         if (! in_array($registration->status, ['submitted', 'approved', 'pending_approval', 'waitlisted'], true)) {
@@ -256,10 +263,6 @@ class FestRegistrationService
         }
 
         if ($registration->item?->results_published_at) {
-            return false;
-        }
-
-        if (app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration)) {
             return false;
         }
 

@@ -1693,13 +1693,15 @@ function standbyCount(reg) {
     return reg.participants?.filter(p => p.participant_role === 'standby').length ?? 0;
 }
 
+// Mirrors FestRegistrationService::canSchoolCancel() — no longer checks the fee at all,
+// paid/approved registrations stay cancellable too. The withdraw() controller action
+// routes those through cancelWithRefund() so the overpayment becomes a tracked
+// FestFeeCredit instead of silently leaving the fee out of sync with the roster.
 function canWithdraw(reg) {
     if (['withdrawn', 'rejected'].includes(reg.status)) return false;
     const event = props.events.find(e => Number(e.id) === Number(reg.event_id) || Number(e.parent_event_id) === Number(reg.event_id)) ?? props.events[0];
     if (!event) return reg.status === 'submitted';
     if (event.results_published || ['completed', 'cancelled'].includes(event.status)) return false;
-    const fee = event.school_fee;
-    if (fee && (fee.status === 'approved' || Number(fee.amount_paid ?? 0) > 0)) return false;
     return event.status === 'registration_open' || reg.status === 'submitted';
 }
 
@@ -1708,6 +1710,9 @@ async function withdraw(id) {
     router.post(`${programBase.value}/registrations/${id}/withdraw`, {}, { preserveScroll: true });
 }
 
+// Mirrors FestRegistrationService::canSchoolEditRoster() — schedule_published isn't a
+// backend-enforced block for editing (only registration_locked/results_published/event
+// status are), so it shouldn't hide the button here either.
 function canEdit(reg) {
     // 'rejected' is editable — that's how a school fixes and resubmits (server resets
     // status back to 'submitted' on save, see FestRegistrationCreateService::updateForSchool()).
@@ -1715,7 +1720,7 @@ function canEdit(reg) {
     if (reg.status === 'withdrawn') return false;
     const event = props.events.find(e => Number(e.id) === Number(reg.event_id) || Number(e.parent_event_id) === Number(reg.event_id)) ?? props.events[0];
     if (!event) return ['submitted', 'rejected'].includes(reg.status);
-    if (event.schedule_published || event.results_published || ['completed', 'cancelled'].includes(event.status)) return false;
+    if (event.results_published || ['completed', 'cancelled'].includes(event.status)) return false;
     return event.status === 'registration_open' || ['submitted', 'rejected'].includes(reg.status);
 }
 

@@ -529,13 +529,13 @@ async function withdraw(id) {
 }
 
 // Mirrors canSchoolEditRoster() on the backend for the fields available client-side
-// (registration/event status, results-publish, registration window). Unlike cancel,
-// an approved/paid registration can still be edited here — the backend allows the
-// save as long as it doesn't reduce the fee owed; it rejects (with a flash error) if
+// (registration/event status, results-publish, registration window) — that method
+// doesn't check schedule_published at all, so this shouldn't block on it either. Unlike
+// cancel, an approved/paid registration can still be edited here — the backend allows
+// the save as long as it doesn't reduce the fee owed; it rejects (with a flash error) if
 // the edit would decrease total_due, since that needs a refund/credit instead.
 function canEdit(reg) {
-    if (!props.event.schedule_published) return canWithdraw(reg);
-    return false;
+    return canWithdraw(reg);
 }
 
 function resetItemForm(item) {

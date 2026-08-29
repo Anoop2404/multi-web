@@ -85,13 +85,22 @@ class FestApiController extends SchoolApiController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
         abort_if($registration->school_id !== $this->school->id, 403);
 
+        $registrationService = app(FestRegistrationService::class);
+
         abort_unless(
-            app(FestRegistrationService::class)->canSchoolCancel($registration, $event),
+            $registrationService->canSchoolCancel($registration, $event),
             422,
             'This registration can no longer be cancelled.'
         );
 
-        app(FestRegistrationService::class)->cancel($registration, $event);
+        // Same routing as SchoolAdmin\FestRegistrationController::withdraw() — canSchoolCancel()
+        // allows an already-paid/approved registration too, but the plain cancel() still hard-
+        // blocks that case, so route it through cancelWithRefund() to get a proper FestFeeCredit.
+        if (app(\App\Services\Events\FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration)) {
+            $registrationService->cancelWithRefund($registration, $event, 'Cancelled by school after payment.');
+        } else {
+            $registrationService->cancel($registration, $event);
+        }
 
         return response()->json(['data' => ['cancelled' => true]]);
     }
