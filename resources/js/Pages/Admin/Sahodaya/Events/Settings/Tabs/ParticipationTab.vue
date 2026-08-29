@@ -122,6 +122,6 @@ import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 const { policyForm, participationPresets, savePolicy } = inject('eventSettings');
 
 const participationPresetOptions = computed(() =>
-    Object.entries(participationPresets).map(([key, label]) => ({ value: key, label }))
+    Object.entries(participationPresets.value ?? {}).map(([key, label]) => ({ value: key, label }))
 );
 </script>
