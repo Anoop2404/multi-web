@@ -44,7 +44,11 @@ export function festItemListingDetails(item, { taxonomy = {}, eventType = 'custo
     }
 
     if (isArts && item.category && item.category !== 'general') {
-        fields.push({ label: 'Category', value: taxonomy.arts_category?.[item.category] ?? item.category });
+        // Labeled "Genre" (matching the Items catalog's own Class Category / Genre
+        // grouping toggle), not "Category" — the Class chip's own value already reads
+        // "Category N — Classes ...", so a second "Category:" chip next to it read as
+        // the same concept repeated instead of the separate arts-genre classification.
+        fields.push({ label: 'Genre', value: taxonomy.arts_category?.[item.category] ?? item.category });
     }
 
     if (isSports && item.age_group) {
