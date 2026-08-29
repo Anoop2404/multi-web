@@ -18,6 +18,7 @@ use App\Services\Membership\MasterClassService;
 use App\Support\AcademicYear;
 use App\Support\MembershipReceiptTemplate;
 use App\Support\FestClassGroupScheme;
+use App\Support\SahodayaHomepageContent;
 use App\Support\SchoolApplicationForm;
 use App\Support\TenantBranding;
 use App\Services\Audit\DataChangeLogger;
