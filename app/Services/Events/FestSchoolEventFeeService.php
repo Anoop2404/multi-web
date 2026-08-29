@@ -1938,7 +1938,7 @@ class FestSchoolEventFeeService
         return $total;
     }
 
-    private function supportsSportsCompositeSchema(): bool
+    public function supportsSportsCompositeSchema(): bool
     {
         return Schema::hasColumn('fest_school_event_fees', 'student_registration_fee')
             && Schema::hasColumn('fest_school_event_fees', 'extra_item_fee');

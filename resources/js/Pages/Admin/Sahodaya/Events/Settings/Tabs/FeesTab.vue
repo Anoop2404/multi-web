@@ -490,6 +490,13 @@
                             <span class="block text-xs text-slate-500 mt-0.5">Overrides cluster default for this event. Turn off to allow unverified students for this event's items.</span>
                         </span>
                     </label>
+                    <label v-if="event.workflow_mode === 'phased_regional_billing'" class="flex items-start gap-2 text-sm">
+                        <input type="checkbox" v-model="feeSettingsForm.require_prior_batch_payment" class="mt-0.5">
+                        <span>
+                            Require each payment level paid before the next
+                            <span class="block text-xs text-slate-500 mt-0.5">A school must fully pay an earlier level (e.g. Level 1) before registering items in a later level (e.g. Level 2).</span>
+                        </span>
+                    </label>
                 </div>
             </section>
 

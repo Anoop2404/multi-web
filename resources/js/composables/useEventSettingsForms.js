@@ -245,6 +245,9 @@ export function useEventSettingsForms(props) {
         require_verified_students: existingFeeSettings.require_verified_students
             ?? schedule.require_verified_students
             ?? false,
+        require_prior_batch_payment: existingFeeSettings.require_prior_batch_payment
+            ?? schedule.require_prior_batch_payment
+            ?? false,
         payment_bank_name: existingFeeSettings.payment_bank_name ?? '',
         payment_account_no: existingFeeSettings.payment_account_no ?? '',
         payment_ifsc: existingFeeSettings.payment_ifsc ?? '',

@@ -78,6 +78,7 @@ class FestRegistrationCreateService
 
         app(FestItemRegistrationGate::class)->assertOpen($item);
         app(FestRegistrationFeeGate::class)->assertCanRegister($event, $school);
+        app(FestRegistrationFeeGate::class)->assertPriorBatchesPaid($event, $item, $school);
 
         if (! $skipSchoolClosedCheck && $school->fest_registration_closed) {
             throw ValidationException::withMessages(['registration' => 'Fest registration is closed for this school.']);

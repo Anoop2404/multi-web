@@ -20,6 +20,48 @@
             </div>
         </div>
 
+        <!-- Combined (Whole-Event) Total -->
+        <div v-if="combinedFee && Number(combinedFee.total_due) > 0" class="card border-indigo-200 bg-indigo-50/60 shadow-sm p-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h4 class="text-sm font-bold text-indigo-950 flex items-center gap-2">
+                        <span>🧾 Combined Total — All Levels</span>
+                    </h4>
+                    <p class="text-xs text-indigo-900/80 mt-0.5">Sum of every payment level above, for your records.</p>
+                </div>
+                <span class="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide border shadow-2xs"
+                      :class="statusBadgeStyle(combinedFee.status)">
+                    {{ statusBadgeText(combinedFee.status) }}
+                </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
+                <div class="p-3 rounded-xl bg-white border border-indigo-100">
+                    <dt class="text-xs font-medium text-slate-500">Combined Total Due</dt>
+                    <dd class="text-base font-black text-indigo-950 mt-0.5">₹{{ money(combinedFee.total_due) }}</dd>
+                </div>
+                <div class="p-3 rounded-xl bg-white border border-indigo-100">
+                    <dt class="text-xs font-medium text-slate-500">Total Paid</dt>
+                    <dd class="text-base font-extrabold text-emerald-700 mt-0.5">₹{{ money(combinedFee.amount_paid) }}</dd>
+                </div>
+                <div class="p-3 rounded-xl bg-white border border-indigo-100">
+                    <dt class="text-xs font-medium text-slate-500">Outstanding</dt>
+                    <dd class="text-base font-extrabold mt-0.5" :class="Number(combinedFee.outstanding) > 0 ? 'text-amber-700' : 'text-emerald-700'">
+                        ₹{{ money(combinedFee.outstanding) }}
+                    </dd>
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <a :href="`${eventBase}/invoice?preview=1`" target="_blank" rel="noopener"
+                   class="btn-secondary text-xs font-semibold inline-flex items-center gap-1">
+                    <span>📄 Preview Combined Invoice</span>
+                </a>
+                <a :href="`${eventBase}/invoice`" target="_blank" rel="noopener"
+                   class="btn-secondary text-xs font-semibold inline-flex items-center gap-1">
+                    <span>⬇️ Download Combined Invoice</span>
+                </a>
+            </div>
+        </div>
+
         <!-- Level Fee Summary Cards -->
         <div v-for="fee in relevantFees" :key="fee.registration_batch_id" class="card border-slate-200 bg-white shadow-sm p-5">
             <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-4">
@@ -248,17 +290,24 @@ const props = defineProps({
 
 const eventBase = `/school-admin/${props.schoolId}/${props.programPrefix}/events/${props.event.id}`;
 
-const relevantFees = computed(() => {
-    const allFees = props.event?.school_registration_batch_fees || [];
+// Every payment level shows together (Level 1 and Level 2 side by side), not narrowed down
+// to just the level the current operational leaf page happens to belong to — a school needs
+// to see its whole-event picture to judge whether an earlier level still needs paying.
+const relevantFees = computed(() => props.event?.school_registration_batch_fees || []);
+
+const currentFee = computed(() => {
     const eventBatchId = props.event?.registration_batch_id;
-
-    if (!eventBatchId) return allFees;
-
-    const matched = allFees.filter(fee => String(fee.registration_batch_id) === String(eventBatchId));
-    return matched.length ? matched : allFees;
+    if (eventBatchId) {
+        const matched = relevantFees.value.find(fee => String(fee.registration_batch_id) === String(eventBatchId));
+        if (matched) return matched;
+    }
+    return relevantFees.value[0] || null;
 });
 
-const currentFee = computed(() => relevantFees.value[0] || null);
+// The combined (whole-event) rollup — same row FestSchoolEventFee already keeps in sync
+// across every level, shown alongside the per-level cards above so a school always sees
+// both views together.
+const combinedFee = computed(() => props.event?.school_fee || null);
 
 const registeredItemBreakdown = computed(() => {
     const items = props.event?.items || [];
@@ -334,7 +383,10 @@ function submitPayment() {
 
 function studentCountForFee(fee) {
     if (!fee) return null;
-    const studentLine = (fee.lines || []).find((l) => l.line_type === 'student_registration');
+    // 'student_registration' — the non-composite per-phase/per-batch student rate line.
+    // 'student_reg' — the composite (kalolsavam_composite/sports_composite) quota-engine's
+    // own line, see FestRegistrationBatchFeeService::compositeAttributionForBatch().
+    const studentLine = (fee.lines || []).find((l) => l.line_type === 'student_registration' || l.line_type === 'student_reg');
     if (studentLine && studentLine.quantity != null) {
         return studentLine.quantity;
     }
@@ -343,7 +395,7 @@ function studentCountForFee(fee) {
 
 function itemCountForFee(fee) {
     if (!fee) return 0;
-    const itemLines = (fee.lines || []).filter((l) => l.line_type === 'item_fee');
+    const itemLines = (fee.lines || []).filter((l) => l.line_type === 'item_fee' || l.line_type === 'extra_item');
     if (itemLines.length) {
         return itemLines.length;
     }
