@@ -29,8 +29,13 @@ class FestPhasedWorkflowService
         return $batch;
     }
 
-    /** @param list<int> $regionIds */
-    public function syncAllowedRegions(FestEventPhase $phase, array $regionIds): void
+    /**
+     * @param  list<int>  $regionIds
+     * @param  array<int, ?string>  $venues  Venue per region_id. A region_id absent from this
+     *   array leaves its existing venue untouched (callers that don't manage venue, e.g. the
+     *   config-driven FestPhasedStructureConfigurator, don't need to pass this at all).
+     */
+    public function syncAllowedRegions(FestEventPhase $phase, array $regionIds, array $venues = []): void
     {
         $regionIds = collect($regionIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
 
@@ -63,9 +68,13 @@ class FestPhasedWorkflowService
             ->update(['nav_hidden' => true, 'registration_locked' => true]);
 
         foreach ($regionIds as $regionId) {
+            $attrs = ['enabled' => true];
+            if (array_key_exists($regionId, $venues)) {
+                $attrs['venue'] = $venues[$regionId] ?: null;
+            }
             FestPhaseRegion::updateOrCreate(
                 ['phase_id' => $phase->id, 'region_id' => $regionId],
-                ['enabled' => true]
+                $attrs
             );
         }
     }

@@ -49,10 +49,12 @@ class FestPhasedWorkflowController extends SahodayaAdminController
                 Rule::exists('regions', 'id')->where(fn ($q) => $q->where('tenant_id', $this->sahodaya->id)
                     ->where(fn ($q2) => $q2->whereNull('fest_event_id')->orWhere('fest_event_id', $event->id))),
             ],
+            'venues' => 'nullable|array',
+            'venues.*' => 'nullable|string|max:255',
         ]);
 
         $phase->update(['is_regional' => true]);
-        $workflow->syncAllowedRegions($phase, $data['region_ids']);
+        $workflow->syncAllowedRegions($phase, $data['region_ids'], $data['venues'] ?? []);
         $topology->sync($event->fresh());
 
         return back()->with('success', "Regions updated for {$phase->name}.");

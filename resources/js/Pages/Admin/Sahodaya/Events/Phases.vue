@@ -315,6 +315,14 @@
                             </div>
                             <p v-else class="text-xs text-slate-400">No active regions configured for this Sahodaya yet.</p>
 
+                            <div v-if="regionEditIds.length" class="space-y-1.5">
+                                <p class="text-xs font-semibold text-slate-600">Venue per selected region</p>
+                                <div v-for="region in regions.filter((r) => regionEditIds.includes(r.id))" :key="`venue-${region.id}`" class="flex items-center gap-2">
+                                    <span class="text-xs text-slate-500 w-32 shrink-0 truncate">{{ region.name }}</span>
+                                    <input v-model="regionEditVenues[region.id]" type="text" class="field !py-1 !text-xs flex-1" placeholder="Venue (e.g. school/college name, hall)">
+                                </div>
+                            </div>
+
                             <div v-if="showAddRegionId === phase.id" class="flex items-center gap-2">
                                 <input v-model="addRegionForm.name" type="text" class="field !py-1 !text-xs flex-1" placeholder="New region name" @keyup.enter="createRegion(phase)">
                                 <button type="button" class="btn-primary text-xs shrink-0" :disabled="addRegionForm.processing || !addRegionForm.name" @click="createRegion(phase)">Add</button>
@@ -466,7 +474,8 @@ const editBatchForm = reactive({ name: '', code: '', school_base_fee: 0, student
 // already accepts any phase and any region list, not just a fixed pair of phase names.
 const regionEditId = ref(null);
 const regionEditIds = ref([]);
-const regionEditForm = useForm({ region_ids: [] });
+const regionEditVenues = ref({});
+const regionEditForm = useForm({ region_ids: [], venues: {} });
 
 // Inline "create a region scoped to this event only" -- posts to
 // FestEventPhaseController::storeRegion(), which sets fest_event_id so the new region
@@ -589,11 +598,16 @@ async function removeBatch(batch) {
 
 function startRegionEdit(phase) {
     regionEditId.value = phase.id;
-    regionEditIds.value = (phase.allowed_regions || []).filter((r) => r.enabled).map((r) => r.region_id);
+    const enabled = (phase.allowed_regions || []).filter((r) => r.enabled);
+    regionEditIds.value = enabled.map((r) => r.region_id);
+    regionEditVenues.value = Object.fromEntries(enabled.map((r) => [r.region_id, r.venue || '']));
 }
 
 function saveRegionEdit(phase) {
     regionEditForm.region_ids = regionEditIds.value;
+    regionEditForm.venues = Object.fromEntries(
+        regionEditIds.value.map((id) => [id, regionEditVenues.value[id] || ''])
+    );
     regionEditForm.post(`${base}/phases/${phase.id}/regions`, {
         preserveScroll: true,
         onSuccess: () => { regionEditId.value = null; },
