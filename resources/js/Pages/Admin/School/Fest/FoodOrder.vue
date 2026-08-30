@@ -5,107 +5,81 @@
 
         <EventHierarchyBadge :hierarchy="hierarchy" />
 
-        <div v-if="bill" class="grid grid-cols-3 gap-3 mb-6 max-w-lg">
-            <div class="card text-center">
-                <p class="text-xl font-bold">₹{{ Number(bill.amount_total).toFixed(2) }}</p>
-                <p class="text-xs text-gray-500">Total</p>
-            </div>
-            <div class="card text-center">
-                <p class="text-xl font-bold text-green-700">₹{{ Number(bill.amount_paid).toFixed(2) }}</p>
-                <p class="text-xs text-gray-500">Paid</p>
-            </div>
-            <div class="card text-center">
-                <p class="text-xl font-bold" :class="bill.balance_due > 0 ? 'text-amber-700' : 'text-gray-700'">₹{{ Number(bill.balance_due).toFixed(2) }}</p>
-                <p class="text-xs text-gray-500">Balance due</p>
-            </div>
-        </div>
         <p v-if="bill && bill.status !== 'open'" class="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 mb-4">
             This bill has been settled. Contact the Sahodaya if you need to change your order.
         </p>
 
-        <div v-for="group in groupedMenu" :key="group.date" class="card card--flush mb-4">
-            <div class="p-3 border-b bg-gray-50 font-bold text-sm">{{ formatCalendarDate(group.date) }}</div>
-            <div v-for="mealGroup in group.meals" :key="mealGroup.mealType" class="border-t first:border-t-0">
-                <div class="px-3 py-1.5 bg-gray-50/70 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    {{ mealTypes[mealGroup.mealType] || mealGroup.mealType }}
+        <div class="grid lg:grid-cols-3 gap-6 items-start">
+            <!-- Menu, grouped by day then meal -->
+            <div class="lg:col-span-2 space-y-6">
+                <div v-for="group in groupedMenu" :key="group.date">
+                    <h3 class="section-title mb-3">{{ formatCalendarDate(group.date) }}</h3>
+                    <div v-for="mealGroup in group.meals" :key="mealGroup.mealType" class="mb-5 last:mb-0">
+                        <div class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <span aria-hidden="true">{{ mealIcon(mealGroup.mealType) }}</span>
+                            <span>{{ mealTypes[mealGroup.mealType] || mealGroup.mealType }}</span>
+                        </div>
+                        <div class="grid sm:grid-cols-2 gap-3">
+                            <FoodItemCard v-for="item in mealGroup.items" :key="item.id"
+                                          :name="item.name" :description="item.description" :price="Number(item.price)"
+                                          :icon="mealIcon(mealGroup.mealType)" :badges="badgesFor(item)">
+                                <template v-if="canOrder" #actions>
+                                    <template v-if="!item.max_per_school || remainingFor(item) > 0">
+                                        <QuantityStepper :model-value="qty[item.id] ?? 1" :max="item.max_per_school ? remainingFor(item) : null"
+                                                          @update:model-value="(val) => (qty[item.id] = val)" />
+                                        <button class="btn-secondary text-xs" :disabled="itemForm.processing" @click="addItem(item)">Add</button>
+                                    </template>
+                                    <span v-else class="text-xs text-gray-400">Limit reached</span>
+                                </template>
+                            </FoodItemCard>
+                        </div>
+                    </div>
                 </div>
-                <table class="w-full text-sm">
-                    <thead class="text-left text-xs uppercase text-gray-400">
-                        <tr>
-                            <th class="p-3">Item</th>
-                            <th class="p-3">Price</th>
-                            <th class="p-3">Ordered</th>
-                            <th class="p-3 text-right"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="item in mealGroup.items" :key="item.id" class="border-t">
-                            <td class="p-3">
-                                {{ item.name }}
-                                <p v-if="item.description" class="text-xs text-gray-400">{{ item.description }}</p>
-                                <p v-if="item.max_per_school" class="text-xs" :class="remainingFor(item) <= 0 ? 'text-amber-600 font-semibold' : 'text-gray-400'">
-                                    {{ orderedQty(item.id) }} / {{ item.max_per_school }} ordered
-                                    <span v-if="remainingFor(item) <= 0">— limit reached</span>
-                                </p>
-                            </td>
-                            <td class="p-3">₹{{ Number(item.price).toFixed(2) }}</td>
-                            <td class="p-3">{{ orderedQty(item.id) }}</td>
-                            <td class="p-3 text-right" v-if="canOrder">
-                                <div v-if="!item.max_per_school || remainingFor(item) > 0" class="flex items-center gap-2 justify-end">
-                                    <input type="number" min="1" :max="item.max_per_school ? remainingFor(item) : undefined"
-                                           v-model="qty[item.id]" class="field text-xs w-16">
-                                    <button class="btn-secondary text-xs" :disabled="itemForm.processing" @click="addItem(item)">Add</button>
-                                </div>
-                                <span v-else class="text-xs text-gray-400">Limit reached</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <EmptyState v-if="!menuItems.length" title="No menu published yet" description="The Sahodaya hasn't added food items for this event yet." />
+            </div>
+
+            <!-- Cart panel -->
+            <div id="your-order" class="lg:sticky lg:top-6 space-y-4">
+                <FoodBillSummary v-if="bill" :total="Number(bill.amount_total)" :paid="Number(bill.amount_paid)"
+                                  :balance="Number(bill.balance_due)" :status="bill.status" />
+
+                <div class="card-list">
+                    <div class="p-3 border-b bg-gray-50 font-bold text-sm">Your order</div>
+                    <div v-if="!orderItems.length" class="p-4 text-center text-sm text-slate-400">Nothing ordered yet.</div>
+                    <div v-for="oi in orderItems" :key="oi.id" class="card-list-row">
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium text-slate-900">{{ oi.item_name }} <span class="text-slate-400">×{{ oi.quantity }}</span></p>
+                            <p class="text-xs text-slate-500">{{ formatCalendarDate(oi.menu_date) }} · ₹{{ Number(oi.line_total).toFixed(2) }}</p>
+                        </div>
+                        <button v-if="canOrder" class="shrink-0 text-xs font-semibold text-red-500" @click="removeItem(oi)">Remove</button>
+                    </div>
+                </div>
+
+                <details v-if="payments.length" class="card card--flush">
+                    <summary class="p-3 cursor-pointer select-none font-bold text-sm">Payments received ({{ payments.length }})</summary>
+                    <table class="data-table">
+                        <thead><tr><th>Receipt</th><th>Amount</th><th>Mode</th><th>Date</th></tr></thead>
+                        <tbody>
+                            <tr v-for="p in payments" :key="p.id">
+                                <td class="font-mono text-xs">{{ p.receipt_number }}</td>
+                                <td>₹{{ Number(p.amount).toFixed(2) }}</td>
+                                <td class="capitalize">{{ p.payment_mode.replace('_', ' ') }}</td>
+                                <td>{{ formatCalendarDate(p.received_at) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </details>
             </div>
         </div>
-        <EmptyState v-if="!menuItems.length" title="No menu published yet" description="The Sahodaya hasn't added food items for this event yet." />
 
-        <div v-if="orderItems.length" class="card card--flush mt-6">
-            <div class="p-3 border-b bg-gray-50 font-bold text-sm">Your order</div>
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                    <tr>
-                        <th class="p-3">Date</th>
-                        <th class="p-3">Item</th>
-                        <th class="p-3">Qty</th>
-                        <th class="p-3">Line total</th>
-                        <th class="p-3 text-right"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="oi in orderItems" :key="oi.id" class="border-t">
-                        <td class="p-3">{{ formatCalendarDate(oi.menu_date) }}</td>
-                        <td class="p-3">{{ oi.item_name }}</td>
-                        <td class="p-3">{{ oi.quantity }}</td>
-                        <td class="p-3">₹{{ Number(oi.line_total).toFixed(2) }}</td>
-                        <td class="p-3 text-right">
-                            <button v-if="canOrder" class="text-xs font-semibold text-red-500" @click="removeItem(oi)">Remove</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div v-if="payments.length" class="card card--flush mt-6">
-            <div class="p-3 border-b bg-gray-50 font-bold text-sm">Payments received</div>
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                    <tr><th class="p-3">Receipt</th><th class="p-3">Amount</th><th class="p-3">Mode</th><th class="p-3">Date</th></tr>
-                </thead>
-                <tbody>
-                    <tr v-for="p in payments" :key="p.id" class="border-t">
-                        <td class="p-3 font-mono text-xs">{{ p.receipt_number }}</td>
-                        <td class="p-3">₹{{ Number(p.amount).toFixed(2) }}</td>
-                        <td class="p-3 capitalize">{{ p.payment_mode.replace('_', ' ') }}</td>
-                        <td class="p-3">{{ formatCalendarDate(p.received_at) }}</td>
-                    </tr>
-                </tbody>
-            </table>
+        <!-- Mobile-only sticky total, so the running balance stays visible while scrolling the menu -->
+        <div v-if="bill" class="lg:hidden sticky bottom-3 mt-6 mx-1 z-10">
+            <a href="#your-order" class="flex items-center justify-between rounded-2xl bg-[color:var(--brand-navy)] px-4 py-3 text-white shadow-lg">
+                <span class="text-sm font-semibold">Total ₹{{ Number(bill.amount_total).toFixed(2) }}</span>
+                <span class="text-xs" :class="Number(bill.balance_due) > 0 ? 'text-amber-300' : 'text-emerald-300'">
+                    Balance ₹{{ Number(bill.balance_due).toFixed(2) }}
+                </span>
+            </a>
         </div>
     </SchoolAdminLayout>
 </template>
@@ -114,6 +88,10 @@
 import { computed, reactive } from 'vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
+import FoodBillSummary from '@/Components/food/FoodBillSummary.vue';
+import FoodItemCard from '@/Components/food/FoodItemCard.vue';
+import QuantityStepper from '@/Components/food/QuantityStepper.vue';
+import { mealIcon } from '@/support/mealIcons.js';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
@@ -148,6 +126,14 @@ function orderedQty(menuItemId) {
 function remainingFor(item) {
     if (!item.max_per_school) return Infinity;
     return item.max_per_school - orderedQty(item.id);
+}
+
+function badgesFor(item) {
+    if (!item.max_per_school) return [];
+    const remaining = remainingFor(item);
+    const badges = [{ label: `${orderedQty(item.id)} / ${item.max_per_school} ordered`, tone: remaining <= 0 ? 'amber' : 'slate' }];
+    if (remaining <= 0) badges.push({ label: 'Limit reached', tone: 'amber' });
+    return badges;
 }
 
 function addItem(item) {

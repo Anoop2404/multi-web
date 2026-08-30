@@ -131,22 +131,22 @@
                     <p class="text-xs text-slate-400">{{ filteredCatalogItems.length }} of {{ catalogItems.length }} item(s)</p>
 
                     <div class="max-h-80 overflow-y-auto rounded-xl border border-slate-200">
-                        <table class="w-full text-sm">
-                            <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500 sticky top-0">
+                        <table class="data-table">
+                            <thead class="sticky top-0">
                                 <tr>
-                                    <th class="p-2 w-8"><input type="checkbox" :checked="allCatalogSelected" @change="toggleSelectAllCatalog"></th>
-                                    <th class="p-2">Item</th>
-                                    <th class="p-2">Price</th>
+                                    <th class="w-8"><input type="checkbox" :checked="allCatalogSelected" @change="toggleSelectAllCatalog"></th>
+                                    <th>Item</th>
+                                    <th>Price</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                <tr v-for="c in filteredCatalogItems" :key="c.id" class="bg-white">
-                                    <td class="p-2 align-top"><input type="checkbox" :value="c.id" v-model="selectedCatalogIds"></td>
-                                    <td class="p-2">
+                            <tbody>
+                                <tr v-for="c in filteredCatalogItems" :key="c.id">
+                                    <td class="align-top"><input type="checkbox" :value="c.id" v-model="selectedCatalogIds"></td>
+                                    <td>
                                         {{ c.name }}
                                         <span v-if="!c.is_active" class="ml-1 text-[10px] text-slate-400">(inactive)</span>
                                     </td>
-                                    <td class="p-2 text-slate-600">₹{{ Number(c.default_price).toFixed(2) }}</td>
+                                    <td class="text-slate-600">₹{{ Number(c.default_price).toFixed(2) }}</td>
                                 </tr>
                                 <tr v-if="filteredCatalogItems.length === 0">
                                     <td colspan="3" class="p-4 text-center text-sm text-slate-400">No items match "{{ catalogSearch }}".</td>
@@ -163,71 +163,64 @@
              truth both here and on the school-facing FoodOrder page). -->
         <div>
             <h3 class="section-title mb-3">Scheduled menu</h3>
-            <div v-for="group in groupedItems" :key="group.date" class="card card--flush mb-4">
-                <div class="p-3 border-b bg-gray-50 font-bold text-sm">{{ formatCalendarDate(group.date) }}</div>
-                <div v-for="mealGroup in group.meals" :key="mealGroup.mealType" class="border-t first:border-t-0">
-                    <div class="px-3 py-1.5 bg-gray-50/70 text-xs font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-1.5">
-                        <span aria-hidden="true">{{ MEAL_ICONS[mealGroup.mealType] || '🍴' }}</span>
+            <div v-for="group in groupedItems" :key="group.date" class="mb-6 last:mb-0">
+                <p class="text-sm font-bold text-slate-800 mb-3">{{ formatCalendarDate(group.date) }}</p>
+                <div v-for="mealGroup in group.meals" :key="mealGroup.mealType" class="mb-5 last:mb-0">
+                    <div class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <span aria-hidden="true">{{ mealIcon(mealGroup.mealType) }}</span>
                         <span>{{ mealTypes[mealGroup.mealType] || mealGroup.mealType }}</span>
                     </div>
-                    <table class="w-full text-sm">
-                        <thead class="text-left text-xs uppercase text-gray-400">
-                            <tr>
-                                <th class="p-3 w-16">Order</th>
-                                <th class="p-3">Item</th>
-                                <th class="p-3">Price</th>
-                                <th class="p-3">Max/school</th>
-                                <th class="p-3">Available</th>
-                                <th class="p-3 text-right"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="item in mealGroup.items" :key="item.id" class="border-t">
-                                <template v-if="editingId === item.id">
-                                    <td class="p-2" colspan="6">
-                                        <form @submit.prevent="saveEdit(item)" class="grid grid-cols-7 gap-2 items-center">
-                                            <input v-model="editForm.sort_order" type="number" min="0" class="field text-xs" placeholder="Order">
-                                            <SearchableSelect v-model="editForm.meal_type" :options="mealTypeOptions"
-                                                              :all-option="false" placeholder="Select meal" />
-                                            <input v-model="editForm.name" type="text" class="field text-xs col-span-2">
-                                            <input v-model="editForm.price" type="number" min="0" step="0.01" class="field text-xs">
-                                            <input v-model="editForm.max_per_school" type="number" min="1" class="field text-xs" placeholder="Max">
-                                            <label class="text-xs flex items-center gap-1">
-                                                <input type="checkbox" v-model="editForm.is_available"> Available
-                                            </label>
-                                            <div class="col-span-7 flex gap-2">
-                                                <button type="submit" class="text-xs font-semibold text-indigo-600">Save</button>
-                                                <button type="button" class="text-xs text-gray-500" @click="cancelEdit">Cancel</button>
-                                            </div>
-                                        </form>
-                                    </td>
-                                </template>
-                                <template v-else>
-                                    <td class="p-3 text-gray-500">{{ item.sort_order }}</td>
-                                    <td class="p-3">
-                                        {{ item.name }}
-                                        <p v-if="item.description" class="text-xs text-gray-400">{{ item.description }}</p>
-                                    </td>
-                                    <td class="p-3">₹{{ Number(item.price).toFixed(2) }}</td>
-                                    <td class="p-3">{{ item.max_per_school || '—' }}</td>
-                                    <td class="p-3">
-                                        <span :class="item.is_available ? 'text-green-700' : 'text-gray-400'" class="text-xs px-2 py-0.5 rounded bg-gray-100">
-                                            {{ item.is_available ? 'Yes' : 'No' }}
-                                        </span>
-                                    </td>
-                                    <td class="p-3 text-right">
-                                        <button class="text-xs font-semibold text-indigo-600 mr-3" @click="startEdit(item)">Edit</button>
-                                        <button class="text-xs font-semibold text-red-500" @click="removeItem(item)">Remove</button>
-                                    </td>
-                                </template>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <FoodItemCard v-for="item in mealGroup.items" :key="item.id"
+                                      :name="item.name" :description="item.description" :price="Number(item.price)"
+                                      :icon="mealIcon(mealGroup.mealType)" :muted="!item.is_available"
+                                      :badges="menuItemBadges(item)">
+                            <template #corner>
+                                <span class="status-pill bg-slate-100 text-slate-500">#{{ item.sort_order }}</span>
+                            </template>
+                            <template #actions>
+                                <button class="text-xs font-semibold text-indigo-600" @click="startEdit(item)">Edit</button>
+                                <button class="text-xs font-semibold text-red-500" @click="removeItem(item)">Remove</button>
+                            </template>
+                        </FoodItemCard>
+                    </div>
                 </div>
             </div>
             <EmptyState v-if="!menuItems.length" title="Nothing scheduled yet"
                         description="Assign a food item to a date and meal above to build the schedule." />
         </div>
+
+        <Modal :show="editingId !== null" title="Edit menu item" size="lg" @close="cancelEdit">
+            <form v-if="editingItem" id="edit-menu-item-form" @submit.prevent="saveEdit(editingItem)" class="form-stack">
+                <FormField label="Item name">
+                    <template #default="{ id }"><input :id="id" v-model="editForm.name" type="text" class="field text-sm"></template>
+                </FormField>
+                <div class="grid grid-cols-2 gap-3">
+                    <FormField label="Meal">
+                        <template #default="{ id }">
+                            <SearchableSelect :id="id" v-model="editForm.meal_type" :options="mealTypeOptions" :all-option="false" placeholder="Select meal" />
+                        </template>
+                    </FormField>
+                    <FormField label="Sort order">
+                        <template #default="{ id }"><input :id="id" v-model="editForm.sort_order" type="number" min="0" class="field text-sm"></template>
+                    </FormField>
+                    <FormField label="Price (₹)">
+                        <template #default="{ id }"><input :id="id" v-model="editForm.price" type="number" min="0" step="0.01" class="field text-sm"></template>
+                    </FormField>
+                    <FormField label="Max per school" hint="Leave blank for no limit">
+                        <template #default="{ id }"><input :id="id" v-model="editForm.max_per_school" type="number" min="1" class="field text-sm"></template>
+                    </FormField>
+                </div>
+                <label class="choice-chip" :class="editForm.is_available ? 'choice-chip--checked' : ''">
+                    <input type="checkbox" v-model="editForm.is_available" class="choice-chip-input">
+                    <span class="choice-chip-label">Available for schools to order</span>
+                </label>
+            </form>
+            <template #footer>
+                <button type="button" class="btn-secondary text-sm" @click="cancelEdit">Cancel</button>
+                <button type="submit" form="edit-menu-item-form" class="btn-primary text-sm">Save changes</button>
+            </template>
+        </Modal>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>
@@ -241,10 +234,10 @@ import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue
 import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
 import FoodRegionDrillDown from '@/Components/sahodaya/FoodRegionDrillDown.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import FoodItemCard from '@/Components/food/FoodItemCard.vue';
+import { mealIcon } from '@/support/mealIcons.js';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
-
-const MEAL_ICONS = { breakfast: '🌅', lunch: '🍽️', snacks: '🍪', tea: '☕', dinner: '🌙', other: '🍴' };
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -344,9 +337,18 @@ function assignCatalogItems() {
     });
 }
 
-// --- Scheduled menu: per-slot inline edit/remove (unchanged from the direct-add flow) ---
+// --- Scheduled menu: per-slot edit (via modal) / remove ---
 const editingId = ref(null);
 const editForm = reactive({ meal_type: '', name: '', price: '', max_per_school: '', is_available: true, sort_order: 0 });
+const editingItem = computed(() => props.menuItems.find((i) => i.id === editingId.value) ?? null);
+
+function menuItemBadges(item) {
+    const badges = [];
+    if (item.max_per_school) badges.push({ label: `Max ${item.max_per_school}/school`, tone: 'slate' });
+    if (!item.is_available) badges.push({ label: 'Unavailable', tone: 'amber' });
+    return badges;
+}
+
 function startEdit(item) {
     editingId.value = item.id;
     editForm.meal_type = item.meal_type;

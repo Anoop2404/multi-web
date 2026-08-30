@@ -15,29 +15,26 @@
         </form>
 
         <div class="card card--flush">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-xs text-gray-500 text-left">
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <th class="p-3">Code</th>
-                        <th class="p-3">Event</th>
-                        <th class="p-3">Meal</th>
-                        <th class="p-3">Valid date</th>
-                        <th class="p-3">Heads</th>
-                        <th class="p-3">Status</th>
+                        <th>Code</th>
+                        <th>Event</th>
+                        <th>Meal</th>
+                        <th>Valid date</th>
+                        <th>Heads</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="c in coupons" :key="c.id" class="border-t">
-                        <td class="p-3 font-mono font-semibold">{{ c.coupon_code }}</td>
-                        <td class="p-3">{{ c.event?.title }}</td>
-                        <td class="p-3 capitalize">{{ c.meal_type }}</td>
-                        <td class="p-3">{{ formatCalendarDate(c.valid_date) }}</td>
-                        <td class="p-3">{{ c.head_count }}</td>
-                        <td class="p-3">
-                            <span class="text-xs px-2 py-0.5 rounded-full capitalize"
-                                  :class="c.status === 'redeemed' ? 'bg-green-100 text-green-800' : c.status === 'void' ? 'bg-gray-100' : 'bg-amber-100 text-amber-800'">
-                                {{ c.status }}
-                            </span>
+                    <tr v-for="c in coupons" :key="c.id">
+                        <td class="font-mono font-semibold">{{ c.coupon_code }}</td>
+                        <td>{{ c.event?.title }}</td>
+                        <td class="capitalize">{{ c.meal_type }}</td>
+                        <td>{{ formatCalendarDate(c.valid_date) }}</td>
+                        <td>{{ c.head_count }}</td>
+                        <td>
+                            <span class="status-pill" :class="couponStatusPillClass(c.status)">{{ couponStatusLabel(c.status) }}</span>
                         </td>
                     </tr>
                     <tr v-if="!coupons.length">
@@ -57,6 +54,7 @@ import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { couponStatusLabel, couponStatusPillClass } from '@/support/foodBillStatus.js';
 
 const props = defineProps({
     events: Array,

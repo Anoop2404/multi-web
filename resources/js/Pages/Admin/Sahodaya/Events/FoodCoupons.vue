@@ -25,45 +25,42 @@
 
         <template v-if="!isPartitionedHub">
         <div class="grid grid-cols-2 gap-3 mb-4 max-w-sm">
-            <div class="card text-center">
-                <p class="text-2xl font-bold">{{ summary.issued }}</p>
-                <p class="text-xs text-gray-500">Issued</p>
+            <div class="stat-tile text-center">
+                <p class="stat-tile-value">{{ summary.issued }}</p>
+                <p class="stat-tile-label">Issued</p>
             </div>
-            <div class="card text-center">
-                <p class="text-2xl font-bold text-green-700">{{ summary.redeemed }}</p>
-                <p class="text-xs text-gray-500">Redeemed</p>
+            <div class="stat-tile text-center">
+                <p class="stat-tile-value text-emerald-700">{{ summary.redeemed }}</p>
+                <p class="stat-tile-label">Redeemed</p>
             </div>
         </div>
 
         <div class="card card--flush">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-left">
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <th class="p-3">Sl No</th>
-                        <th class="p-3">Code</th>
-                        <th class="p-3">School</th>
-                        <th class="p-3">Meal</th>
-                        <th class="p-3">Date</th>
-                        <th class="p-3">Heads</th>
-                        <th class="p-3">Status</th>
-                        <th class="p-3"></th>
+                        <th>Sl No</th>
+                        <th>Code</th>
+                        <th>School</th>
+                        <th>Meal</th>
+                        <th>Date</th>
+                        <th>Heads</th>
+                        <th>Status</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="(c, idx) in coupons" :key="c.id" class="border-t">
-                        <td class="p-3">{{ idx + 1 }}</td>
-                        <td class="p-3 font-mono text-xs">{{ c.coupon_code }}</td>
-                        <td class="p-3">{{ (c.school_name || '').toUpperCase() }}</td>
-                        <td class="p-3 capitalize">{{ c.meal_type }}</td>
-                        <td class="p-3">{{ formatCalendarDate(c.valid_date) }}</td>
-                        <td class="p-3">{{ c.head_count }}</td>
-                        <td class="p-3">
-                            <span class="text-xs px-2 py-0.5 rounded"
-                                  :class="c.status === 'redeemed' ? 'bg-green-100 text-green-800' : c.status === 'void' ? 'bg-gray-100 text-gray-500' : 'bg-amber-100 text-amber-800'">
-                                {{ c.status }}
-                            </span>
+                    <tr v-for="(c, idx) in coupons" :key="c.id">
+                        <td>{{ idx + 1 }}</td>
+                        <td class="font-mono text-xs">{{ c.coupon_code }}</td>
+                        <td>{{ (c.school_name || '').toUpperCase() }}</td>
+                        <td class="capitalize">{{ c.meal_type }}</td>
+                        <td>{{ formatCalendarDate(c.valid_date) }}</td>
+                        <td>{{ c.head_count }}</td>
+                        <td>
+                            <span class="status-pill" :class="couponStatusPillClass(c.status)">{{ couponStatusLabel(c.status) }}</span>
                         </td>
-                        <td class="p-3 text-right">
+                        <td class="text-right">
                             <button v-if="c.status === 'issued'" @click="redeem(c.id)" class="text-green-600 text-xs font-semibold">Redeem</button>
                         </td>
                     </tr>
@@ -86,6 +83,7 @@ import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue
 import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
 import FoodRegionDrillDown from '@/Components/sahodaya/FoodRegionDrillDown.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { couponStatusLabel, couponStatusPillClass } from '@/support/foodBillStatus.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
