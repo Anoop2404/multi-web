@@ -83,9 +83,13 @@
                     </div>
 
                     <div v-if="defaultType === 'school'">
-                        <label class="form-label mb-1.5">Parent Sahodaya *</label>
-                        <SearchableSelect v-model="form.parent_id" :options="sahodayas" :required="true"
-                                          :all-option="true" all-label="— Select Sahodaya —" />
+                        <label class="form-label mb-1.5">Parent Sahodaya</label>
+                        <SearchableSelect v-model="form.parent_id" :options="sahodayas" :required="false"
+                                          :all-option="true" all-label="— None (independent school) —" />
+                        <p class="text-xs text-gray-500 mt-1">
+                            Leave blank for a school with no Sahodaya cluster — it gets the website/CMS product only
+                            (no membership, fest, or exam features).
+                        </p>
                         <p v-if="form.errors.parent_id" class="text-xs text-red-500 mt-1">{{ form.errors.parent_id }}</p>
                     </div>
 
