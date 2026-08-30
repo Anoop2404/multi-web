@@ -10,6 +10,7 @@ use App\Support\SectionFieldRegistry;
 use App\Support\SahodayaTenantBranding;
 use App\Support\TenantPublicSite;
 use App\Support\SahodayaWebsiteTemplateCatalog;
+use App\Services\Licensing\FeatureGate;
 use App\Services\Website\SahodayaContentReadiness;
 use Illuminate\Http\Request;
 
@@ -85,7 +86,14 @@ class SiteBuilderController extends SahodayaAdminController
             'navNeedsSetup'          => empty($navConfig['items']),
             'themeConfig'            => SahodayaTenantBranding::theme($this->sahodaya),
             'themePresets'           => SahodayaTenantBranding::themePresets(),
-            'experiences'            => SahodayaWebsiteTemplateCatalog::summaries(),
+            'experiences'            => (function () {
+                $premiumAllowed = app(FeatureGate::class)->allows($this->sahodaya, 'module.website_premium');
+
+                return collect(SahodayaWebsiteTemplateCatalog::summaries())
+                    ->map(fn (array $exp) => $exp + ['locked' => $exp['key'] === 'sahodaya-premium' && ! $premiumAllowed])
+                    ->values()
+                    ->all();
+            })(),
             'readiness'              => app(SahodayaContentReadiness::class)->inspect($this->sahodaya, $site),
         ]);
     }

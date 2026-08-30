@@ -6,6 +6,7 @@ use App\Models\Tenant;
 use App\Support\SahodayaPublicData;
 use App\Support\SahodayaSiteTemplate;
 use Database\Seeders\SahodayaMasterDataSeeder;
+use Database\Seeders\SubscriptionPlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -16,6 +17,8 @@ class SahodayaPublicSiteTest extends TestCase
 
     public function test_sahodaya_site_template_seeds_modern_layout(): void
     {
+        $this->seed(SubscriptionPlanSeeder::class);
+
         $sahodaya = Tenant::create([
             'id'        => (string) Str::uuid(),
             'type'      => 'sahodaya',
@@ -29,8 +32,8 @@ class SahodayaPublicSiteTest extends TestCase
 
         $this->assertDatabaseHas('site_sections', [
             'tenant_id'    => $sahodaya->id,
-            'section_type' => 'sahodaya_home',
-            'variant'      => 'dashboard',
+            'section_type' => 'hero',
+            'variant'      => 'gradient-split',
         ]);
 
         $nav = $sahodaya->settings()->where('key', 'nav_config')->first()?->value;

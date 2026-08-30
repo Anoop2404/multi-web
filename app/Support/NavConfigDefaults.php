@@ -45,6 +45,56 @@ class NavConfigDefaults
         return SchoolPortalNavLinks::mergePortalCta($stored);
     }
 
+    /**
+     * Drop any `/#slug` nav item whose anchor doesn't correspond to a section actually
+     * rendered on the page (site-section-frame.blade.php gives every section an
+     * id="{section_type with _ replaced by -}"). Non-anchor URLs (real routes, external
+     * links) always pass through untouched. Recurses into `children` so a dropdown
+     * doesn't keep dead sub-links either.
+     *
+     * @param  array<string, mixed>  $navConfig
+     * @param  \Illuminate\Support\Collection<int, mixed>  $sections
+     * @return array<string, mixed>
+     */
+    public static function pruneDeadAnchors(array $navConfig, \Illuminate\Support\Collection $sections): array
+    {
+        $liveAnchors = $sections
+            ->pluck('section_type')
+            ->filter()
+            ->map(fn (string $type) => str_replace('_', '-', $type))
+            ->unique();
+
+        $navConfig['items'] = self::filterDeadAnchorItems($navConfig['items'] ?? [], $liveAnchors);
+
+        return $navConfig;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $items
+     * @param  \Illuminate\Support\Collection<int, string>  $liveAnchors
+     * @return array<int, array<string, mixed>>
+     */
+    private static function filterDeadAnchorItems(array $items, \Illuminate\Support\Collection $liveAnchors): array
+    {
+        return collect($items)
+            ->filter(function (array $item) use ($liveAnchors) {
+                if (! preg_match('/^\/#(.+)$/', $item['url'] ?? '', $matches)) {
+                    return true;
+                }
+
+                return $liveAnchors->contains($matches[1]);
+            })
+            ->map(function (array $item) use ($liveAnchors) {
+                if (! empty($item['children'])) {
+                    $item['children'] = self::filterDeadAnchorItems($item['children'], $liveAnchors);
+                }
+
+                return $item;
+            })
+            ->values()
+            ->all();
+    }
+
     /** @return array<string, mixed> */
     public static function forSahodaya(): array
     {
@@ -54,7 +104,7 @@ class NavConfigDefaults
             'items'          => [
                 ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
                 ['label' => 'About', 'url' => '/#about-sahodaya', 'external' => false, 'children' => []],
-                ['label' => 'Programmes', 'url' => '/#programmes', 'external' => false, 'children' => []],
+                ['label' => 'Programmes', 'url' => '/#events-programs', 'external' => false, 'children' => []],
                 [
                     'label' => 'Events & Results', 'url' => '/fest', 'external' => false,
                     'children' => [
@@ -65,12 +115,8 @@ class NavConfigDefaults
                 ],
                 ['label' => 'Office Bearers', 'url' => '/#office-bearers', 'external' => false, 'children' => []],
                 ['label' => 'Member Schools', 'url' => '/#member-schools', 'external' => false, 'children' => []],
-                [
-                    'label' => 'Academic', 'url' => '/#academic-quicklinks', 'external' => false,
-                    'children' => [
-                        ['label' => 'Membership Renewal', 'url' => '/school-register', 'external' => false],
-                    ],
-                ],
+                ['label' => 'Gallery', 'url' => '/#gallery', 'external' => false, 'children' => []],
+                ['label' => 'Membership Renewal', 'url' => '/school-register', 'external' => false, 'children' => []],
                 ['label' => 'Contact', 'url' => '/#contact', 'external' => false, 'children' => []],
             ],
             'portal_cta' => PortalNavLinks::portalCtaDefaults(),
@@ -89,6 +135,7 @@ class NavConfigDefaults
                 ['label' => 'Academics', 'url' => '/#academic-programmes', 'external' => false, 'children' => []],
                 ['label' => 'Admissions', 'url' => '/#admissions', 'external' => false, 'children' => []],
                 ['label' => 'Gallery', 'url' => '/#gallery', 'external' => false, 'children' => []],
+                ['label' => 'Mandatory Disclosure', 'url' => '/#mandatory-disclosure', 'external' => false, 'children' => []],
                 ['label' => 'Contact', 'url' => '/#contact', 'external' => false, 'children' => []],
             ],
             'portal_cta' => SchoolPortalNavLinks::portalCtaDefaults(),

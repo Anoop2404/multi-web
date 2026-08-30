@@ -19,6 +19,7 @@ class FeatureCatalog
             'module.training' => ['label' => 'Teacher training', 'type' => 'module'],
             'module.board_results' => ['label' => 'Board results', 'type' => 'module'],
             'module.website' => ['label' => 'Public website / site builder', 'type' => 'module'],
+            'module.website_premium' => ['label' => 'Premium website design tier', 'type' => 'module'],
             'api_access' => ['label' => 'API access', 'type' => 'module'],
             'limit.schools' => ['label' => 'Max member schools', 'type' => 'limit'],
             'limit.students' => ['label' => 'Max students', 'type' => 'limit'],

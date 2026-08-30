@@ -3,9 +3,12 @@
 namespace App\Support;
 
 use App\Models\OfficeBearers;
-use App\Models\SiteSection;
+use App\Models\SubscriptionPlan;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
+use App\Models\TenantSubscription;
+use App\Models\WebsiteSite;
+use App\Services\Website\SahodayaTemplateApplier;
 
 class SahodayaSiteTemplate
 {
@@ -18,8 +21,30 @@ class SahodayaSiteTemplate
         self::seedNav($sahodaya);
         self::seedTheme($sahodaya);
         self::seedFooter($sahodaya);
+        self::ensureFreeSubscription($sahodaya);
         self::seedSections($sahodaya);
         self::seedSampleBearers($sahodaya);
+    }
+
+    private static function ensureFreeSubscription(Tenant $sahodaya): void
+    {
+        if (TenantSubscription::where('tenant_id', $sahodaya->id)->exists()) {
+            return;
+        }
+
+        $freePlan = SubscriptionPlan::where('slug', 'free')->first();
+        if (! $freePlan) {
+            throw new \RuntimeException('Free subscription plan is not seeded — run SubscriptionPlanSeeder before provisioning tenants.');
+        }
+
+        TenantSubscription::create([
+            'tenant_id' => $sahodaya->id,
+            'plan_id' => $freePlan->id,
+            'period_start' => now(),
+            'period_end' => now()->addYears(50),
+            'status' => 'active',
+            'auto_renew' => true,
+        ]);
     }
 
     private static function seedNav(Tenant $sahodaya): void
@@ -31,12 +56,13 @@ class SahodayaSiteTemplate
                 'layout_variant' => 'sahodaya-modern',
                 'items'          => [
                     ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
-                    ['label' => 'About', 'url' => '/#about', 'external' => false, 'children' => []],
-                    ['label' => 'Programmes', 'url' => '/#programmes', 'external' => false, 'children' => []],
+                    ['label' => 'About', 'url' => '/#about-sahodaya', 'external' => false, 'children' => []],
+                    ['label' => 'Programmes', 'url' => '/#events-programs', 'external' => false, 'children' => []],
                     ['label' => 'Office Bearers', 'url' => '/#office-bearers', 'external' => false, 'children' => []],
                     ['label' => 'Member Schools', 'url' => '/#member-schools', 'external' => false, 'children' => []],
+                    ['label' => 'Gallery', 'url' => '/#gallery', 'external' => false, 'children' => []],
                     [
-                        'label' => 'Academic', 'url' => '/#academic', 'external' => false,
+                        'label' => 'Academic', 'url' => '/fest', 'external' => false,
                         'children' => [
                             ['label' => 'Fest Schedule & Results', 'url' => '/fest', 'external' => false],
                             ['label' => 'MCQ Talent Search Papers', 'url' => '/mcq/papers', 'external' => false],
@@ -44,7 +70,6 @@ class SahodayaSiteTemplate
                         ],
                     ],
                     ['label' => 'Circulars', 'url' => '/circulars', 'external' => false, 'children' => []],
-                    ['label' => 'Useful Links', 'url' => '/#useful-links', 'external' => false, 'children' => []],
                     ['label' => 'Contact', 'url' => '/#contact', 'external' => false, 'children' => []],
                     ['label' => 'School Registration', 'url' => '/school-register', 'external' => false, 'children' => []],
                     ['label' => 'School Login', 'url' => '/login', 'external' => false, 'children' => []],
@@ -101,31 +126,13 @@ class SahodayaSiteTemplate
             return;
         }
 
-        SiteSection::create([
-            'tenant_id'     => $sahodaya->id,
-            'section_type'  => 'sahodaya_home',
-            'variant'       => 'dashboard',
-            'display_order' => 1,
-            'is_active'     => true,
-            'config'        => [
-                'heading'            => $sahodaya->name,
-                'tagline'            => 'Uniting CBSE schools for academic excellence, cultural programs, and collaborative growth.',
-                'eyebrow'            => 'CBSE Sahodaya School Complex',
-                'motto'              => 'Caring and Sharing',
-                'about_heading'      => 'Caring and Sharing',
-                'about_text'         => 'An association of CBSE-affiliated schools fostering collaboration, cultural programmes, sports meets, and professional development — guided by the Sahodaya philosophy of collective growth.',
-                'programmes_heading' => 'Programmes & Services',
-                'bearers_heading'    => 'Office Bearers',
-                'academic_heading'   => 'Programs & Results',
-                'events_heading'     => 'Upcoming Events',
-                'schools_heading'    => 'Member Schools',
-                'links_heading'      => 'Useful Links',
-                'portal_heading'     => 'Member School Portal',
-                'portal_text'        => 'Schools can log in to submit annual registration, upload student & teacher data, and track membership status.',
-                'contact_heading'    => 'Contact Us',
-                'contact_text'       => 'Reach the Sahodaya office for membership, events, and academic coordination.',
-            ],
-        ]);
+        $site = WebsiteSite::ensurePrimary($sahodaya->id);
+        $template = SahodayaWebsiteTemplateCatalog::get('network-directory');
+        $context = SahodayaTenantBranding::context($sahodaya);
+
+        $applier = app(SahodayaTemplateApplier::class);
+        $applier->applyDraft($sahodaya, $site, 'network-directory', $template, $context);
+        $applier->publishDraft($site);
     }
 
     private static function seedSampleBearers(Tenant $sahodaya): void

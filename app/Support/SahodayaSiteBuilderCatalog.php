@@ -14,7 +14,7 @@ class SahodayaSiteBuilderCatalog
         'events_programs'       => ['upcoming-cards', 'cards', 'timeline'],
         'kalotsav'              => ['results-tabs', 'scoreboard', 'registration-cta'],
         'sports_meet'           => ['results-highlight', 'schedule-cards'],
-        'statistics'            => ['counter-strip', 'horizontal-strip', 'counter-cards'],
+        'statistics'            => ['counter-strip', 'horizontal-strip', 'counter-cards', 'with-achievements'],
         'programmes'            => ['service-grid'],
         'academic_quicklinks'   => ['year-tabs'],
         'downloads_sahodaya'    => ['sahodaya-grid'],

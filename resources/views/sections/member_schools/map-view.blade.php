@@ -98,11 +98,11 @@
             @endforeach
         </div>
         @else
-        <div class="rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center bg-slate-50">
-            <svg class="w-12 h-12 text-slate-400 mx-auto mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.5H4.5V21"/></svg>
-            <h3 class="text-base font-bold text-slate-800">Member Directory Initializing</h3>
-            <p class="text-sm text-slate-500 mt-1">Affiliated member schools will be listed here shortly.</p>
-        </div>
+        <x-section-empty-state
+            title="Member Directory Initializing"
+            subtitle="Affiliated member schools will be listed here shortly."
+            icon="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.5H4.5V21"
+        />
         @endif
     </div>
 </section>

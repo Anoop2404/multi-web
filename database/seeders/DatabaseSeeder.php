@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             SkinPresetsSeeder::class,
             SahodayaMasterDataSeeder::class,
+            SubscriptionPlanSeeder::class,
             DemoTenantsSeeder::class,
             NotificationTemplatesSeeder::class,
         ]);

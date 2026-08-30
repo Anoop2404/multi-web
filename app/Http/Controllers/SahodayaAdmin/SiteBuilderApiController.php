@@ -10,6 +10,7 @@ use App\Support\SahodayaSiteBuilderCatalog;
 use App\Support\SahodayaTenantBranding;
 use App\Support\TenantPublicSite;
 use App\Support\SahodayaWebsiteTemplateCatalog;
+use App\Services\Licensing\FeatureGate;
 use App\Services\Website\SahodayaContentReadiness;
 use App\Services\Website\SahodayaTemplateApplier;
 use App\Models\SiteSection;
@@ -26,7 +27,14 @@ class SiteBuilderApiController extends SahodayaAdminController
 {
     public function experiences(): JsonResponse
     {
-        return response()->json(['experiences' => SahodayaWebsiteTemplateCatalog::summaries()]);
+        $premiumAllowed = app(FeatureGate::class)->allows($this->sahodaya, 'module.website_premium');
+
+        $experiences = collect(SahodayaWebsiteTemplateCatalog::summaries())
+            ->map(fn (array $exp) => $exp + ['locked' => $exp['key'] === 'sahodaya-premium' && ! $premiumAllowed])
+            ->values()
+            ->all();
+
+        return response()->json(['experiences' => $experiences]);
     }
 
     public function applyExperienceDraft(Request $request, SahodayaTemplateApplier $applier): JsonResponse
@@ -36,8 +44,12 @@ class SiteBuilderApiController extends SahodayaAdminController
             'template_key' => 'required|string|max:80',
             'mode' => 'nullable|in:full,style',
         ]);
+        $this->assertAllowedTemplate($data['template_key']);
+
         $site = WebsiteSite::resolveForTenant($this->sahodaya->id, (int) $data['site_id']);
-        $draft = $applier->applyDraft($this->sahodaya, $site, $data['template_key'], $data['mode'] ?? 'full');
+        $template = SahodayaWebsiteTemplateCatalog::get($data['template_key']);
+        $context = SahodayaTenantBranding::context($this->sahodaya);
+        $draft = $applier->applyDraft($this->sahodaya, $site, $data['template_key'], $template, $context, $data['mode'] ?? 'full');
         $this->sahodaya->invalidateCache();
 
         return response()->json([
@@ -438,6 +450,15 @@ class SiteBuilderApiController extends SahodayaAdminController
         if ($sectionType && ! SahodayaSiteBuilderCatalog::allows($sectionType, $variant)) {
             throw ValidationException::withMessages([
                 'section_type' => 'This section type is not available in the Sahodaya site builder.',
+            ]);
+        }
+    }
+
+    private function assertAllowedTemplate(string $templateKey): void
+    {
+        if ($templateKey === 'sahodaya-premium' && ! app(FeatureGate::class)->allows($this->sahodaya, 'module.website_premium')) {
+            throw ValidationException::withMessages([
+                'template_key' => 'Upgrade to the Premium plan to apply this website design.',
             ]);
         }
     }

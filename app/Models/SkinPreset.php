@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class SkinPreset extends Model
 {
+    use CentralConnection;
+
     protected $fillable = ['name','slug','preview_image','description','theme','is_active','display_order'];
     protected $casts = ['theme' => 'array', 'is_active' => 'boolean'];
 

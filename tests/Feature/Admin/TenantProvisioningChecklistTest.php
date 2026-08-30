@@ -6,6 +6,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Tenancy\TenantProvisioningChecklistService;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Database\Seeders\SubscriptionPlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +21,7 @@ class TenantProvisioningChecklistTest extends TestCase
     private function actingSuperadmin(): User
     {
         $this->seed(RolesAndPermissionsSeeder::class);
+        $this->seed(SubscriptionPlanSeeder::class);
 
         $superadmin = User::factory()->create([
             'tenant_id' => null,
