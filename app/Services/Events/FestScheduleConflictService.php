@@ -66,6 +66,7 @@ class FestScheduleConflictService
                     $schoolName = Tenant::where('id', $entrySchoolId)->value('name') ?? '—';
 
                     $clashes[] = [
+                        'student_id'   => $studentId,
                         'student_name' => $student?->name ?? "Student #{$studentId}",
                         'school_name'  => $schoolName,
                         'school_id'    => $entrySchoolId,
