@@ -1333,22 +1333,22 @@ class FestSchoolEventFeeService
         $feeModel = $schedule['fee_model'] ?? 'none';
 
         if ($fee->registration_batch_id) {
-            // Item-fee/extra-item lines carry meta.item_id but not the item's own arts
+            // Item-fee/extra-item lines carry meta.item_id but not the item's own class
             // category — batch-fetched once here so the admin Fees listing can show which
-            // genre each charge belongs to (e.g. "Essay Writing (extra) — Literary")
-            // instead of just the bare item title.
+            // class category each charge belongs to (e.g. "Essay Writing (extra) —
+            // Category 1 — Classes 3 & 4") instead of just the bare item title.
             $lineItemIds = $fee->lines->pluck('meta')
                 ->map(fn ($meta) => $meta['item_id'] ?? null)
                 ->filter()
                 ->unique();
-            $categoryByItemId = $lineItemIds->isNotEmpty()
-                ? \App\Models\FestEventItem::whereIn('id', $lineItemIds)->pluck('category', 'id')
+            $classGroupByItemId = $lineItemIds->isNotEmpty()
+                ? \App\Models\FestEventItem::whereIn('id', $lineItemIds)->pluck('class_group', 'id')
                 : collect();
-            $taxonomy = app(\App\Services\Events\FestTaxonomyRegistry::class)->forTenant($event->tenant_id)->labels('arts_category');
+            $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
 
             foreach ($fee->lines as $line) {
                 $itemId = $line->meta['item_id'] ?? null;
-                $categoryKey = $itemId ? ($categoryByItemId[$itemId] ?? null) : null;
+                $classGroupKey = $itemId ? ($classGroupByItemId[$itemId] ?? null) : null;
 
                 $items[] = [
                     'label' => $line->label,
@@ -1356,7 +1356,8 @@ class FestSchoolEventFeeService
                     'line_type' => $line->line_type,
                     'quantity' => $line->quantity ?? 1,
                     'meta' => $line->meta,
-                    'category' => ($categoryKey && $categoryKey !== 'general') ? ($taxonomy[$categoryKey] ?? $categoryKey) : null,
+                    'category' => ($classGroupKey && $classGroupKey !== 'open')
+                        ? ($classGroupLabels[$classGroupKey] ?? $classGroupKey) : null,
                 ];
             }
 
