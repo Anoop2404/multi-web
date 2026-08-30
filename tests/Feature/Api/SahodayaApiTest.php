@@ -89,7 +89,7 @@ class SahodayaApiTest extends TestCase
         $this->auth($token)
             ->getJson("/api/v1/sahodaya/{$sahodaya->id}/schools/{$school->id}")
             ->assertOk()
-            ->assertJsonPath('data.school.name', 'Govt HS')
+            ->assertJsonPath('data.school.name', 'GOVT HS') // Tenant::getNameAttribute() uppercases school names
             ->assertJsonPath('data.school.has_login', false)
             ->assertJsonStructure([
                 'data' => [
@@ -144,13 +144,13 @@ class SahodayaApiTest extends TestCase
             ->getJson("/api/v1/sahodaya/{$sahodaya->id}/schools?payment_status=payment_not_done")
             ->assertOk()
             ->assertJsonPath('data.0.payment_status', 'payment_not_done')
-            ->assertJsonPath('data.0.name', 'Unpaid School');
+            ->assertJsonPath('data.0.name', 'UNPAID SCHOOL'); // Tenant::getNameAttribute() uppercases school names
 
         $this->auth($token)
             ->getJson("/api/v1/sahodaya/{$sahodaya->id}/schools?payment_status=payment_pending")
             ->assertOk()
             ->assertJsonPath('data.0.payment_status', 'payment_pending')
-            ->assertJsonPath('data.0.name', 'Govt HS');
+            ->assertJsonPath('data.0.name', 'GOVT HS'); // Tenant::getNameAttribute() uppercases school names
     }
 
     public function test_pending_membership_schools_without_payment_show_as_payment_due(): void

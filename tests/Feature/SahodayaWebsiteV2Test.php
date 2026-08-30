@@ -6,7 +6,7 @@ use App\Models\SiteSection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\WebsiteSite;
-use App\Models\KalotsavEvent;
+use App\Models\FestEvent;
 use App\Services\Website\SahodayaContentReadiness;
 use App\Services\Website\SahodayaHomepageModeResolver;
 use App\Support\SahodayaWebsiteTemplateCatalog;
@@ -49,13 +49,13 @@ class SahodayaWebsiteV2Test extends TestCase
         ]);
     }
 
-    public function test_all_four_experience_manifests_are_valid(): void
+    public function test_all_experience_manifests_are_valid(): void
     {
         $templates = SahodayaWebsiteTemplateCatalog::summaries();
 
-        $this->assertCount(4, $templates);
+        $this->assertCount(5, $templates);
         $this->assertEqualsCanonicalizing(
-            ['network-directory', 'events-results-live', 'academic-resources', 'confederation-governance'],
+            ['network-directory', 'events-results-live', 'academic-resources', 'confederation-governance', 'sahodaya-premium'],
             collect($templates)->pluck('key')->all(),
         );
     }
@@ -146,9 +146,9 @@ class SahodayaWebsiteV2Test extends TestCase
 
     public function test_homepage_mode_follows_event_lifecycle_without_a_live_override(): void
     {
-        KalotsavEvent::create([
-            'tenant_id' => $this->sahodaya->id, 'name' => 'Arts Festival', 'type' => 'kalotsav',
-            'academic_year' => '2026-27', 'event_date' => now()->addWeek(), 'is_active' => true,
+        FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Arts Festival', 'event_type' => 'kalolsavam',
+            'status' => 'registration_open', 'event_start' => now()->addWeek(),
             'results_published' => false,
         ]);
 

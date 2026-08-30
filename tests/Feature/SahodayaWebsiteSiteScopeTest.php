@@ -81,7 +81,9 @@ class SahodayaWebsiteSiteScopeTest extends TestCase
         $this->get('http://scoped-site.sahodaya.test/m/innovation-expo')
             ->assertOk()
             ->assertSee('href="/m/innovation-expo"', false)
-            ->assertSee('href="/m/innovation-expo#about-sahodaya"', false)
+            // 'directory' navigation for a v2 microsite builds real subpage links
+            // (RendersPublicPages::renderPublic()), not same-page anchors.
+            ->assertSee('href="/m/innovation-expo/about"', false)
             ->assertDontSee('href="/#about-sahodaya"', false);
     }
 
