@@ -54,12 +54,12 @@ class DashboardController extends SchoolAdminController
             'documentAlerts' => $this->documentAlerts($tid),
             'programSummaries' => $this->programSummaries(),
             'dashboardExtras'  => app(\App\Services\Events\ProgramHubDataService::class)->schoolDashboardExtras($this->school),
-            'cpd' => [
+            'cpd' => $this->school->parent_id ? [
                 'hours' => $cpdHours,
                 'teachers' => $cpdTeachers,
                 'year' => AcademicYear::forSchool($this->school),
-            ],
-            'boardResultsWidget' => $this->boardResultsWidget($tid, $year),
+            ] : null,
+            'boardResultsWidget' => $this->school->parent_id ? $this->boardResultsWidget($tid, $year) : null,
             'setup' => $this->setupStatus(),
             'membershipComplete' => $this->membershipComplete(),
             'recentActivity' => $this->recentActivity(),
@@ -69,7 +69,7 @@ class DashboardController extends SchoolAdminController
                         ->forSchool($this->school, AcademicYear::forSchool($this->school))
                 ),
             'showSetupWizard' => ! $this->school->school_setup_wizard_dismissed
-                && $this->school->membership_status === 'approved',
+                && ($this->school->parent_id === null || $this->school->membership_status === 'approved'),
         ]);
     }
 

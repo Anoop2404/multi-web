@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Public\Concerns\RendersPublicPages;
 use App\Models\AdmissionEnquiry;
 use App\Models\Tenant;
 use App\Services\Mail\SchoolSiteMailer;
@@ -11,6 +12,21 @@ use Illuminate\Http\Request;
 
 class AdmissionEnquiryController extends Controller
 {
+    use RendersPublicPages;
+
+    public function create()
+    {
+        $tenant = $this->resolveTenant();
+
+        return $this->renderPublic('public.admission-enquiry', $tenant, [
+            'pageSeo' => [
+                'title'       => 'Admission Enquiry — '.$tenant->name,
+                'description' => 'Submit an admission enquiry for '.$tenant->name.'.',
+                'og_type'     => 'website',
+            ],
+        ]);
+    }
+
     public function store(Request $request)
     {
         $tenant = tenancy()->tenant;

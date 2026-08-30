@@ -13,6 +13,7 @@
             'A. GENERAL INFORMATION' => [
                 'Name of the School'              => $disc['school_name'] ?? $tenant->name,
                 'Affiliation No.'                 => $disc['affiliation_no'] ?? '',
+                'UDISE Code'                       => $disc['udise_code'] ?? '',
                 'School Code'                     => $disc['school_code'] ?? '',
                 'Complete Address with Pin Code'  => $disc['address'] ?? '',
                 'Principal Name & Qualification'  => $disc['principal'] ?? '',

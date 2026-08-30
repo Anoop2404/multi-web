@@ -200,6 +200,7 @@ const navGroups = computed(() => {
         coordinatorMode: isEventCoordinatorUser.value,
         navVisibility: page.props.navVisibility ?? null,
         membershipPaid: page.props.membershipPaid !== false,
+        isStandalone: !school.value?.parent_id,
     };
 
     const mcqExamId = detectSchoolMcqExamIdFromUrl(page.url);

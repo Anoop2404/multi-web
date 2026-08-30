@@ -32,7 +32,6 @@ class SetupApiController extends SchoolApiController
         abort_if($this->school->prefixes_locked && filled($this->school->school_prefix), 403, 'School code is locked.');
 
         $sahodaya = $this->school->parent;
-        abort_unless($sahodaya, 422, 'School is not linked to a Sahodaya.');
 
         $data = $request->validate([
             'school_prefix' => SchoolApplicationForm::schoolPrefixRules($sahodaya, $this->school->id),

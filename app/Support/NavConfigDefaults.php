@@ -134,6 +134,7 @@ class NavConfigDefaults
                 ['label' => 'About', 'url' => '/#about', 'external' => false, 'children' => []],
                 ['label' => 'Academics', 'url' => '/#academic-programmes', 'external' => false, 'children' => []],
                 ['label' => 'Admissions', 'url' => '/#admissions', 'external' => false, 'children' => []],
+                ['label' => 'Results', 'url' => '/results', 'external' => false, 'children' => []],
                 ['label' => 'Gallery', 'url' => '/#gallery', 'external' => false, 'children' => []],
                 ['label' => 'Mandatory Disclosure', 'url' => '/#mandatory-disclosure', 'external' => false, 'children' => []],
                 ['label' => 'Contact', 'url' => '/#contact', 'external' => false, 'children' => []],

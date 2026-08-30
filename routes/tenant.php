@@ -106,6 +106,8 @@ Route::middleware([
         Route::get('/circulars/{circular}/download', [\App\Http\Controllers\Public\CircularController::class, 'download'])->name('tenant.circulars.download');
         Route::get('/events', [EventController::class, 'index'])->name('tenant.events.index');
         Route::get('/events/{slug}', [EventController::class, 'show'])->name('tenant.events.show');
+        Route::get('/results', [\App\Http\Controllers\Public\SchoolResultsController::class, 'index'])->name('tenant.results.index');
+        Route::get('/results/{boardResult}/download', [\App\Http\Controllers\Public\SchoolResultsController::class, 'downloadPdf'])->name('tenant.results.download');
 
         // CKSC-style CMS pages (must be registered before /gallery/{slug})
         Route::get('/about', fn () => app(SahodayaCmsPageController::class)->show('about'))->name('tenant.sahodaya.about');
@@ -129,6 +131,7 @@ Route::middleware([
 
         Route::get('/gallery/{slug}', [GalleryAlbumController::class, 'show'])->name('tenant.gallery.show');
 
+        Route::get('/admission-enquiry', [AdmissionEnquiryController::class, 'create'])->name('admission-enquiry.create');
         Route::post('/admission-enquiry', [AdmissionEnquiryController::class, 'store'])->name('admission-enquiry.store');
 
         Route::get('/forms/{slug}', [\App\Http\Controllers\Public\SiteFormPublicController::class, 'show'])->name('tenant.forms.show');

@@ -278,6 +278,7 @@ export function schoolAdminNav(schoolId, options = {}) {
         pendingChangeRequests = 0,
         navVisibility = null,
         membershipPaid = true,
+        isStandalone = false,
     } = options;
 
     const base = schoolAdminHref(schoolId);
@@ -293,7 +294,9 @@ export function schoolAdminNav(schoolId, options = {}) {
     });
 
     // ── School (students + core records) ──────────────────────────────
-    if (canNav('students')) {
+    // Independent schools get a website/CMS product, not the student-records SIS —
+    // Academic Results (CBSE board results) stays since it's genuinely website content.
+    if (!isStandalone && canNav('students')) {
         const schoolItems = [];
         if (!schoolHasPrefix) {
             schoolItems.push({ label: 'Set school code', href: schoolAdminHref(schoolId, 'setup', 'code'), icon: 'alert-circle' });
@@ -318,7 +321,8 @@ export function schoolAdminNav(schoolId, options = {}) {
     }
 
     // ── Membership ────────────────────────────────────────────────────
-    if (canNav('membership')) {
+    // No Sahodaya cluster means no annual membership/registration cycle to manage.
+    if (!isStandalone && canNav('membership')) {
         const membershipItems = [
             { label: 'Annual Registration', href: schoolAdminHref(schoolId, 'registration'), icon: 'clipboard' },
             { label: 'Payments & Receipts', href: schoolAdminHref(schoolId, 'payments'), icon: 'credit-card' },
@@ -341,7 +345,7 @@ export function schoolAdminNav(schoolId, options = {}) {
     }
 
     // Programs (Fest / Talent Search / Training) unlock only after membership payment.
-    if (!membershipPaid && (canNav('fest') || canNav('mcq') || canNav('training'))) {
+    if (!isStandalone && !membershipPaid && (canNav('fest') || canNav('mcq') || canNav('training'))) {
         groups.push({
             section: 'Programs',
             items: [{
@@ -353,7 +357,8 @@ export function schoolAdminNav(schoolId, options = {}) {
     }
 
     // ── Fest ──────────────────────────────────────────────────────────
-    if (membershipPaid && canNav('fest')) {
+    // Fest programs are Sahodaya-cluster events — nothing to run standalone.
+    if (!isStandalone && membershipPaid && canNav('fest')) {
         const festProgramItems = SCHOOL_FEST_PROGRAMS
             .filter((p) => isNavProgramVisible(navVisibility, p.slug))
             .map((p) => ({
@@ -389,17 +394,20 @@ export function schoolAdminNav(schoolId, options = {}) {
     }
 
     // ── Board Results (Academic Results) ──────────────────────────────
-    groups.push({
-        section: 'Academic Results',
-        items: [
-            { label: 'Class X Results', href: `${base}/board-results?class=10`, icon: 'bar-chart', matchQuery: { class: '10' } },
-            { label: 'Class XII Results', href: `${base}/board-results?class=12`, icon: 'bar-chart', matchQuery: { class: '12' } },
-            { label: 'Subject-Wise Toppers', href: `${base}/board-results/subject-toppers`, icon: 'award' },
-            { label: 'Full A1 Achievers', href: `${base}/board-results/full-a1-achievers`, icon: 'star' },
-            { label: 'Principal Verification', href: `${base}/board-results/principal-verification`, icon: 'shield' },
-            { label: 'Reports', href: `${base}/board-results/reports`, icon: 'file-text' },
-        ],
-    });
+    // Independent schools get a website/CMS product only — no results workflow.
+    if (!isStandalone) {
+        groups.push({
+            section: 'Academic Results',
+            items: [
+                { label: 'Class X Results', href: `${base}/board-results?class=10`, icon: 'bar-chart', matchQuery: { class: '10' } },
+                { label: 'Class XII Results', href: `${base}/board-results?class=12`, icon: 'bar-chart', matchQuery: { class: '12' } },
+                { label: 'Subject-Wise Toppers', href: `${base}/board-results/subject-toppers`, icon: 'award' },
+                { label: 'Full A1 Achievers', href: `${base}/board-results/full-a1-achievers`, icon: 'star' },
+                { label: 'Principal Verification', href: `${base}/board-results/principal-verification`, icon: 'shield' },
+                { label: 'Reports', href: `${base}/board-results/reports`, icon: 'file-text' },
+            ],
+        });
+    }
 
     // ── Website (collapses to single hub entry) ────────────────────────
     if (websiteEnabled && publicWebsiteEnabled && canNav('website')) {

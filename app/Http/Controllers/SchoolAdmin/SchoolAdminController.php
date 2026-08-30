@@ -65,7 +65,7 @@ abstract class SchoolAdminController extends Controller
 
         return inertia($component, array_merge([
             'school' => array_merge(
-                $this->school->only('id', 'name', 'type', 'school_prefix', 'prefixes_locked', 'membership_status', 'is_non_affiliated', 'fest_registration_closed'),
+                $this->school->only('id', 'name', 'type', 'parent_id', 'school_prefix', 'prefixes_locked', 'membership_status', 'is_non_affiliated', 'fest_registration_closed'),
                 ['logo_url' => TenantBranding::logoUrl($this->school)],
             ),
             'publicUrl'  => TenantDomainSync::publicUrl($this->school),
@@ -82,7 +82,7 @@ abstract class SchoolAdminController extends Controller
                     SahodayaProfile::where('tenant_id', $this->school->parent_id)->first(),
                     $this->school->parent?->nav_overrides,
                 )
-                : SahodayaNavVisibility::defaults(),
+                : SahodayaNavVisibility::standaloneDefaults(),
             'membershipPaid' => app(\App\Services\Membership\SchoolMembershipGate::class)->isPaid($this->school),
             'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->school),
         ], $props));

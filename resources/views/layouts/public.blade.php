@@ -32,7 +32,7 @@
 
     <script type="application/ld+json">
         {!! json_encode([
-            '@context' => 'https://schema.org',
+            '@' . 'context' => 'https://schema.org',
             '@type' => ($tenant->type ?? null) === 'sahodaya' ? 'Organization' : 'EducationalOrganization',
             'name' => $tenant->name ?? '',
             'url' => $canonicalUrl,

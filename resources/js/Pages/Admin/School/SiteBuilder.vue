@@ -70,9 +70,9 @@
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
                     <div class="flex flex-wrap items-start justify-between gap-4">
                         <div>
-                            <h2 class="font-bold text-gray-900">Admissions & Admin Login</h2>
+                            <h2 class="font-bold text-gray-900">Admissions & Portal Login</h2>
                             <p class="text-sm text-gray-500 mt-1">
-                                Show prominent buttons in the navbar and add links to the menu and footer.
+                                Show prominent buttons in the navbar and add links to the menu and footer. The login button defaults to the student/parent portal, not admin login.
                             </p>
                         </div>
                         <button @click="ensurePortalLinks" :disabled="portalSaving"
@@ -154,7 +154,7 @@
                     </div>
                     <label class="flex items-center gap-3 cursor-pointer">
                         <input type="checkbox" v-model="footerIncludePortal" class="w-4 h-4 rounded text-sky-700">
-                        <span class="text-sm font-medium text-gray-700">Include admissions & login links when saving</span>
+                        <span class="text-sm font-medium text-gray-700">Include admissions & admin login links when saving</span>
                     </label>
                     <div class="space-y-2">
                         <div v-for="(link, idx) in footerConfig.quick_links" :key="idx"

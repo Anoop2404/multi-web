@@ -93,6 +93,31 @@
                     </div>
                 </div>
 
+                <!-- Website widgets -->
+                <div class="card space-y-4">
+                    <h3 class="font-bold text-gray-800">Website Widgets</h3>
+                    <p class="text-xs text-gray-400 -mt-1">Shown as floating buttons on your public website.</p>
+
+                    <div>
+                        <label class="form-label mb-1.5">WhatsApp Number</label>
+                        <input v-model="form.whatsapp_number" type="tel" placeholder="+91 98765 43210"
+                               class="field">
+                        <p class="text-xs text-gray-400 mt-1">Adds a floating WhatsApp chat button. Leave blank to hide it.</p>
+                    </div>
+
+                    <div>
+                        <label class="form-label mb-1.5">CBSE Affiliation Number</label>
+                        <input v-model="form.cbse_affiliation_number" type="text" placeholder="e.g. 1234567"
+                               class="field">
+                        <p class="text-xs text-gray-400 mt-1">Shown on the CBSE Affiliated badge. Also appears on your Mandatory Public Disclosure page.</p>
+                    </div>
+
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input v-model="form.cbse_badge_show" type="checkbox" class="w-5 h-5 rounded text-indigo-600">
+                        <span class="text-sm font-semibold text-gray-600">Show CBSE Affiliated badge</span>
+                    </label>
+                </div>
+
                 <!-- SEO -->
                 <div class="card space-y-4">
                     <h3 class="font-bold text-gray-800">SEO & Search</h3>
@@ -186,6 +211,9 @@ const form = useForm({
     facebook:        props.settings.widgets?.social_links?.facebook ?? '',
     youtube:         props.settings.widgets?.social_links?.youtube ?? '',
     instagram:       props.settings.widgets?.social_links?.instagram ?? '',
+    whatsapp_number: props.settings.widgets?.whatsapp_number ?? '',
+    cbse_affiliation_number: props.settings.widgets?.cbse_affiliation_number ?? '',
+    cbse_badge_show: props.settings.widgets?.cbse_badge_show ?? true,
     logo:            null,
     seo_title:       seo.title ?? '',
     seo_description: seo.description ?? '',

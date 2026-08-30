@@ -30,6 +30,9 @@ class SettingsController extends SchoolAdminController
             'facebook'        => 'nullable|url|max:255',
             'youtube'         => 'nullable|url|max:255',
             'instagram'       => 'nullable|url|max:255',
+            'whatsapp_number' => 'nullable|string|max:20',
+            'cbse_affiliation_number' => 'nullable|string|max:50',
+            'cbse_badge_show' => 'nullable|boolean',
             'logo'            => 'nullable|image|max:2048',
             'seo_title'       => 'nullable|string|max:70',
             'seo_description' => 'nullable|string|max:160',
@@ -69,6 +72,20 @@ class SettingsController extends SchoolAdminController
         if ($socials) {
             $widgets = $this->school->getWidgets();
             $widgets['social_links'] = array_merge($widgets['social_links'] ?? [], $socials);
+            $this->school->setSetting('widgets', $widgets);
+        }
+
+        if ($request->has('whatsapp_number') || $request->has('cbse_affiliation_number') || $request->has('cbse_badge_show')) {
+            $widgets = $this->school->getWidgets();
+            if ($request->has('whatsapp_number')) {
+                $widgets['whatsapp_number'] = $data['whatsapp_number'] ?: null;
+            }
+            if ($request->has('cbse_affiliation_number')) {
+                $widgets['cbse_affiliation_number'] = $data['cbse_affiliation_number'] ?: null;
+            }
+            if ($request->has('cbse_badge_show')) {
+                $widgets['cbse_badge_show'] = $data['cbse_badge_show'] ?? true;
+            }
             $this->school->setSetting('widgets', $widgets);
         }
 

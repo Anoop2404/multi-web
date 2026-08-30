@@ -450,7 +450,7 @@ class SchoolApplicationForm
         return filter_var(trim($email), FILTER_VALIDATE_EMAIL) !== false;
     }
 
-    public static function prefixIsTaken(Tenant $sahodaya, string $prefix, ?string $exceptSchoolId = null): bool
+    public static function prefixIsTaken(?Tenant $sahodaya, string $prefix, ?string $exceptSchoolId = null): bool
     {
         $normalized = strtoupper(trim($prefix));
 
@@ -458,7 +458,10 @@ class SchoolApplicationForm
             return false;
         }
 
-        return Tenant::where('parent_id', $sahodaya->id)
+        // Independent schools (no Sahodaya) are scoped against each other via a null
+        // parent_id rather than a cluster id — Eloquent turns `where('parent_id', null)`
+        // into a proper `whereNull`.
+        return Tenant::where('parent_id', $sahodaya?->id)
             ->where('type', 'school')
             ->when($exceptSchoolId, fn ($q) => $q->where('id', '!=', $exceptSchoolId))
             ->where('school_prefix', $normalized)
@@ -466,7 +469,7 @@ class SchoolApplicationForm
     }
 
     /** @return array<int, mixed> */
-    public static function schoolPrefixRules(Tenant $sahodaya, ?string $exceptSchoolId = null): array
+    public static function schoolPrefixRules(?Tenant $sahodaya, ?string $exceptSchoolId = null): array
     {
         return [
             'required',
@@ -478,7 +481,9 @@ class SchoolApplicationForm
                     return;
                 }
                 if (self::prefixIsTaken($sahodaya, $value, $exceptSchoolId)) {
-                    $fail('This school code is already in use within this Sahodaya.');
+                    $fail($sahodaya
+                        ? 'This school code is already in use within this Sahodaya.'
+                        : 'This school code is already in use.');
                 }
             },
         ];

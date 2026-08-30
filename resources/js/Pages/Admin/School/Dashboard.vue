@@ -7,7 +7,12 @@
                 <p class="dash-hero-eyebrow">School portal</p>
                 <h1 class="dash-hero-title">{{ school.name }}</h1>
                 <p class="dash-hero-desc">
-                    Manage students, complete annual Sahodaya membership, and participate in fest programs.
+                    <template v-if="isStandalone">
+                        Manage students and teachers, and run your school's public website.
+                    </template>
+                    <template v-else>
+                        Manage students, complete annual Sahodaya membership, and participate in fest programs.
+                    </template>
                 </p>
                 <div class="dash-hero-badges">
                     <span v-if="school.school_prefix" class="dash-badge dash-badge--gold">
@@ -16,12 +21,14 @@
                     <span v-if="setup.academicYear" class="dash-badge">
                         {{ setup.academicYear }}
                     </span>
-                    <span v-if="membershipComplete" class="dash-badge dash-badge--success">
-                        Membership complete
-                    </span>
-                    <span v-else-if="setup.hasRegistration" class="dash-badge">
-                        Registration in progress
-                    </span>
+                    <template v-if="!isStandalone">
+                        <span v-if="membershipComplete" class="dash-badge dash-badge--success">
+                            Membership complete
+                        </span>
+                        <span v-else-if="setup.hasRegistration" class="dash-badge">
+                            Registration in progress
+                        </span>
+                    </template>
                 </div>
             </div>
 
@@ -101,7 +108,7 @@
                 <div class="setup-progress" role="progressbar" :aria-valuenow="setupProgress" aria-valuemin="0" aria-valuemax="100">
                     <div class="setup-progress-bar" :style="{ width: `${setupProgress}%` }" />
                 </div>
-                <p class="mb-5 text-xs font-medium text-slate-500">{{ setupProgress }}% complete · {{ setupStepsDone }}/3 steps</p>
+                <p class="mb-5 text-xs font-medium text-slate-500">{{ setupProgress }}% complete · {{ setupStepsDone }}/{{ totalSetupSteps }} steps</p>
 
                 <div class="setup-step-grid">
                     <div class="setup-step-card"
@@ -141,6 +148,9 @@
                                 Pick class when registering, or
                                 <Link :href="`/school-admin/${school.id}/students?bulk=1`" class="link-brand">bulk upload</Link>.
                             </template>
+                            <template v-else-if="isStandalone">
+                                Optional — add students whenever you're ready.
+                            </template>
                             <template v-else>
                                 Teacher/counts-only registration — student records optional unless needed for fest/Talent Search.
                             </template>
@@ -151,7 +161,7 @@
                         </Link>
                     </div>
 
-                    <div class="setup-step-card"
+                    <div v-if="!isStandalone" class="setup-step-card"
                          :class="[
                              setup.hasRegistration ? 'setup-step-card--done' : setup.hasSchoolCode ? 'setup-step-card--active' : '',
                              !setup.hasSchoolCode && 'opacity-50',
@@ -171,7 +181,7 @@
             </div>
 
             <!-- Key stats -->
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div class="grid grid-cols-1 gap-4" :class="isStandalone ? 'sm:grid-cols-2' : 'sm:grid-cols-3'">
                 <DashboardStatCard
                     v-for="stat in linkedStats"
                     :key="stat.label"
@@ -393,23 +403,31 @@ const props = defineProps({
 const dismissForm = useForm({});
 const base = computed(() => `/school-admin/${props.school.id}`);
 
+// An independent school (no Sahodaya cluster) has no annual membership/registration
+// cycle — the setup wizard, hero copy and quick actions below drop that step entirely.
+const isStandalone = computed(() => !props.school.parent_id);
+
 const stepTwoDone = computed(() =>
     props.setup.requiresStudents ? props.setup.studentCount > 0 : true
 );
 
+const totalSetupSteps = computed(() => (isStandalone.value ? 2 : 3));
+
 const setupComplete = computed(() =>
-    props.setup.hasSchoolCode && stepTwoDone.value && props.setup.hasRegistration
+    isStandalone.value
+        ? props.setup.hasSchoolCode && stepTwoDone.value
+        : props.setup.hasSchoolCode && stepTwoDone.value && props.setup.hasRegistration
 );
 
 const setupStepsDone = computed(() => {
     let n = 0;
     if (props.setup.hasSchoolCode) n++;
     if (stepTwoDone.value) n++;
-    if (props.setup.hasRegistration) n++;
+    if (!isStandalone.value && props.setup.hasRegistration) n++;
     return n;
 });
 
-const setupProgress = computed(() => Math.round((setupStepsDone.value / 3) * 100));
+const setupProgress = computed(() => Math.round((setupStepsDone.value / totalSetupSteps.value) * 100));
 
 function dismissWizard() {
     dismissForm.post(`${base.value}/setup/dismiss-wizard`);
@@ -445,7 +463,7 @@ const alertItems = computed(() => {
             linkLabel: 'Manage documents',
         });
     }
-    if (props.leadershipContacts && !props.leadershipContacts.complete) {
+    if (!isStandalone.value && props.leadershipContacts && !props.leadershipContacts.complete) {
         items.push({
             tone: 'warning',
             title: 'Leadership contacts pending',
@@ -454,7 +472,7 @@ const alertItems = computed(() => {
             linkLabel: 'Complete registration profile',
         });
     }
-    if (registrationClosingSoon.value) {
+    if (!isStandalone.value && registrationClosingSoon.value) {
         items.push({
             tone: 'warning',
             title: 'Annual registration closes soon',
@@ -463,7 +481,7 @@ const alertItems = computed(() => {
             linkLabel: 'Continue registration',
         });
     }
-    if (props.membershipComplete) {
+    if (!isStandalone.value && props.membershipComplete) {
         items.push({
             tone: 'success',
             title: `${props.membershipComplete.academicYear} membership complete`,
@@ -474,12 +492,19 @@ const alertItems = computed(() => {
 });
 
 const quickActions = computed(() => {
-    const actions = [
-        { label: 'Students', description: 'Manage records', icon: '👨‍🎓', href: `${base.value}/students` },
-        { label: 'Registration', description: 'Annual membership', icon: '📋', href: `${base.value}/registration` },
-        { label: 'Teachers', description: 'Staff directory', icon: '👩‍🏫', href: `${base.value}/teachers` },
-        { label: 'Profile', description: 'Registration details', icon: '⚙️', href: `${base.value}/registration/profile` },
-    ];
+    const actions = isStandalone.value
+        ? [
+            { label: 'Students', description: 'Manage records', icon: '👨‍🎓', href: `${base.value}/students` },
+            { label: 'Teachers', description: 'Staff directory', icon: '👩‍🏫', href: `${base.value}/teachers` },
+            { label: 'Website', description: 'Site builder & pages', icon: '🌐', href: `${base.value}/website/hub` },
+            { label: 'Settings', description: 'School profile', icon: '⚙️', href: `${base.value}/settings` },
+        ]
+        : [
+            { label: 'Students', description: 'Manage records', icon: '👨‍🎓', href: `${base.value}/students` },
+            { label: 'Registration', description: 'Annual membership', icon: '📋', href: `${base.value}/registration` },
+            { label: 'Teachers', description: 'Staff directory', icon: '👩‍🏫', href: `${base.value}/teachers` },
+            { label: 'Profile', description: 'Registration details', icon: '⚙️', href: `${base.value}/registration/profile` },
+        ];
     if (props.setup.hasSchoolCode) {
         actions.splice(1, 0, {
             label: 'Bulk upload',
@@ -491,31 +516,36 @@ const quickActions = computed(() => {
     return actions;
 });
 
-const linkedStats = computed(() => [
-    {
-        label: 'Active students',
-        value: props.stats?.[0]?.value ?? 0,
-        href: `${base.value}/students`,
-        icon: '👨‍🎓',
-        tone: 'navy',
-        hint: 'View all students',
-    },
-    {
-        label: 'Teachers',
-        value: props.stats?.[1]?.value ?? 0,
-        href: `${base.value}/teachers`,
-        icon: '👩‍🏫',
-        tone: 'indigo',
-    },
-    {
-        label: 'Annual registration',
-        value: props.membershipComplete ? 'Complete ✓' : (props.setup.hasRegistration ? 'In progress' : 'Start'),
-        href: `${base.value}/registration`,
-        icon: '📋',
-        tone: props.membershipComplete ? 'green' : 'gold',
-        hint: props.setup.academicYear ?? null,
-    },
-]);
+const linkedStats = computed(() => {
+    const stats = [
+        {
+            label: 'Active students',
+            value: props.stats?.[0]?.value ?? 0,
+            href: `${base.value}/students`,
+            icon: '👨‍🎓',
+            tone: 'navy',
+            hint: 'View all students',
+        },
+        {
+            label: 'Teachers',
+            value: props.stats?.[1]?.value ?? 0,
+            href: `${base.value}/teachers`,
+            icon: '👩‍🏫',
+            tone: 'indigo',
+        },
+    ];
+    if (!isStandalone.value) {
+        stats.push({
+            label: 'Annual registration',
+            value: props.membershipComplete ? 'Complete ✓' : (props.setup.hasRegistration ? 'In progress' : 'Start'),
+            href: `${base.value}/registration`,
+            icon: '📋',
+            tone: props.membershipComplete ? 'green' : 'gold',
+            hint: props.setup.academicYear ?? null,
+        });
+    }
+    return stats;
+});
 
 function programIcon(slug) {
     const map = {

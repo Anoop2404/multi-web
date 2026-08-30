@@ -17,6 +17,12 @@ class SchoolMembershipGate
 {
     public function isPaid(Tenant $school): bool
     {
+        // Independent schools (no Sahodaya cluster) have no membership to settle —
+        // the Sahodaya-only programs this gate protects are hidden for them entirely.
+        if ($school->parent_id === null) {
+            return true;
+        }
+
         if (! $school->is_active || $school->membership_status === 'rejected') {
             return false;
         }

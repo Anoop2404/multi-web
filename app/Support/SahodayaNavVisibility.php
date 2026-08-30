@@ -65,6 +65,25 @@ class SahodayaNavVisibility
     }
 
     /**
+     * A school with no Sahodaya cluster (`parent_id` null) has nothing to run these
+     * against — fest programs, Talent Search exams, teacher training, and the fest
+     * payment/appeal/certificate tooling all only make sense inside a cluster. Only
+     * the website stays on.
+     *
+     * @return array{programs: array<string, bool>, menus: array<string, bool>}
+     */
+    public static function standaloneDefaults(): array
+    {
+        return [
+            'programs' => array_fill_keys(self::programSlugs(), false),
+            'menus'    => array_merge(
+                array_fill_keys(array_keys(self::menuLabels()), false),
+                ['website' => true],
+            ),
+        ];
+    }
+
+    /**
      * Effective sidebar visibility for a Sahodaya.
      *
      * @param  array<string, mixed>|null  $platformOverrides  Super-admin hard cap: any key set
