@@ -92,11 +92,17 @@ class NotificationService
      */
     private function cachedTemplate(string $slug): ?NotificationTemplate
     {
-        return Cache::remember(
+        // Cache the raw attributes rather than the model itself: the file cache store's
+        // serializable_classes hardening (config/cache.php) blocks unserializing any PHP
+        // object, so a cached model instance comes back as __PHP_Incomplete_Class instead
+        // of NotificationTemplate. Same pattern as ExamStream::findByCode().
+        $attributes = Cache::remember(
             "notif_template:{$slug}",
             300,
-            fn () => NotificationTemplate::where('slug', $slug)->where('is_active', true)->first(),
+            fn () => NotificationTemplate::where('slug', $slug)->where('is_active', true)->first()?->getAttributes(),
         );
+
+        return $attributes ? (new NotificationTemplate)->newFromBuilder($attributes) : null;
     }
 
     private function fallbackTemplate(string $slug): ?array
