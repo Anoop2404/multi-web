@@ -1333,13 +1333,30 @@ class FestSchoolEventFeeService
         $feeModel = $schedule['fee_model'] ?? 'none';
 
         if ($fee->registration_batch_id) {
+            // Item-fee/extra-item lines carry meta.item_id but not the item's own arts
+            // category — batch-fetched once here so the admin Fees listing can show which
+            // genre each charge belongs to (e.g. "Essay Writing (extra) — Literary")
+            // instead of just the bare item title.
+            $lineItemIds = $fee->lines->pluck('meta')
+                ->map(fn ($meta) => $meta['item_id'] ?? null)
+                ->filter()
+                ->unique();
+            $categoryByItemId = $lineItemIds->isNotEmpty()
+                ? \App\Models\FestEventItem::whereIn('id', $lineItemIds)->pluck('category', 'id')
+                : collect();
+            $taxonomy = app(\App\Services\Events\FestTaxonomyRegistry::class)->forTenant($event->tenant_id)->labels('arts_category');
+
             foreach ($fee->lines as $line) {
+                $itemId = $line->meta['item_id'] ?? null;
+                $categoryKey = $itemId ? ($categoryByItemId[$itemId] ?? null) : null;
+
                 $items[] = [
                     'label' => $line->label,
                     'amount' => (float) $line->amount,
                     'line_type' => $line->line_type,
                     'quantity' => $line->quantity ?? 1,
                     'meta' => $line->meta,
+                    'category' => ($categoryKey && $categoryKey !== 'general') ? ($taxonomy[$categoryKey] ?? $categoryKey) : null,
                 ];
             }
 

@@ -248,7 +248,10 @@
                                         <div class="mt-1 space-y-0.5 max-h-48 overflow-y-auto pr-1">
                                             <div v-for="(b, bIdx) in breakdownItemLines(row)" :key="'i'+bIdx"
                                                  class="flex items-center justify-between gap-3 text-[11px] py-0.5 border-b border-slate-100 last:border-0">
-                                                <span class="text-slate-700 font-medium truncate max-w-[14rem]">{{ b.label }}</span>
+                                                <span class="text-slate-700 font-medium truncate max-w-[14rem]">
+                                                    {{ b.label }}
+                                                    <span v-if="b.category" class="text-slate-400 font-normal">— {{ b.category }}</span>
+                                                </span>
                                                 <span class="font-bold text-slate-900 shrink-0 tabular-nums">₹{{ fmt(b.amount) }}</span>
                                             </div>
                                         </div>
