@@ -1838,7 +1838,7 @@ class FestEventReportAnalyticsService
                 'name'           => $name,
                 'reg_no'         => $regNo,
                 'gender'         => $student->gender,
-                'photo_url'      => $student->photoUrl(),
+                'photo_url'      => $student->sahodayaPhotoUrl($this->event->tenant_id),
                 'photo_data_uri' => $includePhotoDataUri ? $student->photoDataUri() : null,
                 'item_count'     => count($items),
                 'total_score'    => collect($items)->sum(fn ($i) => (float) ($i['score'] ?? 0)),
