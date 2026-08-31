@@ -64,7 +64,7 @@
                     <td class="pcard__meta-sep">:</td>
                     <td class="pcard__meta-val">{{ $card['venue'] ?? '—' }}</td>
                 </tr>
-                @if(!empty($card['dob']))
+                @if(!empty($card['dob']) && !empty($card['is_sports']))
                 <tr>
                     <td class="pcard__meta-label">DOB</td>
                     <td class="pcard__meta-sep">:</td>
@@ -81,7 +81,7 @@
                     <td class="pcard__meta-sep">:</td>
                     <td class="pcard__meta-val">{{ str_replace('_', ' ', $card['category'] ?? ($card['class_category'] ?? '—')) }}</td>
                 </tr>
-                @if(!$isEventPass && !empty($card['items_display']))
+                @if(!empty($card['items_display']))
                 <tr>
                     <td class="pcard__meta-label">Items</td>
                     <td class="pcard__meta-sep">:</td>

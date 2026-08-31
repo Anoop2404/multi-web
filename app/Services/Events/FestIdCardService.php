@@ -476,8 +476,11 @@ class FestIdCardService
                     ->map(fn (FestParticipant $p) => $p->registration?->item?->title)
                     ->filter()
                     ->unique()
+                    ->sort()
                     ->values()
                     ->all();
+                $cleanItems = array_map(fn ($i) => str_replace('_', ' ', $i), $items);
+                $itemsDisplay = implode(' · ', $cleanItems);
 
                 $schedule = $group
                     ->map(fn (FestParticipant $p) => $schedules->get($p->id))
@@ -493,8 +496,8 @@ class FestIdCardService
                     'role_label'      => 'PARTICIPANT',
                     'role_class'      => 'student',
                     'detail'          => null,
-                    'items'           => $items,
-                    'items_display'   => null,
+                    'items'           => $cleanItems,
+                    'items_display'   => $itemsDisplay,
                     'item_count'      => count($items),
                     'item_label'      => null,
                     'id_label'        => 'Fest ID',
@@ -742,6 +745,7 @@ class FestIdCardService
             'event_date'      => $eventDate,
             'venue'           => $venue,
             'dob'             => $dob,
+            'is_sports'       => $isSports,
             'sahodaya_name'   => $sahodayaName,
             'category'        => $categoryDisplay,
             'items_display'   => $itemTitleClean,
