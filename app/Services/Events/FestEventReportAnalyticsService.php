@@ -1876,8 +1876,12 @@ class FestEventReportAnalyticsService
     {
         // "Category" here means class category (e.g. "Category 1 — Classes 3 & 4"), not the
         // item's arts genre — matches how the item catalog and Fees listing both group/label
-        // by class category.
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event);
+        // by class category. The scheme itself is configured on fee_settings.
+        // class_group_scheme on the ROOT event — FestClassGroupScheme::resolve() reads that
+        // straight off whatever event it's given with no parent walk, so passing a phase
+        // leaf here (this->event, e.g. a "PHASE 2" operational child) misses the Sahodaya's
+        // actual configured scheme entirely and falls back to the platform default.
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $usesPhasedRegionalBilling = $this->event->rootEvent()->usesPhasedRegionalBilling();
 
         return FestParticipant::query()
@@ -1904,12 +1908,17 @@ class FestEventReportAnalyticsService
                 $registration = $p->registration;
                 $item = $registration->item;
                 $event = $registration->event;
-                // Raw class_group values aren't always the canonical lp/up/hs/hss/open keys
-                // the scheme's own label map is keyed by — older/imported data can carry
-                // free-form strings like "category_1" instead. Canonicalize first so those
-                // still resolve to the scheme's real "Category 1 — Classes ..." label
-                // instead of falling through to a bare capitalized raw key.
-                $classGroup = \App\Support\FestClassGroupScheme::canonicalKey($item->class_group) ?: 'open';
+                // A named/numeric scheme (e.g. "State Kalotsav") is keyed by whatever raw
+                // strings its own groups were configured with — often literally
+                // "category_1" — so that must be tried as-is FIRST. canonicalKey() (which
+                // maps to the fixed lp/up/hs/hss/open keyset) is only a fallback for the
+                // small default scheme or genuinely malformed/legacy class_group values,
+                // not the primary lookup — using it first would break a named scheme's own
+                // "category_1"-style keys by mistranslating them to the wrong keyset.
+                $rawClassGroup = $item->class_group ?: 'open';
+                $classGroup = array_key_exists($rawClassGroup, $classGroupLabels)
+                    ? $rawClassGroup
+                    : (\App\Support\FestClassGroupScheme::canonicalKey($item->class_group) ?: 'open');
 
                 return [
                     'id'              => $p->id,

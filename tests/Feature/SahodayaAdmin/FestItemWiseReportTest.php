@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SahodayaAdmin;
 
+use App\Models\FestClassCategoryScheme;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestEventPhase;
@@ -274,5 +275,81 @@ class FestItemWiseReportTest extends TestCase
 
         $this->assertSame($expectedLabel, $row['category_label']);
         $this->assertNotSame('Category_1', $row['category_label'], 'must resolve the real scheme label, not a bare capitalized raw key');
+    }
+
+    /**
+     * A Sahodaya using a named/numeric class category scheme (e.g. "State Kalotsav") keys
+     * its own groups by whatever raw string it was configured with — here literally
+     * "category_1" — and that scheme is configured on the ROOT event's fee_settings, not
+     * on each individual phase-leaf child event. Registering against the leaf (the normal
+     * flow — items live on the operational phase leaf, not the hub) must still resolve the
+     * real Sahodaya-configured label ("Category 1 — Classes 3 & 4"), not fall back to the
+     * platform default scheme (which doesn't have a "category_1" key at all) or a bare
+     * capitalized raw key.
+     */
+    public function test_item_wise_report_resolves_the_root_events_named_scheme_from_a_phase_leaf(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Named Scheme Sahodaya',
+            'domain' => Str::uuid().'.test',
+            'is_active' => true,
+        ]);
+        SahodayaProfile::create([
+            'tenant_id' => $sahodaya->id,
+            'prefix' => 'NS',
+            'student_data_mode' => 'counts_only',
+        ]);
+
+        FestClassCategoryScheme::ensureDefaultsForTenant($sahodaya->id);
+        $scheme = FestClassCategoryScheme::forTenant($sahodaya->id)->where('name', 'like', '%State Kalotsav%')->firstOrFail();
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Named Scheme School',
+            'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true,
+        ]);
+
+        $root = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Named Scheme Kalotsav', 'event_type' => 'kalolsavam',
+            'conduct_mode' => 'partitioned', 'workflow_mode' => 'phased_regional_billing',
+            'level_round' => 'sahodaya', 'status' => 'registration_open',
+            'fee_settings' => ['class_group_scheme' => (string) $scheme->id],
+        ]);
+        $phase = FestEventPhase::create(['event_id' => $root->id, 'name' => 'PHASE 2', 'code' => 'P2', 'sort_order' => 1, 'is_regional' => false]);
+        $leaf = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Named Scheme Kalotsav — PHASE 2', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'registration_open',
+            'parent_event_id' => $root->id, 'source_phase_id' => $phase->id, 'partition_role' => 'phase',
+        ]);
+
+        $item = FestEventItem::create([
+            'event_id' => $leaf->id, 'title' => 'Anchoring', 'item_code' => '429',
+            'stage_type' => 'on_stage', 'participant_type' => 'individual',
+            'class_group' => 'category_1', 'is_enabled' => true,
+        ]);
+
+        $class = SchoolClass::create(['tenant_id' => $school->id, 'name' => '10']);
+        $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Test Student', 'reg_no' => 'STU/1']);
+
+        $reg = FestRegistration::create(['event_id' => $leaf->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $student->id, 'participant_type' => 'student', 'event_id' => $leaf->id]);
+
+        $schoolAdmin = User::factory()->create(['tenant_id' => $school->id, 'email_verified_at' => now()]);
+        $schoolAdmin->assignRole('school_admin');
+
+        // Hitting the report against the LEAF event id, matching the real production URL
+        // shape (/kalotsav/reports/{leafEventId}/item-wise) that surfaced this bug.
+        $response = $this->actingAs($schoolAdmin)->get(route('school.kalotsav.reports.item-wise', [
+            'tenantId' => $school->id,
+            'event' => $leaf->id,
+        ]));
+        $response->assertOk();
+
+        $row = collect($response->viewData('page')['props']['rows'])->first();
+
+        $this->assertSame('Category 1 — Classes 3 & 4', $row['category_label']);
     }
 }

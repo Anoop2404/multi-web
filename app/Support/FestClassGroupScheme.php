@@ -145,6 +145,23 @@ class FestClassGroupScheme
      *
      * @return array<string, string>
      */
+    /**
+     * A fresh admin-created scheme/category group (Category Masters' own "Display label"
+     * field) expects just a short name like "Junior" and relies on classesSuffix() to
+     * append the class range. But FestClassCategoryScheme::ensureDefaultsForTenant()'s 3
+     * auto-seeded starter schemes ("State Kalotsav", "CBSE Kerala", "Sahodaya standard")
+     * store the FULL descriptive text in `label` already (e.g. "Category 1 — Classes 3 &
+     * 4") — appending unconditionally doubled the class range for every one of those.
+     * Shared by labelsForSchemeId() and customLabelsForEvent(), the two callers that read
+     * an admin-entered `label` alongside a `classes` array.
+     */
+    private static function appendClassesSuffixOnce(object $row): string
+    {
+        $suffix = $row->classesSuffix();
+
+        return str_ends_with($row->label, $suffix) ? $row->label : $row->label.$suffix;
+    }
+
     public static function labelsForSchemeId(int $schemeId): array
     {
         $labels = ['open' => 'Open / All Categories'];
@@ -155,7 +172,7 @@ class FestClassGroupScheme
             ->get(['key', 'label', 'classes']);
 
         foreach ($rows as $row) {
-            $labels[$row->key] = $row->label.$row->classesSuffix();
+            $labels[$row->key] = self::appendClassesSuffixOnce($row);
         }
 
         return $labels;
@@ -194,7 +211,7 @@ class FestClassGroupScheme
             ->get(['key', 'label', 'classes']);
 
         foreach ($rows as $row) {
-            $labels[$row->key] = $row->label.$row->classesSuffix();
+            $labels[$row->key] = self::appendClassesSuffixOnce($row);
         }
 
         return $labels;
