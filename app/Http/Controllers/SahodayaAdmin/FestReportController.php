@@ -484,27 +484,49 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = $this->scopedReportService($request, $this->regionAwareTargetEvent($request, $event));
+        $target = $this->regionAwareTargetEvent($request, $event);
+        $service = $this->scopedReportService($request, $target);
         $regs = $service->activeRegistrations();
 
-        $rows = $regs->groupBy('school_id')->map(function ($group) {
-            $first = $group->first();
+        // Registrations don't carry their own phase — a phase is a leaf FestEvent (tagged
+        // source_phase_id) under a phased_regional_billing root, so the phase a
+        // registration belongs to is whichever leaf its event_id points at (never trust
+        // FestEventItem.phase_id for this — see FestEventReportAnalyticsService's
+        // itemWiseReportRows() docblock for the production bug that taught us that).
+        $usesPhases = $target->rootEvent()->usesPhasedRegionalBilling();
 
-            return [
-                'school_id'         => $first->school_id,
-                'school_name'       => $first->school?->name ?? $first->school_id,
-                'active_count'      => $group->count(),
-                'item_count'        => $group->pluck('item_id')->unique()->count(),
-                'participant_count' => $group->sum(fn ($r) => $r->participants->count()),
-            ];
-        })->sortByDesc('active_count')->values()->all();
+        $rows = $regs
+            ->groupBy(fn ($r) => $r->school_id.'|'.($usesPhases ? ($r->event->source_phase_id ?? 0) : 0))
+            ->map(function ($group) use ($usesPhases) {
+                $first = $group->first();
+                $enabled = $group->filter(fn ($r) => $r->item?->is_enabled ?? true);
+
+                return [
+                    'school_id'            => $first->school_id,
+                    'school_name'          => $first->school?->name ?? $first->school_id,
+                    'phase_id'             => $usesPhases ? $first->event->source_phase_id : null,
+                    'phase_name'           => $usesPhases ? ($first->event->sourcePhase?->name ?? 'Unassigned') : null,
+                    'active_count'         => $group->count(),
+                    'item_count'           => $enabled->pluck('item_id')->unique()->count(),
+                    'unique_student_count' => $enabled->flatMap(fn ($r) => $r->participants)->pluck('student_id')->filter()->unique()->count(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        usort($rows, function ($a, $b) {
+            $phaseCmp = strcmp($a['phase_name'] ?? '', $b['phase_name'] ?? '');
+
+            return $phaseCmp !== 0 ? $phaseCmp : $b['active_count'] <=> $a['active_count'];
+        });
 
         return $this->inertia('Sahodaya/Events/Reports/SchoolParticipation', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
-            'rows'   => $rows,
-            'totals' => [
-                'schools'              => count($rows),
+            'rows'       => $rows,
+            'usesPhases' => $usesPhases,
+            'totals'     => [
+                'schools'              => $regs->pluck('school_id')->unique()->count(),
                 'active_registrations' => $regs->count(),
-                'participants'         => array_sum(array_column($rows, 'participant_count')),
+                'unique_students'      => $regs->flatMap(fn ($r) => $r->participants)->pluck('student_id')->filter()->unique()->count(),
             ],
         ])));
     }

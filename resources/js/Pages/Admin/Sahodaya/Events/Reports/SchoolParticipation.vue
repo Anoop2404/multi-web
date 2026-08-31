@@ -2,7 +2,9 @@
     <SahodayaEventsLayout :title="`${event.title} — School participation`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — School participation counts`" eyebrow="Reports"
-                    description="Schools with an active registration in this event, and how many items/participants they've entered." />
+                    :description="usesPhases
+                        ? 'Schools with an active registration in this event, broken down by phase, with unique student counts.'
+                        : 'Schools with an active registration in this event, and how many items/students they\'ve entered.'" />
 
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="school-participation" />
 
@@ -16,8 +18,8 @@
                 <p class="text-xs text-slate-500 mt-1">Active registrations</p>
             </div>
             <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold">{{ totals.participants }}</p>
-                <p class="text-xs text-slate-500 mt-1">Participants</p>
+                <p class="text-xl font-bold">{{ totals.unique_students }}</p>
+                <p class="text-xs text-slate-500 mt-1">Unique students</p>
             </div>
         </div>
 
@@ -27,20 +29,22 @@
                     <thead>
                         <tr>
                             <th>School</th>
+                            <th v-if="usesPhases">Phase</th>
                             <th>Active registrations</th>
                             <th>Items</th>
-                            <th>Participants</th>
+                            <th>Unique students</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="row in rows" :key="row.school_id">
+                        <tr v-for="row in rows" :key="`${row.school_id}-${row.phase_id ?? 'none'}`">
                             <td class="font-medium">{{ row.school_name }}</td>
+                            <td v-if="usesPhases">{{ row.phase_name }}</td>
                             <td>{{ row.active_count }}</td>
                             <td>{{ row.item_count }}</td>
-                            <td>{{ row.participant_count }}</td>
+                            <td>{{ row.unique_student_count }}</td>
                         </tr>
                         <tr v-if="!rows.length">
-                            <td colspan="4" class="p-6 text-center text-slate-400">No schools have an active registration for this event yet.</td>
+                            <td :colspan="usesPhases ? 5 : 4" class="p-6 text-center text-slate-400">No schools have an active registration for this event yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -63,6 +67,7 @@ defineProps({
     event: Object,
     rows: Array,
     totals: Object,
+    usesPhases: { type: Boolean, default: false },
     activityLogs: { type: Array, default: () => [] },
 });
 </script>

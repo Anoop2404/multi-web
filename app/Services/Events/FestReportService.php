@@ -139,7 +139,7 @@ class FestReportService
             ->active()
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->when($classGroup, fn ($q) => $q->whereHas('item', fn ($i) => $i->where('class_group', $classGroup)))
-            ->with(['item', 'participants.student', 'participants.teacher', 'school'])
+            ->with(['item', 'participants.student', 'participants.teacher', 'school', 'event:id,source_phase_id', 'event.sourcePhase:id,name'])
             ->orderBy('school_id')
             ->get();
     }
