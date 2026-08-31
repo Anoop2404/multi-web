@@ -57,11 +57,32 @@ class SahodayaWebsiteV2Test extends TestCase
     {
         $templates = SahodayaWebsiteTemplateCatalog::summaries();
 
-        $this->assertCount(5, $templates);
+        $this->assertCount(6, $templates);
         $this->assertEqualsCanonicalizing(
-            ['network-directory', 'events-results-live', 'academic-resources', 'confederation-governance', 'sahodaya-premium'],
+            ['network-directory', 'events-results-live', 'academic-resources', 'confederation-governance', 'sahodaya-premium', 'heritage-institutional'],
             collect($templates)->pluck('key')->all(),
         );
+    }
+
+    public function test_heritage_institutional_template_applies_and_renders_its_brand_colors(): void
+    {
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/draft'), [
+            'site_id' => $this->site->id, 'template_key' => 'heritage-institutional',
+        ])->assertOk()->assertJsonPath('draft.template_key', 'heritage-institutional');
+
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/publish'), ['site_id' => $this->site->id])
+            ->assertOk()->assertJsonPath('site.experience_version', 'v2');
+
+        $site = $this->site->fresh();
+        $this->assertSame('heritage-institutional', $site->template_key);
+        $this->assertCount(13, $site->sectionQuery()->get());
+
+        $this->get('http://v2-site.sahodaya.test/')
+            ->assertOk()
+            ->assertSee('--color-primary: #7A0D11', false)
+            ->assertSee('--color-accent: #E09A00', false)
+            ->assertSee('Our network at a glance')
+            ->assertSee('Frequently asked questions');
     }
 
     public function test_classic_site_does_not_receive_v2_section_width_constraints(): void

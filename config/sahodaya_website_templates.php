@@ -141,6 +141,83 @@ return [
         ],
     ],
 
+    'heritage-institutional' => [
+        'name' => 'Heritage Institutional',
+        'version' => '1.0.0',
+        'purpose' => 'A restrained, logo-led institutional presentation for Sahodayas whose emblem carries a traditional heritage palette.',
+        'audience' => 'Member schools, prospective members and the public',
+        'character' => 'Civic, restrained and authoritative',
+        'accent' => 'Heritage & tradition',
+        'design' => [
+            'primary' => '#7A0D11', 'secondary' => '#A81419', 'accent_color' => '#E09A00',
+            'display_font' => 'Manrope', 'body_font' => 'Inter', 'type_scale' => 'balanced',
+            'density' => 'comfortable', 'surface' => 'elevated', 'corners' => 'soft',
+            'buttons' => 'solid', 'images' => 'documentary', 'motion' => 'restrained',
+            'navigation' => 'directory', 'footer' => 'directory',
+        ],
+        'widgets' => ['news_ticker' => true, 'admission_banner' => false, 'social_strip' => true],
+        'sections' => [
+            ['section_type' => 'hero', 'variant' => 'full-bleed', 'config' => [
+                'eyebrow' => 'CBSE school network', 'heading' => '{{name}}',
+                'tagline' => 'Find schools, programmes and shared opportunities across {{region}}.',
+                'cta_label' => 'Find a member school', 'cta_url' => '#member-schools',
+                'secondary_cta_label' => 'Membership services', 'secondary_cta_url' => '/school-register',
+            ], 'layout' => ['width' => 'full', 'spacing' => 'spacious', 'surface' => 'dark', 'heading_alignment' => 'left']],
+            ['section_type' => 'statistics', 'variant' => 'with-achievements', 'config' => [
+                'heading' => 'Our network at a glance',
+                'achievements_title' => 'Key achievements',
+                'achievements' => [
+                    ['text' => 'Coordinated academic, cultural and sports programmes across member schools.'],
+                    ['text' => 'Shared teacher training and professional development opportunities.'],
+                    ['text' => 'A single membership and event registration process for every school.'],
+                ],
+            ], 'layout' => ['width' => 'wide', 'spacing' => 'compact', 'surface' => 'canvas', 'heading_alignment' => 'center']],
+            ['section_type' => 'member_schools', 'variant' => 'map-view', 'config' => ['eyebrow' => 'Directory', 'heading' => 'Find a member school', 'subheading' => 'Search by school name, district or location.'], 'layout' => ['width' => 'wide', 'spacing' => 'spacious', 'surface' => 'muted', 'heading_alignment' => 'left']],
+            ['section_type' => 'about_sahodaya', 'variant' => 'with-timeline', 'config' => [
+                'eyebrow' => 'Our journey', 'heading' => 'Our journey',
+                'subtext' => 'Milestones in the growth of the {{name}} network.',
+                'milestones' => [
+                    ['year' => 'Founding', 'title' => 'Network established', 'description' => 'Member schools came together under the {{name}} banner.'],
+                    ['year' => 'Growth', 'title' => 'Programmes expanded', 'description' => 'Cultural, sports and academic events opened to every member school.'],
+                    ['year' => 'Today', 'title' => 'Digital collaboration', 'description' => 'Registrations, schedules and results now run in one shared platform.'],
+                ],
+            ], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'canvas', 'heading_alignment' => 'left']],
+            ['section_type' => 'events_programs', 'variant' => 'upcoming-cards', 'config' => ['eyebrow' => 'What is next', 'heading' => 'Upcoming programmes'], 'layout' => ['width' => 'wide', 'spacing' => 'standard', 'surface' => 'canvas', 'heading_alignment' => 'left']],
+            ['section_type' => 'office_bearers', 'variant' => 'photo-cards', 'config' => ['heading' => 'Network leadership'], 'layout' => ['width' => 'wide', 'spacing' => 'standard', 'surface' => 'muted', 'heading_alignment' => 'center']],
+            ['section_type' => 'gallery', 'variant' => 'masonry-grid', 'config' => ['eyebrow' => 'Media showcase', 'heading' => 'Sahodaya event gallery'], 'layout' => ['width' => 'wide', 'spacing' => 'spacious', 'surface' => 'dark', 'heading_alignment' => 'left']],
+            ['section_type' => 'news_circulars', 'variant' => 'modern-feed', 'config' => ['heading' => 'Latest updates'], 'layout' => ['width' => 'standard', 'spacing' => 'standard', 'surface' => 'canvas', 'heading_alignment' => 'left']],
+            ['section_type' => 'testimonials_sahodaya', 'variant' => 'principal-quotes', 'config' => [
+                'eyebrow' => 'Voices from the network', 'heading' => 'What our members say',
+                'quotes' => [
+                    ['quote' => 'Being part of {{name}} has strengthened how our teachers collaborate across schools.', 'name' => 'Principal, Member School', 'designation' => 'Principal'],
+                    ['quote' => 'The shared training and Kalotsav calendar keep our students engaged all year.', 'name' => 'Vice Principal, Member School', 'designation' => 'Vice Principal'],
+                ],
+            ], 'layout' => ['width' => 'wide', 'spacing' => 'standard', 'surface' => 'muted', 'heading_alignment' => 'center']],
+            ['section_type' => 'awards', 'variant' => 'cards', 'config' => [
+                'eyebrow' => 'Recognition', 'heading' => 'Awards & recognition',
+                'awards' => [
+                    ['title' => 'Best Sahodaya Network', 'year' => date('Y'), 'description' => 'Recognized for consistent academic collaboration.'],
+                ],
+            ], 'layout' => ['width' => 'wide', 'spacing' => 'standard', 'surface' => 'canvas', 'heading_alignment' => 'center']],
+            ['section_type' => 'faq', 'variant' => 'accordion', 'config' => [
+                'eyebrow' => 'Help', 'heading' => 'Frequently asked questions',
+                'items' => [
+                    ['question' => 'How do I register my school with {{name}}?', 'answer' => 'Use the School Registration link in the navigation to submit your details for review.'],
+                    ['question' => 'Who can I contact for membership queries?', 'answer' => 'Reach the Sahodaya office using the contact details at the bottom of this page.'],
+                ],
+            ], 'layout' => ['width' => 'narrow', 'spacing' => 'standard', 'surface' => 'canvas', 'heading_alignment' => 'left']],
+            ['section_type' => 'membership_cta', 'variant' => 'steps', 'config' => [
+                'eyebrow' => 'Join us', 'heading' => 'Join the {{name}} network',
+                'steps' => [
+                    ['title' => 'Submit your application', 'description' => 'Complete the school registration form.'],
+                    ['title' => 'Verification', 'description' => 'The Sahodaya office reviews your submission.'],
+                    ['title' => 'Welcome aboard', 'description' => 'Start collaborating with member schools.'],
+                ],
+            ], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'dark', 'heading_alignment' => 'center']],
+            $commonContact,
+        ],
+    ],
+
     'events-results-live' => [
         'name' => 'Events & Results Live',
         'version' => '2.0.0',
