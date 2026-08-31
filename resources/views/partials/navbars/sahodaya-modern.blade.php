@@ -5,7 +5,7 @@
         <div class="flex items-center justify-between h-16 lg:h-[4.25rem]">
             <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 min-w-0 group">
                 @if(!empty($logo))
-                    <img src="{{ $logo }}" alt="{{ $tenant->name }}" class="h-10 w-auto shrink-0 group-hover:scale-105 transition-transform">
+                    <img src="{{ $logo }}" alt="{{ $tenant->name }}" class="h-10 w-auto max-w-[140px] shrink-0 object-contain group-hover:scale-105 transition-transform">
                 @else
                     <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold shadow-sm shrink-0" style="background-color: var(--color-primary, #4f46e5)">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

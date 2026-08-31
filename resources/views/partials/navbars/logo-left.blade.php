@@ -20,9 +20,9 @@
 
 <nav class="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-slate-200" x-data="{ open: false, activeSubmenu: null }">
     <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16 sm:h-20">
-        <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 min-w-0 shrink-0 group">
+        <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 min-w-0 group">
             @if(!empty($logo))
-                <img loading="lazy" src="{{ $logo }}" class="h-10 sm:h-11 w-auto shrink-0 group-hover:scale-105 transition-transform" alt="{{ $tenant->name ?? 'Sahodaya' }}">
+                <img loading="lazy" src="{{ $logo }}" class="h-10 sm:h-11 w-auto max-w-[140px] shrink-0 object-contain group-hover:scale-105 transition-transform" alt="{{ $tenant->name ?? 'Sahodaya' }}">
             @else
                 <div class="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shadow-sm shrink-0">
                     <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

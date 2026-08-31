@@ -4,9 +4,9 @@
     <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16 sm:h-20">
             {{-- Brand / Logo area --}}
-            <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 min-w-0 shrink-0 group">
+            <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 min-w-0 group">
                 @if(isset($tenant) && !empty($logo = \App\Support\TenantBranding::logoUrl($tenant)))
-                    <img loading="lazy" src="{{ $logo }}" class="h-10 sm:h-11 w-auto shrink-0 group-hover:scale-105 transition-transform" alt="{{ $tenant->name }}">
+                    <img loading="lazy" src="{{ $logo }}" class="h-10 sm:h-11 w-auto max-w-[140px] shrink-0 object-contain group-hover:scale-105 transition-transform" alt="{{ $tenant->name }}">
                 @else
                     <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-400 to-amber-200 text-slate-950 flex items-center justify-center font-bold shadow-md shrink-0">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

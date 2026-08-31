@@ -11,7 +11,7 @@
                 </h2>
             </div>
             
-            <a href="/m/v2/announcements" class="v2-btn-primary inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition">
+            <a href="{{ route('tenant.circulars.index') }}" class="v2-btn-primary inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition">
                 <span>View All Circulars</span>
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
             </a>

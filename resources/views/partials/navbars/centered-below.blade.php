@@ -4,7 +4,7 @@
         <div class="flex items-center justify-center py-3 sm:py-4">
             <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 group">
                 @if(!empty($logo))
-                <img loading="lazy" src="{{ $logo }}" class="h-10 sm:h-12 w-auto shrink-0 group-hover:scale-105 transition-transform" alt="{{ $tenant->name }}">
+                <img loading="lazy" src="{{ $logo }}" class="h-10 sm:h-12 w-auto max-w-[140px] shrink-0 object-contain group-hover:scale-105 transition-transform" alt="{{ $tenant->name }}">
                 @else
                 <span class="text-xl sm:text-2xl font-bold font-heading group-hover:opacity-90 transition-opacity" style="color: var(--color-primary, #4f46e5)">{{ $tenant->name ?? 'School' }}</span>
                 @endif

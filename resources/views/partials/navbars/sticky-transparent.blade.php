@@ -3,9 +3,9 @@
      x-init="window.addEventListener('scroll', () => { scrolled = window.scrollY > 50; })"
      :class="scrolled ? 'bg-white/95 text-slate-900 shadow-md border-b border-slate-200/80' : 'bg-slate-950/40 text-white border-b border-white/10'">
     <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16 sm:h-20">
-        <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 shrink-0 group">
+        <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 min-w-0 group">
             @if(!empty($logo))
-            <img loading="lazy" src="{{ $logo }}" class="h-10 sm:h-11 w-auto transition-transform group-hover:scale-105" alt="{{ $tenant->name }}"
+            <img loading="lazy" src="{{ $logo }}" class="h-10 sm:h-11 w-auto max-w-[140px] shrink-0 object-contain transition-transform group-hover:scale-105" alt="{{ $tenant->name }}"
                  :class="scrolled ? '' : 'brightness-0 invert'">
             @else
             <span class="text-lg sm:text-xl font-bold font-heading transition-colors truncate max-w-[240px]"
