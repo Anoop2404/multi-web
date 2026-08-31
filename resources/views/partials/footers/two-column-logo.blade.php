@@ -16,21 +16,24 @@
                    class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center hover:bg-primary transition"
                    onmouseover="this.style.backgroundColor='var(--color-primary)'"
                    onmouseout="this.style.backgroundColor=''">
-                    @include("partials.widgets.social-icons.{$platform}")
+                    @includeIf("partials.widgets.social-icons.{$platform}")
                 </a>
                 @endforeach
             </div>
             @endif
         </div>
         <div class="grid sm:grid-cols-2 gap-8">
+            @if(!empty($content['quick_links']))
             <div>
                 <h3 class="text-white font-semibold mb-3 text-sm uppercase tracking-wide">Quick Links</h3>
                 <ul class="space-y-2 text-sm">
-                    @foreach($content['quick_links'] ?? [] as $link)
+                    @foreach($content['quick_links'] as $link)
                     <li><a href="{{ $link['url'] }}" class="hover:text-white transition">{{ $link['label'] }}</a></li>
                     @endforeach
                 </ul>
             </div>
+            @endif
+            @if(!empty($content['address']) || !empty($content['phone']) || !empty($content['email']))
             <div>
                 <h3 class="text-white font-semibold mb-3 text-sm uppercase tracking-wide">Contact</h3>
                 <address class="text-sm not-italic space-y-2">
@@ -39,6 +42,7 @@
                     @if(!empty($content['email']))<p>✉️ <a href="mailto:{{ $content['email'] }}" class="hover:text-white">{{ $content['email'] }}</a></p>@endif
                 </address>
             </div>
+            @endif
         </div>
     </div>
     <div class="border-t border-gray-800 px-4 py-4 text-center text-xs text-gray-500">

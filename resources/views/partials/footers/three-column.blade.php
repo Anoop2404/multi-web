@@ -10,23 +10,27 @@
             @endif
         </div>
 
+        @if(!empty($content['quick_links']))
         <div>
             <h3 class="text-white font-semibold mb-3">Quick Links</h3>
             <ul class="space-y-1 text-sm">
-                @foreach($content['quick_links'] ?? [] as $link)
+                @foreach($content['quick_links'] as $link)
                     <li><a href="{{ $link['url'] }}" class="hover:text-white transition-colors">{{ $link['label'] }}</a></li>
                 @endforeach
             </ul>
         </div>
+        @endif
 
+        @if(!empty($content['address']) || !empty($content['phone']) || !empty($content['email']))
         <div>
             <h3 class="text-white font-semibold mb-3">Contact</h3>
             <address class="text-sm not-italic space-y-1">
-                @if(isset($content['address']))<p>{{ $content['address'] }}</p>@endif
-                @if(isset($content['phone']))<p>{{ $content['phone'] }}</p>@endif
-                @if(isset($content['email']))<p>{{ $content['email'] }}</p>@endif
+                @if(!empty($content['address']))<p>{{ $content['address'] }}</p>@endif
+                @if(!empty($content['phone']))<p>{{ $content['phone'] }}</p>@endif
+                @if(!empty($content['email']))<p>{{ $content['email'] }}</p>@endif
             </address>
         </div>
+        @endif
     </div>
     <div class="border-t border-gray-800 px-4 py-4 text-center text-xs text-gray-500">
         {{ $content['copyright'] ?? '© ' . date('Y') . ' ' . ($tenant->name ?? 'School') . '. All rights reserved.' }}

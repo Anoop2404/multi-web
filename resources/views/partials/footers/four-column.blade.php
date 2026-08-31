@@ -17,7 +17,7 @@
                    style="--hover-bg: var(--color-primary)"
                    onmouseover="this.style.backgroundColor='var(--color-primary)'"
                    onmouseout="this.style.backgroundColor=''">
-                    @include("partials.widgets.social-icons.{$platform}")
+                    @includeIf("partials.widgets.social-icons.{$platform}")
                 </a>
                 @endforeach
             </div>
@@ -25,22 +25,25 @@
         </div>
 
         {{-- Quick links --}}
+        @if(!empty($content['quick_links']))
         <div>
             <h3 class="text-white font-semibold mb-3 text-sm uppercase tracking-wide">Quick Links</h3>
             <ul class="space-y-2 text-sm">
-                @foreach($content['quick_links'] ?? [] as $link)
+                @foreach($content['quick_links'] as $link)
                 <li>
                     <a href="{{ $link['url'] }}" class="hover:text-white transition-colors">{{ $link['label'] }}</a>
                 </li>
                 @endforeach
             </ul>
         </div>
+        @endif
 
         {{-- Important links --}}
+        @if(!empty($content['important_links']))
         <div>
             <h3 class="text-white font-semibold mb-3 text-sm uppercase tracking-wide">Important Links</h3>
             <ul class="space-y-2 text-sm">
-                @foreach($content['important_links'] ?? [] as $link)
+                @foreach($content['important_links'] as $link)
                 <li>
                     <a href="{{ $link['url'] }}" target="{{ $link['target'] ?? '_self' }}"
                        class="hover:text-white transition-colors">{{ $link['label'] }}</a>
@@ -48,8 +51,10 @@
                 @endforeach
             </ul>
         </div>
+        @endif
 
         {{-- Contact --}}
+        @if(!empty($content['address']) || !empty($content['phone']) || !empty($content['email']))
         <div>
             <h3 class="text-white font-semibold mb-3 text-sm uppercase tracking-wide">Contact</h3>
             <address class="text-sm not-italic space-y-2">
@@ -72,6 +77,7 @@
                 @endif
             </address>
         </div>
+        @endif
     </div>
 
     <div class="border-t border-gray-800 px-4 py-4 text-center text-xs text-gray-500">
