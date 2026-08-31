@@ -57,7 +57,7 @@ class FestScheduleController extends SahodayaAdminController
             'clashCount'   => count($clashes) + count($stageConflicts),
             'clashes'      => array_slice($clashes, 0, 25),
             'stageConflicts' => array_slice($stageConflicts, 0, 25),
-            'classGroupLabels' => FestClassGroupScheme::labels(null, $event),
+            'classGroupLabels' => FestClassGroupScheme::labels(null, $event->rootEvent()),
             'ageGroupLabels'   => config('fest_item_taxonomy.age_group', []),
         ]));
     }

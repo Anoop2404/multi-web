@@ -66,7 +66,7 @@ class FestEventSettingsController extends SahodayaAdminController
 
         $feeService = app(FestSchoolEventFeeService::class);
         $schedule = $feeService->resolveSchedule($event);
-        $classGroupScheme = FestClassGroupScheme::resolveForEvent($event, $schedule);
+        $classGroupScheme = FestClassGroupScheme::resolveForEvent($event->rootEvent(), $schedule);
 
         $itemHeads = \App\Models\FestItemHead::where('event_id', $event->id)
             ->orderBy('sort_order')
@@ -126,7 +126,7 @@ class FestEventSettingsController extends SahodayaAdminController
 
                 return $schemes;
             })(),
-            'classGroupLabels' => FestClassGroupScheme::labels($classGroupScheme, $event),
+            'classGroupLabels' => FestClassGroupScheme::labels($classGroupScheme, $event->rootEvent()),
             'defaultClassGroupFees' => FestClassGroupScheme::defaultFees($classGroupScheme, $event),
             // LEGACY — only still populated so an event that already saved the literal
             // 'custom' string keeps its old per-event categories visible/editable. New
@@ -152,7 +152,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'judgeGate'    => app(FestJudgeGateService::class)->status($event),
             'lifecycle'    => FestLifecycleService::for($event)->checklist(),
             'suggestedStatus' => FestLifecycleService::for($event)->suggestedStatus(),
-            'classGroups'  => FestClassGroupScheme::labels(null, $event),
+            'classGroups'  => FestClassGroupScheme::labels(null, $event->rootEvent()),
             'initialTab'   => $initialTab,
             'participationPolicy' => \App\Models\FestParticipationPolicy::where('event_id', $event->id)->whereNull('class_group')->first(),
             'participationPresets' => app(\App\Services\Events\FestParticipationPolicyService::class)->presetOptions(),
@@ -194,7 +194,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'event'        => $event,
             'gradeConfigs' => FestGradeConfig::where('event_id', $event->id)->with('item')->get(),
             'childEvents'  => $event->sportEventDropdownOptions(),
-            'classGroupLabels' => FestClassGroupScheme::labels(null, $event),
+            'classGroupLabels' => FestClassGroupScheme::labels(null, $event->rootEvent()),
         ]));
     }
 

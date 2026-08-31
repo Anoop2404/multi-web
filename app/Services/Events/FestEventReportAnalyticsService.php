@@ -653,7 +653,7 @@ class FestEventReportAnalyticsService
             }
         }
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
 
         $rows = [];
@@ -873,7 +873,7 @@ class FestEventReportAnalyticsService
             ->groupBy('item_id')
             ->pluck('cnt', 'item_id');
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
 
         $rows = [];
@@ -1137,7 +1137,7 @@ class FestEventReportAnalyticsService
             ->orderBy('sort_order')
             ->get();
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
 
         $rows = [];
@@ -1209,7 +1209,7 @@ class FestEventReportAnalyticsService
                 ->get()
             : collect([$this->event])->when($headId, fn ($c) => $c->where('id', $headId));
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
 
         $rows = [];
@@ -1475,7 +1475,7 @@ class FestEventReportAnalyticsService
             ->orderBy('name')
             ->get();
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
 
         $rows = [];
@@ -1776,7 +1776,7 @@ class FestEventReportAnalyticsService
             ->get()
             ->keyBy('participant_id');
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         $rows = [];

@@ -975,10 +975,10 @@ class FestCertificateService
      */
     private function itemTaxonomyLabels(?FestEventItem $item, FestEvent $event): array
     {
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
 
         $category = match (true) {
-            (bool) $item?->class_group && $item->class_group !== 'open' => $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group),
+            (bool) $item?->class_group && $item->class_group !== 'open' => FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group),
             (bool) $item?->age_group => $item->age_group,
             (bool) $item?->category && $item->category !== 'general' => ucwords(str_replace(['_', '-'], ' ', $item->category)),
             default => 'General Category',

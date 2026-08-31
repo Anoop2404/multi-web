@@ -21,7 +21,7 @@ class FestItemScheduleService
             ->get()
             ->keyBy('item_id');
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
 
         return FestEventItem::query()
             ->where('event_id', $event->id)

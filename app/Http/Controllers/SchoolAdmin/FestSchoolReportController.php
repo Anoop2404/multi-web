@@ -797,7 +797,7 @@ class FestSchoolReportController extends SchoolAdminController
 
         $itemCounts = $service->itemParticipantCounts($event, $this->school->id);
         $registrationCounts = $service->itemRegistrationCounts($event, $this->school->id);
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $ageGroupLabels = config('fest_item_taxonomy.age_group', []);
 
         $cluster = Tenant::find($this->school->parent_id);
@@ -1838,7 +1838,7 @@ class FestSchoolReportController extends SchoolAdminController
         }
 
         if ($item->class_group && $item->class_group !== 'open') {
-            return $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
+            return \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group);
         }
 
         if ($item->category && $item->category !== 'general') {

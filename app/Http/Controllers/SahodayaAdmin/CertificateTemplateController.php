@@ -45,7 +45,7 @@ class CertificateTemplateController extends SahodayaAdminController
             ->with(['items' => fn ($q) => $q->orderBy('display_order')])
             ->get(['id', 'title', 'event_type', 'event_start'])
             ->map(function (FestEvent $e) {
-                $classGroupLabels = FestClassGroupScheme::labels(null, $e);
+                $classGroupLabels = FestClassGroupScheme::labels(null, $e->rootEvent());
                 $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
                 return [

@@ -514,7 +514,7 @@ class FestMarkEntryController extends SahodayaAdminController
         $event = $this->regionAwareTargetEvent($request, $event);
         $event->load('items');
 
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
 
         $items = $event->items
             ->sortBy('title')
@@ -675,7 +675,7 @@ class FestMarkEntryController extends SahodayaAdminController
         usort($rows, fn ($a, $b) => ((int) preg_replace('/[^0-9]/', '', (string) ($a['chest_no'] ?? 999999))) <=> ((int) preg_replace('/[^0-9]/', '', (string) ($b['chest_no'] ?? 999999))));
 
         $sheetTitle = 'Digital Sum Sheet';
-        $categoryLabel = $this->itemCategoryLabel($item, \App\Support\FestClassGroupScheme::labels(null, $event));
+        $categoryLabel = $this->itemCategoryLabel($item, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()));
 
         $nameParts = [$event->title];
         if ($categoryLabel) {
@@ -720,7 +720,7 @@ class FestMarkEntryController extends SahodayaAdminController
         // "Category" on a Kalotsav item almost always means its class/age bracket
         // (e.g. "Category 1 — Classes 3 & 4"), not the arts_category genre tag —
         // this is the same scheme FestIdCardService resolves for ID cards.
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
 
         $sheets = [];
 

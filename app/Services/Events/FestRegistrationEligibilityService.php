@@ -271,9 +271,9 @@ class FestRegistrationEligibilityService
         }
 
         if ($canonicalStudentGroup !== $canonicalItemGroup) {
-            $labels = FestClassGroupScheme::labels(null, $event ?? $item->event);
-            $expected = $labels[$canonicalItemGroup] ?? $labels[$itemGroup] ?? strtoupper($itemGroup);
-            $actual = $labels[$canonicalStudentGroup] ?? $labels[$studentGroup] ?? strtoupper($studentGroup);
+            $labels = FestClassGroupScheme::labels(null, ($event ?? $item->event)?->rootEvent());
+            $expected = FestClassGroupScheme::resolveItemLabel($labels, $itemGroup);
+            $actual = FestClassGroupScheme::resolveItemLabel($labels, $studentGroup);
 
             return "belongs to {$actual}, but this item is for {$expected}.";
         }

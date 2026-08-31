@@ -53,7 +53,7 @@ class FestItemResultsService
                 'competition_end', 'results_published_at', 'inherited_from_item_id', 'event_id',
             ]);
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         // Group items by canonical root item ID (inherited_from_item_id ?: id)

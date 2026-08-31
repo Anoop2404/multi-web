@@ -95,7 +95,7 @@ class EventContext
 
         if ($available->isEmpty()) {
             return array_values(array_filter(
-                array_keys(FestClassGroupScheme::labels(null, $this->event)),
+                array_keys(FestClassGroupScheme::labels(null, $this->event->rootEvent())),
                 fn (string $key) => $key !== 'open',
             ));
         }
@@ -120,8 +120,7 @@ class EventContext
                 ?? strtoupper($category);
         }
 
-        return FestClassGroupScheme::labels(null, $this->event)[$category]
-            ?? config("fest_item_taxonomy.class_group.{$category}", strtoupper($category));
+        return FestClassGroupScheme::resolveItemLabel(FestClassGroupScheme::labels(null, $this->event->rootEvent()), $category);
     }
 
     /** @return list<array{school_id: string, school_name: string, total_points: int, rank: int}> */

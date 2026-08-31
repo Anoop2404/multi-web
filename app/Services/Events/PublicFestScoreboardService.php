@@ -255,8 +255,7 @@ class PublicFestScoreboardService
             return FestSportsAgeGroup::labels($root->tenant_id)[$category] ?? self::humanizeCategoryKey($category);
         }
 
-        return FestClassGroupScheme::labels(null, $root)[$category]
-            ?? config("fest_item_taxonomy.class_group.{$category}", self::humanizeCategoryKey($category));
+        return FestClassGroupScheme::resolveItemLabel(FestClassGroupScheme::labels(null, $root), $category);
     }
 
     /**

@@ -33,7 +33,7 @@ class FestClashRequestController extends SchoolAdminController
             ->latest()
             ->get();
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q

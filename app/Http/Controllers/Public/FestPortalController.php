@@ -589,7 +589,7 @@ class FestPortalController extends Controller
 
         $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
         $schedules = $this->mapScheduleRows($event, $item->id, [$event->id], $isAdminPreview);
-        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event), config('fest_item_taxonomy.arts_category', []));
+        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event->rootEvent()), config('fest_item_taxonomy.arts_category', []));
 
         return $this->renderPublic('public.fest.item-schedule', $tenant, compact('event', 'item', 'schedules', 'categoryLabel') + ['isAdminPreview' => $isAdminPreview]);
     }
@@ -1027,7 +1027,7 @@ public function tv(Request $request, int $eventId)
             // formatPublicParticipant() derived from the participant's registration.
             $nowPerforming['category_label'] = FestItemCategoryLabel::resolve(
                 $nowSlot->item,
-                FestClassGroupScheme::labels(null, $event),
+                FestClassGroupScheme::labels(null, $event->rootEvent()),
                 config('fest_item_taxonomy.arts_category', [])
             );
         }
@@ -1351,7 +1351,7 @@ public function tv(Request $request, int $eventId)
         // Group by registration so the public schedule shows one slot per performance,
         // with the full roster attached, matching how results()/itemResults() already
         // resolve rosters for the same reason.
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
 
         return $rows
             ->groupBy(fn (FestSchedule $row) => $row->participant?->registration_id ?? 'solo-'.$row->id)

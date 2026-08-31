@@ -1286,11 +1286,11 @@ class FestEventController extends SahodayaAdminController
         $program = $this->programSlugFor($event);
 
         $feeSchedule = app(\App\Services\Events\FestSchoolEventFeeService::class)->resolveSchedule($event);
-        $classGroupScheme = FestClassGroupScheme::resolveForEvent($event, $feeSchedule);
+        $classGroupScheme = FestClassGroupScheme::resolveForEvent($event->rootEvent(), $feeSchedule);
         $taxonomyRegistry = app(FestTaxonomyRegistry::class)->forTenant($this->sahodaya->id);
         $taxonomyRegistry->ensureDefaults();
         $taxonomy = $taxonomyRegistry->allLabels();
-        $taxonomy['class_group'] = FestClassGroupScheme::taxonomyClassGroups($classGroupScheme, $event);
+        $taxonomy['class_group'] = FestClassGroupScheme::taxonomyClassGroups($classGroupScheme, $event->rootEvent());
 
         // Sports (Head = Event): pages group by sport events, not FestItemHead rows.
         // Keep the passive sync (heals partition_role / hub visibility, never creates)
@@ -1390,7 +1390,7 @@ class FestEventController extends SahodayaAdminController
     private function taxonomyValidationRules(FestTaxonomyRegistry $registry, FestEvent $event): array
     {
         $ageKeys = array_keys(FestSportsAgeGroup::labels($this->sahodaya->id));
-        $classKeys = array_keys(FestClassGroupScheme::labels(null, $event));
+        $classKeys = array_keys(FestClassGroupScheme::labels(null, $event->rootEvent()));
         $kidsKeys = array_keys(\App\Support\FestKidsFestBand::labels());
 
         // 'sports' was a valid value under the old hardcoded category enum

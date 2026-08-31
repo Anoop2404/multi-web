@@ -99,7 +99,7 @@ class FestExportService
             ->get()
             ->keyBy(fn (FestAttendance $a) => $a->item_id.'-'.$a->participant_id);
 
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
 
         $rows = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $event->reportableEventIds())

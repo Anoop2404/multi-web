@@ -206,7 +206,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
      */
     private function itemsWithCategoryLabel(FestEvent $event)
     {
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         return $event->items->values()->map(function (FestEventItem $item) use ($classGroupLabels, $artsCategoryLabels) {

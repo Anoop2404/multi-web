@@ -20,7 +20,7 @@ class FestSubstitutionRequestController extends SchoolAdminController
         $meta = SchoolFestProgram::meta($program);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         $requests = FestSubstitutionRequest::where('event_id', $event->id)

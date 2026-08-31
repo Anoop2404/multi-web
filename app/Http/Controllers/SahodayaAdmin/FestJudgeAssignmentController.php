@@ -33,7 +33,7 @@ class FestJudgeAssignmentController extends SahodayaAdminController
             'event'       => $event,
             'assignments' => $assignments,
             'judges'      => $judges,
-            'classGroupLabels' => FestClassGroupScheme::labels(null, $event),
+            'classGroupLabels' => FestClassGroupScheme::labels(null, $event->rootEvent()),
         ]));
     }
 

@@ -693,8 +693,8 @@ class FestIdCardService
         $studentClass = $p->student?->schoolClass?->name ?? $p->student?->class ?? null;
         $classCategory = null;
         if ($itemModel?->class_group) {
-            $schemeLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
-            $classCategory = $schemeLabels[$itemModel->class_group] ?? strtoupper($itemModel->class_group);
+            $schemeLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+            $classCategory = \App\Support\FestClassGroupScheme::resolveItemLabel($schemeLabels, $itemModel->class_group);
         }
 
         $pureCategory = $ageGroupLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : null));

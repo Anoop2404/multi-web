@@ -26,7 +26,7 @@ class FestItemCategoryLabel
         }
 
         if ($item->class_group && $item->class_group !== 'open') {
-            return $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
+            return FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group);
         }
 
         if ($item->age_group) {

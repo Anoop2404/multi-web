@@ -71,7 +71,7 @@ class McqDashboardController extends SahodayaAdminController
                 'title'           => $bank->title,
                 'subject'         => $bank->subject,
                 'class_group'     => $bank->class_group,
-                'class_group_label' => FestClassGroupScheme::labelsForSahodaya($this->sahodaya->id)[$bank->class_group] ?? $bank->class_group,
+                'class_group_label' => FestClassGroupScheme::resolveItemLabel(FestClassGroupScheme::labelsForSahodaya($this->sahodaya->id), $bank->class_group),
                 'status'          => $bank->status,
                 'school_name'     => $bank->school?->name,
                 'teacher_name'    => $bank->teacher?->name,

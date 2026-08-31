@@ -86,7 +86,7 @@ class FestSchoolReportExportService
     ): Response {
         $slug = str($event->title)->slug()->limit(40);
         $itemSlug = str($item->title)->slug()->limit(30);
-        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event));
+        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event->rootEvent()));
 
         return $this->renderPdf('fest.reports.item-wise-school', [
             'event'         => $event,

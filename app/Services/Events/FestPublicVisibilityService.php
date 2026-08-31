@@ -162,7 +162,7 @@ class FestPublicVisibilityService
         $showName = $this->showParticipantName($event, $participant, $participant->registration?->item, $isAdminPreview);
 
         $item = $participant->registration?->item;
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
         $categoryLabel = FestItemCategoryLabel::resolve($item, $classGroupLabels, config('fest_item_taxonomy.arts_category', []));
 
         return [
@@ -214,7 +214,7 @@ class FestPublicVisibilityService
             ->get()
             ->keyBy('participant_id');
 
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
 
         return $entries
             ->map(function (FestParticipant $p) use ($event, $showMarks, $marksByParticipant, $isAdminPreview, $classGroupLabels) {
@@ -268,7 +268,7 @@ class FestPublicVisibilityService
         }
 
         $item = $participant->registration?->item;
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
 
         $category = FestItemCategoryLabel::resolve($item, $classGroupLabels) ?? 'General Category';
 

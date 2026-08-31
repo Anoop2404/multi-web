@@ -44,7 +44,7 @@ class FestEligibilityRuleController extends SahodayaAdminController
             ->orderBy('sort_order')
             ->get();
 
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($event->tenant_id)->labels('arts_category');
 
         $items = FestEventItem::where('event_id', $event->id)

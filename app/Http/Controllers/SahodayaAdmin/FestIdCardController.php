@@ -27,7 +27,10 @@ class FestIdCardController extends SahodayaAdminController
 
         $itemCounts = $service->itemParticipantCounts($targetEvent);
         $registrationCounts = $service->itemRegistrationCounts($targetEvent);
-        $classGroupLabels = FestClassGroupScheme::labels(null, $targetEvent);
+        // Resolve from the original (un-cloned) $event, not $targetEvent — regionAwareTargetEvent()
+        // may return a clone with parent_event_id nulled out, which would make ->rootEvent()
+        // resolve to itself instead of walking to the real root where class_group_scheme lives.
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $ageGroupLabels = config('fest_item_taxonomy.age_group', []);
 
         return $this->inertia('Sahodaya/Events/IdCards/Index', $this->withEventActivity($event, FestPageActivity::ID_CARDS, [
@@ -256,7 +259,7 @@ class FestIdCardController extends SahodayaAdminController
         }
 
         if ($item->class_group && $item->class_group !== 'open') {
-            return $classGroupLabels[$item->class_group] ?? strtoupper($item->class_group);
+            return \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group);
         }
 
         if ($item->category && $item->category !== 'general') {

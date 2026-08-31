@@ -61,7 +61,7 @@ class FestHeadItemNavigationService
                 'competition_time', 'results_published_at', 'participant_type', 'gender',
                 'age_group', 'class_group', 'category', 'min_group_size', 'max_group_size', 'criteria_json',
             ];
-            $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+            $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
             $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
             $numbering = app(FestNumberingService::class)->settings($event);
             $defaultChestStart = (int) ($numbering['chest_no_start'] ?? 1);
@@ -481,7 +481,7 @@ class FestHeadItemNavigationService
 
             $numbering = app(FestNumberingService::class)->settings($sport);
             $defaultChestStart = (int) ($numbering['chest_no_start'] ?? 1);
-            $classGroupLabels = FestClassGroupScheme::labels(null, $sport);
+            $classGroupLabels = FestClassGroupScheme::labels(null, $sport->parent_event_id ? $sport->rootEvent() : $sport);
             $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
             $itemPayloads = $items->map(

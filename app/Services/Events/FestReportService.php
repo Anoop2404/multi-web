@@ -113,7 +113,7 @@ class FestReportService
     /** @return array<string, string> */
     public static function classGroups(?FestEvent $event = null): array
     {
-        return FestClassGroupScheme::labels(null, $event);
+        return FestClassGroupScheme::labels(null, $event?->rootEvent());
     }
 
     public function approvedRegistrations(?string $classGroup = null, ?string $schoolId = null)
@@ -812,7 +812,7 @@ class FestReportService
             ->get();
 
         $item = FestEventItem::find($itemId);
-        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $this->event));
+        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $this->event->rootEvent()));
 
         return $this->renderPdf('fest.reports.item-wise', [
             'event'         => $this->event,

@@ -117,7 +117,7 @@ class FestCertificateController extends SahodayaAdminController
 
     private function publishedItemsForEvent(FestEvent $event): Collection
     {
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         return FestEventItem::whereIn('event_id', $event->reportableEventIds())
@@ -194,7 +194,7 @@ class FestCertificateController extends SahodayaAdminController
      */
     private function groupCertificatesByItem(Collection $certificates, string $certType, FestEvent $event): Collection
     {
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         return $certificates
@@ -226,7 +226,7 @@ class FestCertificateController extends SahodayaAdminController
 
     private function groupCertificatesBySchool(Collection $certificates, string $certType, FestEvent $event): Collection
     {
-        $classGroupLabels = FestClassGroupScheme::labels(null, $event);
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         return $certificates
