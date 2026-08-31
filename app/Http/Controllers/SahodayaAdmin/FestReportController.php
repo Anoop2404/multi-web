@@ -480,6 +480,35 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
+    public function schoolParticipation(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $service = $this->scopedReportService($request, $this->regionAwareTargetEvent($request, $event));
+        $regs = $service->activeRegistrations();
+
+        $rows = $regs->groupBy('school_id')->map(function ($group) {
+            $first = $group->first();
+
+            return [
+                'school_id'         => $first->school_id,
+                'school_name'       => $first->school?->name ?? $first->school_id,
+                'active_count'      => $group->count(),
+                'item_count'        => $group->pluck('item_id')->unique()->count(),
+                'participant_count' => $group->sum(fn ($r) => $r->participants->count()),
+            ];
+        })->sortByDesc('active_count')->values()->all();
+
+        return $this->inertia('Sahodaya/Events/Reports/SchoolParticipation', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'rows'   => $rows,
+            'totals' => [
+                'schools'              => count($rows),
+                'active_registrations' => $regs->count(),
+                'participants'         => array_sum(array_column($rows, 'participant_count')),
+            ],
+        ])));
+    }
+
     public function disciplineRegistration(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

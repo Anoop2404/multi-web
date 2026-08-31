@@ -261,6 +261,7 @@ class FestReportCatalog
             ['id' => 'overall-ranking', 'label' => 'Overall Ranking', 'href' => "{$base}/overall-ranking"],
             ['id' => 'house-detailed', 'label' => 'House Detailed', 'href' => "{$base}/house-detailed"],
             ['id' => 'participation-counts', 'label' => 'Participation Counts', 'href' => "{$base}/participation-counts"],
+            ['id' => 'school-participation', 'label' => 'School Participation Counts', 'href' => "{$base}/school-participation"],
             ['id' => 'registration-register', 'label' => 'Registration & Fees Register', 'href' => "{$base}/registration-register"],
             ['id' => 'mark-entry-status', 'label' => 'Mark Entry Status', 'href' => "{$base}/mark-entry-status"],
             ['id' => 'results-pending', 'label' => 'Results Pending', 'href' => "{$base}/results-pending"],
@@ -338,7 +339,7 @@ class FestReportCatalog
         // is applied separately to each catalog, so both need to match this one flat list.
         'school-detailed', 'school-wise',
         'house-detailed', 'house-wise',
-        'participation-counts', 'student-participation',
+        'participation-counts', 'student-participation', 'school-participation',
         'area-wise-participants', 'age-group-matrix',
         'item-schedule', 'item-schedule-pdf',
         'student-wise', 'student-wise-report', 'student-wise-pdf',

@@ -1445,6 +1445,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/schedule-clashes', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'scheduleClashes'])->name('reports.schedule-clashes');
                 Route::get('/{event}/reports/item-schedule', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemSchedule'])->name('reports.item-schedule');
                 Route::get('/{event}/reports/item-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemCounts'])->name('reports.item-counts');
+                Route::get('/{event}/reports/school-participation', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'schoolParticipation'])->name('reports.school-participation');
                 Route::get('/{event}/reports/discipline-registration', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'disciplineRegistration'])->name('reports.discipline-registration');
                 Route::get('/{event}/reports/head-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'headWiseParticipants'])->name('reports.head-wise-participants');
                 Route::get('/{event}/reports/area-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'areaWiseParticipants'])->name('reports.area-wise-participants');
