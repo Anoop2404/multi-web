@@ -1,10 +1,10 @@
-<footer class="bg-gray-900 text-gray-300 mt-16">
+<footer class="text-gray-300 mt-16" style="background-color: var(--color-primary)">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid md:grid-cols-3 gap-8">
         <div>
             <h3 class="text-white font-semibold mb-3 font-heading">{{ $tenant->name ?? 'School' }}</h3>
             <p class="text-sm">{{ $content['tagline'] ?? '' }}</p>
             @if(isset($content['sahodaya_link']))
-                <a href="{{ $content['sahodaya_link']['url'] }}" class="text-sm text-primary hover:underline mt-2 block">
+                <a href="{{ $content['sahodaya_link']['url'] }}" class="text-sm text-white font-semibold hover:underline mt-2 block">
                     {{ $content['sahodaya_link']['label'] ?? 'Sahodaya Cluster' }}
                 </a>
             @endif
@@ -32,7 +32,7 @@
         </div>
         @endif
     </div>
-    <div class="border-t border-gray-800 px-4 py-4 text-center text-xs text-gray-500">
+    <div class="border-t border-white/10 px-4 py-4 text-center text-xs text-gray-400">
         {{ $content['copyright'] ?? '© ' . date('Y') . ' ' . ($tenant->name ?? 'School') . '. All rights reserved.' }}
     </div>
 </footer>

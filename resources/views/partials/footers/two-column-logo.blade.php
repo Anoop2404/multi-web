@@ -1,4 +1,4 @@
-<footer class="bg-gray-900 text-gray-300 mt-16">
+<footer class="text-gray-300 mt-16" style="background-color: var(--color-primary)">
     <div class="max-w-7xl mx-auto px-4 py-12 grid md:grid-cols-2 gap-8">
         <div>
             <a href="/" class="flex items-center gap-3 mb-4">
@@ -45,7 +45,7 @@
             @endif
         </div>
     </div>
-    <div class="border-t border-gray-800 px-4 py-4 text-center text-xs text-gray-500">
+    <div class="border-t border-white/10 px-4 py-4 text-center text-xs text-gray-400">
         {{ $content['copyright'] ?? '© ' . date('Y') . ' ' . ($tenant->name ?? 'School') . '. All rights reserved.' }}
         @if(!empty($content['sahodaya_link']))
         &nbsp;|&nbsp;<a href="{{ $content['sahodaya_link']['url'] }}" class="hover:text-gray-300">{{ $content['sahodaya_link']['label'] }}</a>
