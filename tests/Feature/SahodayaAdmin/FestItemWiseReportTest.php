@@ -79,11 +79,13 @@ class FestItemWiseReportTest extends TestCase
 
         $musicItem = FestEventItem::create([
             'event_id' => $phase1Leaf->id, 'title' => 'Light Music-Malayalam', 'item_code' => '104',
-            'stage_type' => 'on_stage', 'participant_type' => 'individual', 'category' => 'music', 'is_enabled' => true,
+            'stage_type' => 'on_stage', 'participant_type' => 'individual', 'category' => 'music',
+            'class_group' => 'lp', 'is_enabled' => true,
         ]);
         $danceItem = FestEventItem::create([
             'event_id' => $phase2Leaf->id, 'title' => 'Bharatanatyam', 'item_code' => '215',
-            'stage_type' => 'on_stage', 'participant_type' => 'individual', 'category' => 'dance', 'is_enabled' => true,
+            'stage_type' => 'on_stage', 'participant_type' => 'individual', 'category' => 'dance',
+            'class_group' => 'up', 'is_enabled' => true,
         ]);
 
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '10']);
@@ -112,19 +114,23 @@ class FestItemWiseReportTest extends TestCase
 
         $this->assertCount(2, $rows, 'both phases\' registrations must appear in the combined report');
 
+        // "Category" here means class category (item.class_group), not the item's arts
+        // genre — see FestEventReportAnalyticsService::itemWiseReportRows().
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $hub);
+
         $musicRow = $rows->firstWhere('item_id', $musicItem->id);
-        $this->assertSame('Music', $musicRow['category_label']);
+        $this->assertSame($classGroupLabels['lp'], $musicRow['category_label']);
         $this->assertSame('PHASE 1', $musicRow['phase_name']);
         $this->assertSame('Item Wise Report School', $musicRow['school_name']);
         $this->assertSame('Test Student', $musicRow['participant']);
 
         $danceRow = $rows->firstWhere('item_id', $danceItem->id);
-        $this->assertSame('Dance', $danceRow['category_label']);
+        $this->assertSame($classGroupLabels['up'], $danceRow['category_label']);
         $this->assertSame('PHASE 2', $danceRow['phase_name']);
         $this->assertSame('Item Wise Report School', $danceRow['school_name']);
 
         $categories = collect($props['categories'])->pluck('key')->all();
-        $this->assertEqualsCanonicalizing(['music', 'dance'], $categories);
+        $this->assertEqualsCanonicalizing(['lp', 'up'], $categories);
 
         $pdfResponse = $this->actingAs($admin)->get(route('sahodaya.events.reports.item-wise.pdf', [
             'tenantId' => $sahodaya->id,
@@ -168,7 +174,8 @@ class FestItemWiseReportTest extends TestCase
 
         $item = FestEventItem::create([
             'event_id' => $event->id, 'title' => 'Recitation-Malayalam', 'item_code' => '101',
-            'stage_type' => 'on_stage', 'participant_type' => 'individual', 'category' => 'music', 'is_enabled' => true,
+            'stage_type' => 'on_stage', 'participant_type' => 'individual', 'category' => 'music',
+            'class_group' => 'hs', 'is_enabled' => true,
         ]);
 
         $ourClass = SchoolClass::create(['tenant_id' => $ourSchool->id, 'name' => '10']);
@@ -198,7 +205,7 @@ class FestItemWiseReportTest extends TestCase
         $this->assertCount(1, $rows, 'must only include the acting school\'s own registrations');
         $this->assertSame('Our Student', $rows->first()['participant']);
         $this->assertSame('Our School', $rows->first()['school_name']);
-        $this->assertSame('Music', $rows->first()['category_label']);
+        $this->assertSame(\App\Support\FestClassGroupScheme::labels(null, $event)['hs'], $rows->first()['category_label']);
 
         $pdfResponse = $this->actingAs($schoolAdmin)->get(route('school.kalotsav.reports.item-wise.marks-pdf', [
             'tenantId' => $ourSchool->id,

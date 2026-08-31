@@ -344,9 +344,12 @@ class FestSchoolReportController extends SchoolAdminController
         $rows = $analytics->itemWiseReportRows($this->school->id);
 
         $root = $event->rootEvent();
-        $taxonomy = app(\App\Services\Events\FestTaxonomyRegistry::class)->forTenant($tenantId)->labels('arts_category');
-        $categories = collect($rows)->pluck('category')->unique()->filter()->sort()->values()
-            ->map(fn ($key) => ['key' => $key, 'label' => $taxonomy[$key] ?? ucfirst($key)])
+        // Filter options are derived straight from the rows' own category/category_label
+        // (class category — see FestEventReportAnalyticsService::itemWiseReportRows())
+        // instead of a separate taxonomy lookup, so the filter list can never drift from
+        // what's actually shown in the CATEGORY column.
+        $categories = collect($rows)->unique('category')->sortBy('category_label')->values()
+            ->map(fn ($row) => ['key' => $row['category'], 'label' => $row['category_label']])
             ->all();
 
         $base = $this->schoolReportsBase($program, $event);

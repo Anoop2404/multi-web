@@ -1874,7 +1874,10 @@ class FestEventReportAnalyticsService
      */
     public function itemWiseReportRows(?string $schoolId = null): array
     {
-        $taxonomy = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
+        // "Category" here means class category (e.g. "Category 1 — Classes 3 & 4"), not the
+        // item's arts genre — matches how the item catalog and Fees listing both group/label
+        // by class category.
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event);
         $usesPhasedRegionalBilling = $this->event->rootEvent()->usesPhasedRegionalBilling();
 
         return FestParticipant::query()
@@ -1897,18 +1900,19 @@ class FestEventReportAnalyticsService
             ])
             ->get()
             ->filter(fn (FestParticipant $p) => $p->registration && $p->registration->item)
-            ->map(function (FestParticipant $p) use ($taxonomy, $usesPhasedRegionalBilling) {
+            ->map(function (FestParticipant $p) use ($classGroupLabels, $usesPhasedRegionalBilling) {
                 $registration = $p->registration;
                 $item = $registration->item;
                 $event = $registration->event;
+                $classGroup = $item->class_group ?: 'open';
 
                 return [
                     'id'              => $p->id,
                     'item_id'         => $item->id,
                     'item_title'      => $item->title,
                     'item_code'       => $item->item_code,
-                    'category'        => $item->category,
-                    'category_label'  => $taxonomy[$item->category] ?? ucfirst((string) $item->category),
+                    'category'        => $classGroup,
+                    'category_label'  => $classGroupLabels[$classGroup] ?? ucfirst($classGroup),
                     'stage_type'      => $item->stage_type,
                     'participant_type' => $item->participant_type,
                     'phase_name'      => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,
