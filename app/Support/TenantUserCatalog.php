@@ -214,8 +214,8 @@ class TenantUserCatalog
             'fest_ops'                 => 'One operational duty (registration desk, stage, food, etc.) for a single event you assign — narrow, task-based access.',
             'school_principal'         => 'Full school-admin access, can create/manage other school users.',
             'event_admin'              => 'Full sahodaya-admin control (items, fees, registrations, results, settings) but locked to only the events you tick below.',
-            'region_admin'             => 'Mark entry, ID cards, registrations, finance, and food billing — locked to one region within one event. Assign via that event\'s Event Staff page, not here.',
-            'phase_admin'              => 'Mark entry, ID cards, registrations, finance, and food billing — locked to one phase, but across every region, within one event. Assign via that event\'s Event Staff page, not here.',
+            'region_admin'             => 'Mark entry, ID cards, registrations, finance, and food billing — locked to one region within one event.',
+            'phase_admin'              => 'Mark entry, ID cards, registrations, finance, and food billing — locked to one phase, but across every region, within one event.',
         ];
     }
 

@@ -39,17 +39,19 @@ class TenantUserController extends SahodayaAdminController
                 'permissions' => $u->getPermissionNames()->values()->all(),
                 'is_active'   => $u->is_active,
                 'fest_assignments' => FestEventStaff::where('user_id', $u->id)
-                    ->with('event:id,title', 'stage:id,name', 'region:id,name')
+                    ->with('event:id,title', 'stage:id,name', 'region:id,name', 'sourcePhase:id,name')
                     ->get()
                     ->map(fn (FestEventStaff $s) => [
-                        'id'          => $s->id,
-                        'event_id'    => $s->event_id,
-                        'event_title' => $s->event?->title,
-                        'duty'        => $s->duty,
-                        'stage_id'    => $s->stage_id,
-                        'stage_name'  => $s->stage?->name,
-                        'region_id'   => $s->region_id,
-                        'region_name' => $s->region?->name,
+                        'id'                => $s->id,
+                        'event_id'          => $s->event_id,
+                        'event_title'       => $s->event?->title,
+                        'duty'              => $s->duty,
+                        'stage_id'          => $s->stage_id,
+                        'stage_name'        => $s->stage?->name,
+                        'region_id'         => $s->region_id,
+                        'region_name'       => $s->region?->name,
+                        'source_phase_id'   => $s->source_phase_id,
+                        'source_phase_name' => $s->sourcePhase?->name,
                     ])->values()->all(),
                 'exam_assignments' => McqExamStaff::where('user_id', $u->id)
                     ->with('exam:id,title')
@@ -66,6 +68,11 @@ class TenantUserController extends SahodayaAdminController
                     ->all(),
             ]);
 
+        $festEvents = FestEvent::where('tenant_id', $this->sahodaya->id)
+            ->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing'])
+            ->orderByDesc('event_start')
+            ->get(['id', 'title', 'status', 'region_id']);
+
         return $this->inertia('Sahodaya/Users/Index', [
             'users'           => $users,
             'assignableRoles' => $this->roleOptions($roles),
@@ -77,10 +84,8 @@ class TenantUserController extends SahodayaAdminController
                 ->mapWithKeys(fn (string $role) => [
                     $role => TenantUserCatalog::defaultPermissionsForRole($role, 'sahodaya'),
                 ])->all(),
-            'festEvents'      => FestEvent::where('tenant_id', $this->sahodaya->id)
-                ->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing'])
-                ->orderByDesc('event_start')
-                ->get(['id', 'title', 'status', 'region_id']),
+            'festEvents'      => $festEvents,
+            'eventPhases'     => $this->eventPhaseOptions($festEvents),
             'mcqExams'        => McqExam::where('tenant_id', $this->sahodaya->id)
                 ->whereIn('status', ['draft', 'published', 'ongoing', 'completed'])
                 ->orderByDesc('scheduled_at')
@@ -123,6 +128,16 @@ class TenantUserController extends SahodayaAdminController
                 'nullable',
                 Rule::exists('regions', 'id')->where('tenant_id', $this->sahodaya->id),
             ],
+            'phase_admin_event_id'  => [
+                Rule::requiredIf(fn () => in_array('phase_admin', $request->input('roles', []), true)),
+                'nullable',
+                'exists:fest_events,id',
+            ],
+            'phase_admin_phase_id' => [
+                Rule::requiredIf(fn () => in_array('phase_admin', $request->input('roles', []), true)),
+                'nullable',
+                'exists:fest_event_phases,id',
+            ],
             'region_ids'   => 'array',
             'region_ids.*' => [Rule::exists('regions', 'id')->where('tenant_id', $this->sahodaya->id)],
         ]);
@@ -144,6 +159,7 @@ class TenantUserController extends SahodayaAdminController
         $this->syncEventStaffAssignment($user, $data);
         $this->syncEventAdminAssignment($user, $data);
         $this->syncRegionAdminAssignment($user, $data);
+        $this->syncPhaseAdminAssignment($user, $data);
         $this->syncExamStaffAssignment($user, $data);
         $this->syncMembershipRegionAssignment($user, $data, $request->user()?->id);
 
@@ -194,6 +210,20 @@ class TenantUserController extends SahodayaAdminController
                 'nullable',
                 Rule::exists('fest_event_staff', 'id')->where('user_id', $user->id)->where('duty', 'region_admin'),
             ],
+            'phase_admin_event_id'  => [
+                Rule::requiredIf(fn () => in_array('phase_admin', $request->input('roles', []), true)),
+                'nullable',
+                'exists:fest_events,id',
+            ],
+            'phase_admin_phase_id' => [
+                Rule::requiredIf(fn () => in_array('phase_admin', $request->input('roles', []), true)),
+                'nullable',
+                'exists:fest_event_phases,id',
+            ],
+            'phase_admin_assignment_id' => [
+                'nullable',
+                Rule::exists('fest_event_staff', 'id')->where('user_id', $user->id)->where('duty', 'phase_admin'),
+            ],
             'region_ids'   => 'array',
             'region_ids.*' => [Rule::exists('regions', 'id')->where('tenant_id', $this->sahodaya->id)],
         ]);
@@ -216,6 +246,7 @@ class TenantUserController extends SahodayaAdminController
         $this->syncEventStaffAssignment($updated, $data);
         $this->syncEventAdminAssignment($updated, $data);
         $this->syncRegionAdminAssignment($updated, $data);
+        $this->syncPhaseAdminAssignment($updated, $data);
         $this->syncExamStaffAssignment($updated, $data);
         $this->syncMembershipRegionAssignment($updated, $data, $request->user()?->id);
 
@@ -421,6 +452,49 @@ class TenantUserController extends SahodayaAdminController
         ]);
     }
 
+    /**
+     * Phase admins are locked to one event + one phase, across every region — mirrors
+     * syncRegionAdminAssignment() above, but writes source_phase_id instead of region_id
+     * (region_id stays null, matching FestEventStaffController's phase_admin handling —
+     * see app/Support/EventRegionAdminScope.php for how this pair is read at runtime).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function syncPhaseAdminAssignment(User $user, array $data): void
+    {
+        if (! in_array('phase_admin', $data['roles'] ?? [], true)) {
+            return;
+        }
+
+        $eventId = $data['phase_admin_event_id'] ?? null;
+        $phaseId = $data['phase_admin_phase_id'] ?? null;
+
+        if (! $eventId || ! $phaseId) {
+            return;
+        }
+
+        $assignmentId = $data['phase_admin_assignment_id'] ?? null;
+        $existing = $assignmentId
+            ? FestEventStaff::where('id', $assignmentId)
+                ->where('user_id', $user->id)
+                ->where('duty', 'phase_admin')
+                ->first()
+            : null;
+
+        if ($existing) {
+            $existing->update(['event_id' => $eventId, 'source_phase_id' => $phaseId, 'region_id' => null]);
+
+            return;
+        }
+
+        FestEventStaff::firstOrCreate([
+            'event_id'        => $eventId,
+            'user_id'         => $user->id,
+            'duty'            => 'phase_admin',
+            'source_phase_id' => $phaseId,
+        ]);
+    }
+
     /** @param  array<string, mixed>  $data */
     private function syncExamStaffAssignment(User $user, array $data): void
     {
@@ -467,6 +541,38 @@ class TenantUserController extends SahodayaAdminController
                 'assigned_by_user_id' => $assignedByUserId,
             ]);
         }
+    }
+
+    /**
+     * Phase options per event, for the Phase admin picker — only events using phased
+     * regional billing have phases at all. Keyed by event id so the frontend can filter
+     * the phase dropdown to whichever event the admin just picked.
+     *
+     * @param  \Illuminate\Support\Collection<int, FestEvent>  $festEvents
+     * @return array<int, list<array{id: int, name: string}>>
+     */
+    private function eventPhaseOptions($festEvents): array
+    {
+        $out = [];
+        foreach ($festEvents as $event) {
+            if (! $event->usesPhasedRegionalBilling()) {
+                continue;
+            }
+
+            $phases = $event->rootEvent()->phases()
+                ->where(fn ($q) => $q->where('is_regional', true)->orWhereNotNull('region_partition_group'))
+                ->orderBy('id')
+                ->get(['id', 'name'])
+                ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name])
+                ->values()
+                ->all();
+
+            if ($phases !== []) {
+                $out[$event->id] = $phases;
+            }
+        }
+
+        return $out;
     }
 
     /** @param  list<string>  $roles */

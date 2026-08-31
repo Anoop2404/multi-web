@@ -69,7 +69,7 @@
                             <div v-if="u.fest_assignments?.length" class="flex flex-wrap gap-1">
                                 <span v-for="a in u.fest_assignments" :key="`f${a.id}`"
                                       class="inline-flex items-center gap-1 rounded-full bg-violet-50 border border-violet-200 pl-2 pr-1 py-0.5 text-[10px] font-medium text-violet-700">
-                                    {{ a.event_title }} · {{ dutyLabel(a.duty) }}{{ a.region_name ? ` — ${a.region_name}` : '' }}
+                                    {{ a.event_title }} · {{ dutyLabel(a.duty) }}{{ a.region_name ? ` — ${a.region_name}` : '' }}{{ a.source_phase_name ? ` — ${a.source_phase_name}` : '' }}
                                     <button type="button" class="leading-none text-violet-400 hover:text-red-600" title="Remove this assignment" @click="removeFestAssignment(u, a)">✕</button>
                                 </span>
                             </div>
@@ -214,6 +214,23 @@
                         </FormField>
                     </div>
                 </div>
+                <div v-if="form.roles.includes('phase_admin')" class="card card--accent space-y-3">
+                    <p class="text-xs font-semibold text-violet-900">Phase admin — event &amp; phase</p>
+                    <p class="text-xs text-slate-500">Locked to this one event and this one phase, across every region — only events using phased regional billing have phases to pick from.</p>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <FormField label="Event" :error="form.errors.phase_admin_event_id" required>
+                            <template #default="{ id }">
+                                <SearchableSelect :id="id" v-model="form.phase_admin_event_id" :options="festEventOptions" all-option all-label="Select event" @change="onPhaseAdminEventChange(form)" />
+                            </template>
+                        </FormField>
+                        <FormField label="Phase" :error="form.errors.phase_admin_phase_id" required>
+                            <template #default="{ id }">
+                                <SearchableSelect :id="id" v-model="form.phase_admin_phase_id" :options="phaseOptionsFor(form.phase_admin_event_id)" all-option all-label="Select phase" />
+                            </template>
+                        </FormField>
+                    </div>
+                    <p v-if="form.phase_admin_event_id && !phaseOptionsFor(form.phase_admin_event_id).length" class="text-xs text-amber-600">This event doesn't use phased regional billing, so it has no phases to assign.</p>
+                </div>
                 <div v-if="hasPermissionRole(form.roles)" class="card card--muted space-y-2">
                     <p class="form-label mb-1">Access permissions</p>
                     <p class="text-xs text-slate-500 mb-2">Role defaults are applied automatically; adjust individual permissions below.</p>
@@ -331,6 +348,23 @@
                         </FormField>
                     </div>
                 </div>
+                <div v-if="editForm.roles.includes('phase_admin')" class="card card--accent space-y-3">
+                    <p class="text-xs font-semibold text-violet-900">Phase admin — event &amp; phase</p>
+                    <p class="text-xs text-slate-500">Locked to this one event and this one phase, across every region — only events using phased regional billing have phases to pick from.</p>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <FormField label="Event" :error="editForm.errors.phase_admin_event_id" required>
+                            <template #default="{ id }">
+                                <SearchableSelect :id="id" v-model="editForm.phase_admin_event_id" :options="festEventOptions" all-option all-label="Select event" @change="onPhaseAdminEventChange(editForm)" />
+                            </template>
+                        </FormField>
+                        <FormField label="Phase" :error="editForm.errors.phase_admin_phase_id" required>
+                            <template #default="{ id }">
+                                <SearchableSelect :id="id" v-model="editForm.phase_admin_phase_id" :options="phaseOptionsFor(editForm.phase_admin_event_id)" all-option all-label="Select phase" />
+                            </template>
+                        </FormField>
+                    </div>
+                    <p v-if="editForm.phase_admin_event_id && !phaseOptionsFor(editForm.phase_admin_event_id).length" class="text-xs text-amber-600">This event doesn't use phased regional billing, so it has no phases to assign.</p>
+                </div>
                 <div v-if="hasPermissionRole(editForm.roles)" class="card card--muted space-y-2">
                     <p class="form-label mb-1">Access permissions</p>
                     <p class="text-xs text-slate-500 mb-2">Role defaults are applied when roles change; adjust individual permissions below.</p>
@@ -378,6 +412,7 @@ const props = defineProps({
     permissionRoles: { type: Array, default: () => [] },
     roleDefaultPermissions: { type: Object, default: () => ({}) },
     festEvents: Array,
+    eventPhases: { type: Object, default: () => ({}) },
     mcqExams: Array,
     dutyOptions: Array,
     newCredentials: Object,
@@ -393,6 +428,7 @@ const form = useForm({
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
     region_admin_event_id: '', region_admin_region_id: '', region_admin_assignment_id: null,
+    phase_admin_event_id: '', phase_admin_phase_id: '', phase_admin_assignment_id: null,
     region_ids: [],
 });
 const editing = ref(null);
@@ -403,6 +439,7 @@ const editForm = useForm({
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
     region_admin_event_id: '', region_admin_region_id: '', region_admin_assignment_id: null,
+    phase_admin_event_id: '', phase_admin_phase_id: '', phase_admin_assignment_id: null,
     region_ids: [],
 });
 
@@ -474,6 +511,16 @@ function onRegionAdminEventChange(targetForm) {
     }
 }
 
+/** Phases belong to whichever event's own root is picked — only events using phased
+ * regional billing have any, so this returns empty for a plain event. */
+function phaseOptionsFor(eventId) {
+    return props.eventPhases[eventId] || [];
+}
+
+function onPhaseAdminEventChange(targetForm) {
+    targetForm.phase_admin_phase_id = '';
+}
+
 function mergedRoleDefaults(roles) {
     const out = new Set();
     for (const role of roles) {
@@ -540,6 +587,11 @@ function openEdit(user) {
     editForm.region_admin_region_id = regionAdminAssignment?.region_id ?? '';
     editForm.region_admin_assignment_id = regionAdminAssignment?.id ?? null;
 
+    const phaseAdminAssignment = (user.fest_assignments || []).find(a => a.duty === 'phase_admin');
+    editForm.phase_admin_event_id = phaseAdminAssignment?.event_id ?? '';
+    editForm.phase_admin_phase_id = phaseAdminAssignment?.source_phase_id ?? '';
+    editForm.phase_admin_assignment_id = phaseAdminAssignment?.id ?? null;
+
     const exam = user.exam_assignments?.[0];
     editForm.exam_staff_exam_id = exam?.exam_id ?? '';
     editForm.exam_staff_role = exam?.role ?? 'staff';
@@ -560,7 +612,7 @@ async function remove(user) {
 }
 
 async function removeFestAssignment(user, assignment) {
-    const label = `${assignment.event_title} · ${dutyLabel(assignment.duty)}${assignment.region_name ? ` — ${assignment.region_name}` : ''}`;
+    const label = `${assignment.event_title} · ${dutyLabel(assignment.duty)}${assignment.region_name ? ` — ${assignment.region_name}` : ''}${assignment.source_phase_name ? ` — ${assignment.source_phase_name}` : ''}`;
     if (!(await confirm({ message: `Remove this assignment from ${user.name}?\n\n${label}` }))) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/users/${user.id}/fest-assignments/${assignment.id}`, { preserveScroll: true });
 }
