@@ -1344,7 +1344,10 @@ class FestSchoolEventFeeService
             $classGroupByItemId = $lineItemIds->isNotEmpty()
                 ? \App\Models\FestEventItem::whereIn('id', $lineItemIds)->pluck('class_group', 'id')
                 : collect();
-            $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+            // Resolve from the ROOT event, same as FestEventReportAnalyticsService::
+            // itemWiseReportRows() — class_group_scheme lives on the root's fee_settings
+            // and FestClassGroupScheme::resolve() doesn't walk up from a phase-leaf $event.
+            $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
 
             foreach ($fee->lines as $line) {
                 $itemId = $line->meta['item_id'] ?? null;
@@ -1357,7 +1360,8 @@ class FestSchoolEventFeeService
                     'quantity' => $line->quantity ?? 1,
                     'meta' => $line->meta,
                     'category' => ($classGroupKey && $classGroupKey !== 'open')
-                        ? ($classGroupLabels[$classGroupKey] ?? $classGroupKey) : null,
+                        ? \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $classGroupKey)
+                        : null,
                 ];
             }
 

@@ -7,7 +7,7 @@
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
-                <ReportDownloadButtons :csv-url="csvUrl" />
+                <ReportDownloadButtons :pdf-url="pdfUrl" :csv-url="csvUrl" />
             </template>
         </PageHeader>
 
@@ -53,7 +53,7 @@
                     <input type="checkbox" v-model="onlyExceeding" class="rounded border-slate-300" />
                     Only show students exceeding a limit
                 </label>
-                <ReportDownloadButtons :csv-url="csvUrl" />
+                <ReportDownloadButtons :pdf-url="pdfUrl" :csv-url="csvUrl" />
             </div>
         </div>
 
@@ -93,6 +93,7 @@
                             <tr>
                                 <th class="w-10 text-center">#</th>
                                 <th>Item Title</th>
+                                <th>Category</th>
                                 <th class="text-center">Type</th>
                                 <th class="text-center">Status</th>
                             </tr>
@@ -101,6 +102,7 @@
                             <tr v-for="(item, idx) in st.items" :key="item.item_id || idx" class="hover:bg-slate-50/50">
                                 <td class="text-center text-slate-400 font-mono">{{ idx + 1 }}</td>
                                 <td class="font-semibold text-slate-900">{{ item.item_title }}</td>
+                                <td class="text-slate-500">{{ item.category_label || '—' }}</td>
                                 <td class="text-center">
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block bg-slate-100 text-slate-600 border border-slate-200">
                                         {{ dimensionLabel(item.dimension) }}
@@ -141,6 +143,7 @@ const props = defineProps({
     rows: { type: Array, default: () => [] },
     summary: { type: Object, default: () => ({}) },
     csvUrl: String,
+    pdfUrl: String,
 });
 
 const { programLabel, programBase } = useSchoolProgramContext(props);

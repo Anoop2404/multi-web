@@ -68,6 +68,11 @@ class FestParticipationLimitService
      */
     public function studentLimitReportRows(string $schoolId, ?string $search = null): array
     {
+        // $this->event is already the root event (the controller constructs this service
+        // with $event->rootEvent()) — the scheme itself is configured on the root's
+        // fee_settings, so this is safe to resolve once here rather than per item.
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event);
+
         $registrations = FestRegistration::whereIn('event_id', $this->scopeEventIds())
             ->where('school_id', $schoolId)
             ->active()
@@ -131,6 +136,7 @@ class FestParticipationLimitService
                 $items[] = [
                     'item_id'    => $reg->item_id,
                     'item_title' => $reg->item?->title,
+                    'category_label' => \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $reg->item?->class_group),
                     'dimension'  => $dims['group'] ? 'group' : ($dims['on_stage'] ? 'on_stage' : ($dims['off_stage'] ? 'off_stage' : null)),
                     'status'     => $reg->status,
                     'countable'  => $isCountable,

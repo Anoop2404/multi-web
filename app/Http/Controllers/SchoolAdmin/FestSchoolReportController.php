@@ -216,7 +216,29 @@ class FestSchoolReportController extends SchoolAdminController
             'rows'    => $rows,
             'summary' => $summary,
             'csvUrl'  => "{$base}/student-limits/export",
+            'pdfUrl'  => "{$base}/student-limits/pdf",
         ]);
+    }
+
+    /** Same whole-fest scoping as studentLimits() above — see its docblock. */
+    public function exportStudentLimitsPdf(Request $request, string $tenantId, FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $service = new FestParticipationLimitService($event->rootEvent());
+        $rows = $service->studentLimitReportRows($this->school->id, $request->input('search'));
+        $summary = $service->summarizeStudentLimitRows($rows);
+
+        $reportService = app(FestReportService::class, ['event' => $event]);
+        $reportService->preview = $request->boolean('inline') || $request->boolean('preview')
+            || (! $request->boolean('download') && ! $request->has('download'));
+
+        return $reportService->renderPdf('fest.reports.student-limits', [
+            'event'   => $event,
+            'rows'    => $rows,
+            'summary' => $summary,
+            ...$reportService->brandingData(),
+        ], \Illuminate\Support\Str::slug($event->title).'-student-limits-report.pdf');
     }
 
     /** Same whole-fest scoping as studentLimits() above — see its docblock. */

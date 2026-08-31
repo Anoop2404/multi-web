@@ -28,7 +28,12 @@ use App\Services\Events\Reports\FestReportScope;
 
 class FestReportService
 {
-    private bool $preview = false;
+    // Public (was private) so a controller calling renderPdf() directly — bypassing the
+    // generic export() dispatcher, which is the only place that used to set this from the
+    // request — can still honor ?inline=1/?preview=1 vs ?download=1. See
+    // FestSchoolReportController::exportStudentLimitsPdf() for the resolution logic to
+    // mirror (export()'s own, line ~413).
+    public bool $preview = false;
 
     /**
      * Chest numbers are Sahodaya-admin-only information — schools don't see them until

@@ -138,6 +138,37 @@ class FestClassGroupScheme
     }
 
     /**
+     * Resolve one item's class_group to this (root) event's real configured display label
+     * — the shared lookup behind every "which class category is this item in" display
+     * (Item-wise report, Student item limits, ...). A named/numeric scheme (e.g. "State
+     * Kalotsav") keys its own groups by whatever raw string it was configured with — often
+     * literally "category_1" — so that raw value is tried FIRST; canonicalKey() (mapping to
+     * the fixed lp/up/hs/hss/open keyset) is only a fallback for the small default scheme
+     * or genuinely malformed/legacy class_group values. $labels must already be resolved
+     * from the ROOT event (self::labels(null, $event->rootEvent())) — this method doesn't
+     * walk to root itself, since callers typically resolve $labels once per report, not
+     * once per item.
+     *
+     * @param  array<string, string>  $labels
+     */
+    public static function resolveItemLabel(array $labels, ?string $rawClassGroup): string
+    {
+        $key = self::resolveItemKey($labels, $rawClassGroup);
+
+        return $labels[$key] ?? ucfirst($key);
+    }
+
+    /** The matched key (raw value as-is, or its canonicalized form) — use this as the filter/group-by value so the same conceptual category never splits into separate entries just because two items spelled its class_group differently. */
+    public static function resolveItemKey(array $labels, ?string $rawClassGroup): string
+    {
+        $rawClassGroup = $rawClassGroup ?: 'open';
+
+        return array_key_exists($rawClassGroup, $labels)
+            ? $rawClassGroup
+            : (self::canonicalKey($rawClassGroup) ?: 'open');
+    }
+
+    /**
      * Labels for a named FestClassCategoryScheme, keyed the same way as every other
      * scheme (machine key => display label), always including the universal 'open'
      * catch-all. A deleted/missing scheme id resolves to just the 'open' bucket rather

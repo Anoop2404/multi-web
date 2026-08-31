@@ -1908,25 +1908,14 @@ class FestEventReportAnalyticsService
                 $registration = $p->registration;
                 $item = $registration->item;
                 $event = $registration->event;
-                // A named/numeric scheme (e.g. "State Kalotsav") is keyed by whatever raw
-                // strings its own groups were configured with — often literally
-                // "category_1" — so that must be tried as-is FIRST. canonicalKey() (which
-                // maps to the fixed lp/up/hs/hss/open keyset) is only a fallback for the
-                // small default scheme or genuinely malformed/legacy class_group values,
-                // not the primary lookup — using it first would break a named scheme's own
-                // "category_1"-style keys by mistranslating them to the wrong keyset.
-                $rawClassGroup = $item->class_group ?: 'open';
-                $classGroup = array_key_exists($rawClassGroup, $classGroupLabels)
-                    ? $rawClassGroup
-                    : (\App\Support\FestClassGroupScheme::canonicalKey($item->class_group) ?: 'open');
 
                 return [
                     'id'              => $p->id,
                     'item_id'         => $item->id,
                     'item_title'      => $item->title,
                     'item_code'       => $item->item_code,
-                    'category'        => $classGroup,
-                    'category_label'  => $classGroupLabels[$classGroup] ?? ucfirst($classGroup),
+                    'category'        => \App\Support\FestClassGroupScheme::resolveItemKey($classGroupLabels, $item->class_group),
+                    'category_label'  => \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group),
                     'stage_type'      => $item->stage_type,
                     'participant_type' => $item->participant_type,
                     'phase_name'      => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,
