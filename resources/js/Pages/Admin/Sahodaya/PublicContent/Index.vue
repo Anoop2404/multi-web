@@ -23,8 +23,8 @@
                 </label>
             </div>
 
-            <!-- Website Version Experience Selector -->
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+            <!-- Website Version Experience Selector — platform-assigned, superadmin only -->
+            <div v-if="isSuperAdmin" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <h2 class="font-bold text-gray-900 flex items-center gap-2">
@@ -295,6 +295,7 @@ const props = defineProps({
     content:                 Object,
     publicWebsiteEnabled:    { type: Boolean, default: true },
     experienceVersion:       { type: String, default: 'v1' },
+    isSuperAdmin:            { type: Boolean, default: false },
 });
 
 const publicSiteEnabled = ref(props.publicWebsiteEnabled ?? true);

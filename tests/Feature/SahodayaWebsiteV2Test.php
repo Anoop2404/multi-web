@@ -21,6 +21,7 @@ class SahodayaWebsiteV2Test extends TestCase
 
     private Tenant $sahodaya;
     private User $admin;
+    private User $superadmin;
     private WebsiteSite $site;
 
     protected function setUp(): void
@@ -36,6 +37,10 @@ class SahodayaWebsiteV2Test extends TestCase
         $this->sahodaya->setSetting('footer_config', ['email' => 'office@example.test']);
         $this->admin = User::factory()->create(['tenant_id' => $this->sahodaya->id]);
         $this->admin->assignRole('sahodaya_admin');
+        // Applying/publishing/restoring a template is platform-assigned (superadmin
+        // only) — see SiteBuilderApiController::assertSuperAdmin().
+        $this->superadmin = User::factory()->create(['tenant_id' => null, 'email_verified_at' => now()]);
+        $this->superadmin->assignRole('superadmin');
         $this->site = WebsiteSite::ensurePrimary($this->sahodaya->id);
 
         SiteSection::create([
@@ -69,7 +74,7 @@ class SahodayaWebsiteV2Test extends TestCase
 
     public function test_experience_is_previewable_as_a_draft_without_changing_live_content(): void
     {
-        $this->actingAs($this->admin)->postJson($this->api('/experience/draft'), [
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/draft'), [
             'site_id' => $this->site->id,
             'template_key' => 'events-results-live',
             'mode' => 'full',
@@ -83,11 +88,11 @@ class SahodayaWebsiteV2Test extends TestCase
 
     public function test_draft_can_be_cancelled_without_touching_live_site(): void
     {
-        $this->actingAs($this->admin)->postJson($this->api('/experience/draft'), [
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/draft'), [
             'site_id' => $this->site->id, 'template_key' => 'network-directory',
         ])->assertOk();
 
-        $this->actingAs($this->admin)->postJson($this->api('/experience/cancel'), ['site_id' => $this->site->id])->assertOk();
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/cancel'), ['site_id' => $this->site->id])->assertOk();
 
         $this->assertNull($this->site->fresh()->draft_template_json);
         $this->get('http://v2-site.sahodaya.test/')->assertSee('ORIGINAL LIVE WEBSITE');
@@ -98,10 +103,10 @@ class SahodayaWebsiteV2Test extends TestCase
         $section = $this->site->sectionQuery()->firstOrFail();
         $section->update(['config' => ['heading' => 'UNPUBLISHED EDIT'], 'status' => SiteSection::STATUS_DRAFT]);
 
-        $this->actingAs($this->admin)->postJson($this->api('/experience/draft'), [
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/draft'), [
             'site_id' => $this->site->id, 'template_key' => 'academic-resources', 'mode' => 'style',
         ])->assertOk();
-        $this->actingAs($this->admin)->postJson($this->api('/experience/publish'), ['site_id' => $this->site->id])->assertOk();
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/publish'), ['site_id' => $this->site->id])->assertOk();
 
         $sameSection = SiteSection::findOrFail($section->id);
         $this->assertSame('UNPUBLISHED EDIT', $sameSection->config['heading']);
@@ -111,11 +116,11 @@ class SahodayaWebsiteV2Test extends TestCase
 
     public function test_publishing_a_ready_draft_is_atomic_and_creates_a_restore_point(): void
     {
-        $this->actingAs($this->admin)->postJson($this->api('/experience/draft'), [
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/draft'), [
             'site_id' => $this->site->id, 'template_key' => 'events-results-live',
         ])->assertOk();
 
-        $this->actingAs($this->admin)->postJson($this->api('/experience/publish'), ['site_id' => $this->site->id])
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/publish'), ['site_id' => $this->site->id])
             ->assertOk()->assertJsonPath('site.experience_version', 'v2');
 
         $site = $this->site->fresh();
@@ -128,13 +133,13 @@ class SahodayaWebsiteV2Test extends TestCase
 
     public function test_restore_point_recovers_content_and_layout_together(): void
     {
-        $this->actingAs($this->admin)->postJson($this->api('/experience/draft'), [
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/draft'), [
             'site_id' => $this->site->id, 'template_key' => 'network-directory',
         ])->assertOk();
-        $this->actingAs($this->admin)->postJson($this->api('/experience/publish'), ['site_id' => $this->site->id])->assertOk();
+        $this->actingAs($this->superadmin)->postJson($this->api('/experience/publish'), ['site_id' => $this->site->id])->assertOk();
 
         $versionId = $this->site->versions()->firstOrFail()->id;
-        $this->actingAs($this->admin)->postJson($this->api("/experience/versions/{$versionId}/restore"), ['site_id' => $this->site->id])
+        $this->actingAs($this->superadmin)->postJson($this->api("/experience/versions/{$versionId}/restore"), ['site_id' => $this->site->id])
             ->assertOk()->assertJsonPath('site.experience_version', 'v1');
 
         $restored = $this->site->fresh()->sectionQuery()->firstOrFail();

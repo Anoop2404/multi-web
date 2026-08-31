@@ -19,6 +19,8 @@ class SahodayaWebsiteSiteScopeTest extends TestCase
 
     private User $admin;
 
+    private User $superadmin;
+
     private WebsiteSite $primary;
 
     private WebsiteSite $microsite;
@@ -39,6 +41,10 @@ class SahodayaWebsiteSiteScopeTest extends TestCase
 
         $this->admin = User::factory()->create(['tenant_id' => $this->sahodaya->id]);
         $this->admin->assignRole('sahodaya_admin');
+        // Applying the legacy template is platform-assigned (superadmin only) — see
+        // SiteBuilderApiController::assertSuperAdmin().
+        $this->superadmin = User::factory()->create(['tenant_id' => null, 'email_verified_at' => now()]);
+        $this->superadmin->assignRole('superadmin');
 
         $this->primary = WebsiteSite::ensurePrimary($this->sahodaya->id);
         $this->microsite = WebsiteSite::create([
@@ -143,7 +149,7 @@ class SahodayaWebsiteSiteScopeTest extends TestCase
         $oldPrimarySection = $this->createPublishedSection($this->primary, 'OLD PRIMARY WEBSITE MARKER');
         $micrositeSection = $this->createPublishedSection($this->microsite, 'MICROSITE MARKER');
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->superadmin)
             ->postJson(
                 "/sahodaya-admin/{$this->sahodaya->id}/site-builder/api/apply-cksc-template",
                 ['site_id' => $this->primary->id, 'replace_sections' => true],
@@ -162,7 +168,7 @@ class SahodayaWebsiteSiteScopeTest extends TestCase
     {
         $micrositeSection = $this->createPublishedSection($this->microsite, 'MICROSITE MARKER');
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->superadmin)
             ->postJson(
                 "/sahodaya-admin/{$this->sahodaya->id}/site-builder/api/apply-cksc-template",
                 ['site_id' => $this->microsite->id, 'replace_sections' => true],

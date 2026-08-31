@@ -22,6 +22,8 @@ class SiteBuilderPremiumGatingTest extends TestCase
 
     private User $admin;
 
+    private User $superadmin;
+
     private WebsiteSite $site;
 
     protected function setUp(): void
@@ -40,6 +42,11 @@ class SiteBuilderPremiumGatingTest extends TestCase
 
         $this->admin = User::factory()->create(['tenant_id' => $this->sahodaya->id]);
         $this->admin->assignRole('sahodaya_admin');
+
+        // Applying/publishing a template is platform-assigned (superadmin only) —
+        // see SiteBuilderApiController::assertSuperAdmin().
+        $this->superadmin = User::factory()->create(['tenant_id' => null, 'email_verified_at' => now()]);
+        $this->superadmin->assignRole('superadmin');
 
         $this->site = WebsiteSite::ensurePrimary($this->sahodaya->id);
     }
@@ -70,13 +77,27 @@ class SiteBuilderPremiumGatingTest extends TestCase
         $this->assertFalse($experiences->firstWhere('key', 'network-directory')['locked']);
     }
 
+    public function test_sahodaya_admin_cannot_apply_any_experience_at_all(): void
+    {
+        // Applying a template is platform-assigned now — a regular Sahodaya admin is
+        // blocked regardless of plan, even for a template that isn't premium-gated.
+        $this->actingAs($this->admin)
+            ->postJson("/sahodaya-admin/{$this->sahodaya->id}/site-builder/api/experience/draft", [
+                'site_id' => $this->site->id,
+                'template_key' => 'network-directory',
+            ])
+            ->assertStatus(403);
+
+        $this->assertNull($this->site->fresh()->draft_template_json);
+    }
+
     public function test_free_tenant_cannot_apply_the_premium_experience(): void
     {
         $free = SubscriptionPlan::create(['name' => 'Free', 'slug' => 'free-'.Str::random(6), 'price_inr' => 0, 'billing_period' => 'annual']);
         PlanFeature::create(['plan_id' => $free->id, 'feature_key' => 'module.website_premium', 'enabled' => false]);
         $this->subscribeTo($free);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->superadmin)
             ->postJson("/sahodaya-admin/{$this->sahodaya->id}/site-builder/api/experience/draft", [
                 'site_id' => $this->site->id,
                 'template_key' => 'sahodaya-premium',
@@ -93,7 +114,7 @@ class SiteBuilderPremiumGatingTest extends TestCase
         PlanFeature::create(['plan_id' => $free->id, 'feature_key' => 'module.website_premium', 'enabled' => false]);
         $this->subscribeTo($free);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->superadmin)
             ->postJson("/sahodaya-admin/{$this->sahodaya->id}/site-builder/api/experience/draft", [
                 'site_id' => $this->site->id,
                 'template_key' => 'network-directory',
@@ -113,7 +134,7 @@ class SiteBuilderPremiumGatingTest extends TestCase
             ->assertOk();
         $this->assertFalse(collect($response->json('experiences'))->firstWhere('key', 'sahodaya-premium')['locked']);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->superadmin)
             ->postJson("/sahodaya-admin/{$this->sahodaya->id}/site-builder/api/experience/draft", [
                 'site_id' => $this->site->id,
                 'template_key' => 'sahodaya-premium',
@@ -129,7 +150,7 @@ class SiteBuilderPremiumGatingTest extends TestCase
         $this->subscribeTo($free);
         TenantFeatureOverride::create(['tenant_id' => $this->sahodaya->id, 'feature_key' => 'module.website_premium', 'enabled' => true]);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->superadmin)
             ->postJson("/sahodaya-admin/{$this->sahodaya->id}/site-builder/api/experience/draft", [
                 'site_id' => $this->site->id,
                 'template_key' => 'sahodaya-premium',

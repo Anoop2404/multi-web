@@ -95,6 +95,7 @@ class SiteBuilderController extends SahodayaAdminController
                     ->all();
             })(),
             'readiness'              => app(SahodayaContentReadiness::class)->inspect($this->sahodaya, $site),
+            'isSuperAdmin'           => (bool) $request->user()?->isSuperAdmin(),
         ]);
     }
 }

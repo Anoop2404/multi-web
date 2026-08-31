@@ -59,7 +59,7 @@
                 </label>
             </div>
 
-            <div v-if="experienceDraft" class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white bg-gradient-to-r from-indigo-950 to-purple-800">
+            <div v-if="isSuperAdmin && experienceDraft" class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white bg-gradient-to-r from-indigo-950 to-purple-800">
                 <div><p class="text-xs font-bold uppercase tracking-wider text-purple-200">Unpublished experience draft</p><h2 class="font-bold mt-1">{{ experienceName(experienceDraft.template_key) }}</h2><p class="text-sm text-white/75 mt-1">The live website is unchanged until you publish this draft.</p></div>
                 <div class="flex flex-wrap gap-2"><a :href="selectedPreviewUrl" target="_blank" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Preview draft ↗</a><button @click="cancelExperienceDraft" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Cancel draft</button><button @click="publishExperienceDraft" :disabled="experienceSaving || !readinessReport.ready" class="px-4 py-2 text-sm font-bold rounded-xl bg-amber-400 text-indigo-950 disabled:opacity-50">Publish experience</button></div>
             </div>
@@ -635,19 +635,34 @@ const props = defineProps({
     currentSite:             { type: Object, default: null },
     experiences:             { type: Array, default: () => [] },
     readiness:               { type: Object, default: () => ({ ready: false, errors: [], warnings: [], score: 0 }) },
+    isSuperAdmin:            { type: Boolean, default: false },
 });
 
 const { confirm } = useConfirm();
 
-const tabs = [
-    { id: 'experience', label: 'Experience' },
-    { id: 'sections', label: 'Sections' },
-    { id: 'navigation', label: 'Navigation & Login' },
-    { id: 'theme', label: 'Design' },
-    { id: 'footer', label: 'Footer Links' },
-    { id: 'readiness', label: 'Readiness & Publish' },
-];
-const activeTab = ref(props.navNeedsSetup ? 'navigation' : (props.currentSite?.experience_version === 'v2' ? 'sections' : 'experience'));
+// Choosing/publishing/rolling back a template or design version is platform-assigned,
+// not self-service — a Sahodaya admin only manages section content. Superadmin still
+// reaches these same tabs by browsing into this Sahodaya's own admin panel.
+const tabs = props.isSuperAdmin
+    ? [
+        { id: 'experience', label: 'Experience' },
+        { id: 'sections', label: 'Sections' },
+        { id: 'navigation', label: 'Navigation & Login' },
+        { id: 'theme', label: 'Design' },
+        { id: 'footer', label: 'Footer Links' },
+        { id: 'readiness', label: 'Readiness & Publish' },
+    ]
+    : [
+        { id: 'sections', label: 'Sections' },
+        { id: 'navigation', label: 'Navigation & Login' },
+        { id: 'theme', label: 'Design' },
+        { id: 'footer', label: 'Footer Links' },
+    ];
+const activeTab = ref(
+    props.navNeedsSetup ? 'navigation'
+        : (props.isSuperAdmin && props.currentSite?.experience_version !== 'v2') ? 'experience'
+        : 'sections'
+);
 
 const sections    = ref([...(props.sections ?? [])]);
 const expandedId  = ref(null);
@@ -1180,7 +1195,9 @@ async function createSection() {
     }
 }
 
-onMounted(loadVersions);
+if (props.isSuperAdmin) {
+    onMounted(loadVersions);
+}
 
 // ── Inline field editor component ─────────────────────────────────────────────
 

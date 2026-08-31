@@ -39,6 +39,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function applyExperienceDraft(Request $request, SahodayaTemplateApplier $applier): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $data = $request->validate([
             'site_id' => 'required|integer',
             'template_key' => 'required|string|max:80',
@@ -61,6 +63,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function cancelExperienceDraft(Request $request, SahodayaTemplateApplier $applier): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $site = $this->requestSite($request);
         $applier->cancelDraft($site);
         $this->sahodaya->invalidateCache();
@@ -70,6 +74,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function publishExperienceDraft(Request $request, SahodayaTemplateApplier $applier, SahodayaContentReadiness $readiness): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $site = $this->requestSite($request);
         $report = $readiness->inspect($this->sahodaya, $site);
         if (! $report['ready']) {
@@ -97,6 +103,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function restoreExperienceVersion(Request $request, string $tenantId, int $versionId): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $site = $this->requestSite($request);
         $version = WebsiteSiteVersion::where('website_site_id', $site->id)->findOrFail($versionId);
         $site = app(SahodayaTemplateApplier::class)->restore($site, $version);
@@ -321,6 +329,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function applyCkscTemplate(Request $request): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $site = \App\Models\WebsiteSite::resolveForTenant(
             $this->sahodaya->id,
             $request->filled('site_id') ? $request->integer('site_id') : null,
@@ -369,6 +379,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function setExperienceVersion(Request $request, SahodayaTemplateApplier $applier, SahodayaContentReadiness $readiness): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $data = $request->validate([
             'site_id'            => 'required|integer',
             'experience_version' => 'required|in:v1,v2',
@@ -461,6 +473,17 @@ class SiteBuilderApiController extends SahodayaAdminController
                 'template_key' => 'Upgrade to the Premium plan to apply this website design.',
             ]);
         }
+    }
+
+    /**
+     * Choosing/publishing/rolling back which template or design version a Sahodaya's
+     * site runs is a platform-assigned decision, not self-service — Sahodaya admins
+     * manage section content only. Superadmin still reaches these same endpoints
+     * (impersonating or navigating directly into this Sahodaya's own admin panel).
+     */
+    private function assertSuperAdmin(): void
+    {
+        abort_unless(request()->user()?->isSuperAdmin(), 403, 'Only a platform administrator can assign the website template or version.');
     }
 
     private function requestSite(Request $request): WebsiteSite

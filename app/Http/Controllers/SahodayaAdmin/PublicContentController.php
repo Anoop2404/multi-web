@@ -21,6 +21,7 @@ class PublicContentController extends SahodayaAdminController
             'content'              => SahodayaHomepageContent::get($this->sahodaya),
             'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->sahodaya),
             'experienceVersion'    => $site->experience_version,
+            'isSuperAdmin'         => (bool) request()->user()?->isSuperAdmin(),
         ]);
     }
 
@@ -74,7 +75,10 @@ class PublicContentController extends SahodayaAdminController
         // contact details entered in the same submit must already be persisted when that check runs.
         SahodayaHomepageContent::update($this->sahodaya, $data);
 
-        if ($request->filled('experience_version')) {
+        // Which template/design version a Sahodaya runs is platform-assigned, not
+        // self-service — only a superadmin (browsing this same Sahodaya's admin panel)
+        // may change it; a regular Sahodaya admin's submission of this field is ignored.
+        if ($request->filled('experience_version') && $request->user()?->isSuperAdmin()) {
             $site = WebsiteSite::ensurePrimary($this->sahodaya->id);
             $newVer = $request->input('experience_version');
 
