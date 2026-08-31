@@ -1904,7 +1904,12 @@ class FestEventReportAnalyticsService
                 $registration = $p->registration;
                 $item = $registration->item;
                 $event = $registration->event;
-                $classGroup = $item->class_group ?: 'open';
+                // Raw class_group values aren't always the canonical lp/up/hs/hss/open keys
+                // the scheme's own label map is keyed by — older/imported data can carry
+                // free-form strings like "category_1" instead. Canonicalize first so those
+                // still resolve to the scheme's real "Category 1 — Classes ..." label
+                // instead of falling through to a bare capitalized raw key.
+                $classGroup = \App\Support\FestClassGroupScheme::canonicalKey($item->class_group) ?: 'open';
 
                 return [
                     'id'              => $p->id,

@@ -214,4 +214,65 @@ class FestItemWiseReportTest extends TestCase
         $pdfResponse->assertOk();
         $this->assertSame('application/pdf', $pdfResponse->headers->get('content-type'));
     }
+
+    /**
+     * Older/imported items can carry a free-form class_group string (e.g. "category_1")
+     * instead of the canonical lp/up/hs/hss/open keys the scheme's own label map is keyed
+     * by — without canonicalizing first, the report fell through to a bare capitalized raw
+     * key ("Category_1") instead of the scheme's real "Category 1 — Classes ..." label.
+     */
+    public function test_item_wise_report_canonicalizes_a_raw_class_group_value_to_the_real_scheme_label(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Raw Class Group Sahodaya',
+            'domain' => Str::uuid().'.test',
+            'is_active' => true,
+        ]);
+        SahodayaProfile::create([
+            'tenant_id' => $sahodaya->id,
+            'prefix' => 'RC',
+            'student_data_mode' => 'counts_only',
+        ]);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Raw Class Group School',
+            'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true,
+        ]);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Raw Class Group Kalotsav', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'registration_open',
+        ]);
+
+        $item = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Anchoring', 'item_code' => '429',
+            'stage_type' => 'on_stage', 'participant_type' => 'individual',
+            'class_group' => 'category_1', 'is_enabled' => true,
+        ]);
+
+        $class = SchoolClass::create(['tenant_id' => $school->id, 'name' => '10']);
+        $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Test Student', 'reg_no' => 'STU/1']);
+
+        $reg = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $student->id, 'participant_type' => 'student', 'event_id' => $event->id]);
+
+        $schoolAdmin = User::factory()->create(['tenant_id' => $school->id, 'email_verified_at' => now()]);
+        $schoolAdmin->assignRole('school_admin');
+
+        $response = $this->actingAs($schoolAdmin)->get(route('school.kalotsav.reports.item-wise', [
+            'tenantId' => $school->id,
+            'event' => $event->id,
+        ]));
+        $response->assertOk();
+
+        $row = collect($response->viewData('page')['props']['rows'])->first();
+        $expectedLabel = \App\Support\FestClassGroupScheme::labels(null, $event)['lp'];
+
+        $this->assertSame($expectedLabel, $row['category_label']);
+        $this->assertNotSame('Category_1', $row['category_label'], 'must resolve the real scheme label, not a bare capitalized raw key');
+    }
 }
