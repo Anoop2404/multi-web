@@ -4,9 +4,23 @@
         <PageHeader :title="`${event.title} — School participation counts`" eyebrow="Reports"
                     :description="usesPhases
                         ? 'Schools with an active registration in this event, broken down by phase, with unique student counts.'
-                        : 'Schools with an active registration in this event, and how many items/students they\'ve entered.'" />
+                        : 'Schools with an active registration in this event, and how many items/students they\'ve entered.'">
+            <template #actions>
+                <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
+            </template>
+        </PageHeader>
 
-        <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="school-participation" />
+        <div v-if="competitionPhases.length" class="card mb-4 !py-4">
+            <div class="grid gap-3 md:grid-cols-3 items-end">
+                <label class="text-xs font-semibold text-slate-600">Competition phase
+                    <SearchableSelect v-model="scopePhaseId" :options="competitionPhases" :all-option="true" all-label="All published phases" class="mt-1 w-full" />
+                </label>
+                <label class="text-xs font-semibold text-slate-600">Region
+                    <SearchableSelect v-model="scopeRegionId" :options="regions" :all-option="true" all-label="Combined" class="mt-1 w-full" />
+                </label>
+                <button type="button" class="btn-primary text-sm" @click="applyReportScope">Apply</button>
+            </div>
+        </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
@@ -56,11 +70,14 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
-import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
-defineProps({
+const props = defineProps({
     sahodaya: Object,
     publicUrl: String,
     pendingPaymentsCount: Number,
@@ -68,6 +85,24 @@ defineProps({
     rows: Array,
     totals: Object,
     usesPhases: { type: Boolean, default: false },
+    pdfUrl: String,
+    xlsUrl: String,
+    regions: { type: Array, default: () => [] },
+    competitionPhases: { type: Array, default: () => [] },
+    reportScopeSelection: { type: Object, default: () => ({}) },
     activityLogs: { type: Array, default: () => [] },
 });
+
+const reportsBase = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports`;
+
+const scopePhaseId = ref(props.reportScopeSelection.competition_phase_id || '');
+const scopeRegionId = ref(props.reportScopeSelection.region_id || '');
+
+function applyReportScope() {
+    router.get(`${reportsBase}/school-participation`, {
+        scope_mode: scopeRegionId.value ? 'region' : 'combined',
+        competition_phase_id: scopePhaseId.value || undefined,
+        region_id: scopeRegionId.value || undefined,
+    }, { preserveState: false });
+}
 </script>

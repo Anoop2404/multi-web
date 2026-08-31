@@ -96,6 +96,84 @@ class FestReportService
         ];
     }
 
+    /**
+     * Schools with an active registration in this event, grouped by phase for
+     * phased_regional_billing roots. A registration's phase is resolved from
+     * registration.event.source_phase_id (the leaf FestEvent it was made against) — never
+     * from FestEventItem.phase_id, which has been mistagged in production before (see
+     * FestEventReportAnalyticsService::itemWiseReportRows() docblock).
+     *
+     * @return array{rows: list<array<string, mixed>>, usesPhases: bool, totals: array<string, int>}
+     */
+    public function schoolParticipationReport(): array
+    {
+        $regs = $this->activeRegistrations();
+        $usesPhases = $this->event->rootEvent()->usesPhasedRegionalBilling();
+
+        $rows = $regs
+            ->groupBy(fn ($r) => $r->school_id.'|'.($usesPhases ? ($r->event->source_phase_id ?? 0) : 0))
+            ->map(function ($group) use ($usesPhases) {
+                $first = $group->first();
+                $enabled = $group->filter(fn ($r) => $r->item?->is_enabled ?? true);
+
+                return [
+                    'school_id'            => $first->school_id,
+                    'school_name'          => $first->school?->name ?? $first->school_id,
+                    'phase_id'             => $usesPhases ? $first->event->source_phase_id : null,
+                    'phase_name'           => $usesPhases ? ($first->event->sourcePhase?->name ?? 'Unassigned') : null,
+                    'active_count'         => $group->count(),
+                    'item_count'           => $enabled->pluck('item_id')->unique()->count(),
+                    'unique_student_count' => $enabled->flatMap(fn ($r) => $r->participants)->pluck('student_id')->filter()->unique()->count(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        usort($rows, function ($a, $b) {
+            $phaseCmp = strcmp($a['phase_name'] ?? '', $b['phase_name'] ?? '');
+
+            return $phaseCmp !== 0 ? $phaseCmp : $b['active_count'] <=> $a['active_count'];
+        });
+
+        return [
+            'rows'       => $rows,
+            'usesPhases' => $usesPhases,
+            'totals'     => [
+                'schools'              => $regs->pluck('school_id')->unique()->count(),
+                'active_registrations' => $regs->count(),
+                'unique_students'      => $regs->flatMap(fn ($r) => $r->participants)->pluck('student_id')->filter()->unique()->count(),
+            ],
+        ];
+    }
+
+    private function schoolParticipationPdf(): \Symfony\Component\HttpFoundation\Response
+    {
+        $report = $this->schoolParticipationReport();
+
+        return $this->renderPdf('fest.reports.school-participation', [
+            'event'      => $this->event,
+            'rows'       => $report['rows'],
+            'usesPhases' => $report['usesPhases'],
+            'totals'     => $report['totals'],
+            ...$this->brandingData(),
+        ], $this->slug().'-school-participation.pdf');
+    }
+
+    private function schoolParticipationXls(): StreamedResponse
+    {
+        $report = $this->schoolParticipationReport();
+
+        $header = $report['usesPhases']
+            ? ['School', 'Phase', 'Active registrations', 'Items', 'Unique students']
+            : ['School', 'Active registrations', 'Items', 'Unique students'];
+
+        $rows = collect($report['rows'])->map(fn ($r) => $report['usesPhases']
+            ? [$r['school_name'], $r['phase_name'], $r['active_count'], $r['item_count'], $r['unique_student_count']]
+            : [$r['school_name'], $r['active_count'], $r['item_count'], $r['unique_student_count']]);
+
+        return ExcelExport::download($this->slug().'-school-participation', $header, $rows);
+    }
+
     public function schools(): Collection
     {
         $ids = FestRegistration::whereIn('event_id', $this->eventIds())
@@ -487,6 +565,8 @@ class FestReportService
             'audit-log-extract' => $analytics()->exportAuditLogExtract(),
             'item-schedule' => $this->itemScheduleCsv($request),
             'item-schedule-pdf' => $this->itemSchedulePdf($request),
+            'school-participation-pdf' => $this->schoolParticipationPdf(),
+            'school-participation-xls' => $this->schoolParticipationXls(),
             default => abort(404, 'Unknown export type'),
         };
     }

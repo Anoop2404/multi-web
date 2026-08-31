@@ -156,6 +156,8 @@ class FestReportCatalog
             ['id' => 'numbering-register', 'label' => 'Numbering Register (Fest ID / chest / item reg)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'pending-approvals', 'label' => 'Pending Approval Register', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'medal-tally', 'label' => 'Medal Tally by School', 'format' => 'pdf', 'params' => [], 'phase' => 'after', 'audience' => 'public'],
+            ['id' => 'school-participation-pdf', 'label' => 'School Participation Counts (PDF)', 'format' => 'pdf', 'params' => ['region_id', 'competition_phase_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'school-participation-xls', 'label' => 'School Participation Counts (Excel)', 'format' => 'xls', 'params' => ['region_id', 'competition_phase_id'], 'phase' => 'before', 'audience' => 'staff'],
         ];
 
         return array_map(
@@ -247,6 +249,8 @@ class FestReportCatalog
         'numbering-register'            => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'pending-approvals'             => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'medal-tally'                   => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'school-participation-pdf'      => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'school-participation-xls'      => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
     ];
 
     /** @return list<array<string, string>> */
@@ -340,6 +344,7 @@ class FestReportCatalog
         'school-detailed', 'school-wise',
         'house-detailed', 'house-wise',
         'participation-counts', 'student-participation', 'school-participation',
+        'school-participation-pdf', 'school-participation-xls',
         'area-wise-participants', 'age-group-matrix',
         'item-schedule', 'item-schedule-pdf',
         'student-wise', 'student-wise-report', 'student-wise-pdf',
