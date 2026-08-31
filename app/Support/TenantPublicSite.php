@@ -9,16 +9,11 @@ class TenantPublicSite
     public const SETTING_KEY = 'public_website_enabled';
 
     /**
-     * Whether the tenant's full public marketing website should be shown.
-     * Requires the global WEBSITE_ENABLED flag; when false, visitors see the
-     * registration/login portal landing instead.
+     * Whether the tenant's full public marketing website should be shown; when
+     * false, visitors see the registration/login portal landing instead.
      */
     public static function isEnabled(?Tenant $tenant = null): bool
     {
-        if (! FeatureFlags::websiteEnabled()) {
-            return false;
-        }
-
         $tenant ??= tenancy()->tenant;
 
         if (! $tenant) {

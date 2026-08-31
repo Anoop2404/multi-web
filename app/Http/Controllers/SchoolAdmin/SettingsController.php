@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
-use App\Support\FeatureFlags;
 use App\Support\TenantPublicSite;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -16,7 +15,6 @@ class SettingsController extends SchoolAdminController
         return $this->inertia('School/Settings/Index', [
             'settings' => $settings,
             'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->school),
-            'websiteFeatureEnabled' => FeatureFlags::websiteEnabled(),
         ]);
     }
 
@@ -105,7 +103,7 @@ class SettingsController extends SchoolAdminController
             $this->school->setSetting('locale', $data['locale']);
         }
 
-        if (FeatureFlags::websiteEnabled() && $request->has('public_website_enabled')) {
+        if ($request->has('public_website_enabled')) {
             TenantPublicSite::setEnabled($this->school, $request->boolean('public_website_enabled'));
         }
 

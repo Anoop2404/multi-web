@@ -31,9 +31,6 @@ class HandleInertiaRequests extends Middleware
                     ['roles' => $this->roleNames($request)]
                 ) : null,
             ],
-            'features' => [
-                'website_enabled' => \App\Support\FeatureFlags::websiteEnabled(),
-            ],
             'impersonating' => fn () => $this->impersonating($request),
             'announcements' => fn () => $this->activeAnnouncements($request),
             'flash' => [

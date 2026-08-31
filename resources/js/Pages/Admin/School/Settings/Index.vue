@@ -5,7 +5,7 @@
 
 
         <div class="max-w-2xl space-y-6">
-            <div v-if="websiteFeatureEnabled" class="card flex flex-wrap items-center justify-between gap-4">
+            <div class="card flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h3 class="font-bold text-gray-800">Public school website</h3>
                     <p class="text-sm text-gray-500 mt-1">
@@ -194,7 +194,6 @@ const props = defineProps({
     school:   Object,
     settings: { type: Object, default: () => ({}) },
     publicWebsiteEnabled: { type: Boolean, default: true },
-    websiteFeatureEnabled: { type: Boolean, default: false },
 });
 
 const publicSiteEnabled = ref(props.publicWebsiteEnabled ?? true);
@@ -225,7 +224,7 @@ const form = useForm({
 function submit() {
     form.transform((data) => ({
         ...data,
-        ...(props.websiteFeatureEnabled ? { public_website_enabled: publicSiteEnabled.value } : {}),
+        public_website_enabled: publicSiteEnabled.value,
     })).post(`/school-admin/${props.school.id}/settings`, { forceFormData: true });
 }
 </script>

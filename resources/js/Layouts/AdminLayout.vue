@@ -116,10 +116,9 @@ const userRoles = computed(() => page.props.auth?.user?.roles ?? []);
 const isStateAdmin = computed(() => userRoles.value.some(r => ['state_admin', 'state_staff'].includes(r)));
 const isStateStaff = computed(() => userRoles.value.includes('state_staff'));
 const isSuperAdmin = computed(() => userRoles.value.includes('superadmin'));
-const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
 
 const navGroups = computed(() => {
-    if (isSuperAdmin.value) return superadminNav({ websiteEnabled: websiteEnabled.value });
+    if (isSuperAdmin.value) return superadminNav();
     if (isStateAdmin.value) return stateAdminNav();
     return [];
 });

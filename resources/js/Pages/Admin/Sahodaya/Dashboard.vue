@@ -236,7 +236,7 @@
                 </div>
 
                 <!-- Recent circulars -->
-                <div v-if="websiteEnabled && canSee('website')" class="card">
+                <div v-if="canSee('website')" class="card">
                     <div class="mb-4 flex items-center justify-between">
                         <h3 class="section-title text-base">{{ publicWebsiteEnabled ? 'Recent circulars' : 'Website disabled' }}</h3>
                         <Link v-if="publicWebsiteEnabled" :href="`/sahodaya-admin/${sahodaya.id}/circulars`" class="link-brand text-xs">View all →</Link>
@@ -294,7 +294,6 @@ import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed, defineComponent, h } from 'vue';
 
 const page = usePage();
-const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
 const publicWebsiteEnabled = computed(() => page.props.publicWebsiteEnabled ?? true);
 const isStaffUser = computed(() => page.props.isStaff);
 
@@ -449,7 +448,7 @@ const quickActions = computed(() => {
         if (programAllowed('english_fest')) items.push({ label: 'English Fest', description: 'Program hub', icon: '📚', href: `${base}/english-fest` });
         if (programAllowed('science_fest')) items.push({ label: 'Science Fest', description: 'Program hub', icon: '🔬', href: `${base}/science-fest` });
     }
-    if (canSee('website') && websiteEnabled.value && publicWebsiteEnabled.value && !isScopedUser.value) {
+    if (canSee('website') && publicWebsiteEnabled.value && !isScopedUser.value) {
         items.push({ label: 'Circulars', description: 'Publish notices', icon: '📄', href: `${base}/circulars` });
     }
     if (canSee('mcq') && !isScopedUser.value) {

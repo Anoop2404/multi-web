@@ -151,9 +151,8 @@ const eventScopes = computed(() => page.props.eventScopes ?? []);
 const school = computed(() => props.school ?? page.props.school);
 const tid = computed(() => school.value?.id ?? '');
 const publicUrl = computed(() => page.props.publicUrl ?? null);
-const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
 const publicWebsiteEnabled = computed(() => page.props.publicWebsiteEnabled ?? true);
-const showPublicSiteLink = computed(() => websiteEnabled.value && publicWebsiteEnabled.value && publicUrl.value);
+const showPublicSiteLink = computed(() => publicWebsiteEnabled.value && publicUrl.value);
 
 const STAFF_NAV = {
     students: ['fest.view', 'website.view', 'website.manage', 'membership.view'],
@@ -193,7 +192,6 @@ const navGroups = computed(() => {
 
     const options = {
         canNav,
-        websiteEnabled: websiteEnabled.value,
         publicWebsiteEnabled: publicWebsiteEnabled.value,
         schoolHasPrefix: Boolean(school.value?.school_prefix),
         pendingChangeRequests: props.pendingChangeRequests || page.props.pendingChangeRequests || 0,

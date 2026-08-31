@@ -8,9 +8,9 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Parameterized module gate — Route::middleware('feature:module.mcq'). Mirrors
- * EnsureWebsiteEnabled's plain abort(404) pattern rather than inventing a new one.
- * Superadmin always bypasses, same convention as every other Ensure* middleware.
+ * Parameterized module gate — Route::middleware('feature:module.mcq'). Plain
+ * abort(404) pattern, same convention as every other Ensure* middleware.
+ * Superadmin always bypasses.
  */
 class EnsureTenantFeatureEnabled
 {

@@ -43,7 +43,7 @@
                           class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
                         Edit
                     </Link>
-                    <Link v-if="websiteEnabled" :href="`/admin/builder/sections?tenant=${tenant.id}`"
+                    <Link :href="`/admin/builder/sections?tenant=${tenant.id}`"
                           class="px-4 py-2 rounded-lg text-white text-sm font-medium transition">
                         Site Builder →
                     </Link>
@@ -629,8 +629,6 @@ const props = defineProps({
     erasureBatches: { type: Array, default: () => [] },
     setupChecklist: { type: Object, default: null },
 });
-
-const websiteEnabled = computed(() => usePage().props.features?.website_enabled ?? false);
 
 const navForm = useForm({
     programs: { ...(props.navManager?.overrides?.programs ?? {}) },

@@ -65,7 +65,7 @@
                     <p class="font-semibold text-slate-900">Member Schools</p>
                     <p class="text-xs text-slate-500 mt-0.5">School tenants &amp; parent Sahodaya</p>
                 </Link>
-                <Link v-if="websiteEnabled" href="/admin/builder/sections" class="track-card block">
+                <Link href="/admin/builder/sections" class="track-card block">
                     <div class="text-2xl mb-2">🎨</div>
                     <p class="font-semibold text-slate-900">Website Builder</p>
                     <p class="text-xs text-slate-500 mt-0.5">Sections, theme, nav, footer for any site</p>
@@ -75,7 +75,7 @@
                     <p class="font-semibold text-slate-900">Registration Rules</p>
                     <p class="text-xs text-slate-500 mt-0.5">Global class categories & teaching types</p>
                 </Link>
-                <Link v-if="websiteEnabled" href="/admin/skin-presets" class="track-card block">
+                <Link href="/admin/skin-presets" class="track-card block">
                     <div class="text-2xl mb-2">🖌️</div>
                     <p class="font-semibold text-slate-900">Skin Presets</p>
                     <p class="text-xs text-slate-500 mt-0.5">Pre-built color themes for schools</p>
@@ -110,16 +110,13 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import { formatDateTime } from '@/support/calendarDates.js';
 
 defineProps({
     stats: { type: Object, default: () => ({}) },
     snapshot: { type: Object, default: null },
 });
-
-const websiteEnabled = computed(() => usePage().props.features?.website_enabled ?? false);
 
 function formatAmount(v) {
     return Number(v ?? 0).toLocaleString('en-IN');

@@ -4,22 +4,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Public website & CMS
-    |--------------------------------------------------------------------------
-    |
-    | When false, public tenant sites, site builder, and website admin menus
-    | are disabled. Registration and admin panels remain available.
-    |
-    | Defaults to enabled — this was a gradual-rollout kill switch during initial
-    | development; the website/CMS feature is now standard, so no .env entry
-    | should be required. Set WEBSITE_ENABLED=false explicitly if an install
-    | genuinely needs to turn it off.
-    |
-    */
-    'website_enabled' => env('WEBSITE_ENABLED', true),
-
-    /*
-    |--------------------------------------------------------------------------
     | Region/phase event reporting remediation (rollout controls)
     |--------------------------------------------------------------------------
     |

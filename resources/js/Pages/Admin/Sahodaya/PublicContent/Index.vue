@@ -8,7 +8,7 @@
                     description="Edit hero text, contact details, announcements, and links shown on your public site or registration portal." />
         <div class="max-w-4xl space-y-5">
             <!-- Public website status -->
-            <div v-if="websiteEnabled" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h2 class="font-bold text-gray-900">Public Website</h2>
                     <p class="text-sm text-gray-500 mt-1">
@@ -24,7 +24,7 @@
             </div>
 
             <!-- Website Version Experience Selector -->
-            <div v-if="websiteEnabled" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <h2 class="font-bold text-gray-900 flex items-center gap-2">
@@ -112,7 +112,7 @@
 
             <!-- Tab: Hero & Contact -->
             <div v-show="activeTab === 'hero'" class="space-y-5">
-                <ContentCard title="Hero Section" :hint="websiteEnabled ? 'Main banner — heading, tagline, eyebrow text.' : 'Shown on the registration portal landing page.'">
+                <ContentCard title="Hero Section" hint="Main banner — heading, tagline, eyebrow text.">
                     <div class="grid sm:grid-cols-2 gap-4">
                         <Field label="Sahodaya Name / Heading" class-extra="sm:col-span-2">
                             <input v-model="form.heading" type="text" class="field">
@@ -129,7 +129,7 @@
                     </div>
                 </ContentCard>
 
-                <ContentCard title="Contact Info" :hint="websiteEnabled ? 'Phone, email, address shown in footer and contact section.' : 'Phone and email shown on the registration portal.'">
+                <ContentCard title="Contact Info" hint="Phone, email, address shown in footer and contact section.">
                     <div class="grid sm:grid-cols-2 gap-4">
                         <Field label="Phone">
                             <input v-model="form.phone" type="tel" class="field">
@@ -281,12 +281,10 @@
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import { useForm, usePage } from '@inertiajs/vue3';
+import { useForm } from '@inertiajs/vue3';
 import { ref, computed, defineComponent, h } from 'vue';
 
-const page = usePage();
-const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
-const pageTitle = computed(() => websiteEnabled.value ? 'Website Content' : 'Portal Content');
+const pageTitle = 'Website Content';
 
 const props = defineProps({
     sahodaya:                Object,
@@ -309,18 +307,14 @@ const activeExperienceVersion = computed(() => props.experienceVersion ?? 'v1');
 
 const activeTab = ref('hero');
 
-const allTabs = [
-    { key: 'hero',          label: 'Portal & Contact', portalOnly: true },
-    { key: 'about',         label: 'About',            portalOnly: true },
-    { key: 'announcements', label: 'Announcements',    portalOnly: false },
-    { key: 'programmes',    label: 'Programmes',       portalOnly: false },
-    { key: 'academic',      label: 'Academic Links',   portalOnly: false },
-    { key: 'links',         label: 'Useful Links',     portalOnly: false },
+const tabs = [
+    { key: 'hero',          label: 'Portal & Contact' },
+    { key: 'about',         label: 'About' },
+    { key: 'announcements', label: 'Announcements' },
+    { key: 'programmes',    label: 'Programmes' },
+    { key: 'academic',      label: 'Academic Links' },
+    { key: 'links',         label: 'Useful Links' },
 ];
-
-const tabs = computed(() =>
-    websiteEnabled.value ? allTabs : allTabs.filter(t => t.portalOnly)
-);
 
 const form = useForm({
     ...props.content,
@@ -339,7 +333,7 @@ function addLink()         { form.links.push({ label: '', url: 'https://', icon:
 function save() {
     form.transform(data => ({
         ...data,
-        ...(websiteEnabled.value ? { public_website_enabled: publicSiteEnabled.value } : {}),
+        public_website_enabled: publicSiteEnabled.value,
     })).put(`/sahodaya-admin/${props.sahodaya.id}/public-content`);
 }
 

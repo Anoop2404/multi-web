@@ -232,7 +232,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     Route::get('/storage-migration/progress', [\App\Http\Controllers\Admin\StorageMigrationController::class, 'progress'])->name('storage-migration.progress');
 
     // ── Builder Inertia pages (superadmin only, website phase) ────────────────
-    Route::middleware(['website.enabled'])->prefix('builder')->name('builder.')->group(function () {
+    Route::prefix('builder')->name('builder.')->group(function () {
         Route::get('/sections', function () {
             return inertia('Builder/Sections', [
                 'tenants' => Tenant::active()->orderBy('name')->get(['id', 'name', 'type']),
@@ -266,9 +266,9 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     });
 
     // ── Builder REST API (JSON, no Inertia) ───────────────────────────────────
-    Route::middleware(['website.enabled'])->get('/api/section-definitions', [BuilderApiController::class, 'sectionDefinitions'])->name('api.section-definitions');
+    Route::get('/api/section-definitions', [BuilderApiController::class, 'sectionDefinitions'])->name('api.section-definitions');
 
-    Route::middleware(['website.enabled', \App\Http\Middleware\InitializeTenancyByRouteTenant::class])->prefix('api/tenants/{tenantId}')->name('api.builder.')->group(function () {
+    Route::middleware([\App\Http\Middleware\InitializeTenancyByRouteTenant::class])->prefix('api/tenants/{tenantId}')->name('api.builder.')->group(function () {
         // Sections
         Route::get('/sections',                      [BuilderApiController::class, 'sections'])->name('sections.index');
         Route::post('/sections',                     [BuilderApiController::class, 'storeSection'])->name('sections.store');
@@ -322,7 +322,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     });
 
     // ── Skin presets management (website phase) ──────────────────────────────
-  Route::middleware(['website.enabled'])->prefix('skin-presets')->name('skin-presets.')->group(function () {
+    Route::prefix('skin-presets')->name('skin-presets.')->group(function () {
         Route::get('/', fn() => inertia('SkinPresets/Index', [
             'presets' => SkinPreset::orderBy('display_order')->get(),
         ]))->name('index');
@@ -595,8 +595,7 @@ Route::prefix('school-admin/{tenantId}')
         Route::post('/{boardResult}/certification/submit', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'submit'])->name('certification.submit');
     });
 
-    // Website & CMS (disabled until WEBSITE_ENABLED=true)
-    Route::middleware('website.enabled')->group(function () {
+    // Website & CMS
     Route::get('/settings',   [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings',  [SettingsController::class, 'update'])->name('settings.update');
 
@@ -707,7 +706,6 @@ Route::prefix('school-admin/{tenantId}')
         Route::post('/design', [SiteBuilderApiController::class, 'saveDesign'])->name('design.save');
     });
     }); // public.website.admin.cms
-    }); // website.enabled
 });
 
 // ── Sahodaya Admin Panel ─────────────────────────────────────────────────────
@@ -794,16 +792,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
         });
 
         // Notification templates — communications config, not part of the public
-        // website/CMS module, so it must stay reachable even when the website
-        // feature is disabled (WEBSITE_ENABLED=false). Previously nested under
-        // the website.enabled middleware below, which made this page 404 for any
-        // Sahodaya with the website feature off.
+        // website/CMS module, so it must stay reachable regardless of a tenant's
+        // public-website setting.
         Route::get('/notification-templates', [\App\Http\Controllers\SahodayaAdmin\NotificationTemplateController::class, 'index'])->name('notification-templates.index');
         Route::put('/notification-templates/{template}', [\App\Http\Controllers\SahodayaAdmin\NotificationTemplateController::class, 'update'])->name('notification-templates.update');
         Route::post('/notification-templates/{template}/test', [\App\Http\Controllers\SahodayaAdmin\NotificationTemplateController::class, 'sendTest'])->name('notification-templates.test');
 
-        // Website & CMS (disabled until WEBSITE_ENABLED=true)
-        Route::middleware('website.enabled')->group(function () {
+        // Website & CMS
         Route::middleware('public.website.admin.cms')->group(function () {
         Route::get('/site-builder', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderController::class, 'index'])->name('site-builder');
         Route::get('/website/domains', [\App\Http\Controllers\SahodayaAdmin\WebsiteDomainController::class, 'index'])->name('website.domains');
@@ -862,7 +857,6 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/circulars',             [\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'store'])->name('circulars.store');
         Route::delete('/circulars/{circular}',[\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'destroy'])->name('circulars.destroy');
         }); // public.website.admin.cms
-        }); // website.enabled
 
         // Portal & website content (portal always available; full website tabs when enabled)
         Route::get('/public-content',  [\App\Http\Controllers\SahodayaAdmin\PublicContentController::class, 'index'])->name('public-content.index');

@@ -335,7 +335,6 @@ export function sahodayaMcqSeriesScopedNav(sahodayaId, seriesId, options = {}) {
 export function sahodayaAdminNav(sahodayaId, options = {}) {
     const {
         canNav = () => true,
-        websiteEnabled = false,
         publicWebsiteEnabled = true,
         approvedSchoolsCount = 0,
         pendingPaymentsCount = 0,
@@ -372,7 +371,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
     });
 
     // ── Website (conditional) ─────────────────────────────────────────
-    if (websiteEnabled && publicWebsiteEnabled && canNav('website') && menuOn('website')) {
+    if (publicWebsiteEnabled && canNav('website') && menuOn('website')) {
         groups.push({
             section: 'Website',
             items: [
@@ -525,11 +524,11 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
             settingsItems.push({ label: 'Sidebar visibility', href: `${base}/settings/nav-visibility`, icon: 'layers' });
             settingsItems.push({ label: 'Failed email queue', href: `${base}/settings/failed-mails`, icon: 'inbox' });
             settingsItems.push({ label: 'Portal users', href: `${base}/users`, icon: 'users' });
-            // Not gated on websiteEnabled/publicWebsiteEnabled — this is a
-            // communications setting, not part of the public website/CMS module.
+            // Not gated on publicWebsiteEnabled — this is a communications
+            // setting, not part of the public website/CMS module.
             settingsItems.push({ label: 'Notification templates', href: `${base}/notification-templates`, icon: 'file-text' });
         }
-        if (websiteEnabled && !publicWebsiteEnabled && canNav('website')) {
+        if (!publicWebsiteEnabled && canNav('website')) {
             settingsItems.push({ label: 'Portal landing', href: `${base}/public-content`, icon: 'globe' });
         }
         if (settingsItems.length) {

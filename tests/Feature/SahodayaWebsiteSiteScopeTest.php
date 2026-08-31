@@ -27,7 +27,6 @@ class SahodayaWebsiteSiteScopeTest extends TestCase
     {
         parent::setUp();
 
-        config(['features.website_enabled' => true]);
         $this->seed(RolesAndPermissionsSeeder::class);
 
         $this->sahodaya = Tenant::create([

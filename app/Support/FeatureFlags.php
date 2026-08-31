@@ -4,11 +4,6 @@ namespace App\Support;
 
 class FeatureFlags
 {
-    public static function websiteEnabled(): bool
-    {
-        return (bool) config('features.website_enabled', false);
-    }
-
     /**
      * Gates the FestReportScopeResolver/FestReportScope-based retrofit (plan §12).
      * Not yet actually consumed by any report controller as a gate — the Phase 1

@@ -13,12 +13,6 @@ class TenantPublicSiteTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        config(['features.website_enabled' => true]);
-    }
-
     public function test_home_shows_registration_portal_when_public_website_disabled(): void
     {
         $sahodaya = Tenant::create([

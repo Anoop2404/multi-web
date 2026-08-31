@@ -98,8 +98,8 @@ Route::middleware([
         Route::get('/merit-list.pdf', [\App\Http\Controllers\Public\AcademicResultsPortalController::class, 'meritListPdf'])->name('merit-list');
     });
 
-    // Public website pages (require global + tenant public-site setting)
-    Route::middleware(['website.enabled', 'public.website.enabled'])->group(function () {
+    // Public website pages (require the tenant's own public-site setting)
+    Route::middleware(['public.website.enabled'])->group(function () {
         Route::get('/news', [NewsArticleController::class, 'index'])->name('tenant.news.index');
         Route::get('/news/{slug}', [NewsArticleController::class, 'show'])->name('tenant.news.show');
         Route::get('/circulars', [\App\Http\Controllers\Public\CircularController::class, 'index'])->name('tenant.circulars.index');

@@ -272,7 +272,6 @@ export function schoolFestScopedNav(schoolId, options = {}) {
 export function schoolAdminNav(schoolId, options = {}) {
     const {
         canNav = () => true,
-        websiteEnabled = false,
         publicWebsiteEnabled = true,
         schoolHasPrefix = true,
         pendingChangeRequests = 0,
@@ -410,7 +409,7 @@ export function schoolAdminNav(schoolId, options = {}) {
     }
 
     // ── Website (collapses to single hub entry) ────────────────────────
-    if (websiteEnabled && publicWebsiteEnabled && canNav('website')) {
+    if (publicWebsiteEnabled && canNav('website')) {
         // Unlike the old site-builder-only entry point (which covered just Page
         // Sections/Navigation/Footer and left the rest unreachable except via nav
         // search), Website/Hub.vue actually links out to all 12 of these — safe to
@@ -423,7 +422,7 @@ export function schoolAdminNav(schoolId, options = {}) {
         });
     }
 
-    if (websiteEnabled && !publicWebsiteEnabled && canNav('website')) {
+    if (!publicWebsiteEnabled && canNav('website')) {
         groups.push({
             section: 'Website',
             items: [

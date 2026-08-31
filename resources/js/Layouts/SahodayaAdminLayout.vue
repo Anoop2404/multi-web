@@ -158,9 +158,8 @@ const isStaffUser = computed(() => props.isStaff || page.props.isStaff);
 const staffPermissions = computed(() => page.props.staffPermissions ?? []);
 const isReadOnlyStaff = computed(() => isStaffUser.value
     && !staffPermissions.value.some(permission => !permission.endsWith('.view')));
-const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
 const publicWebsiteEnabled = computed(() => page.props.publicWebsiteEnabled ?? true);
-const showPublicSiteLink = computed(() => websiteEnabled.value && publicWebsiteEnabled.value && props.publicUrl);
+const showPublicSiteLink = computed(() => publicWebsiteEnabled.value && props.publicUrl);
 
 const STAFF_NAV = {
     website: ['website.view', 'website.manage', 'website.news'],
@@ -189,7 +188,6 @@ const navGroups = computed(() => {
     const options = {
         canNav,
         isStaffUser: isStaffUser.value,
-        websiteEnabled: websiteEnabled.value,
         publicWebsiteEnabled: publicWebsiteEnabled.value,
         approvedSchoolsCount: props.approvedSchoolsCount,
         pendingPaymentsCount: props.pendingPaymentsCount,

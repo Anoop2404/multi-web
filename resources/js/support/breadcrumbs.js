@@ -44,7 +44,6 @@ function sahodayaBreadcrumbs(url, props) {
     const base = `/sahodaya-admin/${sahodayaId}`;
 
     const groups = sahodayaAdminNav(sahodayaId, {
-        websiteEnabled: props.features?.website_enabled ?? false,
         publicWebsiteEnabled: props.publicWebsiteEnabled ?? true,
         navVisibility: props.navVisibility ?? null,
         competitionPrograms: props.competitionPrograms ?? {},
@@ -63,7 +62,6 @@ function schoolBreadcrumbs(url, props) {
     const base = `/school-admin/${schoolId}`;
 
     const groups = schoolAdminNav(schoolId, {
-        websiteEnabled: props.features?.website_enabled ?? false,
         publicWebsiteEnabled: props.publicWebsiteEnabled ?? true,
         navVisibility: props.navVisibility ?? null,
         membershipPaid: props.membershipPaid !== false,
@@ -83,7 +81,7 @@ function adminBreadcrumbs(url, props) {
     }
 
     const groups = isSuperAdmin
-        ? superadminNav({ websiteEnabled: props.features?.website_enabled ?? false })
+        ? superadminNav()
         : stateAdminNav();
     const base = isStateAdmin ? '/admin/state-dashboard' : '/admin/dashboard';
 

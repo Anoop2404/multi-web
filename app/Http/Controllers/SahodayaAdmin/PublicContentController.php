@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
-use App\Support\FeatureFlags;
 use App\Support\SahodayaHomepageContent;
 use App\Support\SahodayaTenantBranding;
 use App\Support\SahodayaWebsiteTemplateCatalog;
@@ -112,8 +111,6 @@ class PublicContentController extends SahodayaAdminController
             $this->sahodaya->invalidateCache();
         }
 
-        $label = FeatureFlags::websiteEnabled() ? 'Website content' : 'Portal content';
-
-        return back()->with('success', "{$label} saved.");
+        return back()->with('success', 'Website content saved.');
     }
 }
