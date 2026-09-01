@@ -836,18 +836,24 @@ class FestReportController extends SahodayaAdminController
         $rootEvent = $event->rootEvent();
         $service = new FestParticipationLimitService($rootEvent);
         $schoolId = $request->input('school_id') ?: null;
+        $category = $request->input('category') ?: null;
+        $itemId = $request->filled('item_id') ? (int) $request->input('item_id') : null;
 
-        $rows = $service->studentLimitReportRows($schoolId);
+        $rows = $service->studentLimitReportRows($schoolId, null, $category, $itemId);
         $summary = $service->summarizeStudentLimitRows($rows);
 
-        $exportParams = http_build_query(array_filter(['school_id' => $schoolId]));
+        $exportParams = http_build_query(array_filter(['school_id' => $schoolId, 'category' => $category, 'item_id' => $itemId]));
         $exportBase = "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export";
 
         return $this->inertia('Sahodaya/Events/Reports/StudentLimits', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'           => $rows,
             'summary'        => $summary,
             'schools'        => $this->scopedReportService($request, $rootEvent)->schools(),
+            'categories'     => \App\Support\FestClassGroupScheme::labels(null, $rootEvent),
+            'items'          => $service->itemFilterOptions(),
             'filterSchoolId' => $schoolId,
+            'filterCategory' => $category,
+            'filterItemId'   => $itemId,
             'pdfUrl'         => "{$exportBase}/student-limits-pdf".($exportParams ? "?{$exportParams}" : ''),
             'xlsUrl'         => "{$exportBase}/student-limits-xls".($exportParams ? "?{$exportParams}" : ''),
         ])));

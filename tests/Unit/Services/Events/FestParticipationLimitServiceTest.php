@@ -81,7 +81,7 @@ class FestParticipationLimitServiceTest extends TestCase
             ['display_order' => 1, 'is_active' => true],
         );
 
-        $student = new Student();
+        $student = new Student;
         $student->id = $studentId;
         $student->tenant_id = $tenantId;
         $student->school_class_id = $schoolClass->id;
@@ -243,5 +243,49 @@ class FestParticipationLimitServiceTest extends TestCase
         $errors = $service->validateRegistration($essay, $schoolId, [$studentId]);
 
         $this->assertSame([], $errors, 'a filled drawing sub-cap must not block a writing item: '.implode(' | ', $errors));
+    }
+
+    public function test_category_and_item_filters_narrow_the_student_list_and_carry_a_photo(): void
+    {
+        [$event, $schoolId] = $this->fixture();
+        $studentA = 1;
+        $studentB = 2;
+
+        $lpItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'LP Solo Song', 'item_code' => 'LPS', 'class_group' => 'lp', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $hsItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Solo Song', 'item_code' => 'HSS', 'class_group' => 'hs', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+
+        // Student A: only the LP item. Student B: only the HS item.
+        $this->registerStudentFor($event, $schoolId, $studentA, $lpItem);
+        $this->registerStudentFor($event, $schoolId, $studentB, $hsItem);
+        Student::where('id', $studentA)->update(['photo' => 'students/photo-a.jpg']);
+
+        $service = new FestParticipationLimitService($event);
+
+        // Unfiltered: both students show, each item carries a resolved category_key.
+        $allRows = $service->studentLimitReportRows($schoolId);
+        $this->assertCount(2, $allRows);
+        $rowA = collect($allRows)->firstWhere('student_id', $studentA);
+        $lpCategoryKey = $rowA['items'][0]['category_key'];
+        $this->assertNotEmpty($lpCategoryKey, 'each item row must carry a resolved category_key for the filter to match against');
+        $this->assertNotNull($rowA['photo_url'], 'a student with a photo must get a non-null photo_url');
+        $rowB = collect($allRows)->firstWhere('student_id', $studentB);
+        $this->assertNull($rowB['photo_url'], 'a student with no photo must get a null photo_url, not an error');
+
+        // Category filter: only student A's item's category should match, so only A shows.
+        $categoryFiltered = $service->studentLimitReportRows($schoolId, null, $lpCategoryKey);
+        $this->assertCount(1, $categoryFiltered);
+        $this->assertSame($studentA, $categoryFiltered[0]['student_id']);
+
+        // Item filter: filtering to the HS item's id should isolate student B instead.
+        $itemFiltered = $service->studentLimitReportRows($schoolId, null, null, $hsItem->id);
+        $this->assertCount(1, $itemFiltered);
+        $this->assertSame($studentB, $itemFiltered[0]['student_id']);
+
+        // itemFilterOptions() must list every item under the event, independent of who's
+        // registered, tagged with the same category_key/category_label used above.
+        $options = $service->itemFilterOptions();
+        $this->assertCount(2, $options);
+        $optionForLp = collect($options)->firstWhere('id', $lpItem->id);
+        $this->assertSame($lpCategoryKey, $optionForLp['category_key']);
     }
 }

@@ -181,17 +181,22 @@ class FestReportService
      *
      * @return array{rows: list<array<string, mixed>>, summary: array<string, int>}
      */
-    private function studentLimitsReport(?string $schoolId): array
+    private function studentLimitsReport(?string $schoolId, ?string $category = null, ?int $itemId = null, bool $includePhotoDataUri = false): array
     {
         $service = new FestParticipationLimitService($this->event->rootEvent());
-        $rows = $service->studentLimitReportRows($schoolId);
+        $rows = $service->studentLimitReportRows($schoolId, null, $category, $itemId, $includePhotoDataUri);
 
         return ['rows' => $rows, 'summary' => $service->summarizeStudentLimitRows($rows)];
     }
 
     private function studentLimitsPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
-        $report = $this->studentLimitsReport($request->input('school_id') ?: null);
+        $report = $this->studentLimitsReport(
+            $request->input('school_id') ?: null,
+            $request->input('category') ?: null,
+            $request->filled('item_id') ? (int) $request->input('item_id') : null,
+            includePhotoDataUri: true,
+        );
 
         return $this->renderPdf('fest.reports.student-limits', [
             'event'   => $this->event,
@@ -203,7 +208,11 @@ class FestReportService
 
     private function studentLimitsXls(Request $request): StreamedResponse
     {
-        $report = $this->studentLimitsReport($request->input('school_id') ?: null);
+        $report = $this->studentLimitsReport(
+            $request->input('school_id') ?: null,
+            $request->input('category') ?: null,
+            $request->filled('item_id') ? (int) $request->input('item_id') : null,
+        );
         $fmt = fn (array $dim) => $dim['limit'] !== null ? "{$dim['used']}/{$dim['limit']}" : (string) $dim['used'];
 
         $rows = collect($report['rows'])->map(fn ($r) => [

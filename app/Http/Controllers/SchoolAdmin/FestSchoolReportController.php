@@ -204,10 +204,13 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $service = new FestParticipationLimitService($event->rootEvent());
-        $rows = $service->studentLimitReportRows($this->school->id, $request->input('search'));
+        $category = $request->input('category') ?: null;
+        $itemId = $request->filled('item_id') ? (int) $request->input('item_id') : null;
+        $rows = $service->studentLimitReportRows($this->school->id, $request->input('search'), $category, $itemId, photoForSchoolAdmin: true);
         $summary = $service->summarizeStudentLimitRows($rows);
 
         $base = $this->schoolReportsBase($program, $event);
+        $exportParams = http_build_query(array_filter(['category' => $category, 'item_id' => $itemId]));
 
         return $this->inertia('School/Events/ReportStudentLimits', [
             'program' => $program,
@@ -215,8 +218,12 @@ class FestSchoolReportController extends SchoolAdminController
             'event'   => $event->only('id', 'title'),
             'rows'    => $rows,
             'summary' => $summary,
-            'csvUrl'  => "{$base}/student-limits/export",
-            'pdfUrl'  => "{$base}/student-limits/pdf",
+            'categories'     => \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()),
+            'items'          => $service->itemFilterOptions(),
+            'filterCategory' => $category,
+            'filterItemId'   => $itemId,
+            'csvUrl'  => "{$base}/student-limits/export".($exportParams ? "?{$exportParams}" : ''),
+            'pdfUrl'  => "{$base}/student-limits/pdf".($exportParams ? "?{$exportParams}" : ''),
         ]);
     }
 
@@ -226,7 +233,14 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $service = new FestParticipationLimitService($event->rootEvent());
-        $rows = $service->studentLimitReportRows($this->school->id, $request->input('search'));
+        $rows = $service->studentLimitReportRows(
+            $this->school->id,
+            $request->input('search'),
+            $request->input('category') ?: null,
+            $request->filled('item_id') ? (int) $request->input('item_id') : null,
+            includePhotoDataUri: true,
+            photoForSchoolAdmin: true,
+        );
         $summary = $service->summarizeStudentLimitRows($rows);
 
         $reportService = app(FestReportService::class, ['event' => $event]);
@@ -247,7 +261,12 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $service = new FestParticipationLimitService($event->rootEvent());
-        $rows = $service->studentLimitReportRows($this->school->id, $request->input('search'));
+        $rows = $service->studentLimitReportRows(
+            $this->school->id,
+            $request->input('search'),
+            $request->input('category') ?: null,
+            $request->filled('item_id') ? (int) $request->input('item_id') : null,
+        );
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');

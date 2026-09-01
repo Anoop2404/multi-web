@@ -60,6 +60,38 @@
             border-bottom: 1px solid #e2e8f0;
             padding: 8px 12px;
         }
+        .student-info {
+            display: table;
+            width: 100%;
+        }
+        .student-photo-cell {
+            display: table-cell;
+            width: 40px;
+            vertical-align: middle;
+        }
+        .student-photo {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid #cbd5e1;
+        }
+        .avatar-placeholder {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #4338ca;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 32px;
+        }
+        .student-details-cell {
+            display: table-cell;
+            vertical-align: middle;
+            padding-left: 8px;
+        }
         .student-name {
             font-size: 13.5px;
             font-weight: bold;
@@ -130,14 +162,25 @@
     @foreach($rows as $idx => $st)
     <div class="student-card">
         <div class="card-header">
-            <div class="student-name">
-                {{ $idx + 1 }}. {{ $st['name'] }}
-                @if(!empty($st['reg_no']))
-                    <span style="font-size: 11px; font-weight: normal; color: #64748b;">({{ $st['reg_no'] }})</span>
-                @endif
-                @if($st['exceeds_any'] ?? false)
-                    <span class="badge-flag">Exceeds limit</span>
-                @endif
+            <div class="student-info">
+                <div class="student-photo-cell">
+                    @if(!empty($st['photo_data_uri']) || !empty($st['photo_url']))
+                        <img src="{{ $st['photo_data_uri'] ?? $st['photo_url'] }}" class="student-photo" alt="{{ $st['name'] }}">
+                    @else
+                        <div class="avatar-placeholder">{{ strtoupper(substr($st['name'] ?? 'S', 0, 1)) }}</div>
+                    @endif
+                </div>
+                <div class="student-details-cell">
+                    <div class="student-name">
+                        {{ $idx + 1 }}. {{ $st['name'] }}
+                        @if(!empty($st['reg_no']))
+                            <span style="font-size: 11px; font-weight: normal; color: #64748b;">({{ $st['reg_no'] }})</span>
+                        @endif
+                        @if($st['exceeds_any'] ?? false)
+                            <span class="badge-flag">Exceeds limit</span>
+                        @endif
+                    </div>
+                </div>
             </div>
             <div class="badges">
                 @foreach(['on_stage' => 'On-stage', 'off_stage' => 'Off-stage', 'individual' => 'Individual', 'group' => 'Group', 'total' => 'Total'] as $key => $label)

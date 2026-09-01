@@ -39,6 +39,22 @@
             </div>
         </div>
 
+        <!-- Category / item filters (server-side — narrows which students show and what the -->
+        <!-- PDF/CSV export contains) -->
+        <div class="card !py-3.5 mb-4 shadow-sm border border-slate-200">
+            <div class="flex flex-wrap items-end gap-3">
+                <div class="w-56">
+                    <label class="label-xs">Category</label>
+                    <SearchableSelect v-model="categoryFilter" :options="categoryOptions" :all-option="true" all-label="All categories" />
+                </div>
+                <div class="w-64">
+                    <label class="label-xs">Item</label>
+                    <SearchableSelect v-model="itemFilter" :options="itemOptions" :all-option="true" all-label="All items" />
+                </div>
+                <button type="button" class="btn-primary text-sm" @click="applyFilters">Apply</button>
+            </div>
+        </div>
+
         <!-- Search Toolbar -->
         <div class="card !py-3.5 mb-4 shadow-sm border border-slate-200">
             <div class="flex flex-wrap items-center justify-between gap-4">
@@ -63,7 +79,11 @@
                  :class="st.exceeds_any ? 'border-rose-300' : 'border-slate-200'">
                 <!-- Card Header -->
                 <div class="px-5 py-3.5 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                    <div>
+                    <div class="flex items-center gap-3">
+                        <img v-if="st.photo_url" :src="st.photo_url" :alt="st.name" class="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0" />
+                        <div v-else class="w-9 h-9 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center shrink-0">
+                            {{ (st.name || 'S').charAt(0).toUpperCase() }}
+                        </div>
                         <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
                             {{ st.name }}
                             <span v-if="st.reg_no" class="text-xs font-mono font-normal text-slate-500">({{ st.reg_no }})</span>
@@ -128,11 +148,12 @@
 </template>
 
 <script setup>
-import { ref, computed, h } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { ref, computed, watch, h } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 
 const props = defineProps({
@@ -142,6 +163,10 @@ const props = defineProps({
     event: Object,
     rows: { type: Array, default: () => [] },
     summary: { type: Object, default: () => ({}) },
+    categories: { type: Object, default: () => ({}) },
+    items: { type: Array, default: () => [] },
+    filterCategory: { type: String, default: null },
+    filterItemId: { type: Number, default: null },
     csvUrl: String,
     pdfUrl: String,
 });
@@ -150,6 +175,32 @@ const { programLabel, programBase } = useSchoolProgramContext(props);
 const searchQuery = ref('');
 const onlyExceeding = ref(false);
 const expandedIds = ref(new Set());
+
+// Category → item is a narrowing cascade (Students.vue's class-category → class filter is
+// the reference pattern in this codebase): picking a category limits the item dropdown to
+// items in it, and switching category clears an item selection that's no longer valid.
+const categoryOptions = computed(() => Object.entries(props.categories).map(([value, label]) => ({ value, label })));
+const categoryFilter = ref(props.filterCategory ?? '');
+const itemFilter = ref(props.filterItemId ? String(props.filterItemId) : '');
+
+const filteredItems = computed(() => {
+    if (!categoryFilter.value) return props.items;
+    return props.items.filter((i) => i.category_key === categoryFilter.value);
+});
+const itemOptions = computed(() => filteredItems.value.map((i) => ({ value: String(i.id), label: i.title })));
+
+watch(categoryFilter, () => {
+    if (itemFilter.value && ! filteredItems.value.some((i) => String(i.id) === itemFilter.value)) {
+        itemFilter.value = '';
+    }
+});
+
+function applyFilters() {
+    router.get(`${programBase.value}/reports/${props.event.id}/student-limits`, {
+        category: categoryFilter.value || undefined,
+        item_id: itemFilter.value || undefined,
+    }, { preserveState: true });
+}
 
 function isExpanded(studentId) {
     return expandedIds.value.has(studentId);

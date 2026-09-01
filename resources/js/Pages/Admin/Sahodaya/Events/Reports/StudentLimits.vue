@@ -14,6 +14,12 @@
             <FormField label="School" class-extra="mb-0">
                 <SearchableSelect v-model="schoolFilter" :options="schools" class="w-56" :all-option="true" all-label="All schools" />
             </FormField>
+            <FormField label="Category" class-extra="mb-0">
+                <SearchableSelect v-model="categoryFilter" :options="categoryOptions" class="w-56" :all-option="true" all-label="All categories" />
+            </FormField>
+            <FormField label="Item" class-extra="mb-0">
+                <SearchableSelect v-model="itemFilter" :options="itemOptions" class="w-64" :all-option="true" all-label="All items" />
+            </FormField>
             <button type="submit" class="btn-primary text-sm">Apply</button>
         </form>
 
@@ -64,7 +70,11 @@
             <div v-for="st in filteredRows" :key="st.student_id" class="card p-0 overflow-hidden shadow-sm border"
                  :class="st.exceeds_any ? 'border-rose-300' : 'border-slate-200'">
                 <div class="px-5 py-3.5 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                    <div>
+                    <div class="flex items-center gap-3">
+                        <img v-if="st.photo_url" :src="st.photo_url" :alt="st.name" class="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0" />
+                        <div v-else class="w-9 h-9 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center shrink-0">
+                            {{ (st.name || 'S').charAt(0).toUpperCase() }}
+                        </div>
                         <h4 class="font-bold text-slate-900 text-base flex items-center gap-2 flex-wrap">
                             {{ st.name }}
                             <span v-if="st.reg_no" class="text-xs font-mono font-normal text-slate-500">({{ st.reg_no }})</span>
@@ -129,7 +139,7 @@
 </template>
 
 <script setup>
-import { ref, computed, h } from 'vue';
+import { ref, computed, watch, h } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
@@ -145,7 +155,11 @@ const props = defineProps({
     rows: { type: Array, default: () => [] },
     summary: { type: Object, default: () => ({}) },
     schools: { type: Array, default: () => [] },
+    categories: { type: Object, default: () => ({}) },
+    items: { type: Array, default: () => [] },
     filterSchoolId: String,
+    filterCategory: { type: String, default: null },
+    filterItemId: { type: Number, default: null },
     pdfUrl: String,
     xlsUrl: String,
     activityLogs: { type: Array, default: () => [] },
@@ -154,8 +168,30 @@ const props = defineProps({
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/student-limits`;
 const schoolFilter = ref(props.filterSchoolId ?? '');
 
+// Category → item is a narrowing cascade — see Students.vue's class-category → class
+// filter, the reference pattern in this codebase for this kind of dependent dropdown.
+const categoryOptions = computed(() => Object.entries(props.categories).map(([value, label]) => ({ value, label })));
+const categoryFilter = ref(props.filterCategory ?? '');
+const itemFilter = ref(props.filterItemId ? String(props.filterItemId) : '');
+
+const filteredItems = computed(() => {
+    if (!categoryFilter.value) return props.items;
+    return props.items.filter((i) => i.category_key === categoryFilter.value);
+});
+const itemOptions = computed(() => filteredItems.value.map((i) => ({ value: String(i.id), label: i.title })));
+
+watch(categoryFilter, () => {
+    if (itemFilter.value && ! filteredItems.value.some((i) => String(i.id) === itemFilter.value)) {
+        itemFilter.value = '';
+    }
+});
+
 function applyFilter() {
-    router.get(base, { school_id: schoolFilter.value || undefined }, { preserveState: true });
+    router.get(base, {
+        school_id: schoolFilter.value || undefined,
+        category: categoryFilter.value || undefined,
+        item_id: itemFilter.value || undefined,
+    }, { preserveState: true });
 }
 
 const searchQuery = ref('');

@@ -76,8 +76,14 @@ class FestParticipationLimitService
      *
      * @return list<array<string, mixed>>
      */
-    public function studentLimitReportRows(?string $schoolId = null, ?string $search = null): array
-    {
+    public function studentLimitReportRows(
+        ?string $schoolId = null,
+        ?string $search = null,
+        ?string $category = null,
+        ?int $itemId = null,
+        bool $includePhotoDataUri = false,
+        bool $photoForSchoolAdmin = false,
+    ): array {
         // $this->event is already the root event (the controller constructs this service
         // with $event->rootEvent()) — the scheme itself is configured on the root's
         // fee_settings, so this is safe to resolve once here rather than per item.
@@ -91,7 +97,7 @@ class FestParticipationLimitService
                 'participants' => fn ($q) => $q
                 ->where('participant_role', 'performer')
                 ->whereNotNull('student_id')
-                ->with('student:id,name,reg_no'),
+                ->with('student:id,name,reg_no,tenant_id,photo'),
             ])
             ->get();
 
@@ -151,11 +157,23 @@ class FestParticipationLimitService
                 $items[] = [
                     'item_id'    => $reg->item_id,
                     'item_title' => $reg->item?->title,
+                    'category_key'   => \App\Support\FestClassGroupScheme::resolveItemKey($classGroupLabels, $reg->item?->class_group),
                     'category_label' => \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $reg->item?->class_group),
                     'dimension'  => $dims['group'] ? 'group' : ($dims['on_stage'] ? 'on_stage' : ($dims['off_stage'] ? 'off_stage' : null)),
                     'status'     => $reg->status,
                     'countable'  => $isCountable,
                 ];
+            }
+
+            // Category/item filters narrow which STUDENTS appear (has ≥1 matching
+            // registration) — they don't recompute the on-stage/off-stage/... totals,
+            // which stay whole-student across every item, matching how search/"only
+            // exceeding" already behave as row filters rather than re-aggregations.
+            if ($category !== null && ! collect($items)->contains(fn ($it) => $it['category_key'] === $category)) {
+                continue;
+            }
+            if ($itemId !== null && ! collect($items)->contains(fn ($it) => $it['item_id'] === $itemId)) {
+                continue;
             }
 
             $onStageLimit = $policy['max_onstage_per_student'] ?? null;
@@ -187,6 +205,8 @@ class FestParticipationLimitService
                 'reg_no'      => $student->reg_no,
                 'school_id'   => $entry['school_id'] ?? null,
                 'school_name' => $entry['school_name'] ?? null,
+                'photo_url'      => $photoForSchoolAdmin ? $student->photoUrl() : $student->sahodayaPhotoUrl($this->event->tenant_id),
+                'photo_data_uri' => $includePhotoDataUri ? $student->photoDataUri() : null,
                 'on_stage'    => $onStage,
                 'off_stage'   => $offStage,
                 'individual'  => $individual,
@@ -216,6 +236,32 @@ class FestParticipationLimitService
             'exceeding_group'     => $collection->filter(fn ($r) => $r['group']['exceeds'])->count(),
             'exceeding_total'     => $collection->filter(fn ($r) => $r['total']['exceeds'])->count(),
         ];
+    }
+
+    /**
+     * Every item under the root event, tagged with its category (class/age bracket) key
+     * and label — populates the Student Item Limits report's category/item filter
+     * dropdowns. Independent of studentLimitReportRows()'s own filtering, so an admin can
+     * pick any category/item that exists on the event even if it currently matches zero
+     * students.
+     *
+     * @return list<array{id: int, title: string, category_key: string, category_label: string}>
+     */
+    public function itemFilterOptions(): array
+    {
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event);
+
+        return FestEventItem::whereIn('event_id', $this->scopeEventIds())
+            ->orderBy('title')
+            ->get(['id', 'title', 'class_group'])
+            ->map(fn (FestEventItem $item) => [
+                'id'    => $item->id,
+                'title' => $item->title,
+                'category_key'   => \App\Support\FestClassGroupScheme::resolveItemKey($classGroupLabels, $item->class_group),
+                'category_label' => \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group),
+            ])
+            ->values()
+            ->all();
     }
 
     /** @return array{used: array<string, int>, limits: array<string, mixed>} */
