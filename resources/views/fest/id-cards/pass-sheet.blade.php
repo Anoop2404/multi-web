@@ -17,7 +17,6 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @page { size: A4 portrait; margin: 0; }
         html, body { font-family: Montserrat, Arial, DejaVu Sans, sans-serif; background: #eef2f7; color: #10213d; }
-        .sheet-title { text-align: center; font-size: 11px; font-weight: bold; color: #475569; padding: 4mm 0; }
         .page-break { page-break-after: always; }
 
         /* =====================================================
@@ -80,7 +79,7 @@
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .sahodaya-tagline {
-            margin-top: .3mm; font-size: 6.6pt; font-weight: 700; color: #000000;
+            margin-top: .3mm; font-size: 6.6pt; font-weight: 700; color: var(--primary);
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .event-branding { text-align: right; padding-right: 1mm; min-width: 0; }
@@ -262,10 +261,6 @@
     </style>
 </head>
 <body>
-@if($showTitle ?? true)
-<p class="sheet-title">{{ $clusterName }} · {{ $eventTitle }} · {{ ucfirst($audience ?? 'participant') }} passes</p>
-@endif
-
 @php
     $renderSections = ! empty($sections);
     $pagePartial = ! empty($isPdf) ? 'fest.id-cards.partials.pass-card-page-pdf' : 'fest.id-cards.partials.pass-card-page';
@@ -274,7 +269,6 @@
 @if($renderSections)
     @foreach($sections as $sectionIndex => $section)
         @if($sectionIndex > 0)<div class="page-break"></div>@endif
-        <p class="sheet-title" style="margin-top: 0;">{{ $section['item_title'] ?? 'Item' }}</p>
         @php $chunks = array_chunk($section['cards'] ?? [], \App\Support\FestIdCardTemplates::PASS_CARDS_PER_PAGE); @endphp
         @foreach($chunks as $pageIndex => $pageCards)
             @if($pageIndex > 0)<div class="page-break"></div>@endif
