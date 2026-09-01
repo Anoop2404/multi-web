@@ -99,7 +99,7 @@ trait DownloadsStudentFestIdCard
         $filename = "{$slug}-{$regSlug}-id-card.pdf";
         $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, 'student');
 
-        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $isDomPdf = empty(config('services.pdf_converter.url'));
         $html = view(
             $this->idCardSheetView($request, $customTemplate),
             $this->idCardViewData($event, $cluster, $cards, 'student', false, null, $customTemplate, $isDomPdf),

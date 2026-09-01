@@ -125,7 +125,7 @@ class FestIdCardController extends SahodayaAdminController
             default => $data['audience'],
         };
 
-        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $isDomPdf = empty(config('services.pdf_converter.url'));
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $targetEvent,
             $this->sahodaya,
@@ -172,7 +172,7 @@ class FestIdCardController extends SahodayaAdminController
 
         $slug = str($event->title)->slug('-');
 
-        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
         
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
@@ -226,7 +226,7 @@ class FestIdCardController extends SahodayaAdminController
 
         $slug = str($event->title)->slug('-');
 
-        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
 
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(

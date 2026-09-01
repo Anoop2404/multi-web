@@ -963,7 +963,7 @@ class FestSchoolReportController extends SchoolAdminController
         };
         $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, 'student');
 
-        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $isDomPdf = empty(config('services.pdf_converter.url'));
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $cluster,
@@ -1004,7 +1004,7 @@ class FestSchoolReportController extends SchoolAdminController
         $slug = str($event->title)->slug('-');
         $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
-        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
 
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
@@ -1041,7 +1041,7 @@ class FestSchoolReportController extends SchoolAdminController
         $slug = str($event->title)->slug('-');
         $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
-        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
 
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(

@@ -1026,7 +1026,7 @@ class FestReportService
 
         $audience = $this->reportAudience($request);
         $isPreview = $this->preview;
-        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $isDomPdf = empty(config('services.pdf_converter.url'));
 
         // Build photo map. Embed every photo as a base64 data URI — for the PDF this
         // avoids handing the renderer an auth-gated URL it has no session cookies to
