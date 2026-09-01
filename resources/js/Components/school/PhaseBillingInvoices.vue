@@ -128,7 +128,10 @@ function phaseFeeStatusLabel(status) {
 }
 
 function canUploadPhaseFee(pf) {
-    return Number(pf.outstanding ?? 0) > 0 && ['pending', 'rejected'].includes(pf.status);
+    // 'partial' must stay in this list — otherwise a school that already had one
+    // partial payment approved has no way to submit the remaining balance (matches
+    // EventBillingPanel.vue's plain-invoice whitelist).
+    return Number(pf.outstanding ?? 0) > 0 && ['pending', 'partial', 'rejected'].includes(pf.status);
 }
 
 function phasePaymentRef(phaseId) {

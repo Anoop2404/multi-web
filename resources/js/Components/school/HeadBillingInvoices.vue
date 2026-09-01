@@ -126,7 +126,10 @@ function headFeeStatusLabel(status) {
 }
 
 function canUploadHeadFee(hf) {
-    return Number(hf.outstanding ?? 0) > 0 && ['pending', 'rejected'].includes(hf.status);
+    // 'partial' must stay in this list — otherwise a school that already had one
+    // partial payment approved has no way to submit the remaining balance (matches
+    // EventBillingPanel.vue's plain-invoice whitelist).
+    return Number(hf.outstanding ?? 0) > 0 && ['pending', 'partial', 'rejected'].includes(hf.status);
 }
 
 function headPaymentRef(headId) {
