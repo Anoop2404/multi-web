@@ -204,6 +204,31 @@ class FestParticipationLimitServiceTest extends TestCase
         $this->assertSame($schoolId, $allSchoolsRows[0]['school_id']);
     }
 
+    public function test_a_limit_of_zero_means_not_set_in_both_the_report_and_registration_blocking(): void
+    {
+        // A limit of 0 (vs. blank/null) is reachable through the settings form
+        // (nullable|integer|min:0) -- it must mean the same thing everywhere: no cap,
+        // not "block everything" in the report while registration lets everything
+        // through, or vice versa.
+        [$event, $schoolId] = $this->fixture(['max_total_per_student' => 0, 'max_onstage_per_student' => 0]);
+        $studentId = 1;
+
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Onstage', 'item_code' => 'OSZ', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $this->registerStudentFor($event, $schoolId, $studentId, $item);
+
+        $service = new FestParticipationLimitService($event);
+        $rows = $service->studentLimitReportRows($schoolId);
+
+        $this->assertNull($rows[0]['on_stage']['limit'], 'a limit of 0 must display as no cap, not "0"');
+        $this->assertFalse($rows[0]['on_stage']['exceeds'], 'a limit of 0 must not flag every user of that dimension as exceeding');
+        $this->assertNull($rows[0]['total']['limit']);
+        $this->assertFalse($rows[0]['total']['exceeds']);
+
+        $secondItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Onstage 2', 'item_code' => 'OSZ2', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $errors = $service->validateRegistration($secondItem, $schoolId, [$studentId]);
+        $this->assertSame([], $errors, 'a limit of 0 must not block registration either -- report and enforcement must agree');
+    }
+
     public function test_offstage_drawing_submax_does_not_block_a_writing_item(): void
     {
         [$event, $schoolId] = $this->fixture(['max_offstage_drawing_per_student' => 1]);

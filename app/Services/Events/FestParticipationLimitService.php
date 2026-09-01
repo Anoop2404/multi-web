@@ -160,14 +160,19 @@ class FestParticipationLimitService
 
             $onStageLimit = $policy['max_onstage_per_student'] ?? null;
             $offStageLimit = $policy['max_offstage_per_student'] ?? null;
-            $individualLimit = (filled($onStageLimit) || filled($offStageLimit))
+            // A limit of 0 means "not set" here, matching validateStudent()'s own
+            // !empty($policy[...]) checks below — a Sahodaya admin who leaves one of
+            // these blank vs. types 0 must get identical behavior in both the report and
+            // actual registration blocking, not the report flagging everyone as over a
+            // "cap of zero" while registration enforces nothing at all.
+            $individualLimit = (! empty($onStageLimit) || ! empty($offStageLimit))
                 ? (int) ($onStageLimit ?: 0) + (int) ($offStageLimit ?: 0)
                 : null;
 
             $dimension = fn (int $used, $limit) => [
                 'used'    => $used,
-                'limit'   => filled($limit) ? (int) $limit : null,
-                'exceeds' => filled($limit) && $used > (int) $limit,
+                'limit'   => ! empty($limit) ? (int) $limit : null,
+                'exceeds' => ! empty($limit) && $used > (int) $limit,
             ];
 
             $onStage = $dimension($onStageUsed, $onStageLimit);
