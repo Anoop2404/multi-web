@@ -72,6 +72,16 @@
                         @change="applyFilters"
                     />
                 </div>
+                <div v-if="classGroupOptions.length" class="w-44">
+                    <label class="text-xs font-semibold text-gray-600">Filter by category</label>
+                    <SearchableSelect
+                        v-model="form.class_group"
+                        :options="classGroupOptions"
+                        all-label="All categories"
+                        class="mt-1"
+                        @change="applyFilters"
+                    />
+                </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by status</label>
                     <SearchableSelect
@@ -152,6 +162,7 @@
                         <th class="p-3 w-12">Sl No</th>
                         <th class="p-3">School</th>
                         <th class="p-3">Item</th>
+                        <th class="p-3">Category</th>
                         <th class="p-3">Status</th>
                         <th class="p-3">Participants</th>
                         <th class="p-3"></th>
@@ -166,6 +177,7 @@
                         <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
                         <td class="p-3">{{ (schoolNames[reg.school_id] ?? reg.school_id ?? '').toString().toUpperCase() }}</td>
                         <td class="p-3">{{ reg.item?.title ?? '—' }}</td>
+                        <td class="p-3 text-gray-600">{{ reg.item?.category_label ?? '—' }}</td>
                         <td class="p-3">
                             <span :class="statusClass(reg.status)" class="text-xs font-semibold px-2 py-0.5 rounded">
                                 {{ reg.status }}
@@ -214,7 +226,7 @@
                         </td>
                     </tr>
                     <tr v-if="!registrationsList.length">
-                        <td colspan="6" class="p-0">
+                        <td colspan="7" class="p-0">
                             <EmptyState title="No registrations match your filters"
                                 description="Try a different school, status, or item filter, or clear the search box above." icon="📋" class="py-8" />
                         </td>
@@ -459,8 +471,9 @@ const props = defineProps({
     registerStudents: { type: Array, default: () => [] },
     registerSchoolId: { type: [String, Number], default: '' },
     eventItems: { type: Array, default: () => [] },
+    classGroupOptions: { type: Array, default: () => [] },
     schoolRegions: { type: Object, default: () => ({}) },
-    filters: { type: Object, default: () => ({ search: '', school_id: '', status: '', region_id: '' }) },
+    filters: { type: Object, default: () => ({ search: '', school_id: '', status: '', region_id: '', class_group: '' }) },
     selectedHeadId: { type: [String, Number], default: null },
     selectedItemId: { type: [Number, String], default: null },
     competitionUrl: { type: String, default: null },
@@ -502,7 +515,10 @@ const form = reactive({
     status: props.filters?.status ?? '',
     search: props.filters?.search ?? '',
     region_id: props.filters?.region_id ?? '',
+    class_group: props.filters?.class_group ?? '',
 });
+
+const classGroupOptions = computed(() => props.classGroupOptions.map(c => ({ value: c.value, label: c.label })));
 
 const approvedPdfUrl = computed(() => {
     const p = new URLSearchParams();
@@ -521,6 +537,7 @@ function applyFilters() {
         item_id: form.item_id || undefined,
         status: form.status || undefined,
         region_id: form.region_id || undefined,
+        class_group: form.class_group || undefined,
     }, { preserveScroll: true, preserveState: true, replace: true });
 }
 

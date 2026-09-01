@@ -285,10 +285,10 @@ const standbyPickerOpen = ref(false);
 
 const showStandbyPicker = computed(() => {
     if (props.isTeacherFest) return false;
-    if (props.item.max_subs === 0 || props.item.standbys === 0) return false;
-    if (props.item.max_subs != null && props.item.max_subs > 0) return true;
-    if (props.item.standbys != null && props.item.standbys > 0) return true;
-    return isGroup.value;
+    const criteria = props.item.criteria_json ?? {};
+    const maxSubs = props.item.max_subs ?? criteria.max_subs;
+    const standbys = props.item.standbys ?? criteria.standbys;
+    return (maxSubs != null && maxSubs > 0) || (standbys != null && standbys > 0);
 });
 
 const displayTitle = computed(() => {

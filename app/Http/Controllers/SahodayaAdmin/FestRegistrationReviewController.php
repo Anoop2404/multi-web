@@ -47,6 +47,12 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $filterSchoolId = $request->input('school_id') ?: null;
         $filterStatus = $request->input('status') ?: null;
         $filterRegionId = $request->input('region_id') ?: null;
+        $filterClassGroup = $request->input('class_group') ?: null;
+
+        if ($filterClassGroup) {
+            $classGroupItemIds = $event->items->where('class_group', $filterClassGroup)->pluck('id')->all();
+            $itemIds = $itemIds === null ? $classGroupItemIds : array_values(array_intersect($itemIds, $classGroupItemIds));
+        }
 
         // When a region filter is active, resolve school IDs in that region and
         // restrict the query to only those schools.
@@ -80,6 +86,22 @@ class FestRegistrationReviewController extends SahodayaAdminController
             ->latest()
             ->paginate(50)
             ->withQueryString();
+
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+        $registrations->getCollection()->each(function (FestRegistration $reg) use ($classGroupLabels, $artsCategoryLabels) {
+            if ($reg->item) {
+                $reg->item->setAttribute('category_label', FestItemCategoryLabel::resolve($reg->item, $classGroupLabels, $artsCategoryLabels));
+            }
+        });
+
+        $classGroupOptions = $event->items
+            ->pluck('class_group')
+            ->filter(fn ($cg) => $cg && $cg !== 'open')
+            ->unique()
+            ->map(fn ($cg) => ['value' => $cg, 'label' => FestClassGroupScheme::resolveItemLabel($classGroupLabels, $cg)])
+            ->sortBy('label')
+            ->values();
 
         // Count of registrations matching the school/item/search filters (deliberately
         // ignoring the on-screen status filter — the number that matters for bulk
@@ -177,11 +199,13 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'registerStudents'   => $registerStudents,
             'registerSchoolId'   => $registerSchoolId,
             'eventItems'         => $this->itemsWithCategoryLabel($event),
+            'classGroupOptions'  => $classGroupOptions,
             'filters'            => [
-                'search'    => $request->input('search', ''),
-                'school_id' => $filterSchoolId ?? '',
-                'status'    => $filterStatus ?? '',
-                'region_id' => $filterRegionId ?? '',
+                'search'      => $request->input('search', ''),
+                'school_id'   => $filterSchoolId ?? '',
+                'status'      => $filterStatus ?? '',
+                'region_id'   => $filterRegionId ?? '',
+                'class_group' => $filterClassGroup ?? '',
             ],
             'selectedHeadId'     => $selectedHeadId,
             'selectedItemId'     => $itemId,
