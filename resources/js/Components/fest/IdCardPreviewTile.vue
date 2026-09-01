@@ -255,7 +255,7 @@ const items = computed(() => {
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pass-tile__tagline {
-    display: block; margin-top: 0.03rem; font-size: 0.38rem; font-weight: 600; color: #64789a;
+    display: block; margin-top: 0.03rem; font-size: 0.46rem; font-weight: 700; color: #64789a;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pass-tile__event { flex-shrink: 0; min-width: 0; max-width: 40%; text-align: right; }
