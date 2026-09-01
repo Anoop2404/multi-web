@@ -488,6 +488,20 @@ class FestRegistrationController extends SchoolAdminController
      */
     protected function redirectHubToSchoolPartition(Request $request, FestEvent $event, string $tenantId, string $programSlug, string $suffix): ?\Illuminate\Http\RedirectResponse
     {
+        // Phased regional billing (Phases & Payment Levels) is a separate, mutually-exclusive
+        // conduct system from the legacy region/cluster partitioning resolved below — see
+        // FestPartitionService::assertLegacyPartitioningAllowed(). A phased hub's own phase-
+        // region leaves are tagged with partition_key/cluster_key too (FestPhaseTopologyService
+        // reuses those columns for its own indexing), which makes isPartitionedHub() below a
+        // false positive for the LEGACY system on a hub that's actually using the new one —
+        // without this guard, landing on the hub's own event id triggered a legacy partition
+        // (re)sync that immediately aborted with a 422. hydrateEventForSchoolRegistration()
+        // already renders a phased hub correctly (phase_region_options picker), so this legacy
+        // redirect simply doesn't apply here.
+        if ($event->usesPhasedRegionalBilling()) {
+            return null;
+        }
+
         if (! app(FestPartitionService::class)->isPartitionedHub($event)) {
             return null;
         }
