@@ -903,6 +903,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::put('/regions/{region}', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'update'])->name('regions.update');
         Route::delete('/regions/{region}', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'destroy'])->name('regions.destroy');
 
+        Route::get('/phase-regions', [\App\Http\Controllers\SahodayaAdmin\FestPhaseRegionMatrixController::class, 'pickEvent'])->name('phase-regions.pick');
+
         // Named class category schemes (Sahodaya-wide, reusable across events) — see
         // FestEventSettingsController::storeClassCategoryScheme() and friends.
         Route::post('/class-category-schemes', [FestEventSettingsController::class, 'storeClassCategoryScheme'])->name('class-category-schemes.store');
@@ -1154,6 +1156,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/phases/{phase}/regions', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'syncPhaseRegions'])->name('phases.regions.sync');
             Route::post('/{event}/phases/{phase}/schools/{schoolId}/region', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'overrideSchoolRegion'])->name('phases.schools.region.override');
             Route::post('/{event}/schools/{schoolId}/fee-slab', [\App\Http\Controllers\SahodayaAdmin\FestPhasedWorkflowController::class, 'overrideSchoolFeeSlab'])->name('schools.fee-slab.override');
+            Route::get('/{event}/phases/regions-matrix', [\App\Http\Controllers\SahodayaAdmin\FestPhaseRegionMatrixController::class, 'index'])->name('phases.regions-matrix');
+            Route::post('/{event}/region-change-requests/{regionChangeRequest}/approve', [\App\Http\Controllers\SahodayaAdmin\FestPhaseRegionMatrixController::class, 'approve'])->name('region-change-requests.approve');
+            Route::post('/{event}/region-change-requests/{regionChangeRequest}/reject', [\App\Http\Controllers\SahodayaAdmin\FestPhaseRegionMatrixController::class, 'reject'])->name('region-change-requests.reject');
             Route::get('/{event}/phase-plan-wizard', [\App\Http\Controllers\SahodayaAdmin\FestPhasePlanWizardController::class, 'index'])->name('phase-plan-wizard.index');
             Route::post('/{event}/phase-plan-wizard/preview', [\App\Http\Controllers\SahodayaAdmin\FestPhasePlanWizardController::class, 'preview'])->name('phase-plan-wizard.preview');
             Route::post('/{event}/phase-plan-wizard/commit', [\App\Http\Controllers\SahodayaAdmin\FestPhasePlanWizardController::class, 'commit'])->name('phase-plan-wizard.commit');
@@ -1223,6 +1228,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/event-staff/{assignment}', [\App\Http\Controllers\SahodayaAdmin\FestEventStaffController::class, 'destroy'])->name('event-staff.destroy');
             Route::get('/{event}/marks', [FestMarkEntryController::class, 'index'])->name('marks.index');
             Route::post('/{event}/marks', [FestMarkEntryController::class, 'store'])->name('marks.store');
+            Route::post('/{event}/marks/bulk', [FestMarkEntryController::class, 'bulkStore'])->name('marks.bulk-store');
             Route::get('/{event}/mark-settings', [FestMarkEntryController::class, 'markSettings'])->name('mark-settings.index');
             Route::get('/{event}/mark-settings/bulk', [FestMarkEntryController::class, 'markSettingsBulk'])->name('mark-settings.bulk');
             Route::post('/{event}/mark-settings/bulk', [FestMarkEntryController::class, 'bulkUpdateMarkSettings'])->name('mark-settings.bulk-update');
@@ -1459,6 +1465,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/numbering-register/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportNumberingRegister'])->name('reports.numbering-register.export');
                 Route::get('/{event}/reports/pending-approvals', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'pendingApprovals'])->name('reports.pending-approvals');
                 Route::get('/{event}/reports/pending-approvals/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportPendingApprovals'])->name('reports.pending-approvals.export');
+                Route::get('/{event}/reports/student-limits', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'studentLimits'])->name('reports.student-limits');
                 Route::get('/{event}/reports/student-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'studentWise'])->name('reports.student-wise');
                 Route::get('/{event}/reports/item-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemWise'])->name('reports.item-wise');
                 Route::get('/{event}/reports/item-wise/export-all', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportItemWiseAll'])->name('reports.item-wise.export-all');

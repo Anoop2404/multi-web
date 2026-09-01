@@ -232,6 +232,10 @@
                                class="text-xs font-semibold text-slate-600 px-2 py-1 rounded-full bg-slate-100 hover:bg-slate-200">
                                 Clash report
                             </a>
+                            <a :href="`${programBase}/events/${event.id}/region-change-requests`"
+                               class="text-xs font-semibold text-slate-600 px-2 py-1 rounded-full bg-slate-100 hover:bg-slate-200">
+                                Region change requests
+                            </a>
                         </div>
                     </div>
                     <div v-if="event.verification_status?.verification_day" class="mt-3 notice-banner text-xs"

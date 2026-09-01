@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\SchoolAdmin\FestClashRequestController;
+use App\Http\Controllers\SchoolAdmin\FestRegionChangeRequestController;
 use App\Http\Controllers\SchoolAdmin\FestSubstitutionRequestController;
 use App\Http\Controllers\SchoolAdmin\FestRegistrationController;
 use App\Http\Controllers\SchoolAdmin\FestSchoolReportController;
@@ -291,6 +292,12 @@ foreach ($festPrograms as $cfg) {
         Route::post('/events/{event}/substitution-requests', [FestSubstitutionRequestController::class, 'store'])
             ->defaults('program', $slug)
             ->name('substitution-requests.store');
+        Route::get('/events/{event}/region-change-requests', [FestRegionChangeRequestController::class, 'index'])
+            ->defaults('program', $slug)
+            ->name('region-change-requests.index');
+        Route::post('/events/{event}/region-change-requests', [FestRegionChangeRequestController::class, 'store'])
+            ->defaults('program', $slug)
+            ->name('region-change-requests.store');
         Route::get('/events/{event}/clash-requests', [FestClashRequestController::class, 'index'])
             ->defaults('program', $slug)
             ->name('clash-requests.index');
