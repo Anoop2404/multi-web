@@ -10,7 +10,11 @@
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/phases`" class="link-brand font-semibold">Phases</Link> page first.
         </div>
 
-        <div v-else class="card overflow-hidden p-0">
+        <div v-else class="space-y-3">
+            <input v-model="schoolSearch" type="search" class="field text-sm max-w-xs" placeholder="Search schools by name…">
+            <p class="text-xs text-slate-400">{{ filteredSchools.length }} of {{ schools.length }} school(s)</p>
+
+            <div class="card overflow-hidden p-0">
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
@@ -25,7 +29,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="school in schools" :key="school.id">
+                        <tr v-for="school in filteredSchools" :key="school.id">
                             <td class="sticky left-0 bg-white font-medium text-slate-700">{{ school.name }}</td>
                             <td v-for="phase in phases" :key="`${school.id}-${phase.id}`"
                                 :class="phase.regions.length === 0 ? 'bg-slate-50 text-slate-300' : ''">
@@ -56,11 +60,14 @@
                                 </template>
                             </td>
                         </tr>
-                        <tr v-if="!schools.length">
-                            <td :colspan="phases.length + 1" class="text-center text-slate-400 py-8">No approved schools yet.</td>
+                        <tr v-if="!filteredSchools.length">
+                            <td :colspan="phases.length + 1" class="text-center text-slate-400 py-8">
+                                {{ schools.length ? 'No schools match your search.' : 'No approved schools yet.' }}
+                            </td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
             </div>
         </div>
 
@@ -105,7 +112,7 @@
 <script setup>
 import { router, useForm } from '@inertiajs/vue3';
 import { Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
@@ -122,6 +129,13 @@ const props = defineProps({
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const { prompt } = useConfirm();
+
+const schoolSearch = ref('');
+const filteredSchools = computed(() => {
+    const q = schoolSearch.value.trim().toLowerCase();
+    if (!q) return props.schools;
+    return props.schools.filter((school) => school.name?.toLowerCase().includes(q));
+});
 
 const editingCell = ref(null);
 const overrideForm = useForm({ region_id: null, reason: '' });
