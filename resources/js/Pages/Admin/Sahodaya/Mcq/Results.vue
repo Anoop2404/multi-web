@@ -14,15 +14,15 @@
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold">{{ registrations.length }}</p>
+                <p class="text-xl font-bold">{{ counts.total }}</p>
                 <p class="text-xs text-slate-500 mt-1">Registrations</p>
             </div>
             <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold text-emerald-700">{{ presentCount }}</p>
+                <p class="text-xl font-bold text-emerald-700">{{ counts.present }}</p>
                 <p class="text-xs text-slate-500 mt-1">Present</p>
             </div>
             <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold">{{ markedCount }}</p>
+                <p class="text-xl font-bold">{{ counts.marked }}</p>
                 <p class="text-xs text-slate-500 mt-1">Marks entered</p>
             </div>
             <div class="card card--muted !py-4 text-center">
@@ -71,9 +71,14 @@
             <div class="p-4 border-b border-slate-100 flex flex-wrap gap-3 items-center justify-between">
                 <div>
                     <h3 class="section-title !mb-0">Mark entry</h3>
-                    <p class="section-desc">Offline scores after attendance is marked ({{ filteredRegistrations.length }} candidate(s)).</p>
+                    <p class="section-desc">Offline scores after attendance is marked ({{ registrations.total }} candidate(s)).</p>
                 </div>
-                <input v-model="regSearch" type="search" class="field max-w-xs text-xs" placeholder="Search name, adm no, ticket…">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <input v-model="filterForm.search" type="search" class="field max-w-xs text-xs" placeholder="Search name, adm no, ticket…">
+                    <SearchableSelect v-model="filterForm.school_id" :options="schoolOptions" :all-option="true" all-label="All schools" placeholder="All schools" />
+                    <SearchableSelect v-model="filterForm.class" :options="classOptions.map(c => ({ value: c, label: c }))" :all-option="true" all-label="All classes" placeholder="All classes" />
+                    <button v-if="hasFilters" type="button" @click="clearFilters" class="text-xs text-slate-400 hover:underline">Clear</button>
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
@@ -92,8 +97,8 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(r, i) in paginatedRegistrations" :key="r.id" :class="['absent','malpractice','withheld'].includes(r.attendance_status) ? 'opacity-60' : ''">
-                            <td class="text-xs font-bold text-slate-400">{{ (resultsPage - 1) * resultsPageSize + i + 1 }}</td>
+                        <tr v-for="(r, i) in registrations.data" :key="r.id" :class="['absent','malpractice','withheld'].includes(r.attendance_status) ? 'opacity-60' : ''">
+                            <td class="text-xs font-bold text-slate-400">{{ (registrations.current_page - 1) * registrations.per_page + i + 1 }}</td>
                             <td class="font-bold text-slate-900">{{ r.student?.name || r.participant_name || ('#' + r.student_id) }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
@@ -132,79 +137,85 @@
                                 <button v-if="canCancelRegistration(r)" type="button" @click="cancelRegistration(r.id)" class="text-red-600 font-semibold text-xs ml-3">Cancel</button>
                             </td>
                         </tr>
-                        <tr v-if="!filteredRegistrations.length">
+                        <tr v-if="!registrations.data?.length">
                             <td :colspan="10" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            <div v-if="filteredRegistrations.length > resultsPageSize" class="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
-                <div>Showing <span class="font-bold text-slate-900">{{ (resultsPage - 1) * resultsPageSize + 1 }}</span> to <span class="font-bold text-slate-900">{{ Math.min(resultsPage * resultsPageSize, filteredRegistrations.length) }}</span> of <span class="font-bold text-slate-900">{{ filteredRegistrations.length }}</span> candidates</div>
-                <div class="flex items-center gap-2">
-                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="resultsPage <= 1" @click="resultsPage--">← Previous</button>
-                    <span class="font-semibold">Page {{ resultsPage }} of {{ totalResultsPages }}</span>
-                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="resultsPage >= totalResultsPages" @click="resultsPage++">Next →</button>
-                </div>
-            </div>
+            <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total, last_page: registrations.last_page }" />
         </section>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { useConfirm } from '@/composables/useConfirm';
+import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 
-const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, gradeBands: { type: Array, default: () => [] } });
+const props = defineProps({
+    sahodaya: Object,
+    publicUrl: String,
+    pendingPaymentsCount: Number,
+    exam: Object,
+    registrations: Object,
+    counts: { type: Object, default: () => ({ total: 0, present: 0, marked: 0 }) },
+    gradeBands: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
+    schoolOptions: { type: Array, default: () => [] },
+    classOptions: { type: Array, default: () => [] },
+});
 
 const { confirm, prompt } = useConfirm();
 
-const regSearch = ref('');
-const resultsPage = ref(1);
-const resultsPageSize = ref(50);
 const marksFile = ref(null);
-const page = usePage();
 
-watch(regSearch, () => {
-    resultsPage.value = 1;
+const filterForm = reactive({
+    search: props.filters?.search ?? '',
+    school_id: props.filters?.school_id ?? null,
+    class: props.filters?.class ?? null,
 });
 
-const markForms = reactive({});
-for (const r of props.registrations) {
-    markForms[r.id] = {
-        correct_count: r.mark?.correct_count ?? 0,
-        wrong_count: r.mark?.wrong_count ?? 0,
-        unanswered_count: r.mark?.unanswered_count ?? 0,
-        score: r.mark?.score ?? 0,
-        grade: r.mark?.grade ?? '',
-    };
+const hasFilters = computed(() => !!(filterForm.search || filterForm.school_id || filterForm.class));
+
+function applyFilters() {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/results`, { ...filterForm }, { preserveState: true, preserveScroll: true });
 }
 
-const presentCount = computed(() => props.registrations.filter((r) => r.attendance_status === 'present').length);
-const markedCount = computed(() => props.registrations.filter((r) => r.mark?.score != null).length);
+useDebouncedInertiaFilters(filterForm, applyFilters, () => props.filters);
+
+function clearFilters() {
+    filterForm.search = '';
+    filterForm.school_id = null;
+    filterForm.class = null;
+    applyFilters();
+}
+
+const markForms = reactive({});
+function syncMarkForms(registrations) {
+    for (const r of registrations?.data ?? []) {
+        markForms[r.id] = {
+            correct_count: r.mark?.correct_count ?? 0,
+            wrong_count: r.mark?.wrong_count ?? 0,
+            unanswered_count: r.mark?.unanswered_count ?? 0,
+            score: r.mark?.score ?? 0,
+            grade: r.mark?.grade ?? '',
+        };
+    }
+}
+syncMarkForms(props.registrations);
+watch(() => props.registrations, syncMarkForms);
+
 const gradeOptions = computed(() => props.gradeBands?.length ? props.gradeBands.map((b) => b.label) : ['A+', 'A', 'B', 'C', 'D', 'F']);
 
 function canEnterMarks(r) {
     return r.attendance_status === 'present' && !props.exam.results_published;
 }
-
-const filteredRegistrations = computed(() => {
-    const q = regSearch.value.trim().toLowerCase();
-    if (!q) return props.registrations;
-    return props.registrations.filter((r) =>
-        [r.student?.name, r.student?.admission_number, r.student?.reg_no, r.teacher?.name, r.teacher?.reg_no, r.teacher?.employee_code, r.hall_ticket_no, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
-    );
-});
-
-const totalResultsPages = computed(() => Math.ceil(filteredRegistrations.value.length / resultsPageSize.value) || 1);
-
-const paginatedRegistrations = computed(() => {
-    const start = (resultsPage.value - 1) * resultsPageSize.value;
-    return filteredRegistrations.value.slice(start, start + resultsPageSize.value);
-});
 
 function importMarks() {
     const file = marksFile.value?.files?.[0];

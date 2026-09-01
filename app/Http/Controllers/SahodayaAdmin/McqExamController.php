@@ -142,9 +142,12 @@ class McqExamController extends SahodayaAdminController
 
         $exam->load(['series:id,title', 'parentExam:id,title,exam_level']);
 
-        $registrations = McqRegistration::where('exam_id', $exam->id)
-            ->with(['mark', 'student', 'feeReceipt'])
-            ->get();
+        $registrationCounts = [
+            'total'            => McqRegistration::where('exam_id', $exam->id)->count(),
+            'present'          => McqRegistration::where('exam_id', $exam->id)->where('attendance_status', 'present')->count(),
+            'marked'           => McqRegistration::where('exam_id', $exam->id)->whereHas('mark', fn ($q) => $q->whereNotNull('score'))->count(),
+            'pending_approval' => McqRegistration::where('exam_id', $exam->id)->where('approval_status', 'pending_payment')->count(),
+        ];
 
         $schoolFees = McqSchoolFee::where('exam_id', $exam->id)
             ->with(['school', 'feeReceipt'])
@@ -178,7 +181,7 @@ class McqExamController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Mcq/Show', [
             'exam'              => $examPayload,
-            'registrations'     => $registrations,
+            'registrationCounts' => $registrationCounts,
             'schoolFees'        => $schoolFees,
             'pendingPaymentApprovals' => $pendingPaymentApprovals,
             'ledgerAccount'     => [

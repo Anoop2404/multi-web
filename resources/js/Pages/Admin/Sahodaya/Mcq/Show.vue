@@ -2,7 +2,7 @@
     <SahodayaAdminLayout :title="exam.title" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="exam.title" eyebrow="Talent Search exam"
-                    :description="`${registrations.length} registrations · ${exam.status}`">
+                    :description="`${registrationCounts.total} registrations · ${exam.status}`">
             <template #actions>
                 <span v-if="exam.series_title" class="text-xs text-slate-500 mr-2">{{ exam.series_title }}</span>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/preview`"
@@ -32,24 +32,24 @@
             :exam="exam"
             :pending-payment-approvals="pendingPaymentApprovals"
             :tickets-issued-count="exam.tickets_issued_count ?? 0"
-            :registration-count="registrations.length"
+            :registration-count="registrationCounts.total"
         />
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold">{{ registrations.length }}</p>
+                <p class="text-xl font-bold">{{ registrationCounts.total }}</p>
                 <p class="text-xs text-slate-500 mt-1">Registrations</p>
             </div>
             <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold text-amber-700">{{ pendingApprovalCount }}</p>
+                <p class="text-xl font-bold text-amber-700">{{ registrationCounts.pending_approval }}</p>
                 <p class="text-xs text-slate-500 mt-1">Pending payment</p>
             </div>
             <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold text-emerald-700">{{ presentCount }}</p>
+                <p class="text-xl font-bold text-emerald-700">{{ registrationCounts.present }}</p>
                 <p class="text-xs text-slate-500 mt-1">Present</p>
             </div>
             <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold">{{ markedCount }}</p>
+                <p class="text-xl font-bold">{{ registrationCounts.marked }}</p>
                 <p class="text-xs text-slate-500 mt-1">Marks entered</p>
             </div>
             <div class="card card--muted !py-4 text-center">
@@ -303,7 +303,7 @@ const props = defineProps({
     publicUrl: String,
     pendingPaymentsCount: Number,
     exam: Object,
-    registrations: Array,
+    registrationCounts: { type: Object, default: () => ({ total: 0, present: 0, marked: 0, pending_approval: 0 }) },
     schoolFees: { type: Array, default: () => [] },
     pendingPaymentApprovals: { type: Number, default: 0 },
     classCategories: { type: Array, default: () => [] },
@@ -394,9 +394,6 @@ const hallTicketTemplateOptions = computed(() => props.hallTicketTemplates.map((
 
 const certificateTemplateOptions = computed(() => props.certificateTemplates.map((t) => ({ value: t.id, label: t.title })));
 
-const presentCount = computed(() => props.registrations.filter((r) => r.attendance_status === 'present').length);
-const markedCount = computed(() => props.registrations.filter((r) => r.mark?.score != null).length);
-const pendingApprovalCount = computed(() => props.registrations.filter((r) => r.approval_status === 'pending_payment').length);
 
 function save() {
     form.put(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}`, { preserveScroll: true });

@@ -137,8 +137,13 @@
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <input v-model="searchQuery" type="search" class="field max-w-md text-xs" placeholder="Search ticket, name, admission no…">
-            <span class="text-xs text-slate-500 font-semibold">Showing {{ filteredRegistrations.length }} candidate(s)</span>
+            <div class="flex flex-wrap gap-2 items-center">
+                <input v-model="filterForm.search" type="search" class="field max-w-md text-xs" placeholder="Search ticket, name, admission no…">
+                <SearchableSelect v-model="filterForm.school_id" :options="schoolOptions" :all-option="true" all-label="All schools" placeholder="All schools" />
+                <SearchableSelect v-model="filterForm.class" :options="classOptions.map(c => ({ value: c, label: c }))" :all-option="true" all-label="All classes" placeholder="All classes" />
+                <button v-if="hasFilters" type="button" @click="clearFilters" class="text-xs text-slate-400 hover:underline">Clear</button>
+            </div>
+            <span class="text-xs text-slate-500 font-semibold">Showing {{ registrations.total }} candidate(s)</span>
         </div>
 
         <div class="form-section overflow-hidden !p-0">
@@ -155,34 +160,27 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(r, i) in paginatedRegistrations" :key="r.id">
-                            <td class="text-xs font-bold text-slate-400">{{ (ticketsPage - 1) * ticketsPageSize + i + 1 }}</td>
+                        <tr v-for="(r, i) in registrations.data" :key="r.id">
+                            <td class="text-xs font-bold text-slate-400">{{ (registrations.current_page - 1) * registrations.per_page + i + 1 }}</td>
                             <td class="font-mono text-xs font-bold text-indigo-700">{{ r.hall_ticket_no || '—' }}</td>
                             <td class="font-bold text-slate-900">{{ r.student?.name || r.teacher?.name || r.participant_name || '—' }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td class="text-xs capitalize">{{ (r.approval_status || 'pending').replaceAll('_', ' ') }}</td>
                             <td class="text-xs">{{ r.hall_room || '—' }} {{ r.seat_no ? `· Seat ${r.seat_no}` : '' }}</td>
                         </tr>
-                        <tr v-if="!filteredRegistrations.length">
+                        <tr v-if="!registrations.data?.length">
                             <td colspan="6" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            <div v-if="filteredRegistrations.length > ticketsPageSize" class="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
-                <div>Showing <span class="font-bold text-slate-900">{{ (ticketsPage - 1) * ticketsPageSize + 1 }}</span> to <span class="font-bold text-slate-900">{{ Math.min(ticketsPage * ticketsPageSize, filteredRegistrations.length) }}</span> of <span class="font-bold text-slate-900">{{ filteredRegistrations.length }}</span> candidates</div>
-                <div class="flex items-center gap-2">
-                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="ticketsPage <= 1" @click="ticketsPage--">← Previous</button>
-                    <span class="font-semibold">Page {{ ticketsPage }} of {{ totalTicketsPages }}</span>
-                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="ticketsPage >= totalTicketsPages" @click="ticketsPage++">Next →</button>
-                </div>
-            </div>
+            <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total, last_page: registrations.last_page }" />
         </div>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
@@ -190,14 +188,16 @@ import McqHallTicketPreview from '@/Components/sahodaya/McqHallTicketPreview.vue
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
 import FormField from '@/Components/ui/FormField.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { useConfirm } from '@/composables/useConfirm';
+import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 
 const props = defineProps({
     sahodaya: Object,
     publicUrl: String,
     pendingPaymentsCount: Number,
     exam: Object,
-    registrations: Array,
+    registrations: Object,
     hallTicketDesign: Object,
     logoUrl: String,
     previewSample: Object,
@@ -205,18 +205,35 @@ const props = defineProps({
     halls: { type: Array, default: () => [] },
     hallTicketsPublished: { type: Boolean, default: false },
     hallTicketsPublishedAt: { type: String, default: null },
+    filters: { type: Object, default: () => ({}) },
+    schoolOptions: { type: Array, default: () => [] },
+    classOptions: { type: Array, default: () => [] },
 });
 
-const searchQuery = ref('');
 const { confirm } = useConfirm();
-const ticketsPage = ref(1);
-const ticketsPageSize = ref(50);
 const logoInput = ref(null);
 const localLogoPreview = ref(null);
 
-watch(searchQuery, () => {
-    ticketsPage.value = 1;
+const filterForm = reactive({
+    search: props.filters?.search ?? '',
+    school_id: props.filters?.school_id ?? null,
+    class: props.filters?.class ?? null,
 });
+
+const hasFilters = computed(() => !!(filterForm.search || filterForm.school_id || filterForm.class));
+
+function applyFilters() {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets`, { ...filterForm }, { preserveState: true, preserveScroll: true });
+}
+
+useDebouncedInertiaFilters(filterForm, applyFilters, () => props.filters);
+
+function clearFilters() {
+    filterForm.search = '';
+    filterForm.school_id = null;
+    filterForm.class = null;
+    applyFilters();
+}
 
 const hallsForm = useForm({
     halls: (props.halls?.length ? props.halls : []).map(h => ({ name: h.name, capacity: h.capacity })),
@@ -279,21 +296,6 @@ const previewUrl = computed(() => {
         layout: designForm.layout,
     });
     return `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/preview?${params}`;
-});
-
-const filteredRegistrations = computed(() => {
-    const q = searchQuery.value.trim().toLowerCase();
-    if (!q) return props.registrations;
-    return props.registrations.filter((r) =>
-        [r.hall_ticket_no, r.student?.name, r.student?.admission_number, r.student?.reg_no, r.teacher?.name, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
-    );
-});
-
-const totalTicketsPages = computed(() => Math.ceil(filteredRegistrations.value.length / ticketsPageSize.value) || 1);
-
-const paginatedRegistrations = computed(() => {
-    const start = (ticketsPage.value - 1) * ticketsPageSize.value;
-    return filteredRegistrations.value.slice(start, start + ticketsPageSize.value);
 });
 
 function saveDesign() {

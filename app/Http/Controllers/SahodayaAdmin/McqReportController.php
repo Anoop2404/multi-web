@@ -17,15 +17,16 @@ class McqReportController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Mcq/Reports', [
             'exam'         => $exam->only('id', 'title', 'exam_level', 'status', 'results_published', 'delivery_mode'),
-            'registrations'=> $reports->registrationRows($exam),
+            'registrations'=> $reports->registrationPreviewRows($exam),
             'feeSummary'   => $feeSummary,
             'classWiseCounts' => $reports->classWiseCountMatrix($exam),
             'resultAnalysis' => $exam->results_published ? $reports->resultAnalysis($exam) : null,
             'schoolPerformance' => $exam->results_published ? $reports->schoolPerformanceRows($exam) : [],
             'stats'        => [
-                'registrations' => McqRegistration::where('exam_id', $exam->id)->count(),
-                'present'       => McqRegistration::where('exam_id', $exam->id)->where('attendance_status', 'present')->count(),
-                'malpractice'   => McqRegistration::where('exam_id', $exam->id)->whereIn('attendance_status', ['malpractice', 'withheld'])->count(),
+                // Active = excludes cancelled registrations, matching the registration register/class-wise counts below.
+                'registrations' => McqRegistration::where('exam_id', $exam->id)->active()->count(),
+                'present'       => McqRegistration::where('exam_id', $exam->id)->active()->where('attendance_status', 'present')->count(),
+                'malpractice'   => McqRegistration::where('exam_id', $exam->id)->active()->whereIn('attendance_status', ['malpractice', 'withheld'])->count(),
                 'fee_collected' => collect($feeSummary)->where('status', 'approved')->sum('total_due'),
                 'fee_pending'   => collect($feeSummary)->whereIn('status', ['proof_uploaded', 'pending'])->sum('total_due'),
             ],

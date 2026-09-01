@@ -37,25 +37,28 @@
                         </button>
                     </div>
                     <p class="text-xs text-slate-500">{{ activeType.hint }}</p>
+
+                    <div class="pt-2 border-t border-slate-100">
+                        <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Card style</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <button v-for="t in templates" :key="t.id" type="button"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
+                                    :class="cardTemplate === t.id
+                                        ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]'
+                                        : 'bg-white border-slate-200 text-slate-700'"
+                                    @click="cardTemplate = t.id">
+                                {{ t.label }}
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div v-if="audience === 'head' || audience === 'participant'" class="card space-y-4">
                     <div>
-                        <h3 class="section-title text-sm">1. Card style & filters</h3>
+                        <h3 class="section-title text-sm">1. Filters</h3>
                         <p class="text-xs text-slate-500 mt-1">
                             Generate ID lanyards for approved participants. All items for each participant are listed on the card.
                         </p>
-                    </div>
-
-                    <div class="flex flex-wrap gap-2">
-                        <button v-for="t in templates" :key="t.id" type="button"
-                                class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
-                                :class="cardTemplate === t.id
-                                    ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]'
-                                    : 'bg-white border-slate-200 text-slate-700'"
-                                @click="cardTemplate = t.id">
-                            {{ t.label }}
-                        </button>
                     </div>
 
                     <div class="grid sm:grid-cols-3 gap-3">
@@ -151,9 +154,12 @@
                         <li><strong>Approved Participants</strong> — one card per student; items listed on card</li>
                         <li><strong>Volunteers</strong> — event-day volunteer passes</li>
                         <li><strong>Staff</strong> — portal users on event staff duty</li>
-                        <li>99 × 85 mm landscape cards</li>
-                        <li><strong>4 cards per A4 page</strong> (2 × 2 grid)</li>
-                        <li>QR code for gate verification</li>
+                        <li v-if="cardTemplate === 'pass'">85.6 × 54 mm portrait cards (credit-card size)</li>
+                        <li v-else>99 × 85 mm landscape cards</li>
+                        <li v-if="cardTemplate === 'pass'"><strong>10 cards per A4 page</strong> (2 × 5 grid)</li>
+                        <li v-else><strong>4 cards per A4 page</strong> (2 × 2 grid)</li>
+                        <li v-if="cardTemplate !== 'pass'">QR code for gate verification</li>
+                        <li v-else>No QR code — name/photo/duty only</li>
                     </ul>
                 </div>
 
@@ -208,7 +214,7 @@ function switchSportEvent(value) {
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/id-cards`;
 const audience = ref('head');
-const cardTemplate = ref('premium');
+const cardTemplate = ref('pass');
 const filters = reactive({ scope: 'event', school_id: '', item_id: '' });
 const previewCards = ref([]);
 const loading = ref(false);
@@ -216,6 +222,7 @@ const loading = ref(false);
 const templates = [
     { id: 'premium', label: 'Premium' },
     { id: 'standard', label: 'Standard' },
+    { id: 'pass', label: 'Participant Pass' },
 ];
 
 const types = computed(() => [

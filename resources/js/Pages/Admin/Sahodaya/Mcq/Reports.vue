@@ -191,7 +191,7 @@
                 <table class="data-table">
                     <thead><tr><th>Sl No</th><th>Hall ticket</th><th>Student</th><th>School</th><th>Approval</th><th>Attendance</th></tr></thead>
                     <tbody>
-                        <tr v-for="(row, i) in registrations.slice(0, 50)" :key="i">
+                        <tr v-for="(row, i) in registrations" :key="i">
                             <td>{{ i + 1 }}</td>
                             <td>{{ row.hall_ticket_no || '—' }}</td>
                             <td>{{ row.student_name }}</td>

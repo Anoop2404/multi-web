@@ -8,6 +8,8 @@ class FestIdCardTemplates
 
     public const PREMIUM = 'premium';
 
+    public const PASS = 'pass';
+
     /**
      * ID card size, 4 per A4 LANDSCAPE page (2 columns x 2 rows).
      * Landscape gives ~285mm of usable width per page instead of ~198mm in
@@ -32,16 +34,30 @@ class FestIdCardTemplates
 
     public const CARDS_PER_PAGE = 4;
 
+    /**
+     * "Participant Pass" layout — a school-ID-style card that lists every item a
+     * student is registered for on one card, instead of one card per registration.
+     * Portrait A4, 2 columns x 5 rows: 85.6mm x 54mm cards (CR80 credit-card
+     * proportions) at 5mm column gap / 2mm row gap fit exactly inside a 9.5mm/16.9mm
+     * page margin — 2 x 85.6 + 5 = 176.2mm width, 5 x 54 + 4 x 2 = 278mm height.
+     */
+    public const PASS_CARD_WIDTH_MM = 85.6;
+
+    public const PASS_CARD_HEIGHT_MM = 54;
+
+    public const PASS_CARDS_PER_PAGE = 10;
+
     /** @return list<string> */
     public static function ids(): array
     {
-        return [self::STANDARD, self::PREMIUM];
+        return [self::STANDARD, self::PREMIUM, self::PASS];
     }
 
     public static function sheetView(?string $template): string
     {
         return match ($template) {
             self::PREMIUM => 'fest.id-cards.premium-sheet',
+            self::PASS    => 'fest.id-cards.pass-sheet',
             default       => 'fest.id-cards.sheet',
         };
     }

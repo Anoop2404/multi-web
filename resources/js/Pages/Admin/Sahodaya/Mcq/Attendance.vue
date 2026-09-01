@@ -23,7 +23,12 @@
             <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold">{{ summary.not_marked }}</p><p class="text-[10px] uppercase text-slate-500">Present, not marked</p></div>
         </div>
 
-        <input v-model="searchQuery" type="search" class="field max-w-md mb-4" placeholder="Search ticket, student, or school…">
+        <div class="flex flex-wrap gap-2 mb-4 items-center">
+            <input v-model="filterForm.search" type="search" class="field max-w-xs" placeholder="Search ticket, student, or school…">
+            <SearchableSelect v-model="filterForm.school_id" :options="schoolOptions" :all-option="true" all-label="All schools" placeholder="All schools" />
+            <SearchableSelect v-model="filterForm.class" :options="classOptions.map(c => ({ value: c, label: c }))" :all-option="true" all-label="All classes" placeholder="All classes" />
+            <button v-if="hasFilters" type="button" @click="clearFilters" class="text-sm text-slate-400 hover:underline">Clear</button>
+        </div>
 
         <div class="flex flex-wrap gap-2 mb-4">
             <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance/export`" class="btn-secondary text-sm">Export attendance CSV ↓</a>
@@ -57,8 +62,8 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(r, i) in paginatedRegistrations" :key="r.id">
-                            <td class="text-xs font-bold text-slate-400">{{ (attendancePage - 1) * attendancePageSize + i + 1 }}</td>
+                        <tr v-for="(r, i) in registrations.data" :key="r.id">
+                            <td class="text-xs font-bold text-slate-400">{{ (registrations.current_page - 1) * registrations.per_page + i + 1 }}</td>
                             <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
                             <td class="font-bold text-slate-900">{{ r.student?.name || r.participant_name || '—' }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
@@ -76,20 +81,13 @@
                             </td>
                             <td><button type="button" @click="save(r)" class="link-brand text-xs">Save</button></td>
                         </tr>
-                        <tr v-if="!filteredRegistrations.length">
+                        <tr v-if="!registrations.data?.length">
                             <td colspan="7" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            <div v-if="filteredRegistrations.length > attendancePageSize" class="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
-                <div>Showing <span class="font-bold text-slate-900">{{ (attendancePage - 1) * attendancePageSize + 1 }}</span> to <span class="font-bold text-slate-900">{{ Math.min(attendancePage * attendancePageSize, filteredRegistrations.length) }}</span> of <span class="font-bold text-slate-900">{{ filteredRegistrations.length }}</span> candidates</div>
-                <div class="flex items-center gap-2">
-                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="attendancePage <= 1" @click="attendancePage--">← Previous</button>
-                    <span class="font-semibold">Page {{ attendancePage }} of {{ totalAttendancePages }}</span>
-                    <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="attendancePage >= totalAttendancePages" @click="attendancePage++">Next →</button>
-                </div>
-            </div>
+            <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total, last_page: registrations.last_page }" />
         </div>
     </SahodayaAdminLayout>
 </template>
@@ -101,40 +99,57 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
+import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 
 const alertMessage = ref('');
 
-const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, summary: Object, pendingCorrectionsCount: { type: Number, default: 0 } });
-const searchQuery = ref('');
-const attendancePage = ref(1);
-const attendancePageSize = ref(50);
+const props = defineProps({
+    sahodaya: Object,
+    publicUrl: String,
+    pendingPaymentsCount: Number,
+    exam: Object,
+    registrations: Object,
+    summary: Object,
+    pendingCorrectionsCount: { type: Number, default: 0 },
+    filters: { type: Object, default: () => ({}) },
+    schoolOptions: { type: Array, default: () => [] },
+    classOptions: { type: Array, default: () => [] },
+});
 const importFile = ref(null);
 const page = usePage();
 
-watch(searchQuery, () => {
-    attendancePage.value = 1;
+const filterForm = reactive({
+    search: props.filters?.search ?? '',
+    school_id: props.filters?.school_id ?? null,
+    class: props.filters?.class ?? null,
 });
 
-const importErrors = computed(() => page.props.flash?.import_errors ?? []);
-const forms = reactive({});
-for (const r of props.registrations) {
-    forms[r.id] = { attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' };
+const hasFilters = computed(() => !!(filterForm.search || filterForm.school_id || filterForm.class));
+
+function applyFilters() {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/attendance`, { ...filterForm }, { preserveState: true, preserveScroll: true });
 }
 
-const filteredRegistrations = computed(() => {
-    const q = searchQuery.value.trim().toLowerCase();
-    if (!q) return props.registrations;
-    return props.registrations.filter((r) =>
-        [r.hall_ticket_no, r.student?.name, r.student?.admission_number, r.student?.reg_no, r.teacher?.name, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
-    );
-});
+useDebouncedInertiaFilters(filterForm, applyFilters, () => props.filters);
 
-const totalAttendancePages = computed(() => Math.ceil(filteredRegistrations.value.length / attendancePageSize.value) || 1);
+function clearFilters() {
+    filterForm.search = '';
+    filterForm.school_id = null;
+    filterForm.class = null;
+    applyFilters();
+}
 
-const paginatedRegistrations = computed(() => {
-    const start = (attendancePage.value - 1) * attendancePageSize.value;
-    return filteredRegistrations.value.slice(start, start + attendancePageSize.value);
-});
+const importErrors = computed(() => page.props.flash?.import_errors ?? []);
+
+const forms = reactive({});
+function syncForms(registrations) {
+    for (const r of registrations?.data ?? []) {
+        forms[r.id] = { attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' };
+    }
+}
+syncForms(props.registrations);
+watch(() => props.registrations, syncForms);
 
 function save(r) {
     const status = forms[r.id].attendance_status;

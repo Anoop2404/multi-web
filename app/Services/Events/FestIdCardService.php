@@ -340,7 +340,8 @@ class FestIdCardService
                 'teacher.tenant',
                 'registration.item.head',
                 'registration.school',
-                'registration.event',
+                'registration.event.sourcePhase',
+                'registration.event.region',
             ]);
 
         if (is_array($participantIds) && $participantIds !== []) {
@@ -454,7 +455,7 @@ class FestIdCardService
         })
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
-            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event']);
+            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event.sourcePhase', 'registration.event.region']);
 
         if (is_array($participantIds) && $participantIds !== []) {
             $query->whereIn('id', $participantIds);
@@ -530,7 +531,7 @@ class FestIdCardService
             }
         })
             ->where('participant_role', '!=', 'standby')
-            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event']);
+            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event.sourcePhase', 'registration.event.region']);
 
         if (is_array($participantIds) && $participantIds !== []) {
             $query->whereIn('id', $participantIds);
@@ -570,7 +571,8 @@ class FestIdCardService
             ))
             ->whereHas('item', fn ($q) => $q->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES))
             ->with([
-                'event',
+                'event.sourcePhase',
+                'event.region',
                 'item:id,title,participant_type',
                 'school:id,name',
                 'groups',
@@ -626,6 +628,8 @@ class FestIdCardService
             }
             $venue = $this->resolveVenue($event, null, $registration);
             $qrPayload = $this->qrPayload($event, 'registration', (string) $registration->id, $festId);
+            $leafEvent = $registration->event ?? $event;
+            $phaseName = $leafEvent->sourcePhase?->name ?: $leafEvent->region?->name;
 
             return [
                 'card_type'       => 'team',
@@ -651,6 +655,7 @@ class FestIdCardService
                 'footer'          => $scheduleLine ?: $event->title,
                 'entity_id'       => 'reg-'.$registration->id,
                 'event_name'      => $event->title,
+                'phase_name'      => $phaseName,
                 'event_date'      => $eventDate,
                 'venue'           => $venue,
                 'sahodaya_name'   => $event->tenant?->name ?? (\App\Models\Tenant::where('id', $event->tenant_id)->value('name') ?? 'Sahodaya'),
@@ -726,6 +731,14 @@ class FestIdCardService
         $rawDob = $p->student?->dob;
         $dob = $rawDob ? date('d M Y', strtotime((string) $rawDob)) : null;
 
+        // The card's $event is often the region-agnostic hub the admin is viewing
+        // (e.g. printing all cards for the season), not the specific phase/region
+        // leaf event the student actually registered under — use the registration's
+        // own event for the phase name so mixed-phase print runs label each card
+        // correctly instead of repeating the hub's generic title on every card.
+        $leafEvent = $p->registration?->event ?? $event;
+        $phaseName = $leafEvent->sourcePhase?->name ?: $leafEvent->region?->name;
+
         return [
             'card_type'       => 'individual',
             'audience'        => 'student',
@@ -742,6 +755,7 @@ class FestIdCardService
             'student_class'   => $studentClass,
             'class_category'  => $classCategory,
             'event_name'      => $event->title,
+            'phase_name'      => $phaseName,
             'event_date'      => $eventDate,
             'venue'           => $venue,
             'dob'             => $dob,

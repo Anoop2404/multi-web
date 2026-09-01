@@ -71,6 +71,65 @@ class McqReportService
             ->all();
     }
 
+    /** Latest registrations for a lightweight dashboard preview, without loading the full exam roster. */
+    /** @return list<array<string, mixed>> */
+    public function registrationPreviewRows(McqExam $exam, int $limit = 50): array
+    {
+        return McqRegistration::where('exam_id', $exam->id)
+            ->active()
+            ->with(['student', 'teacher', 'school'])
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(fn (McqRegistration $reg) => [
+                'hall_ticket_no'    => $reg->hall_ticket_no,
+                'student_name'      => $reg->participantName(),
+                'school_name'       => $reg->school?->name,
+                'approval_status'   => $reg->approval_status,
+                'attendance_status' => $reg->attendance_status,
+            ])
+            ->all();
+    }
+
+    /** Distinct schools with a registration in this exam, for filter dropdowns. */
+    /** @return list<array<string, mixed>> */
+    public function schoolFilterOptions(McqExam $exam): array
+    {
+        return \App\Models\Tenant::query()
+            ->whereIn('id', McqRegistration::where('exam_id', $exam->id)->select('school_id')->distinct())
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($school) => ['value' => $school->id, 'label' => $school->name])
+            ->all();
+    }
+
+    /** Distinct class names across registrations in this exam, for filter dropdowns. */
+    /** @return list<string> */
+    public function classFilterOptions(McqExam $exam): array
+    {
+        $classes = \Illuminate\Support\Facades\DB::table('mcq_registrations')
+            ->join('students', 'mcq_registrations.student_id', '=', 'students.id')
+            ->join('school_classes', 'students.school_class_id', '=', 'school_classes.id')
+            ->where('mcq_registrations.exam_id', $exam->id)
+            ->distinct()
+            ->pluck('school_classes.name')
+            ->filter()
+            ->all();
+
+        usort($classes, function ($a, $b) {
+            $numA = (int) filter_var($a, FILTER_SANITIZE_NUMBER_INT);
+            $numB = (int) filter_var($b, FILTER_SANITIZE_NUMBER_INT);
+
+            if ($numA > 0 && $numB > 0 && $numA !== $numB) {
+                return $numA <=> $numB;
+            }
+
+            return strnatcasecmp($a, $b);
+        });
+
+        return array_values($classes);
+    }
+
     /** @return list<array<string, mixed>> */
     public function feeSummaryRows(McqExam $exam): array
     {

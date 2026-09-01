@@ -15,32 +15,76 @@ use Illuminate\Http\Request;
 
 class McqExamOpsController extends SahodayaAdminController
 {
-    public function attendance(string $tenantId, McqExam $exam)
+    public function attendance(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        $registrations = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student', 'school', 'mark'])
-            ->orderBy('hall_ticket_no')
-            ->get();
+        $filters = $request->validate([
+            'search'    => 'nullable|string|max:100',
+            'school_id' => 'nullable|string|max:36',
+            'class'     => 'nullable|string|max:60',
+        ]);
 
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->with(['student', 'school', 'mark']);
+
+        $this->applyRegistrationFilters($query, $filters);
+
+        $registrations = $query->orderBy('hall_ticket_no')
+            ->paginate(50)
+            ->withQueryString();
+
+        $base = McqRegistration::where('exam_id', $exam->id);
         $summary = [
-            'total'        => $registrations->count(),
-            'pending'      => $registrations->whereNull('attendance_status')->count()
-                + $registrations->where('attendance_status', 'pending')->count(),
-            'present'      => $registrations->where('attendance_status', 'present')->count(),
-            'absent'       => $registrations->where('attendance_status', 'absent')->count(),
-            'malpractice'  => $registrations->where('attendance_status', 'malpractice')->count(),
-            'withheld'     => $registrations->where('attendance_status', 'withheld')->count(),
-            'marks_entered'=> $registrations->filter(fn ($r) => $r->mark !== null)->count(),
-            'not_marked'   => $registrations->where('attendance_status', 'present')->filter(fn ($r) => $r->mark === null)->count(),
+            'total'         => (clone $base)->count(),
+            'pending'       => (clone $base)->where(fn ($q) => $q->whereNull('attendance_status')->orWhere('attendance_status', 'pending'))->count(),
+            'present'       => (clone $base)->where('attendance_status', 'present')->count(),
+            'absent'        => (clone $base)->where('attendance_status', 'absent')->count(),
+            'malpractice'   => (clone $base)->where('attendance_status', 'malpractice')->count(),
+            'withheld'      => (clone $base)->where('attendance_status', 'withheld')->count(),
+            'marks_entered' => (clone $base)->whereHas('mark')->count(),
+            'not_marked'    => (clone $base)->where('attendance_status', 'present')->whereDoesntHave('mark')->count(),
         ];
 
         $pendingCorrectionsCount = \App\Models\McqAttendanceCorrectionRequest::where('exam_id', $exam->id)
             ->where('status', 'pending')
             ->count();
 
-        return $this->inertia('Sahodaya/Mcq/Attendance', compact('exam', 'registrations', 'summary', 'pendingCorrectionsCount'));
+        return $this->inertia('Sahodaya/Mcq/Attendance', [
+            'exam'                    => $exam,
+            'registrations'           => $registrations,
+            'summary'                 => $summary,
+            'pendingCorrectionsCount' => $pendingCorrectionsCount,
+            'filters'                 => $filters,
+            'schoolOptions'           => $reports->schoolFilterOptions($exam),
+            'classOptions'            => $reports->classFilterOptions($exam),
+        ]);
+    }
+
+    /** @param  \Illuminate\Database\Eloquent\Builder<McqRegistration>  $query */
+    private function applyRegistrationFilters($query, array $filters): void
+    {
+        if (! empty($filters['school_id'])) {
+            $query->where('school_id', $filters['school_id']);
+        }
+
+        if (! empty($filters['class'])) {
+            $class = mb_strtolower(trim((string) $filters['class']));
+            $query->whereHas('student.schoolClass', fn ($q) => $q->whereRaw('LOWER(name) = ?', [$class]));
+        }
+
+        if (! empty($filters['search'])) {
+            $term = '%'.mb_strtolower(trim((string) $filters['search'])).'%';
+            $query->where(function ($q) use ($term) {
+                $q->whereRaw('LOWER(hall_ticket_no) LIKE ?', [$term])
+                    ->orWhereHas('student', fn ($s) => $s->whereRaw('LOWER(name) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(admission_number) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(reg_no) LIKE ?', [$term]))
+                    ->orWhereHas('teacher', fn ($t) => $t->whereRaw('LOWER(name) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(employee_code) LIKE ?', [$term]))
+                    ->orWhereHas('school', fn ($s) => $s->whereRaw('LOWER(name) LIKE ?', [$term]));
+            });
+        }
     }
 
     public function storeAttendance(Request $request, string $tenantId, McqExam $exam)
@@ -129,28 +173,63 @@ class McqExamOpsController extends SahodayaAdminController
         return $invoices->download($registration, $this->sahodaya);
     }
 
-    public function results(string $tenantId, McqExam $exam)
+    public function results(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        $registrations = McqRegistration::where('exam_id', $exam->id)
-            ->with(['mark', 'student', 'school', 'feeReceipt'])
-            ->orderBy('hall_ticket_no')
-            ->get();
+        $filters = $request->validate([
+            'search'    => 'nullable|string|max:100',
+            'school_id' => 'nullable|string|max:36',
+            'class'     => 'nullable|string|max:60',
+        ]);
+
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->with(['mark', 'student', 'school', 'feeReceipt']);
+
+        $this->applyRegistrationFilters($query, $filters);
+
+        $registrations = $query->orderBy('hall_ticket_no')
+            ->paginate(50)
+            ->withQueryString();
+
+        $base = McqRegistration::where('exam_id', $exam->id);
+        $counts = [
+            'total'   => (clone $base)->count(),
+            'present' => (clone $base)->where('attendance_status', 'present')->count(),
+            'marked'  => (clone $base)->whereHas('mark', fn ($q) => $q->whereNotNull('score'))->count(),
+        ];
 
         $gradeBands = app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam);
 
-        return $this->inertia('Sahodaya/Mcq/Results', compact('exam', 'registrations', 'gradeBands'));
+        return $this->inertia('Sahodaya/Mcq/Results', [
+            'exam'          => $exam,
+            'registrations' => $registrations,
+            'gradeBands'    => $gradeBands,
+            'counts'        => $counts,
+            'filters'       => $filters,
+            'schoolOptions' => $reports->schoolFilterOptions($exam),
+            'classOptions'  => $reports->classFilterOptions($exam),
+        ]);
     }
 
-    public function hallTickets(string $tenantId, McqExam $exam)
+    public function hallTickets(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        $registrations = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student', 'teacher', 'school'])
-            ->orderBy('hall_ticket_no')
-            ->get();
+        $filters = $request->validate([
+            'search'    => 'nullable|string|max:100',
+            'school_id' => 'nullable|string|max:36',
+            'class'     => 'nullable|string|max:60',
+        ]);
+
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->with(['student', 'teacher', 'school']);
+
+        $this->applyRegistrationFilters($query, $filters);
+
+        $registrations = $query->orderBy('hall_ticket_no')
+            ->paginate(50)
+            ->withQueryString();
 
         $design = McqHallTicketDesign::fromExam($exam);
         $logoUrl = McqHallTicketDesign::logoUrl($this->sahodaya, $design);
@@ -167,6 +246,9 @@ class McqExamOpsController extends SahodayaAdminController
             'halls'           => $seating->normalizedHalls($exam),
             'hallTicketsPublished'   => (bool) $exam->hall_tickets_published,
             'hallTicketsPublishedAt' => $exam->hall_tickets_published_at?->format('d M Y, h:i A'),
+            'filters'         => $filters,
+            'schoolOptions'   => $reports->schoolFilterOptions($exam),
+            'classOptions'    => $reports->classFilterOptions($exam),
         ]);
     }
 
