@@ -198,16 +198,23 @@
         .pass-card-pdf__logo { width: 6.5mm; height: 6.5mm; object-fit: contain; }
         .pass-card-pdf__brand-cell { width: 55%; }
         .pass-card-pdf__org-name {
-            font-size: 5.6pt; font-weight: 800; color: #073f82; text-transform: uppercase;
+            font-size: 6pt; font-weight: 800; color: #073f82; text-transform: uppercase;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .pass-card-pdf__tagline { margin-top: 0.3mm; font-size: 3.1pt; color: #73839a; text-transform: uppercase; letter-spacing: 0.1mm; }
+        .pass-card-pdf__tagline {
+            margin-top: 0.3mm; font-size: 6.6pt; font-weight: 700; color: #ec1470;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
         .pass-card-pdf__event-cell { text-align: right; }
         .pass-card-pdf__event-name {
-            font-size: 5.8pt; font-weight: 900; color: #ec1470;
+            font-size: 6.2pt; font-weight: 900; color: #ec1470; text-transform: uppercase;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .pass-card-pdf__body { display: table; width: 100%; padding: 1.6mm 2.2mm 1mm; }
+        .pass-card-pdf__event-year {
+            margin-top: 0.3mm; font-size: 4pt; font-weight: 700; color: #073f82;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .pass-card-pdf__body { display: table; width: 100%; table-layout: fixed; padding: 1.6mm 2.2mm 1mm; }
         .pass-card-pdf__photo-cell { display: table-cell; width: 19mm; vertical-align: top; padding: 1.6mm 0 1mm 2.2mm; }
         .pass-card-pdf__photo-box {
             width: 19mm; height: 24mm; border-radius: 1.6mm; overflow: hidden;
@@ -229,26 +236,26 @@
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .pass-card-pdf__school {
-            margin-top: 0.5mm; font-size: 4pt; font-weight: 600; color: #53667e;
+            margin-top: 0.5mm; font-size: 4.4pt; font-weight: 600; color: #53667e;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .pass-card-pdf__meta { width: 100%; border-collapse: separate; border-spacing: 1mm 0.6mm; margin-top: 1mm; }
+        .pass-card-pdf__meta { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 1mm 0.6mm; margin-top: 1mm; }
         .pass-card-pdf__meta-box { width: 50%; background: #f2f7fc; border-radius: 1mm; padding: 0.6mm 1mm; vertical-align: top; }
-        .pass-card-pdf__meta-label { display: block; font-size: 2.8pt; font-weight: 700; text-transform: uppercase; color: #8391a4; }
+        .pass-card-pdf__meta-label { display: block; font-size: 3.1pt; font-weight: 700; text-transform: uppercase; color: #8391a4; }
         .pass-card-pdf__meta-value {
-            display: block; font-size: 3.7pt; font-weight: 700; color: #173557;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            display: block; font-size: 4.3pt; font-weight: 700; color: #173557; line-height: 1.25;
+            max-height: 5mm; overflow: hidden;
         }
         .pass-card-pdf__meta-value--accent { color: #073f82; }
         .pass-card-pdf__items { margin-top: 1mm; padding-top: 0.8mm; border-top: 0.2mm solid #dce6f0; }
-        .pass-card-pdf__items-title { width: 100%; border-collapse: collapse; margin-bottom: 0.5mm; }
-        .pass-card-pdf__items-title strong { font-size: 3.9pt; color: #073f82; text-transform: uppercase; }
+        .pass-card-pdf__items-title { width: 100%; table-layout: fixed; border-collapse: collapse; margin-bottom: 0.5mm; }
+        .pass-card-pdf__items-title strong { font-size: 4.3pt; color: #073f82; text-transform: uppercase; }
         .pass-card-pdf__items-count-cell { text-align: right; }
         .pass-card-pdf__items-count {
             display: inline-block; padding: 0.3mm 1.1mm; border-radius: 3mm; background: #e4f1ff;
-            color: #073f82; font-size: 3pt; font-weight: 800;
+            color: #073f82; font-size: 3.4pt; font-weight: 800;
         }
-        .pass-card-pdf__items-table { width: 100%; border-collapse: collapse; }
+        .pass-card-pdf__items-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
         .pass-card-pdf__items-col { width: 50%; vertical-align: top; padding-right: 1mm; }
         .pass-card-pdf__items-table ol { margin: 0; padding-left: 3mm; }
         .pass-card-pdf__items-table li { font-size: 4.4pt; font-weight: 600; color: #253850; line-height: 1.4; }

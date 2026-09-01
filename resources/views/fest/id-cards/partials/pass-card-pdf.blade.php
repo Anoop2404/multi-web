@@ -16,6 +16,13 @@
 
     $schoolName = $card['subtitle'] ?? $card['school_name'] ?? '—';
     $category = $card['category'] ?? $card['class_category'] ?? '—';
+    // DomPDF has no reliable line-clamp — an un-capped meta value just keeps
+    // wrapping and balloons the card past its fixed height, breaking the
+    // whole sheet's grid. Truncate the string itself so it settles within
+    // ~2 lines regardless of DomPDF's CSS quirks (the CSS max-height below
+    // is only a safety net on top of this, not the primary control).
+    $venueDisplay = str($card['venue'] ?? '—')->limit(40)->toString();
+    $categoryDisplay = str($category)->limit(40)->toString();
     $idLabel = $card['id_label'] ?? 'Reg ID';
     $idNumber = $card['id_number'] ?? '—';
     // A phase (Zonal, Sub District, ...) is the specific competition round the
@@ -23,6 +30,8 @@
     // season hub an admin is bulk-printing from, which can span several phases at
     // once — so the phase name wins on the card face whenever one is known.
     $eventDisplayName = $card['phase_name'] ?? $eventTitle;
+    $phaseName = $card['phase_name'] ?? null;
+    $academicYear = $card['academic_year'] ?? null;
     $roleLabel = $card['role_title'] ?? ucfirst(strtolower($card['role_label'] ?? 'Participant'));
     $passLabel = $card['role_title'] ?? ucwords(strtolower($card['role_label'] ?? 'Participant'));
 @endphp
@@ -35,10 +44,15 @@
         </div>
         <div class="pass-card-pdf__brand-cell">
             <div class="pass-card-pdf__org-name">{{ $card['sahodaya_name'] ?? $clusterName }}</div>
-            <div class="pass-card-pdf__tagline">Festival {{ $passLabel }} ID</div>
+            @if($phaseName)
+                <div class="pass-card-pdf__tagline">{{ $phaseName }}</div>
+            @endif
         </div>
         <div class="pass-card-pdf__event-cell">
-            <div class="pass-card-pdf__event-name">{{ $eventDisplayName }}</div>
+            <div class="pass-card-pdf__event-name">Kalotsav</div>
+            @if($academicYear)
+                <div class="pass-card-pdf__event-year">{{ $academicYear }}</div>
+            @endif
         </div>
     </div>
 
@@ -86,7 +100,7 @@
                     <tr>
                         <td class="pass-card-pdf__meta-box">
                             <span class="pass-card-pdf__meta-label">Venue</span>
-                            <span class="pass-card-pdf__meta-value">{{ $card['venue'] ?? '—' }}</span>
+                            <span class="pass-card-pdf__meta-value">{{ $venueDisplay }}</span>
                         </td>
                         <td class="pass-card-pdf__meta-box">
                             <span class="pass-card-pdf__meta-label">Event Date</span>
@@ -96,7 +110,7 @@
                     <tr>
                         <td class="pass-card-pdf__meta-box">
                             <span class="pass-card-pdf__meta-label">Category</span>
-                            <span class="pass-card-pdf__meta-value pass-card-pdf__meta-value--accent">{{ $category }}</span>
+                            <span class="pass-card-pdf__meta-value pass-card-pdf__meta-value--accent">{{ $categoryDisplay }}</span>
                         </td>
                         <td class="pass-card-pdf__meta-box">
                             <span class="pass-card-pdf__meta-label">{{ $idLabel }}</span>

@@ -38,7 +38,7 @@
                     </div>
                     <p class="text-xs text-slate-500">{{ activeType.hint }}</p>
 
-                    <div v-if="event?.event_type !== 'kalolsavam'" class="pt-2 border-t border-slate-100">
+                    <div v-if="!isKalolsavam" class="pt-2 border-t border-slate-100">
                         <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Card style</h4>
                         <div class="flex flex-wrap gap-2">
                             <button v-for="t in templates" :key="t.id" type="button"
@@ -62,7 +62,7 @@
                     </div>
 
                     <div class="grid sm:grid-cols-3 gap-3">
-                        <FormField v-if="event?.event_type !== 'kalolsavam'" label="Card scope">
+                        <FormField v-if="!isKalolsavam" label="Card scope">
                             <SearchableSelect v-model="filters.scope" :all-option="false"
                                 :options="[
                                     { value: 'event', label: 'Event Pass (Event-wise)' },
@@ -77,7 +77,7 @@
                                 search-placeholder="Type school name to search…"
                                 @change="loadPreview" />
                         </FormField>
-                        <FormField v-if="event?.event_type !== 'kalolsavam'" label="Item filter (optional)">
+                        <FormField v-if="!isKalolsavam" label="Item filter (optional)">
                             <SearchableSelect
                                 v-model="filters.item_id"
                                 :options="itemOptions"
@@ -200,6 +200,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import IdCardPreviewTile from '@/Components/fest/IdCardPreviewTile.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import { isKalolsavamEvent } from '@/support/festEventType.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -214,7 +215,8 @@ function switchSportEvent(value) {
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/id-cards`;
 const audience = ref('head');
-const cardTemplate = ref(props.event?.event_type === 'kalolsavam' ? 'pass' : 'premium');
+const isKalolsavam = computed(() => isKalolsavamEvent(props.event));
+const cardTemplate = ref(isKalolsavamEvent(props.event) ? 'pass' : 'premium');
 const filters = reactive({ scope: 'event', school_id: '', item_id: '' });
 const previewCards = ref([]);
 const loading = ref(false);
