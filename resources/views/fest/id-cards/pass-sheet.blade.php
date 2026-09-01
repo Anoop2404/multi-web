@@ -79,7 +79,7 @@
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .sahodaya-tagline {
-            margin-top: .3mm; font-size: 6.6pt; font-weight: 700; color: var(--primary);
+            margin-top: .3mm; font-size: 6.6pt; font-weight: 700; color: var(--accent);
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .event-branding { text-align: right; padding-right: 1mm; min-width: 0; }
