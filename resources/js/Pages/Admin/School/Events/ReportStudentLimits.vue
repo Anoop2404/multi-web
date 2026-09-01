@@ -187,7 +187,10 @@ const filteredItems = computed(() => {
     if (!categoryFilter.value) return props.items;
     return props.items.filter((i) => i.category_key === categoryFilter.value);
 });
-const itemOptions = computed(() => filteredItems.value.map((i) => ({ value: String(i.id), label: i.title })));
+const itemOptions = computed(() => filteredItems.value.map((i) => ({
+    value: String(i.id),
+    label: i.category_label ? `${i.title} — ${i.category_label}` : i.title,
+})));
 
 watch(categoryFilter, () => {
     if (itemFilter.value && ! filteredItems.value.some((i) => String(i.id) === itemFilter.value)) {
