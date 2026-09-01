@@ -23,17 +23,6 @@
             </template>
         </PageHeader>
 
-        <!-- Kalotsav's hub redirects straight here (singleton event, no separate dashboard),
-             so its sidebar no longer carries Results/Qualifiers/Reports links — reproduce them
-             here instead. Guarded to Kalotsav only; every other program is unaffected. -->
-        <div v-if="programSlug === 'kalotsav'" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5 max-w-2xl">
-            <HubCard :href="`${programBase}/results`" icon="📊" label="Results" hint="Published scores" />
-            <HubCard :href="`${programBase}/qualifiers`" icon="🎯" label="Qualifiers" hint="Promoted students" />
-            <HubCard :href="`${programBase}/reports`" icon="📋" label="Reports" hint="Admit cards & exports" />
-            <HubCard v-if="canManageCoordinators" :href="`/school-admin/${school.id}/users?coordinators=1`" icon="👥"
-                     label="Assign coordinator" hint="Kalotsav access" />
-        </div>
-
         <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
 
         <div v-if="schoolRegion?.applies && !focusEvent?.uses_registration_batch_billing" class="mb-5 max-w-2xl">
@@ -743,7 +732,6 @@ function submitRegion() {
 
 const { programSlug, programLabel, programBase } = useSchoolProgramContext(props);
 const page = usePage();
-const canManageCoordinators = computed(() => !page.props.isStaff && !page.props.isEventCoordinator);
 const programPrefix = computed(() =>
     props.programPrefix
     || page.props.programPrefix

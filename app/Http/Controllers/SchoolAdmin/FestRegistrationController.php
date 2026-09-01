@@ -44,7 +44,6 @@ use App\Services\Students\StudentVerificationGate;
 use App\Services\Notifications\SahodayaAdminNotifier;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class FestRegistrationController extends SchoolAdminController
@@ -419,56 +418,16 @@ class FestRegistrationController extends SchoolAdminController
      */
     protected function resolveSingletonSchoolEvent(Request $request, string $eventType, string $programSlug): ?FestEvent
     {
-        $events = $this->visibleRootEventsForSchool($request, $eventType, $programSlug);
-
-        return $events->count() === 1 ? $events->first() : null;
-    }
-
-    /**
-     * Root (non-partition-child) events of $eventType a school may see, staff-scoped —
-     * the shared query behind resolveSingletonSchoolEvent() above and kalotsavHub() below.
-     */
-    protected function visibleRootEventsForSchool(Request $request, string $eventType, string $programSlug): Collection
-    {
-        return FestEvent::where('tenant_id', $this->school->parent_id)
+        $events = FestEvent::where('tenant_id', $this->school->parent_id)
             ->ofType($eventType)
             ->primaryHub()
             ->listedForSchool($this->school->id, $eventType)
-            ->withCount(['registrations' => fn ($q) => $q->where('school_id', $this->school->id)])
             ->orderByDesc('event_start')
-            ->get(['id', 'title', 'event_type', 'level_round', 'conducting_school_id', 'parent_event_id', 'partition_role', 'status', 'event_start', 'event_end', 'results_published'])
+            ->get(['id', 'title', 'event_type', 'level_round', 'conducting_school_id', 'parent_event_id', 'partition_role', 'status', 'event_start'])
             ->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)
                 ->filterFestEventsForUser($request->user(), $this->school->id, $programSlug, $rows));
-    }
 
-    /**
-     * Kalotsav's own hub route: skip straight to the single yearly event's registration
-     * page (same singleton behavior index() already applies to /registration) instead of
-     * ProgramHub.vue's dashboard, or list every visible Kalotsav event when there's more
-     * than one (rare — e.g. during a year transition).
-     */
-    public function kalotsavHub(Request $request, string $tenantId)
-    {
-        $meta = SchoolFestProgram::meta('kalotsav');
-        $events = $this->visibleRootEventsForSchool($request, $meta['eventType'], 'kalotsav');
-
-        if ($events->count() === 1) {
-            return redirect("/school-admin/{$tenantId}/kalotsav/events/{$events->first()->id}/registration");
-        }
-
-        return $this->inertia('School/Events/KalotsavEvents', [
-            'program' => $meta,
-            'events' => $events->map(fn (FestEvent $e) => [
-                'id' => $e->id,
-                'title' => $e->title,
-                'status' => $e->status,
-                'level_label' => config("fest_fees.level_labels.{$e->level_round}", $e->level_round),
-                'event_start' => $e->event_start,
-                'event_end' => $e->event_end,
-                'registrations_count' => $e->registrations_count,
-                'results_published' => $e->results_published,
-            ])->values(),
-        ]);
+        return $events->count() === 1 ? $events->first() : null;
     }
 
     /**
