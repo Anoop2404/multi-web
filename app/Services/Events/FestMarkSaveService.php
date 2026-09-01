@@ -33,14 +33,20 @@ class FestMarkSaveService
      *                             the writes themselves. Every other caller (single-mark
      *                             coordinator/ops/school endpoints) keeps the default and is
      *                             unaffected.
+     * @param  ?FestEventItem  $item  Pass the item when the caller already has it loaded
+     *                                (e.g. bulkStore()'s per-batch item map) to skip the
+     *                                findOrFail() below.
+     * @param  ?FestParticipant  $participant  Same, for the participant — must already
+     *                                have its `registration` relation loaded.
      * @return array{message: string, record_break: bool}
      */
-    public function save(FestEvent $event, array $data, int $lockedBy, bool $recalculate = true): array
+    public function save(FestEvent $event, array $data, int $lockedBy, bool $recalculate = true, ?FestEventItem $item = null, ?FestParticipant $participant = null): array
     {
-        $item = FestEventItem::findOrFail($data['item_id']);
+        $item ??= FestEventItem::findOrFail($data['item_id']);
         abort_if($item->event_id !== $event->id, 403);
 
-        $participant = FestParticipant::with('registration')->findOrFail($data['participant_id']);
+        $participant ??= FestParticipant::with('registration')->findOrFail($data['participant_id']);
+        $participant->loadMissing('registration');
         abort_if($participant->registration->event_id !== $event->id, 403);
         abort_if($participant->registration->item_id !== $item->id, 422, 'The participant is not registered for this item.');
         abort_if($participant->registration->status !== 'approved', 422, 'Marks can only be entered for approved registrations.');
@@ -87,7 +93,8 @@ class FestMarkSaveService
             $derivedGrade = $this->gradePointService->resolveGradeFromScore(
                 $event,
                 (int) $data['item_id'],
-                (float) $data['score']
+                (float) $data['score'],
+                $item
             );
             if ($derivedGrade !== null || empty($data['grade'])) {
                 $data['grade'] = $derivedGrade;
@@ -123,7 +130,11 @@ class FestMarkSaveService
         CertificateStalenessMarker::markStaleForParticipant($participant->id);
         CertificateStalenessMarker::markStaleForParticipationAggregate($event->id, $participant->student_id, $participant->teacher_id);
 
-        $recordResult = $this->recordService->evaluateMark($mark->fresh());
+        // evaluateMark() needs these two relations when record tracking is on for this
+        // event; loadMissing() is a no-op when the caller already prefetched them (the
+        // common bulk-save case) and only queries here for a single, interactive save().
+        $participant->loadMissing(['student', 'registration.school']);
+        $recordResult = $this->recordService->evaluateMark($mark->fresh(), $event, $item, $participant);
 
         if ($recalculate) {
             $this->recalculate($event);

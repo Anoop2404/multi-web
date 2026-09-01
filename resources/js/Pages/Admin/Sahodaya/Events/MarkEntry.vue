@@ -775,27 +775,58 @@ function saveMark(participant, item) {
     });
 }
 
+// One request for every visible row instead of one router.post() per participant —
+// each save used to trigger its own full-event points recalculation server-side, so
+// saving N participants sequentially reran that whole recalculation N times. See
+// FestMarkEntryController::bulkStore().
 async function saveAll() {
     bulkSaving.value = true;
+
+    const rows = [];
     for (const { participant, item } of iterSaveRows()) {
         if (isAbsent(participant, item)) continue;
+        rows.push({ participant, payload: payloadFor(participant, item) });
+    }
 
-        await new Promise((resolve) => {
-            savingIds.value = new Set([...savingIds.value, participant.id]);
-            router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, payloadFor(participant, item), {
+    if (!rows.length) {
+        bulkSaving.value = false;
+        return;
+    }
+
+    savingIds.value = new Set(rows.map(({ participant }) => participant.id));
+
+    await new Promise((resolve) => {
+        router.post(
+            `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/bulk`,
+            { rows: rows.map(({ payload }) => payload) },
+            {
                 preserveScroll: true,
                 onSuccess: () => {
-                    markSaveOutcome(participant.id);
+                    const result = usePage().props.flash?.bulkMarkSaveResult;
+                    const nextSaved = new Set(savedIds.value);
+                    const nextFailed = new Set(failedIds.value);
+
+                    for (const { participant } of rows) {
+                        if (result?.results?.[participant.id]?.ok) {
+                            nextSaved.add(participant.id);
+                            nextFailed.delete(participant.id);
+                        } else {
+                            nextFailed.add(participant.id);
+                            nextSaved.delete(participant.id);
+                        }
+                    }
+
+                    savedIds.value = nextSaved;
+                    failedIds.value = nextFailed;
                 },
                 onFinish: () => {
-                    const next = new Set(savingIds.value);
-                    next.delete(participant.id);
-                    savingIds.value = next;
+                    savingIds.value = new Set();
                     resolve();
                 },
-            });
-        });
-    }
+            }
+        );
+    });
+
     bulkSaving.value = false;
 }
 

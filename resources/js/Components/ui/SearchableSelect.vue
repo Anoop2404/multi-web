@@ -34,7 +34,7 @@
         <!-- Dropdown panel -->
         <div
             v-if="isOpen && !disabled"
-            class="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col max-h-64"
+            class="absolute left-0 top-full mt-1 min-w-full w-max max-w-sm bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col max-h-64"
         >
             <!-- Search input inside dropdown -->
             <div v-if="searchable" class="p-2 border-b border-slate-100 bg-slate-50/50">

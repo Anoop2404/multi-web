@@ -97,18 +97,23 @@ class MemberSchoolsController extends SahodayaAdminController
             return User::whereIn('tenant_id', $pageIds)->pluck('tenant_id')->unique()->all();
         }) ?? [];
 
-        $schools->getCollection()->transform(function (Tenant $school) use ($year, $schoolIdsWithUser) {
+        // Latest submitted/verified membership payment per school for this academic year, batched for the whole page.
+        $latestPaymentsBySchool = MembershipPayment::whereIn('school_id', $pageIds)
+            ->where('academic_year', $year)
+            ->whereIn('status', ['submitted', 'verified'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('school_id')
+            ->map(fn ($payments) => $payments->first());
+
+        $schools->getCollection()->transform(function (Tenant $school) use ($schoolIdsWithUser, $latestPaymentsBySchool) {
             $payload = $school->application_payload ?? [];
             $school->setAttribute('contact_email', $payload['school_email'] ?? $payload['contact_email'] ?? null);
             $school->setAttribute('contact_phone', $payload['phone'] ?? $payload['contact_phone'] ?? null);
             $school->setAttribute('affiliation', $payload['cbse_affiliation'] ?? $payload['affiliation_number'] ?? null);
 
-            // Fetch the latest submitted/verified membership payment for this academic year
-            $payment = MembershipPayment::where('school_id', $school->id)
-                ->where('academic_year', $year)
-                ->whereIn('status', ['submitted', 'verified'])
-                ->latest()
-                ->first();
+            $payment = $latestPaymentsBySchool->get($school->id);
+            $payment?->setRelation('school', $school);
 
             $school->setAttribute('has_payment', $payment !== null);
             $school->setAttribute('payment_status', $payment?->status);

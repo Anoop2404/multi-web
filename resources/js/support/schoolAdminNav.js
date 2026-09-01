@@ -232,18 +232,26 @@ export function schoolProgramScopedNav(schoolId, programSlug, options = {}) {
         return [];
     }
 
-    return [
+    const groups = [
         {
             section: coordinatorMode ? 'Assigned program' : 'School home',
             items: coordinatorMode
                 ? [{ label: '← My assignments', href: base, icon: 'grid', exact: true }]
                 : [{ label: 'Dashboard', href: base, icon: 'grid', exact: true }],
         },
-        {
+    ];
+
+    // Kalotsav's own hub redirects straight into the single yearly event (or lists every
+    // event) and carries its own quick-actions row (Results/Qualifiers/Reports) inline, so
+    // this 5-item sub-nav would just duplicate links already reachable from the page itself.
+    if (programSlug !== 'kalotsav') {
+        groups.push({
             section: program.label,
             items: schoolProgramWorkflowItems(schoolId, programSlug),
-        },
-    ];
+        });
+    }
+
+    return groups;
 }
 
 /** Sidebar when viewing fest hub or a specific fest event page. */

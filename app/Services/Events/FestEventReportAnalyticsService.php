@@ -43,12 +43,46 @@ class FestEventReportAnalyticsService
         return $this->scope?->eventIds ?? $this->event->reportableEventIds();
     }
 
-    /** @return list<int> */
-    private function itemIdsFor(int $itemId): array
+    /**
+     * Batched equivalent of calling reportableItemIds() once per item — computing each
+     * item's reportable family (itself plus any partition-region copies sharing
+     * its root/item_code) used to cost ~4 queries per item via reportableItemIds().
+     * This prefetches every item in the event's topology once and resolves every
+     * family from that in memory.
+     *
+     * @param \Illuminate\Support\Collection<int, FestEventItem> $items
+     * @return array{0: list<int>, 1: array<int, int>} [allReportableItemIds, itemId => canonicalItemId]
+     */
+    private function itemFamiliesFor($items): array
     {
-        $ids = $this->event->reportableItemIds([$itemId]);
+        // Same root/item_code matching rule reportableItemIds() uses — shared on the
+        // model (see FestEvent::itemFamilyGroups()) so the two can't drift apart.
+        [$byRoot, $byCode] = $this->event->itemFamilyGroups();
 
-        return $this->scope ? array_values(array_intersect($ids, $this->scope->itemIds)) : $ids;
+        $allReportableItemIds = [];
+        $itemFamilyMap = [];
+
+        foreach ($items as $item) {
+            $rootId = (int) ($item->inherited_from_item_id ?: $item->id);
+            $familyIds = $byRoot->get($rootId, collect())->pluck('id');
+
+            if ($item->item_code) {
+                $familyIds = $familyIds->merge($byCode->get($item->item_code, collect())->pluck('id'));
+            }
+
+            $familyIds = $familyIds->map(fn ($id) => (int) $id)->unique();
+
+            if ($this->scope) {
+                $familyIds = $familyIds->filter(fn ($id) => in_array($id, $this->scope->itemIds, true));
+            }
+
+            foreach ($familyIds as $fid) {
+                $allReportableItemIds[] = $fid;
+                $itemFamilyMap[$fid] = $item->id;
+            }
+        }
+
+        return [array_values(array_unique($allReportableItemIds)), $itemFamilyMap];
     }
 
     /**
@@ -587,16 +621,7 @@ class FestEventReportAnalyticsService
             return [];
         }
 
-        $allReportableItemIds = [];
-        $itemFamilyMap = [];
-        foreach ($items as $item) {
-            $family = $this->itemIdsFor($item->id);
-            foreach ($family as $fid) {
-                $allReportableItemIds[] = $fid;
-                $itemFamilyMap[$fid] = $item->id;
-            }
-        }
-        $allReportableItemIds = array_values(array_unique($allReportableItemIds));
+        [$allReportableItemIds, $itemFamilyMap] = $this->itemFamiliesFor($items);
 
         $statusRows = FestRegistration::query()
             ->whereIn('event_id', $eventIds)
@@ -1140,26 +1165,29 @@ class FestEventReportAnalyticsService
         $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
 
+        $itemHeadMap = FestEventItem::where('event_id', $this->event->id)
+            ->whereIn('head_id', $heads->pluck('id'))
+            ->pluck('head_id', 'id');
+
+        $participantsByHead = FestParticipant::query()
+            ->whereHas('registration', fn ($q) => $q
+                ->where('event_id', $this->event->id)
+                ->whereIn('item_id', $itemHeadMap->keys())
+                ->active()
+                ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+            ->with([
+                'student:id,name,reg_no,photo,tenant_id',
+                'student.schoolClass:id,name',
+                'teacher:id,name,reg_no',
+                'registration.school:id,name',
+                'registration.item:id,title,head_id,class_group,category,competition_start,competition_end,competition_time',
+            ])
+            ->get()
+            ->groupBy(fn ($p) => $itemHeadMap->get($p->registration?->item_id));
+
         $rows = [];
         foreach ($heads as $head) {
-            $itemIds = FestEventItem::where('event_id', $this->event->id)
-                ->where('head_id', $head->id)
-                ->pluck('id');
-
-            $participants = FestParticipant::query()
-                ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $this->event->id)
-                    ->whereIn('item_id', $itemIds)
-                    ->active()
-                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
-                ->with([
-                    'student:id,name,reg_no,photo,tenant_id',
-                    'student.schoolClass:id,name',
-                    'teacher:id,name,reg_no',
-                    'registration.school:id,name',
-                    'registration.item:id,title,head_id,class_group,category,competition_start,competition_end,competition_time',
-                ])
-                ->get();
+            $participants = $participantsByHead->get($head->id, collect());
 
             foreach ($participants as $p) {
                 $rows[] = [
@@ -1212,21 +1240,26 @@ class FestEventReportAnalyticsService
         $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
 
+        $sportIds = $sports->pluck('id');
+
+        $participantsBySport = FestParticipant::query()
+            ->whereHas('registration', fn ($q) => $q
+                ->whereIn('event_id', $sportIds)
+                ->active()
+                ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+            ->with([
+                'student:id,name,reg_no,photo,tenant_id',
+                'student.schoolClass:id,name',
+                'teacher:id,name,reg_no',
+                'registration.school:id,name',
+                'registration.item:id,title,head_id,class_group,category,competition_start,competition_end,competition_time',
+            ])
+            ->get()
+            ->groupBy(fn ($p) => $p->registration?->event_id);
+
         $rows = [];
         foreach ($sports as $sport) {
-            $participants = FestParticipant::query()
-                ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $sport->id)
-                    ->active()
-                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
-                ->with([
-                    'student:id,name,reg_no,photo,tenant_id',
-                    'student.schoolClass:id,name',
-                    'teacher:id,name,reg_no',
-                    'registration.school:id,name',
-                    'registration.item:id,title,head_id,class_group,category,competition_start,competition_end,competition_time',
-                ])
-                ->get();
+            $participants = $participantsBySport->get($sport->id, collect());
 
             foreach ($participants as $p) {
                 $rows[] = [
@@ -1265,14 +1298,16 @@ class FestEventReportAnalyticsService
             ->orderBy('title')
             ->get();
 
+        $regsByItem = FestRegistration::whereIn('item_id', $teamItems->pluck('id'))
+            ->active()
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->with(['school:id,name', 'participants.student:id,name,reg_no', 'participants.teacher:id,name'])
+            ->get()
+            ->groupBy('item_id');
+
         $rows = [];
         foreach ($teamItems as $item) {
-            $regs = FestRegistration::where('event_id', $item->event_id)
-                ->where('item_id', $item->id)
-                ->active()
-                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-                ->with(['school:id,name', 'participants.student:id,name,reg_no', 'participants.teacher:id,name'])
-                ->get();
+            $regs = $regsByItem->get($item->id, collect());
 
             foreach ($regs as $reg) {
                 $members = $reg->participants->map(fn ($p) => [
@@ -1478,25 +1513,28 @@ class FestEventReportAnalyticsService
         $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $artsCategoryLabels = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
 
+        $itemAreaMap = FestEventItem::where('event_id', $this->event->id)
+            ->whereIn('area_id', $areas->pluck('id'))
+            ->pluck('area_id', 'id');
+
+        $participantsByArea = FestParticipant::query()
+            ->whereHas('registration', fn ($q) => $q
+                ->where('event_id', $this->event->id)
+                ->whereIn('item_id', $itemAreaMap->keys())
+                ->active()
+                ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+            ->with([
+                'student:id,name,reg_no,tenant_id',
+                'teacher:id,name,reg_no',
+                'registration.school:id,name',
+                'registration.item:id,title,area_id,class_group,category',
+            ])
+            ->get()
+            ->groupBy(fn ($p) => $itemAreaMap->get($p->registration?->item_id));
+
         $rows = [];
         foreach ($areas as $area) {
-            $itemIds = FestEventItem::where('event_id', $this->event->id)
-                ->where('area_id', $area->id)
-                ->pluck('id');
-
-            $participants = FestParticipant::query()
-                ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $this->event->id)
-                    ->whereIn('item_id', $itemIds)
-                    ->active()
-                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
-                ->with([
-                    'student:id,name,reg_no,tenant_id',
-                    'teacher:id,name,reg_no',
-                    'registration.school:id,name',
-                    'registration.item:id,title,area_id,class_group,category',
-                ])
-                ->get();
+            $participants = $participantsByArea->get($area->id, collect());
 
             foreach ($participants as $p) {
                 $rows[] = [
@@ -1518,7 +1556,7 @@ class FestEventReportAnalyticsService
 
         if ($areaId === null || $areaId === 0) {
             $itemIds = FestEventItem::where('event_id', $this->event->id)->whereNull('area_id')->pluck('id');
-            if ($itemIds->isNotEmpty() && ($areaId === null || $areaId === 0)) {
+            if ($itemIds->isNotEmpty()) {
                 $participants = FestParticipant::query()
                     ->whereHas('registration', fn ($q) => $q
                         ->where('event_id', $this->event->id)

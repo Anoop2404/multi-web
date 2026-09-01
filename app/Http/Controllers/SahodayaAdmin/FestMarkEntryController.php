@@ -24,7 +24,10 @@ use App\Support\FestPageActivity;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class FestMarkEntryController extends SahodayaAdminController
 {
@@ -276,25 +279,18 @@ class FestMarkEntryController extends SahodayaAdminController
         ]);
 
         // Now phase-aware — no-op while phase_mode_enabled is off (see EventLifecycleGate). Reordered validate() before the gate so a malformed item_id 422s on validation, not the business-rule check.
-        EventLifecycleGate::allowMarkEntryForItem($event, $item);
+        // The judge-cap check inside this helper is redundant here (the dynamic `max:`
+        // validation rule above already enforced it) but harmless — see the helper's
+        // docblock for why store() and bulkStore() share it.
+        $hasRealJudgeScore = $this->checkJudgeCapAndGate($event, $item, $criteriaService, $data['judge_scores'] ?? null);
 
         $judgeScores = $data['judge_scores'] ?? null;
         unset($data['judge_scores']);
 
-        // The judge panel always sends every judge's current box, even when the admin
-        // only meant to change something else on the row (rank, attendance) — if those
-        // boxes happen to be empty (e.g. this participant's judge breakdown was never
-        // entered through this screen), that's NOT "the judges scored zero," it's "there's
-        // nothing here to save." Only recompute/overwrite the combined score when at
-        // least one judge box actually has a value, so an empty panel can never silently
-        // wipe an already-saved score.
-        $hasRealJudgeScore = is_array($judgeScores)
-            && collect($judgeScores)->contains(fn ($v) => $v !== null && $v !== '');
-
-        $teamParticipantIds = $this->expandToTeam($event, (int) $data['item_id'], (int) $data['participant_id']);
+        $teamParticipants = $this->expandToTeam($event, (int) $data['item_id'], (int) $data['participant_id']);
 
         $result = null;
-        foreach ($teamParticipantIds as $participantId) {
+        foreach ($teamParticipants as $participantId => $teamParticipant) {
             $rowData = $data;
 
             if ($item && $hasRealJudgeScore && $criteriaService->hasJudgePanel($item)) {
@@ -313,7 +309,7 @@ class FestMarkEntryController extends SahodayaAdminController
             // docblock); doing it once after the loop instead turns an N-member team
             // save from N full-event recomputes into 1, with zero behavior change for
             // individual items (N=1 either way).
-            $result = $markSave->save($event, [...$rowData, 'participant_id' => $participantId], $request->user()->id, recalculate: false);
+            $result = $markSave->save($event, [...$rowData, 'participant_id' => $participantId], $request->user()->id, recalculate: false, item: $item, participant: $teamParticipant);
         }
         if ($result !== null) {
             $markSave->recalculate($event);
@@ -354,10 +350,123 @@ class FestMarkEntryController extends SahodayaAdminController
             'measurement_value' => $data['measurement_value'] ?? null,
             'measurement_unit'  => $data['measurement_unit'] ?? null,
             'judge_scores'      => $judgeScores ?? null,
-            'team_size'         => count($teamParticipantIds),
+            'team_size'         => $teamParticipants->count(),
         ]);
 
         return back()->with('success', $result['message'] ?? 'Mark saved.');
+    }
+
+    /**
+     * Batched counterpart to store() for the "Save All" button on the Mark Entry page —
+     * one request for every visible row instead of one request per participant. Each row
+     * previously triggered its own full-event recalculateSchoolPoints() pass (see
+     * FestMarkSaveService::save()'s docblock), so saving N participants meant N full
+     * recalculations of every mark in the event; this saves every row with
+     * recalculate: false and recalculates once at the end, the same fix already applied
+     * to team/group expansion within a single store() call.
+     *
+     * Rows can span multiple items (the page's "All items" view groups registrations by
+     * item into sections), so — unlike store(), which resolves one item up front to size
+     * a single judge-score validation rule — each row's judge-score cap is checked
+     * against its own item after the structural validation below. A row that fails its
+     * own business rules (locked item, disqualified participant, judge score over cap,
+     * etc.) is recorded as failed and does not affect the other rows in the batch.
+     */
+    public function bulkStore(Request $request, string $tenantId, FestEvent $event, FestMarkSaveService $markSave, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'rows'                     => 'required|array|min:1|max:500',
+            'rows.*.participant_id'    => 'required|integer|exists:fest_participants,id',
+            'rows.*.item_id'           => 'required|integer|exists:fest_event_items,id',
+            'rows.*.grade'             => ['nullable', app(\App\Services\Events\FestGradePointService::class)->gradeValidationRule($event)],
+            'rows.*.position'         => 'nullable|integer|min:1|max:255',
+            'rows.*.score'             => 'nullable|numeric|min:0',
+            'rows.*.measurement_value' => 'nullable|string|max:50',
+            'rows.*.measurement_unit'  => 'nullable|string|max:20',
+            'rows.*.judge_scores'      => 'nullable|array',
+            'rows.*.judge_scores.*'    => 'nullable|numeric|min:0',
+        ]);
+
+        // ->with('phase') + manually attaching the already-loaded $event (rather than
+        // ->with('event'), which would re-query the exact event we already have) means
+        // EventLifecycleGate::allowMarkEntryForItem() below never re-fetches event/phase
+        // per row — see FestPhaseLifecycleService::effectiveLifecycleForItem(), which
+        // only re-queries when the item's event/phase relations aren't already loaded.
+        $items = FestEventItem::where('event_id', $event->id)
+            ->whereIn('id', collect($data['rows'])->pluck('item_id')->unique())
+            ->with('phase')
+            ->get()
+            ->keyBy('id');
+        $items->each(fn (FestEventItem $item) => $item->setRelation('event', $event));
+
+        [$participants, $teams] = $this->resolveBatchTeamData($event, $data['rows']);
+
+        $results = [];
+        $savedCount = 0;
+
+        DB::transaction(function () use ($request, $data, $event, $items, $participants, $teams, $markSave, $criteriaService, $audit, &$results, &$savedCount) {
+            foreach ($data['rows'] as $rowData) {
+                $participantId = (int) $rowData['participant_id'];
+
+                try {
+                    $item = $items->get((int) $rowData['item_id']);
+                    abort_if(! $item, 404, 'This item is not part of the event.');
+
+                    $judgeScores = $rowData['judge_scores'] ?? null;
+                    unset($rowData['judge_scores']);
+
+                    $hasRealJudgeScore = $this->checkJudgeCapAndGate($event, $item, $criteriaService, $judgeScores);
+
+                    $teamParticipants = $this->expandToTeam($event, (int) $rowData['item_id'], $participantId, $participants, $teams);
+
+                    foreach ($teamParticipants as $memberId => $memberParticipant) {
+                        $memberRow = $rowData;
+
+                        if ($hasRealJudgeScore && $criteriaService->hasJudgePanel($item)) {
+                            $memberRow['score'] = $criteriaService->saveParticipantJudgeScores($item, $memberId, $judgeScores);
+                        }
+
+                        $markSave->save($event, [...$memberRow, 'participant_id' => $memberId], $request->user()->id, recalculate: false, item: $item, participant: $memberParticipant);
+                    }
+
+                    $savedCount++;
+                    $results[$participantId] = ['ok' => true];
+
+                    $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.saved', "Mark saved for participant #{$participantId} in {$item->title} (bulk save)", [
+                        'participant_id' => $participantId,
+                        'item_id'        => $item->id,
+                        'team_size'      => $teamParticipants->count(),
+                    ]);
+                } catch (\Throwable $e) {
+                    $errorMessage = match (true) {
+                        $e instanceof ValidationException => collect($e->errors())->flatten()->first(),
+                        $e instanceof HttpExceptionInterface => $e->getMessage(),
+                        default => null,
+                    };
+
+                    $results[$participantId] = ['ok' => false, 'error' => $errorMessage ?: 'Could not save this mark.'];
+                }
+            }
+        });
+
+        if ($savedCount > 0) {
+            $markSave->recalculate($event);
+        }
+
+        $failedCount = count($data['rows']) - $savedCount;
+
+        return back()->with([
+            'success' => $failedCount === 0
+                ? "Saved {$savedCount} mark(s)."
+                : "Saved {$savedCount} mark(s), {$failedCount} failed.",
+            'bulkMarkSaveResult' => [
+                'results'     => $results,
+                'saved_count' => $savedCount,
+                'total'       => count($data['rows']),
+            ],
+        ]);
     }
 
     public function saveCriteria(Request $request, string $tenantId, FestEvent $event, FestEventItem $item, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)
@@ -549,8 +658,11 @@ class FestMarkEntryController extends SahodayaAdminController
         $updatedCount = 0;
 
         DB::transaction(function () use ($data, $event, $criteriaService, &$updatedCount) {
+            $itemIds = collect($data['items'])->pluck('id');
+            $items = FestEventItem::where('event_id', $event->id)->whereIn('id', $itemIds)->get()->keyBy('id');
+
             foreach ($data['items'] as $itemData) {
-                $item = FestEventItem::where('event_id', $event->id)->find($itemData['id']);
+                $item = $items->get($itemData['id']);
                 if (! $item) {
                     continue;
                 }
@@ -576,14 +688,75 @@ class FestMarkEntryController extends SahodayaAdminController
      *
      * @return list<int>
      */
-    private function expandToTeam(FestEvent $event, int $itemId, int $participantId): array
+    /**
+     * Judge-score cap check + lifecycle gate — identical business rules previously
+     * duplicated verbatim in store() and bulkStore(). Throws when a judge's score
+     * exceeds the item's per-judge cap (total_marks split evenly across the panel);
+     * store() also enforces this earlier via a dynamic `max:` validation rule, so this
+     * check is redundant-but-harmless there, and the only enforcement bulkStore() has
+     * (its rows span multiple items, so it can't size one Laravel rule up front).
+     *
+     * @return bool  hasRealJudgeScore — whether the judge panel actually submitted
+     *               anything (an all-empty panel must not overwrite an already-saved
+     *               score, see the call sites).
+     */
+    private function checkJudgeCapAndGate(FestEvent $event, ?FestEventItem $item, FestMarkCriteriaService $criteriaService, ?array $judgeScores): bool
     {
-        $participant = FestParticipant::with('registration.item')->find($participantId);
+        $perJudgeMax = $item?->total_marks !== null
+            ? $item->total_marks / $criteriaService->judgeCountForItem($item)
+            : null;
+
+        if ($perJudgeMax !== null && is_array($judgeScores)) {
+            foreach ($judgeScores as $judgeScore) {
+                if ($judgeScore !== null && $judgeScore !== '' && (float) $judgeScore > $perJudgeMax) {
+                    throw ValidationException::withMessages([
+                        'judge_scores' => "A judge's score cannot exceed {$perJudgeMax} for this item.",
+                    ]);
+                }
+            }
+        }
+
+        EventLifecycleGate::allowMarkEntryForItem($event, $item);
+
+        return is_array($judgeScores) && collect($judgeScores)->contains(fn ($v) => $v !== null && $v !== '');
+    }
+
+    /**
+     * Expands one row's participant_id to its full team for a team/group item (or just
+     * itself, for an individual item) — returns full FestParticipant models keyed by id
+     * so callers (store()/bulkStore()) can pass them straight into
+     * FestMarkSaveService::save() instead of it re-fetching each one.
+     *
+     * $preloadedParticipants/$preloadedTeams let bulkStore() batch this across its
+     * whole row set up front (see resolveBatchTeamData()) instead of querying per row;
+     * store() (a single participant per request) omits them and this falls back to its
+     * original per-call queries.
+     *
+     * @param  ?Collection<int, FestParticipant>  $preloadedParticipants  keyed by participant id
+     * @param  ?Collection<string, Collection<int, FestParticipant>>  $preloadedTeams  keyed by "{group_id}:{item_id}"
+     * @return Collection<int, ?FestParticipant> keyed by participant id
+     */
+    private function expandToTeam(
+        FestEvent $event,
+        int $itemId,
+        int $participantId,
+        ?Collection $preloadedParticipants = null,
+        ?Collection $preloadedTeams = null,
+    ): Collection {
+        $participant = $preloadedParticipants?->get($participantId)
+            ?? FestParticipant::with('registration.item')->find($participantId);
         $item = $participant?->registration?->item;
 
         if (! $participant || ! $item || ! $participant->group_id
             || ! app(FestNumberingService::class)->isGroupItem($item)) {
-            return [$participantId];
+            // $participant may be null here only if $participantId doesn't exist, which
+            // the caller's validation (exists:fest_participants,id) already rules out —
+            // passing null through just falls back to save()'s own findOrFail.
+            return collect([$participantId => $participant]);
+        }
+
+        if ($preloadedTeams !== null) {
+            return $preloadedTeams->get($participant->group_id.':'.$itemId, collect())->keyBy('id');
         }
 
         return FestParticipant::where('group_id', $participant->group_id)
@@ -592,8 +765,44 @@ class FestMarkEntryController extends SahodayaAdminController
                 $q->whereNull('participant_role')
                     ->orWhere('participant_role', '!=', 'standby');
             })
-            ->pluck('id')
-            ->all();
+            ->get()
+            ->keyBy('id');
+    }
+
+    /**
+     * Prefetches everything bulkStore()'s loop needs so expandToTeam() and save() never
+     * re-query per row: every submitted row's own participant (with the relations
+     * save()/evaluateMark() need), plus — for rows on a team/group item — every
+     * teammate in one batched query instead of one query per row.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return array{0: Collection<int, FestParticipant>, 1: Collection<string, Collection<int, FestParticipant>>}
+     */
+    private function resolveBatchTeamData(FestEvent $event, array $rows): array
+    {
+        $eagerLoad = ['registration.item', 'registration.school', 'student'];
+
+        $participantIds = collect($rows)->pluck('participant_id')->map(fn ($id) => (int) $id)->unique()->values();
+        $participants = FestParticipant::with($eagerLoad)->whereIn('id', $participantIds)->get()->keyBy('id');
+
+        $numbering = app(FestNumberingService::class);
+        $groupIds = $participants
+            ->filter(fn (FestParticipant $p) => $p->group_id && $p->registration?->item && $numbering->isGroupItem($p->registration->item))
+            ->pluck('group_id')
+            ->unique()
+            ->filter()
+            ->values();
+
+        $teams = $groupIds->isEmpty()
+            ? collect()
+            : FestParticipant::with($eagerLoad)
+                ->whereIn('group_id', $groupIds)
+                ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id))
+                ->where(fn ($q) => $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))
+                ->get()
+                ->groupBy(fn (FestParticipant $p) => $p->group_id.':'.$p->registration->item_id);
+
+        return [$participants, $teams];
     }
 
     /**
@@ -724,19 +933,24 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $sheets = [];
 
+        $criteriaByItem = $criteriaService->criteriaForItems($items);
+
+        $participantsByItem = FestParticipant::whereHas('registration', fn ($q) => $q
+                ->where('event_id', $event->id)
+                ->whereIn('item_id', $items->pluck('id'))
+                ->whereNotIn('status', ['rejected', 'withdrawn']))
+            ->where('participant_role', '!=', 'standby')
+            ->with(['student', 'teacher', 'registration.school', 'group'])
+            ->get()
+            ->groupBy(fn ($p) => $p->registration->item_id);
+
         foreach ($items as $item) {
             $isGroup = $numbering->isGroupItem($item);
-            $criteria = $criteriaService->criteriaForItem($item);
+            $criteria = $criteriaByItem->get($item->id, collect());
             $judgeCount = $criteriaService->judgeCountForItem($item);
             $categoryLabel = $this->itemCategoryLabel($item, $classGroupLabels);
 
-            $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $event->id)
-                    ->where('item_id', $item->id)
-                    ->whereNotIn('status', ['rejected', 'withdrawn']))
-                ->where('participant_role', '!=', 'standby')
-                ->with(['student', 'teacher', 'registration.school', 'group'])
-                ->get();
+            $participants = $participantsByItem->get($item->id, collect());
 
             $rows = [];
             $seenGroups = [];

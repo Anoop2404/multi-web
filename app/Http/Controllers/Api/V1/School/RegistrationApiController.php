@@ -58,6 +58,7 @@ class RegistrationApiController extends SchoolApiController
                 ->where('status', '!=', 'superseded')
                 ->orderByDesc('created_at')
                 ->get()
+                ->each(fn ($payment) => $payment->setRelation('school', $this->school))
             : collect();
 
         return $this->ok([

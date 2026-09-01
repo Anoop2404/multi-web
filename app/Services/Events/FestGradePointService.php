@@ -19,6 +19,37 @@ class FestGradePointService
         'C'      => ['1' => 3, '2' => 2, '3' => 1],
     ];
 
+    /**
+     * Per-instance caches for pointsForMark()/resolveGradeFromScore() — both are called
+     * once per FestMark by EventContext::recalculateSchoolPoints()'s loop over every mark
+     * in an event, but point rules, grade configs, and item lookups only vary by
+     * event/item, not by mark. Without these, a single recalculation re-ran the same
+     * event-scoped queries once per mark (and the bulk "Save All" mark-entry flow
+     * triggers a full recalculation per participant on top of that).
+     */
+    private array $pointRulesByEvent = [];
+    private array $gradeConfigsByEvent = [];
+    private array $itemById = [];
+
+    private function pointRulesForEvent(int $eventId): Collection
+    {
+        return $this->pointRulesByEvent[$eventId] ??= FestPointRule::where('event_id', $eventId)->get();
+    }
+
+    private function gradeConfigsForEvent(int $eventId): Collection
+    {
+        return $this->gradeConfigsByEvent[$eventId] ??= FestGradeConfig::where('event_id', $eventId)->get();
+    }
+
+    private function itemById(int $itemId): ?FestEventItem
+    {
+        if (! array_key_exists($itemId, $this->itemById)) {
+            $this->itemById[$itemId] = FestEventItem::find($itemId);
+        }
+
+        return $this->itemById[$itemId];
+    }
+
     public function pointsForMark(FestEvent $event, FestMark $mark): int
     {
         $item = $mark->item ?? $mark->participant?->registration?->item;
@@ -27,7 +58,7 @@ class FestGradePointService
         $isGroup = $participantType !== 'individual';
 
         if ($mark->score !== null && $itemId) {
-            $effectiveGrade = $this->resolveGradeFromScore($event, (int) $itemId, (float) $mark->score);
+            $effectiveGrade = $this->resolveGradeFromScore($event, (int) $itemId, (float) $mark->score, $item);
             if ($effectiveGrade !== $mark->grade) {
                 $mark->grade = $effectiveGrade;
             }
@@ -39,7 +70,8 @@ class FestGradePointService
         // scratch), those custom rules take over. Previously this short-circuited
         // unconditionally, so the preset tab looked fully editable but any custom rules
         // saved there were silently never read — the fixed table always won regardless.
-        $hasCustomPointRules = FestPointRule::where('event_id', $event->id)->exists();
+        $pointRules = $this->pointRulesForEvent($event->id);
+        $hasCustomPointRules = $pointRules->isNotEmpty();
 
         if (! $hasCustomPointRules && $event->scoring_preset === 'mcs_kalotsav') {
             return $this->mcsPointsForMark($mark, $isGroup);
@@ -58,25 +90,26 @@ class FestGradePointService
             return 0;
         }
 
-        $gradeMatch = function ($q) use ($event, $mark) {
-            $mark->grade
-                ? $q->where('grade', $this->normalizeGrade($event, $mark->grade))
-                : $q->whereNull('grade');
-        };
+        $normalizedGrade = $mark->grade ? $this->normalizeGrade($event, $mark->grade) : null;
+        $matchesGrade = fn (FestPointRule $r) => $normalizedGrade !== null
+            ? $r->grade === $normalizedGrade
+            : $r->grade === null;
 
         // Exact match on this grade at this exact position — e.g. "Grade A, 1st place".
-        // latest('id') is a defensive tiebreaker, not the real fix: storePointRule() now
-        // upserts on (event_id, grade, position, is_group) so this combination can't be
-        // saved twice going forward, but existing duplicate rows from before that fix (or
-        // any other future write path) would otherwise make ->first() pick an effectively
-        // arbitrary row — this at least keeps that pick consistent across requests instead
-        // of drifting between whichever row the database happens to return first.
+        // Sorting matches by id desc and taking the first is a defensive tiebreaker, not
+        // the real fix: storePointRule() now upserts on (event_id, grade, position,
+        // is_group) so this combination can't be saved twice going forward, but existing
+        // duplicate rows from before that fix (or any other future write path) would
+        // otherwise make this pick an effectively arbitrary row — this at least keeps
+        // that pick consistent across requests instead of drifting between whichever row
+        // happens to come first.
         if ($mark->position) {
-            $rule = FestPointRule::where('event_id', $event->id)
-                ->where('is_group', $isGroup)
-                ->where('position', $mark->position)
-                ->where($gradeMatch)
-                ->latest('id')
+            $rule = $pointRules
+                ->filter(fn (FestPointRule $r) => (bool) $r->is_group === $isGroup
+                    && $r->position !== null
+                    && (int) $r->position === (int) $mark->position
+                    && $matchesGrade($r))
+                ->sortByDesc('id')
                 ->first();
 
             if ($rule) {
@@ -94,11 +127,11 @@ class FestGradePointService
             return 0;
         }
 
-        $anyPositionRule = FestPointRule::where('event_id', $event->id)
-            ->where('is_group', $isGroup)
-            ->whereNull('position')
-            ->where($gradeMatch)
-            ->latest('id')
+        $anyPositionRule = $pointRules
+            ->filter(fn (FestPointRule $r) => (bool) $r->is_group === $isGroup
+                && $r->position === null
+                && $matchesGrade($r))
+            ->sortByDesc('id')
             ->first();
 
         if ($anyPositionRule) {
@@ -162,20 +195,21 @@ class FestGradePointService
      * different maximums, instead of needing a raw-score band per item's own scale. Items
      * with no total_marks keep the original raw-score behaviour unchanged.
      */
-    public function resolveGradeFromScore(FestEvent $event, ?int $itemId, float $score): ?string
+    public function resolveGradeFromScore(FestEvent $event, ?int $itemId, float $score, ?FestEventItem $item = null): ?string
     {
         // total_marks is the item's overall ceiling across every judge (e.g. 200), not each
         // judge's own scale — each judge's input is already capped at total_marks / judgeCount
         // (see FestMarkEntryController::store() and MarkEntry.vue's perJudgeMax), so their sum
         // tops out at total_marks directly with no further multiplication needed here.
-        $itemModel = $itemId ? FestEventItem::find($itemId) : null;
+        //
+        // $item lets a caller that already has the model in hand (pointsForMark(), a
+        // save() already holding the item) skip the itemById() query entirely.
+        $itemModel = $item ?? ($itemId ? $this->itemById($itemId) : null);
         $maxPossibleMarks = (float) ($itemModel?->total_marks ?? 100.0);
 
-        $configs = FestGradeConfig::where('event_id', $event->id)
-            ->where(function ($q) use ($itemId) {
-                $q->where('item_id', $itemId)->orWhereNull('item_id');
-            })
-            ->get();
+        $configs = $this->gradeConfigsForEvent($event->id)
+            ->filter(fn (FestGradeConfig $c) => $c->item_id === null || (int) $c->item_id === $itemId)
+            ->values();
 
         $hasCustomConfigs = $configs->isNotEmpty();
 

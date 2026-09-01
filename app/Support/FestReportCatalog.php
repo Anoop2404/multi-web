@@ -158,6 +158,8 @@ class FestReportCatalog
             ['id' => 'medal-tally', 'label' => 'Medal Tally by School', 'format' => 'pdf', 'params' => [], 'phase' => 'after', 'audience' => 'public'],
             ['id' => 'school-participation-pdf', 'label' => 'School Participation Counts (PDF)', 'format' => 'pdf', 'params' => ['region_id', 'competition_phase_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'school-participation-xls', 'label' => 'School Participation Counts (Excel)', 'format' => 'xls', 'params' => ['region_id', 'competition_phase_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'student-limits-pdf', 'label' => 'Student Item Limits (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'student-limits-xls', 'label' => 'Student Item Limits (Excel)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
         ];
 
         return array_map(
@@ -251,6 +253,10 @@ class FestReportCatalog
         'medal-tally'                   => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
         'school-participation-pdf'      => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'school-participation-xls'      => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        // Always whole-fest (constructed against rootEvent()) — not scope/phase filterable,
+        // unlike every other export above. See FestReportController::studentLimits()'s docblock.
+        'student-limits-pdf'            => ['dataset' => 'registration', 'supported_scopes' => ['self'], 'supports_competition_phase' => false],
+        'student-limits-xls'            => ['dataset' => 'registration', 'supported_scopes' => ['self'], 'supports_competition_phase' => false],
     ];
 
     /** @return list<array<string, string>> */
@@ -276,6 +282,7 @@ class FestReportCatalog
             ['id' => 'assignment-completeness', 'label' => 'Assignment Completeness', 'href' => "{$base}/assignment-completeness"],
             ['id' => 'numbering-register', 'label' => 'Numbering Register', 'href' => "{$base}/numbering-register"],
             ['id' => 'pending-approvals', 'label' => 'Pending Approvals', 'href' => "{$base}/pending-approvals"],
+            ['id' => 'student-limits', 'label' => 'Student Item Limits', 'href' => "{$base}/student-limits"],
             ['id' => 'discipline-registration', 'label' => 'Discipline Registration', 'href' => "{$base}/discipline-registration"],
             ['id' => 'age-group-matrix', 'label' => 'Age Group Matrix', 'href' => "{$base}/age-group-matrix"],
             ['id' => 'fee-collection', 'label' => 'Fee Collection', 'href' => "{$base}/fee-collection"],

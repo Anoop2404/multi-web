@@ -679,6 +679,27 @@ class FestEvent extends Model
     }
 
     /**
+     * Same family-matching rule as reportableItemIds() (root via inherited_from_item_id,
+     * plus item_code) — bulk grouping tables over this event's whole item topology,
+     * exposed for callers that need the per-item family mapping (which item maps to
+     * which family) rather than just a flat id list, e.g.
+     * FestEventReportAnalyticsService::itemFamiliesFor(), so that matching rule lives
+     * in one place instead of being reimplemented per caller.
+     *
+     * @return array{0: \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, FestEventItem>>, 1: \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, FestEventItem>>}
+     */
+    public function itemFamilyGroups(): array
+    {
+        $allItems = FestEventItem::whereIn('event_id', $this->reportableEventIds())
+            ->get(['id', 'item_code', 'inherited_from_item_id']);
+
+        return [
+            $allItems->groupBy(fn (FestEventItem $i) => (int) ($i->inherited_from_item_id ?: $i->id)),
+            $allItems->whereNotNull('item_code')->groupBy('item_code'),
+        ];
+    }
+
+    /**
      * The season/program root of this event's topology. For every non-partitioned,
      * non-child event this is just $this. Added for FestReportScopeResolver
      * (remediation plan §4.2) — reportableEventIds() intentionally stays untouched for

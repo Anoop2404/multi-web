@@ -22,6 +22,10 @@ use Illuminate\Support\Str;
 
 class FestCertificateService
 {
+    public function __construct(
+        private FestGradePointService $gradePointService,
+    ) {}
+
     /** @return list<Certificate> */
     public function generateForEvent(FestEvent $event, ?int $itemId = null): array
     {
@@ -957,7 +961,7 @@ class FestCertificateService
         }
 
         if ($mark->score !== null) {
-            return app(FestGradePointService::class)->resolveGradeFromScore($event, $itemId, (float) $mark->score) ?: $mark->grade;
+            return $this->gradePointService->resolveGradeFromScore($event, $itemId, (float) $mark->score) ?: $mark->grade;
         }
 
         return $mark->grade;

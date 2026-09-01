@@ -6,6 +6,7 @@ use App\Support\CsvSafety;
 use App\Models\FestEvent;
 use App\Services\Events\EventContext;
 use App\Services\Events\EventLifecycleGate;
+use App\Services\Events\FestParticipationLimitService;
 use App\Services\Events\FestParticipationPolicyService;
 use App\Services\Events\FestRegistrationRegisterService;
 use App\Services\Events\FestReportService;
@@ -815,6 +816,40 @@ class FestReportController extends SahodayaAdminController
                 'school_id' => $schoolId,
                 'region_id' => $request->integer('region_id') ?: null,
             ])),
+        ])));
+    }
+
+    /**
+     * Deliberately whole-fest, always — matches FestSchoolReportController::studentLimits(),
+     * which constructs FestParticipationLimitService against $event->rootEvent() because
+     * limits are a single fest-wide policy, tallied across every phase/region a student
+     * could be registered under. Unlike other reports in this file, this one does NOT go
+     * through regionAwareTargetEvent()/REGION_ID_AWARE_IDS — rootEvent() already reaches
+     * the top of the tree regardless of which region/phase leaf the route's $event is, so
+     * a student's limit status can't silently differ depending on which region tile you
+     * clicked into.
+     */
+    public function studentLimits(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $rootEvent = $event->rootEvent();
+        $service = new FestParticipationLimitService($rootEvent);
+        $schoolId = $request->input('school_id') ?: null;
+
+        $rows = $service->studentLimitReportRows($schoolId);
+        $summary = $service->summarizeStudentLimitRows($rows);
+
+        $exportParams = http_build_query(array_filter(['school_id' => $schoolId]));
+        $exportBase = "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export";
+
+        return $this->inertia('Sahodaya/Events/Reports/StudentLimits', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'rows'           => $rows,
+            'summary'        => $summary,
+            'schools'        => $this->scopedReportService($request, $rootEvent)->schools(),
+            'filterSchoolId' => $schoolId,
+            'pdfUrl'         => "{$exportBase}/student-limits-pdf".($exportParams ? "?{$exportParams}" : ''),
+            'xlsUrl'         => "{$exportBase}/student-limits-xls".($exportParams ? "?{$exportParams}" : ''),
         ])));
     }
 

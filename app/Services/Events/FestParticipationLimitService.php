@@ -13,6 +13,9 @@ use Illuminate\Support\Collection;
 
 class FestParticipationLimitService
 {
+    /** @var array<string, array<string, mixed>> */
+    private array $policyCache = [];
+
     public function __construct(
         public FestEvent $event,
         private ?FestParticipationPolicyService $policyService = null,
@@ -20,10 +23,17 @@ class FestParticipationLimitService
         $this->policyService ??= app(FestParticipationPolicyService::class);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Memoized per class_group — studentLimitReportRows() can call this once per
+     * student, and a whole-fest report has only a handful of distinct class_groups
+     * across potentially thousands of students, so caching here turns that into one
+     * FestParticipationPolicy query per class_group instead of one per student.
+     *
+     * @return array<string, mixed>
+     */
     public function policyFor(?string $classGroup = null): array
     {
-        return $this->policyService->resolveForEvent($this->event, $classGroup);
+        return $this->policyCache[$classGroup ?? ''] ??= $this->policyService->resolveForEvent($this->event, $classGroup);
     }
 
     /**
@@ -66,7 +76,7 @@ class FestParticipationLimitService
      *
      * @return list<array<string, mixed>>
      */
-    public function studentLimitReportRows(string $schoolId, ?string $search = null): array
+    public function studentLimitReportRows(?string $schoolId = null, ?string $search = null): array
     {
         // $this->event is already the root event (the controller constructs this service
         // with $event->rootEvent()) — the scheme itself is configured on the root's
@@ -74,12 +84,15 @@ class FestParticipationLimitService
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event);
 
         $registrations = FestRegistration::whereIn('event_id', $this->scopeEventIds())
-            ->where('school_id', $schoolId)
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->active()
-            ->with(['item', 'participants' => fn ($q) => $q
+            ->with([
+                'item', 'school:id,name',
+                'participants' => fn ($q) => $q
                 ->where('participant_role', 'performer')
                 ->whereNotNull('student_id')
-                ->with('student:id,name,reg_no')])
+                ->with('student:id,name,reg_no'),
+            ])
             ->get();
 
         $byStudent = [];
@@ -90,6 +103,8 @@ class FestParticipationLimitService
                     continue;
                 }
                 $byStudent[$student->id]['student'] ??= $student;
+                $byStudent[$student->id]['school_id'] ??= $reg->school_id;
+                $byStudent[$student->id]['school_name'] ??= $reg->school?->name;
                 $byStudent[$student->id]['regs'][] = $reg;
             }
         }
@@ -165,6 +180,8 @@ class FestParticipationLimitService
                 'student_id'  => (int) $studentId,
                 'name'        => $student->name,
                 'reg_no'      => $student->reg_no,
+                'school_id'   => $entry['school_id'] ?? null,
+                'school_name' => $entry['school_name'] ?? null,
                 'on_stage'    => $onStage,
                 'off_stage'   => $offStage,
                 'individual'  => $individual,

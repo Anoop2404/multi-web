@@ -54,6 +54,7 @@ class AnnualRegistrationController extends SchoolAdminController
                 ->where('status', '!=', 'superseded')
                 ->orderByDesc('created_at')
                 ->get()
+                ->each(fn ($payment) => $payment->setRelation('school', $this->school))
             : collect();
 
         $yearOptions = AcademicYear::options();
@@ -634,7 +635,8 @@ class AnnualRegistrationController extends SchoolAdminController
                 ->where('academic_year', $registration->academic_year)
                 ->where('status', '!=', 'superseded')
                 ->orderByDesc('created_at')
-                ->get(),
+                ->get()
+                ->each(fn ($payment) => $payment->setRelation('school', $this->school)),
             'paymentDueDate' => $slab?->due_date?->format('Y-m-d'),
             'paymentOverdue' => (bool) $isOverdue,
             'lateFeeAmount'  => $lateFee,

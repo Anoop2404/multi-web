@@ -13,20 +13,30 @@ use App\Services\Notifications\NotificationService;
 
 class FestAthleticRecordService
 {
-    /** @return array{record_break: bool, break: ?FestRecordBreak, message: ?string} */
-    public function evaluateMark(FestMark $mark): array
+    /**
+     * @param  ?FestEvent  $event  Pass through when the caller already has it (e.g.
+     *                             FestMarkSaveService::save() always does) to skip the
+     *                             find() below — this is checked on every mark save, so
+     *                             re-fetching the same event/item/participant per call
+     *                             adds up fast across a bulk save.
+     * @param  ?FestEventItem  $item  Same, for the item.
+     * @param  ?FestParticipant  $participant  Same, for the participant — should already
+     *                             have `student` and `registration.school` loaded.
+     * @return array{record_break: bool, break: ?FestRecordBreak, message: ?string}
+     */
+    public function evaluateMark(FestMark $mark, ?FestEvent $event = null, ?FestEventItem $item = null, ?FestParticipant $participant = null): array
     {
-        $event = FestEvent::find($mark->event_id);
+        $event ??= FestEvent::find($mark->event_id);
         if (! $event?->record_tracking_enabled || blank($mark->measurement_value)) {
             return ['record_break' => false, 'break' => null, 'message' => null];
         }
 
-        $item = FestEventItem::find($mark->item_id);
+        $item ??= FestEventItem::find($mark->item_id);
         if (! $item || (($item->category ?? '') !== 'sports' && ! $item->sport_discipline)) {
             return ['record_break' => false, 'break' => null, 'message' => null];
         }
 
-        $participant = FestParticipant::with(['student', 'registration.school'])->find($mark->participant_id);
+        $participant ??= FestParticipant::with(['student', 'registration.school'])->find($mark->participant_id);
         if (! $participant) {
             return ['record_break' => false, 'break' => null, 'message' => null];
         }

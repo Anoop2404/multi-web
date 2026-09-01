@@ -2,8 +2,12 @@
 
 @section('content')
 @php
-    $micrositeSlug = $microsite->slug ?? 'v2';
-    $micrositeHome = route('tenant.site.microsite', ['slug' => $micrositeSlug], false);
+    // Primary-site standalone pages have no $microsite — link back to the root site
+    // instead of a /m/{slug} prefix.
+    $micrositeHome = $microsite
+        ? route('tenant.site.microsite', ['slug' => $microsite->slug], false)
+        : '';
+    $homeLabel = $microsite ? 'Home' : ($tenant->name ?? 'Home');
 @endphp
 
 {{-- Sub-Page Banner Header --}}
@@ -17,9 +21,9 @@
     <div class="max-w-7xl mx-auto relative z-10 space-y-4">
         {{-- Breadcrumbs Navigation --}}
         <nav class="flex items-center gap-2 text-xs font-semibold text-slate-300">
-            <a href="{{ $micrositeHome }}" class="hover:text-amber-300 transition-colors flex items-center gap-1">
+            <a href="{{ $micrositeHome ?: '/' }}" class="hover:text-amber-300 transition-colors flex items-center gap-1">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
-                <span>Home</span>
+                <span>{{ $homeLabel }}</span>
             </a>
             <span>/</span>
             <span class="text-amber-300 truncate">{{ $pageConfig['title'] ?? 'Page' }}</span>
@@ -66,7 +70,7 @@
             <div class="w-16 h-16 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center mx-auto text-2xl font-bold">ℹ</div>
             <h2 class="text-2xl font-bold text-slate-900 font-heading">Content Coming Soon</h2>
             <p class="text-slate-600 max-w-md mx-auto">This page is being prepared by the secretariat desk.</p>
-            <a href="{{ $micrositeHome }}" class="inline-block v2-btn-accent font-bold px-6 py-2.5 rounded-xl text-sm shadow-md">
+            <a href="{{ $micrositeHome ?: '/' }}" class="inline-block v2-btn-accent font-bold px-6 py-2.5 rounded-xl text-sm shadow-md">
                 Back to Homepage
             </a>
         </div>

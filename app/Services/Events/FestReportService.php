@@ -174,6 +174,49 @@ class FestReportService
         return ExcelExport::download($this->slug().'-school-participation', $header, $rows);
     }
 
+    /**
+     * Whole-fest, always — mirrors FestReportController::studentLimits()'s own docblock:
+     * limits are a single fest-wide policy, so $this->event->rootEvent() is used
+     * regardless of which region/phase leaf this export was requested against.
+     *
+     * @return array{rows: list<array<string, mixed>>, summary: array<string, int>}
+     */
+    private function studentLimitsReport(?string $schoolId): array
+    {
+        $service = new FestParticipationLimitService($this->event->rootEvent());
+        $rows = $service->studentLimitReportRows($schoolId);
+
+        return ['rows' => $rows, 'summary' => $service->summarizeStudentLimitRows($rows)];
+    }
+
+    private function studentLimitsPdf(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $report = $this->studentLimitsReport($request->input('school_id') ?: null);
+
+        return $this->renderPdf('fest.reports.student-limits', [
+            'event'   => $this->event,
+            'rows'    => $report['rows'],
+            'summary' => $report['summary'],
+            ...$this->brandingData(),
+        ], $this->slug().'-student-limits.pdf');
+    }
+
+    private function studentLimitsXls(Request $request): StreamedResponse
+    {
+        $report = $this->studentLimitsReport($request->input('school_id') ?: null);
+        $fmt = fn (array $dim) => $dim['limit'] !== null ? "{$dim['used']}/{$dim['limit']}" : (string) $dim['used'];
+
+        $rows = collect($report['rows'])->map(fn ($r) => [
+            $r['name'], $r['reg_no'] ?? '', $r['school_name'] ?? '',
+            $fmt($r['on_stage']), $fmt($r['off_stage']), $fmt($r['individual']), $fmt($r['group']), $fmt($r['total']),
+            $r['exceeds_any'] ? 'Yes' : 'No',
+        ]);
+
+        return ExcelExport::download($this->slug().'-student-limits', [
+            'Student', 'Reg No', 'School', 'On-stage', 'Off-stage', 'Individual', 'Group', 'Total', 'Exceeds limit?',
+        ], $rows);
+    }
+
     public function schools(): Collection
     {
         $ids = FestRegistration::whereIn('event_id', $this->eventIds())
@@ -567,6 +610,8 @@ class FestReportService
             'item-schedule-pdf' => $this->itemSchedulePdf($request),
             'school-participation-pdf' => $this->schoolParticipationPdf(),
             'school-participation-xls' => $this->schoolParticipationXls(),
+            'student-limits-pdf' => $this->studentLimitsPdf($request),
+            'student-limits-xls' => $this->studentLimitsXls($request),
             default => abort(404, 'Unknown export type'),
         };
     }

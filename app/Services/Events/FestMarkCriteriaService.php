@@ -95,6 +95,22 @@ class FestMarkCriteriaService
         return FestMarkCriterion::where('item_id', $item->id)->exists();
     }
 
+    /**
+     * Batched counterpart to criteriaForItem() for rendering many items at once
+     * (e.g. a whole event's mark-entry sheets) without one query per item.
+     *
+     * @param Collection<int, FestEventItem> $items
+     * @return Collection<int, Collection<int, FestMarkCriterion>> item_id => criteria
+     */
+    public function criteriaForItems(Collection $items): Collection
+    {
+        return FestMarkCriterion::whereIn('item_id', $items->pluck('id'))
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('item_id');
+    }
+
     /** @param array<int, array{label: string, max_score: float|int|null}> $rows */
     public function saveCriteria(FestEvent $event, FestEventItem $item, array $rows): Collection
     {
