@@ -214,7 +214,7 @@ function switchSportEvent(value) {
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/id-cards`;
 const audience = ref('head');
-const cardTemplate = ref('pass');
+const cardTemplate = ref(props.event?.event_type === 'kalolsavam' ? 'pass' : 'premium');
 const filters = reactive({ scope: 'event', school_id: '', item_id: '' });
 const previewCards = ref([]);
 const loading = ref(false);

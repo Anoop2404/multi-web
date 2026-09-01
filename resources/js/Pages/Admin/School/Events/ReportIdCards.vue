@@ -157,10 +157,12 @@
                 <div class="card space-y-3">
                     <h3 class="section-title text-sm">Layout guide</h3>
                     <ul class="text-xs text-slate-600 space-y-1.5 list-disc pl-4">
-                        <li>Print on standard A4 paper (4 cards per sheet).</li>
+                        <li v-if="cardTemplate === 'pass'">Print on standard A4 paper (10 cards per sheet).</li>
+                        <li v-else>Print on standard A4 paper (4 cards per sheet).</li>
                         <li>Cut along outer border guides.</li>
-                        <li>Punch lanyard hole at top center mark.</li>
-                        <li>QR codes verify participant status when scanned.</li>
+                        <li v-if="cardTemplate !== 'pass'">Punch lanyard hole at top center mark.</li>
+                        <li v-if="cardTemplate !== 'pass'">QR codes verify participant status when scanned.</li>
+                        <li v-else>No QR code — name, photo, and registered items only.</li>
                     </ul>
                 </div>
             </aside>
@@ -193,7 +195,7 @@ const { programLabel, programBase } = useSchoolProgramContext(props);
 const cardScope = ref(props.event?.event_type === 'sports' ? 'head' : 'item');
 const itemId = ref(cardScope.value === 'item' ? (props.items?.length ? 'all' : '') : '');
 const headId = ref(cardScope.value === 'head' ? (props.heads?.length ? String(props.heads[0].id) : '') : '');
-const cardTemplate = ref('premium');
+const cardTemplate = ref(props.event?.event_type === 'kalolsavam' ? 'pass' : 'premium');
 const layout = ref('individual');
 const previewCards = ref([]);
 const loading = ref(false);
@@ -209,6 +211,7 @@ onMounted(() => {
 });
 
 const templates = [
+    { id: 'pass', label: 'Participant Pass' },
     { id: 'premium', label: 'Premium' },
     { id: 'standard', label: 'Standard' },
 ];
