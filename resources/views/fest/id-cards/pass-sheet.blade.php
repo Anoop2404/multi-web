@@ -79,10 +79,6 @@
             font-size: 5.7pt; font-weight: 800; color: var(--primary); text-transform: uppercase;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .sahodaya-tagline {
-            margin-top: .35mm; font-size: 3.2pt; color: #73839a; text-transform: uppercase; letter-spacing: .15mm;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
         .event-branding { text-align: right; padding-right: 1mm; min-width: 0; }
         .event-name {
             font-size: 6.2pt; line-height: 1.1; font-weight: 900; color: var(--accent); text-transform: uppercase;

@@ -5,7 +5,6 @@
             <div v-else class="pass-tile__logo-fallback">{{ clusterInitials }}</div>
             <div class="pass-tile__brand">
                 <span class="pass-tile__org">{{ card.sahodaya_name || clusterName }}</span>
-                <span class="pass-tile__tagline">Festival {{ passLabel }} ID</span>
             </div>
             <div class="pass-tile__event">
                 <span class="pass-tile__event-name">Kalotsav</span>
@@ -252,10 +251,6 @@ const items = computed(() => {
 .pass-tile__brand { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pass-tile__org {
     font-size: 0.56rem; font-weight: 800; color: #073f82; text-transform: uppercase;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.pass-tile__tagline {
-    font-size: 0.4rem; color: #73839a; text-transform: uppercase; letter-spacing: 0.03em; margin-top: 0.05rem;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pass-tile__event { flex-shrink: 0; min-width: 0; max-width: 40%; text-align: right; }

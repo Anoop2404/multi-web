@@ -36,7 +36,6 @@
 
         <div class="branding">
             <div class="sahodaya-name">{{ $card['sahodaya_name'] ?? $clusterName }}</div>
-            <div class="sahodaya-tagline">Festival {{ $passLabel }} ID</div>
         </div>
 
         <div class="event-branding">
