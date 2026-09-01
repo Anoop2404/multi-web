@@ -76,7 +76,11 @@
         .sahodaya-logo { width: 6.8mm; height: 6.8mm; object-fit: contain; }
         .branding { padding-left: 1.4mm; min-width: 0; }
         .sahodaya-name {
-            font-size: 5.7pt; font-weight: 800; color: var(--primary); text-transform: uppercase;
+            font-size: 6pt; font-weight: 800; color: var(--primary); text-transform: uppercase;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .sahodaya-tagline {
+            margin-top: .3mm; font-size: 3.6pt; font-weight: 600; color: #64789a;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .event-branding { text-align: right; padding-right: 1mm; min-width: 0; }
@@ -123,23 +127,23 @@
             display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
         }
         .school-name {
-            margin-top: .6mm; font-size: 4.1pt; line-height: 1.1; font-weight: 600; color: #53667e;
+            margin-top: .6mm; font-size: 4.4pt; line-height: 1.15; font-weight: 600; color: #53667e;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
         .meta-grid { margin-top: 1.3mm; display: grid; grid-template-columns: 1fr 1fr; gap: .7mm 1mm; }
         .meta-box { min-width: 0; padding: .7mm 1mm; background: #f2f7fc; border-radius: 1mm; }
-        .meta-label { display: block; font-size: 2.9pt; font-weight: 700; text-transform: uppercase; color: #8391a4; margin-bottom: .25mm; }
+        .meta-label { display: block; font-size: 3.1pt; font-weight: 700; text-transform: uppercase; color: #8391a4; margin-bottom: .3mm; }
         .meta-value {
-            display: block; font-size: 3.8pt; line-height: 1.05; font-weight: 700; color: #173557;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+            font-size: 4.3pt; line-height: 1.2; font-weight: 700; color: #173557;
         }
         .category-value { color: var(--primary); }
 
         .items-section { margin-top: 1.2mm; padding-top: 1mm; border-top: .2mm solid #dce6f0; }
         .items-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: .7mm; }
-        .items-title strong { font-size: 4pt; color: var(--primary); text-transform: uppercase; }
-        .item-count { padding: .4mm 1.2mm; border-radius: 3mm; background: #e4f1ff; color: var(--primary); font-size: 3.1pt; font-weight: 800; }
+        .items-title strong { font-size: 4.3pt; color: var(--primary); text-transform: uppercase; }
+        .item-count { padding: .4mm 1.2mm; border-radius: 3mm; background: #e4f1ff; color: var(--primary); font-size: 3.4pt; font-weight: 800; }
         .item-list {
             list-style: none; counter-reset: event-item;
             column-count: 2; column-gap: 2mm;
@@ -156,7 +160,7 @@
             display: flex; align-items: center; justify-content: center; color: #fff;
             background: linear-gradient(90deg, var(--primary), #135ea6 45%, var(--accent) 82%, #ff9d20);
         }
-        .footer-text { position: relative; z-index: 2; font-size: 2.9pt; font-weight: 700; text-transform: uppercase; letter-spacing: .25mm; }
+        .footer-text { position: relative; z-index: 2; font-size: 3.2pt; font-weight: 700; text-transform: uppercase; letter-spacing: .25mm; }
         .corner-decoration {
             position: absolute; width: 19mm; height: 19mm; right: -10mm; bottom: -11mm;
             border-radius: 50%; border: 3mm solid rgba(255,255,255,.20);

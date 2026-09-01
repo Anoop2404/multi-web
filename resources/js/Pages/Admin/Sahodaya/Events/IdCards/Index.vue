@@ -62,7 +62,7 @@
                     </div>
 
                     <div class="grid sm:grid-cols-3 gap-3">
-                        <FormField label="Card scope">
+                        <FormField v-if="event?.event_type !== 'kalolsavam'" label="Card scope">
                             <SearchableSelect v-model="filters.scope" :all-option="false"
                                 :options="[
                                     { value: 'event', label: 'Event Pass (Event-wise)' },
@@ -77,7 +77,7 @@
                                 search-placeholder="Type school name to search…"
                                 @change="loadPreview" />
                         </FormField>
-                        <FormField label="Item filter (optional)">
+                        <FormField v-if="event?.event_type !== 'kalolsavam'" label="Item filter (optional)">
                             <SearchableSelect
                                 v-model="filters.item_id"
                                 :options="itemOptions"

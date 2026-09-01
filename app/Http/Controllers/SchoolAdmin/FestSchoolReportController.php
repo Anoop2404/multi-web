@@ -829,7 +829,7 @@ class FestSchoolReportController extends SchoolAdminController
             'school'      => $this->school->only('id', 'name'),
             'clusterName' => $cluster?->name ?? 'Sahodaya',
             'clusterLogoUrl' => $cluster ? TenantBranding::logoUrl($cluster) : null,
-            'event'       => $event->only('id', 'title', 'status'),
+            'event'       => $event->only('id', 'title', 'status', 'event_type'),
             'items'       => $event->items->map(fn (\App\Models\FestEventItem $item) => [
                 'id'                 => $item->id,
                 'title'              => $item->title,

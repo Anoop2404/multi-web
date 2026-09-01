@@ -3,9 +3,11 @@
         <PageHeader
             :title="`Student ID Cards — ${event.title}`"
             :eyebrow="programLabel"
-            :description="event.event_type === 'sports'
-                ? 'Item cards, sport event cards (one per Sport Event with items listed), or a single event participant pass for your school.'
-                : 'Item cards, head cards (one per item head with items listed), or a single event participant pass for your school.'"
+            :description="event.event_type === 'kalolsavam'
+                ? 'Participant Pass — one card per student listing every item they registered for.'
+                : event.event_type === 'sports'
+                    ? 'Item cards, sport event cards (one per Sport Event with items listed), or a single event participant pass for your school.'
+                    : 'Item cards, head cards (one per item head with items listed), or a single event participant pass for your school.'"
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
@@ -48,7 +50,7 @@
                         </button>
                     </div>
 
-                    <div class="flex flex-wrap gap-2">
+                    <div v-if="event?.event_type !== 'kalolsavam'" class="flex flex-wrap gap-2">
                         <button type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
                                 :class="cardScope === 'item'
                                     ? 'bg-emerald-700 text-white border-emerald-700'
@@ -192,7 +194,11 @@ const props = defineProps({
 });
 
 const { programLabel, programBase } = useSchoolProgramContext(props);
-const cardScope = ref(props.event?.event_type === 'sports' ? 'head' : 'item');
+const cardScope = ref(
+    props.event?.event_type === 'kalolsavam' ? 'event'
+        : props.event?.event_type === 'sports' ? 'head'
+            : 'item',
+);
 const itemId = ref(cardScope.value === 'item' ? (props.items?.length ? 'all' : '') : '');
 const headId = ref(cardScope.value === 'head' ? (props.heads?.length ? String(props.heads[0].id) : '') : '');
 const cardTemplate = ref(props.event?.event_type === 'kalolsavam' ? 'pass' : 'premium');

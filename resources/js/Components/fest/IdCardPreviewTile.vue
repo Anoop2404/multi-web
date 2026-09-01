@@ -5,6 +5,7 @@
             <div v-else class="pass-tile__logo-fallback">{{ clusterInitials }}</div>
             <div class="pass-tile__brand">
                 <span class="pass-tile__org">{{ card.sahodaya_name || clusterName }}</span>
+                <span v-if="card.phase_name" class="pass-tile__tagline">{{ card.phase_name }}</span>
             </div>
             <div class="pass-tile__event">
                 <span class="pass-tile__event-name">Kalotsav</span>
@@ -250,7 +251,11 @@ const items = computed(() => {
 }
 .pass-tile__brand { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pass-tile__org {
-    font-size: 0.56rem; font-weight: 800; color: #073f82; text-transform: uppercase;
+    font-size: 0.58rem; font-weight: 800; color: #073f82; text-transform: uppercase;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pass-tile__tagline {
+    display: block; margin-top: 0.03rem; font-size: 0.38rem; font-weight: 600; color: #64789a;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pass-tile__event { flex-shrink: 0; min-width: 0; max-width: 40%; text-align: right; }
@@ -286,24 +291,24 @@ const items = computed(() => {
     display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
 .pass-tile__school {
-    margin-top: 0.1rem; font-size: 0.5rem; font-weight: 600; color: #53667e;
+    margin-top: 0.1rem; font-size: 0.53rem; font-weight: 600; color: #53667e;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pass-tile__meta { margin-top: 0.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.12rem 0.18rem; }
 .pass-tile__meta-box { min-width: 0; padding: 0.12rem 0.2rem; background: #f2f7fc; border-radius: 0.2rem; }
-.pass-tile__meta-label { display: block; font-size: 0.36rem; font-weight: 700; text-transform: uppercase; color: #8391a4; }
+.pass-tile__meta-label { display: block; font-size: 0.4rem; font-weight: 700; text-transform: uppercase; color: #8391a4; }
 .pass-tile__meta-value {
-    display: block; font-size: 0.46rem; font-weight: 700; color: #173557;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+    font-size: 0.5rem; line-height: 1.2; font-weight: 700; color: #173557;
 }
 .pass-tile__meta-value--accent { color: #073f82; }
 
 .pass-tile__items { margin-top: 0.2rem; padding-top: 0.15rem; border-top: 1px solid #dce6f0; }
 .pass-tile__items-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.1rem; }
-.pass-tile__items-title strong { font-size: 0.48rem; color: #073f82; text-transform: uppercase; }
+.pass-tile__items-title strong { font-size: 0.5rem; color: #073f82; text-transform: uppercase; }
 .pass-tile__items-count {
     padding: 0.03rem 0.22rem; border-radius: 999px; background: #e4f1ff;
-    color: #073f82; font-size: 0.38rem; font-weight: 800;
+    color: #073f82; font-size: 0.4rem; font-weight: 800;
 }
 .pass-tile__items-list {
     list-style: none; counter-reset: pass-tile-item;
@@ -311,7 +316,7 @@ const items = computed(() => {
 }
 .pass-tile__items-list li {
     counter-increment: pass-tile-item; break-inside: avoid;
-    font-size: 0.42rem; line-height: 1.35; font-weight: 600; color: #253850;
+    font-size: 0.46rem; line-height: 1.35; font-weight: 600; color: #253850;
 }
 .pass-tile__items-list li::before { content: counter(pass-tile-item) ". "; font-weight: 800; color: #073f82; }
 

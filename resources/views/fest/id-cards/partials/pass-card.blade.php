@@ -22,6 +22,7 @@
     // informational "Event" field on staff/volunteer cards — the card's own
     // branded heading is a fixed "Kalotsav" + academic year, not this.
     $eventDisplayName = $card['phase_name'] ?? $eventTitle;
+    $phaseName = $card['phase_name'] ?? null;
     $academicYear = $card['academic_year'] ?? null;
     $roleLabel = $card['role_title'] ?? ucfirst(strtolower($card['role_label'] ?? 'Participant'));
     $passLabel = $card['role_title'] ?? ucwords(strtolower($card['role_label'] ?? 'Participant'));
@@ -36,6 +37,9 @@
 
         <div class="branding">
             <div class="sahodaya-name">{{ $card['sahodaya_name'] ?? $clusterName }}</div>
+            @if($phaseName)
+                <div class="sahodaya-tagline">{{ $phaseName }}</div>
+            @endif
         </div>
 
         <div class="event-branding">
