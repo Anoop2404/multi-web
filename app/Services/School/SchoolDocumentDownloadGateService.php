@@ -50,11 +50,22 @@ class SchoolDocumentDownloadGateService
      *                        only that head's fee needs to be paid — a school can clear Athletics
      *                        while Chess is still pending. Omit (or pass null) to fall back to the
      *                        old "whole event fee" check for every other event/fee model.
+     * @param  ?int  $phaseId  When given and the event bills Kalotsavam fees per named Phase, only
+     *                         that phase's fee needs to be paid — phases are independently payable
+     *                         (see FestSchoolEventFeeService::recalculateForPhase()), so a school
+     *                         that has fully paid Phase 1 must not be blocked from Phase 1
+     *                         downloads just because Phase 2 is still unpaid. Omit (or pass null)
+     *                         to fall back to the whole-event check, e.g. for a bundle spanning
+     *                         every phase.
      */
-    public function festEventFeeCleared(FestEvent $event, Tenant $school, ?int $headId = null): bool
+    public function festEventFeeCleared(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null): bool
     {
         if ($headId !== null && $this->festFees->usesPerHeadBilling($event)) {
             return $this->festFees->isHeadPaid($event, $school->id, $headId);
+        }
+
+        if ($phaseId !== null && $this->festFees->usesPerPhaseBilling($event)) {
+            return $this->festFees->isPhasePaid($event, $school->id, $phaseId);
         }
 
         return $this->festFees->isPaid($event, $school->id);
@@ -90,17 +101,22 @@ class SchoolDocumentDownloadGateService
         abort(422, 'Sahodaya membership fee payment is pending. Pay and get it verified before downloading ID cards or hall tickets.');
     }
 
-    public function assertFestEventFeeForDownloads(FestEvent $event, Tenant $school, ?int $headId = null): void
+    public function assertFestEventFeeForDownloads(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null): void
     {
         $this->assertMembershipFeeForDownloads($school);
 
-        if ($this->festEventFeeCleared($event, $school, $headId)) {
+        if ($this->festEventFeeCleared($event, $school, $headId, $phaseId)) {
             return;
         }
 
-        $message = $headId !== null && $this->festFees->usesPerHeadBilling($event)
-            ? 'Event Head fee payment is pending. Upload payment proof for this head and wait for verification before downloading ID cards or hall tickets.'
-            : 'Event fee payment is pending. Upload payment proof and wait for verification before downloading ID cards or hall tickets.';
+        $message = match (true) {
+            $headId !== null && $this->festFees->usesPerHeadBilling($event) =>
+                'Event Head fee payment is pending. Upload payment proof for this head and wait for verification before downloading ID cards or hall tickets.',
+            $phaseId !== null && $this->festFees->usesPerPhaseBilling($event) =>
+                'This phase\'s fee payment is pending. Upload payment proof for this phase and wait for verification before downloading ID cards or hall tickets.',
+            default =>
+                'Event fee payment is pending. Upload payment proof and wait for verification before downloading ID cards or hall tickets.',
+        };
 
         abort(422, $message);
     }
@@ -117,12 +133,14 @@ class SchoolDocumentDownloadGateService
     }
 
     /**
+     * @param  ?int  $headId  See festEventFeeCleared().
+     * @param  ?int  $phaseId  See festEventFeeCleared().
      * @return array{blocked: bool, reason: ?string, membership_cleared: bool, event_fee_cleared: bool|null, mcq_fee_cleared: bool|null}
      */
-    public function payload(Tenant $school, ?FestEvent $event = null, ?McqExam $exam = null): array
+    public function payload(Tenant $school, ?FestEvent $event = null, ?McqExam $exam = null, ?int $headId = null, ?int $phaseId = null): array
     {
         $membershipCleared = $this->membershipFeeCleared($school);
-        $eventFeeCleared = $event ? $this->festEventFeeCleared($event, $school) : null;
+        $eventFeeCleared = $event ? $this->festEventFeeCleared($event, $school, $headId, $phaseId) : null;
         $mcqFeeCleared = $exam ? $this->mcqExamFeeCleared($exam, $school) : null;
 
         $reason = null;
@@ -133,9 +151,17 @@ class SchoolDocumentDownloadGateService
             // whenever only membership was the blocker.
             $reason = 'Sahodaya membership fee payment is pending. Pay and get it verified before downloading ID cards or hall tickets.';
         } elseif ($event && ! $eventFeeCleared) {
-            $fee = \App\Models\FestSchoolEventFee::where('event_id', $event->id)->where('school_id', $school->id)->first();
+            $feeQuery = \App\Models\FestSchoolEventFee::where('event_id', $event->id)->where('school_id', $school->id);
+            if ($headId !== null && $this->festFees->usesPerHeadBilling($event)) {
+                $feeQuery->where('head_id', $headId);
+            } elseif ($phaseId !== null && $this->festFees->usesPerPhaseBilling($event)) {
+                $feeQuery->where('phase_id', $phaseId);
+            }
+            $fee = $feeQuery->first();
             if ($fee && $fee->status === 'proof_uploaded') {
                 $reason = 'Event fee payment proof is uploaded and awaiting Sahodaya approval. ID card downloads unlock automatically right after approval.';
+            } elseif ($phaseId !== null && $this->festFees->usesPerPhaseBilling($event)) {
+                $reason = 'This phase\'s fee payment is pending. Upload payment proof and get it approved to unlock ID card downloads.';
             } else {
                 $reason = 'Event fee payment is pending. Upload payment proof and get it approved to unlock ID card downloads.';
             }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Support\CsvSafety;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestItemHead;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
@@ -843,37 +844,59 @@ class FestSchoolReportController extends SchoolAdminController
         ]);
     }
 
+    /** Which named Phase (if any) an ID-card item filter belongs to, for phase-scoped fee gating. */
+    private function resolvePhaseIdForItem(?int $itemId): ?int
+    {
+        if (! $itemId) {
+            return null;
+        }
+
+        return FestEventItem::where('id', $itemId)->value('phase_id');
+    }
+
     public function idCardsJson(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
         $service->hideChestNo = true;
-
-        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
-            $event, $this->school, $request->integer('head_id') ?: null,
-        );
 
         $filters = array_merge($this->idCardFilters($request), [
             'school_id'        => $this->school->id,
             'school_downloads' => true,
         ]);
 
+        // Scoped to the item actually selected — for per-phase Kalotsavam billing, a
+        // school that's fully paid Phase 1 must see Phase 1 cards even while Phase 2 is
+        // still unpaid (phases are independently payable). "All items" bundles every
+        // phase, so it resolves no single phase and correctly falls back to the
+        // whole-event aggregate check below.
+        $headId = $filters['head_id'] ?? null;
+        $phaseId = $this->resolvePhaseIdForItem($filters['item_id'] ?? null);
+
+        $downloadGate = app(SchoolDocumentDownloadGateService::class)
+            ->payload($this->school, $event, null, $headId, $phaseId);
+
+        if ($downloadGate['blocked']) {
+            return response()->json(['cards' => [], 'downloadGate' => $downloadGate]);
+        }
+
         if (($filters['scope'] ?? 'item') === 'item' && $request->input('item_id') === 'all') {
             $sections = $service->cardsGroupedByItem($event, $filters);
             $cards = collect($sections)->flatMap(fn ($section) => $section['cards'])->values()->all();
 
-            return response()->json(['cards' => $cards]);
+            return response()->json(['cards' => $cards, 'downloadGate' => $downloadGate]);
         }
 
         if (($filters['scope'] ?? 'item') === 'item' && empty($filters['item_id'])) {
-            return response()->json(['cards' => [], 'message' => 'Select an item to preview cards.']);
+            return response()->json(['cards' => [], 'message' => 'Select an item to preview cards.', 'downloadGate' => $downloadGate]);
         }
 
         if (($filters['scope'] ?? 'item') === 'head' && empty($filters['head_id'])) {
-            return response()->json(['cards' => [], 'message' => 'Select an item head to preview cards.']);
+            return response()->json(['cards' => [], 'message' => 'Select an item head to preview cards.', 'downloadGate' => $downloadGate]);
         }
 
         return response()->json([
             'cards' => $service->cards($event, 'student', $filters),
+            'downloadGate' => $downloadGate,
         ]);
     }
 
@@ -885,15 +908,16 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
         $service->hideChestNo = true;
 
-        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
-            $event, $this->school, $request->integer('head_id') ?: null,
-        );
-
-        $cluster = Tenant::findOrFail($this->school->parent_id);
         $filters = array_merge($this->idCardFilters($request), [
             'school_id'        => $this->school->id,
             'school_downloads' => true,
         ]);
+
+        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
+            $event, $this->school, $filters['head_id'] ?? null, $this->resolvePhaseIdForItem($filters['item_id'] ?? null),
+        );
+
+        $cluster = Tenant::findOrFail($this->school->parent_id);
 
         $service->requireStudentItem('student', $filters);
 
@@ -916,16 +940,17 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
         $service->hideChestNo = true;
 
-        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
-            $event, $this->school, $request->integer('head_id') ?: null,
-        );
-
-        $cluster = Tenant::findOrFail($this->school->parent_id);
         $filters = array_merge($this->idCardFilters($request), [
             'school_id'        => $this->school->id,
             'school_downloads' => true,
             'include_data_uris' => true,
         ]);
+
+        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
+            $event, $this->school, $filters['head_id'] ?? null, $this->resolvePhaseIdForItem($filters['item_id'] ?? null),
+        );
+
+        $cluster = Tenant::findOrFail($this->school->parent_id);
 
         $service->requireStudentItem('student', $filters);
 

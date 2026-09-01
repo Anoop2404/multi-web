@@ -9,21 +9,21 @@
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
-                <a :href="previewUrl" target="_blank" class="btn-secondary text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
+                <a :href="previewUrl" target="_blank" class="btn-secondary text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || gate?.blocked }">
                     Preview in browser ↗
                 </a>
-                <a v-if="cardScope === 'head'" :href="pdfAllHeadsUrl" class="btn-secondary text-sm" :class="{ 'pointer-events-none opacity-50': downloadGate?.blocked }">All heads PDF ↓</a>
-                <a :href="pdfUrl" class="btn-primary text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
+                <a v-if="cardScope === 'head'" :href="pdfAllHeadsUrl" class="btn-secondary text-sm" :class="{ 'pointer-events-none opacity-50': gate?.blocked }">All heads PDF ↓</a>
+                <a :href="pdfUrl" class="btn-primary text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || gate?.blocked }">
                     Download PDF ↓
                 </a>
             </template>
         </PageHeader>
 
-        <div v-if="downloadGate?.blocked" class="notice-banner notice-banner--warning mb-6 max-w-5xl text-sm">
+        <div v-if="gate?.blocked" class="notice-banner notice-banner--warning mb-6 max-w-5xl text-sm">
             <p class="font-semibold">Payment pending</p>
-            <p class="mt-0.5">{{ downloadGate.reason }}</p>
-            <p v-if="downloadGate.links?.payments" class="mt-2">
-                <Link :href="downloadGate.links.payments" class="link-brand font-semibold">Go to payments →</Link>
+            <p class="mt-0.5">{{ gate.reason }}</p>
+            <p v-if="gate.links?.payments" class="mt-2">
+                <Link :href="gate.links.payments" class="link-brand font-semibold">Go to payments →</Link>
             </p>
         </div>
 
@@ -142,13 +142,13 @@
                 <div class="card space-y-3">
                     <h3 class="section-title text-sm">Generate</h3>
                     <div class="space-y-2">
-                        <a :href="previewUrl" target="_blank" class="btn-secondary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
+                        <a :href="previewUrl" target="_blank" class="btn-secondary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || gate?.blocked }">
                             Preview in browser ↗
                         </a>
-                        <a :href="pdfUrl" class="btn-primary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
+                        <a :href="pdfUrl" class="btn-primary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || gate?.blocked }">
                             Download PDF ↓
                         </a>
-                        <a v-if="cardScope === 'head'" :href="pdfAllHeadsUrl" class="btn-secondary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': downloadGate?.blocked }">
+                        <a v-if="cardScope === 'head'" :href="pdfAllHeadsUrl" class="btn-secondary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': gate?.blocked }">
                             All heads PDF ↓
                         </a>
                     </div>
@@ -197,6 +197,12 @@ const cardTemplate = ref('premium');
 const layout = ref('individual');
 const previewCards = ref([]);
 const loading = ref(false);
+// Payment-gating is per selection (a Kalotsavam phase's fee can be paid
+// independently of other phases — see FestSchoolEventFeeService::isPhasePaid()),
+// so the page-load `downloadGate` prop (a whole-event aggregate) is only a
+// starting point. loadPreview() below refreshes this to reflect whatever item/
+// head is currently selected.
+const gate = ref(props.downloadGate);
 
 onMounted(() => {
     loadPreview();
@@ -300,11 +306,6 @@ function setLayout(value) {
 }
 
 async function loadPreview() {
-    if (props.downloadGate?.blocked) {
-        previewCards.value = [];
-        return;
-    }
-
     if (cardScope.value === 'item' && !itemId.value) {
         previewCards.value = [];
         return;
@@ -327,6 +328,7 @@ async function loadPreview() {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         });
         const data = await res.json();
+        gate.value = data.downloadGate ?? props.downloadGate;
         previewCards.value = data.cards ?? [];
     } catch {
         previewCards.value = [];

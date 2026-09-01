@@ -1571,8 +1571,19 @@ class FestSchoolEventFeeService
             return $records->isEmpty() || $records->every(fn (FestSchoolEventFee $fee) => $fee->isFullyPaid());
         }
 
+        // Per-head (sports_composite) and per-phase (Kalotsavam) billing both persist
+        // extra head_id-/phase_id-scoped rows alongside the head_id=null/phase_id=null
+        // "rollup" row that actually represents the whole-event balance (see
+        // recalculateAggregateForPerHeadEvent()/recalculateAggregateForPerPhaseEvent()).
+        // Without these filters, a bare event_id+school_id lookup with no ORDER BY can
+        // return any one of those rows non-deterministically — including a single
+        // phase's row — making "is the event paid" reflect only that one phase/head
+        // instead of the true aggregate. Mirrors the filtering currentFeeRecordFor()
+        // already applies.
         $fee = FestSchoolEventFee::where('event_id', $this->feeOwnerEvent($event)->id)
             ->where('school_id', $schoolId)
+            ->when(Schema::hasColumn('fest_school_event_fees', 'head_id'), fn ($q) => $q->whereNull('head_id'))
+            ->when(Schema::hasColumn('fest_school_event_fees', 'phase_id'), fn ($q) => $q->whereNull('phase_id'))
             ->first();
 
         if (! $fee) {
