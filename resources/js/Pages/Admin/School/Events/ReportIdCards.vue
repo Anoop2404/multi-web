@@ -37,7 +37,7 @@
                         </p>
                     </div>
 
-                    <div class="flex flex-wrap gap-2">
+                    <div v-if="event?.event_type !== 'kalolsavam'" class="flex flex-wrap gap-2">
                         <button v-for="t in templates" :key="t.id" type="button"
                                 class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
                                 :class="cardTemplate === t.id

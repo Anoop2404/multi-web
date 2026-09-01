@@ -18,8 +18,11 @@
     // A phase (Zonal, Sub District, ...) is the specific competition round the
     // student actually registered under; the sheet-wide $eventTitle is often the
     // season hub an admin is bulk-printing from, which can span several phases at
-    // once — so the phase name wins on the card face whenever one is known.
+    // once — so the phase name wins whenever one is known. Used only for the
+    // informational "Event" field on staff/volunteer cards — the card's own
+    // branded heading is a fixed "Kalotsav" + academic year, not this.
     $eventDisplayName = $card['phase_name'] ?? $eventTitle;
+    $academicYear = $card['academic_year'] ?? null;
     $roleLabel = $card['role_title'] ?? ucfirst(strtolower($card['role_label'] ?? 'Participant'));
     $passLabel = $card['role_title'] ?? ucwords(strtolower($card['role_label'] ?? 'Participant'));
 @endphp
@@ -37,7 +40,10 @@
         </div>
 
         <div class="event-branding">
-            <div class="event-name">{{ $eventDisplayName }}</div>
+            <div class="event-name">Kalotsav</div>
+            @if($academicYear)
+                <div class="event-year">{{ $academicYear }}</div>
+            @endif
         </div>
     </div>
 

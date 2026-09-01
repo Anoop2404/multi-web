@@ -1,5 +1,89 @@
 <template>
-    <div class="id-card-tile" :class="[`id-card-tile--${card.role_class}`]">
+    <div v-if="variant === 'pass'" class="pass-tile">
+        <header class="pass-tile__head">
+            <img v-if="clusterLogoUrl" :src="clusterLogoUrl" :alt="clusterName" class="pass-tile__logo">
+            <div v-else class="pass-tile__logo-fallback">{{ clusterInitials }}</div>
+            <div class="pass-tile__brand">
+                <span class="pass-tile__org">{{ card.sahodaya_name || clusterName }}</span>
+                <span class="pass-tile__tagline">Festival {{ passLabel }} ID</span>
+            </div>
+            <div class="pass-tile__event">
+                <span class="pass-tile__event-name">Kalotsav</span>
+                <span v-if="card.academic_year" class="pass-tile__event-year">{{ card.academic_year }}</span>
+            </div>
+        </header>
+
+        <div class="pass-tile__body">
+            <div class="pass-tile__photo-col">
+                <div class="pass-tile__photo-box">
+                    <img v-if="card.photo_url || card.photo_src" :src="card.photo_url || card.photo_src" :alt="card.name" class="pass-tile__photo" loading="lazy">
+                    <span v-else class="pass-tile__initials">{{ card.initials }}</span>
+                </div>
+                <div class="pass-tile__role">{{ passLabel }}</div>
+            </div>
+
+            <div class="pass-tile__info">
+                <p class="pass-tile__name">{{ card.name }}</p>
+                <p class="pass-tile__school">{{ card.subtitle || card.school_name }}</p>
+
+                <div v-if="isStaffOrVolunteer" class="pass-tile__meta">
+                    <div class="pass-tile__meta-box">
+                        <span class="pass-tile__meta-label">{{ card.audience === 'staff' ? 'Location' : 'Contact' }}</span>
+                        <span class="pass-tile__meta-value">{{ card.detail || '—' }}</span>
+                    </div>
+                    <div class="pass-tile__meta-box">
+                        <span class="pass-tile__meta-label">Event</span>
+                        <span class="pass-tile__meta-value">{{ card.phase_name || eventTitle }}</span>
+                    </div>
+                    <div class="pass-tile__meta-box">
+                        <span class="pass-tile__meta-label">{{ card.secondary_label || 'Info' }}</span>
+                        <span class="pass-tile__meta-value pass-tile__meta-value--accent">{{ card.secondary_value || '—' }}</span>
+                    </div>
+                    <div class="pass-tile__meta-box">
+                        <span class="pass-tile__meta-label">{{ card.id_label || 'ID' }}</span>
+                        <span class="pass-tile__meta-value">{{ card.id_number || '—' }}</span>
+                    </div>
+                </div>
+
+                <template v-else>
+                    <div class="pass-tile__meta">
+                        <div class="pass-tile__meta-box">
+                            <span class="pass-tile__meta-label">Venue</span>
+                            <span class="pass-tile__meta-value">{{ card.venue || '—' }}</span>
+                        </div>
+                        <div class="pass-tile__meta-box">
+                            <span class="pass-tile__meta-label">Event Date</span>
+                            <span class="pass-tile__meta-value">{{ card.event_date || '—' }}</span>
+                        </div>
+                        <div class="pass-tile__meta-box">
+                            <span class="pass-tile__meta-label">Category</span>
+                            <span class="pass-tile__meta-value pass-tile__meta-value--accent">{{ card.category || card.class_category || '—' }}</span>
+                        </div>
+                        <div class="pass-tile__meta-box">
+                            <span class="pass-tile__meta-label">{{ card.id_label || 'ID' }}</span>
+                            <span class="pass-tile__meta-value">{{ card.id_number || '—' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="pass-tile__items">
+                        <div class="pass-tile__items-title">
+                            <strong>Registered Items</strong>
+                            <span class="pass-tile__items-count">{{ items.length }}</span>
+                        </div>
+                        <ol class="pass-tile__items-list">
+                            <li v-for="item in items" :key="item">{{ item }}</li>
+                        </ol>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <footer class="pass-tile__footer">
+            <span>Official {{ passLabel }} Pass</span>
+        </footer>
+    </div>
+
+    <div v-else class="id-card-tile" :class="[`id-card-tile--${card.role_class}`]">
         <!-- Header -->
         <header class="id-card-tile__head">
             <div class="id-card-tile__brand">
@@ -48,11 +132,6 @@
                         <td class="id-card-tile__meta-label">Date</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.event_date || '—' }}</td>
-                    </tr>
-                    <tr>
-                        <td class="id-card-tile__meta-label">Venue</td>
-                        <td class="id-card-tile__meta-sep">:</td>
-                        <td class="id-card-tile__meta-val">{{ card.venue || '—' }}</td>
                     </tr>
                     <tr v-if="card.dob">
                         <td class="id-card-tile__meta-label">DOB</td>
@@ -110,9 +189,145 @@ const clusterInitials = computed(() =>
         .map((word) => word.charAt(0).toUpperCase())
         .join('') || 'S',
 );
+
+const isStaffOrVolunteer = computed(() => ['staff', 'volunteer'].includes(props.card.audience));
+
+const passLabel = computed(() => {
+    if (props.card.role_title) return props.card.role_title;
+    const label = (props.card.role_label || 'Participant').toLowerCase();
+    return label.charAt(0).toUpperCase() + label.slice(1);
+});
+
+const items = computed(() => {
+    const card = props.card;
+    let list = card.items || [];
+    if (!list.length && card.members?.length) {
+        list = card.members.map((m) => m.name).filter(Boolean);
+    }
+    if (!list.length && !isStaffOrVolunteer.value) {
+        list = [card.item_label || card.detail].filter(Boolean);
+    }
+    return list.slice(0, 7);
+});
 </script>
 
 <style scoped>
+/* ========= Participant Pass tile ========= */
+.pass-tile {
+    width: 100%;
+    aspect-ratio: 85.6 / 54;
+    background: linear-gradient(135deg, #ffffff 0%, #ffffff 65%, #f4f9ff 100%);
+    border: 1px solid #bdd0e5;
+    border-radius: 0.7rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 0 3px 12px rgba(4, 42, 91, 0.10);
+}
+.pass-tile__head {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.55rem;
+    border-bottom: 1px solid #dde7f1;
+    background: linear-gradient(90deg, #ffffff 0%, #ffffff 72%, #eef6ff 100%);
+    position: relative;
+}
+.pass-tile__head::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%; height: 3px;
+    background: linear-gradient(90deg, #073f82, #1767b7, #ec1470, #ff9e24);
+}
+.pass-tile__logo, .pass-tile__logo-fallback {
+    width: 1.5rem; height: 1.5rem; border-radius: 50%; flex-shrink: 0; object-fit: contain;
+}
+.pass-tile__logo-fallback {
+    display: flex; align-items: center; justify-content: center;
+    background: #eef6ff; color: #073f82; font-size: 0.55rem; font-weight: 800;
+}
+.pass-tile__brand { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pass-tile__org {
+    font-size: 0.56rem; font-weight: 800; color: #073f82; text-transform: uppercase;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pass-tile__tagline {
+    font-size: 0.4rem; color: #73839a; text-transform: uppercase; letter-spacing: 0.03em; margin-top: 0.05rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pass-tile__event { flex-shrink: 0; min-width: 0; max-width: 40%; text-align: right; }
+.pass-tile__event-name {
+    display: block; font-size: 0.62rem; font-weight: 900; color: #ec1470; text-transform: uppercase;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pass-tile__event-year {
+    display: block; margin-top: 0.05rem; font-size: 0.4rem; font-weight: 700; color: #073f82;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.pass-tile__body { flex: 1; min-height: 0; display: flex; gap: 0.45rem; padding: 0.4rem 0.55rem 0.2rem; }
+.pass-tile__photo-col { width: 22%; flex-shrink: 0; }
+.pass-tile__photo-box {
+    width: 100%; aspect-ratio: 19 / 24; border-radius: 0.3rem; overflow: hidden;
+    background: linear-gradient(145deg, #e5edf7, #c8daed); border: 1px solid #cddaea;
+}
+.pass-tile__photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pass-tile__initials {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 800; color: #073f82;
+}
+.pass-tile__role {
+    margin-top: 0.25rem; text-align: center; padding: 0.15rem 0.1rem; border-radius: 0.2rem;
+    background: #ec1470; color: #fff; font-size: 0.4rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.03em;
+}
+
+.pass-tile__info { flex: 1; min-width: 0; }
+.pass-tile__name {
+    font-size: 0.82rem; font-weight: 800; color: #0b1e3a; line-height: 1.15;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.pass-tile__school {
+    margin-top: 0.1rem; font-size: 0.5rem; font-weight: 600; color: #53667e;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pass-tile__meta { margin-top: 0.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.12rem 0.18rem; }
+.pass-tile__meta-box { min-width: 0; padding: 0.12rem 0.2rem; background: #f2f7fc; border-radius: 0.2rem; }
+.pass-tile__meta-label { display: block; font-size: 0.36rem; font-weight: 700; text-transform: uppercase; color: #8391a4; }
+.pass-tile__meta-value {
+    display: block; font-size: 0.46rem; font-weight: 700; color: #173557;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pass-tile__meta-value--accent { color: #073f82; }
+
+.pass-tile__items { margin-top: 0.2rem; padding-top: 0.15rem; border-top: 1px solid #dce6f0; }
+.pass-tile__items-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.1rem; }
+.pass-tile__items-title strong { font-size: 0.48rem; color: #073f82; text-transform: uppercase; }
+.pass-tile__items-count {
+    padding: 0.03rem 0.22rem; border-radius: 999px; background: #e4f1ff;
+    color: #073f82; font-size: 0.38rem; font-weight: 800;
+}
+.pass-tile__items-list {
+    list-style: none; counter-reset: pass-tile-item;
+    column-count: 2; column-gap: 0.4rem; margin: 0; padding: 0;
+}
+.pass-tile__items-list li {
+    counter-increment: pass-tile-item; break-inside: avoid;
+    font-size: 0.42rem; line-height: 1.35; font-weight: 600; color: #253850;
+}
+.pass-tile__items-list li::before { content: counter(pass-tile-item) ". "; font-weight: 800; color: #073f82; }
+
+.pass-tile__footer {
+    flex-shrink: 0; height: 0.85rem; position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    background: linear-gradient(90deg, #073f82, #135ea6 45%, #ec1470 82%, #ff9d20);
+}
+.pass-tile__footer span { font-size: 0.38rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* ========= Premium-style tile (default) ========= */
 .id-card-tile {
     width: 100%;
     aspect-ratio: 98 / 62;

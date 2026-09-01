@@ -38,7 +38,7 @@
                     </div>
                     <p class="text-xs text-slate-500">{{ activeType.hint }}</p>
 
-                    <div class="pt-2 border-t border-slate-100">
+                    <div v-if="event?.event_type !== 'kalolsavam'" class="pt-2 border-t border-slate-100">
                         <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Card style</h4>
                         <div class="flex flex-wrap gap-2">
                             <button v-for="t in templates" :key="t.id" type="button"

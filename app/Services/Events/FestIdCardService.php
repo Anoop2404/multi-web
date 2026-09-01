@@ -656,6 +656,7 @@ class FestIdCardService
                 'entity_id'       => 'reg-'.$registration->id,
                 'event_name'      => $event->title,
                 'phase_name'      => $phaseName,
+                'academic_year'   => $this->resolveEventYearLabel($event),
                 'event_date'      => $eventDate,
                 'venue'           => $venue,
                 'sahodaya_name'   => $event->tenant?->name ?? (\App\Models\Tenant::where('id', $event->tenant_id)->value('name') ?? 'Sahodaya'),
@@ -738,6 +739,10 @@ class FestIdCardService
         // correctly instead of repeating the hub's generic title on every card.
         $leafEvent = $p->registration?->event ?? $event;
         $phaseName = $leafEvent->sourcePhase?->name ?: $leafEvent->region?->name;
+        // Fest events don't span academic years (a phase never carries a different
+        // year than its own hub), so the hub's own record is authoritative — no need
+        // to chase the leaf event's own academicYear() and risk an N+1 per card.
+        $academicYear = $this->resolveEventYearLabel($event);
 
         return [
             'card_type'       => 'individual',
@@ -756,6 +761,7 @@ class FestIdCardService
             'class_category'  => $classCategory,
             'event_name'      => $event->title,
             'phase_name'      => $phaseName,
+            'academic_year'   => $academicYear,
             'event_date'      => $eventDate,
             'venue'           => $venue,
             'dob'             => $dob,
@@ -1029,6 +1035,7 @@ class FestIdCardService
                 'qr_src'          => $this->qrService->dataUri($qrPayload),
                 'footer'          => $event->title,
                 'entity_id'       => (string) $v->id,
+                'academic_year'   => $this->resolveEventYearLabel($event),
             ];
         })->values()->all();
     }
@@ -1075,8 +1082,25 @@ class FestIdCardService
                 'qr_src'          => $this->qrService->dataUri($qrPayload),
                 'footer'          => $event->title,
                 'entity_id'       => (string) $a->id,
+                'academic_year'   => $this->resolveEventYearLabel($event),
             ];
         })->values()->all();
+    }
+
+    /**
+     * "Kalotsav {year}" heading on the Participant Pass card face. Prefers the
+     * event's own academic-year record ("2026-27"); falls back to the plain
+     * calendar year off the event's start date when no academic year is set.
+     */
+    private function resolveEventYearLabel(FestEvent $event): ?string
+    {
+        if ($label = $event->academicYear?->label) {
+            return $label;
+        }
+
+        $rawDate = $event->event_start ?? $event->starts_at ?? $event->start_date ?? $event->event_end;
+
+        return $rawDate ? date('Y', strtotime((string) $rawDate)) : null;
     }
 
     private function initials(string $name): string

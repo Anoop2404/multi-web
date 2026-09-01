@@ -85,7 +85,11 @@
         }
         .event-branding { text-align: right; padding-right: 1mm; min-width: 0; }
         .event-name {
-            font-size: 6pt; line-height: 1.15; font-weight: 900; color: var(--accent);
+            font-size: 6.2pt; line-height: 1.1; font-weight: 900; color: var(--accent); text-transform: uppercase;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .event-year {
+            margin-top: .3mm; font-size: 4pt; line-height: 1.1; font-weight: 700; color: var(--primary);
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
