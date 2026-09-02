@@ -513,12 +513,19 @@ function formatMoney(value) {
 }
 
 function openPicker() {
-    if (props.blocked) {
+    const hasExistingRegistration = !isEditing.value && (props.registrations?.length ?? 0) > 0 && props.registrations[0];
+    // A "blocked" item (e.g. school's per-item quota already reached) must still
+    // be editable via its own existing registration -- that's the entire point of
+    // isItemBlocked()'s isCurrentlyEditing exception in the parent. Auto-entering
+    // edit mode has to happen BEFORE the blocked check below, not after, or the
+    // block never lifts and this becomes a permanent deadlock: blocked because
+    // not editing, never editing because blocked. Only a genuinely new
+    // registration attempt (nothing to fall back into) should honor the block.
+    if (hasExistingRegistration) {
+        emit('edit', props.registrations[0]);
+    } else if (props.blocked) {
         showWarning(props.blockReason || 'This item is currently unavailable.', 'Item Unavailable');
         return;
-    }
-    if (!isEditing.value && (props.registrations?.length ?? 0) > 0 && props.registrations[0]) {
-        emit('edit', props.registrations[0]);
     }
     if (!isEditing.value && isGroup.value && !String(props.form.team_name ?? '').trim()) {
         props.form.team_name = nextTeamName.value;
@@ -527,12 +534,14 @@ function openPicker() {
 }
 
 function openStandbyPicker() {
-    if (props.blocked) {
+    const hasExistingRegistration = !isEditing.value && (props.registrations?.length ?? 0) > 0 && props.registrations[0];
+    // See openPicker() above for why the existing-registration edit trigger must
+    // run before the blocked check.
+    if (hasExistingRegistration) {
+        emit('edit', props.registrations[0]);
+    } else if (props.blocked) {
         showWarning(props.blockReason || 'This item is currently unavailable.', 'Item Unavailable');
         return;
-    }
-    if (!isEditing.value && (props.registrations?.length ?? 0) > 0 && props.registrations[0]) {
-        emit('edit', props.registrations[0]);
     }
     standbyPickerOpen.value = true;
 }
