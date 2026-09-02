@@ -29,9 +29,10 @@ class McqExamController extends SahodayaAdminController
 {
     public function index()
     {
+        // Active = excludes cancelled registrations, matching the per-exam Overview/Reports stats.
         $exams = McqExam::where('tenant_id', $this->sahodaya->id)
             ->with(['series:id,title', 'parentExam:id,title,exam_level'])
-            ->withCount('registrations')
+            ->withCount(['registrations' => fn ($q) => $q->active()])
             ->orderByDesc('scheduled_at')
             ->get()
             ->map(fn (McqExam $exam) => array_merge($exam->toArray(), [

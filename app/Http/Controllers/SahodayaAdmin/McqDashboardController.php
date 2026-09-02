@@ -20,7 +20,11 @@ class McqDashboardController extends SahodayaAdminController
         $stats = [
             'exams'         => $allExams->count(),
             'active'        => $allExams->whereIn('status', $activeStatuses)->count(),
-            'registrations' => (int) McqExam::where('tenant_id', $sahodayaId)->withCount('registrations')->get()->sum('registrations_count'),
+            // Active = excludes cancelled registrations, matching the per-exam Overview/Reports stats.
+            'registrations' => (int) McqExam::where('tenant_id', $sahodayaId)
+                ->withCount(['registrations' => fn ($q) => $q->active()])
+                ->get()
+                ->sum('registrations_count'),
             'published'     => $allExams->where('results_published', true)->count(),
         ];
 

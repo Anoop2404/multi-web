@@ -8,8 +8,9 @@ class McqExamsApiController extends SahodayaApiController
 {
     public function index()
     {
+        // Active = excludes cancelled registrations, matching the Sahodaya admin dashboard/exam list.
         $exams = McqExam::where('tenant_id', $this->sahodaya->id)
-            ->withCount('registrations')
+            ->withCount(['registrations' => fn ($q) => $q->active()])
             ->orderByDesc('scheduled_at')
             ->get();
 
