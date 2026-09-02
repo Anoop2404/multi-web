@@ -72,6 +72,7 @@ class FestEventPhaseController extends SahodayaAdminController
             'registration_batch_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('fest_registration_batches', 'id')->where('event_id', $event->id)],
             'is_regional' => 'nullable|boolean',
             'result_publish_mode' => 'nullable|in:all_regions,per_region',
+            'venue' => 'nullable|string|max:255',
         ]);
 
         $phase = $service->createPhase($event, $data);
@@ -119,6 +120,7 @@ class FestEventPhaseController extends SahodayaAdminController
             'registration_batch_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('fest_registration_batches', 'id')->where('event_id', $event->id)],
             'is_regional' => 'nullable|boolean',
             'result_publish_mode' => 'nullable|in:all_regions,per_region',
+            'venue' => 'nullable|string|max:255',
             'payment_instructions' => 'nullable|string|max:5000',
             'payment_qr_code' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:3072',
             'remove_payment_qr_code' => 'nullable|boolean',

@@ -29,6 +29,9 @@ class FestEventPhase extends Model
         'student_registration_fee',
         'payment_instructions',
         'payment_qr_code',
+        // Only meaningful for a non-regional phase — a regional phase's venue is set per
+        // region instead, via FestPhaseRegion::venue.
+        'venue',
         'starts_at',
         'ends_at',
         'registration_open',

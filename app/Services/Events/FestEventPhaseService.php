@@ -47,6 +47,7 @@ class FestEventPhaseService
             'registration_batch_id' => $data['registration_batch_id'] ?? null,
             'is_regional' => (bool) ($data['is_regional'] ?? false),
             'result_publish_mode' => $data['result_publish_mode'] ?? 'all_regions',
+            'venue' => $data['venue'] ?? null,
         ]);
     }
 
@@ -82,7 +83,7 @@ class FestEventPhaseService
             // explicitly present" shape fits it — see FestEventPhase::school_registration_fee_share
             // and docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md §3 item 4.
             'school_registration_fee_share', 'student_registration_fee',
-            'registration_batch_id', 'is_regional', 'result_publish_mode',
+            'registration_batch_id', 'is_regional', 'result_publish_mode', 'venue',
         ];
 
         $payload = [

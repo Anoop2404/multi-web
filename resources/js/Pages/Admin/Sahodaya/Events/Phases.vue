@@ -196,6 +196,10 @@
                     <p v-else-if="addForm.is_regional" class="text-xs text-slate-400">
                         After saving, a "Regions" button will appear on this phase to choose which regions run it.
                     </p>
+                    <label v-if="!addForm.is_regional" class="text-xs text-slate-500 block">
+                        Venue
+                        <input v-model="addForm.venue" type="text" class="field text-sm mt-0.5" placeholder="e.g. school/college name, hall">
+                    </label>
                     <div class="flex gap-2">
                         <button type="submit" class="btn-primary text-sm" :disabled="addForm.processing">Add phase</button>
                         <button type="button" class="btn-ghost text-sm" @click="showAdd = false">Cancel</button>
@@ -261,6 +265,10 @@
                                 <div class="flex items-center gap-2 pt-1">
                                     <label class="flex items-center gap-2 text-[11px] cursor-pointer"><input v-model="editForm.is_regional" type="checkbox" class="rounded border-slate-300"> Regional</label>
                                 </div>
+                                <label v-if="!editForm.is_regional" class="text-[11px] text-slate-500 block">
+                                    Venue
+                                    <input v-model="editForm.venue" type="text" class="field !py-1 !text-xs mt-0.5" placeholder="e.g. school/college name, hall">
+                                </label>
                             </div>
                             <div class="flex gap-2 shrink-0">
                                 <button type="button" class="text-xs font-semibold text-[#0f3d7a]" @click="saveEdit(phase)">Save</button>
@@ -291,6 +299,7 @@
                                     </span>
                                     <span v-if="phase.registration_batch" class="ml-2">{{ phase.registration_batch.name }}</span>
                                     <span v-if="phase.is_regional" class="ml-2 text-indigo-600">Regional: {{ phase.allowed_regions?.filter((r) => r.enabled).map((r) => r.region?.name).join(', ') || 'not configured' }}</span>
+                                    <span v-else-if="phase.venue" class="ml-2">Venue: {{ phase.venue }}</span>
                                 </div>
                             </div>
                             <div class="flex gap-2 shrink-0">
@@ -453,9 +462,9 @@ const addForm = useForm({
     name: '', code: '', sort_order: null, is_default: false,
     starts_at: '', ends_at: '',
     registration_open: '', registration_close: '', status: 'registration_open', school_registration_fee_share: null, student_registration_fee: null,
-    registration_batch_id: null, is_regional: false,
+    registration_batch_id: null, is_regional: false, venue: '',
 });
-const editForm = reactive({ name: '', code: '', starts_at: '', ends_at: '', registration_open: '', registration_close: '', status: 'registration_open', school_registration_fee_share: null, student_registration_fee: null, registration_batch_id: null, is_regional: false });
+const editForm = reactive({ name: '', code: '', starts_at: '', ends_at: '', registration_open: '', registration_close: '', status: 'registration_open', school_registration_fee_share: null, student_registration_fee: null, registration_batch_id: null, is_regional: false, venue: '' });
 const assignForm = useForm({ phase_id: null, item_ids: [] });
 
 // Payment batches — a Sahodaya defines however many of these it needs (0, 1, 2, or more),
@@ -553,6 +562,7 @@ function startEdit(phase) {
         student_registration_fee: phase.student_registration_fee ?? null,
         registration_batch_id: phase.registration_batch_id ?? null,
         is_regional: Boolean(phase.is_regional),
+        venue: phase.venue ?? '',
     });
 }
 
