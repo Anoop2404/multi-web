@@ -13,6 +13,8 @@ use App\Services\Events\FestChestNumberService;
 use App\Services\Events\FestHeadItemNavigationService;
 use App\Services\Events\FestNumberingService;
 use App\Support\FestPageActivity;
+use App\Support\PdfGenerator;
+use App\Support\TenantBranding;
 use Illuminate\Http\Request;
 
 class FestChestNumberController extends SahodayaAdminController
@@ -59,6 +61,21 @@ class FestChestNumberController extends SahodayaAdminController
             default => null,
         };
 
+        $childEvents = $event->sportEventDropdownOptions();
+
+        // Picking an option here is a hard navigation to that event's own id (see
+        // ChestNumbers.vue's switchSportEvent()) — for an event/region/phase-scoped admin,
+        // an out-of-scope option isn't a dead end, it's a 403 (EnsureSahodayaAdmin denies
+        // the resulting request), which looks exactly like "the region/phase switcher
+        // doesn't work." Narrow to what they can actually open, same as
+        // FestRegistrationReviewController::index().
+        if (($scopedEventIds = $this->scopedFestEventIds()) !== null) {
+            $childEvents = array_values(array_filter(
+                $childEvents,
+                fn (array $option) => in_array($option['id'], $scopedEventIds, true),
+            ));
+        }
+
         return $this->inertia('Sahodaya/Events/ChestNumbers', $this->withEventActivity($event, FestPageActivity::CHEST_NUMBERS, array_merge($nav, [
             'event'          => $event->only('id', 'title', 'status', 'event_type', 'chest_reveal_mode', 'results_published'),
             'selectedHeadId' => $selectedHeadId,
@@ -68,7 +85,7 @@ class FestChestNumberController extends SahodayaAdminController
             'greenRoom'      => $greenRoom,
             'includePending' => $includePending,
             'view'           => $request->query('view') === 'green-room' ? 'green-room' : null,
-            'childEvents'    => $event->sportEventDropdownOptions(),
+            'childEvents'    => $childEvents,
             'itemHasMarksOrAttendance'  => $itemHasMarksOrAttendance,
             'eventHasMarksOrAttendance' => $eventHasMarksOrAttendance,
         ])));
@@ -216,11 +233,18 @@ class FestChestNumberController extends SahodayaAdminController
 
         $rows = $this->chestNumberRows($event, $itemId);
 
-        return view('fest.chest-numbers-print', [
-            'event' => $event,
-            'item'  => $item,
-            'rows'  => $rows,
-        ]);
+        $html = view('fest.chest-numbers-print', [
+            'event'   => $event,
+            'item'    => $item,
+            'rows'    => $rows,
+            'orgName' => $this->sahodaya->name,
+            'logoSrc' => TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->render();
+
+        $slug = str($event->title)->slug()->limit(40).($item ? '-'.str($item->title)->slug()->limit(30) : '');
+        $inline = $request->boolean('inline') || $request->boolean('preview');
+
+        return PdfGenerator::download($html, "{$slug}-chest-numbers.pdf", $inline);
     }
 
     public function cards(Request $request, string $tenantId, FestEvent $event)
@@ -230,11 +254,18 @@ class FestChestNumberController extends SahodayaAdminController
         $itemId = $request->integer('item_id') ?: null;
         $item = $itemId ? FestEventItem::where('event_id', $event->id)->findOrFail($itemId) : null;
 
-        return view('fest.chest-cards-print', [
-            'event' => $event,
-            'item'  => $item,
-            'rows'  => $this->chestNumberRows($event, $itemId),
-        ]);
+        $html = view('fest.chest-cards-print', [
+            'event'   => $event,
+            'item'    => $item,
+            'rows'    => $this->chestNumberRows($event, $itemId),
+            'orgName' => $this->sahodaya->name,
+            'logoSrc' => TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->render();
+
+        $slug = str($event->title)->slug()->limit(40).($item ? '-'.str($item->title)->slug()->limit(30) : '');
+        $inline = $request->boolean('inline') || $request->boolean('preview');
+
+        return PdfGenerator::download($html, "{$slug}-chest-cards.pdf", $inline, true);
     }
 
     public function csv(Request $request, string $tenantId, FestEvent $event)

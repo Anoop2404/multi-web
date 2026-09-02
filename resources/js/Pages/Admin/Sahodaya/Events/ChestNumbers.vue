@@ -20,7 +20,7 @@
         <!-- Sport Event / Region Switcher -->
         <div v-if="childEvents.length" class="card mb-4 !py-3">
             <div class="flex flex-wrap gap-3 items-center">
-                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}</label>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Phase / Region:' }}</label>
                 <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
                                   :options="childEventOptions" :all-option="false" class="w-64" />
             </div>
@@ -56,8 +56,10 @@
                         <button v-if="selectedItemId" type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-50 border-rose-200 font-semibold" @click="clearAllChests">
                             Clear Item Chests
                         </button>
-                        <a :href="printUrl" target="_blank" class="btn-secondary text-sm">Print list</a>
-                        <a :href="cardsUrl" target="_blank" class="btn-secondary text-sm">Print chest cards</a>
+                        <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}inline=1`" target="_blank" class="btn-secondary text-sm">Preview list</a>
+                        <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}download=1`" target="_blank" class="btn-secondary text-sm">Download list (PDF)</a>
+                        <a :href="`${cardsUrl}${cardsUrl.includes('?') ? '&' : '?'}inline=1`" target="_blank" class="btn-secondary text-sm">Preview chest cards</a>
+                        <a :href="`${cardsUrl}${cardsUrl.includes('?') ? '&' : '?'}download=1`" target="_blank" class="btn-secondary text-sm">Download chest cards (PDF)</a>
                         <a :href="csvUrl" class="btn-secondary text-sm">CSV</a>
                         <button v-if="item?.stage_type === 'on_stage' && event.chest_reveal_mode === 'stage_entry'"
                                 type="button" class="btn-secondary text-sm"
@@ -196,7 +198,7 @@ const pageTitle = computed(() => {
     return `${props.event.title} — Chest Numbers`;
 });
 const printUrl = computed(() =>
-    props.selectedItemId ? `${base.value}/print?item_id=${props.selectedItemId}` : base.value,
+    props.selectedItemId ? `${base.value}/print?item_id=${props.selectedItemId}` : `${base.value}/print`,
 );
 const cardsUrl = computed(() =>
     props.selectedItemId ? `${base.value}/cards?item_id=${props.selectedItemId}` : `${base.value}/cards`,
