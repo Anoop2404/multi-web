@@ -30,35 +30,48 @@ class McqReportController extends SahodayaAdminController
                 'fee_collected' => collect($feeSummary)->where('status', 'approved')->sum('total_due'),
                 'fee_pending'   => collect($feeSummary)->whereIn('status', ['proof_uploaded', 'pending'])->sum('total_due'),
             ],
+            'schoolOptions' => $reports->schoolFilterOptions($exam),
+            'classOptions'  => $reports->classFilterOptions($exam),
         ]);
     }
 
-    public function exportClassWiseCounts(string $tenantId, McqExam $exam, McqReportService $reports)
+    public function exportClassWiseCounts(Request $request, string $tenantId, McqExam $exam, McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        return $reports->exportClassWiseCounts($exam);
+        return $reports->exportClassWiseCounts($exam, $request->input('school_id'));
     }
 
-    public function exportClassWiseCountsPdf(string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $printable)
+    public function exportClassWiseCountsPdf(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $printable)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        return $printable->classWiseCountsPdf($exam, sahodaya: $this->sahodaya);
+        return $printable->classWiseCountsPdf(
+            $exam,
+            schoolId: $request->input('school_id'),
+            inline: $request->boolean('inline') || $request->query('preview') == '1',
+            sahodaya: $this->sahodaya,
+        );
     }
 
-    public function exportRegistration(string $tenantId, McqExam $exam, McqReportService $reports)
+    public function exportRegistration(Request $request, string $tenantId, McqExam $exam, McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        return $reports->exportRegistrationRegister($exam);
+        return $reports->exportRegistrationRegister($exam, $request->input('school_id'), $request->input('class'));
     }
 
-    public function exportRegistrationPdf(string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $printable)
+    public function exportRegistrationPdf(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $printable)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        return $printable->classWiseRegistrationPdf($exam);
+        return $printable->classWiseRegistrationPdf(
+            $exam,
+            schoolId: $request->input('school_id'),
+            selectedClass: $request->input('class'),
+            inline: $request->boolean('inline') || $request->query('preview') == '1',
+            sahodaya: $this->sahodaya,
+        );
     }
 
     public function exportFees(string $tenantId, McqExam $exam, McqReportService $reports)

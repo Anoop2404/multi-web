@@ -23,18 +23,32 @@
             </div>
         </div>
 
+        <div class="card mb-6 flex flex-wrap items-center gap-3">
+            <div class="mr-2">
+                <h3 class="section-title !mb-0">Report filters</h3>
+                <p class="section-desc">Narrow the exports and PDFs below to one school and/or class.</p>
+            </div>
+            <SearchableSelect v-model="reportSchoolId" class="min-w-[200px]" :options="schoolOptions" :all-option="true" all-label="All schools" placeholder="All schools" />
+            <SearchableSelect v-model="reportClass" class="min-w-[160px]" :options="classOptions.map(c => ({ value: c, label: c }))" :all-option="true" all-label="All classes" placeholder="All classes" />
+            <button v-if="reportSchoolId || reportClass" type="button" @click="reportSchoolId = null; reportClass = null;" class="text-sm text-slate-400 hover:underline">Clear</button>
+        </div>
+
         <div class="grid lg:grid-cols-3 gap-4 mb-6">
             <div class="card">
                 <h3 class="section-title">Registration register</h3>
-                <p class="section-desc">All registrations with approval, attendance, and marks.</p>
-                <a :href="exportBase + '/registration/export'" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
+                <p class="section-desc">Full candidate directory with student photos, hall tickets, admission numbers, and approval status.</p>
+                <div class="grid grid-cols-2 gap-2 mt-3">
+                    <a :href="reportUrl(exportBase + '/registration/export')" class="btn-secondary text-sm justify-center">Excel ↓</a>
+                    <a :href="reportUrl(exportBase + '/registration/pdf')" target="_blank" class="btn-secondary text-sm justify-center">PDF ↓</a>
+                </div>
+                <button type="button" @click="openPdfPreview(exportBase + '/registration/pdf')" class="btn-secondary text-sm mt-2 w-full justify-center">👁 Preview PDF</button>
             </div>
             <div class="card">
                 <h3 class="section-title">Class-wise registration counts</h3>
                 <p class="section-desc">School-wise and class-wise breakdown matrix of registered students.</p>
                 <div class="flex flex-wrap gap-2 mt-3">
-                    <a :href="exportBase + '/class-wise-counts/export'" class="btn-secondary text-sm">Export Excel ↓</a>
-                    <a :href="exportBase + '/class-wise-counts/pdf'" class="btn-secondary text-sm" target="_blank">Download PDF ↓</a>
+                    <a :href="reportUrl(exportBase + '/class-wise-counts/export')" class="btn-secondary text-sm">Export Excel ↓</a>
+                    <a :href="reportUrl(exportBase + '/class-wise-counts/pdf')" class="btn-secondary text-sm" target="_blank">Download PDF ↓</a>
                 </div>
             </div>
             <div class="card">
@@ -46,8 +60,12 @@
             </div>
             <div class="card">
                 <h3 class="section-title">Attendance sheet</h3>
-                <p class="section-desc">Hall ticket list for exam-day attendance marking.</p>
-                <a :href="exportBase + '/attendance/export'" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
+                <p class="section-desc">Hall ticket list for exam-day attendance marking, with student photos.</p>
+                <div class="grid grid-cols-2 gap-2 mt-3">
+                    <a :href="reportUrl(exportBase + '/attendance/export')" class="btn-secondary text-sm justify-center">Excel ↓</a>
+                    <a :href="reportUrl(`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance/sheet.pdf`)" target="_blank" class="btn-secondary text-sm justify-center">PDF ↓</a>
+                </div>
+                <button type="button" @click="openPdfPreview(`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance/sheet.pdf`)" class="btn-secondary text-sm mt-2 w-full justify-center">👁 Preview PDF</button>
                 <a :href="exportBase + '/absent/export'" class="btn-secondary text-sm mt-2 inline-block">Absent list ↓</a>
                 <a :href="exportBase + '/malpractice/export'" class="btn-secondary text-sm mt-2 inline-block">Malpractice register ↓</a>
             </div>
@@ -207,9 +225,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -222,7 +241,25 @@ const props = defineProps({
     resultAnalysis: { type: Object, default: null },
     schoolPerformance: { type: Array, default: () => [] },
     stats: { type: Object, default: () => ({}) },
+    schoolOptions: { type: Array, default: () => [] },
+    classOptions: { type: Array, default: () => [] },
 });
 
 const exportBase = computed(() => `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/reports`);
+
+const reportSchoolId = ref(null);
+const reportClass = ref(null);
+
+function reportUrl(baseUrl, inline = false) {
+    const params = [];
+    if (inline) params.push('inline=1');
+    if (reportSchoolId.value) params.push('school_id=' + encodeURIComponent(reportSchoolId.value));
+    if (reportClass.value) params.push('class=' + encodeURIComponent(reportClass.value));
+    if (!params.length) return baseUrl;
+    return baseUrl + (baseUrl.includes('?') ? '&' : '?') + params.join('&');
+}
+
+function openPdfPreview(baseUrl) {
+    window.open(reportUrl(baseUrl, true), '_blank');
+}
 </script>

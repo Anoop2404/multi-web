@@ -142,11 +142,12 @@ class McqExamController extends SahodayaAdminController
 
         $exam->load(['series:id,title', 'parentExam:id,title,exam_level']);
 
+        // Active = excludes cancelled registrations, matching the Reports page's "Registrations" stat.
         $registrationCounts = [
-            'total'            => McqRegistration::where('exam_id', $exam->id)->count(),
-            'present'          => McqRegistration::where('exam_id', $exam->id)->where('attendance_status', 'present')->count(),
-            'marked'           => McqRegistration::where('exam_id', $exam->id)->whereHas('mark', fn ($q) => $q->whereNotNull('score'))->count(),
-            'pending_approval' => McqRegistration::where('exam_id', $exam->id)->where('approval_status', 'pending_payment')->count(),
+            'total'            => McqRegistration::where('exam_id', $exam->id)->active()->count(),
+            'present'          => McqRegistration::where('exam_id', $exam->id)->active()->where('attendance_status', 'present')->count(),
+            'marked'           => McqRegistration::where('exam_id', $exam->id)->active()->whereHas('mark', fn ($q) => $q->whereNotNull('score'))->count(),
+            'pending_approval' => McqRegistration::where('exam_id', $exam->id)->active()->where('approval_status', 'pending_payment')->count(),
         ];
 
         $schoolFees = McqSchoolFee::where('exam_id', $exam->id)

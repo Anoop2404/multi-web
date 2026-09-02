@@ -95,8 +95,20 @@ class McqReportService
     /** @return list<array<string, mixed>> */
     public function schoolFilterOptions(McqExam $exam): array
     {
+        // Resolve IDs on the tenant connection first: McqRegistration lives per-tenant while
+        // Tenant is a central-connection model, and a cross-connection subquery blows up on Postgres.
+        $schoolIds = McqRegistration::where('exam_id', $exam->id)
+            ->active()
+            ->select('school_id')
+            ->distinct()
+            ->pluck('school_id');
+
+        if ($schoolIds->isEmpty()) {
+            return [];
+        }
+
         return \App\Models\Tenant::query()
-            ->whereIn('id', McqRegistration::where('exam_id', $exam->id)->select('school_id')->distinct())
+            ->whereIn('id', $schoolIds)
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn ($school) => ['value' => $school->id, 'label' => $school->name])
@@ -111,6 +123,7 @@ class McqReportService
             ->join('students', 'mcq_registrations.student_id', '=', 'students.id')
             ->join('school_classes', 'students.school_class_id', '=', 'school_classes.id')
             ->where('mcq_registrations.exam_id', $exam->id)
+            ->where('mcq_registrations.status', '!=', 'cancelled')
             ->distinct()
             ->pluck('school_classes.name')
             ->filter()

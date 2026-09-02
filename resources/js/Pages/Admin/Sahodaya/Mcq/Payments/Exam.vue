@@ -9,8 +9,17 @@
             <p class="font-semibold text-amber-900">{{ pendingCount }} school batch fee(s) awaiting approval</p>
         </div>
 
+        <div class="flex flex-wrap gap-2 mb-4 items-center">
+            <input v-model="search" type="search" class="field max-w-xs" placeholder="Search school…">
+            <SearchableSelect v-model="schoolFilter" :options="schoolOptions" :all-option="true" all-label="All schools" placeholder="All schools" />
+            <SearchableSelect v-model="statusFilter" :options="statusOptions" :all-option="true" all-label="All payment statuses" placeholder="All payment statuses" />
+            <button v-if="hasFilters" type="button" @click="clearFilters" class="text-sm text-slate-400 hover:underline">Clear</button>
+            <span class="text-xs text-slate-500 ml-auto">Showing {{ filteredFees.length }} of {{ schoolFees.length }} school(s)</span>
+        </div>
+
         <div class="card card--flush overflow-hidden">
             <EmptyState v-if="!schoolFees.length" title="No school fees yet" description="Fees appear when schools register students and upload batch payment proof." icon="💳" class="py-10" />
+            <EmptyState v-else-if="!filteredFees.length" title="No matching schools" description="Try a different search term or filter." icon="🔍" class="py-10" />
             <div v-else class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
@@ -25,7 +34,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <template v-for="(sf, idx) in schoolFees" :key="sf.id">
+                        <template v-for="(sf, idx) in filteredFees" :key="sf.id">
                         <tr>
                             <td>{{ idx + 1 }}</td>
                             <td class="font-medium">{{ (sf.school_name || '').toUpperCase() }}</td>
@@ -89,10 +98,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -111,6 +121,52 @@ const expanded = ref({});
 function toggleExpand(id) {
     expanded.value = { ...expanded.value, [id]: !expanded.value[id] };
 }
+
+const search = ref('');
+const schoolFilter = ref(null);
+const statusFilter = ref(null);
+
+const schoolOptions = computed(() => {
+    const seen = new Map();
+    for (const sf of props.schoolFees) {
+        if (!seen.has(sf.school_id)) seen.set(sf.school_id, sf.school_name);
+    }
+    return [...seen.entries()]
+        .map(([value, label]) => ({ value, label: (label || '').toUpperCase() }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+});
+
+const statusOptions = [
+    { value: 'not_paid', label: 'Not paid' },
+    { value: 'partial', label: 'Partial' },
+    { value: 'fully_paid', label: 'Fully paid' },
+];
+
+// Buckets the underlying fee status (pending/proof_uploaded/partial/approved/rejected/waived)
+// into the three states admins actually care about here.
+function paymentBucket(status) {
+    if (status === 'partial') return 'partial';
+    if (status === 'approved' || status === 'waived') return 'fully_paid';
+    return 'not_paid';
+}
+
+const hasFilters = computed(() => !!(search.value || schoolFilter.value || statusFilter.value));
+
+function clearFilters() {
+    search.value = '';
+    schoolFilter.value = null;
+    statusFilter.value = null;
+}
+
+const filteredFees = computed(() => {
+    const q = search.value.trim().toLowerCase();
+    return props.schoolFees.filter((sf) => {
+        if (q && !(sf.school_name || '').toLowerCase().includes(q)) return false;
+        if (schoolFilter.value && sf.school_id !== schoolFilter.value) return false;
+        if (statusFilter.value && paymentBucket(sf.status) !== statusFilter.value) return false;
+        return true;
+    });
+});
 
 function statusClass(status) {
     return {

@@ -303,7 +303,7 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $analytics = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event]);
-        $rows = $this->stripChestNumbers($analytics->studentWiseBrowserRows($this->school->id, $request->input('search')));
+        $rows = $this->stripChestNumbers($analytics->studentWiseBrowserRows($this->school->id, $request->input('search'), photoForSchoolAdmin: true));
 
         $base = $this->schoolReportsBase($program, $event);
 
@@ -558,7 +558,12 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $analytics = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event]);
-        $rows = $this->stripChestNumbers($analytics->studentWiseBrowserRows($this->school->id, $request->input('search')));
+        $rows = $this->stripChestNumbers($analytics->studentWiseBrowserRows(
+            $this->school->id,
+            $request->input('search'),
+            includePhotoDataUri: true,
+            photoForSchoolAdmin: true,
+        ));
 
         $reportService = app(\App\Services\Events\FestReportService::class, ['event' => $event]);
 

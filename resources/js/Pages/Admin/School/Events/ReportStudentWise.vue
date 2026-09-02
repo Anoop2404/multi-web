@@ -11,15 +11,22 @@
             </template>
         </PageHeader>
 
-        <!-- Search Toolbar -->
+        <!-- Search & Filter Toolbar -->
         <div class="card !py-3.5 my-4 shadow-sm border border-slate-200">
             <div class="flex flex-wrap items-center justify-between gap-4">
-                <div class="relative flex-1 min-w-[240px]">
-                    <input v-model="searchQuery"
-                           type="text"
-                           placeholder="Search student name or admission / reg no..."
-                           class="field text-xs pl-8 w-full" />
-                    <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[240px]">
+                    <div class="relative flex-1 min-w-[220px]">
+                        <input v-model="searchQuery"
+                               type="text"
+                               placeholder="Search student name or admission / reg no..."
+                               class="field text-xs pl-8 w-full" />
+                        <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </div>
+                    <SearchableSelect v-model="classFilter" class="min-w-[160px]" :options="classOptions" :all-option="true" all-label="All classes" placeholder="All classes" />
+                    <button v-if="searchQuery || classFilter" type="button" @click="searchQuery = ''; classFilter = null;" class="text-xs text-slate-400 hover:underline">Clear</button>
+                    <span v-if="searchQuery || classFilter" class="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg">
+                        {{ filteredRows.length }} of {{ rows.length }}
+                    </span>
                 </div>
                 <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" :csv-url="csvUrl" />
             </div>
@@ -43,7 +50,7 @@
                                 {{ st.name }}
                                 <span v-if="st.reg_no" class="text-xs font-mono font-normal text-slate-500">({{ st.reg_no }})</span>
                             </h4>
-                            <p class="text-xs text-slate-500 font-medium mt-0.5">🏫 {{ st.school_name || school?.name }}</p>
+                            <p class="text-xs text-slate-500 font-medium mt-0.5">🏫 {{ st.school_name || school?.name }}<span v-if="st.class_name"> · Class {{ st.class_name }}</span></p>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -120,6 +127,7 @@ import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { festItemParticipantTypeLabel as participantTypeLabel } from '@/support/festItemListingMeta.js';
 
@@ -136,13 +144,26 @@ const props = defineProps({
 
 const { programLabel, programBase } = useSchoolProgramContext(props);
 const searchQuery = ref('');
+const classFilter = ref(null);
+
+const classOptions = computed(() => {
+    const names = [...new Set(props.rows.map((r) => r.class_name).filter(Boolean))];
+    names.sort((a, b) => {
+        const numA = parseInt(a, 10);
+        const numB = parseInt(b, 10);
+        if (!Number.isNaN(numA) && !Number.isNaN(numB) && numA !== numB) return numA - numB;
+        return a.localeCompare(b, undefined, { numeric: true });
+    });
+    return names.map((name) => ({ value: name, label: `Class ${name}` }));
+});
 
 const filteredRows = computed(() => {
-    if (!searchQuery.value) return props.rows;
     const q = searchQuery.value.toLowerCase();
-    return props.rows.filter((r) =>
-        (r.name && r.name.toLowerCase().includes(q)) ||
-        (r.reg_no && r.reg_no.toLowerCase().includes(q))
-    );
+    return props.rows.filter((r) => {
+        if (classFilter.value && r.class_name !== classFilter.value) return false;
+        if (!q) return true;
+        return (r.name && r.name.toLowerCase().includes(q)) ||
+            (r.reg_no && r.reg_no.toLowerCase().includes(q));
+    });
 });
 </script>

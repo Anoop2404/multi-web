@@ -1148,12 +1148,12 @@ class FestEventReportAnalyticsService
     }
 
     /** @return list<array<string, mixed>> */
-    public function headWiseParticipantRows(?int $headId = null, ?string $schoolId = null): array
+    public function headWiseParticipantRows(?int $headId = null, ?string $schoolId = null, bool $photoForSchoolAdmin = false): array
     {
         // Sports (Head = Event): FestItemHead rows are never created for sports events —
         // "head" means a sport/discipline, i.e. a child FestEvent. See sportsWiseSummary().
         if ($this->event->event_type === 'sports') {
-            return $this->sportsWiseParticipantRows($headId, $schoolId);
+            return $this->sportsWiseParticipantRows($headId, $schoolId, $photoForSchoolAdmin);
         }
 
         $heads = FestItemHead::forTenant($this->event->tenant_id)
@@ -1199,7 +1199,7 @@ class FestEventReportAnalyticsService
                     'student'    => $p->student?->name ?? $p->teacher?->name,
                     'reg_no'     => $p->student?->reg_no ?? $p->teacher?->reg_no,
                     'class'      => $p->student?->schoolClass?->name,
-                    'photo_url'  => $p->student?->sahodayaPhotoUrl($this->event->tenant_id),
+                    'photo_url'  => $photoForSchoolAdmin ? $p->student?->photoUrl() : $p->student?->sahodayaPhotoUrl($this->event->tenant_id),
                     'item'       => $p->registration?->item?->title,
                     'category_label' => FestItemCategoryLabel::resolve($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
                     'item_reg'   => $p->item_registration_number,
@@ -1226,7 +1226,7 @@ class FestEventReportAnalyticsService
      *
      * @return list<array<string, mixed>>
      */
-    private function sportsWiseParticipantRows(?int $headId = null, ?string $schoolId = null): array
+    private function sportsWiseParticipantRows(?int $headId = null, ?string $schoolId = null, bool $photoForSchoolAdmin = false): array
     {
         $sports = $this->event->isSportsSeasonEvent()
             ? FestEvent::where('parent_event_id', $this->event->id)
@@ -1271,7 +1271,7 @@ class FestEventReportAnalyticsService
                     'student'    => $p->student?->name ?? $p->teacher?->name,
                     'reg_no'     => $p->student?->reg_no ?? $p->teacher?->reg_no,
                     'class'      => $p->student?->schoolClass?->name,
-                    'photo_url'  => $p->student?->sahodayaPhotoUrl($this->event->tenant_id),
+                    'photo_url'  => $photoForSchoolAdmin ? $p->student?->photoUrl() : $p->student?->sahodayaPhotoUrl($this->event->tenant_id),
                     'item'       => $p->registration?->item?->title,
                     'category_label' => FestItemCategoryLabel::resolve($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
                     'item_reg'   => $p->item_registration_number,
@@ -1789,7 +1789,7 @@ class FestEventReportAnalyticsService
     }
 
     /** @return list<array<string, mixed>> */
-    public function studentWiseBrowserRows(?string $schoolId = null, ?string $search = null, bool $includePhotoDataUri = false): array
+    public function studentWiseBrowserRows(?string $schoolId = null, ?string $search = null, bool $includePhotoDataUri = false, bool $photoForSchoolAdmin = false): array
     {
         $eventIds = $this->eventIds();
 
@@ -1800,7 +1800,8 @@ class FestEventReportAnalyticsService
                 ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
             ->whereNotNull('student_id')
             ->with([
-                'student:id,tenant_id,name,reg_no,gender,photo',
+                'student:id,tenant_id,name,reg_no,gender,photo,school_class_id',
+                'student.schoolClass:id,name',
                 'registration.school:id,name,school_prefix',
                 'registration.item:id,title,head_id,event_id,class_group,age_group,category,stage_type,participant_type,results_published_at',
                 'registration.item.head:id,name',
@@ -1876,7 +1877,8 @@ class FestEventReportAnalyticsService
                 'name'           => $name,
                 'reg_no'         => $regNo,
                 'gender'         => $student->gender,
-                'photo_url'      => $student->sahodayaPhotoUrl($this->event->tenant_id),
+                'class_name'     => $student->schoolClass?->name,
+                'photo_url'      => $photoForSchoolAdmin ? $student->photoUrl() : $student->sahodayaPhotoUrl($this->event->tenant_id),
                 'photo_data_uri' => $includePhotoDataUri ? $student->photoDataUri() : null,
                 'item_count'     => count($items),
                 'total_score'    => collect($items)->sum(fn ($i) => (float) ($i['score'] ?? 0)),

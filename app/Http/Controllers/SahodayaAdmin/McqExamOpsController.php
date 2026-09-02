@@ -26,6 +26,7 @@ class McqExamOpsController extends SahodayaAdminController
         ]);
 
         $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
             ->with(['student', 'school', 'mark']);
 
         $this->applyRegistrationFilters($query, $filters);
@@ -34,7 +35,8 @@ class McqExamOpsController extends SahodayaAdminController
             ->paginate(50)
             ->withQueryString();
 
-        $base = McqRegistration::where('exam_id', $exam->id);
+        // Active = excludes cancelled registrations, matching the Reports page's "Registrations" stat.
+        $base = McqRegistration::where('exam_id', $exam->id)->active();
         $summary = [
             'total'         => (clone $base)->count(),
             'pending'       => (clone $base)->where(fn ($q) => $q->whereNull('attendance_status')->orWhere('attendance_status', 'pending'))->count(),
@@ -144,11 +146,17 @@ class McqExamOpsController extends SahodayaAdminController
         return $reports->exportAttendance($exam);
     }
 
-    public function attendanceSheetPdf(string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $docs)
+    public function attendanceSheetPdf(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $docs)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        return $docs->attendanceSheetPdf($exam, $this->sahodaya);
+        return $docs->attendanceSheetPdf(
+            $exam,
+            schoolId: $request->input('school_id'),
+            selectedClass: $request->input('class'),
+            inline: $request->boolean('inline') || $request->query('preview') == '1',
+            sahodaya: $this->sahodaya,
+        );
     }
 
     public function markSheetPdf(string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $docs)
@@ -184,6 +192,7 @@ class McqExamOpsController extends SahodayaAdminController
         ]);
 
         $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
             ->with(['mark', 'student', 'school', 'feeReceipt']);
 
         $this->applyRegistrationFilters($query, $filters);
@@ -192,7 +201,8 @@ class McqExamOpsController extends SahodayaAdminController
             ->paginate(50)
             ->withQueryString();
 
-        $base = McqRegistration::where('exam_id', $exam->id);
+        // Active = excludes cancelled registrations, matching the Reports page's "Registrations" stat.
+        $base = McqRegistration::where('exam_id', $exam->id)->active();
         $counts = [
             'total'   => (clone $base)->count(),
             'present' => (clone $base)->where('attendance_status', 'present')->count(),
@@ -223,6 +233,7 @@ class McqExamOpsController extends SahodayaAdminController
         ]);
 
         $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
             ->with(['student', 'teacher', 'school']);
 
         $this->applyRegistrationFilters($query, $filters);
