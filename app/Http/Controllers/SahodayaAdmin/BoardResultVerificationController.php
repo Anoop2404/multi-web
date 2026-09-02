@@ -241,9 +241,16 @@ class BoardResultVerificationController extends SahodayaAdminController
 
         // Subject Toppers — one sheet per subject, ranked by that subject's marks
         // (top mark first) within each sheet. A subject-entry Topper's subject_marks
-        // map always holds exactly one {subject: marks} pair (see Topper::saving()'s
-        // entry_type !== ENTRY_SUBJECT guard on percentage — subject entries don't get
-        // an overall percentage at all, so marks is the only meaningful rank order).
+        // map is *expected* to hold exactly one {subject: marks} pair (see
+        // Topper::saving()'s entry_type !== ENTRY_SUBJECT guard on percentage —
+        // subject entries don't get an overall percentage at all), but that's not
+        // actually enforced anywhere a Topper row is created, and rows with more than
+        // one subject attached do exist in practice. Grouping by the first key alone
+        // put the whole row on that one sheet, but reusing the generic $rowFor showed
+        // every attached subject's marks on it regardless — e.g. a student correctly
+        // sorted onto the "Business Studies" sheet still showing "Business Studies:
+        // 98, Economics: 97, Accountancy: 95" in that column. Filters the displayed
+        // marks (and the sort key) to just the subject this sheet is actually for.
         if ($entryType === Topper::ENTRY_SUBJECT) {
             $sheets = [];
             $bySubject = $toppers->groupBy(function (Topper $t) {
@@ -253,15 +260,27 @@ class BoardResultVerificationController extends SahodayaAdminController
             });
 
             foreach ($bySubject->sortKeys() as $subjectName => $subjectToppers) {
-                $sorted = $subjectToppers->sortByDesc(function (Topper $t) {
-                    $marks = $t->subject_marks;
-
-                    return $marks === [] ? 0 : reset($marks);
-                })->values();
+                $sorted = $subjectToppers->sortByDesc(
+                    fn (Topper $t) => $t->subject_marks[$subjectName] ?? 0
+                )->values();
 
                 $sheets[$subjectName] = [
                     'headers' => $headers,
-                    'rows' => $sorted->map($rowFor)->values(),
+                    'rows' => $sorted->map(function (Topper $topper) use ($schoolNames, $subjectName) {
+                        $marks = $topper->subject_marks[$subjectName] ?? null;
+
+                        return [
+                            $schoolNames[$topper->tenant_id] ?? $topper->tenant_id,
+                            $topper->name,
+                            $topper->admission_no,
+                            $topper->roll_no,
+                            $topper->examStream?->name ?? $topper->stream,
+                            $marks !== null ? "{$subjectName}: {$marks}" : '',
+                            $topper->percentage,
+                            $topper->verification_status,
+                            $topper->rejection_reason,
+                        ];
+                    })->values(),
                 ];
             }
 
