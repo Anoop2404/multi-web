@@ -4,6 +4,7 @@
         <PageHeader :title="pageTitle" eyebrow="Academic Results"
                     description="Review CBSE board results submitted by member schools — verify, approve, reject, or publish.">
             <template #actions>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification/export?status=${filters.status}${selectedClass ? '&class=' + selectedClass : ''}`" target="_blank" class="btn-secondary text-sm">📊 Excel</a>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/masters`" class="btn-secondary text-sm">Masters</Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/reports`" class="btn-secondary text-sm">Reports</Link>
             </template>

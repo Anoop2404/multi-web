@@ -3,6 +3,7 @@
         <PageHeader :title="pageTitle" eyebrow="Academic Results"
                     description="Review and verify marksheets for Overall and Stream toppers submitted by member schools.">
             <template #actions>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification/overall/export?class=${selectedClass}&status=${filters.status}`" target="_blank" class="btn-secondary text-sm">📊 Excel</a>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/masters`" class="btn-secondary text-sm">Masters</Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/reports`" class="btn-secondary text-sm">Reports</Link>
             </template>

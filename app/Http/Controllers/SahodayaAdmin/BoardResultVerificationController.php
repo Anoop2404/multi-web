@@ -70,9 +70,52 @@ class BoardResultVerificationController extends SahodayaAdminController
         ]);
     }
 
+    public function exportSchoolProofs(Request $request)
+    {
+        $status = $request->string('status')->toString() ?: 'submitted';
+        $class = $request->filled('class') ? $request->integer('class') : null;
+        abort_if($class !== null && ! in_array($class, [10, 12], true), 404);
+
+        $schoolIds = Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->pluck('id');
+
+        $results = BoardResult::query()
+            ->whereIn('tenant_id', $schoolIds)
+            ->when($status !== 'all', fn ($q) => $q->where('status', $status))
+            ->when($class, fn ($q) => $q->where('class', $class))
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('updated_at')
+            ->get();
+
+        $schoolNames = Tenant::whereIn('id', $results->pluck('tenant_id')->unique())
+            ->pluck('name', 'id');
+
+        $rows = $results->map(fn (BoardResult $result) => [
+            $schoolNames[$result->tenant_id] ?? $result->tenant_id,
+            $result->class,
+            $result->academic_year,
+            $result->status,
+            $result->submitted_at?->format('Y-m-d H:i'),
+            $result->rejection_reason,
+        ]);
+
+        return \App\Support\ExcelExport::download(
+            'board-result-school-proofs-'.$status,
+            ['School', 'Class', 'Academic Year', 'Status', 'Submitted At', 'Rejection Reason'],
+            $rows,
+        );
+    }
+
     public function verifyOverall(Request $request)
     {
         return $this->renderTopperVerificationPage($request, Topper::ENTRY_OVERALL, 'VerifyOverallToppers');
+    }
+
+    public function exportOverall(Request $request)
+    {
+        return $this->exportTopperVerification($request, Topper::ENTRY_OVERALL, 'overall-toppers');
     }
 
     public function verifySubjects(Request $request)
@@ -80,12 +123,23 @@ class BoardResultVerificationController extends SahodayaAdminController
         return $this->renderTopperVerificationPage($request, Topper::ENTRY_SUBJECT, 'VerifySubjectToppers');
     }
 
+    public function exportSubjects(Request $request)
+    {
+        return $this->exportTopperVerification($request, Topper::ENTRY_SUBJECT, 'subject-toppers');
+    }
+
     public function verifyA1(Request $request)
     {
         return $this->renderTopperVerificationPage($request, Topper::ENTRY_FULL_A1, 'VerifyA1Achievers');
     }
 
-    private function renderTopperVerificationPage(Request $request, string $entryType, string $component)
+    public function exportA1(Request $request)
+    {
+        return $this->exportTopperVerification($request, Topper::ENTRY_FULL_A1, 'full-a1-achievers');
+    }
+
+    /** Shared by the on-screen page and the Excel export below, so they can never drift. */
+    private function topperVerificationQuery(Request $request, string $entryType): array
     {
         $status = $request->string('status')->toString() ?: 'pending';
         $class = $request->filled('class') ? $request->integer('class') : 10;
@@ -96,7 +150,7 @@ class BoardResultVerificationController extends SahodayaAdminController
             ->where('type', 'school')
             ->pluck('id');
 
-        $toppers = Topper::query()
+        $query = Topper::query()
             ->with(['boardResult', 'examStream', 'subjectMarks'])
             ->whereHas('boardResult', function ($q) use ($schoolIds, $class) {
                 $q->whereIn('tenant_id', $schoolIds)
@@ -110,9 +164,16 @@ class BoardResultVerificationController extends SahodayaAdminController
                     $q->where('verification_status', $status);
                 }
             })
-            ->orderBy('created_at', 'desc')
-            ->paginate(50)
-            ->withQueryString();
+            ->orderBy('created_at', 'desc');
+
+        return [$query, $status, $class];
+    }
+
+    private function renderTopperVerificationPage(Request $request, string $entryType, string $component)
+    {
+        [$query, $status, $class] = $this->topperVerificationQuery($request, $entryType);
+
+        $toppers = $query->paginate(50)->withQueryString();
 
         $schoolNames = Tenant::whereIn('id', $toppers->pluck('tenant_id')->unique())
             ->pluck('name', 'id');
@@ -129,6 +190,40 @@ class BoardResultVerificationController extends SahodayaAdminController
                 'all' => 'All',
             ],
         ]);
+    }
+
+    private function exportTopperVerification(Request $request, string $entryType, string $slug)
+    {
+        [$query, $status, $class] = $this->topperVerificationQuery($request, $entryType);
+
+        $toppers = $query->get();
+
+        $schoolNames = Tenant::whereIn('id', $toppers->pluck('tenant_id')->unique())
+            ->pluck('name', 'id');
+
+        $rows = $toppers->map(function (Topper $topper) use ($schoolNames) {
+            $subjects = collect($topper->subject_marks)
+                ->map(fn ($marks, $subject) => "{$subject}: {$marks}")
+                ->implode(', ');
+
+            return [
+                $schoolNames[$topper->tenant_id] ?? $topper->tenant_id,
+                $topper->name,
+                $topper->admission_no,
+                $topper->roll_no,
+                $topper->examStream?->name ?? $topper->stream,
+                $subjects,
+                $topper->percentage,
+                $topper->verification_status,
+                $topper->rejection_reason,
+            ];
+        });
+
+        return \App\Support\ExcelExport::download(
+            "{$slug}-class-{$class}-{$status}",
+            ['School', 'Student', 'Admission No', 'Roll No', 'Stream', 'Subjects & Marks', 'Percentage', 'Verification Status', 'Rejection Reason'],
+            $rows,
+        );
     }
 
     public function verify(Request $request, string $tenantId, BoardResult $boardResult)

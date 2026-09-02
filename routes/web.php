@@ -1046,9 +1046,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
 
         Route::prefix('board-results')->name('board-results.')->group(function () {
             Route::get('/verification', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'index'])->name('verification');
+            Route::get('/verification/export', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'exportSchoolProofs'])->name('verification.export');
             Route::get('/verification/overall', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyOverall'])->name('verification.overall');
+            Route::get('/verification/overall/export', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'exportOverall'])->name('verification.overall.export');
             Route::get('/verification/subjects', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifySubjects'])->name('verification.subjects');
+            Route::get('/verification/subjects/export', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'exportSubjects'])->name('verification.subjects.export');
             Route::get('/verification/a1', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyA1'])->name('verification.a1');
+            Route::get('/verification/a1/export', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'exportA1'])->name('verification.a1.export');
             Route::get('/settings', [\App\Http\Controllers\SahodayaAdmin\BoardResultSettingsController::class, 'index'])->name('settings');
             Route::put('/settings/entry-window', [\App\Http\Controllers\SahodayaAdmin\BoardResultSettingsController::class, 'updateEntryWindow'])->name('settings.entry-window');
             Route::put('/settings/certification-required', [\App\Http\Controllers\SahodayaAdmin\BoardResultSettingsController::class, 'updateCertificationRequired'])->name('settings.certification-required');
