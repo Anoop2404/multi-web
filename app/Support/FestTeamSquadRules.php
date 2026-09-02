@@ -34,6 +34,18 @@ class FestTeamSquadRules
         return in_array($participantType, self::MULTI_PERSON_TYPES, true);
     }
 
+    /**
+     * Whether squad-count rules should apply to this item: either its participant_type
+     * marks it multi-person, or an admin has explicitly configured group size bounds
+     * (some items carry those bounds without a matching participant_type).
+     */
+    public static function hasSquadRules(\App\Models\FestEventItem $item): bool
+    {
+        return self::isMultiPerson($item->participant_type)
+            || (bool) $item->min_group_size
+            || (bool) $item->max_group_size;
+    }
+
     /** Default roster size for pair/trio when admin leaves squad fields blank. */
     public static function defaultSizeFor(?string $participantType): ?int
     {
@@ -46,7 +58,7 @@ class FestTeamSquadRules
 
     public static function fromItem(\App\Models\FestEventItem $item): ?self
     {
-        if (! self::isMultiPerson($item->participant_type)) {
+        if (! self::hasSquadRules($item)) {
             return null;
         }
 

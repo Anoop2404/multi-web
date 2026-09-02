@@ -446,11 +446,28 @@ const pickerSummary = computed(() => {
     return `Pick ${props.performerLabel}`;
 });
 
+// Some items carry min_group_size/max_group_size without participant_type being
+// literally 'team'/'group'/'pair'/'trio' (matches the backend's hasSquadRules()
+// widening in FestTeamSquadRules::fromItem) -- key off the actual configured
+// bounds, not just the participant_type badge, so the count check can't be
+// silently skipped by a type mismatch.
+const groupSizeBounds = computed(() => {
+    if (!isGroup.value && !props.item.min_group_size && !props.item.max_group_size) return null;
+    const min = Number(props.item.min_group_size || 1);
+    const max = props.item.max_group_size ? Number(props.item.max_group_size) : null;
+    return { min, max };
+});
+
 const canSubmit = computed(() => {
     const ids = pickerModel.value ?? [];
     if (!ids.length) return false;
     if (isGroup.value && !String(props.form.team_name ?? '').trim()) return false;
     if (!isGroup.value && maxSelectedLimit.value != null && ids.length > maxSelectedLimit.value) return false;
+    if (groupSizeBounds.value) {
+        const { min, max } = groupSizeBounds.value;
+        if (ids.length < min) return false;
+        if (max != null && ids.length > max) return false;
+    }
     return true;
 });
 
@@ -458,6 +475,15 @@ const submitHint = computed(() => {
     const ids = pickerModel.value ?? [];
     if (!isGroup.value && maxSelectedLimit.value != null && ids.length > maxSelectedLimit.value) {
         return `Maximum ${maxSelectedLimit.value} entry registrations allowed.`;
+    }
+    if (ids.length > 0 && groupSizeBounds.value) {
+        const { min, max } = groupSizeBounds.value;
+        if (ids.length < min) {
+            return `Select at least ${min} ${props.performerLabel}${min !== 1 ? 's' : ''} for this item.`;
+        }
+        if (max != null && ids.length > max) {
+            return `Maximum ${max} ${props.performerLabel}${max !== 1 ? 's' : ''} allowed for this item.`;
+        }
     }
     if (isGroup.value && ids.length > 0 && !String(props.form.team_name ?? '').trim()) {
         return 'Team name required.';

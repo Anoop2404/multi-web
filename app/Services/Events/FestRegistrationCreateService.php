@@ -101,7 +101,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['student_ids' => 'Select at least one participant.']);
         }
 
-        $isGroup = FestTeamSquadRules::isMultiPerson($item->participant_type);
+        $isGroup = FestTeamSquadRules::hasSquadRules($item);
         if ($isGroup) {
             if (! filled($teamName)) {
                 $teamName = $this->nextDefaultTeamName($event, $item, $school);
@@ -365,7 +365,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['student_ids' => 'Select at least one participant.']);
         }
 
-        $isGroup = FestTeamSquadRules::isMultiPerson($item->participant_type);
+        $isGroup = FestTeamSquadRules::hasSquadRules($item);
         if ($isGroup) {
             if (! filled($teamName)) {
                 $teamName = $this->nextDefaultTeamName($event, $item, $school, $registration->id);
