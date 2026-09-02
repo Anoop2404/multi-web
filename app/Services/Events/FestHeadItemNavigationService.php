@@ -164,7 +164,7 @@ class FestHeadItemNavigationService
             return $this->sportsNavigation($event, $schoolId, withItems: true);
         }
 
-        $targetEvent = $event->parent_event_id ? $event->rootEvent() : $event;
+        $targetEvent = $this->catalogScopeEvent($event);
         $stats = $this->participantStatsByItem($event, $schoolId);
 
         $heads = FestItemHead::query()
@@ -173,12 +173,16 @@ class FestHeadItemNavigationService
             ->orderBy('name')
             ->get(['id', 'name', 'sort_order', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time', 'status']);
 
-        $items = FestEventItem::query()
-            ->where('event_id', $targetEvent->id)
-            ->where('is_enabled', true)
-            ->orderBy('display_order')
-            ->orderBy('title')
-            ->get(['id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at', 'class_group', 'category', 'age_group']);
+        $items = $this->filterToOwnPhase(
+            FestEventItem::query()
+                ->where('event_id', $targetEvent->id)
+                ->where('is_enabled', true)
+                ->with('phase:id,source_phase_id')
+                ->orderBy('display_order')
+                ->orderBy('title')
+                ->get(['id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at', 'class_group', 'category', 'age_group', 'phase_id']),
+            $event,
+        );
 
         $numbering = app(FestNumberingService::class)->settings($targetEvent);
         $defaultChestStart = (int) ($numbering['chest_no_start'] ?? 1);
@@ -393,16 +397,70 @@ class FestHeadItemNavigationService
         return array_values(array_unique($ids));
     }
 
+    /**
+     * The event whose own item/head catalog $event should read from. A phase/region leaf
+     * gets its own copied catalog rows (event_id = leaf.id) via
+     * FestItemSyncService::copyItemsToPartition(), so prefer those over unconditionally
+     * jumping to the root's whole-event catalog — that jump used to be unconditional here,
+     * which is why every phase's items showed up in every other phase's item
+     * pickers/reports (Chest Numbers, Mark Entry, Results, Reports) once partition-scoped
+     * item copies existed. Falls back to the root only when this leaf genuinely has no
+     * item rows of its own yet (pre-sync/legacy topologies).
+     */
+    private function catalogScopeEvent(FestEvent $event): FestEvent
+    {
+        if (! $event->parent_event_id) {
+            return $event;
+        }
+
+        return FestEventItem::where('event_id', $event->id)->exists() ? $event : $event->rootEvent();
+    }
+
+    /**
+     * Narrows an item collection down to items whose canonical phase matches $event's own
+     * source_phase_id — a leaf's own item table can still hold a handful of items copied
+     * under the wrong phase. Same fix/precedent as
+     * FestRegistrationController::eventRegistration() (first found live on Wayanad
+     * Sahodaya: event 5 "PHASE 1" listing all 141 hub items instead of its own 74). No-op
+     * when $event isn't phase-scoped, or an item has no phase_id of its own.
+     *
+     * @param  \Illuminate\Support\Collection<int, FestEventItem>  $items
+     * @return \Illuminate\Support\Collection<int, FestEventItem>
+     */
+    private function filterToOwnPhase($items, FestEvent $event)
+    {
+        if (! $event->source_phase_id) {
+            return $items;
+        }
+
+        return $items->filter(function (FestEventItem $item) use ($event) {
+            if (! $item->phase_id) {
+                return true;
+            }
+            $phase = $item->phase;
+            if (! $phase) {
+                return true;
+            }
+            $canonicalPhaseId = $phase->source_phase_id ?: $phase->id;
+
+            return $canonicalPhaseId === $event->source_phase_id;
+        })->values();
+    }
+
     /** @return array<int, array{participant_count: int, chest_assigned: int, item_reg_assigned: int}> */
     private function participantStatsByItem(FestEvent $event, ?string $schoolId): array
     {
         $eventIds = $event->reportableEventIds();
-        $targetEvent = $event->parent_event_id ? $event->rootEvent() : $event;
+        $targetEvent = $this->catalogScopeEvent($event);
 
-        $items = FestEventItem::query()
-            ->where('event_id', $targetEvent->id)
-            ->where('is_enabled', true)
-            ->get(['id', 'item_code', 'participant_type', 'inherited_from_item_id']);
+        $items = $this->filterToOwnPhase(
+            FestEventItem::query()
+                ->where('event_id', $targetEvent->id)
+                ->where('is_enabled', true)
+                ->with('phase:id,source_phase_id')
+                ->get(['id', 'item_code', 'participant_type', 'inherited_from_item_id', 'phase_id']),
+            $event,
+        );
 
         if ($items->isEmpty()) {
             return [];
