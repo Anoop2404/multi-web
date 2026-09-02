@@ -38,8 +38,9 @@ class FestAttendanceController extends SahodayaAdminController
         $event = $this->regionAwareTargetEvent($request, $event);
 
         $event->load([
-            'items' => fn ($query) => $query->where('is_enabled', true),
+            'items' => fn ($query) => $query->where('is_enabled', true)->with('phase:id,source_phase_id'),
         ]);
+        $event->setRelation('items', \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($event->items, $event));
 
         // For sports season events (parent hub), registrations live under
         // child events — filtering by event_id alone returns nothing.

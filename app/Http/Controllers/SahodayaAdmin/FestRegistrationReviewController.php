@@ -39,7 +39,8 @@ class FestRegistrationReviewController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $event->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')]);
+        $event->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')->with('phase:id,source_phase_id')]);
+        $event->setRelation('items', \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($event->items, $event));
 
         $headId = $this->resolveHeadQueryParam($request->query('head_id') ?? $request->query('head'));
         $itemId = $request->integer('item_id') ?: null;

@@ -23,7 +23,8 @@ class FestIdCardController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $targetEvent = $this->regionAwareTargetEvent($request, $event);
-        $targetEvent->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')]);
+        $targetEvent->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')->with('phase:id,source_phase_id')]);
+        $targetEvent->setRelation('items', \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($targetEvent->items, $targetEvent));
 
         $itemCounts = $service->itemParticipantCounts($targetEvent);
         $registrationCounts = $service->itemRegistrationCounts($targetEvent);

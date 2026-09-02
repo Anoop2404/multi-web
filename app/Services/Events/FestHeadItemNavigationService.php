@@ -173,7 +173,7 @@ class FestHeadItemNavigationService
             ->orderBy('name')
             ->get(['id', 'name', 'sort_order', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time', 'status']);
 
-        $items = $this->filterToOwnPhase(
+        $items = self::filterToOwnPhase(
             FestEventItem::query()
                 ->where('event_id', $targetEvent->id)
                 ->where('is_enabled', true)
@@ -424,10 +424,16 @@ class FestHeadItemNavigationService
      * Sahodaya: event 5 "PHASE 1" listing all 141 hub items instead of its own 74). No-op
      * when $event isn't phase-scoped, or an item has no phase_id of its own.
      *
+     * Public (and static) so every controller loading $event->items directly for an item
+     * picker/filter — not just this service's own navigationForEvent()/
+     * participantStatsByItem() — can reuse the exact same rule instead of re-deriving it.
+     * Callers must eager-load item.phase (e.g. ->with('phase:id,source_phase_id')) first;
+     * this never queries on its own.
+     *
      * @param  \Illuminate\Support\Collection<int, FestEventItem>  $items
      * @return \Illuminate\Support\Collection<int, FestEventItem>
      */
-    private function filterToOwnPhase($items, FestEvent $event)
+    public static function filterToOwnPhase($items, FestEvent $event)
     {
         if (! $event->source_phase_id) {
             return $items;
@@ -453,7 +459,7 @@ class FestHeadItemNavigationService
         $eventIds = $event->reportableEventIds();
         $targetEvent = $this->catalogScopeEvent($event);
 
-        $items = $this->filterToOwnPhase(
+        $items = self::filterToOwnPhase(
             FestEventItem::query()
                 ->where('event_id', $targetEvent->id)
                 ->where('is_enabled', true)
