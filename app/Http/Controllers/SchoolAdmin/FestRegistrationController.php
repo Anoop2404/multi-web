@@ -1451,6 +1451,7 @@ class FestRegistrationController extends SchoolAdminController
                 'status'           => $r->status,
                 'amount'           => (float) $r->amount,
                 'transaction_ref'  => $r->transaction_ref,
+                'bank_name'        => $r->bank_name,
                 'payment_date'     => $r->payment_date?->toDateString(),
                 'uploaded_at'      => $r->created_at?->toDateTimeString(),
                 'reviewed_at'      => $r->reviewed_at?->toDateTimeString(),

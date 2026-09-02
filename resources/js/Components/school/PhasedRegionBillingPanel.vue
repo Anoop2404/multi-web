@@ -173,6 +173,46 @@
                     <span>💳 Upload Payment Proof</span>
                 </button>
             </div>
+
+            <!-- Payment History — every proof already uploaded for this level, and its review status -->
+            <div v-if="fee.receipt_history?.length" class="mt-5 border-t border-slate-100 pt-4">
+                <h5 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Payment History</h5>
+                <div class="overflow-x-auto rounded-lg border border-slate-200">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th class="px-3 py-2">Uploaded</th>
+                                <th class="px-3 py-2">Transaction Ref</th>
+                                <th class="px-3 py-2">Bank</th>
+                                <th class="px-3 py-2 text-right">Amount (₹)</th>
+                                <th class="px-3 py-2">Status</th>
+                                <th class="px-3 py-2">Reviewed</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            <tr v-for="receipt in fee.receipt_history" :key="receipt.id" class="hover:bg-slate-50/50 align-top">
+                                <td class="px-3 py-2 text-slate-700">{{ formatDate(receipt.uploaded_at) }}</td>
+                                <td class="px-3 py-2 font-mono text-slate-700">{{ receipt.transaction_ref || '—' }}</td>
+                                <td class="px-3 py-2 text-slate-600">{{ receipt.bank_name || '—' }}</td>
+                                <td class="px-3 py-2 text-right font-mono font-semibold text-slate-900">₹{{ money(receipt.amount) }}</td>
+                                <td class="px-3 py-2">
+                                    <span class="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border"
+                                          :class="receiptStatusBadge(receipt.status).class">
+                                        {{ receiptStatusBadge(receipt.status).text }}
+                                    </span>
+                                    <p v-if="receipt.status === 'rejected' && receipt.rejection_reason" class="text-[10px] text-red-700 mt-1">
+                                        {{ receipt.rejection_reason }}
+                                    </p>
+                                </td>
+                                <td class="px-3 py-2 text-slate-500">
+                                    <span v-if="receipt.reviewed_at">{{ formatDate(receipt.reviewed_at) }}<span v-if="receipt.reviewed_by"> · {{ receipt.reviewed_by }}</span></span>
+                                    <span v-else>—</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- Itemized Registered Items Details -->
@@ -414,5 +454,15 @@ function statusBadgeStyle(status) {
     if (status === 'proof_uploaded' || status === 'partial') return 'bg-blue-100 text-blue-800 border-blue-200';
     if (status === 'rejected') return 'bg-red-100 text-red-800 border-red-200';
     return 'bg-amber-100 text-amber-800 border-amber-200';
+}
+
+// FeeReceipt's own status vocabulary (uploaded/approved/rejected/superseded/reversed) —
+// distinct from the fee-level status above (pending/proof_uploaded/partial/approved/rejected).
+function receiptStatusBadge(status) {
+    if (status === 'approved') return { text: 'Approved', class: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+    if (status === 'rejected') return { text: 'Rejected', class: 'bg-red-100 text-red-800 border-red-200' };
+    if (status === 'superseded') return { text: 'Superseded', class: 'bg-slate-100 text-slate-600 border-slate-200' };
+    if (status === 'reversed') return { text: 'Reversed', class: 'bg-slate-100 text-slate-600 border-slate-200' };
+    return { text: 'Pending Review', class: 'bg-blue-100 text-blue-800 border-blue-200' };
 }
 </script>
