@@ -39,6 +39,34 @@
                         </p>
                     </div>
 
+                    <div v-if="hasLevels" class="space-y-2">
+                        <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide">Registration level</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button v-if="allLevelsPaid" type="button"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
+                                    :class="levelId === 'all'
+                                        ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]'
+                                        : 'bg-white border-slate-200 text-slate-700'"
+                                    @click="setLevel('all')">
+                                All levels
+                            </button>
+                            <button v-for="level in levels" :key="level.id" type="button"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
+                                    :class="String(levelId) === String(level.id)
+                                        ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]'
+                                        : 'bg-white border-slate-200 text-slate-700'"
+                                    @click="setLevel(level.id)">
+                                {{ level.name }}
+                                <span :class="String(levelId) === String(level.id) ? 'opacity-80' : 'text-slate-400'">
+                                    · {{ level.paid ? 'paid' : 'unpaid' }}
+                                </span>
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-500">
+                            Each level is paid and approved separately. Cards cover the items registered under the selected level only.
+                        </p>
+                    </div>
+
                     <div v-if="!isKalolsavam" class="flex flex-wrap gap-2">
                         <button v-for="t in templates" :key="t.id" type="button"
                                 class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
@@ -191,6 +219,10 @@ const props = defineProps({
     meta: Object,
     clusterName: { type: String, default: 'Sahodaya' },
     clusterLogoUrl: { type: String, default: '' },
+    // Registration levels, for events billed one level at a time. Empty on every
+    // other event, which keeps the single whole-event card set.
+    levels: { type: Array, default: () => [] },
+    defaultLevelId: { type: [Number, String], default: null },
     downloadGate: { type: Object, default: null },
 });
 
@@ -213,6 +245,28 @@ const loading = ref(false);
 // starting point. loadPreview() below refreshes this to reflect whatever item/
 // head is currently selected.
 const gate = ref(props.downloadGate);
+// Each level is invoiced and approved on its own, so cards are generated one level at
+// a time: the server gates on the selected level's fee and returns only that level's
+// participants. Defaults to the first level the school has actually paid for.
+// A school that has paid every level starts on the combined set, exactly as before
+// levels existed; anyone mid-payment starts on the level they have actually paid for.
+const levelId = ref(
+    props.levels?.length && props.levels.every((level) => level.paid)
+        ? 'all'
+        : (props.defaultLevelId != null ? String(props.defaultLevelId) : ''),
+);
+const hasLevels = computed(() => (props.levels?.length ?? 0) > 0);
+const allLevelsPaid = computed(() => hasLevels.value && props.levels.every((level) => level.paid));
+
+function setLevel(id) {
+    levelId.value = String(id);
+    // The item picker is level-scoped, so a selection from another level can't survive.
+    if (cardScope.value === 'item' && !isAllItems.value
+        && !levelItems.value.some((item) => String(item.id) === String(itemId.value))) {
+        itemId.value = levelItems.value.length ? 'all' : '';
+    }
+    loadPreview();
+}
 
 onMounted(() => {
     loadPreview();
@@ -231,9 +285,17 @@ function itemLabel(item) {
     return `${withCategory} (${itemCountLabel(item)})`;
 }
 
+// Items carry the level they belong to; anything without one (non-levelled events)
+// stays visible in every selection.
+const levelItems = computed(() => {
+    if (!hasLevels.value || !levelId.value || levelId.value === 'all') return props.items;
+    return props.items.filter((item) => item.level_id == null
+        || String(item.level_id) === String(levelId.value));
+});
+
 const itemOptions = computed(() => [
     { id: 'all', name: 'All items (bundle PDF)' },
-    ...props.items.map(item => ({ id: String(item.id), name: itemLabel(item) })),
+    ...levelItems.value.map(item => ({ id: String(item.id), name: itemLabel(item) })),
 ]);
 
 const headOptions = computed(() =>
@@ -258,12 +320,14 @@ const cardsUrl = computed(() => `${programBase.value}/reports/${props.event.id}/
 // there's no single-page browser preview for that combination, only the PDF.
 const pdfAllItemsUrl = computed(() => {
     const params = new URLSearchParams({ template: cardTemplate.value });
+    if (levelId.value) params.set('batch_id', levelId.value);
     if (layout.value === 'team') params.set('layout', 'team');
     return `${programBase.value}/reports/${props.event.id}/id-cards/pdf-all-items?${params.toString()}`;
 });
 
 const previewUrl = computed(() => {
     const params = new URLSearchParams({ template: cardTemplate.value, scope: cardScope.value });
+    if (levelId.value) params.set('batch_id', levelId.value);
     if (cardScope.value === 'item' && itemId.value && !isAllItems.value) params.set('item_id', itemId.value);
     if (cardScope.value === 'head' && headId.value) params.set('head_id', headId.value);
     if (cardScope.value === 'item' && layout.value === 'team' && selectedItemSupportsTeam.value) {
@@ -276,6 +340,7 @@ const pdfUrl = computed(() => {
     if (isAllItems.value) return pdfAllItemsUrl.value;
 
     const params = new URLSearchParams({ template: cardTemplate.value, scope: cardScope.value });
+    if (levelId.value) params.set('batch_id', levelId.value);
     if (cardScope.value === 'item' && itemId.value) params.set('item_id', itemId.value);
     if (cardScope.value === 'head' && headId.value) params.set('head_id', headId.value);
     if (cardScope.value === 'item' && layout.value === 'team' && selectedItemSupportsTeam.value) {
@@ -286,6 +351,7 @@ const pdfUrl = computed(() => {
 
 const pdfAllHeadsUrl = computed(() => {
     const params = new URLSearchParams({ template: cardTemplate.value });
+    if (levelId.value) params.set('batch_id', levelId.value);
     return `${programBase.value}/reports/${props.event.id}/id-cards/pdf-all-heads?${params.toString()}`;
 });
 
@@ -330,6 +396,7 @@ async function loadPreview() {
     loading.value = true;
     try {
         const params = new URLSearchParams({ scope: cardScope.value });
+        if (levelId.value) params.set('batch_id', levelId.value);
         if (cardScope.value === 'item' && itemId.value) params.set('item_id', itemId.value);
         if (cardScope.value === 'head' && headId.value) params.set('head_id', headId.value);
         if (cardScope.value === 'item' && layout.value === 'team' && selectedItemSupportsTeam.value) {

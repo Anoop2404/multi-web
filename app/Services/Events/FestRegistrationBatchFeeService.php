@@ -321,6 +321,33 @@ class FestRegistrationBatchFeeService
         return $source?->registrationBatch;
     }
 
+    /**
+     * Is one registration level (batch) fully paid — or nothing due — for this school?
+     *
+     * Levels are independently payable (each has its own invoice and approval, see
+     * recalculateBatch()), so downloads scoped to one level must be gated on that
+     * level alone rather than on FestSchoolEventFeeService::isPaid(), which only
+     * clears once EVERY level is paid.
+     */
+    public function isBatchPaid(FestEvent $event, string $schoolId, int $batchId): bool
+    {
+        $root = $event->rootEvent();
+
+        $batch = FestRegistrationBatch::where('event_id', $root->id)->find($batchId);
+        if (! $batch) {
+            return false;
+        }
+
+        // Read the stored record when there is one — this runs on every ID-card page load
+        // and download, and recalculating there would rewrite fee rows on a plain GET.
+        $fee = FestSchoolEventFee::where('event_id', $root->id)
+            ->where('school_id', $schoolId)
+            ->where('registration_batch_id', $batch->id)
+            ->first();
+
+        return ($fee ?: $this->recalculateBatch($root, $schoolId, $batch))->isFullyPaid();
+    }
+
     public function isPaidForRegistration(FestEvent $event, FestRegistration $registration): bool
     {
         $batch = $this->batchForRegistration($event, $registration);

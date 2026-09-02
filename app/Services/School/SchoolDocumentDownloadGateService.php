@@ -8,6 +8,7 @@ use App\Models\McqSchoolFee;
 use App\Models\MembershipPayment;
 use App\Models\Registration;
 use App\Models\Tenant;
+use App\Services\Events\FestRegistrationBatchFeeService;
 use App\Services\Events\FestSchoolEventFeeService;
 use App\Support\AcademicYear;
 
@@ -15,6 +16,7 @@ class SchoolDocumentDownloadGateService
 {
     public function __construct(
         private FestSchoolEventFeeService $festFees,
+        private FestRegistrationBatchFeeService $batchFees,
     ) {}
 
     /** Sahodaya annual membership fee verified for the current academic year. */
@@ -57,9 +59,20 @@ class SchoolDocumentDownloadGateService
      *                         downloads just because Phase 2 is still unpaid. Omit (or pass null)
      *                         to fall back to the whole-event check, e.g. for a bundle spanning
      *                         every phase.
+     * @param  ?int  $batchId  When given and the event bills per registration level/batch
+     *                         (workflow_mode = phased_regional_billing), only that level's fee
+     *                         needs to be paid. Same reasoning as $phaseId, for the other
+     *                         phased fee model: FestSchoolEventFeeService::isPaid() clears only
+     *                         once EVERY level is paid, which wrongly blocked Level 1 ID cards
+     *                         for a school whose Level 1 invoice is approved while Level 2 is
+     *                         still outstanding.
      */
-    public function festEventFeeCleared(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null): bool
+    public function festEventFeeCleared(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null): bool
     {
+        if ($batchId !== null && $event->usesPhasedRegionalBilling()) {
+            return $this->batchFees->isBatchPaid($event, $school->id, $batchId);
+        }
+
         if ($headId !== null && $this->festFees->usesPerHeadBilling($event)) {
             return $this->festFees->isHeadPaid($event, $school->id, $headId);
         }
@@ -101,15 +114,17 @@ class SchoolDocumentDownloadGateService
         abort(422, 'Sahodaya membership fee payment is pending. Pay and get it verified before downloading ID cards or hall tickets.');
     }
 
-    public function assertFestEventFeeForDownloads(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null): void
+    public function assertFestEventFeeForDownloads(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null): void
     {
         $this->assertMembershipFeeForDownloads($school);
 
-        if ($this->festEventFeeCleared($event, $school, $headId, $phaseId)) {
+        if ($this->festEventFeeCleared($event, $school, $headId, $phaseId, $batchId)) {
             return;
         }
 
         $message = match (true) {
+            $batchId !== null && $event->usesPhasedRegionalBilling() =>
+                $this->batchLabel($event, $batchId).' fee payment is pending. Upload payment proof for this level and wait for verification before downloading ID cards or hall tickets.',
             $headId !== null && $this->festFees->usesPerHeadBilling($event) =>
                 'Event Head fee payment is pending. Upload payment proof for this head and wait for verification before downloading ID cards or hall tickets.',
             $phaseId !== null && $this->festFees->usesPerPhaseBilling($event) =>
@@ -137,10 +152,10 @@ class SchoolDocumentDownloadGateService
      * @param  ?int  $phaseId  See festEventFeeCleared().
      * @return array{blocked: bool, reason: ?string, membership_cleared: bool, event_fee_cleared: bool|null, mcq_fee_cleared: bool|null}
      */
-    public function payload(Tenant $school, ?FestEvent $event = null, ?McqExam $exam = null, ?int $headId = null, ?int $phaseId = null): array
+    public function payload(Tenant $school, ?FestEvent $event = null, ?McqExam $exam = null, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null): array
     {
         $membershipCleared = $this->membershipFeeCleared($school);
-        $eventFeeCleared = $event ? $this->festEventFeeCleared($event, $school, $headId, $phaseId) : null;
+        $eventFeeCleared = $event ? $this->festEventFeeCleared($event, $school, $headId, $phaseId, $batchId) : null;
         $mcqFeeCleared = $exam ? $this->mcqExamFeeCleared($exam, $school) : null;
 
         $reason = null;
@@ -151,15 +166,23 @@ class SchoolDocumentDownloadGateService
             // whenever only membership was the blocker.
             $reason = 'Sahodaya membership fee payment is pending. Pay and get it verified before downloading ID cards or hall tickets.';
         } elseif ($event && ! $eventFeeCleared) {
-            $feeQuery = \App\Models\FestSchoolEventFee::where('event_id', $event->id)->where('school_id', $school->id);
-            if ($headId !== null && $this->festFees->usesPerHeadBilling($event)) {
+            $batchScoped = $batchId !== null && $event->usesPhasedRegionalBilling();
+            $feeQuery = \App\Models\FestSchoolEventFee::where('event_id', $batchScoped ? $event->rootEvent()->id : $event->id)
+                ->where('school_id', $school->id);
+            if ($batchScoped) {
+                $feeQuery->where('registration_batch_id', $batchId);
+            } elseif ($headId !== null && $this->festFees->usesPerHeadBilling($event)) {
                 $feeQuery->where('head_id', $headId);
             } elseif ($phaseId !== null && $this->festFees->usesPerPhaseBilling($event)) {
                 $feeQuery->where('phase_id', $phaseId);
             }
             $fee = $feeQuery->first();
             if ($fee && $fee->status === 'proof_uploaded') {
-                $reason = 'Event fee payment proof is uploaded and awaiting Sahodaya approval. ID card downloads unlock automatically right after approval.';
+                $reason = $batchScoped
+                    ? $this->batchLabel($event, $batchId).' fee payment proof is uploaded and awaiting Sahodaya approval. ID card downloads unlock automatically right after approval.'
+                    : 'Event fee payment proof is uploaded and awaiting Sahodaya approval. ID card downloads unlock automatically right after approval.';
+            } elseif ($batchScoped) {
+                $reason = $this->batchLabel($event, $batchId).' fee payment is pending. Upload payment proof for this level and get it approved to unlock ID card downloads.';
             } elseif ($phaseId !== null && $this->festFees->usesPerPhaseBilling($event)) {
                 $reason = 'This phase\'s fee payment is pending. Upload payment proof and get it approved to unlock ID card downloads.';
             } else {
@@ -185,5 +208,15 @@ class SchoolDocumentDownloadGateService
                 'payments'   => "/school-admin/{$school->id}/payments",
             ],
         ];
+    }
+
+    /** Human label for one registration level, so gate messages name it ("Level 1 fee payment is pending."). */
+    private function batchLabel(FestEvent $event, int $batchId): string
+    {
+        $name = \App\Models\FestRegistrationBatch::where('event_id', $event->rootEvent()->id)
+            ->where('id', $batchId)
+            ->value('name');
+
+        return $name ?: 'This registration level';
     }
 }

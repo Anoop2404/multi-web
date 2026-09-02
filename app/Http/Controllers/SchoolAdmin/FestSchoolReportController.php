@@ -821,7 +821,17 @@ class FestSchoolReportController extends SchoolAdminController
         $ageGroupLabels = config('fest_item_taxonomy.age_group', []);
 
         $cluster = Tenant::find($this->school->parent_id);
-        $downloadGate = app(SchoolDocumentDownloadGateService::class)->payload($this->school, $event);
+
+        // Levels (registration batches) are independently payable, so ID cards are
+        // generated one level at a time and the fee gate below is scoped to whichever
+        // level is selected — a school with Level 1 approved must get its Level 1 cards
+        // while Level 2 is still outstanding.
+        $levels = $this->idCardLevels($event);
+        $defaultLevelId = $levels === [] ? null : $this->defaultIdCardLevelId($event);
+        $itemLevels = $this->itemLevelMap($event);
+
+        $downloadGate = app(SchoolDocumentDownloadGateService::class)
+            ->payload($this->school, $event, null, null, null, $defaultLevelId);
 
         return $this->inertia('School/Events/ReportIdCards', [
             'program'     => $meta['slug'],
@@ -837,11 +847,139 @@ class FestSchoolReportController extends SchoolAdminController
                 'count'              => $itemCounts[$item->id] ?? 0,
                 'registration_count' => $registrationCounts[$item->id] ?? 0,
                 'category_label'     => $this->itemCategoryLabel($item, $classGroupLabels, $ageGroupLabels),
+                'level_id'           => $itemLevels[$item->id] ?? null,
             ]),
             'heads'       => $service->headOptions($event, $this->school->id),
             'meta'        => $service->indexMeta($event, $this->school->id),
+            'levels'      => $levels,
+            'defaultLevelId' => $defaultLevelId,
             'downloadGate' => $downloadGate,
         ]);
+    }
+
+    /**
+     * Registration levels (batches) this school is billed for, with their payment state —
+     * only for events on the phased_regional_billing workflow; every other event returns []
+     * and keeps the old whole-event behavior.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function idCardLevels(FestEvent $event): array
+    {
+        if (! $event->usesPhasedRegionalBilling()) {
+            return [];
+        }
+
+        return app(\App\Services\Events\FestRegistrationBatchFeeService::class)
+            ->recalculateAll($event->rootEvent(), $this->school->id)
+            ->filter(fn ($fee) => $fee->registration_batch_id)
+            ->map(fn ($fee) => [
+                'id'          => (int) $fee->registration_batch_id,
+                'code'        => $fee->registrationBatch?->code,
+                'name'        => $fee->registrationBatch?->name ?? 'Registration level',
+                'sort_order'  => (int) ($fee->registrationBatch?->sort_order ?? 0),
+                'status'      => $fee->status,
+                'paid'        => $fee->isFullyPaid(),
+                'outstanding' => (float) $fee->outstandingBalance(),
+            ])
+            ->sortBy('sort_order')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The level a school lands on: the first one it has actually paid for, else the first
+     * level. Reads stored fee rows rather than recalculating — this runs on every preview
+     * and download request, not just the page load.
+     */
+    private function defaultIdCardLevelId(FestEvent $event): ?int
+    {
+        $batchIds = \App\Models\FestRegistrationBatch::where('event_id', $event->rootEvent()->id)
+            ->orderBy('sort_order')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($batchIds === []) {
+            return null;
+        }
+
+        $fees = \App\Models\FestSchoolEventFee::where('event_id', $event->rootEvent()->id)
+            ->where('school_id', $this->school->id)
+            ->whereIn('registration_batch_id', $batchIds)
+            ->get()
+            ->keyBy('registration_batch_id');
+
+        foreach ($batchIds as $batchId) {
+            $fee = $fees->get($batchId);
+            if ($fee && $fee->isFullyPaid()) {
+                return $batchId;
+            }
+        }
+
+        return $batchIds[0];
+    }
+
+    /**
+     * item_id => registration level id, so the item picker can be narrowed to the
+     * selected level client-side.
+     *
+     * @return array<int, int>
+     */
+    private function itemLevelMap(FestEvent $event): array
+    {
+        if (! $event->usesPhasedRegionalBilling()) {
+            return [];
+        }
+
+        return FestEventItem::where('event_id', $event->id)
+            ->whereNotNull('phase_id')
+            ->with('phase.sourcePhase')
+            ->get(['id', 'phase_id'])
+            ->mapWithKeys(function (FestEventItem $item) {
+                $phase = $item->phase;
+                $batchId = $phase?->registration_batch_id ?? $phase?->sourcePhase?->registration_batch_id;
+
+                return [$item->id => $batchId ? (int) $batchId : null];
+            })
+            ->filter()
+            ->all();
+    }
+
+    /**
+     * The registration level an ID-card request is scoped to: whatever the page asked for,
+     * else the level the selected item belongs to, else the school's default level. Null
+     * for every event that does not use per-level billing, which keeps the whole-event
+     * gate for those.
+     */
+    private function resolveIdCardLevelId(Request $request, FestEvent $event, ?int $itemId = null): ?int
+    {
+        if (! $event->usesPhasedRegionalBilling()) {
+            return null;
+        }
+
+        // Explicit "every level in one card set" — only usable once every level is paid,
+        // since it falls back to the whole-event gate below.
+        if ($request->input('batch_id') === 'all') {
+            return null;
+        }
+
+        $requested = $request->integer('batch_id') ?: null;
+
+        if ($requested && \App\Models\FestRegistrationBatch::where('event_id', $event->rootEvent()->id)
+            ->whereKey($requested)
+            ->exists()) {
+            return $requested;
+        }
+
+        if ($itemId) {
+            $fromItem = $this->itemLevelMap($event)[(int) $itemId] ?? null;
+            if ($fromItem) {
+                return $fromItem;
+            }
+        }
+
+        return $this->defaultIdCardLevelId($event);
     }
 
     /** Which named Phase (if any) an ID-card item filter belongs to, for phase-scoped fee gating. */
@@ -871,9 +1009,13 @@ class FestSchoolReportController extends SchoolAdminController
         // whole-event aggregate check below.
         $headId = $filters['head_id'] ?? null;
         $phaseId = $this->resolvePhaseIdForItem($filters['item_id'] ?? null);
+        $levelId = $this->resolveIdCardLevelId($request, $event, $filters['item_id'] ?? null);
+        if ($levelId) {
+            $filters['registration_batch_id'] = $levelId;
+        }
 
         $downloadGate = app(SchoolDocumentDownloadGateService::class)
-            ->payload($this->school, $event, null, $headId, $phaseId);
+            ->payload($this->school, $event, null, $headId, $phaseId, $levelId);
 
         if ($downloadGate['blocked']) {
             return response()->json(['cards' => [], 'downloadGate' => $downloadGate]);
@@ -913,8 +1055,13 @@ class FestSchoolReportController extends SchoolAdminController
             'school_downloads' => true,
         ]);
 
+        $levelId = $this->resolveIdCardLevelId($request, $event, $filters['item_id'] ?? null);
+        if ($levelId) {
+            $filters['registration_batch_id'] = $levelId;
+        }
+
         app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
-            $event, $this->school, $filters['head_id'] ?? null, $this->resolvePhaseIdForItem($filters['item_id'] ?? null),
+            $event, $this->school, $filters['head_id'] ?? null, $this->resolvePhaseIdForItem($filters['item_id'] ?? null), $levelId,
         );
 
         $cluster = Tenant::findOrFail($this->school->parent_id);
@@ -946,8 +1093,13 @@ class FestSchoolReportController extends SchoolAdminController
             'include_data_uris' => true,
         ]);
 
+        $levelId = $this->resolveIdCardLevelId($request, $event, $filters['item_id'] ?? null);
+        if ($levelId) {
+            $filters['registration_batch_id'] = $levelId;
+        }
+
         app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
-            $event, $this->school, $filters['head_id'] ?? null, $this->resolvePhaseIdForItem($filters['item_id'] ?? null),
+            $event, $this->school, $filters['head_id'] ?? null, $this->resolvePhaseIdForItem($filters['item_id'] ?? null), $levelId,
         );
 
         $cluster = Tenant::findOrFail($this->school->parent_id);
@@ -983,14 +1135,18 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
         $service->hideChestNo = true;
 
-        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $this->school);
+        $levelId = $this->resolveIdCardLevelId($request, $event);
+
+        app(SchoolDocumentDownloadGateService::class)
+            ->assertFestEventFeeForDownloads($event, $this->school, null, null, $levelId);
 
         $cluster = Tenant::findOrFail($this->school->parent_id);
-        $filters = [
+        $filters = array_filter([
             'school_id'        => $this->school->id,
             'school_downloads' => true,
             'include_data_uris' => true,
-        ];
+            'registration_batch_id' => $levelId,
+        ]);
         $sections = collect($service->cardsGroupedByHead($event, $filters))
             ->map(fn ($section) => [
                 'item_title' => $section['head_title'],
@@ -1026,14 +1182,18 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
         $service->hideChestNo = true;
 
-        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $this->school);
+        $levelId = $this->resolveIdCardLevelId($request, $event);
+
+        app(SchoolDocumentDownloadGateService::class)
+            ->assertFestEventFeeForDownloads($event, $this->school, null, null, $levelId);
 
         $cluster = Tenant::findOrFail($this->school->parent_id);
-        $filters = [
+        $filters = array_filter([
             'school_id'        => $this->school->id,
             'school_downloads' => true,
             'include_data_uris' => true,
-        ];
+            'registration_batch_id' => $levelId,
+        ]);
         $sections = $service->cardsGroupedByItem($event, $filters);
 
         abort_if($sections === [], 422, 'No approved participants found for any item.');

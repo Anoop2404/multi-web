@@ -193,7 +193,7 @@ class FestIdCardService
         $rows = FestParticipant::query()
             ->whereHas('registration', function ($q) use ($event, $filters) {
                 $q->whereIn('event_id', $event->reportableEventIds());
-                $this->constrainRegistrationStatus($q, $filters);
+                $this->constrainRegistrationScope($q, $filters, $event);
                 if (! empty($filters['school_id'])) {
                     $q->where('school_id', $filters['school_id']);
                 }
@@ -217,7 +217,7 @@ class FestIdCardService
         ]);
 
         $query = FestRegistration::query()->whereIn('event_id', $event->reportableEventIds());
-        $this->constrainRegistrationStatus($query, $filters);
+        $this->constrainRegistrationScope($query, $filters, $event);
         if (! empty($filters['school_id'])) {
             $query->where('school_id', $filters['school_id']);
         }
@@ -265,7 +265,7 @@ class FestIdCardService
 
         return FestParticipant::whereHas('registration', function ($q) use ($event, $filters) {
             $q->whereIn('event_id', $event->reportableEventIds());
-            $this->constrainRegistrationStatus($q, $filters);
+            $this->constrainRegistrationScope($q, $filters, $event);
             if (! empty($filters['school_id'])) {
                 $q->where('school_id', $filters['school_id']);
             }
@@ -327,7 +327,7 @@ class FestIdCardService
 
         $query = FestParticipant::whereHas('registration', function ($q) use ($event, $filters) {
             $q->whereIn('event_id', $event->reportableEventIds());
-            $this->constrainRegistrationStatus($q, $filters);
+            $this->constrainRegistrationScope($q, $filters, $event);
             if (! empty($filters['school_id'])) {
                 $q->where('school_id', $filters['school_id']);
             }
@@ -445,7 +445,7 @@ class FestIdCardService
 
         $query = FestParticipant::whereHas('registration', function ($q) use ($event, $filters) {
             $q->whereIn('event_id', $event->reportableEventIds());
-            $this->constrainRegistrationStatus($q, $filters);
+            $this->constrainRegistrationScope($q, $filters, $event);
             if (! empty($filters['school_id'])) {
                 $q->where('school_id', $filters['school_id']);
             }
@@ -522,7 +522,7 @@ class FestIdCardService
 
         $query = FestParticipant::whereHas('registration', function ($q) use ($event, $filters, $itemId) {
             $q->whereIn('event_id', $event->reportableEventIds());
-            $this->constrainRegistrationStatus($q, $filters);
+            $this->constrainRegistrationScope($q, $filters, $event);
             if (! empty($filters['school_id'])) {
                 $q->where('school_id', $filters['school_id']);
             }
@@ -559,7 +559,7 @@ class FestIdCardService
 
         $query = FestRegistration::query()
             ->whereIn('event_id', $event->reportableEventIds());
-        $this->constrainRegistrationStatus($query, $filters);
+        $this->constrainRegistrationScope($query, $filters, $event);
         if ($schoolId) {
             $query->where('school_id', $schoolId);
         }
@@ -1119,9 +1119,50 @@ class FestIdCardService
      * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Relations\Relation  $query
      * @param  array<string, mixed>  $filters
      */
-    private function constrainRegistrationStatus($query, array $filters): void
+    private function constrainRegistrationScope($query, array $filters, ?FestEvent $event = null): void
     {
         $query->whereNotIn('status', ['rejected', 'withdrawn']);
+
+        $batchId = isset($filters['registration_batch_id']) ? (int) $filters['registration_batch_id'] : null;
+        if ($batchId && $event) {
+            $this->constrainRegistrationBatch($query, $event, $batchId);
+        }
+    }
+
+    /**
+     * Narrow a registration query to one registration level (batch) of a
+     * phased_regional_billing event. Registrations reach a level either through the leaf
+     * event generated from one of that level's phases, or — for legacy rows written
+     * straight against the root event — through their item's phase. Mirrors
+     * FestRegistrationBatchFeeService::registrations(), so a level's ID cards cover
+     * exactly the registrations that level's invoice bills for: a school that has paid
+     * Level 1 gets its Level 1 cards while Level 2 is still outstanding.
+     */
+    private function constrainRegistrationBatch($query, FestEvent $event, int $batchId): void
+    {
+        $root = $event->rootEvent();
+
+        $phaseIds = \App\Models\FestEventPhase::where('event_id', $root->id)
+            ->where('registration_batch_id', $batchId)
+            ->pluck('id');
+
+        // Leaf events carry registration_batch_id directly (FestPhaseTopologyService::
+        // syncLeaf()); source_phase_id is the fallback for leaves created before that
+        // column was populated. Their own children (region partitions) come along too.
+        $leafIds = FestEvent::where('parent_event_id', $root->id)
+            ->where(fn ($q) => $q->where('registration_batch_id', $batchId)
+                ->orWhereIn('source_phase_id', $phaseIds))
+            ->pluck('id');
+        $leafIds = $leafIds->merge(
+            FestEvent::whereIn('parent_event_id', $leafIds)->pluck('id')
+        )->unique()->values();
+
+        $query->where(function ($q) use ($root, $leafIds, $phaseIds) {
+            $q->whereIn('event_id', $leafIds)
+                ->orWhere(fn ($legacy) => $legacy
+                    ->where('event_id', $root->id)
+                    ->whereHas('item', fn ($item) => $item->whereIn('phase_id', $phaseIds)));
+        });
     }
 
     /**
