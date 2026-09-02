@@ -620,6 +620,10 @@ class FestRegistrationController extends SchoolAdminController
             'min_group_size'    => $item->min_group_size,
             'max_group_size'    => $item->max_group_size,
             'squad_summary'     => $item->squad_summary,
+            // FestRegistrationItemRow.vue's showStandbyPicker reads item.criteria_json
+            // (max_subs/standbys) directly — squad_summary above is only the display
+            // text, it doesn't carry the raw values the "Standbys" picker button needs.
+            'criteria_json'     => $item->criteria_json,
             'eligibility_label' => FestSportsAgeGroup::itemEligibilityLabel($item, $event),
             'item_fee'          => $feeRequired ? $itemFeeResolver->amountForItem($item, $schedule, $event) : null,
             'registration_open' => $regGate->isOpen($item),
