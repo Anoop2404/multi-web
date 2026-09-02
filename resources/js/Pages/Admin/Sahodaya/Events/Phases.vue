@@ -49,11 +49,11 @@
                 <div class="grid grid-cols-2 gap-2">
                     <label class="text-xs text-slate-500">
                         Registration opens
-                        <input v-model="addBatchForm.registration_open" type="datetime-local" class="field text-sm mt-0.5">
+                        <input v-model="addBatchForm.registration_open" type="date" class="field text-sm mt-0.5">
                     </label>
                     <label class="text-xs text-slate-500">
                         Registration closes
-                        <input v-model="addBatchForm.registration_close" type="datetime-local" class="field text-sm mt-0.5">
+                        <input v-model="addBatchForm.registration_close" type="date" class="field text-sm mt-0.5">
                     </label>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
@@ -99,8 +99,8 @@
                                 <input v-model="editBatchForm.invoice_prefix" class="field !py-1 !text-xs" placeholder="Invoice prefix">
                             </div>
                             <div class="grid grid-cols-2 gap-2">
-                                <input v-model="editBatchForm.registration_open" type="datetime-local" class="field !py-1 !text-xs">
-                                <input v-model="editBatchForm.registration_close" type="datetime-local" class="field !py-1 !text-xs">
+                                <input v-model="editBatchForm.registration_open" type="date" class="field !py-1 !text-xs">
+                                <input v-model="editBatchForm.registration_close" type="date" class="field !py-1 !text-xs">
                             </div>
                             <div class="grid grid-cols-2 gap-2">
                                 <SearchableSelect v-model="editBatchForm.status" :options="[{ value: 'registration_open', label: 'Registration Open' }, { value: 'published', label: 'Published' }, { value: 'draft', label: 'Draft' }]" :all-option="false" />
@@ -150,21 +150,21 @@
                     <div class="grid grid-cols-2 gap-2">
                         <label class="text-xs text-slate-500">
                             Event start date
-                            <input v-model="addForm.starts_at" type="datetime-local" class="field text-sm mt-0.5">
+                            <input v-model="addForm.starts_at" type="date" class="field text-sm mt-0.5">
                         </label>
                         <label class="text-xs text-slate-500">
                             Event end date
-                            <input v-model="addForm.ends_at" type="datetime-local" class="field text-sm mt-0.5">
+                            <input v-model="addForm.ends_at" type="date" class="field text-sm mt-0.5">
                         </label>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <label class="text-xs text-slate-500">
                             Registration opens
-                            <input v-model="addForm.registration_open" type="datetime-local" class="field text-sm mt-0.5">
+                            <input v-model="addForm.registration_open" type="date" class="field text-sm mt-0.5">
                         </label>
                         <label class="text-xs text-slate-500">
                             Registration closes
-                            <input v-model="addForm.registration_close" type="datetime-local" class="field text-sm mt-0.5">
+                            <input v-model="addForm.registration_close" type="date" class="field text-sm mt-0.5">
                         </label>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
@@ -221,21 +221,21 @@
                                 <div class="grid grid-cols-2 gap-2">
                                     <label class="text-[11px] text-slate-500">
                                         Event start
-                                        <input v-model="editForm.starts_at" type="datetime-local" class="field !py-1 !text-xs mt-0.5">
+                                        <input v-model="editForm.starts_at" type="date" class="field !py-1 !text-xs mt-0.5">
                                     </label>
                                     <label class="text-[11px] text-slate-500">
                                         Event end
-                                        <input v-model="editForm.ends_at" type="datetime-local" class="field !py-1 !text-xs mt-0.5">
+                                        <input v-model="editForm.ends_at" type="date" class="field !py-1 !text-xs mt-0.5">
                                     </label>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
                                     <label class="text-[11px] text-slate-500">
                                         Reg. opens
-                                        <input v-model="editForm.registration_open" type="datetime-local" class="field !py-1 !text-xs mt-0.5">
+                                        <input v-model="editForm.registration_open" type="date" class="field !py-1 !text-xs mt-0.5">
                                     </label>
                                     <label class="text-[11px] text-slate-500">
                                         Reg. closes
-                                        <input v-model="editForm.registration_close" type="datetime-local" class="field !py-1 !text-xs mt-0.5">
+                                        <input v-model="editForm.registration_close" type="date" class="field !py-1 !text-xs mt-0.5">
                                     </label>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
@@ -629,14 +629,13 @@ function createRegion(phase) {
     });
 }
 
-// datetime-local inputs need "YYYY-MM-DDTHH:mm", not the ISO string with seconds/timezone
-// that the backend sends back.
+// date inputs need "YYYY-MM-DD", not the ISO string with time/timezone that the backend sends back.
 function toDatetimeLocal(value) {
     if (!value) return '';
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return '';
     const pad = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function saveEdit(phase) {
