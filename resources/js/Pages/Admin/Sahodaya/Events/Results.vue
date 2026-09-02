@@ -27,7 +27,7 @@
         <div v-if="childEvents.length" class="card mb-4">
             <div class="flex flex-wrap gap-3 items-center">
                 <div>
-                    <label class="text-xs font-semibold text-slate-600">{{ event.event_type === 'sports' ? 'Select Sport Event / Region' : 'Select Region' }}</label>
+                    <label class="text-xs font-semibold text-slate-600">{{ event.event_type === 'sports' ? 'Select Sport Event / Region' : 'Select Phase / Region' }}</label>
                     <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
                                       :options="sportEventOptions" :all-option="false"
                                       placeholder="Select event" class="mt-1 w-64" />

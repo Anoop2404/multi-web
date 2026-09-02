@@ -79,11 +79,13 @@ class FestAttendanceController extends SahodayaAdminController
             ->pluck('participant_id')
             ->all();
 
+        $childEvents = $this->scopedChildEventOptions($event);
+
         return $this->inertia('Sahodaya/Events/Attendance', $this->withEventActivity($event, FestPageActivity::ATTENDANCE, [
             'event' => $event,
             'participants' => $participants,
             'attendance' => $attendance,
-            'childEvents' => $event->sportEventDropdownOptions(),
+            'childEvents' => $childEvents,
             'markedParticipantIds' => $markedParticipantIds,
         ]));
     }

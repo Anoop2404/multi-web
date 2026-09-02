@@ -124,7 +124,7 @@ class FestReportController extends SahodayaAdminController
             'regions'             => $regions,
             'isPartitionedParent' => $isPartitionedParent,
             'regionChildren'      => $regionChildren,
-            'childEvents'         => $event->sportEventDropdownOptions(),
+            'childEvents'         => $this->scopedChildEventOptions($event),
             'competitionPhases'   => $rootEvent->usesPhasedRegionalBilling()
                 ? $rootEvent->phases()->get(['id', 'name', 'code', 'is_regional'])
                 : collect(),
@@ -477,7 +477,7 @@ class FestReportController extends SahodayaAdminController
             'headSummary' => $analytics->headRegistrationSummary(),
             'totals'      => $analytics->itemRegistrationTotals($rows),
             'pdfUrl'      => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/item-list",
-            'childEvents' => $event->sportEventDropdownOptions(),
+            'childEvents' => $this->scopedChildEventOptions($event),
         ])));
     }
 
@@ -882,7 +882,7 @@ class FestReportController extends SahodayaAdminController
             ? collect($rows)->firstWhere('student_id', $studentId)
             : null;
 
-        $childEvents = $event->sportEventDropdownOptions();
+        $childEvents = $this->scopedChildEventOptions($event);
 
         return $this->inertia('Sahodaya/Events/Reports/StudentWise', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'            => $rows,
@@ -937,7 +937,7 @@ class FestReportController extends SahodayaAdminController
             'filterItemId'   => $itemId,
             'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/item-wise/export-all',
             'pdfUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/item-wise/pdf',
-            'childEvents'    => $event->sportEventDropdownOptions(),
+            'childEvents'    => $this->scopedChildEventOptions($event),
         ])));
     }
 
@@ -1012,7 +1012,7 @@ class FestReportController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Events/Reports/CategoryWisePoints', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'categories'  => $categories,
-            'childEvents' => $event->sportEventDropdownOptions(),
+            'childEvents' => $this->scopedChildEventOptions($event),
         ])));
     }
 
@@ -1044,7 +1044,7 @@ class FestReportController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/Reports/CategoryItemMatrix', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'categories'  => $matrix['categories'],
             'schools'     => $matrix['schools'],
-            'childEvents' => $event->sportEventDropdownOptions(),
+            'childEvents' => $this->scopedChildEventOptions($event),
         ])));
     }
 

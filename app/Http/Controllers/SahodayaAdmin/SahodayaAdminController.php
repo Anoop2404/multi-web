@@ -180,6 +180,34 @@ abstract class SahodayaAdminController extends Controller
     }
 
     /**
+     * The "Select Sport Event / Region" / "Select Phase / Region" switcher options for
+     * $event, narrowed to what the acting admin can actually open. Picking an option is a
+     * hard navigation to that event's own id (see e.g. Attendance.vue's
+     * switchSportEvent()) — for an event/region/phase-scoped admin, an out-of-scope
+     * option isn't a dead end, it's a 403 (EnsureSahodayaAdmin denies the resulting
+     * request), which looks exactly like "the region/phase switcher doesn't work."
+     * Was previously reimplemented ad hoc per-controller (first fixed in
+     * FestRegistrationReviewController, then FestChestNumberController,
+     * FestAttendanceController) — centralized here so every caller of
+     * FestEvent::sportEventDropdownOptions() for this exact purpose gets it for free.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function scopedChildEventOptions(FestEvent $event): array
+    {
+        $options = $event->sportEventDropdownOptions();
+
+        if (($scopedEventIds = $this->scopedFestEventIds()) === null) {
+            return $options;
+        }
+
+        return array_values(array_filter(
+            $options,
+            fn (array $option) => in_array($option['id'], $scopedEventIds, true),
+        ));
+    }
+
+    /**
      * Blocks a scoped admin (event_admin/region_admin/phase_admin) from a whole program
      * (Sports Meet, Kids Fest, ...) when they hold zero assignments anywhere in it. A full
      * admin (scopedFestEventIds() === null) is always allowed through unchanged.

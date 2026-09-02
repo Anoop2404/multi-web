@@ -61,20 +61,7 @@ class FestChestNumberController extends SahodayaAdminController
             default => null,
         };
 
-        $childEvents = $event->sportEventDropdownOptions();
-
-        // Picking an option here is a hard navigation to that event's own id (see
-        // ChestNumbers.vue's switchSportEvent()) — for an event/region/phase-scoped admin,
-        // an out-of-scope option isn't a dead end, it's a 403 (EnsureSahodayaAdmin denies
-        // the resulting request), which looks exactly like "the region/phase switcher
-        // doesn't work." Narrow to what they can actually open, same as
-        // FestRegistrationReviewController::index().
-        if (($scopedEventIds = $this->scopedFestEventIds()) !== null) {
-            $childEvents = array_values(array_filter(
-                $childEvents,
-                fn (array $option) => in_array($option['id'], $scopedEventIds, true),
-            ));
-        }
+        $childEvents = $this->scopedChildEventOptions($event);
 
         return $this->inertia('Sahodaya/Events/ChestNumbers', $this->withEventActivity($event, FestPageActivity::CHEST_NUMBERS, array_merge($nav, [
             'event'          => $event->only('id', 'title', 'status', 'event_type', 'chest_reveal_mode', 'results_published'),

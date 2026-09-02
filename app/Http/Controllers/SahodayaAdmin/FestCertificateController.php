@@ -267,7 +267,7 @@ class FestCertificateController extends SahodayaAdminController
             'event' => $event,
             'rows' => $tally['rows'],
             'totals' => $tally['totals'],
-            'childEvents' => $event->sportEventDropdownOptions(),
+            'childEvents' => $this->scopedChildEventOptions($event),
         ]));
     }
 

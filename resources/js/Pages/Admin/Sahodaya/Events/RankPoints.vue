@@ -15,7 +15,7 @@
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="rank-points" class="mb-4" />
 
         <div v-if="childEvents.length" class="card !p-4 mb-5 flex flex-wrap items-center gap-2">
-            <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ isSports ? 'Sport Event / Region:' : 'Region:' }}</label>
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ isSports ? 'Sport Event / Region:' : 'Phase / Region:' }}</label>
             <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent" :options="childEventOptions" :all-option="false" class="w-64" />
         </div>
 

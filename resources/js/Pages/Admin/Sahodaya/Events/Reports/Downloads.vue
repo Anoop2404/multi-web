@@ -25,7 +25,7 @@
             <!-- Sport Event / Region Switcher -->
             <div v-if="childEvents.length && !competitionPhases.length" class="card mb-4 !py-3">
                 <div class="flex flex-wrap gap-3 items-center">
-                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}</label>
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Phase / Region:' }}</label>
                     <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent"
                                       class="w-64" :options="childEventOptions" :all-option="false"
                                       placeholder="Select sport event" />

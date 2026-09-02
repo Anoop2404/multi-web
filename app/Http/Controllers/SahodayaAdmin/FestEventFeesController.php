@@ -245,7 +245,7 @@ class FestEventFeesController extends SahodayaAdminController
             2,
         );
 
-        $childEvents = $event->sportEventDropdownOptions();
+        $childEvents = $this->scopedChildEventOptions($event);
 
         return $this->inertia('Sahodaya/Events/Fees', $this->withEventActivity($event, FestPageActivity::FEES, [
             'event' => $event,

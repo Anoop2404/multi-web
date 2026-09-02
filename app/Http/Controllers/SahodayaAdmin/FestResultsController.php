@@ -75,7 +75,7 @@ class FestResultsController extends SahodayaAdminController
                 'suggested' => $suggestedNext?->id === $e->id,
             ]);
 
-        $childEvents = $event->sportEventDropdownOptions();
+        $childEvents = $this->scopedChildEventOptions($event);
 
         return $this->inertia('Sahodaya/Events/Results', $this->withEventActivity($event, FestPageActivity::RESULTS, array_merge($ctx, [
             'event' => $event,

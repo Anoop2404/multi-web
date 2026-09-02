@@ -46,7 +46,7 @@ class FestIdCardController extends SahodayaAdminController
             'heads'  => $service->headOptions($targetEvent),
             'meta'   => $service->indexMeta($targetEvent),
             'schools'=> $service->schoolOptions($targetEvent),
-            'childEvents' => $event->sportEventDropdownOptions(),
+            'childEvents' => $this->scopedChildEventOptions($event),
         ]));
     }
 

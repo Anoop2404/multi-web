@@ -55,7 +55,7 @@ class FestMarkEntryController extends SahodayaAdminController
         // a child rather than the hub itself. Require picking a specific region first, the
         // same way registration already does, instead of showing a roster that can't
         // actually be saved against. See Documents/Path_breaks.md.
-        $regionOptions = $event->sportEventDropdownOptions();
+        $regionOptions = $this->scopedChildEventOptions($event);
         $needsRegionSelection = $wasHubBeforeResolution && ! $request->filled('region_id') && count($regionOptions) > 1;
 
         if ($needsRegionSelection) {
@@ -148,7 +148,7 @@ class FestMarkEntryController extends SahodayaAdminController
             default => null,
         };
 
-        $childEvents = $event->sportEventDropdownOptions();
+        $childEvents = $this->scopedChildEventOptions($event);
 
         // Real marks-entered progress per item, so the item picker can show it across
         // 140+ items without opening each one. Previously this counted items with at
@@ -611,7 +611,7 @@ class FestMarkEntryController extends SahodayaAdminController
             'rubricTemplates' => $rubricTemplates,
             'criteria'       => $criteria,
             'judgeCount'     => $judgeCount,
-            'childEvents'    => $event->sportEventDropdownOptions(),
+            'childEvents'    => $this->scopedChildEventOptions($event),
         ]));
     }
 
@@ -640,7 +640,7 @@ class FestMarkEntryController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/MarkSettingsBulk', $this->withEventActivity($event, FestPageActivity::MARK_SETTINGS, [
             'event'       => $event,
             'items'       => $items,
-            'childEvents' => $event->sportEventDropdownOptions(),
+            'childEvents' => $this->scopedChildEventOptions($event),
         ]));
     }
 

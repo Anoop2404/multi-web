@@ -35,7 +35,7 @@
         <!-- Simple region/sport-event switcher for non-phased partitioned events -->
         <div v-else-if="childEvents.length" class="card mb-4 !py-3">
             <div class="flex flex-wrap gap-3 items-center">
-                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Region:' }}</label>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Phase / Region:' }}</label>
                 <SearchableSelect :model-value="String(event.id)" @update:model-value="switchSportEvent" :options="childEventOptions" :all-option="false" class="text-xs w-64 font-semibold" />
             </div>
         </div>
