@@ -90,11 +90,17 @@ class EventLifecycleGate
             return 'Registration is not open for this item\'s competition phase.';
         }
 
+        // Both dates come from a plain date-only picker (Phases.vue's "Registration
+        // opens"/"closes" fields) and are cast as midnight on that date — comparing the
+        // close date raw would cut registration off at the START of its last displayed
+        // day instead of the end of it. Same startOfDay()/endOfDay() normalization
+        // FestEvent::isRegistrationOpen() and FestItemWindowResolver already apply to
+        // their own equivalent dates.
         $now = now();
-        if ($lifecycle->registration_open && $now->lt($lifecycle->registration_open)) {
+        if ($lifecycle->registration_open && $now->lt($lifecycle->registration_open->copy()->startOfDay())) {
             return 'Registration has not opened yet for this item\'s competition phase.';
         }
-        if ($lifecycle->registration_close && $now->gt($lifecycle->registration_close)) {
+        if ($lifecycle->registration_close && $now->gt($lifecycle->registration_close->copy()->endOfDay())) {
             return 'Registration has closed for this item\'s competition phase.';
         }
 

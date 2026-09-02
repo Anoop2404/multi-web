@@ -50,7 +50,12 @@ class FestRegistrationBatch extends Model
             return false;
         }
 
-        return (! $this->registration_open || now()->gte($this->registration_open))
-            && (! $this->registration_close || now()->lte($this->registration_close));
+        // Both dates come from a plain date-only picker and are cast as midnight on that
+        // date — comparing registration_close raw would cut registration off at the START
+        // of its last displayed day instead of the end of it. Same startOfDay()/endOfDay()
+        // normalization FestEvent::isRegistrationOpen() already applies to its own
+        // equivalent dates.
+        return (! $this->registration_open || now()->gte($this->registration_open->copy()->startOfDay()))
+            && (! $this->registration_close || now()->lte($this->registration_close->copy()->endOfDay()));
     }
 }

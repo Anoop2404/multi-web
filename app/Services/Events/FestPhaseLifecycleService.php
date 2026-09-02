@@ -127,8 +127,8 @@ class FestPhaseLifecycleService
 
         $batchOpen = ! $batch || $batch->isRegistrationOpen() || (
             ! $batch->registration_locked
-            && (! $batch->registration_open || now()->gte($batch->registration_open))
-            && (! $batch->registration_close || now()->lte($batch->registration_close))
+            && (! $batch->registration_open || now()->gte($batch->registration_open->copy()->startOfDay()))
+            && (! $batch->registration_close || now()->lte($batch->registration_close->copy()->endOfDay()))
             && in_array($phase->status, ['published', 'registration_open'], true)
         );
 
