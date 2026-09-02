@@ -1323,7 +1323,6 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/chest-numbers/{participant}/clear', [FestChestNumberController::class, 'clearChest'])->name('chest-numbers.clear');
             Route::post('/{event}/chest-numbers/{participant}/reveal', [FestChestNumberController::class, 'revealChest'])->name('chest-numbers.reveal');
             Route::get('/{event}/chest-numbers/print', [FestChestNumberController::class, 'print'])->name('chest-numbers.print');
-            Route::get('/{event}/chest-numbers/cards', [FestChestNumberController::class, 'cards'])->name('chest-numbers.cards');
             Route::get('/{event}/chest-numbers/csv', [FestChestNumberController::class, 'csv'])->name('chest-numbers.csv');
             Route::get('/{event}/id-cards', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'index'])->name('id-cards.index');
             Route::get('/{event}/id-cards/cards', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'cardsJson'])->name('id-cards.cards');

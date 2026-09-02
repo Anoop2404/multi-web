@@ -234,27 +234,6 @@ class FestChestNumberController extends SahodayaAdminController
         return PdfGenerator::download($html, "{$slug}-chest-numbers.pdf", $inline);
     }
 
-    public function cards(Request $request, string $tenantId, FestEvent $event)
-    {
-        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-
-        $itemId = $request->integer('item_id') ?: null;
-        $item = $itemId ? FestEventItem::where('event_id', $event->id)->findOrFail($itemId) : null;
-
-        $html = view('fest.chest-cards-print', [
-            'event'   => $event,
-            'item'    => $item,
-            'rows'    => $this->chestNumberRows($event, $itemId),
-            'orgName' => $this->sahodaya->name,
-            'logoSrc' => TenantBranding::logoEmbedSrc($this->sahodaya),
-        ])->render();
-
-        $slug = str($event->title)->slug()->limit(40).($item ? '-'.str($item->title)->slug()->limit(30) : '');
-        $inline = $request->boolean('inline') || $request->boolean('preview');
-
-        return PdfGenerator::download($html, "{$slug}-chest-cards.pdf", $inline, true);
-    }
-
     public function csv(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -264,7 +243,7 @@ class FestChestNumberController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            CsvSafety::fputcsv($out, ['Chest No', 'Fest ID', 'Item Reg No', 'Participant', 'Item', 'School']);
+            CsvSafety::fputcsv($out, ['Chest No', 'Fest ID', 'Item Reg No', 'Participant', 'Item', 'Category', 'School']);
             foreach ($rows as $row) {
                 CsvSafety::fputcsv($out, [
                     $row['chest_no'],
@@ -272,6 +251,7 @@ class FestChestNumberController extends SahodayaAdminController
                     $row['item_reg'],
                     $row['name'],
                     $row['item'],
+                    $row['category'] ?? '',
                     $row['school'],
                 ]);
             }
@@ -412,6 +392,14 @@ class FestChestNumberController extends SahodayaAdminController
             ->get();
 
         $numbering = app(FestNumberingService::class);
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+        $categoryFor = function (?FestEventItem $item) use ($classGroupLabels) {
+            if (! $item || ! $item->class_group || $item->class_group === 'open') {
+                return null;
+            }
+
+            return \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group);
+        };
 
         $individualRows = $participants->toBase()
             ->filter(fn ($p) => ! $p->registration->item || ! $numbering->isGroupItem($p->registration->item))
@@ -422,13 +410,14 @@ class FestChestNumberController extends SahodayaAdminController
                 'item_reg' => $p->item_registration_number,
                 'name'     => $p->student?->name ?? $p->teacher?->name,
                 'item'     => $p->registration->item?->title,
+                'category' => $categoryFor($p->registration->item),
                 'school'   => $p->registration?->school?->name ?? Tenant::find($p->registration->school_id)?->name,
             ]);
 
         $groupRows = $participants->toBase()
             ->filter(fn ($p) => $p->registration->item && $numbering->isGroupItem($p->registration->item) && $p->group?->chest_no !== null)
             ->groupBy('group_id')
-            ->map(function ($members) {
+            ->map(function ($members) use ($categoryFor) {
                 $first = $members->first();
                 $group = $first->group;
 
@@ -438,6 +427,7 @@ class FestChestNumberController extends SahodayaAdminController
                     'item_reg' => $first->item_registration_number,
                     'name'     => ($group->team_name ?: 'Team').' ('.$members->count().' members)',
                     'item'     => $first->registration->item?->title,
+                    'category' => $categoryFor($first->registration->item),
                     'school'   => $first->registration?->school?->name ?? Tenant::find($first->registration->school_id)?->name,
                 ];
             })

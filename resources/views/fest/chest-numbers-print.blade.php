@@ -20,7 +20,7 @@
     <h1>{{ $event->title }}@if(!empty($item)) — {{ $item->title }}@endif</h1>
     <table>
         <thead>
-            <tr><th>Chest No</th><th>Fest ID</th><th>Item reg</th><th>Name</th>@if(empty($item))<th>Item</th>@endif<th>School</th></tr>
+            <tr><th>Chest No</th><th>Fest ID</th><th>Item reg</th><th>Name</th>@if(empty($item))<th>Item</th>@endif<th>Category</th><th>School</th></tr>
         </thead>
         <tbody>
             @foreach($rows as $row)
@@ -30,6 +30,7 @@
                 <td>{{ $row['item_reg'] ?? '—' }}</td>
                 <td>{{ $row['name'] }}</td>
                 @if(empty($item))<td>{{ $row['item'] }}</td>@endif
+                <td>{{ $row['category'] ?? '—' }}</td>
                 <td>{{ $row['school'] }}</td>
             </tr>
             @endforeach

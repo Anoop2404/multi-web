@@ -58,8 +58,6 @@
                         </button>
                         <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}inline=1`" target="_blank" class="btn-secondary text-sm">Preview list</a>
                         <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}download=1`" target="_blank" class="btn-secondary text-sm">Download list (PDF)</a>
-                        <a :href="`${cardsUrl}${cardsUrl.includes('?') ? '&' : '?'}inline=1`" target="_blank" class="btn-secondary text-sm">Preview chest cards</a>
-                        <a :href="`${cardsUrl}${cardsUrl.includes('?') ? '&' : '?'}download=1`" target="_blank" class="btn-secondary text-sm">Download chest cards (PDF)</a>
                         <a :href="csvUrl" class="btn-secondary text-sm">CSV</a>
                         <button v-if="item?.stage_type === 'on_stage' && event.chest_reveal_mode === 'stage_entry'"
                                 type="button" class="btn-secondary text-sm"
@@ -199,9 +197,6 @@ const pageTitle = computed(() => {
 });
 const printUrl = computed(() =>
     props.selectedItemId ? `${base.value}/print?item_id=${props.selectedItemId}` : `${base.value}/print`,
-);
-const cardsUrl = computed(() =>
-    props.selectedItemId ? `${base.value}/cards?item_id=${props.selectedItemId}` : `${base.value}/cards`,
 );
 const csvUrl = computed(() =>
     props.selectedItemId ? `${base.value}/csv?item_id=${props.selectedItemId}` : `${base.value}/csv`,
