@@ -218,7 +218,13 @@ class McqMarksAttendanceImporter
 
             $total = $correct + $wrong + $unanswered;
             $computedScore = round(($correct * $marksEach) - ($wrong * $negEach), 2);
-            $maxScore = round($total * $marksEach, 2);
+
+            // Percentage is graded against the class's configured max marks when set
+            // (Overview > class-wise max marks), not just this row's own correct+wrong+
+            // unanswered sum — keeps grading consistent even if a sheet under-counts.
+            $classBucket = $registration->isTeacherRegistration() ? 'Teacher' : ($registration->student?->schoolClass?->name ?: null);
+            $effectiveTotal = $exam->totalQuestionsForClass($classBucket) ?: $total;
+            $maxScore = round($effectiveTotal * $marksEach, 2);
 
             $score = isset($headerMap['score']) && is_numeric($cols[$headerMap['score']] ?? null)
                 ? round((float) $cols[$headerMap['score']], 2)

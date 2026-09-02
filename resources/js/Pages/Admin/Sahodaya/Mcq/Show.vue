@@ -249,7 +249,27 @@
                     </template>
                 </FormField>
             </FormGrid>
-            <p v-if="gradeBands?.length" class="text-xs text-slate-500">Active grade bands: {{ gradeBands.map(b => b.label).join(', ') }}</p>
+            <p v-if="gradeBands?.length" class="text-xs text-slate-500">Active grade bands: {{ gradeBands.map(b => b.label).join(', ') }} — percentage-based, so they apply the same regardless of a class's max marks.</p>
+
+            <div class="border-t border-slate-100 pt-4">
+                <FormField label="Total marks / questions (default)" hint="Denominator for percentage/grade on offline mark entry when a class below has no override.">
+                    <template #default="{ id }">
+                        <input :id="id" v-model.number="form.total_questions" type="number" min="1" class="field max-w-[10rem]" placeholder="e.g. 25">
+                    </template>
+                </FormField>
+
+                <div v-if="classOptions.length" class="mt-3">
+                    <p class="text-xs font-semibold text-slate-600 mb-2">Class-wise max marks (optional) — overrides the default above for a specific class.</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 max-w-xl">
+                        <div v-for="cls in classOptions" :key="cls" class="flex items-center gap-2">
+                            <span class="text-xs text-slate-500 w-20 shrink-0">Class {{ cls }}</span>
+                            <input v-model.number="form.class_max_marks[cls]" type="number" min="1" class="field text-xs"
+                                   :placeholder="form.total_questions ? `default: ${form.total_questions}` : 'default'">
+                        </div>
+                    </div>
+                </div>
+                <p v-else class="text-xs text-slate-400 mt-2">Class-wise overrides appear here once students have registered for at least one class.</p>
+            </div>
 
             <h3 class="section-title pt-2">Hall tickets</h3>
             <p class="section-desc mb-3">
@@ -315,6 +335,7 @@ const props = defineProps({
     certificateTemplates: { type: Array, default: () => [] },
     gradeBands: { type: Array, default: () => [] },
     clusterRequireStudentVerification: { type: Boolean, default: true },
+    classOptions: { type: Array, default: () => [] },
 });
 
 const { confirm } = useConfirm();
@@ -340,6 +361,11 @@ const publicMcqPapersUrl = computed(() => {
     const root = (props.publicUrl ?? '').replace(/\/$/, '');
     return root ? `${root}/mcq/papers` : '/mcq/papers';
 });
+
+const initialClassMaxMarks = {};
+for (const cls of props.classOptions) {
+    initialClassMaxMarks[cls] = props.exam.settings_json?.class_max_marks?.[cls] ?? null;
+}
 
 const form = useForm({
     title: props.exam.title,
@@ -377,6 +403,8 @@ const form = useForm({
     grade_master_id: props.exam.grade_master_id ?? '',
     hall_ticket_template_id: props.exam.hall_ticket_template_id ?? '',
     certificate_template_id: props.exam.certificate_template_id ?? '',
+    total_questions: props.exam.total_questions || '',
+    class_max_marks: initialClassMaxMarks,
 });
 
 const studentVerificationOptions = computed(() => [

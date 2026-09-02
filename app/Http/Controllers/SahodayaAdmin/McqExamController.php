@@ -136,7 +136,7 @@ class McqExamController extends SahodayaAdminController
             ->with('success', 'Exam created.');
     }
 
-    public function show(string $tenantId, McqExam $exam)
+    public function show(string $tenantId, McqExam $exam, \App\Services\Mcq\McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
@@ -205,6 +205,7 @@ class McqExamController extends SahodayaAdminController
             'hallTicketTemplates' => \App\Models\McqHallTicketTemplate::where('tenant_id', $this->sahodaya->id)->where('is_active', true)->orderBy('title')->get(['id', 'title', 'is_default']),
             'certificateTemplates' => \App\Models\McqCertificateTemplate::where('tenant_id', $this->sahodaya->id)->where('is_active', true)->orderBy('title')->get(['id', 'title', 'is_default']),
             'gradeBands' => app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam),
+            'classOptions' => $reports->classFilterOptions($exam),
             'clusterRequireStudentVerification' => app(StudentVerificationGate::class)
                 ->requiredGlobally($this->sahodaya->id),
         ]);
