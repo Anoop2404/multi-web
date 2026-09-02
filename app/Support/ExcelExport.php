@@ -72,6 +72,14 @@ class ExcelExport
         $xml .= 'xmlns:x="urn:schemas-microsoft-com:office:excel" ';
         $xml .= 'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'."\n";
 
+        // Bold, shaded header row + normal body row, referenced below via ss:StyleID —
+        // without a Styles block every cell (header and data alike) renders identically
+        // plain, which is why the header row was indistinguishable from data before this.
+        $xml .= '<Styles>';
+        $xml .= '<Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/><Alignment ss:Vertical="Center"/></Style>';
+        $xml .= '<Style ss:ID="body"><Alignment ss:Vertical="Center"/></Style>';
+        $xml .= '</Styles>'."\n";
+
         // Excel sheet names: no fresh worksheet at all is invalid, so an empty $sheets
         // list still gets one blank "Sheet1" rather than a corrupt/unopenable file.
         if ($sheets === []) {
@@ -81,17 +89,23 @@ class ExcelExport
         $usedNames = [];
         foreach ($sheets as $name => $sheet) {
             $safeName = self::uniqueSheetName((string) $name, $usedNames);
+            // Materialized once — computing column widths needs to walk every row, and a
+            // caller may hand us a one-shot generator that row-writing below would then
+            // find already exhausted.
+            $rows = is_array($sheet['rows']) ? $sheet['rows'] : iterator_to_array($sheet['rows']);
 
-            $xml .= '<Worksheet ss:Name="'.$escape($safeName).'"><Table>'."\n";
+            $xml .= '<Worksheet ss:Name="'.$escape($safeName).'">';
+            $xml .= '<Table>'."\n";
+            $xml .= self::columnWidthsXml($sheet['headers'], $rows);
 
-            $xml .= '<Row>';
+            $xml .= '<Row ss:StyleID="header">';
             foreach ($sheet['headers'] as $header) {
                 $xml .= '<Cell><Data ss:Type="String">'.$escape($header).'</Data></Cell>';
             }
             $xml .= '</Row>'."\n";
 
-            foreach ($sheet['rows'] as $row) {
-                $xml .= '<Row>';
+            foreach ($rows as $row) {
+                $xml .= '<Row ss:StyleID="body">';
                 foreach ($row as $cell) {
                     $type = is_numeric($cell) && $cell !== '' && $cell !== null ? 'Number' : 'String';
                     $xml .= '<Cell><Data ss:Type="'.$type.'">'.$escape($cell).'</Data></Cell>';
@@ -99,12 +113,47 @@ class ExcelExport
                 $xml .= '</Row>'."\n";
             }
 
-            $xml .= '</Table></Worksheet>'."\n";
+            $xml .= '</Table>';
+            $xml .= '</Worksheet>'."\n";
         }
 
         $xml .= '</Workbook>';
 
         return $xml;
+    }
+
+    /**
+     * Column widths sized to the widest of the header or any cell in that column
+     * (sampled across every row — exports here run to at most a few thousand rows, so a
+     * full scan is cheap), clamped to a readable range. SpreadsheetML ss:Width is in
+     * points; ~6.5pt per character is a reasonable approximation for the default font.
+     *
+     * @param  list<string>  $headers
+     * @param  list<list<string|int|float|null>>  $rows
+     */
+    private static function columnWidthsXml(array $headers, array $rows): string
+    {
+        $maxLen = [];
+        foreach ($headers as $i => $header) {
+            $maxLen[$i] = mb_strlen((string) $header);
+        }
+
+        foreach ($rows as $row) {
+            foreach (array_values($row) as $i => $cell) {
+                $len = mb_strlen((string) ($cell ?? ''));
+                if ($len > ($maxLen[$i] ?? 0)) {
+                    $maxLen[$i] = $len;
+                }
+            }
+        }
+
+        $xml = '';
+        foreach ($maxLen as $len) {
+            $width = (int) max(60, min(320, ($len + 3) * 6.5));
+            $xml .= '<Column ss:Width="'.$width.'"/>';
+        }
+
+        return $xml."\n";
     }
 
     /**
