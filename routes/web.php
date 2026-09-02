@@ -1306,6 +1306,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/school-fees/{schoolEventFee}/approve', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'approve'])->name('school-fees.approve');
             Route::post('/{event}/school-fees/{schoolEventFee}/reject', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'reject'])->name('school-fees.reject');
             Route::post('/{event}/school-fees/{schoolEventFee}/receipts/{feeReceipt}/reject', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'rejectReceipt'])->name('school-fees.receipts.reject');
+            Route::post('/{event}/school-fees/{schoolEventFee}/receipts/{feeReceipt}/restore', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'restoreReceipt'])->name('school-fees.receipts.restore');
             Route::get('/{event}/school-fees/{schoolEventFee}/proof', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'proof'])->name('school-fees.proof');
             Route::get('/{event}/school-fees/{schoolEventFee}/proofs/{feeReceipt}', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'receiptProof'])->name('school-fees.receipt-proof');
             Route::post('/{event}/school-fees/{schoolEventFee}/recalculate', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'recalculate'])->name('school-fees.recalculate');

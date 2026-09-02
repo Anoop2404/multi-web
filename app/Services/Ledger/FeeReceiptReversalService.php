@@ -82,6 +82,79 @@ class FeeReceiptReversalService
         });
     }
 
+    /**
+     * Undo an accidental reverse(): restores approved status and posts an offsetting ledger
+     * entry. Deliberately does NOT mirror syncFeeableAfterReversal()'s MembershipPayment-
+     * specific side effects (flipping registration_status back, appending rejection
+     * history) — those may have been legitimately superseded by other changes since the
+     * reversal, so blindly reverting them risks stomping on unrelated later edits. For
+     * MembershipPayment, only the receipt/ledger state is restored; any registration-status
+     * fix needed after an accidental reversal is a separate, manual step.
+     */
+    public function restore(FeeReceipt $receipt, User $actor, ?string $reason = null): FeeReceipt
+    {
+        return DB::transaction(function () use ($receipt, $actor, $reason) {
+            /** @var FeeReceipt $locked */
+            $locked = FeeReceipt::query()->whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === FeeReceipt::STATUS_APPROVED) {
+                return $locked;
+            }
+
+            if ($locked->status !== FeeReceipt::STATUS_REVERSED) {
+                throw ValidationException::withMessages([
+                    'receipt' => 'Only a reversed fee receipt can be restored.',
+                ]);
+            }
+
+            $tenantId = app(FeeReceiptObserver::class)->resolveTenantIdPublic($locked);
+            if (! $tenantId) {
+                throw ValidationException::withMessages([
+                    'receipt' => 'Cannot resolve tenant for ledger restore. Fix the feeable link and retry.',
+                ]);
+            }
+
+            app(FeeReceiptLedgerDispatcher::class)->postRestore($locked, $tenantId);
+
+            $locked->update([
+                'status'          => FeeReceipt::STATUS_APPROVED,
+                'reversed_by'     => null,
+                'reversed_at'     => null,
+                'reversal_reason' => null,
+            ]);
+
+            $feeable = $locked->fresh(['feeable'])->feeable;
+            if ($feeable) {
+                if (method_exists($feeable, 'refreshPaidState')) {
+                    $feeable->refresh();
+                    $feeable->refreshPaidState(
+                        $feeable instanceof TrainingRegistration ? 'fee_status' : 'status'
+                    );
+                }
+                // Re-point the carrier's primary receipt back to this one now that it's
+                // approved again — mirrors what reject/reverse already does in reverse.
+                if (property_exists($feeable, 'fee_receipt_id') || array_key_exists('fee_receipt_id', $feeable->getAttributes())) {
+                    $feeable->forceFill(['fee_receipt_id' => $locked->id])->save();
+                }
+            }
+
+            app(PlatformAuditLogger::class)->log(
+                action: 'fee_receipt.restored',
+                description: "Fee receipt #{$locked->id} restored to approved".($reason ? ": {$reason}" : ''),
+                subject: $locked,
+                properties: [
+                    'feeable_type' => $locked->feeable_type,
+                    'feeable_id'   => $locked->feeable_id,
+                    'amount'       => $locked->amount,
+                    'reason'       => $reason,
+                ],
+                category: 'finance',
+            );
+
+            return $locked->fresh();
+        });
+    }
+
     private function syncFeeableAfterReversal(FeeReceipt $receipt, ?string $reason): void
     {
         $feeable = $receipt->feeable;

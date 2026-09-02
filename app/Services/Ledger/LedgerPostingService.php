@@ -201,6 +201,65 @@ class LedgerPostingService
         });
     }
 
+    /**
+     * Undo an accidental reversal: posts a mirror of the REVERSAL rows (not the original
+     * approval rows), which nets back to the original approved position while keeping every
+     * prior entry (original approval + reversal + this restore) visible for audit — same
+     * "never delete, only offset" approach as postReceiptReversal().
+     *
+     * @return list<LedgerTransaction>
+     */
+    public function postReceiptRestore(FeeReceipt $receipt, string $tenantId, ?int $postedBy = null): array
+    {
+        return DB::transaction(function () use ($receipt, $tenantId, $postedBy) {
+            FeeReceipt::query()->whereKey($receipt->id)->lockForUpdate()->first();
+
+            $existingRestore = LedgerTransaction::where('reference_type', FeeReceipt::REVERSAL_RESTORE_REFERENCE)
+                ->where('reference_id', $receipt->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($existingRestore->isNotEmpty()) {
+                return $existingRestore->all();
+            }
+
+            $reversal = LedgerTransaction::where('reference_type', FeeReceipt::REVERSAL_REFERENCE)
+                ->where('reference_id', $receipt->id)
+                ->with('accountHead:id,code')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($reversal->isEmpty()) {
+                throw new \RuntimeException("No reversal ledger rows found to restore for fee receipt #{$receipt->id}.");
+            }
+
+            $lines = $reversal->map(function (LedgerTransaction $row) {
+                $code = $row->accountHead?->code;
+                if (! $code) {
+                    throw new \RuntimeException("Missing account head for ledger row #{$row->id}.");
+                }
+
+                return [
+                    'code'        => $code,
+                    'entry_type'  => $row->entry_type === 'debit' ? 'credit' : 'debit',
+                    'amount'      => $row->amount,
+                    'description' => 'Restore of reversal of receipt #'.$row->reference_id.($row->description ? " — {$row->description}" : ''),
+                ];
+            })->all();
+
+            return $this->postJournal(
+                $tenantId,
+                $lines,
+                FeeReceipt::REVERSAL_RESTORE_REFERENCE,
+                $receipt->id,
+                now()->toDateString(),
+                $postedBy ?? $receipt->reviewed_by,
+            );
+        });
+    }
+
     /** @return list<LedgerTransaction> */
     public function postExpense(
         string $tenantId,

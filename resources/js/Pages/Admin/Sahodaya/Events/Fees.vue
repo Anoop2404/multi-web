@@ -533,27 +533,38 @@
                                             class="btn-secondary !py-1 !px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-50 shadow-xs">
                                         {{ rc.status === 'approved' ? 'Reverse this payment' : 'Reject this proof' }}
                                     </button>
+                                    <button v-if="!rc.is_system_credit && rc.status === 'reversed'"
+                                            type="button"
+                                            @click="beginReceiptRejection(rc)"
+                                            class="btn-secondary !py-1 !px-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 shadow-xs">
+                                        Restore to approved
+                                    </button>
                                 </div>
                             </div>
                         </div>
 
                         <div v-if="receiptAction?.id === rc.id"
-                             class="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3">
-                            <p class="text-xs font-bold text-rose-900">
-                                {{ rc.status === 'approved'
-                                    ? `Reverse approved receipt ${rc.receipt_number ? `#${rc.receipt_number}` : `#${rc.id}`} for ₹${fmt(rc.amount)}?`
-                                    : `Reject this ₹${fmt(rc.amount)} payment proof?` }}
+                             class="mt-4 rounded-lg border p-3"
+                             :class="rc.status === 'reversed' ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'">
+                            <p class="text-xs font-bold" :class="rc.status === 'reversed' ? 'text-emerald-900' : 'text-rose-900'">
+                                {{ rc.status === 'reversed'
+                                    ? `Restore reversed receipt ${rc.receipt_number ? `#${rc.receipt_number}` : `#${rc.id}`} for ₹${fmt(rc.amount)} back to approved?`
+                                    : rc.status === 'approved'
+                                        ? `Reverse approved receipt ${rc.receipt_number ? `#${rc.receipt_number}` : `#${rc.id}`} for ₹${fmt(rc.amount)}?`
+                                        : `Reject this ₹${fmt(rc.amount)} payment proof?` }}
                             </p>
-                            <p class="mt-1 text-[11px] text-rose-700">
-                                {{ rc.status === 'approved'
-                                    ? 'Compensating ledger entries will be posted and the school balance will be recalculated.'
-                                    : 'The school will be allowed to upload a replacement proof.' }}
+                            <p class="mt-1 text-[11px]" :class="rc.status === 'reversed' ? 'text-emerald-700' : 'text-rose-700'">
+                                {{ rc.status === 'reversed'
+                                    ? 'An offsetting ledger entry will be posted and the school balance recalculated as paid — use this only to undo an accidental reversal.'
+                                    : rc.status === 'approved'
+                                        ? 'Compensating ledger entries will be posted and the school balance will be recalculated.'
+                                        : 'The school will be allowed to upload a replacement proof.' }}
                             </p>
                             <label class="mt-3 block text-[11px] font-bold text-slate-700">
                                 Reason <span class="font-normal text-slate-500">(optional)</span>
                                 <textarea v-model="receiptActionReason" rows="2" maxlength="500"
                                           class="field mt-1 text-xs"
-                                          placeholder="Example: Duplicate payment proof, incorrect transaction, bank chargeback..."></textarea>
+                                          :placeholder="rc.status === 'reversed' ? 'Example: Reversed by mistake, wrong receipt selected...' : 'Example: Duplicate payment proof, incorrect transaction, bank chargeback...'"></textarea>
                             </label>
                             <div class="mt-3 flex items-center justify-end gap-2">
                                 <button type="button" class="btn-secondary text-xs"
@@ -562,10 +573,11 @@
                                     Cancel
                                 </button>
                                 <button type="button"
-                                        class="btn-primary !bg-rose-700 hover:!bg-rose-800 text-xs"
+                                        class="btn-primary text-xs"
+                                        :class="rc.status === 'reversed' ? '!bg-emerald-700 hover:!bg-emerald-800' : '!bg-rose-700 hover:!bg-rose-800'"
                                         :disabled="receiptActionBusy"
                                         @click="submitReceiptRejection(rc)">
-                                    {{ receiptActionBusy ? 'Processing…' : (rc.status === 'approved' ? 'Confirm reversal' : 'Confirm rejection') }}
+                                    {{ receiptActionBusy ? 'Processing…' : (rc.status === 'reversed' ? 'Confirm restore' : rc.status === 'approved' ? 'Confirm reversal' : 'Confirm rejection') }}
                                 </button>
                             </div>
                         </div>
@@ -659,9 +671,14 @@ function submitReceiptRejection(receipt) {
     // FestSchoolEventFee records — must target the receipt's own record, not the
     // combined row's id, or this 403s for any receipt outside the rollup record.
     const schoolEventFeeId = receipt.school_event_fee_id ?? activeProofModalRow.value.id;
+    const isRestore = receipt.status === 'reversed';
+    const url = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${schoolEventFeeId}/receipts/${receipt.id}/${isRestore ? 'restore' : 'reject'}`;
+    const payload = isRestore
+        ? { restore_reason: receiptActionReason.value }
+        : { rejection_reason: receiptActionReason.value };
     router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${schoolEventFeeId}/receipts/${receipt.id}/reject`,
-        { rejection_reason: receiptActionReason.value },
+        url,
+        payload,
         {
             preserveScroll: true,
             onSuccess: () => { closeProofModal(); },

@@ -287,6 +287,44 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         );
     }
 
+    /** Undo an accidental reversal — restores the receipt to approved and posts an offsetting ledger entry. */
+    public function restoreReceipt(
+        Request $request,
+        string $tenantId,
+        FestEvent $event,
+        FestSchoolEventFee $schoolEventFee,
+        \App\Models\FeeReceipt $feeReceipt,
+        PlatformAuditLogger $audit,
+    ) {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($schoolEventFee->event_id !== $event->id, 403);
+        abort_if(
+            $feeReceipt->feeable_type !== FestSchoolEventFee::class
+                || (int) $feeReceipt->feeable_id !== (int) $schoolEventFee->id,
+            403,
+        );
+
+        $data = $request->validate(['restore_reason' => 'nullable|string|max:500']);
+
+        app(\App\Services\Ledger\FeeReceiptReversalService::class)
+            ->restore($feeReceipt, $request->user(), $data['restore_reason'] ?? null);
+
+        $audit->festEvent(
+            $event,
+            FestPageActivity::FEES,
+            'fest.fee.receipt_restored',
+            'Reversed event fee receipt restored to approved',
+            [
+                'school_id' => $schoolEventFee->school_id,
+                'fee_receipt_id' => $feeReceipt->id,
+                'amount' => (float) $feeReceipt->amount,
+                'reason' => $data['restore_reason'] ?? null,
+            ],
+        );
+
+        return back()->with('success', 'Payment restored to approved and the ledger entry offset.');
+    }
+
     public function proof(string $tenantId, FestEvent $event, FestSchoolEventFee $schoolEventFee)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

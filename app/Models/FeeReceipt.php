@@ -22,6 +22,9 @@ class FeeReceipt extends Model
     /** Ledger reference_type for compensating reversal journals (not FeeReceipt::class). */
     public const REVERSAL_REFERENCE = 'fee_receipt_reversal';
 
+    /** Ledger reference_type for restoring an accidentally-reversed receipt back to approved. */
+    public const REVERSAL_RESTORE_REFERENCE = 'fee_receipt_reversal_restore';
+
     protected $fillable = [
         'feeable_type', 'feeable_id', 'receipt_number', 'file_path', 'generated_receipt_path', 'transaction_ref', 'bank_name',
         'payment_date', 'amount', 'waiver_amount', 'waiver_reason', 'waived_by_user_id', 'status', 'rejection_reason',

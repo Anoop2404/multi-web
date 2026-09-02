@@ -93,4 +93,87 @@ class FeeReceiptReversalTest extends TestCase
         $payment->refresh();
         $this->assertSame('rejected', $payment->status);
     }
+
+    public function test_restore_undoes_an_accidental_reversal_with_an_offsetting_ledger_entry(): void
+    {
+        $this->seed(SahodayaMasterDataSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'Restore Sahodaya',
+            'domain'    => 'restore-sahodaya.test',
+            'is_active' => true,
+        ]);
+
+        SahodayaProfile::create([
+            'tenant_id'         => $sahodaya->id,
+            'prefix'            => 'RST',
+            'student_data_mode' => 'counts_only',
+        ]);
+
+        $school = Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'Restore School',
+            'parent_id'         => $sahodaya->id,
+            'school_prefix'     => 'RSC',
+            'membership_status' => 'approved',
+            'is_active'         => true,
+        ]);
+
+        $user = User::factory()->create();
+
+        $registration = Registration::create([
+            'school_id'             => $school->id,
+            'academic_year'         => AcademicYear::current(),
+            'registration_status'   => 'approved',
+            'membership_fee_amount' => 500,
+        ]);
+
+        $payment = MembershipPayment::create([
+            'school_id'          => $school->id,
+            'academic_year'      => AcademicYear::current(),
+            'registration_id'    => $registration->id,
+            'amount'             => 500,
+            'payment_proof_path' => 'payments/test/proof.png',
+            'status'             => 'verified',
+            'verified_by_user_id'=> $user->id,
+            'verified_at'        => now(),
+        ]);
+
+        $receipt = app(FeeReceiptService::class)->createForMembershipPayment($payment);
+        $receipt->update([
+            'status'      => FeeReceipt::STATUS_APPROVED,
+            'payment_date'=> now()->toDateString(),
+            'reviewed_by' => $user->id,
+            'reviewed_at' => now(),
+        ]);
+
+        app(LedgerService::class)->postFeeReceipt($receipt->fresh(), $sahodaya->id);
+
+        app(FeeReceiptReversalService::class)->reverse($receipt->fresh(), $user, 'Reversed by mistake');
+
+        $restored = app(FeeReceiptReversalService::class)->restore($receipt->fresh(), $user, 'Undo accidental reversal');
+
+        $this->assertSame(FeeReceipt::STATUS_APPROVED, $restored->status);
+        $this->assertNull($restored->reversed_by);
+        $this->assertNull($restored->reversed_at);
+        $this->assertNull($restored->reversal_reason);
+
+        // Original approval (2 rows) + reversal (2 rows) + restore (2 rows) — nothing deleted,
+        // every step stays visible, and the three postings net back to the original balance.
+        $this->assertSame(2, LedgerTransaction::where('reference_type', FeeReceipt::class)->count());
+        $this->assertSame(2, LedgerTransaction::where('reference_type', FeeReceipt::REVERSAL_REFERENCE)->count());
+        $this->assertSame(2, LedgerTransaction::where('reference_type', FeeReceipt::REVERSAL_RESTORE_REFERENCE)->count());
+
+        $netDebit = (float) LedgerTransaction::where('entry_type', 'debit')->sum('amount');
+        $netCredit = (float) LedgerTransaction::where('entry_type', 'credit')->sum('amount');
+        $this->assertEquals($netDebit, $netCredit);
+
+        // Calling restore() again is a no-op — doesn't double-post or throw.
+        $restoredAgain = app(FeeReceiptReversalService::class)->restore($receipt->fresh(), $user, 'Undo accidental reversal');
+        $this->assertSame(FeeReceipt::STATUS_APPROVED, $restoredAgain->status);
+        $this->assertSame(2, LedgerTransaction::where('reference_type', FeeReceipt::REVERSAL_RESTORE_REFERENCE)->count());
+    }
 }

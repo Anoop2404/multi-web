@@ -35,4 +35,15 @@ class FeeReceiptLedgerDispatcher
             default => app(LedgerPostingService::class)->postReceiptReversal($receipt, $tenantId),
         };
     }
+
+    public function postRestore(FeeReceipt $receipt, string $tenantId): void
+    {
+        match ($receipt->feeable_type) {
+            MembershipPayment::class => app(LedgerService::class)->postRestore($receipt, $tenantId),
+            FestSchoolEventFee::class, FestRegistration::class => app(FestFeeLedgerService::class)->postRestore($receipt, $tenantId),
+            TrainingRegistration::class, TrainingSchoolFee::class => app(TrainingFeeLedgerService::class)->postRestore($receipt, $tenantId),
+            McqRegistration::class, McqSchoolFee::class => app(McqFeeLedgerService::class)->postRestore($receipt, $tenantId),
+            default => app(LedgerPostingService::class)->postReceiptRestore($receipt, $tenantId),
+        };
+    }
 }

@@ -59,6 +59,11 @@ class FestFeeLedgerService
         app(LedgerPostingService::class)->postReceiptReversal($receipt, $tenantId);
     }
 
+    public function postRestore(FeeReceipt $receipt, string $tenantId): void
+    {
+        app(LedgerPostingService::class)->postReceiptRestore($receipt, $tenantId);
+    }
+
     /**
      * Post the income-reducing / liability-creating leg for a newly issued FestFeeCredit
      * (a paid item rejected, or a paid registration cancelled-with-refund). Debits this
