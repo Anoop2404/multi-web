@@ -827,7 +827,9 @@ class FestSchoolReportController extends SchoolAdminController
         // level is selected — a school with Level 1 approved must get its Level 1 cards
         // while Level 2 is still outstanding.
         $levels = $this->idCardLevels($event);
-        $defaultLevelId = $levels === [] ? null : $this->defaultIdCardLevelId($event);
+        $defaultLevelId = $levels === []
+            ? null
+            : ($this->eventLevelId($event) ?? $this->defaultIdCardLevelId($event));
         $itemLevels = $this->itemLevelMap($event);
 
         $downloadGate = app(SchoolDocumentDownloadGateService::class)
@@ -858,9 +860,36 @@ class FestSchoolReportController extends SchoolAdminController
     }
 
     /**
+     * The level this event itself belongs to, when it is a phase's own operational event
+     * (a leaf like "Digi Fest" under a Kalotsavam root — FestPhaseTopologyService::syncLeaf()
+     * stamps registration_batch_id on it). Such a page shows exactly one phase, so its
+     * downloads are gated on that phase's level and nothing else: no picker, no fallback
+     * to some other level, and no way to widen it via a query parameter. Null on the root
+     * hub, where every level is in view.
+     */
+    private function eventLevelId(FestEvent $event): ?int
+    {
+        if (! $event->usesPhasedRegionalBilling() || ! $event->parent_event_id) {
+            return null;
+        }
+
+        if ($event->registration_batch_id) {
+            return (int) $event->registration_batch_id;
+        }
+
+        // Leaves created before registration_batch_id was stamped on the event itself.
+        $batchId = $event->source_phase_id
+            ? \App\Models\FestEventPhase::whereKey($event->source_phase_id)->value('registration_batch_id')
+            : null;
+
+        return $batchId ? (int) $batchId : null;
+    }
+
+    /**
      * Registration levels (batches) this school is billed for, with their payment state —
      * only for events on the phased_regional_billing workflow; every other event returns []
-     * and keeps the old whole-event behavior.
+     * and keeps the old whole-event behavior. A phase's own event is billed under exactly
+     * one level, so only that one is listed.
      *
      * @return list<array<string, mixed>>
      */
@@ -870,9 +899,12 @@ class FestSchoolReportController extends SchoolAdminController
             return [];
         }
 
+        $eventLevelId = $this->eventLevelId($event);
+
         return app(\App\Services\Events\FestRegistrationBatchFeeService::class)
             ->recalculateAll($event->rootEvent(), $this->school->id)
-            ->filter(fn ($fee) => $fee->registration_batch_id)
+            ->filter(fn ($fee) => $fee->registration_batch_id
+                && ($eventLevelId === null || (int) $fee->registration_batch_id === $eventLevelId))
             ->map(fn ($fee) => [
                 'id'          => (int) $fee->registration_batch_id,
                 'code'        => $fee->registrationBatch?->code,
@@ -956,6 +988,13 @@ class FestSchoolReportController extends SchoolAdminController
     {
         if (! $event->usesPhasedRegionalBilling()) {
             return null;
+        }
+
+        // A phase's own event is billed under one level; that level decides, whatever the
+        // request asks for.
+        $eventLevelId = $this->eventLevelId($event);
+        if ($eventLevelId !== null) {
+            return $eventLevelId;
         }
 
         // Explicit "every level in one card set" — only usable once every level is paid,

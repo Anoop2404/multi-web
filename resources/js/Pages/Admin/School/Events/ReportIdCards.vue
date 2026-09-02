@@ -41,7 +41,15 @@
 
                     <div v-if="hasLevels" class="space-y-2">
                         <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide">Registration level</p>
-                        <div class="flex flex-wrap gap-2">
+                        <div v-if="levelLocked" class="flex flex-wrap items-center gap-2">
+                            <span class="px-3 py-1.5 rounded-lg text-xs font-semibold border bg-slate-50 border-slate-200 text-slate-700">
+                                {{ levels[0].name }}
+                            </span>
+                            <span class="text-xs" :class="levels[0].paid ? 'text-emerald-700' : 'text-amber-700'">
+                                {{ levels[0].paid ? 'Fee paid & approved' : 'Fee pending' }}
+                            </span>
+                        </div>
+                        <div v-else class="flex flex-wrap gap-2">
                             <button v-if="allLevelsPaid" type="button"
                                     class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
                                     :class="levelId === 'all'
@@ -63,7 +71,9 @@
                             </button>
                         </div>
                         <p class="text-xs text-slate-500">
-                            Each level is paid and approved separately. Cards cover the items registered under the selected level only.
+                            {{ levelLocked
+                                ? 'This phase is billed under the level above. Its cards unlock as soon as that level\'s fee is approved, whatever other levels still owe.'
+                                : 'Each level is paid and approved separately. Cards cover the items registered under the selected level only.' }}
                         </p>
                     </div>
 
@@ -248,15 +258,21 @@ const gate = ref(props.downloadGate);
 // Each level is invoiced and approved on its own, so cards are generated one level at
 // a time: the server gates on the selected level's fee and returns only that level's
 // participants. Defaults to the first level the school has actually paid for.
-// A school that has paid every level starts on the combined set, exactly as before
-// levels existed; anyone mid-payment starts on the level they have actually paid for.
+// One level in the list means this page IS one phase's event — the level is fixed and
+// there is nothing to pick. Otherwise: a school that has paid every level starts on the
+// combined set, exactly as before levels existed, and anyone mid-payment starts on the
+// level they have actually paid for.
+const levelLocked = (props.levels?.length ?? 0) === 1;
 const levelId = ref(
-    props.levels?.length && props.levels.every((level) => level.paid)
-        ? 'all'
-        : (props.defaultLevelId != null ? String(props.defaultLevelId) : ''),
+    levelLocked
+        ? String(props.levels[0].id)
+        : (props.levels?.length && props.levels.every((level) => level.paid)
+            ? 'all'
+            : (props.defaultLevelId != null ? String(props.defaultLevelId) : '')),
 );
 const hasLevels = computed(() => (props.levels?.length ?? 0) > 0);
-const allLevelsPaid = computed(() => hasLevels.value && props.levels.every((level) => level.paid));
+const allLevelsPaid = computed(() => hasLevels.value && ! levelLocked
+    && props.levels.every((level) => level.paid));
 
 function setLevel(id) {
     levelId.value = String(id);

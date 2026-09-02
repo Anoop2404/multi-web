@@ -84,6 +84,7 @@ class FestLevelIdCardGateTest extends TestCase
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '10']);
         $levels = [];
         $items = [];
+        $leaves = [];
 
         foreach ([['level_1', 'Level 1', 'Digi Fest', 1], ['level_2', 'Level 2', 'Off Stage', 2]] as [$code, $name, $phaseName, $order]) {
             $batch = FestRegistrationBatch::create([
@@ -102,6 +103,21 @@ class FestLevelIdCardGateTest extends TestCase
                 'sort_order' => $order,
             ]);
 
+            // The phase's own operational event — what a school actually opens from the
+            // Kalotsav hub ("… — Digi Fest"). FestPhaseTopologyService stamps the level on it.
+            $leaf = FestEvent::create([
+                'tenant_id' => $sahodaya->id,
+                'parent_event_id' => $event->id,
+                'source_phase_id' => $phase->id,
+                'registration_batch_id' => $batch->id,
+                'title' => 'Level Gate Kalotsavam — '.$phaseName,
+                'event_type' => 'kalolsavam',
+                'level_round' => 'sahodaya',
+                'status' => 'registration_open',
+                'workflow_mode' => FestPhasedWorkflowService::MODE,
+                'phase_mode_enabled' => true,
+            ]);
+
             $item = FestEventItem::create([
                 'event_id' => $event->id,
                 'title' => $name.' Item',
@@ -117,8 +133,10 @@ class FestLevelIdCardGateTest extends TestCase
                 'admission_no' => strtoupper($code),
             ]);
 
+            // Registrations are written against the phase's own event, as the phased
+            // registration flow does.
             $registration = FestRegistration::create([
-                'event_id' => $event->id,
+                'event_id' => $leaf->id,
                 'item_id' => $item->id,
                 'school_id' => $school->id,
                 'status' => 'approved',
@@ -131,6 +149,7 @@ class FestLevelIdCardGateTest extends TestCase
 
             $levels[$code] = $batch;
             $items[$code] = $item;
+            $leaves[$code] = $leaf;
         }
 
         // Level 1 invoiced, paid and approved. Level 2 left outstanding.
@@ -148,7 +167,7 @@ class FestLevelIdCardGateTest extends TestCase
         ]);
         $feeOne->refreshPaidState();
 
-        return compact('sahodaya', 'school', 'admin', 'event', 'levels', 'items');
+        return compact('sahodaya', 'school', 'admin', 'event', 'levels', 'items', 'leaves');
     }
 
     public function test_paid_level_gets_its_id_cards_while_another_level_is_unpaid(): void
@@ -200,6 +219,58 @@ class FestLevelIdCardGateTest extends TestCase
         $response->assertOk();
         $this->assertTrue($response->json('downloadGate.blocked'));
         $this->assertSame([], $response->json('cards'));
+    }
+
+    /**
+     * Opening one phase's own event gates on the level that phase is billed under — the
+     * paid Level 1 phase generates, the unpaid Level 2 phase does not — with no picker and
+     * no way to widen the scope through the query string.
+     */
+    public function test_phase_event_is_gated_on_its_own_level(): void
+    {
+        $f = $this->fixture();
+
+        $paidPhase = $this->actingAs($f['admin'])->getJson(route('school.kalotsav.reports.id-cards.cards', [
+            'tenantId' => $f['school']->id,
+            'event' => $f['leaves']['level_1']->id,
+            'scope' => 'event',
+            // Even asked to widen, a phase page stays on its own level.
+            'batch_id' => 'all',
+        ]));
+
+        $paidPhase->assertOk();
+        $this->assertFalse($paidPhase->json('downloadGate.blocked'));
+        $this->assertCount(1, $paidPhase->json('cards'));
+        $this->assertEquals('Level 1 Student', $paidPhase->json('cards.0.name'));
+
+        $unpaidPhase = $this->actingAs($f['admin'])->getJson(route('school.kalotsav.reports.id-cards.cards', [
+            'tenantId' => $f['school']->id,
+            'event' => $f['leaves']['level_2']->id,
+            'scope' => 'event',
+            'batch_id' => $f['levels']['level_1']->id,
+        ]));
+
+        $unpaidPhase->assertOk();
+        $this->assertTrue($unpaidPhase->json('downloadGate.blocked'));
+        $this->assertStringContainsString('Level 2', $unpaidPhase->json('downloadGate.reason'));
+    }
+
+    public function test_phase_event_page_shows_only_its_own_level(): void
+    {
+        $f = $this->fixture();
+
+        $response = $this->actingAs($f['admin'])->get(route('school.kalotsav.reports.id-cards', [
+            'tenantId' => $f['school']->id,
+            'event' => $f['leaves']['level_1']->id,
+        ]));
+
+        $response->assertOk();
+        $props = $response->viewData('page')['props'];
+
+        $this->assertCount(1, $props['levels']);
+        $this->assertEquals('Level 1', $props['levels'][0]['name']);
+        $this->assertEquals($f['levels']['level_1']->id, $props['defaultLevelId']);
+        $this->assertFalse($props['downloadGate']['blocked']);
     }
 
     public function test_page_defaults_to_the_paid_level_instead_of_reporting_the_whole_event_unpaid(): void
