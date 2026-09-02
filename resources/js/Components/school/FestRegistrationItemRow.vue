@@ -61,20 +61,20 @@
             <div class="flex flex-wrap items-center justify-end gap-1.5">
                 <button type="button"
                         class="btn-secondary text-xs !min-h-0 !px-2.5 !py-1"
-                        :disabled="blocked"
+                        :disabled="blocked && !hasRegistrationToEdit"
                         @click="openPicker">
                     {{ pickerSummary }}
                 </button>
                 <button v-if="showStandbyPicker"
                         type="button"
                         class="btn-secondary text-xs !min-h-0 !px-2 !py-1"
-                        :disabled="blocked"
+                        :disabled="blocked && !hasRegistrationToEdit"
                         @click="openStandbyPicker">
                     Standbys{{ standbySelectedCount ? ` (${standbySelectedCount})` : '' }}
                 </button>
                 <button type="button"
                         class="btn-primary text-xs !min-h-0 !px-3 !py-1"
-                        :disabled="blocked || !canSubmit"
+                        :disabled="(blocked && !isEditing) || !canSubmit"
                         @click="submit">
                     {{ isEditing ? 'Save changes' : 'Register' }}
                 </button>
@@ -152,7 +152,7 @@
             <div class="flex flex-wrap items-center gap-2">
                 <button type="button"
                         class="btn-secondary text-xs !min-h-0 !px-2 !py-1"
-                        :disabled="blocked"
+                        :disabled="blocked && !hasRegistrationToEdit"
                         @click="openPicker">
                     {{ pickerSummary }}
                 </button>
@@ -162,7 +162,7 @@
                 <button v-if="showStandbyPicker"
                         type="button"
                         class="btn-secondary text-xs !min-h-0 !px-2 !py-1"
-                        :disabled="blocked"
+                        :disabled="blocked && !hasRegistrationToEdit"
                         @click="openStandbyPicker">
                     Standbys ({{ standbySelectedCount }})
                 </button>
@@ -181,7 +181,7 @@
         <td class="px-3 py-2 text-right">
             <button type="button"
                     class="btn-primary text-xs !min-h-0 !px-2 !py-1.5"
-                    :disabled="blocked || !canSubmit"
+                    :disabled="(blocked && !isEditing) || !canSubmit"
                     @click="submit">
                 {{ isEditing ? 'Save changes' : 'Register' }}
             </button>
@@ -201,7 +201,8 @@
         :coach-phone="isGroup ? form.coach_phone : undefined"
         :manager-name="isGroup ? form.manager_name : undefined"
         :manager-phone="isGroup ? form.manager_phone : undefined"
-        :max-selected="maxSelectedLimit"
+        :min-selected="isGroup ? groupSizeBounds?.min : null"
+        :max-selected="isGroup ? groupSizeBounds?.max : maxSelectedLimit"
         :confirm-label="layout === 'sports' ? 'Register selection' : 'Use selection'"
         @update:team-name="form.team_name = $event"
         @update:coach-name="form.coach_name = $event"
@@ -278,6 +279,16 @@ const props = defineProps({
 const emit = defineEmits(['register', 'update', 'withdraw', 'edit', 'cancel-edit', 'add-student', 'search-students']);
 
 const isEditing = computed(() => props.editingRegistrationId != null);
+
+// A "blocked" item (e.g. school's per-item quota already reached) must still be
+// reachable via its own existing registration -- that's the whole point of
+// isItemBlocked()'s isCurrentlyEditing exception in the parent. This can't be
+// keyed off isEditing: before the first click, isEditing is false precisely
+// because nothing has been clicked yet, so a `blocked && !isEditing` disabled
+// guard would leave the button permanently disabled (blocked because not
+// editing, never editing because the disabled button can't be clicked).
+// Keying off "is there a registration to fall back into" avoids that deadlock.
+const hasRegistrationToEdit = computed(() => !isEditing.value && (props.registrations?.length ?? 0) > 0 && !!props.registrations[0]);
 
 const pickerOpen = ref(false);
 const standbyPickerOpen = ref(false);
@@ -539,15 +550,11 @@ function formatMoney(value) {
 }
 
 function openPicker() {
-    const hasExistingRegistration = !isEditing.value && (props.registrations?.length ?? 0) > 0 && props.registrations[0];
-    // A "blocked" item (e.g. school's per-item quota already reached) must still
-    // be editable via its own existing registration -- that's the entire point of
-    // isItemBlocked()'s isCurrentlyEditing exception in the parent. Auto-entering
-    // edit mode has to happen BEFORE the blocked check below, not after, or the
-    // block never lifts and this becomes a permanent deadlock: blocked because
-    // not editing, never editing because blocked. Only a genuinely new
-    // registration attempt (nothing to fall back into) should honor the block.
-    if (hasExistingRegistration) {
+    // Auto-entering edit mode has to happen BEFORE the blocked check below, not
+    // after, or the block never lifts (see hasRegistrationToEdit's comment).
+    // Only a genuinely new registration attempt (nothing to fall back into)
+    // should honor the block.
+    if (hasRegistrationToEdit.value) {
         emit('edit', props.registrations[0]);
     } else if (props.blocked) {
         showWarning(props.blockReason || 'This item is currently unavailable.', 'Item Unavailable');
@@ -560,10 +567,9 @@ function openPicker() {
 }
 
 function openStandbyPicker() {
-    const hasExistingRegistration = !isEditing.value && (props.registrations?.length ?? 0) > 0 && props.registrations[0];
     // See openPicker() above for why the existing-registration edit trigger must
     // run before the blocked check.
-    if (hasExistingRegistration) {
+    if (hasRegistrationToEdit.value) {
         emit('edit', props.registrations[0]);
     } else if (props.blocked) {
         showWarning(props.blockReason || 'This item is currently unavailable.', 'Item Unavailable');
@@ -579,7 +585,10 @@ function handleMainPickerConfirm() {
 }
 
 function submit() {
-    if (props.blocked) {
+    // Once editing an existing registration, `blocked` (a per-school/new-entry
+    // cap) no longer applies -- saving changes to what's already on file isn't
+    // creating a new entry. Only a fresh, non-editing submit should honor it.
+    if (props.blocked && !isEditing.value) {
         showWarning(props.blockReason || 'This item is currently unavailable for registration.', 'Item Unavailable');
         return;
     }

@@ -42,8 +42,8 @@
                             {{ filteredEligible.length }} eligible
                             <span v-if="!showIneligible && hasIneligible"> · {{ ineligibleCount }} hidden</span>
                         </span>
-                        <span v-if="maxSelected" class="text-slate-400">
-                            · {{ maxSelected === 1 ? 'Max 1 per entry' : `Max ${maxSelected}` }}
+                        <span v-if="selectionRequirementLabel" class="text-slate-400">
+                            · {{ selectionRequirementLabel }}
                         </span>
                         <span v-if="localSelected.length" class="font-semibold text-[#0f3d7a]">
                             · {{ localSelected.length }} selected
@@ -136,6 +136,7 @@
 
             <div class="modal-foot shrink-0 border-t border-slate-200 bg-white px-6 py-3.5 flex items-center justify-end gap-3 z-10">
                 <button type="button" class="btn-ghost text-sm" @click="close">Cancel</button>
+                <div v-if="confirmHint" class="text-xs text-amber-700 mr-auto">{{ confirmHint }}</div>
                 <button
                     type="button"
                     class="btn-primary text-sm min-w-[120px]"
@@ -168,6 +169,7 @@ const props = defineProps({
     managerName: { type: String, default: undefined },
     managerPhone: { type: String, default: undefined },
     confirmLabel: { type: String, default: 'Apply selection' },
+    minSelected: { type: Number, default: null },
     maxSelected: { type: Number, default: null },
     showAddStudent: { type: Boolean, default: true },
 });
@@ -237,10 +239,32 @@ const selectedChips = computed(() => {
         .map(e => ({ id: e.id, name: e.name, displayName: e.displayName, regNo: e.regNo || '—' }));
 });
 
+const selectionRequirementLabel = computed(() => {
+    const { minSelected, maxSelected } = props;
+    if (minSelected && maxSelected && minSelected !== maxSelected) return `Requires ${minSelected}–${maxSelected}`;
+    if (minSelected && maxSelected) return `Requires exactly ${minSelected}`;
+    if (minSelected) return `Requires at least ${minSelected}`;
+    if (maxSelected) return maxSelected === 1 ? 'Max 1 per entry' : `Max ${maxSelected}`;
+    return '';
+});
+
 const canConfirm = computed(() => {
     if (!localSelected.value.length) return false;
     if (props.requireTeamName && !String(localTeamName.value ?? '').trim()) return false;
+    if (props.minSelected && localSelected.value.length < props.minSelected) return false;
+    if (props.maxSelected && localSelected.value.length > props.maxSelected) return false;
     return true;
+});
+
+const confirmHint = computed(() => {
+    const n = localSelected.value.length;
+    if (props.minSelected && n > 0 && n < props.minSelected) {
+        return `Select at least ${props.minSelected} (currently ${n}).`;
+    }
+    if (props.maxSelected && n > props.maxSelected) {
+        return `Select at most ${props.maxSelected} (currently ${n}).`;
+    }
+    return '';
 });
 
 // For large schools, `entries` is only ever the first ~150 students by name (see
@@ -279,6 +303,13 @@ function toggleId(id) {
     const idx = localSelected.value.indexOf(id);
     if (idx === -1) {
         if (props.maxSelected && localSelected.value.length >= props.maxSelected) {
+            if (props.requireTeamName) {
+                // A squad/team item hitting its cap should just block the extra pick --
+                // swapping in the whole squad (the individual-item behavior below) would
+                // silently discard the rest of the roster the school just built.
+                showWarning(`Maximum ${props.maxSelected} allowed for this item.`, 'Selection Limit Reached');
+                return;
+            }
             localSelected.value = [id];
             return;
         }
