@@ -383,7 +383,7 @@ class McqExamOpsController extends SahodayaAdminController
         return back()->with('success', "{$count} hall ticket(s) generated.");
     }
 
-    /** Re-sort every issued reg. number into contiguous per-school blocks. Blocked once tickets are published. */
+    /** Re-sort every issued reg. number into a fresh 1..N roll number per class (shared across schools). Blocked once tickets are published. */
     public function renumberHallTickets(string $tenantId, McqExam $exam, McqHallTicketService $service)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
@@ -392,7 +392,7 @@ class McqExamOpsController extends SahodayaAdminController
         @ini_set('memory_limit', '1024M');
         @ini_set('max_execution_time', '300');
 
-        $result = $service->renumberBySchool($exam);
+        $result = $service->renumberByClass($exam);
 
         if ($result['renumbered'] === 0) {
             return back()->with('warning', 'No issued reg. numbers to renumber yet.');
@@ -400,7 +400,7 @@ class McqExamOpsController extends SahodayaAdminController
 
         $note = $result['cleared'] > 0 ? " {$result['cleared']} cancelled registration(s) had their number cleared." : '';
 
-        return back()->with('success', "Renumbered {$result['renumbered']} registration(s) by school, starting at {$result['start']}.{$note}");
+        return back()->with('success', "Renumbered {$result['renumbered']} registration(s) across {$result['classes']} class(es), each starting at {$result['start']}.{$note}");
     }
 
     /**

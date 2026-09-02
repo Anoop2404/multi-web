@@ -38,7 +38,7 @@
                 <input ref="importFile" type="file" accept=".csv,.txt,.xlsx,.xls" class="text-sm" required>
                 <button type="submit" class="btn-secondary text-sm">Import attendance (CSV/Excel)</button>
             </form>
-            <p class="text-xs text-slate-500 w-full">Columns: hall_ticket_no, present|absent|malpractice|withheld, note (note required for malpractice/withheld)</p>
+            <p class="text-xs text-slate-500 w-full">Columns: hall_ticket_no, class, present|absent|malpractice|withheld, note (note required for malpractice/withheld). Class is required — reg. numbers repeat across classes.</p>
         </div>
         <div v-if="importErrors?.length" class="card mb-4 !border-amber-200 bg-amber-50 text-sm text-amber-900 space-y-1">
             <p class="font-semibold">Import issues ({{ importErrors.length }})</p>

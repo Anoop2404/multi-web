@@ -256,11 +256,27 @@ class ExamOpsController extends Controller
                 continue;
             }
 
-            $registration = McqRegistration::where('exam_id', $exam->id)
+            // hall_ticket_no alone is a class-scoped roll number (reused across classes exam-wide),
+            // so without registration_id/student_id it needs the row's class to disambiguate too.
+            $usingTicketOnly = ! empty($data['hall_ticket_no']) && empty($data['registration_id']) && empty($data['student_id']);
+
+            $matches = McqRegistration::where('exam_id', $exam->id)
                 ->when(! empty($data['registration_id']), fn ($q) => $q->where('id', $data['registration_id']))
                 ->when(! empty($data['hall_ticket_no']), fn ($q) => $q->where('hall_ticket_no', $data['hall_ticket_no']))
                 ->when(! empty($data['student_id']), fn ($q) => $q->where('student_id', $data['student_id']))
-                ->first();
+                ->when($usingTicketOnly, function ($q) use ($data) {
+                    $target = strtolower(trim(str_ireplace('class', '', (string) ($data['class'] ?? ''))));
+                    $q->where(function ($q2) use ($target) {
+                        if ($target === 'teacher') {
+                            $q2->whereNotNull('teacher_id')->whereNull('student_id');
+                        } else {
+                            $q2->whereHas('student.schoolClass', fn ($c) => $c->whereRaw('LOWER(name) = ?', [$target]));
+                        }
+                    });
+                })
+                ->get();
+
+            $registration = $matches->count() === 1 ? $matches->first() : null;
 
             if (! $registration || empty($data['attendance_status'])) {
                 continue;

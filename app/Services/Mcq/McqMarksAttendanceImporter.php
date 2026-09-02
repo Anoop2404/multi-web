@@ -11,11 +11,16 @@ use Illuminate\Http\UploadedFile;
 /**
  * Excel/CSV import for Talent Search attendance and marks.
  *
+ * Reg. numbers (hall_ticket_no) are roll numbers scoped to a class, shared exam-wide
+ * across every school — "Roll 1" exists once per class, so a ticket number alone does
+ * NOT identify a unique registration. Every row must also carry the candidate's class,
+ * and rows are matched on (hall_ticket_no, class) together (see findRegistration()).
+ *
  * Attendance columns (header aliases supported):
- *   hall_ticket_no | ticket, attendance_status | status, note (optional)
+ *   hall_ticket_no | ticket, class, attendance_status | status, note (optional)
  *
  * Marks columns:
- *   hall_ticket_no | ticket, correct, wrong, unanswered
+ *   hall_ticket_no | ticket, class, correct, wrong, unanswered
  *   optional: score, marks_per_correct, negative_per_wrong
  *
  * Scoring when score column absent (defaults match McqExamSessionService):
@@ -28,6 +33,7 @@ class McqMarksAttendanceImporter
     /** @var array<string, list<string>> */
     private const ATTENDANCE_ALIASES = [
         'ticket' => ['hall_ticket_no', 'hall ticket no', 'ticket', 'reg_no', 'reg no', 'registration_no'],
+        'class'  => ['class', 'class_name', 'class name', 'student_class'],
         'status' => ['attendance_status', 'attendance status', 'status', 'attendance'],
         'note'   => ['note', 'attendance_note', 'attendance note', 'reason', 'remarks'],
     ];
@@ -35,6 +41,7 @@ class McqMarksAttendanceImporter
     /** @var array<string, list<string>> */
     private const MARKS_ALIASES = [
         'ticket'     => ['hall_ticket_no', 'hall ticket no', 'ticket', 'reg_no', 'reg no'],
+        'class'      => ['class', 'class_name', 'class name', 'student_class'],
         'correct'    => ['correct', 'correct_count', 'correct count'],
         'wrong'      => ['wrong', 'wrong_count', 'wrong count', 'incorrect'],
         'unanswered' => ['unanswered', 'unanswered_count', 'unanswered count', 'skipped'],
@@ -59,15 +66,15 @@ class McqMarksAttendanceImporter
             $rowNumber++;
 
             if ($headerMap === null) {
-                $mapped = $this->mapHeader($cols, self::ATTENDANCE_ALIASES, ['ticket', 'status']);
-                $maybeStatus = strtolower(trim((string) ($cols[$mapped['status'] ?? 1] ?? '')));
+                $mapped = $this->mapHeader($cols, self::ATTENDANCE_ALIASES, ['ticket', 'class', 'status']);
+                $maybeStatus = strtolower(trim((string) ($cols[$mapped['status'] ?? 2] ?? '')));
                 if ($mapped !== null && ! in_array($maybeStatus, ['present', 'absent', 'malpractice', 'withheld', 'pending'], true)) {
                     $headerMap = $mapped;
                     $headerConsumed = true;
 
                     continue;
                 }
-                $headerMap = $mapped ?? ['ticket' => 0, 'status' => 1, 'note' => 2];
+                $headerMap = $mapped ?? ['ticket' => 0, 'class' => 1, 'status' => 2, 'note' => 3];
             }
 
             if ($this->rowIsEmpty($cols)) {
@@ -75,11 +82,18 @@ class McqMarksAttendanceImporter
             }
 
             $ticket = trim((string) ($cols[$headerMap['ticket']] ?? ''));
+            $class = trim((string) ($cols[$headerMap['class']] ?? ''));
             $status = strtolower(trim((string) ($cols[$headerMap['status']] ?? '')));
             $note = trim((string) ($cols[$headerMap['note'] ?? -1] ?? ''));
 
             if ($ticket === '') {
                 $errors[] = ['row' => $rowNumber, 'message' => 'Missing hall ticket / reg. no.'];
+
+                continue;
+            }
+
+            if ($class === '') {
+                $errors[] = ['row' => $rowNumber, 'message' => "Missing class for ticket {$ticket} — reg. numbers repeat across classes, so class is required to identify the candidate."];
 
                 continue;
             }
@@ -96,12 +110,10 @@ class McqMarksAttendanceImporter
                 continue;
             }
 
-            $registration = McqRegistration::where('exam_id', $exam->id)
-                ->where('hall_ticket_no', $ticket)
-                ->first();
+            [$registration, $matchError] = $this->findRegistration($exam, $ticket, $class);
 
             if (! $registration) {
-                $errors[] = ['row' => $rowNumber, 'message' => "No registration found for ticket {$ticket}."];
+                $errors[] = ['row' => $rowNumber, 'message' => $matchError];
 
                 continue;
             }
@@ -152,14 +164,14 @@ class McqMarksAttendanceImporter
             $rowNumber++;
 
             if ($headerMap === null) {
-                $mapped = $this->mapHeader($cols, self::MARKS_ALIASES, ['ticket', 'correct', 'wrong', 'unanswered']);
-                $maybeCorrect = $cols[$mapped['correct'] ?? 1] ?? null;
+                $mapped = $this->mapHeader($cols, self::MARKS_ALIASES, ['ticket', 'class', 'correct', 'wrong', 'unanswered']);
+                $maybeCorrect = $cols[$mapped['correct'] ?? 2] ?? null;
                 if ($mapped !== null && ! is_numeric(trim((string) $maybeCorrect))) {
                     $headerMap = $mapped;
 
                     continue;
                 }
-                $headerMap = $mapped ?? ['ticket' => 0, 'correct' => 1, 'wrong' => 2, 'unanswered' => 3];
+                $headerMap = $mapped ?? ['ticket' => 0, 'class' => 1, 'correct' => 2, 'wrong' => 3, 'unanswered' => 4];
             }
 
             if ($this->rowIsEmpty($cols)) {
@@ -173,12 +185,17 @@ class McqMarksAttendanceImporter
                 continue;
             }
 
-            $registration = McqRegistration::where('exam_id', $exam->id)
-                ->where('hall_ticket_no', $ticket)
-                ->first();
+            $class = trim((string) ($cols[$headerMap['class']] ?? ''));
+            if ($class === '') {
+                $errors[] = ['row' => $rowNumber, 'message' => "Missing class for ticket {$ticket} — reg. numbers repeat across classes, so class is required to identify the candidate."];
+
+                continue;
+            }
+
+            [$registration, $matchError] = $this->findRegistration($exam, $ticket, $class);
 
             if (! $registration) {
-                $errors[] = ['row' => $rowNumber, 'message' => "No registration found for ticket {$ticket}."];
+                $errors[] = ['row' => $rowNumber, 'message' => $matchError];
 
                 continue;
             }
@@ -235,6 +252,48 @@ class McqMarksAttendanceImporter
             'errors'   => $errors,
             'success'  => $imported > 0 || $errors === [],
         ];
+    }
+
+    /**
+     * hall_ticket_no is a roll number scoped to a class (shared exam-wide across every
+     * school), so it does not identify a unique registration on its own — every lookup
+     * must also match the row's class against the candidate's actual class (or "Teacher"
+     * for a teacher registration).
+     *
+     * @return array{0: ?McqRegistration, 1: ?string}
+     */
+    private function findRegistration(McqExam $exam, string $ticket, string $classInput): array
+    {
+        $candidates = McqRegistration::where('exam_id', $exam->id)
+            ->where('hall_ticket_no', $ticket)
+            ->with(['student.schoolClass', 'teacher'])
+            ->get();
+
+        if ($candidates->isEmpty()) {
+            return [null, "No registration found for ticket {$ticket}."];
+        }
+
+        $target = strtolower(trim(str_ireplace('class', '', $classInput)));
+
+        $matches = $candidates->filter(function (McqRegistration $reg) use ($target) {
+            if ($reg->isTeacherRegistration()) {
+                return $target === 'teacher';
+            }
+
+            $name = strtolower(trim(str_ireplace('class', '', (string) ($reg->student?->schoolClass?->name ?? ''))));
+
+            return $name === $target;
+        });
+
+        if ($matches->count() === 1) {
+            return [$matches->first(), null];
+        }
+
+        if ($matches->isEmpty()) {
+            return [null, "Ticket {$ticket}: no candidate in class “{$classInput}” — check the class spelling matches the school's class name exactly."];
+        }
+
+        return [null, "Ticket {$ticket}: matched more than one candidate in class “{$classInput}” — this needs manual review."];
     }
 
     /**

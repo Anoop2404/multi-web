@@ -14,7 +14,7 @@
                     <input type="file" accept=".csv,text/csv" @change="e => csvFile = e.target.files[0]" class="text-xs" required>
                 </div>
                 <button type="submit" class="btn-secondary text-xs">Import attendance</button>
-                <p class="text-xs text-slate-500 w-full">Columns: registration_id or reg_no (hall_ticket_no) or student_id, attendance_status (present/absent/malpractice/withheld)</p>
+                <p class="text-xs text-slate-500 w-full">Columns: registration_id or student_id (unambiguous), or reg_no (hall_ticket_no) + class (reg. numbers repeat across classes, so class is required when using reg_no alone), attendance_status (present/absent/malpractice/withheld)</p>
             </form>
             <p v-if="!isTrustedReviewer" class="text-xs text-slate-500 px-4 pt-3">
                 Changing attendance that has already been marked will be sent to the Sahodaya for approval.

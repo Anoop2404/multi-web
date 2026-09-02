@@ -8,7 +8,7 @@
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/certificates/preview`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Sample certificate ↗</a>
                 <button type="button" @click="generate" class="btn-primary text-sm">Issue missing (approved only)</button>
-                <button v-if="!hallTicketsPublished" type="button" @click="renumberBySchool" class="btn-secondary text-sm">Renumber by school</button>
+                <button v-if="!hallTicketsPublished" type="button" @click="renumberByClass" class="btn-secondary text-sm">Renumber by class</button>
                 <button type="button" @click="allocateSeats(false)" class="btn-secondary text-sm">Allocate seats</button>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/print-all`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Print all ↗</a>
@@ -334,9 +334,9 @@ function generate() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/generate`, {}, { preserveScroll: true });
 }
 
-async function renumberBySchool() {
+async function renumberByClass() {
     if (!(await confirm({
-        message: 'This changes every candidate\'s reg. number so they run in contiguous blocks per school (alphabetical, then class, then name), keeping the same starting number. Numbers already shared or printed elsewhere will no longer match. Continue?',
+        message: 'This changes every candidate\'s reg. number into a fresh roll number per class — each class (shared across every school) gets its own 1..N sequence starting from the same starting number, so different classes will show the same roll no. Numbers already shared or printed elsewhere will no longer match. Continue?',
         destructive: true,
     }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/renumber`, {}, { preserveScroll: true });

@@ -54,7 +54,7 @@
 
         <div v-if="!exam.results_published" class="card mb-6 space-y-3">
             <h3 class="section-title !mb-0">Bulk import marks</h3>
-            <p class="text-xs text-slate-500">CSV or Excel: hall_ticket_no, correct, wrong, unanswered. Optional: score, marks_per_correct, negative_per_wrong.</p>
+            <p class="text-xs text-slate-500">CSV or Excel: hall_ticket_no, class, correct, wrong, unanswered. Optional: score, marks_per_correct, negative_per_wrong. Class is required — reg. numbers repeat across classes.</p>
             <div class="flex flex-wrap gap-2 items-center">
                 <a :href="marksEntryTemplateUrl" class="btn-secondary text-sm">Download marks entry template ↓</a>
                 <span class="text-xs text-slate-500">Reg. no + present, unmarked candidates (respects the filters above) — fill in correct/wrong/unanswered and re-upload below.</span>
