@@ -125,4 +125,107 @@ class FestEventFeesCombinedBatchRowTest extends TestCase
             return true;
         });
     }
+
+    /**
+     * The rollup row's amount_paid/status is what the fees list and the "Payment Proofs &
+     * Approval" modal actually display — it's only kept in sync by
+     * FestRegistrationBatchFeeService::recalculateAll(), which historically ran only on
+     * registration changes or the manual "Recalculate" button. Confirms
+     * approve/reject/rejectReceipt/restoreReceipt now also trigger it, so the header total
+     * doesn't keep showing a payment as paid (or unpaid) after it was reversed (or restored).
+     */
+    public function test_rollup_amount_paid_stays_in_sync_after_reject_receipt_and_restore(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Rollup Sync Sahodaya',
+            'domain' => Str::uuid().'.test',
+            'is_active' => true,
+        ]);
+        SahodayaProfile::create([
+            'tenant_id' => $sahodaya->id,
+            'prefix' => 'RSS',
+            'student_data_mode' => 'counts_only',
+        ]);
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'parent_id' => $sahodaya->id,
+            'name' => 'Rollup Sync School',
+            'domain' => Str::uuid().'.test',
+            'membership_status' => 'approved',
+            'is_active' => true,
+        ]);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $root = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Rollup Sync Kalotsav',
+            'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya',
+            'conductor_level' => 'sahodaya',
+            'status' => 'registration_open',
+            'workflow_mode' => FestPhasedWorkflowService::MODE,
+            'fee_settings' => ['fee_model' => 'kalolsavam_composite'],
+        ]);
+        $level1 = FestRegistrationBatch::create([
+            'event_id' => $root->id, 'code' => 'LEVEL_1', 'name' => 'Level 1', 'sort_order' => 1,
+        ]);
+        FestEventPhase::create(['event_id' => $root->id, 'name' => 'Digi Fest', 'code' => 'DIGI', 'sort_order' => 1, 'registration_batch_id' => $level1->id]);
+
+        $level1Fee = FestSchoolEventFee::create([
+            'event_id' => $root->id, 'school_id' => $school->id, 'registration_batch_id' => $level1->id,
+            'participation_item_count' => 3, 'total_due' => 4400, 'amount_paid' => 4400, 'status' => 'approved',
+        ]);
+        $rollup = FestSchoolEventFee::create([
+            'event_id' => $root->id, 'school_id' => $school->id,
+            'total_due' => 4400, 'amount_paid' => 4400, 'status' => 'approved',
+        ]);
+
+        $receipt = FeeReceipt::create([
+            'feeable_type' => FestSchoolEventFee::class,
+            'feeable_id' => $level1Fee->id,
+            'file_path' => 'fest/receipts/level1.jpg',
+            'amount' => 4400,
+            'status' => 'approved',
+            'receipt_number' => 'RSS-0001',
+            'reviewed_by' => $admin->id,
+            'reviewed_at' => now(),
+        ]);
+        $level1Fee->update(['fee_receipt_id' => $receipt->id]);
+
+        app(\App\Services\Events\FestFeeLedgerService::class)->postApprovedReceipt($receipt->fresh());
+
+        $this->assertSame(4400.0, (float) $rollup->fresh()->amount_paid, 'Sanity check on the fixture before acting.');
+
+        // Reverse the approved receipt via the same endpoint the "Reverse this payment"
+        // button in the modal calls — targeting the receipt's own batch-level fee id.
+        $reverseResponse = $this->actingAs($admin)->post(route('sahodaya.events.school-fees.receipts.reject', [
+            'tenantId' => $sahodaya->id,
+            'event' => $root->id,
+            'schoolEventFee' => $level1Fee->id,
+            'feeReceipt' => $receipt->id,
+        ]), ['rejection_reason' => 'Wrong bank account']);
+        $reverseResponse->assertSessionHasNoErrors();
+
+        $this->assertSame(0.0, (float) $rollup->fresh()->amount_paid, 'Rollup must reflect the reversal, not keep showing the old paid total.');
+        $this->assertSame(0.0, (float) $level1Fee->fresh()->amount_paid);
+
+        // Restore the accidentally-reversed receipt back to approved.
+        $restoreResponse = $this->actingAs($admin)->post(route('sahodaya.events.school-fees.receipts.restore', [
+            'tenantId' => $sahodaya->id,
+            'event' => $root->id,
+            'schoolEventFee' => $level1Fee->id,
+            'feeReceipt' => $receipt->id,
+        ]), ['restore_reason' => 'Reversed by mistake']);
+        $restoreResponse->assertSessionHasNoErrors();
+
+        $this->assertSame(4400.0, (float) $rollup->fresh()->amount_paid, 'Rollup must reflect the restore, not keep showing zero.');
+        $this->assertSame(4400.0, (float) $level1Fee->fresh()->amount_paid);
+        $this->assertSame('approved', $receipt->fresh()->status);
+    }
 }

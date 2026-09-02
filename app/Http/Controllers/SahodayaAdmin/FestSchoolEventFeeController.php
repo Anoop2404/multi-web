@@ -104,6 +104,7 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         });
 
         app(FestFeeLedgerService::class)->postApprovedReceipt($receipt->fresh());
+        $this->syncBatchRollup($event, $schoolEventFee->school_id);
 
         $schoolEventFee->load(['school', 'feeReceipt', 'event']);
         $festHtml = app(ProgramFeeReceiptService::class)->renderFestSchoolEventFee($schoolEventFee);
@@ -182,6 +183,8 @@ class FestSchoolEventFeeController extends SahodayaAdminController
                     ->update(['status' => 'issued']);
             }
         });
+
+        $this->syncBatchRollup($event, $schoolEventFee->school_id);
 
         $audit->festEvent($event, FestPageActivity::FEES, 'fest.fee.rejected', 'School event fee rejected', [
             'school_id' => $schoolEventFee->school_id,
@@ -266,6 +269,8 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             }
         });
 
+        $this->syncBatchRollup($event, $schoolEventFee->school_id);
+
         $audit->festEvent(
             $event,
             FestPageActivity::FEES,
@@ -308,6 +313,8 @@ class FestSchoolEventFeeController extends SahodayaAdminController
 
         app(\App\Services\Ledger\FeeReceiptReversalService::class)
             ->restore($feeReceipt, $request->user(), $data['restore_reason'] ?? null);
+
+        $this->syncBatchRollup($event, $schoolEventFee->school_id);
 
         $audit->festEvent(
             $event,
@@ -434,6 +441,7 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         if ($receipt) {
             app(FestFeeLedgerService::class)->postApprovedReceipt($receipt->fresh());
         }
+        $this->syncBatchRollup($event, $schoolEventFee->school_id);
 
         $audit->festEvent($event, FestPageActivity::FEES, 'fest.fee.force_approved', 'School event fee manually approved in full', [
             'school_id' => $schoolEventFee->school_id,
@@ -442,5 +450,24 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         ]);
 
         return back()->with('success', 'School event fee approved in full (₹'.number_format($due, 2).') — registrations approved.');
+    }
+
+    /**
+     * Phased_regional_billing events keep a separate rollup FestSchoolEventFee row
+     * (registration_batch_id/phase_id/head_id all null) whose amount_paid/status the
+     * fees list and "Payment Proofs & Approval" modal actually display — it's synced by
+     * FestRegistrationBatchFeeService::recalculateAll(), which normally only runs on
+     * registration changes or the manual "Recalculate" button. None of
+     * approve/reject/rejectReceipt/restoreReceipt/forceApprove ever triggered it, so a
+     * school's header total kept showing stale numbers after a payment action until
+     * someone happened to change a registration or click Recalculate. Call this after
+     * any action that changes a receipt's status for a batch-billed school.
+     */
+    private function syncBatchRollup(FestEvent $event, string $schoolId): void
+    {
+        if ($event->usesPhasedRegionalBilling()) {
+            app(\App\Services\Events\FestRegistrationBatchFeeService::class)
+                ->recalculateAll($event->rootEvent(), $schoolId);
+        }
     }
 }
