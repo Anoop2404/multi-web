@@ -655,8 +655,12 @@ function submitReceiptRejection(receipt) {
     if (!activeProofModalRow.value || receiptActionBusy.value) return;
 
     receiptActionBusy.value = true;
+    // A combined (multi-level) row's receipts are merged from several underlying
+    // FestSchoolEventFee records — must target the receipt's own record, not the
+    // combined row's id, or this 403s for any receipt outside the rollup record.
+    const schoolEventFeeId = receipt.school_event_fee_id ?? activeProofModalRow.value.id;
     router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${activeProofModalRow.value.id}/receipts/${receipt.id}/reject`,
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${schoolEventFeeId}/receipts/${receipt.id}/reject`,
         { rejection_reason: receiptActionReason.value },
         {
             preserveScroll: true,

@@ -111,6 +111,12 @@ class FestEventFeesController extends SahodayaAdminController
                 $allReceipts = $fee->receipts->sortByDesc('id')->values()->map(function ($r) use ($event, $fee) {
                     return [
                         'id'                => $r->id,
+                        // The receipt's OWN fee record — not necessarily the combined/rollup
+                        // row this array ends up nested under once multi-level batch rows are
+                        // merged below. Reject/reverse actions must target this, or a receipt
+                        // that belongs to a non-rollup batch 403s (feeReceipt->feeable_id
+                        // wouldn't match the rollup row's id).
+                        'school_event_fee_id' => $fee->id,
                         'status'            => $r->status,
                         'amount'            => (float) $r->amount,
                         'receipt_number'    => $r->receipt_number,
