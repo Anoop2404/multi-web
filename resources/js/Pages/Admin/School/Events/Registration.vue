@@ -1890,6 +1890,7 @@ function isItemFull(event, item) {
 
 function itemRegWindowMessage(item) {
     if (item.registration_open !== false) return '';
+    if (item.phase_block_reason) return item.phase_block_reason;
     if (item.reg_start && item.reg_end) {
         return `Registration for this item is closed (window was ${item.reg_start} – ${item.reg_end}).`;
     }

@@ -49,33 +49,56 @@ class EventLifecycleGate
 
         self::assertItemRosterNotFrozen($item);
 
-        if (! $event->phase_mode_enabled || ! $item) {
-            self::allowRegistration($event);
+        if ($reason = self::registrationBlockedReasonForItem($event, $item)) {
+            throw new HttpException(422, $reason);
+        }
+    }
 
-            return;
+    /**
+     * Non-throwing counterpart to allowRegistrationForItem() above — same rules, returns
+     * the block reason (or null when registration is actually allowed) instead of
+     * throwing. Exists so FestItemRegistrationGate::isOpen() (which drives the school
+     * registration page's "Open"/"Closed" badge and Register-button disabled state) can
+     * reflect this exact phase-lifecycle gate instead of only the item-level reg window —
+     * previously the badge/button only checked FestItemWindowResolver, so a
+     * phase_mode_enabled item could show "Open" and let the button submit, only to fail
+     * with this method's own "closed for this item's competition phase" message after the
+     * fact. See allowRegistrationForItem()'s call site in
+     * FestRegistrationCreateService::createForSchool() for the other (throwing) caller.
+     */
+    public static function registrationBlockedReasonForItem(FestEvent $event, ?FestEventItem $item = null): ?string
+    {
+        if (! $event->phase_mode_enabled || ! $item) {
+            if ($event->registration_locked) {
+                return 'Registration is locked for this event.';
+            }
+
+            return $event->isRegistrationOpen() ? null : 'Registration is not open for this event.';
         }
 
         $lifecycle = app(FestPhaseLifecycleService::class)->effectiveLifecycleForItem($item);
 
         if (! ($lifecycle->registration_batch_open ?? true)) {
-            throw new HttpException(422, 'Registration is not open for this item\'s payment level.');
+            return 'Registration is not open for this item\'s payment level.';
         }
 
         if ($lifecycle->registration_locked) {
-            throw new HttpException(422, 'Registration is locked for this item\'s competition phase.');
+            return 'Registration is locked for this item\'s competition phase.';
         }
 
         if (! in_array($lifecycle->status, ['registration_open', 'published'], true)) {
-            throw new HttpException(422, 'Registration is not open for this item\'s competition phase.');
+            return 'Registration is not open for this item\'s competition phase.';
         }
 
         $now = now();
         if ($lifecycle->registration_open && $now->lt($lifecycle->registration_open)) {
-            throw new HttpException(422, 'Registration has not opened yet for this item\'s competition phase.');
+            return 'Registration has not opened yet for this item\'s competition phase.';
         }
         if ($lifecycle->registration_close && $now->gt($lifecycle->registration_close)) {
-            throw new HttpException(422, 'Registration has closed for this item\'s competition phase.');
+            return 'Registration has closed for this item\'s competition phase.';
         }
+
+        return null;
     }
 
     /**

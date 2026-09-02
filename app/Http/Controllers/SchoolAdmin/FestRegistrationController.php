@@ -623,6 +623,14 @@ class FestRegistrationController extends SchoolAdminController
             'eligibility_label' => FestSportsAgeGroup::itemEligibilityLabel($item, $event),
             'item_fee'          => $feeRequired ? $itemFeeResolver->amountForItem($item, $schedule, $event) : null,
             'registration_open' => $regGate->isOpen($item),
+            // Distinct from reg_start/reg_end below (FestItemWindowResolver's item-level
+            // window) — once phase mode is on, the item's phase lifecycle is what actually
+            // gates registration (see FestItemRegistrationGate::isOpen()'s own comment), so
+            // the item-level dates wouldn't explain why registration_open came back false.
+            // Lets the frontend show the real reason instead of a stale/irrelevant date range.
+            'phase_block_reason' => $event->phase_mode_enabled
+                ? \App\Services\Events\EventLifecycleGate::registrationBlockedReasonForItem($event, $item)
+                : null,
             'reg_start'         => $windowResolver->effectiveRegStart($item)?->format('Y-m-d'),
             'reg_end'           => $windowResolver->effectiveRegEnd($item)?->format('Y-m-d'),
             'competition_start' => $windowResolver->effectiveCompetitionStart($item)?->format('Y-m-d'),

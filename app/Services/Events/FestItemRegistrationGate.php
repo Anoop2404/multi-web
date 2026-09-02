@@ -18,6 +18,17 @@ class FestItemRegistrationGate
             return false;
         }
 
+        // Once phase mode is on, the item's phase lifecycle is the authoritative gate on
+        // the actual write path (FestRegistrationCreateService::createForSchool() calls
+        // EventLifecycleGate::allowRegistrationForItem() right after this class's own
+        // assertOpen()) — it replaces the event-level/item-window check below entirely,
+        // same as that method's own branching. Without this, an item could show "Open"
+        // and let the Register button submit here, then fail with EventLifecycleGate's
+        // own "closed for this item's competition phase" message only after the fact.
+        if ($event->phase_mode_enabled) {
+            return EventLifecycleGate::registrationBlockedReasonForItem($event, $item) === null;
+        }
+
         if (! $event->isRegistrationOpen()) {
             return false;
         }
