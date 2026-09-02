@@ -268,33 +268,49 @@ class BoardResultVerificationController extends SahodayaAdminController
             return \App\Support\ExcelExport::downloadMultiSheet($filename, $sheets);
         }
 
-        // Full A1 Achievers — one row per (student, subject) pair instead of a single
-        // "Subjects & Marks" cell cramming every subject together, since a student can
-        // hold several A1s and a reviewer needs each one as its own sortable/filterable row.
+        // Full A1 Achievers — one sheet per stream (subjects differ by stream, so pooling
+        // every stream's subjects into one sheet would leave a sparse, hard-to-read
+        // column set); within each sheet, one row per student with every subject its
+        // own column (pivoted, not one row per subject) so a reviewer can see a
+        // student's full spread of A1s across one row at a glance.
         if ($entryType === Topper::ENTRY_FULL_A1) {
-            $a1Headers = ['School', 'Student', 'Admission No', 'Roll No', 'Stream', 'Subject', 'Marks', 'Percentage', 'Verification Status', 'Rejection Reason'];
+            $sheets = [];
+            foreach ($toppers->groupBy(fn (Topper $t) => $t->examStream?->name ?? $t->stream ?: 'No Stream')->sortKeys() as $streamName => $streamToppers) {
+                $subjectNames = $streamToppers
+                    ->flatMap(fn (Topper $t) => array_keys($t->subject_marks))
+                    ->unique()
+                    ->sort()
+                    ->values();
 
-            $rows = $toppers->flatMap(function (Topper $topper) use ($schoolNames) {
-                $subjects = $topper->subject_marks;
-                if ($subjects === []) {
-                    $subjects = ['—' => null];
-                }
+                $a1Headers = array_merge(
+                    ['School', 'Student', 'Admission No', 'Roll No'],
+                    $subjectNames->all(),
+                    ['Percentage', 'Verification Status', 'Rejection Reason'],
+                );
 
-                return collect($subjects)->map(fn ($marks, $subject) => [
-                    $schoolNames[$topper->tenant_id] ?? $topper->tenant_id,
-                    $topper->name,
-                    $topper->admission_no,
-                    $topper->roll_no,
-                    $topper->examStream?->name ?? $topper->stream,
-                    $subject,
-                    $marks,
-                    $topper->percentage,
-                    $topper->verification_status,
-                    $topper->rejection_reason,
-                ]);
-            });
+                $rows = $streamToppers->sortByDesc('percentage')->map(function (Topper $topper) use ($schoolNames, $subjectNames) {
+                    $marks = $topper->subject_marks;
 
-            return \App\Support\ExcelExport::download($filename, $a1Headers, $rows);
+                    $row = [
+                        $schoolNames[$topper->tenant_id] ?? $topper->tenant_id,
+                        $topper->name,
+                        $topper->admission_no,
+                        $topper->roll_no,
+                    ];
+                    foreach ($subjectNames as $subject) {
+                        $row[] = $marks[$subject] ?? null;
+                    }
+                    $row[] = $topper->percentage;
+                    $row[] = $topper->verification_status;
+                    $row[] = $topper->rejection_reason;
+
+                    return $row;
+                })->values();
+
+                $sheets[$streamName] = ['headers' => $a1Headers, 'rows' => $rows];
+            }
+
+            return \App\Support\ExcelExport::downloadMultiSheet($filename, $sheets);
         }
 
         return \App\Support\ExcelExport::download($filename, $headers, $toppers->map($rowFor));
