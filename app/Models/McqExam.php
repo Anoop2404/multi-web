@@ -163,6 +163,25 @@ class McqExam extends Model
         return (bool) ($this->settings_json['requires_hall_ticket'] ?? false);
     }
 
+    /** @return array<string, int> class name (or "Teacher") => total questions/max marks override */
+    public function classMaxMarks(): array
+    {
+        return $this->settings_json['class_max_marks'] ?? [];
+    }
+
+    /** Total questions/max marks for a class bucket, falling back to the exam-wide default. */
+    public function totalQuestionsForClass(?string $classBucket): int
+    {
+        if ($classBucket !== null) {
+            $override = $this->classMaxMarks()[$classBucket] ?? null;
+            if ($override !== null && (int) $override > 0) {
+                return (int) $override;
+            }
+        }
+
+        return (int) ($this->total_questions ?: 0);
+    }
+
     public function questionBanks(): BelongsToMany
     {
         return $this->belongsToMany(McqQuestionBank::class, 'mcq_exam_question_banks', 'exam_id', 'bank_id');

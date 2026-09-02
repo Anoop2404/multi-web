@@ -233,6 +233,8 @@ class McqExamController extends SahodayaAdminController
             'duration_minutes' => 'nullable|integer|min:5|max:480',
             'total_questions'  => 'nullable|integer|min:1',
             'pass_mark'        => 'nullable|integer|min:0',
+            'class_max_marks'  => 'nullable|array',
+            'class_max_marks.*'=> 'nullable|integer|min:1',
             'fee_amount'       => 'nullable|numeric|min:0',
             'school_discount_amount' => 'nullable|numeric|min:0',
             'payment_deadline' => 'nullable|date',
@@ -320,6 +322,16 @@ class McqExamController extends SahodayaAdminController
             $settings['hall_ticket'] = array_merge($settings['hall_ticket'] ?? [], $data['hall_ticket_settings']);
             $data['settings_json'] = $settings;
             unset($data['hall_ticket_settings']);
+        }
+
+        if (array_key_exists('class_max_marks', $data)) {
+            $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
+            $settings['class_max_marks'] = array_filter(
+                $data['class_max_marks'] ?? [],
+                fn ($v) => $v !== null && $v !== ''
+            );
+            $data['settings_json'] = $settings;
+            unset($data['class_max_marks']);
         }
 
         if (array_key_exists('requires_hall_ticket', $data)) {
