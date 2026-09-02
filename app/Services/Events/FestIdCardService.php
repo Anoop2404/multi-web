@@ -622,9 +622,9 @@ class FestIdCardService
             })->values()->all();
 
             $rawDate = $event->event_start ?? $event->starts_at ?? $event->start_date;
-            $eventDate = $rawDate ? date('d M Y', strtotime((string) $rawDate)) : null;
+            $eventDate = $rawDate ? date('jS M Y', strtotime((string) $rawDate)) : null;
             if (! $eventDate && $event->event_end) {
-                $eventDate = date('d M Y', strtotime((string) $event->event_end));
+                $eventDate = date('jS M Y', strtotime((string) $event->event_end));
             }
             $venue = $this->resolveVenue($event, null, $registration);
             $qrPayload = $this->qrPayload($event, 'registration', (string) $registration->id, $festId);
@@ -721,9 +721,9 @@ class FestIdCardService
         $photoSrc = $this->resolveParticipantPhotoSrc($p, $gender, $includeDataUris);
 
         $rawDate = $event->event_start ?? $event->starts_at ?? $event->start_date;
-        $eventDate = $rawDate ? date('d M Y', strtotime((string) $rawDate)) : null;
+        $eventDate = $rawDate ? date('jS M Y', strtotime((string) $rawDate)) : null;
         if (! $eventDate && $event->event_end) {
-            $eventDate = date('d M Y', strtotime((string) $event->event_end));
+            $eventDate = date('jS M Y', strtotime((string) $event->event_end));
         }
         $venue = $this->resolveVenue($event, $p);
         $sahodayaName = $event->tenant?->name
