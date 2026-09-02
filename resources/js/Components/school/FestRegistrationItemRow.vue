@@ -37,6 +37,7 @@
                         {{ squadCompletionLabel(reg) }}
                     </span>
                     <span class="text-emerald-600/70 shrink-0">{{ reg.status }}</span>
+                    <span v-if="registeredStandbyNames(reg)" class="text-emerald-700/70 shrink-0 truncate">· Standby: {{ registeredStandbyNames(reg) }}</span>
                     <button v-if="canEdit(reg)" type="button"
                             class="shrink-0 text-indigo-600 font-semibold hover:underline"
                             :title="reg.status === 'rejected' ? reg.rejection_reason : null"
@@ -139,6 +140,7 @@
                             @click="$emit('withdraw', reg.id)">
                         Cancel
                     </button>
+                    <div v-if="registeredStandbyNames(reg)" class="text-[10px] text-indigo-500">Standby: {{ registeredStandbyNames(reg) }}</div>
                     <div class="text-[10px] text-gray-400">{{ registrationTimestampLabel(reg) }}</div>
                 </div>
             </div>
@@ -390,7 +392,18 @@ const pickerSubtitle = computed(() => {
 const eligibleCount = computed(() => props.eligibleStudents?.length ?? 0);
 const rosterCount = computed(() => props.allStudents?.length ?? 0);
 const selectedCount = computed(() => pickerModel.value?.length ?? 0);
-const standbySelectedCount = computed(() => standbyModel.value?.length ?? 0);
+
+// While actively editing, standbyModel (bound to props.form.standby_ids) is the
+// live pending selection. Outside of an edit session that form is always blank
+// -- it's reset on load and after every successful save -- so counting from it
+// there would show 0 regardless of how many standbys are actually saved on the
+// registration. Read the real saved count from props.registrations instead.
+const savedStandbyCount = computed(() => {
+    const reg = props.registrations?.[0];
+    if (!reg) return 0;
+    return (reg.participants ?? []).filter(p => p.participant_role === 'standby').length;
+});
+const standbySelectedCount = computed(() => isEditing.value ? (standbyModel.value?.length ?? 0) : savedStandbyCount.value);
 
 const standbyEntries = computed(() => {
     const performerIds = props.form.student_ids ?? [];
@@ -622,6 +635,24 @@ function registrationTimestampLabel(reg) {
     }
 
     return submitted;
+}
+
+// registeredNames (a parent-supplied prop) deliberately excludes standbys, and
+// no other part of this row surfaces their names as text -- the only way to see
+// who's on standby was to reopen the picker. Show them here the same way.
+function registeredStandbyNames(reg) {
+    const labels = (reg.participants ?? [])
+        .filter(p => p.participant_role === 'standby')
+        .map((p) => {
+            const name = p.student ? studentDisplayName(p.student) : null;
+            const regNo = p.student?.admission_number;
+            const festId = p.level_registration_number;
+            if (name && festId) return `${name} (${festId})`;
+            if (name && regNo) return `${name} (${regNo})`;
+            return name ?? regNo;
+        })
+        .filter(Boolean);
+    return labels.join(', ');
 }
 
 function squadPerformersCount(reg) {
