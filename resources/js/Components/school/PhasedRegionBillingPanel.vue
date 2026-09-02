@@ -243,14 +243,8 @@
             </div>
         </div>
 
-        <!-- Upload Payment Form Modal / Inline Box -->
-        <div v-if="paymentBatch" class="card border-amber-300 bg-amber-50/50 p-5 rounded-2xl shadow-md space-y-4">
-            <div class="flex items-center justify-between gap-3 border-b border-amber-200/60 pb-3">
-                <h4 class="font-bold text-amber-950 text-sm flex items-center gap-2">
-                    <span>💳 Upload Payment Proof for {{ paymentBatch.batch_name }}</span>
-                </h4>
-                <button type="button" class="text-slate-400 hover:text-slate-700 text-lg font-bold" @click="paymentBatch = null">×</button>
-            </div>
+        <!-- Upload Payment Proof Modal -->
+        <Modal :show="!!paymentBatch" :title="`💳 Upload Payment Proof for ${paymentBatch?.batch_name ?? ''}`" size="lg" @close="paymentBatch = null">
             <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="submitPayment">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Transaction Reference Number *</label>
@@ -275,13 +269,14 @@
                     </button>
                 </div>
             </form>
-        </div>
+        </Modal>
     </section>
 </template>
 
 <script setup>
 import { computed, reactive, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
+import Modal from '@/Components/ui/Modal.vue';
 
 const props = defineProps({
     event: { type: Object, required: true },
