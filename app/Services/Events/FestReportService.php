@@ -667,7 +667,11 @@ class FestReportService
             ->get()
             ->keyBy('participant_id');
 
-        return collect($participants)->map(function (FestParticipant $p) use ($visibility, $audience, $schedules) {
+        // Resolved once, not per-row — FestClassGroupScheme::labels() walks up to the
+        // root event, which would otherwise re-run for every single participant.
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event->rootEvent());
+
+        return collect($participants)->map(function (FestParticipant $p) use ($visibility, $audience, $schedules, $classGroupLabels) {
             $schedule = $schedules->get($p->id);
 
             $item = $p->registration?->item;
@@ -682,6 +686,15 @@ class FestReportService
                     '_uses_class' => $ageGroup === '' && $classGroup !== '' && $classGroup !== 'open',
                     'dob'         => $p->student?->dob?->format('d M Y'),
                     'class'       => $p->student?->schoolClass?->name,
+                    // Item's own Category/Type/Gender — read by the attendance sheet's
+                    // single-item header meta line (item_category/item_type/item_gender
+                    // keys were previously read but never actually set anywhere, so that
+                    // header line was always blank).
+                    'item_category' => ($classGroup !== '' && $classGroup !== 'open')
+                        ? \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $classGroup)
+                        : null,
+                    'item_type'   => $item ? (\App\Support\FestTeamSquadRules::isMultiPerson($item->participant_type) ? 'Group' : 'Individual') : null,
+                    'item_gender' => $item ? (\App\Support\FestSportsAgeGroup::genderLabel($item->gender) ?? 'Open') : null,
                 ],
             );
         })->all();

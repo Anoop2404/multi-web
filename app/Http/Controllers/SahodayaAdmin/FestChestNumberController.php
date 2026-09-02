@@ -220,12 +220,21 @@ class FestChestNumberController extends SahodayaAdminController
 
         $rows = $this->chestNumberRows($event, $itemId);
 
+        $itemCategory = null;
+        if ($item && $item->class_group && $item->class_group !== 'open') {
+            $itemCategory = \App\Support\FestClassGroupScheme::resolveItemLabel(
+                \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()),
+                $item->class_group,
+            );
+        }
+
         $html = view('fest.chest-numbers-print', [
-            'event'   => $event,
-            'item'    => $item,
-            'rows'    => $rows,
-            'orgName' => $this->sahodaya->name,
-            'logoSrc' => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'event'        => $event,
+            'item'         => $item,
+            'itemCategory' => $itemCategory,
+            'rows'         => $rows,
+            'orgName'      => $this->sahodaya->name,
+            'logoSrc'      => TenantBranding::logoEmbedSrc($this->sahodaya),
         ])->render();
 
         $slug = str($event->title)->slug()->limit(40).($item ? '-'.str($item->title)->slug()->limit(30) : '');

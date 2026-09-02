@@ -26,47 +26,17 @@
     @foreach($sheets as $sheet)
         <div class="sheet">
             <div class="header" style="margin-bottom: 12px;">
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
-                    <tr>
-                        @if(!empty($logoSrc))
-                            <td style="width: 55px; vertical-align: middle; padding-right: 12px;">
-                                <img src="{{ $logoSrc }}" alt="Logo" style="width: 48px; height: 48px; object-fit: contain;">
-                            </td>
-                        @endif
-                        <td style="vertical-align: middle;">
-                            <div style="font-size: 17px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.1;">
-                                {{ $sahodaya->name ?? 'SAHODAYA SCHOOLS COMPLEX' }}
-                            </div>
-                            <div style="font-size: 11px; font-weight: 600; color: #475569; margin-top: 3px;">
-                                CBSE Sahodaya Inter-School Competitions & Events
-                            </div>
-                        </td>
-                        <td style="text-align: right; vertical-align: middle;">
-                            <div style="display: inline-block; background: #0f172a; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">
-                                OFFICIAL EVALUATION SHEET
-                            </div>
-                        </td>
-                    </tr>
-                </table>
+                @include('partials.pdf-branding-header', [
+                    'orgName' => $sahodaya->name ?? 'Sahodaya',
+                    'logoSrc' => $logoSrc ?? null,
+                    'docTitle' => !empty($sheet['sheet_label']) ? $sheet['sheet_label'] : 'MARK ENTRY SHEET',
+                ])
+                <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">{{ $event->title }}</div>
 
-                <div style="border-bottom: 2px solid #0f172a; margin-bottom: 8px;"></div>
+                @include('partials.pdf-item-info-bar', ['item' => $sheet['item'], 'category' => $sheet['category_label'] ?? null])
 
-                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 6px 10px;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 10px; color: #1e293b;">
-                        <tr>
-                            <td style="padding: 2px 0;"><strong>EVENT:</strong> {{ strtoupper($event->title) }}</td>
-                            <td style="padding: 2px 0; text-align: right;"><strong>SHEET:</strong> {{ !empty($sheet['sheet_label']) ? $sheet['sheet_label'] : 'MARK ENTRY SHEET' }}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 2px 0;">
-                                <strong>ITEM:</strong> {{ $sheet['item']->item_code ? "[{$sheet['item']->item_code}] " : '' }}{{ $sheet['item']->title }}
-                                @if(!empty($sheet['category_label']))
-                                    <strong>&middot; CATEGORY:</strong> {{ $sheet['category_label'] }}
-                                @endif
-                            </td>
-                            <td style="padding: 2px 0; text-align: right;"><strong>TOTAL PARTICIPANTS:</strong> {{ count($sheet['rows']) }}</td>
-                        </tr>
-                    </table>
+                <div style="font-size: 10px; color: #475569; text-align: right; margin-top: -6px;">
+                    <strong>Total Participants:</strong> {{ count($sheet['rows']) }}
                 </div>
             </div>
 

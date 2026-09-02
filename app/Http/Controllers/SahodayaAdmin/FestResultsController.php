@@ -116,12 +116,21 @@ class FestResultsController extends SahodayaAdminController
         $rows = app(FestItemResultsService::class)->resultRowsForItem($event, $item->id);
         usort($rows, fn ($a, $b) => ($a['position'] ?? PHP_INT_MAX) <=> ($b['position'] ?? PHP_INT_MAX));
 
+        $itemCategory = null;
+        if ($item->class_group && $item->class_group !== 'open') {
+            $itemCategory = \App\Support\FestClassGroupScheme::resolveItemLabel(
+                \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()),
+                $item->class_group,
+            );
+        }
+
         $html = view('fest.reports.item-results-ranked', [
-            'event'   => $event,
-            'item'    => $item,
-            'rows'    => $rows,
-            'orgName' => $this->sahodaya->name,
-            'logoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'event'        => $event,
+            'item'         => $item,
+            'itemCategory' => $itemCategory,
+            'rows'         => $rows,
+            'orgName'      => $this->sahodaya->name,
+            'logoSrc'      => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
         ])->render();
 
         $filename = str($event->title.'-'.$item->title)->slug()->limit(60)->toString().'-results.pdf';
