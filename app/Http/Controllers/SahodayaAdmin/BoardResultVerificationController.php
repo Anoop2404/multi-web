@@ -201,7 +201,9 @@ class BoardResultVerificationController extends SahodayaAdminController
         $schoolNames = Tenant::whereIn('id', $toppers->pluck('tenant_id')->unique())
             ->pluck('name', 'id');
 
-        $rows = $toppers->map(function (Topper $topper) use ($schoolNames) {
+        $headers = ['School', 'Student', 'Admission No', 'Roll No', 'Stream', 'Subjects & Marks', 'Percentage', 'Verification Status', 'Rejection Reason'];
+
+        $rowFor = function (Topper $topper) use ($schoolNames) {
             $subjects = collect($topper->subject_marks)
                 ->map(fn ($marks, $subject) => "{$subject}: {$marks}")
                 ->implode(', ');
@@ -217,13 +219,85 @@ class BoardResultVerificationController extends SahodayaAdminController
                 $topper->verification_status,
                 $topper->rejection_reason,
             ];
-        });
+        };
 
-        return \App\Support\ExcelExport::download(
-            "{$slug}-class-{$class}-{$status}",
-            ['School', 'Student', 'Admission No', 'Roll No', 'Stream', 'Subjects & Marks', 'Percentage', 'Verification Status', 'Rejection Reason'],
-            $rows,
-        );
+        $filename = "{$slug}-class-{$class}-{$status}";
+
+        // Stream Toppers (Class XII) — one sheet per stream (Commerce, Science, ...),
+        // ranked by percentage within each so the sheet reads top-to-bottom like a
+        // leaderboard. Class X has no streams, so this collapses to a single
+        // "No Stream" sheet there — same shape, just not worth a separate branch.
+        if ($entryType === Topper::ENTRY_OVERALL) {
+            $sheets = [];
+            foreach ($toppers->groupBy(fn (Topper $t) => $t->examStream?->name ?? $t->stream ?: 'No Stream')->sortKeys() as $streamName => $streamToppers) {
+                $sheets[$streamName] = [
+                    'headers' => $headers,
+                    'rows' => $streamToppers->sortByDesc('percentage')->map($rowFor)->values(),
+                ];
+            }
+
+            return \App\Support\ExcelExport::downloadMultiSheet($filename, $sheets);
+        }
+
+        // Subject Toppers — one sheet per subject, ranked by that subject's marks
+        // (top mark first) within each sheet. A subject-entry Topper's subject_marks
+        // map always holds exactly one {subject: marks} pair (see Topper::saving()'s
+        // entry_type !== ENTRY_SUBJECT guard on percentage — subject entries don't get
+        // an overall percentage at all, so marks is the only meaningful rank order).
+        if ($entryType === Topper::ENTRY_SUBJECT) {
+            $sheets = [];
+            $bySubject = $toppers->groupBy(function (Topper $t) {
+                $subjects = $t->subject_marks;
+
+                return $subjects === [] ? 'Subject' : array_key_first($subjects);
+            });
+
+            foreach ($bySubject->sortKeys() as $subjectName => $subjectToppers) {
+                $sorted = $subjectToppers->sortByDesc(function (Topper $t) {
+                    $marks = $t->subject_marks;
+
+                    return $marks === [] ? 0 : reset($marks);
+                })->values();
+
+                $sheets[$subjectName] = [
+                    'headers' => $headers,
+                    'rows' => $sorted->map($rowFor)->values(),
+                ];
+            }
+
+            return \App\Support\ExcelExport::downloadMultiSheet($filename, $sheets);
+        }
+
+        // Full A1 Achievers — one row per (student, subject) pair instead of a single
+        // "Subjects & Marks" cell cramming every subject together, since a student can
+        // hold several A1s and a reviewer needs each one as its own sortable/filterable row.
+        if ($entryType === Topper::ENTRY_FULL_A1) {
+            $a1Headers = ['School', 'Student', 'Admission No', 'Roll No', 'Stream', 'Subject', 'Marks', 'Percentage', 'Verification Status', 'Rejection Reason'];
+
+            $rows = $toppers->flatMap(function (Topper $topper) use ($schoolNames) {
+                $subjects = $topper->subject_marks;
+                if ($subjects === []) {
+                    $subjects = ['—' => null];
+                }
+
+                return collect($subjects)->map(fn ($marks, $subject) => [
+                    $schoolNames[$topper->tenant_id] ?? $topper->tenant_id,
+                    $topper->name,
+                    $topper->admission_no,
+                    $topper->roll_no,
+                    $topper->examStream?->name ?? $topper->stream,
+                    $subject,
+                    $marks,
+                    $topper->percentage,
+                    $topper->verification_status,
+                    $topper->rejection_reason,
+                ]);
+            });
+
+            return \App\Support\ExcelExport::download($filename, $a1Headers, $rows);
+        }
+
+        return \App\Support\ExcelExport::download($filename, $headers, $toppers->map($rowFor));
     }
 
     public function verify(Request $request, string $tenantId, BoardResult $boardResult)
