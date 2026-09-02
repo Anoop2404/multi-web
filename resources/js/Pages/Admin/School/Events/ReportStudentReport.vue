@@ -11,19 +11,15 @@
         </PageHeader>
 
         <div v-if="filterOptions.phases.length || filterOptions.batches.length" class="mb-6 flex flex-wrap gap-3">
-            <div v-if="filterOptions.phases.length">
+            <div v-if="filterOptions.phases.length" class="w-56">
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Phase</label>
-                <select class="field text-xs" :value="filterPhaseId ?? ''" @change="onPhaseSelect($event.target.value)">
-                    <option value="">All phases</option>
-                    <option v-for="phase in filterOptions.phases" :key="phase.id" :value="phase.id">{{ phase.name }}</option>
-                </select>
+                <SearchableSelect :model-value="filterPhaseId ?? ''" :options="filterOptions.phases.map((p) => ({ value: p.id, label: p.name }))"
+                                   all-label="All phases" @update:model-value="onPhaseSelect" />
             </div>
-            <div v-if="filterOptions.batches.length">
+            <div v-if="filterOptions.batches.length" class="w-56">
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Level</label>
-                <select class="field text-xs" :value="filterBatchId ?? ''" @change="onBatchSelect($event.target.value)">
-                    <option value="">All levels</option>
-                    <option v-for="batch in filterOptions.batches" :key="batch.id" :value="batch.id">{{ batch.name }}</option>
-                </select>
+                <SearchableSelect :model-value="filterBatchId ?? ''" :options="filterOptions.batches.map((b) => ({ value: b.id, label: b.name }))"
+                                   all-label="All levels" @update:model-value="onBatchSelect" />
             </div>
         </div>
 
@@ -81,6 +77,7 @@
 import { computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 
 const props = defineProps({
