@@ -294,14 +294,23 @@
                 </div>
 
                 <div class="p-5">
-                <!-- Unique student count + total item registration count summary -->
-                <div class="flex flex-wrap gap-3 mb-4 text-xs">
-                    <span class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 text-slate-800 px-3 py-1.5 border border-slate-200 font-semibold">
-                        👤 {{ eventRegistrationStats(event.id).uniqueStudents }} unique student{{ eventRegistrationStats(event.id).uniqueStudents === 1 ? '' : 's' }}
-                    </span>
-                    <span class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 text-slate-800 px-3 py-1.5 border border-slate-200 font-semibold">
-                        📝 {{ eventRegistrationStats(event.id).totalItemRegs }} total item registration{{ eventRegistrationStats(event.id).totalItemRegs === 1 ? '' : 's' }}
-                    </span>
+                <!-- Unique student count + total item registration count summary — scoped to
+                     THIS phase/region leaf event only. A "Level" (registration batch) can span
+                     several phase+region leaves (e.g. On-stage + Off-stage, or multiple
+                     regions), so these counts can be smaller than that Level's own total on
+                     Step 3 · Billing & Payment, which aggregates every leaf sharing the batch. -->
+                <div class="mb-4">
+                    <div class="flex flex-wrap gap-3 text-xs">
+                        <span class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 text-slate-800 px-3 py-1.5 border border-slate-200 font-semibold">
+                            👤 {{ eventRegistrationStats(event.id).uniqueStudents }} unique student{{ eventRegistrationStats(event.id).uniqueStudents === 1 ? '' : 's' }} registered here
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 text-slate-800 px-3 py-1.5 border border-slate-200 font-semibold">
+                            📝 {{ eventRegistrationStats(event.id).totalItemRegs }} item registration{{ eventRegistrationStats(event.id).totalItemRegs === 1 ? '' : 's' }} here
+                        </span>
+                    </div>
+                    <p v-if="event.uses_registration_batch_billing || event.uses_per_phase_billing" class="text-[11px] text-slate-400 mt-1">
+                        Counts for this phase &amp; region only — see <strong>Step 3 · Billing &amp; Payment</strong> for a Level's combined total across every region/phase.
+                    </p>
                 </div>
 
                 <!-- Kalotsav-style participation quotas -->
