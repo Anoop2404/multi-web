@@ -7,6 +7,17 @@ use App\Models\Student;
 
 class FestStudentClassResolver
 {
+    /**
+     * Per-request cache of scheme_id => [key => classes]. schemeGroupForStudent() is
+     * called once per student (annotateStudents() maps over the whole roster), and a
+     * whole event only ever resolves against a handful of distinct scheme ids, so this
+     * turns hundreds of identical FestClassCategorySchemeGroup queries into one per
+     * scheme_id per request.
+     *
+     * @var array<int, \Illuminate\Support\Collection>
+     */
+    private static array $schemeGroupsCache = [];
+
     public static function classNumberFromName(?string $className): ?int
     {
         if (! filled($className)) {
@@ -101,7 +112,7 @@ class FestStudentClassResolver
             return null;
         }
 
-        $groups = \App\Models\FestClassCategorySchemeGroup::where('scheme_id', $schemeId)->get(['key', 'classes']);
+        $groups = self::$schemeGroupsCache[$schemeId] ??= \App\Models\FestClassCategorySchemeGroup::where('scheme_id', $schemeId)->get(['key', 'classes']);
 
         foreach ($groups as $group) {
             if (in_array($classNumber, array_map('intval', $group->classes ?? []), true)) {

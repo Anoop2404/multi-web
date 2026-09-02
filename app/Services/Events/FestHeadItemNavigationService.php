@@ -357,6 +357,42 @@ class FestHeadItemNavigationService
         return null;
     }
 
+    /**
+     * Every item id that should be counted together with $itemId — same item, its
+     * inherited copies, or anything sharing its item_code — mirroring
+     * FestEvent::reportableItemIds()'s matching rules exactly, but resolved against a
+     * pre-fetched $byRoot/$byCode map instead of a fresh query per item. Keeps
+     * participantStatsByItem() (called once per item, potentially 100+ times per
+     * event) from re-querying fest_events/fest_event_items on every iteration.
+     *
+     * @param  array<int, true>  $inScopeIds
+     * @param  array<int, list<int>>  $byRoot
+     * @param  array<string, list<int>>  $byCode
+     * @return list<int>
+     */
+    private function equivalentItemIdsFromMap(int $itemId, ?int $inheritedFromItemId, ?string $itemCode, array $inScopeIds, array $byRoot, array $byCode): array
+    {
+        // reportableItemIds() first re-fetches the item itself scoped to $eventIds —
+        // if that lookup comes back empty (item's own event_id isn't reportable from
+        // here, e.g. $event is a leaf whose scope doesn't reach the root event the item
+        // list is drawn from) it returns [] immediately, before ever looking at what
+        // other in-scope items point back to it via inherited_from_item_id/item_code.
+        // Must gate on that here too, or an in-scope inherited copy would pull an
+        // otherwise-unreachable root item's count back in.
+        if (! isset($inScopeIds[$itemId])) {
+            return [];
+        }
+
+        $rootId = $inheritedFromItemId ?: $itemId;
+        $ids = $byRoot[$rootId] ?? [];
+
+        if (filled($itemCode) && isset($byCode[$itemCode])) {
+            $ids = array_merge($ids, $byCode[$itemCode]);
+        }
+
+        return array_values(array_unique($ids));
+    }
+
     /** @return array<int, array{participant_count: int, chest_assigned: int, item_reg_assigned: int}> */
     private function participantStatsByItem(FestEvent $event, ?string $schoolId): array
     {
@@ -366,66 +402,77 @@ class FestHeadItemNavigationService
         $items = FestEventItem::query()
             ->where('event_id', $targetEvent->id)
             ->where('is_enabled', true)
-            ->get(['id', 'participant_type', 'inherited_from_item_id']);
+            ->get(['id', 'item_code', 'participant_type', 'inherited_from_item_id']);
+
+        if ($items->isEmpty()) {
+            return [];
+        }
+
+        // Same universe reportableItemIds() would search within — every item across the
+        // reportable event scope, not just $targetEvent — so partition/cluster children
+        // sharing an item_code or inherited_from_item_id still get folded in below.
+        $inScopeIds = [];
+        $byRoot = [];
+        $byCode = [];
+        foreach (FestEventItem::whereIn('event_id', $eventIds)->get(['id', 'item_code', 'inherited_from_item_id']) as $row) {
+            $inScopeIds[(int) $row->id] = true;
+            $rootId = (int) ($row->inherited_from_item_id ?: $row->id);
+            $byRoot[$rootId][] = (int) $row->id;
+            if (filled($row->item_code)) {
+                $byCode[$row->item_code][] = (int) $row->id;
+            }
+        }
+
+        $baseGroupQuery = fn () => \App\Models\FestGroup::query()
+            ->join('fest_registrations', 'fest_groups.registration_id', '=', 'fest_registrations.id')
+            ->whereIn('fest_registrations.event_id', $eventIds)
+            ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
+            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId));
+
+        $groupRows = $baseGroupQuery()
+            ->selectRaw('fest_registrations.item_id as item_id, count(*) as team_count, sum(case when fest_groups.chest_no is not null then 1 else 0 end) as chest_assigned')
+            ->groupBy('fest_registrations.item_id')
+            ->get()
+            ->keyBy('item_id');
+
+        $baseParticipantQuery = fn () => FestParticipant::query()
+            ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
+            ->leftJoin('fest_groups', 'fest_participants.group_id', '=', 'fest_groups.id')
+            ->whereIn('fest_registrations.event_id', $eventIds)
+            ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
+            ->where('fest_participants.participant_role', '!=', 'standby')
+            ->where(fn ($q) => $q->whereNotNull('fest_participants.student_id')->orWhereNotNull('fest_participants.teacher_id'))
+            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId));
+
+        $participantRows = $baseParticipantQuery()
+            ->selectRaw('fest_registrations.item_id as item_id, count(*) as indiv_count, sum(case when fest_participants.chest_no is not null or fest_groups.chest_no is not null then 1 else 0 end) as chest_assigned')
+            ->groupBy('fest_registrations.item_id')
+            ->get()
+            ->keyBy('item_id');
 
         $map = [];
 
         foreach ($items as $item) {
-            $itemIds = $event->reportableItemIds([$item->id]);
+            $itemIds = $this->equivalentItemIdsFromMap((int) $item->id, $item->inherited_from_item_id, $item->item_code, $inScopeIds, $byRoot, $byCode);
             $isMultiPerson = \App\Support\FestTeamSquadRules::isMultiPerson($item->participant_type);
+            $rows = $isMultiPerson ? $groupRows : $participantRows;
+            $countKey = $isMultiPerson ? 'team_count' : 'indiv_count';
 
-            if ($isMultiPerson) {
-                $teamCount = \App\Models\FestGroup::query()
-                    ->join('fest_registrations', 'fest_groups.registration_id', '=', 'fest_registrations.id')
-                    ->whereIn('fest_registrations.event_id', $eventIds)
-                    ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
-                    ->whereIn('fest_registrations.item_id', $itemIds)
-                    ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
-                    ->count();
-
-                $chestAssigned = \App\Models\FestGroup::query()
-                    ->join('fest_registrations', 'fest_groups.registration_id', '=', 'fest_registrations.id')
-                    ->whereIn('fest_registrations.event_id', $eventIds)
-                    ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
-                    ->whereIn('fest_registrations.item_id', $itemIds)
-                    ->whereNotNull('fest_groups.chest_no')
-                    ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
-                    ->count();
-
-                $map[$item->id] = [
-                    'participant_count' => $teamCount,
-                    'chest_assigned'    => $chestAssigned,
-                    'item_reg_assigned' => $chestAssigned,
-                ];
-            } else {
-                $indivCount = FestParticipant::query()
-                    ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
-                    ->whereIn('fest_registrations.event_id', $eventIds)
-                    ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
-                    ->whereIn('fest_registrations.item_id', $itemIds)
-                    ->where('fest_participants.participant_role', '!=', 'standby')
-                    ->where(fn ($q) => $q->whereNotNull('fest_participants.student_id')->orWhereNotNull('fest_participants.teacher_id'))
-                    ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
-                    ->count();
-
-                $chestAssigned = FestParticipant::query()
-                    ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
-                    ->leftJoin('fest_groups', 'fest_participants.group_id', '=', 'fest_groups.id')
-                    ->whereIn('fest_registrations.event_id', $eventIds)
-                    ->whereNotIn('fest_registrations.status', ['rejected', 'withdrawn'])
-                    ->whereIn('fest_registrations.item_id', $itemIds)
-                    ->where('fest_participants.participant_role', '!=', 'standby')
-                    ->where(fn ($q) => $q->whereNotNull('fest_participants.student_id')->orWhereNotNull('fest_participants.teacher_id'))
-                    ->where(fn ($q) => $q->whereNotNull('fest_participants.chest_no')->orWhereNotNull('fest_groups.chest_no'))
-                    ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
-                    ->count();
-
-                $map[$item->id] = [
-                    'participant_count' => $indivCount,
-                    'chest_assigned'    => $chestAssigned,
-                    'item_reg_assigned' => $chestAssigned,
-                ];
+            $count = 0;
+            $chestAssigned = 0;
+            foreach ($itemIds as $iid) {
+                $row = $rows->get($iid);
+                if ($row) {
+                    $count += (int) $row->{$countKey};
+                    $chestAssigned += (int) $row->chest_assigned;
+                }
             }
+
+            $map[$item->id] = [
+                'participant_count' => $count,
+                'chest_assigned'    => $chestAssigned,
+                'item_reg_assigned' => $chestAssigned,
+            ];
         }
 
         return $map;
