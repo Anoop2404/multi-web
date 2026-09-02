@@ -140,7 +140,14 @@
                             @click="$emit('withdraw', reg.id)">
                         Cancel
                     </button>
-                    <div v-if="registeredStandbyNames(reg)" class="text-[10px] text-indigo-500">Standby: {{ registeredStandbyNames(reg) }}</div>
+                    <div v-if="standbyEntriesForReg(reg).length" class="text-[10px] text-indigo-500 flex flex-wrap items-center gap-x-1">
+                        <span>Standby:</span>
+                        <span v-for="s in standbyEntriesForReg(reg)" :key="s.id" class="inline-flex items-center gap-0.5">
+                            {{ s.label }}
+                            <button type="button" class="text-red-500 hover:text-red-700 font-bold leading-none"
+                                    title="Remove standby" @click="removeStandby(reg, s.id)">&times;</button>
+                        </span>
+                    </div>
                     <div class="text-[10px] text-gray-400">{{ registrationTimestampLabel(reg) }}</div>
                 </div>
             </div>
@@ -640,19 +647,32 @@ function registrationTimestampLabel(reg) {
 // registeredNames (a parent-supplied prop) deliberately excludes standbys, and
 // no other part of this row surfaces their names as text -- the only way to see
 // who's on standby was to reopen the picker. Show them here the same way.
-function registeredStandbyNames(reg) {
-    const labels = (reg.participants ?? [])
+function standbyEntriesForReg(reg) {
+    return (reg.participants ?? [])
         .filter(p => p.participant_role === 'standby')
         .map((p) => {
             const name = p.student ? studentDisplayName(p.student) : null;
             const regNo = p.student?.admission_number;
             const festId = p.level_registration_number;
-            if (name && festId) return `${name} (${festId})`;
-            if (name && regNo) return `${name} (${regNo})`;
-            return name ?? regNo;
+            const label = name && festId ? `${name} (${festId})` : name && regNo ? `${name} (${regNo})` : (name ?? regNo);
+            return { id: p.student_id, label };
         })
-        .filter(Boolean);
-    return labels.join(', ');
+        .filter(e => e.label);
+}
+
+function registeredStandbyNames(reg) {
+    return standbyEntriesForReg(reg).map(e => e.label).join(', ');
+}
+
+// Drop one standby without walking back through the full picker. Falls back
+// into edit mode first (same as openStandbyPicker) so the rest of the roster
+// stays intact -- this only ever stages the removal, the school still has to
+// hit Save changes, same as every other edit on this row.
+function removeStandby(reg, studentId) {
+    if (!isEditing.value) {
+        emit('edit', reg);
+    }
+    props.form.standby_ids = (props.form.standby_ids ?? []).filter(id => id !== studentId);
 }
 
 function squadPerformersCount(reg) {
