@@ -813,14 +813,18 @@ class FestIdCardService
 
         // 1. Check FestVenue table for matching region_id if targetRegionId exists
         if ($targetRegionId) {
+            // Scoped to this event's own family ($eventIds) only — NOT a tenant-wide
+            // lookup. A tenant-wide fallback here previously let a same-region
+            // FestVenue row from a completely unrelated past event (any event ever
+            // run by this Sahodaya that happened to share the region) silently
+            // outrank this event's own explicitly-configured venue. See the
+            // "wrong venue is loaded" investigation: a Digi Fest card was showing a
+            // venue belonging to a different event two seasons prior, purely
+            // because both were tagged with region_id 2.
             $regionalVenue = \App\Models\FestVenue::whereIn('event_id', $eventIds)
                 ->where('region_id', $targetRegionId)
                 ->where('is_active', true)
-                ->first()
-                ?? \App\Models\FestVenue::where('tenant_id', $event->tenant_id)
-                    ->where('region_id', $targetRegionId)
-                    ->where('is_active', true)
-                    ->first();
+                ->first();
 
             if ($regionalVenue && !empty($regionalVenue->name)) {
                 return $regionalVenue->name;
