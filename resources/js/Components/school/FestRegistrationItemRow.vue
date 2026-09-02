@@ -279,12 +279,16 @@ const emit = defineEmits(['register', 'update', 'withdraw', 'edit', 'cancel-edit
 
 const isEditing = computed(() => props.editingRegistrationId != null);
 
-watch(() => props.editingRegistrationId, (id) => {
-    if (id != null) pickerOpen.value = true;
-});
-
 const pickerOpen = ref(false);
 const standbyPickerOpen = ref(false);
+
+// openStandbyPicker() also emits 'edit' (to sync the form with the existing
+// registration before showing standby-eligible students) — without the
+// standbyPickerOpen guard, this watcher reacting to that same edit would force
+// the main squad picker open on top of the standby one that was just requested.
+watch(() => props.editingRegistrationId, (id) => {
+    if (id != null && !standbyPickerOpen.value) pickerOpen.value = true;
+});
 
 const showStandbyPicker = computed(() => {
     if (props.isTeacherFest) return false;
