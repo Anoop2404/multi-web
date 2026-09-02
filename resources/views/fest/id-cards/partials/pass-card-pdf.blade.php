@@ -21,8 +21,14 @@
     // whole sheet's grid. Truncate the string itself so it settles within
     // ~2 lines regardless of DomPDF's CSS quirks (the CSS max-height below
     // is only a safety net on top of this, not the primary control).
-    $venueDisplay = str($card['venue'] ?? '—')->limit(40)->toString();
-    $categoryDisplay = str($category)->limit(40)->toString();
+    // DomPDF's text-overflow:ellipsis support is unreliable -- it silently clips
+    // without ever drawing the "…" character. Truncate the string itself instead
+    // (Str::limit appends its own "…"), so the ellipsis is guaranteed visible
+    // regardless of DomPDF's CSS quirks. white-space:nowrap + overflow:hidden on
+    // .pass-card-pdf__meta-value is then just a safety net for this box's real
+    // one-line capacity (~20 characters at this font size/box width).
+    $venueDisplay = str($card['venue'] ?? '—')->limit(12)->toString();
+    $categoryDisplay = str($category)->limit(12)->toString();
     $idLabel = $card['id_label'] ?? 'Reg ID';
     $idNumber = $card['id_number'] ?? '—';
     // A phase (Zonal, Sub District, ...) is the specific competition round the

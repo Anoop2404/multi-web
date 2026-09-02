@@ -37,15 +37,17 @@ class FestIdCardTemplates
     /**
      * "Participant Pass" layout — a school-ID-style card that lists every item a
      * student is registered for on one card, instead of one card per registration.
-     * Portrait A4, 2 columns x 5 rows: 85.6mm x 54mm cards (CR80 credit-card
-     * proportions) at 5mm column gap / 2mm row gap fit exactly inside a 9.5mm/16.9mm
-     * page margin — 2 x 85.6 + 5 = 176.2mm width, 5 x 54 + 4 x 2 = 278mm height.
+     * 4 cards per A4 LANDSCAPE page (2x2), same proven geometry as the Premium
+     * template above (138x86mm cards) — was previously 10-per-page at CR80 credit-
+     * card size (85.6x54mm) in portrait; every internal spacing/font-size in the
+     * pass-sheet/pass-card templates was scaled up ~1.6x (138/85.6, 86/54) to match,
+     * not just the outer card box.
      */
-    public const PASS_CARD_WIDTH_MM = 85.6;
+    public const PASS_CARD_WIDTH_MM = self::CARD_WIDTH_MM;
 
-    public const PASS_CARD_HEIGHT_MM = 54;
+    public const PASS_CARD_HEIGHT_MM = self::CARD_HEIGHT_MM;
 
-    public const PASS_CARDS_PER_PAGE = 10;
+    public const PASS_CARDS_PER_PAGE = self::CARDS_PER_PAGE;
 
     /** @return list<string> */
     public static function ids(): array
