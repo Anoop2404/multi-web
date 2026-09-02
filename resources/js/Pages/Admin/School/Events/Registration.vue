@@ -294,6 +294,16 @@
                 </div>
 
                 <div class="p-5">
+                <!-- Unique student count + total item registration count summary -->
+                <div class="flex flex-wrap gap-3 mb-4 text-xs">
+                    <span class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 text-slate-800 px-3 py-1.5 border border-slate-200 font-semibold">
+                        👤 {{ eventRegistrationStats(event.id).uniqueStudents }} unique student{{ eventRegistrationStats(event.id).uniqueStudents === 1 ? '' : 's' }}
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 text-slate-800 px-3 py-1.5 border border-slate-200 font-semibold">
+                        📝 {{ eventRegistrationStats(event.id).totalItemRegs }} total item registration{{ eventRegistrationStats(event.id).totalItemRegs === 1 ? '' : 's' }}
+                    </span>
+                </div>
+
                 <!-- Kalotsav-style participation quotas -->
                 <div v-if="event.quotas && eventType === 'kalolsavam'" class="grid sm:grid-cols-3 gap-3 mb-4">
                     <div class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs flex items-center justify-between">
@@ -1366,24 +1376,49 @@ function registrationsForItem(eventId, itemId) {
             return false;
         }
 
-        const regEventId = Number(reg.event_id);
-        const regParentEventId = reg.event?.parent_event_id ? Number(reg.event.parent_event_id) : null;
-        const regRootEventId = reg.event?.root_event_id ? Number(reg.event.root_event_id) : null;
-
-        const targetEvent = (props.events ?? []).find(e => Number(e.id) === numEventId) || props.event;
-        const targetParentId = targetEvent?.parent_event_id ? Number(targetEvent.parent_event_id) : null;
-        const targetRootId = targetEvent?.root_event_id ? Number(targetEvent.root_event_id) : null;
-
-        const eventMatch = regEventId === numEventId
-            || (targetParentId !== null && regEventId === targetParentId)
-            || (targetRootId !== null && regEventId === targetRootId)
-            || (regParentEventId !== null && regParentEventId === numEventId)
-            || (regRootEventId !== null && regRootEventId === numEventId)
-            || (targetParentId !== null && regParentEventId !== null && targetParentId === regParentEventId)
-            || (targetRootId !== null && regRootEventId !== null && targetRootId === regRootEventId);
-
-        return eventMatch;
+        return regMatchesEvent(reg, numEventId);
     });
+}
+
+// Shared by registrationsForItem() above (item + event match) and eventRegistrationStats()
+// below (event match only) — a registration can carry the phase/child event's id while the
+// page is scoped to its parent/root, or vice versa, so "does this registration belong to
+// this event" has to walk parent_event_id/root_event_id both directions either way.
+function regMatchesEvent(reg, eventId) {
+    const numEventId = Number(eventId);
+    const regEventId = Number(reg.event_id);
+    const regParentEventId = reg.event?.parent_event_id ? Number(reg.event.parent_event_id) : null;
+    const regRootEventId = reg.event?.root_event_id ? Number(reg.event.root_event_id) : null;
+
+    const targetEvent = (props.events ?? []).find(e => Number(e.id) === numEventId) || props.event;
+    const targetParentId = targetEvent?.parent_event_id ? Number(targetEvent.parent_event_id) : null;
+    const targetRootId = targetEvent?.root_event_id ? Number(targetEvent.root_event_id) : null;
+
+    return regEventId === numEventId
+        || (targetParentId !== null && regEventId === targetParentId)
+        || (targetRootId !== null && regEventId === targetRootId)
+        || (regParentEventId !== null && regParentEventId === numEventId)
+        || (regRootEventId !== null && regRootEventId === numEventId)
+        || (targetParentId !== null && regParentEventId !== null && targetParentId === regParentEventId)
+        || (targetRootId !== null && regRootEventId !== null && targetRootId === regRootEventId);
+}
+
+// "Unique student count and total item reg count" summary shown on both Step 1 (Event
+// Registration) and Step 2 (Item Registration) — they're the same card, just a different
+// tab of it, so one stat block covers both.
+function eventRegistrationStats(eventId) {
+    const regs = (props.registrations ?? []).filter((reg) => {
+        if (['withdrawn', 'rejected'].includes(reg.status)) return false;
+
+        return regMatchesEvent(reg, eventId);
+    });
+
+    const studentIds = new Set();
+    regs.forEach((reg) => (reg.participants ?? []).forEach((p) => {
+        if (p.student_id) studentIds.add(p.student_id);
+    }));
+
+    return { uniqueStudents: studentIds.size, totalItemRegs: regs.length };
 }
 
 function registeredNames(reg) {

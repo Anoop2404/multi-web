@@ -35,6 +35,10 @@ class FestRegistrationRegisterService
      *                                reads that scope's own registrations/fees, not every
      *                                leaf under the root (see FestReportController's
      *                                registrationRegister()/exportRegistrationRegister()).
+     * @param  ?string  $phaseId  Optional phase filter from the on-screen dropdown — an
+     *                            item's own phase_id, not the registration's event_id.
+     * @param  ?string  $registrationBatchId  Optional "Level" filter — filters by the
+     *                                        registration batch behind the item's phase.
      * @return array{
      *     rows: list<array<string, mixed>>|\Illuminate\Pagination\LengthAwarePaginator,
      *     school_summaries: list<array<string, mixed>>,
@@ -50,6 +54,8 @@ class FestRegistrationRegisterService
         ?string $itemId = null,
         ?array $schoolIds = null,
         ?array $eventIds = null,
+        ?string $phaseId = null,
+        ?string $registrationBatchId = null,
     ): array {
         $schedule = $this->feeService->resolveSchedule($event);
         $feeRequired = $this->feeService->feeRequired($event);
@@ -99,10 +105,17 @@ class FestRegistrationRegisterService
                 }
             })
             ->when($itemId, fn ($q) => $q->where('item_id', $itemId))
+            ->when($phaseId, fn ($q) => $q->whereHas('item', fn ($iq) => $iq->where('phase_id', $phaseId)))
+            ->when($registrationBatchId, fn ($q) => $q->whereHas(
+                'item.phase',
+                fn ($pq) => $pq->where('registration_batch_id', $registrationBatchId)
+            ))
             ->with([
                 'school:id,name',
-                'item:id,title,participant_type,class_group,age_group,fee_amount,head_id',
+                'item:id,title,participant_type,class_group,age_group,fee_amount,head_id,phase_id',
                 'item.head:id,name',
+                'item.phase:id,name,registration_batch_id',
+                'item.phase.registrationBatch:id,code,name',
                 'participants.student:id,name,reg_no',
                 'participants.teacher:id,name,reg_no',
             ])
@@ -185,6 +198,90 @@ class FestRegistrationRegisterService
         return $paginator->withQueryString();
     }
 
+    /**
+     * Phase and registration-batch ("Level") options for the Registration Register's
+     * filter dropdowns. Phases/levels are configured on the root event, not the leaf a
+     * particular registration was scoped under, same as feeScopeFor() above. Empty
+     * arrays mean this event doesn't use phases/levels — callers should hide the filter.
+     *
+     * @return array{
+     *     phases: list<array{id:int,name:string,batch_id:?int}>,
+     *     batches: list<array{id:int,code:?string,name:string}>
+     * }
+     */
+    public function filterOptions(FestEvent $event): array
+    {
+        $root = $event->rootEvent();
+
+        $phases = \App\Models\FestEventPhase::where('event_id', $root->id)
+            ->orderBy('sort_order')
+            ->get(['id', 'name', 'registration_batch_id'])
+            ->map(fn ($phase) => [
+                'id'       => $phase->id,
+                'name'     => $phase->name,
+                'batch_id' => $phase->registration_batch_id,
+            ])
+            ->all();
+
+        $batches = \App\Models\FestRegistrationBatch::where('event_id', $root->id)
+            ->orderBy('sort_order')
+            ->get(['id', 'code', 'name'])
+            ->map(fn ($batch) => [
+                'id'   => $batch->id,
+                'code' => $batch->code,
+                'name' => $batch->name,
+            ])
+            ->all();
+
+        return ['phases' => $phases, 'batches' => $batches];
+    }
+
+    /**
+     * One row per student/teacher (not per item registration, unlike build()'s rows) —
+     * every item they're registered for on this event, rolled up under their name, with
+     * the distinct phases/levels those items span. Reuses build()'s already phase/level-
+     * enriched participant rows rather than re-querying, so filtering and column shape
+     * stay identical to the Registration Register above.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function studentSummaryRows(
+        FestEvent $event,
+        ?string $schoolId = null,
+        ?string $phaseId = null,
+        ?string $registrationBatchId = null,
+    ): array {
+        $data = $this->build($event, $schoolId, null, 50, null, null, null, null, $phaseId, $registrationBatchId);
+
+        return collect($data['rows'])
+            ->groupBy(fn (array $row) => $row['student_id'] ?? $row['teacher_id'] ?? $row['participant_reg_no'])
+            ->map(function ($rows) {
+                $first = $rows->first();
+
+                return [
+                    'key'          => $first['student_id'] ?? $first['teacher_id'] ?? $first['participant_reg_no'],
+                    'name'         => $first['participant_name'],
+                    'reg_no'       => $first['participant_reg_no'],
+                    'level_reg'    => $first['level_reg'],
+                    'school_id'    => $first['school_id'],
+                    'school_name'  => $first['school_name'],
+                    'is_teacher'   => $first['is_teacher'],
+                    'item_count'   => $rows->count(),
+                    'phase_names'  => $rows->pluck('phase_name')->filter()->unique()->values()->all(),
+                    'batch_names'  => $rows->pluck('batch_name')->filter()->unique()->values()->all(),
+                    'items'        => $rows->map(fn (array $r) => [
+                        'title'       => $r['item_title'],
+                        'status'      => $r['registration_status'],
+                        'phase_name'  => $r['phase_name'],
+                        'batch_name'  => $r['batch_name'],
+                    ])->values()->all(),
+                ];
+            })
+            ->sortBy([['school_name', 'asc'], ['name', 'asc']])
+            ->values()
+            ->all();
+    }
+
     /** @return list<array<string, mixed>> */
     public function schools(FestEvent $event): array
     {
@@ -226,7 +323,7 @@ class FestRegistrationRegisterService
 
         return response()->streamDownload(function () use ($data, $includeChestNo) {
             $out = fopen('php://output', 'w');
-            $header = ['School', 'Student', 'School reg no', 'Fest ID', 'Item reg no', 'Item', 'Reg status', 'Role'];
+            $header = ['School', 'Student', 'School reg no', 'Fest ID', 'Item reg no', 'Item', 'Phase', 'Level', 'Reg status', 'Role'];
             if ($includeChestNo) {
                 $header[] = 'Chest no';
             }
@@ -239,6 +336,8 @@ class FestRegistrationRegisterService
                     $row['level_reg'],
                     $row['item_reg'],
                     $row['item_title'],
+                    $row['phase_name'] ?? '—',
+                    $row['batch_name'] ?? '—',
                     $row['registration_status'],
                     $row['participant_role'],
                 ];
@@ -356,6 +455,8 @@ class FestRegistrationRegisterService
         return [
             'registration_id'     => $registration->id,
             'participant_id'        => $participant->id,
+            'student_id'            => $participant->student_id,
+            'teacher_id'            => $participant->teacher_id,
             'school_id'             => $registration->school_id,
             'school_name'           => $registration->school?->name ?? $registration->school_id,
             'participant_name'      => $name,
@@ -366,6 +467,11 @@ class FestRegistrationRegisterService
             'item_title'            => $registration->item?->title ?? '—',
             'head_id'               => $registration->item?->head_id,
             'head_name'             => $registration->item?->head?->name,
+            'phase_id'              => $registration->item?->phase_id,
+            'phase_name'            => $registration->item?->phase?->name,
+            'registration_batch_id' => $registration->item?->phase?->registration_batch_id,
+            'batch_code'            => $registration->item?->phase?->registrationBatch?->code,
+            'batch_name'            => $registration->item?->phase?->registrationBatch?->name,
             'registration_status'   => $registration->status,
             'participant_role'      => $participant->participant_role ?? 'performer',
             'chest_no'              => $participant->chest_no ?? '—',

@@ -32,6 +32,23 @@
                                     @select="onItemSelect" />
         </div>
 
+        <div v-if="filterOptions.phases.length || filterOptions.batches.length" class="mb-6 flex flex-wrap gap-3">
+            <div v-if="filterOptions.phases.length">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Phase</label>
+                <select class="field text-xs" :value="filterPhaseId ?? ''" @change="onPhaseSelect($event.target.value)">
+                    <option value="">All phases</option>
+                    <option v-for="phase in filterOptions.phases" :key="phase.id" :value="phase.id">{{ phase.name }}</option>
+                </select>
+            </div>
+            <div v-if="filterOptions.batches.length">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Level</label>
+                <select class="field text-xs" :value="filterBatchId ?? ''" @change="onBatchSelect($event.target.value)">
+                    <option value="">All levels</option>
+                    <option v-for="batch in filterOptions.batches" :key="batch.id" :value="batch.id">{{ batch.name }}</option>
+                </select>
+            </div>
+        </div>
+
         <div v-if="schoolSummary && totals.fee_required" class="grid sm:grid-cols-4 gap-3 mb-6">
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ schoolSummary.item_count }}</p>
@@ -60,6 +77,8 @@
                         <th class="p-3">Participant</th>
                         <th class="p-3">Fest ID</th>
                         <th class="p-3">Item</th>
+                        <th v-if="filterOptions.phases.length" class="p-3">Phase</th>
+                        <th v-if="filterOptions.batches.length" class="p-3">Level</th>
                         <th class="p-3">Item reg</th>
                         <th class="p-3">Status</th>
                         <th class="p-3">Item fee</th>
@@ -68,7 +87,7 @@
                 <tbody>
                     <template v-for="(row, idx) in rows.data" :key="row.participant_id">
                         <tr v-if="shouldShowHeadDivider(row, rows.data[idx - 1])" class="bg-slate-50">
-                            <td colspan="7" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            <td :colspan="columnCount" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 {{ row.head_name ?? 'Other items' }}
                             </td>
                         </tr>
@@ -80,6 +99,8 @@
                             </td>
                             <td class="p-3 font-mono text-xs font-semibold text-[#0f3d7a]">{{ row.level_reg }}</td>
                             <td class="p-3 text-xs">{{ row.item_title }}</td>
+                            <td v-if="filterOptions.phases.length" class="p-3 text-xs">{{ row.phase_name ?? '—' }}</td>
+                            <td v-if="filterOptions.batches.length" class="p-3 text-xs">{{ row.batch_name ?? '—' }}</td>
                             <td class="p-3 font-mono text-xs">{{ row.item_reg }}</td>
                             <td class="p-3 text-xs capitalize">
                                 {{ row.registration_status }}
@@ -89,7 +110,7 @@
                         </tr>
                     </template>
                     <tr v-if="!rows.data.length">
-                        <td colspan="7" class="p-8 text-center text-gray-400">No registrations match the selected filters.</td>
+                        <td :colspan="columnCount" class="p-8 text-center text-gray-400">No registrations match the selected filters.</td>
                     </tr>
                 </tbody>
             </table>
@@ -125,6 +146,9 @@ const props = defineProps({
     rows: Object,
     schoolSummary: Object,
     totals: Object,
+    filterOptions: { type: Object, default: () => ({ phases: [], batches: [] }) },
+    filterPhaseId: { type: [String, Number], default: null },
+    filterBatchId: { type: [String, Number], default: null },
     paymentsUrl: String,
     pdfUrl: String,
     csvUrl: String,
@@ -132,6 +156,16 @@ const props = defineProps({
 
 const { programLabel, programBase } = useSchoolProgramContext(props);
 const base = `${programBase.value}/reports/${props.event.id}/registration-register`;
+
+const columnCount = computed(() => 6 + (props.filterOptions.phases.length ? 1 : 0) + (props.filterOptions.batches.length ? 1 : 0));
+
+function onPhaseSelect(phaseId) {
+    router.get(base, phaseId ? { phase_id: phaseId } : {}, { preserveScroll: true, preserveState: true });
+}
+
+function onBatchSelect(batchId) {
+    router.get(base, batchId ? { registration_batch_id: batchId } : {}, { preserveScroll: true, preserveState: true });
+}
 
 // Filtering now happens server-side (see FestRegistrationRegisterService::build()) since
 // 'rows' is a paginated slice — client-side post-filtering would only ever see whatever

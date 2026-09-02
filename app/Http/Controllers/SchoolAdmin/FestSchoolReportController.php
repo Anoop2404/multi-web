@@ -768,6 +768,8 @@ class FestSchoolReportController extends SchoolAdminController
             50,
             $request->string('head_id')->toString() ?: null,
             $request->string('item_id')->toString() ?: null,
+            phaseId: $request->string('phase_id')->toString() ?: null,
+            registrationBatchId: $request->string('registration_batch_id')->toString() ?: null,
         );
 
         // Chest numbers are Sahodaya-admin-only information — schools don't see them until
@@ -785,11 +787,43 @@ class FestSchoolReportController extends SchoolAdminController
                 'rows'            => $rows,
                 'schoolSummary'   => $data['school_summaries'][0] ?? null,
                 'totals'          => $data['totals'],
+                'filterOptions'   => $register->filterOptions($event),
+                'filterPhaseId'   => $request->string('phase_id')->toString() ?: null,
+                'filterBatchId'   => $request->string('registration_batch_id')->toString() ?: null,
                 'paymentsUrl'     => "/school-admin/{$this->school->id}/payments",
                 'pdfUrl'          => $this->schoolReportsBase($program, $event).'/registration-register/pdf',
                 'csvUrl'          => $this->schoolReportsBase($program, $event).'/registration-register/export',
             ],
         ));
+    }
+
+    /**
+     * One row per student/teacher (Registration Register above is one row per item
+     * registration) — same phase/level filters, so a school can see "who's registered,
+     * and under which phase/level" without counting item rows per student by hand.
+     */
+    public function studentReport(Request $request, string $tenantId, FestEvent $event, string $program, FestRegistrationRegisterService $register)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $meta = SchoolFestProgram::meta($program);
+        $phaseId = $request->string('phase_id')->toString() ?: null;
+        $batchId = $request->string('registration_batch_id')->toString() ?: null;
+
+        $rows = $register->studentSummaryRows($event, $this->school->id, $phaseId, $batchId);
+
+        return $this->inertia('School/Events/ReportStudentReport', [
+            'program'        => $meta['slug'],
+            'programMeta'    => $meta,
+            'school'         => $this->school->only('id', 'name'),
+            'event'          => $event->only('id', 'title'),
+            'rows'           => $rows,
+            'uniqueStudents' => count($rows),
+            'totalItemRegs'  => array_sum(array_column($rows, 'item_count')),
+            'filterOptions'  => $register->filterOptions($event),
+            'filterPhaseId'  => $phaseId,
+            'filterBatchId'  => $batchId,
+        ]);
     }
 
     public function exportRegistrationRegister(Request $request, string $tenantId, FestEvent $event, string $program, FestRegistrationRegisterService $register)
