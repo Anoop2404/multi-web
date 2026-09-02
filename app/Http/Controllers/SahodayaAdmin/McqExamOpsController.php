@@ -383,6 +383,26 @@ class McqExamOpsController extends SahodayaAdminController
         return back()->with('success', "{$count} hall ticket(s) generated.");
     }
 
+    /** Re-sort every issued reg. number into contiguous per-school blocks. Blocked once tickets are published. */
+    public function renumberHallTickets(string $tenantId, McqExam $exam, McqHallTicketService $service)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($exam->hall_tickets_published, 422, 'Hall tickets are already published to schools — renumbering is disabled to avoid invalidating numbers they have already seen.');
+
+        @ini_set('memory_limit', '1024M');
+        @ini_set('max_execution_time', '300');
+
+        $result = $service->renumberBySchool($exam);
+
+        if ($result['renumbered'] === 0) {
+            return back()->with('warning', 'No issued reg. numbers to renumber yet.');
+        }
+
+        $note = $result['cleared'] > 0 ? " {$result['cleared']} cancelled registration(s) had their number cleared." : '';
+
+        return back()->with('success', "Renumbered {$result['renumbered']} registration(s) by school, starting at {$result['start']}.{$note}");
+    }
+
     /**
      * Release hall tickets (roll no., hall, seat) to schools and candidates.
      * Roll numbers are already assigned per-registration as each is approved — this flag is

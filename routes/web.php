@@ -1518,6 +1518,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{exam}/payments/{schoolFee}/approve', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'approveForExam'])->name('payments.approve');
             Route::post('/{exam}/payments/{schoolFee}/reject', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'rejectForExam'])->name('payments.reject');
             Route::get('/{exam}/reports', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'show'])->name('reports');
+            Route::get('/{exam}/reports/registration', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'registrationRegister'])->name('reports.registration');
+            Route::get('/{exam}/reports/attendance', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'attendanceSheetPage'])->name('reports.attendance');
+            Route::get('/{exam}/reports/fees', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'feeSummaryPage'])->name('reports.fees');
+            Route::get('/{exam}/reports/class-wise-counts', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'classWiseCountsPage'])->name('reports.class-wise-counts');
             Route::get('/{exam}/reports/registration/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRegistration'])->name('reports.registration.export');
             Route::get('/{exam}/reports/registration/pdf', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRegistrationPdf'])->name('reports.registration.pdf');
             Route::get('/{exam}/reports/fees/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportFees'])->name('reports.fees.export');
@@ -1551,6 +1555,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/hall-tickets/preview', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'previewHallTicket'])->name('hall-tickets.preview');
             Route::post('/{exam}/hall-tickets/design', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'updateHallTicketDesign'])->name('hall-tickets.design');
             Route::post('/{exam}/hall-tickets/generate', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'generateHallTickets'])->name('hall-tickets.generate');
+            Route::post('/{exam}/hall-tickets/renumber', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'renumberHallTickets'])->name('hall-tickets.renumber');
             Route::post('/{exam}/hall-tickets/publish', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'publishHallTickets'])->name('hall-tickets.publish');
             Route::post('/{exam}/hall-tickets/unpublish', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'unpublishHallTickets'])->name('hall-tickets.unpublish');
             Route::post('/{exam}/hall-tickets/halls', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'saveHalls'])->name('hall-tickets.halls');
