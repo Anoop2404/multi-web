@@ -367,6 +367,55 @@ class McqReportService
         );
     }
 
+    /**
+     * A fill-and-reupload template for the "Import marks (CSV/Excel)" flow on the Results
+     * page: same hall_ticket_no column McqMarksAttendanceImporter::importMarks() reads,
+     * pre-filled for every present-but-unmarked registration, with the score columns left
+     * blank instead of just reporting attendance status (see exportMarksPending() above).
+     */
+    public function exportMarksEntryTemplate(McqExam $exam, ?string $schoolId = null, ?string $selectedClass = null): StreamedResponse
+    {
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->where('attendance_status', 'present')
+            ->whereDoesntHave('mark')
+            ->with(['student.schoolClass', 'school']);
+
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
+
+        $rows = $query->orderBy('hall_ticket_no')->get();
+
+        if ($selectedClass && filled($selectedClass) && strtolower(trim((string) $selectedClass)) !== 'all') {
+            $cleanFilter = strtolower(trim(str_ireplace('class', '', (string) $selectedClass)));
+            $rows = $rows->filter(function (McqRegistration $reg) use ($cleanFilter) {
+                $cName = strtolower(trim(str_ireplace('class', '', (string) ($reg->student?->schoolClass?->name ?? ''))));
+
+                return $cName === $cleanFilter;
+            });
+        }
+
+        $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+        if ($selectedClass) {
+            $suffix .= '-class-'.$selectedClass;
+        }
+
+        return ExcelExport::download(
+            'mcq-marks-entry-template-'.$exam->id.$suffix,
+            ['hall_ticket_no', 'student_name', 'reg_no', 'class', 'school', 'correct', 'wrong', 'unanswered'],
+            $rows->values()->map(fn (McqRegistration $reg) => [
+                $reg->hall_ticket_no,
+                $reg->student?->name,
+                $reg->student?->reg_no,
+                $reg->student?->schoolClass?->name,
+                $reg->school?->name,
+                '',
+                '',
+                '',
+            ]),
+        );
+    }
+
     public function exportPendingFees(McqExam $exam): StreamedResponse
     {
         $rows = collect($this->feeSummaryRows($exam))

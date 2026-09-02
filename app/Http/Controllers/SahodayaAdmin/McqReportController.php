@@ -245,6 +245,13 @@ class McqReportController extends SahodayaAdminController
         return $reports->exportMarksPending($exam);
     }
 
+    public function exportMarksEntryTemplate(Request $request, string $tenantId, McqExam $exam, McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportMarksEntryTemplate($exam, $request->input('school_id'), $request->input('class'));
+    }
+
     public function exportPendingFees(string $tenantId, McqExam $exam, McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);

@@ -1533,6 +1533,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/reports/level2-qualifiers/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportLevel2Qualifiers'])->name('reports.level2-qualifiers.export');
             Route::get('/{exam}/reports/absent/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportAbsent'])->name('reports.absent.export');
             Route::get('/{exam}/reports/marks-pending/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportMarksPending'])->name('reports.marks-pending.export');
+            Route::get('/{exam}/reports/marks-entry-template/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportMarksEntryTemplate'])->name('reports.marks-entry-template.export');
             Route::get('/{exam}/reports/fees-pending/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportPendingFees'])->name('reports.fees-pending.export');
             Route::get('/{exam}/reports/fees-rejected/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRejectedFees'])->name('reports.fees-rejected.export');
             Route::get('/{exam}/reports/grade-bands/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportGradeBands'])->name('reports.grade-bands.export');

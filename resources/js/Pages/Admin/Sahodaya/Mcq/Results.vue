@@ -55,6 +55,10 @@
         <div v-if="!exam.results_published" class="card mb-6 space-y-3">
             <h3 class="section-title !mb-0">Bulk import marks</h3>
             <p class="text-xs text-slate-500">CSV or Excel: hall_ticket_no, correct, wrong, unanswered. Optional: score, marks_per_correct, negative_per_wrong.</p>
+            <div class="flex flex-wrap gap-2 items-center">
+                <a :href="marksEntryTemplateUrl" class="btn-secondary text-sm">Download marks entry template ↓</a>
+                <span class="text-xs text-slate-500">Reg. no + present, unmarked candidates (respects the filters above) — fill in correct/wrong/unanswered and re-upload below.</span>
+            </div>
             <form @submit.prevent="importMarks" class="flex flex-wrap gap-2 items-center">
                 <input ref="marksFile" type="file" accept=".csv,.txt,.xlsx,.xls" class="text-sm" required>
                 <button type="submit" class="btn-secondary text-sm">Import marks (CSV/Excel)</button>
@@ -182,6 +186,14 @@ const filterForm = reactive({
 });
 
 const hasFilters = computed(() => !!(filterForm.search || filterForm.school_id || filterForm.class));
+
+const marksEntryTemplateUrl = computed(() => {
+    const params = [];
+    if (filterForm.school_id) params.push('school_id=' + encodeURIComponent(filterForm.school_id));
+    if (filterForm.class) params.push('class=' + encodeURIComponent(filterForm.class));
+    const base = `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/reports/marks-entry-template/export`;
+    return params.length ? `${base}?${params.join('&')}` : base;
+});
 
 function applyFilters() {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/results`, { ...filterForm }, { preserveState: true, preserveScroll: true });
