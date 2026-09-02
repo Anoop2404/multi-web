@@ -48,6 +48,7 @@
                             @click="$emit('withdraw', reg.id)">
                         Cancel
                     </button>
+                    <span class="text-emerald-600/50 shrink-0 text-[9px]" :title="registrationTimestampLabel(reg)">{{ registrationTimestampLabel(reg) }}</span>
                 </span>
             </div>
             <span v-else class="text-xs text-slate-300">—</span>
@@ -138,6 +139,7 @@
                             @click="$emit('withdraw', reg.id)">
                         Cancel
                     </button>
+                    <div class="text-[10px] text-gray-400">{{ registrationTimestampLabel(reg) }}</div>
                 </div>
             </div>
             <span v-else class="text-gray-400">—</span>
@@ -240,6 +242,7 @@ import { computed, ref, watch } from 'vue';
 import FestStudentPickerModal from '@/Components/school/FestStudentPickerModal.vue';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 import { useSweetAlert } from '@/composables/useSweetAlert.js';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 const { showError, showWarning } = useSweetAlert();
 
@@ -562,6 +565,15 @@ function formatDate(iso) {
     if (!iso) return '';
     const d = new Date(`${iso}T12:00:00`);
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function registrationTimestampLabel(reg) {
+    const submitted = `Submitted ${formatDateTime(reg.created_at)}`;
+    if (reg.updated_at && reg.updated_at !== reg.created_at) {
+        return `${submitted} · Modified ${formatDateTime(reg.updated_at)}`;
+    }
+
+    return submitted;
 }
 
 function squadPerformersCount(reg) {

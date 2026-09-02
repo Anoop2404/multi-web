@@ -125,6 +125,7 @@
                         <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                             <tr>
                                 <th class="px-3 py-2">Line Item Description</th>
+                                <th class="px-3 py-2">Category</th>
                                 <th class="px-3 py-2 text-center">Qty / Count</th>
                                 <th class="px-3 py-2 text-right">Unit Rate (₹)</th>
                                 <th class="px-3 py-2 text-right">Amount (₹)</th>
@@ -133,6 +134,7 @@
                         <tbody class="divide-y divide-slate-100 bg-white">
                             <tr v-for="(line, idx) in fee.lines" :key="idx" class="hover:bg-slate-50/50">
                                 <td class="px-3 py-2 font-medium text-slate-800">{{ line.label }}</td>
+                                <td class="px-3 py-2 text-slate-600">{{ line.category || '—' }}</td>
                                 <td class="px-3 py-2 text-center text-slate-700 font-semibold">
                                     {{ line.quantity != null ? line.quantity : 1 }}
                                     <span v-if="line.line_type === 'student_registration'" class="text-[10px] text-slate-500 font-normal ml-0.5">student{{ line.quantity === 1 ? '' : 's' }}</span>
@@ -143,7 +145,7 @@
                                 <td class="px-3 py-2 text-right font-mono font-bold text-slate-900">₹{{ money(line.amount) }}</td>
                             </tr>
                             <tr class="bg-slate-50/80 font-bold border-t border-slate-200">
-                                <td colspan="3" class="px-3 py-2 text-slate-900">Total Invoice Amount</td>
+                                <td colspan="4" class="px-3 py-2 text-slate-900">Total Invoice Amount</td>
                                 <td class="px-3 py-2 text-right font-mono text-indigo-900">₹{{ money(fee.total_due) }}</td>
                             </tr>
                         </tbody>

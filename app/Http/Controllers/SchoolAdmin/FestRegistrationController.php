@@ -801,7 +801,21 @@ class FestRegistrationController extends SchoolAdminController
             $root = $event->rootEvent();
             $batchFees = app(\App\Services\Events\FestRegistrationBatchFeeService::class)
                 ->recalculateAll($root, $this->school->id);
-            $event->setAttribute('school_registration_batch_fees', $batchFees->map(function ($fee) use ($event) {
+
+            // Item-fee/extra-item lines carry meta.item_id but not the item's own class
+            // category — batch-fetched once here (across all levels) so the invoice line
+            // items table can show which eligibility category each charge belongs to,
+            // same treatment as FestSchoolEventFeeService::breakdown().
+            $lineItemIds = $batchFees->flatMap(fn ($fee) => $fee->lines->pluck('meta'))
+                ->map(fn ($meta) => $meta['item_id'] ?? null)
+                ->filter()
+                ->unique();
+            $classGroupByItemId = $lineItemIds->isNotEmpty()
+                ? FestEventItem::whereIn('id', $lineItemIds)->pluck('class_group', 'id')
+                : collect();
+            $classGroupLabels = FestClassGroupScheme::labels(null, $root);
+
+            $event->setAttribute('school_registration_batch_fees', $batchFees->map(function ($fee) use ($event, $classGroupByItemId, $classGroupLabels) {
                 $phase = $fee->registrationBatch?->phase ?? $fee->phase;
 
                 return [
@@ -821,7 +835,19 @@ class FestRegistrationController extends SchoolAdminController
                     'status' => $fee->status,
                     'payment_details_text' => $phase ? $phase->paymentDetailsText($event) : $event->paymentDetailsText(),
                     'payment_qr_code_url' => $phase ? $phase->paymentQrCodeUrl($event) : $event->paymentQrCodeUrl(),
-                    'lines' => $fee->lines->map(fn ($line) => $line->only(['line_type', 'label', 'quantity', 'unit_amount', 'amount', 'meta']))->values(),
+                    'lines' => $fee->lines->map(function ($line) use ($classGroupByItemId, $classGroupLabels) {
+                        $itemId = $line->meta['item_id'] ?? null;
+                        $classGroupKey = $itemId ? ($classGroupByItemId[$itemId] ?? null) : null;
+
+                        return array_merge(
+                            $line->only(['line_type', 'label', 'quantity', 'unit_amount', 'amount', 'meta']),
+                            [
+                                'category' => ($classGroupKey && $classGroupKey !== 'open')
+                                    ? FestClassGroupScheme::resolveItemLabel($classGroupLabels, $classGroupKey)
+                                    : null,
+                            ]
+                        );
+                    })->values(),
                     'receipt_history' => $this->receiptHistoryPayload($fee),
                 ];
             })->values()->all());
