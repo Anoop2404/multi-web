@@ -1380,6 +1380,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::put('/{event}/grade-configs/{gradeConfig}', [FestEventSettingsController::class, 'updateGradeConfig'])->name('grade-configs.update');
             Route::delete('/{event}/grade-configs/{gradeConfig}', [FestEventSettingsController::class, 'destroyGradeConfig'])->name('grade-configs.destroy');
             Route::post('/{event}/grade-configs/sync-to-regions', [FestEventSettingsController::class, 'syncGradeConfigsToRegions'])->name('grade-configs.sync-to-regions');
+            Route::post('/{event}/grading/apply-default-kalotsav', [FestEventSettingsController::class, 'applyDefaultKalotsavGrading'])->name('grading.apply-default-kalotsav');
             Route::get('/{event}/rank-points', [FestEventSettingsController::class, 'rankPoints'])->name('rank-points.index');
             Route::post('/{event}/point-rules', [FestEventSettingsController::class, 'storePointRule'])->name('point-rules.store');
             Route::delete('/{event}/point-rules/{pointRule}', [FestEventSettingsController::class, 'destroyPointRule'])->name('point-rules.destroy');

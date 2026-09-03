@@ -119,6 +119,9 @@
                         <p class="section-desc mt-0.5">Points awarded by grade and position for leaderboard calculations — set separate rules for group/team items vs. individual items.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 shrink-0">
+                        <button type="button" class="btn-secondary text-xs !py-1.5 !px-3" :disabled="applyingDefaults" @click="applyDefaultGrading">
+                            {{ applyingDefaults ? 'Applying…' : '⚡ Apply Default Kalotsav Grading' }}
+                        </button>
                         <button type="button" class="btn-secondary text-xs !py-1.5 !px-3" :disabled="seedingConfed" @click="seedConfedKalotsav">
                             {{ seedingConfed ? 'Loading…' : '⚡ Load Kalolsavam Manual Standard' }}
                         </button>
@@ -305,6 +308,19 @@ async function removePointRule(id) {
     });
     if (!ok) return;
     router.delete(`${base.value}/point-rules/${id}`, { preserveScroll: true });
+}
+
+const applyingDefaults = ref(false);
+async function applyDefaultGrading() {
+    const ok = await confirm({
+        message: 'Load the standard Kalotsav grade bands (A/B/C/No Grade) and Grade Points Master table onto this event? Any existing band or point rule that matches one of the standard combinations (same grade, item, position, and individual/group type) will be overwritten with the standard value — anything else you\'ve configured is left as-is.',
+    });
+    if (!ok) return;
+    applyingDefaults.value = true;
+    router.post(`${base.value}/grading/apply-default-kalotsav`, {}, {
+        preserveScroll: true,
+        onFinish: () => { applyingDefaults.value = false; },
+    });
 }
 
 const seedingConfed = ref(false);

@@ -1391,6 +1391,55 @@ class FestEventSettingsController extends SahodayaAdminController
     }
 
     /**
+     * One-click fill for BOTH Grade Master bands and Grade Points Master rules from
+     * config/fest_default_kalotsav_grading.php -- the standard Kalotsav grade+points
+     * table any Sahodaya admin can self-service load onto their own event (and, via
+     * the existing sync-to-regions actions, push down to that event's own regions).
+     * Same updateOrCreate-so-re-clicking-is-safe pattern as seedConfedKalotsavPoints().
+     */
+    public function applyDefaultKalotsavGrading(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $defaults = config('fest_default_kalotsav_grading');
+
+        $bandCount = 0;
+        foreach ($defaults['grade_bands'] as $band) {
+            FestGradeConfig::updateOrCreate(
+                ['event_id' => $event->id, 'item_id' => null, 'grade' => $band['grade']],
+                [
+                    'min_score'   => $band['min'],
+                    'max_score'   => $band['max'],
+                    'min_percent' => $band['min'],
+                    'max_percent' => $band['max'],
+                ],
+            );
+            $bandCount++;
+        }
+
+        $ruleCount = 0;
+        foreach ($defaults['point_rules'] as $rule) {
+            FestPointRule::updateOrCreate(
+                ['event_id' => $event->id, 'grade' => $rule['grade'], 'position' => $rule['position'], 'is_group' => $rule['is_group']],
+                ['points' => $rule['points']],
+            );
+            $ruleCount++;
+        }
+
+        EventContext::for($event)->recalculateSchoolPoints();
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('grades'),
+            'fest.settings.default_kalotsav_grading_applied',
+            'Applied default Kalotsav grading (bands + points)',
+            ['bands' => $bandCount, 'rules' => $ruleCount],
+        );
+
+        return back()->with('success', "Default Kalotsav grading applied ({$bandCount} bands, {$ruleCount} point rules).");
+    }
+
+    /**
      * Copies this event's current Grade Points Master rows down to every region-child
      * event under the same hub. FestPointRule is scoped by event_id, so a region child
      * (its own separate event) never inherits rules edited on the hub — marks entered

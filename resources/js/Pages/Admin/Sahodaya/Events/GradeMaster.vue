@@ -4,6 +4,9 @@
         <PageHeader :title="`${event.title} — Grade Master`" eyebrow="Grade master"
                     description="Map score ranges to grades, used for mark entry and results.">
             <template #actions>
+                <button type="button" class="btn-secondary text-sm" :disabled="applyingDefaults" @click="applyDefaultGrading">
+                    {{ applyingDefaults ? 'Applying…' : '⚡ Apply Default Kalotsav Grading' }}
+                </button>
                 <button v-if="isHubWithRegions" type="button" class="btn-secondary text-sm"
                         :disabled="syncingToRegions || !props.gradeConfigs.length" :title="!props.gradeConfigs.length ? 'Add bands here first' : ''"
                         @click="syncToRegions">
@@ -182,6 +185,19 @@ function switchSportEvent(value) {
 // since it's the one screen meant to hold the shared/canonical band set.
 const isHubWithRegions = computed(() => props.childEvents.length > 1 && String(props.event.id) === String(props.childEvents[0]?.id));
 const regionCount = computed(() => Math.max(props.childEvents.length - 1, 0));
+
+const applyingDefaults = ref(false);
+async function applyDefaultGrading() {
+    const ok = await confirm({
+        message: 'Load the standard Kalotsav grade bands (A/B/C/No Grade) and Grade Points Master table onto this event? Any existing band or point rule that matches one of the standard combinations (same grade, item, position, and individual/group type) will be overwritten with the standard value — anything else you\'ve configured is left as-is.',
+    });
+    if (!ok) return;
+    applyingDefaults.value = true;
+    router.post(`${base.value}/grading/apply-default-kalotsav`, {}, {
+        preserveScroll: true,
+        onFinish: () => { applyingDefaults.value = false; },
+    });
+}
 
 const syncingToRegions = ref(false);
 function syncToRegions() {
