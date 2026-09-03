@@ -4,7 +4,7 @@
 @endphp
 @if($show)
 <div class="fixed right-0 top-1/2 -translate-y-1/2 z-50">
-    <a href="#mandatory-disclosure"
+    <a href="/disclosure"
        class="flex flex-col items-center gap-1.5 text-white shadow-lg px-2.5 py-4 rounded-l-xl hover:pr-3.5 transition-all"
        style="background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-secondary, var(--color-primary)) 100%)"
        aria-label="CBSE Affiliated — view mandatory public disclosure">

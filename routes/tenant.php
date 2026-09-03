@@ -112,13 +112,17 @@ Route::middleware([
         Route::get('/results/{boardResult}/download', [\App\Http\Controllers\Public\SchoolResultsController::class, 'downloadPdf'])->name('tenant.results.download');
 
         // CKSC-style CMS pages (must be registered before /gallery/{slug})
-        Route::get('/about', fn () => app(SahodayaCmsPageController::class)->show('about'))->name('tenant.sahodaya.about');
+        Route::get('/about', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'about'))->name('tenant.sahodaya.about');
+        Route::get('/academics', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'academics'))->name('tenant.site.academics');
+        Route::get('/admissions', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'admissions'))->name('tenant.site.admissions');
+        Route::get('/disclosure', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'disclosure'))->name('tenant.site.disclosure');
+        Route::get('/mandatory-disclosure', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'disclosure'))->name('tenant.site.mandatory-disclosure');
         Route::get('/executive', fn () => app(SahodayaCmsPageController::class)->show('executive'))->name('tenant.sahodaya.executive');
-        Route::get('/contact', fn () => app(SahodayaCmsPageController::class)->show('contact'))->name('tenant.sahodaya.contact');
+        Route::get('/contact', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'contact'))->name('tenant.sahodaya.contact');
         Route::post('/contact', [\App\Http\Controllers\Public\AdmissionEnquiryController::class, 'store'])->name('tenant.contact.submit');
         Route::post('/enquire', [\App\Http\Controllers\Public\AdmissionEnquiryController::class, 'store'])->name('tenant.enquiry.submit');
         Route::post('/alumni-register', [\App\Http\Controllers\Public\AlumniPublicController::class, 'store'])->name('alumni.register');
-        Route::get('/contactus', fn () => app(SahodayaCmsPageController::class)->show('contact'));
+        Route::get('/contactus', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'contact'));
         Route::get('/downloads', fn () => app(SahodayaCmsPageController::class)->show('downloads'))->name('tenant.sahodaya.downloads');
         Route::get('/download', fn () => app(SahodayaCmsPageController::class)->show('downloads'));
         Route::get('/gallery/function', fn () => app(SahodayaCmsPageController::class)->show('gallery/function'))->name('tenant.sahodaya.gallery.function');

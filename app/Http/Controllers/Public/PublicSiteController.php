@@ -51,6 +51,91 @@ class PublicSiteController extends Controller
         ]);
     }
 
+    public function page(Request $request, string $page)
+    {
+        $tenant = $this->resolveTenant();
+        $site = WebsiteSite::ensurePrimary($tenant->id);
+        $allSections = $site->sectionQuery()->forPublic()->orderBy('display_order')->get();
+
+        $pageLower = strtolower(trim($page));
+        switch ($pageLower) {
+            case 'about':
+            case 'about-us':
+                $pageConfig = [
+                    'title' => $tenant->type === 'school' ? 'About Our School' : 'About Sahodaya',
+                    'eyebrow' => $tenant->type === 'school' ? 'Vision & Values' : 'Network Vision & Leadership',
+                    'subheading' => 'Fostering academic excellence, character building, and holistic education.',
+                    'section_types' => ['about', 'about_sahodaya', 'facilities', 'statistics'],
+                ];
+                break;
+            case 'academics':
+            case 'academic':
+            case 'courses':
+                $pageConfig = [
+                    'title' => 'Academic Programmes',
+                    'eyebrow' => 'CBSE Curriculum',
+                    'subheading' => 'Comprehensive academic curriculum, innovative teaching methods, and student development.',
+                    'section_types' => ['academic_programmes', 'board_results'],
+                ];
+                break;
+            case 'admissions':
+            case 'admission':
+                $pageConfig = [
+                    'title' => 'Admissions',
+                    'eyebrow' => 'Join Our School',
+                    'subheading' => 'Admission details, eligibility criteria, and application enquiry desk.',
+                    'section_types' => ['admissions'],
+                ];
+                break;
+            case 'disclosure':
+            case 'mandatory-disclosure':
+            case 'cbse-disclosure':
+                $pageConfig = [
+                    'title' => 'CBSE Mandatory Public Disclosure',
+                    'eyebrow' => 'CBSE Affiliation Bye-Laws',
+                    'subheading' => 'Mandatory public disclosures, affiliation documents, infrastructure, and governance.',
+                    'section_types' => ['mandatory_disclosure'],
+                ];
+                break;
+            case 'contact':
+            case 'contact-us':
+                $pageConfig = [
+                    'title' => 'Contact Us',
+                    'eyebrow' => 'Get In Touch',
+                    'subheading' => 'Contact our administrative desk or send us an enquiry.',
+                    'section_types' => ['contact'],
+                ];
+                break;
+            default:
+                $pageConfig = [
+                    'title' => ucfirst(str_replace('-', ' ', $page)),
+                    'eyebrow' => $tenant->name ?? 'Portal',
+                    'subheading' => 'Official page for ' . ($tenant->name ?? 'School') . '.',
+                    'section_types' => [str_replace('-', '_', $pageLower)],
+                ];
+                break;
+        }
+
+        $filteredSections = $allSections->filter(function ($section) use ($pageConfig) {
+            return in_array($section->section_type, $pageConfig['section_types'], true);
+        });
+
+        if ($filteredSections->isEmpty()) {
+            $filteredSections = $allSections->reject(fn ($s) => $s->section_type === 'hero');
+        }
+
+        return $this->renderPublic('public.microsite.page', $tenant, [
+            'sections' => $filteredSections,
+            'allSections' => $allSections,
+            'microsite' => null,
+            'site' => $site,
+            'pageConfig' => $pageConfig,
+            'activePage' => $page,
+            'pageSeo' => array_merge($site->seo_json ?? [], ['title' => $pageConfig['title'] . ' | ' . ($tenant->name ?? 'School')]),
+            'experience' => $this->experienceData($site),
+        ]);
+    }
+
     public function microsite(Request $request, string $slug)
     {
         $tenant = $this->resolveTenant();

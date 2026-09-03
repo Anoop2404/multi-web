@@ -18,7 +18,7 @@ class SchoolPortalNavLinks
             // real school sites keep staff/admin access out of the main nav. The
             // student/parent/teacher self-service portal is genuinely useful to
             // visitors though, so that's what the default CTA button points to.
-            'show_in_navbar'    => true,
+            'show_in_navbar'    => false,
             'show_in_menu'      => false,
             'register_label'    => 'Admissions',
             'register_url'      => self::ADMISSIONS_URL,
