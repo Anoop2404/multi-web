@@ -1,19 +1,27 @@
 {{-- Top Micro Announcement Ticker Bar --}}
+@php
+    $latestCircular = isset($tenant) ? \App\Support\SahodayaPublicData::latestCirculars($tenant->id, 1)->first() : null;
+    $tickerSchoolCount = isset($tenant) ? \App\Support\SahodayaPublicData::memberSchools($tenant->id)->count() : null;
+@endphp
 <div class="bg-slate-950 text-white text-[11px] font-semibold py-1.5 px-4 border-b border-white/10 hidden sm:block">
     <div class="max-w-[1440px] mx-auto flex items-center justify-between gap-4">
         <div class="flex items-center gap-2 truncate">
+            @if($latestCircular)
             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-accent text-white" style="background-color: var(--color-accent, #f59e0b);">
                 <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                Urgent Circular
+                Latest Circular
             </span>
-            <span class="text-slate-300 truncate">CBSE Affiliation Renewal Guidelines & Event Schedules Published</span>
+            <a href="{{ route('tenant.circulars.download', $latestCircular) }}" class="text-slate-300 truncate hover:text-white transition">{{ $latestCircular->title }}</a>
+            @endif
         </div>
         <div class="flex items-center gap-4 shrink-0 text-slate-300 text-[10px]">
+            @if($tickerSchoolCount)
             <span class="flex items-center gap-1">
                 <svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582"/></svg>
-                80+ CBSE Schools
+                {{ $tickerSchoolCount }} CBSE Schools
             </span>
-            <a href="/#contact" class="hover:text-amber-400 font-bold transition">Secretariat Helpdesk</a>
+            @endif
+            <a href="/contact" class="hover:text-amber-400 font-bold transition">Secretariat Helpdesk</a>
         </div>
     </div>
 </div>

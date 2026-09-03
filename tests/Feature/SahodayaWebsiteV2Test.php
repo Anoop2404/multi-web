@@ -87,6 +87,10 @@ class SahodayaWebsiteV2Test extends TestCase
             // links out to the dedicated Member Schools page.
             ->assertSee('Find a Member School')
             ->assertSee('href="/member-schools"', false)
+            // The top ticker bar used to hardcode a fake circular + school count
+            // for every tenant regardless of real data.
+            ->assertDontSee('CBSE Affiliation Renewal Guidelines & Event Schedules Published')
+            ->assertDontSee('80+ CBSE Schools')
             ->assertDontSee('Search by school name, district or location.');
     }
 
