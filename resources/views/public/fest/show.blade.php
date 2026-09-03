@@ -49,7 +49,11 @@
                 @else
                 <div class="p-4 bg-slate-900/30 border border-slate-800/60 rounded-2xl text-sm text-white/40">Schedule not published</div>
                 @endif
+                @if($event->status === 'completed')
+                <a href="{{ route('tenant.fest.live', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Final Standings <span class="float-right text-white/30">→</span></a>
+                @else
                 <a href="{{ route('tenant.fest.live', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Live Event <span class="float-right text-red-400">●</span></a>
+                @endif
                 @if($scopeResultsPublished || ($isAdminPreview ?? false))
                 <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id]) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Event Scoreboard <span class="float-right text-amber-400">→</span></a>
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'toppers']) }}" class="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:border-amber-500/50 hover:bg-slate-900 transition font-semibold">Topper Highlights <span class="float-right text-amber-400">→</span></a>
@@ -76,7 +80,7 @@
                 @foreach($recentResults as $itemGroup)
                 <a href="{{ route('tenant.fest.item-results', [$event->id, $itemGroup['item_id']]) }}" class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden hover:border-amber-500/50 hover:bg-slate-900 transition">
                     <div class="px-4 py-3 border-b border-slate-800/60">
-                        <h3 class="font-bold text-white truncate uppercase">{{ $itemGroup['item'] }}</h3>
+                        <h3 class="font-bold text-white uppercase">{{ $itemGroup['item'] }}</h3>
                     </div>
                     <div class="flex flex-wrap">
                         @foreach($itemGroup['winners'] as $winner)
@@ -102,7 +106,7 @@
                                     </div>
                                     @endforeach
                                 </div>
-                                <p class="text-xs text-white/40 mt-3 truncate uppercase">{{ $winner['school'] }}</p>
+                                <p class="text-xs text-white/40 mt-3 uppercase">{{ $winner['school'] }}</p>
                             </div>
                         </div>
                         @endforeach
@@ -146,8 +150,8 @@
                     </div>
                     <div class="mt-auto pt-4 flex gap-2">
                         @if(($scopeSchedulePublished || ($isAdminPreview ?? false)) && $scheduledItemIds->contains($item->id))<a href="{{ route('tenant.fest.item-schedule', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold text-white hover:bg-white/15">Schedule</a>@endif
-                        @if($item->results_published_at || $scopeResultsPublished || ($isAdminPreview ?? false))<a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>@endif
-                        @if(!($scopeSchedulePublished || ($isAdminPreview ?? false) && $scheduledItemIds->contains($item->id)) && !($item->results_published_at || $scopeResultsPublished || ($isAdminPreview ?? false)))
+                        @if(($item->results_published_at || $scopeResultsPublished || ($isAdminPreview ?? false)) && !$item->results_hidden)<a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>@endif
+                        @if(!(($scopeSchedulePublished || ($isAdminPreview ?? false)) && $scheduledItemIds->contains($item->id)) && !(($item->results_published_at || $scopeResultsPublished || ($isAdminPreview ?? false)) && !$item->results_hidden))
                         <span class="flex-1 rounded-xl border border-dashed border-slate-700 px-3 py-2 text-center text-xs font-semibold text-white/30">Not yet published</span>
                         @endif
                     </div>

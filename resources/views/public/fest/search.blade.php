@@ -14,7 +14,7 @@
         @unless($nameSearch)
         <p class="text-xs text-white/40 mb-6">Names are hidden until results are published. Search by chest number or level registration number.</p>
         @else
-        <p class="mb-6"></p>
+        <p class="text-xs text-white/40 mb-6">Search by name, chest number, or level registration number.</p>
         @endunless
         <ul class="divide-y divide-slate-800 bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
             @forelse($results as $p)
@@ -27,6 +27,8 @@
                     <span class="text-white/40 font-normal">(name hidden until results)</span>
                     @endif
                 </a>
+                @else
+                <span class="font-medium text-white/40 font-normal">(name hidden until results)</span>
                 @endif
                 <p class="text-xs text-white/40">{{ $p['item_title'] ?? '' }}{{ ($p['item_title'] ?? null) && ($p['category_label'] ?? null) ? ' · ' : '' }}{{ $p['category_label'] ?? '' }}{{ (($p['item_title'] ?? null) || ($p['category_label'] ?? null)) && ($p['school'] ?? null) ? ' · ' : '' }}{{ $p['school'] ?? '' }}</p>
             </li>

@@ -71,7 +71,7 @@
                             <h3 class="font-bold px-4 py-3 bg-white/5 border-b border-slate-800 text-white">{{ $board['label'] }}</h3>
                             <ol class="divide-y divide-slate-800">
                                 @foreach($board['rows'] as $row)
-                                <li class="flex items-center gap-3 px-4 py-3"><span class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span><span class="font-semibold text-sm flex-1 min-w-0 truncate text-white uppercase">{{ $row['school_name'] }}</span><span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span></li>
+                                <li class="flex items-center gap-3 px-4 py-3"><span class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span><span class="font-semibold text-sm flex-1 min-w-0 text-white uppercase">{{ $row['school_name'] }}</span><span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span></li>
                                 @endforeach
                             </ol>
                         </article>
@@ -91,7 +91,7 @@
                                 @foreach($group['rows'] as $row)
                                 <li class="flex items-center gap-3 px-4 py-3">
                                     @if($row['photo'] ?? null)<img src="{{ $row['photo'] }}" alt="" class="w-10 h-10 rounded-xl object-cover object-top border border-slate-700 shrink-0">@else<span class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-sm font-extrabold text-amber-400 shrink-0">{{ strtoupper(substr($row['student'] ?? '?', 0, 1)) }}</span>@endif
-                                    <div class="min-w-0 flex-1"><p class="font-bold text-sm truncate text-white uppercase"><span class="text-amber-400 mr-1">#{{ $row['category_rank'] }}</span>{{ $row['student'] }}</p><p class="text-xs text-white/40 truncate mt-0.5 uppercase">{{ $row['school'] }}</p></div><span class="font-mono font-bold text-white">{{ $row['points'] }}</span>
+                                    <div class="min-w-0 flex-1"><p class="font-bold text-sm text-white uppercase"><span class="text-amber-400 mr-1">#{{ $row['category_rank'] }}</span>{{ $row['student'] }}</p><p class="text-xs text-white/40 mt-0.5 uppercase">{{ $row['school'] }}</p></div><span class="font-mono font-bold text-white">{{ $row['points'] }}</span>
                                 </li>
                                 @endforeach
                             </ol>
@@ -188,19 +188,14 @@
                 <table class="w-full text-sm">
                     <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
                         <tr>
-                            {{-- <th class="p-3">Rank</th> --}}
                             <th class="p-3">School</th>
                             <th class="p-3 text-right">Points</th>
                             <th class="p-3 w-10"><span class="sr-only">View full roster</span></th>
-                            {{-- <th class="p-3 text-center" title="Gold — 1st place finishes"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold" class="w-5 h-5 inline-block"></th> --}}
-                            {{-- <th class="p-3 text-center" title="Silver — 2nd place finishes"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Silver" class="w-5 h-5 inline-block"></th> --}}
-                            {{-- <th class="p-3 text-center" title="Bronze — 3rd place finishes"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Bronze" class="w-5 h-5 inline-block"></th> --}}
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
                         @forelse($schoolBoard as $row)
                             <tr>
-                                {{-- <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td> --}}
                                 <td class="p-3 font-semibold text-white uppercase">
                                     <button type="button" data-jump-to-school="{{ $row['school_id'] }}" class="hover:text-amber-400 hover:underline text-left">{{ $row['school_name'] }}</button>
                                 </td>
@@ -215,9 +210,6 @@
                                         </svg>
                                     </a>
                                 </td>
-                                {{-- <td class="p-3 text-center font-mono {{ $row['gold'] ? 'font-bold text-amber-400' : 'text-white/20' }}">{{ $row['gold'] }}</td> --}}
-                                {{-- <td class="p-3 text-center font-mono {{ $row['silver'] ? 'font-bold text-slate-300' : 'text-white/20' }}">{{ $row['silver'] }}</td> --}}
-                                {{-- <td class="p-3 text-center font-mono {{ $row['bronze'] ? 'font-bold text-orange-400' : 'text-white/20' }}">{{ $row['bronze'] }}</td> --}}
                             </tr>
                         @empty
                             <tr><td colspan="3" class="p-8 text-center text-white/30">No school points published yet.</td></tr>
@@ -250,7 +242,7 @@
                     @foreach($schoolWinnersBoard as $row)
                     <article class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden" data-school-winner-card data-school-id="{{ $row['school_id'] }}">
                         <div class="flex items-center justify-between gap-3 px-4 py-3 bg-white/5 border-b border-slate-800">
-                            <h3 class="font-bold text-white uppercase truncate">{{ $row['school_name'] }}</h3>
+                            <h3 class="font-bold text-white uppercase">{{ $row['school_name'] }}</h3>
                             <span class="text-xs font-bold text-amber-400 shrink-0">{{ $row['total_points'] }} pts</span>
                         </div>
                         <ol class="divide-y divide-slate-800">
@@ -278,10 +270,10 @@
                                     @endforeach
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <p class="text-sm text-white truncate">{{ $winner['item'] }}</p>
-                                    <p class="text-[11px] text-white/40 truncate mt-0.5">{{ $winner['category'] }} · {{ $winner['participant_type'] }}</p>
+                                    <p class="text-sm text-white">{{ $winner['item'] }}</p>
+                                    <p class="text-[11px] text-white/40 mt-0.5">{{ $winner['category'] }} · {{ $winner['participant_type'] }}</p>
                                     @if($rosterNames->isNotEmpty())
-                                        <p class="text-[11px] text-white/60 truncate mt-0.5 uppercase">{{ $rosterNames->take(3)->implode(', ') }}{{ $rosterNames->count() > 3 ? ' +'.($rosterNames->count() - 3) : '' }}</p>
+                                        <p class="text-[11px] text-white/60 mt-0.5 uppercase">{{ $rosterNames->take(3)->implode(', ') }}{{ $rosterNames->count() > 3 ? ' +'.($rosterNames->count() - 3) : '' }}</p>
                                     @endif
                                 </div>
                                 @if(!empty($winner['grade']))
@@ -424,7 +416,7 @@
                                                     </div>
                                                     @endforeach
                                                 </div>
-                                                <p class="text-xs text-white/40 mt-3 truncate uppercase">{{ $winner['school'] }}</p>
+                                                <p class="text-xs text-white/40 mt-3 uppercase">{{ $winner['school'] }}</p>
                                             </div>
                                         </div>
                                         @endforeach
@@ -440,6 +432,10 @@
             <div id="result-item-empty" class="hidden rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">No published item results match those filters.</div>
         @elseif($tab === 'individual')
             <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
+                <div class="px-4 py-3 bg-white/5 border-b border-slate-800">
+                    <h2 class="font-bold text-white">Individual Results</h2>
+                    <p class="text-xs text-white/40">Every published result, one row per participant — not the same as the Championship tab's cumulative points.</p>
+                </div>
                 <table class="w-full text-sm">
                     <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
                         <tr><th class="p-3">Participant</th><th class="p-3">School</th><th class="p-3">Item</th><th class="p-3 text-right">Points</th><th class="p-3">Position</th><th class="p-3">Grade</th></tr>
@@ -472,8 +468,8 @@
         @else
             <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
                 <div class="px-4 py-3 bg-white/5 border-b border-slate-800">
-                    <h2 class="font-bold text-white">Individual Championship</h2>
-                    <p class="text-xs text-white/40">Total points across the whole meet, per student.</p>
+                    <h2 class="font-bold text-white">Championship Standings</h2>
+                    <p class="text-xs text-white/40">Cumulative individual championship points across the whole meet, per student — not the same as the Individual tab's per-result list.</p>
                 </div>
                 <table class="w-full text-sm">
                     <thead class="bg-white/5 text-left text-xs uppercase text-white/40">

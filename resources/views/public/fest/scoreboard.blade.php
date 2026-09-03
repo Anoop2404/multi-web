@@ -15,7 +15,7 @@
                         @else
                         <span class="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-extrabold shrink-0">#1</span>
                         @endif
-                        <div class="min-w-0"><p class="text-xs uppercase tracking-widest text-amber-400 font-extrabold truncate">{{ $tenant->name ?? 'Sahodaya Complex' }}</p><p class="text-[11px] text-slate-400">Official public scoreboard</p></div>
+                        <div class="min-w-0"><p class="text-xs uppercase tracking-widest text-amber-400 font-extrabold">{{ $tenant->name ?? 'Sahodaya Complex' }}</p><p class="text-[11px] text-slate-400">Official public scoreboard</p></div>
                     </div>
                     <div>
                         <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight font-heading text-white">{{ $event->title }}</h1>

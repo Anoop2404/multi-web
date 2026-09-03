@@ -6,20 +6,26 @@
         ? '<img src="'.asset('images/fest/medals/rank-'.$rank.'.webp').'" alt="Rank '.$rank.'" class="inline-block w-5 h-5 align-middle">'
         : '<span class="font-mono">#'.$rank.'</span>';
 @endphp
-<section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen" id="fest-live-root" data-live-url="{{ route('tenant.fest.live.data', ['event' => $event->id]) }}">
+<section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen" id="fest-live-root" data-live-url="{{ route('tenant.fest.live.data', ['event' => $event->id]) }}" data-event-status="{{ $event->status }}">
     <div class="max-w-2xl mx-auto">
 
-        <header class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-red-500/20 p-6 sm:p-8 text-center shadow-2xl">
+        <header class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border {{ $event->status === 'completed' ? 'border-slate-700' : 'border-red-500/20' }} p-6 sm:p-8 text-center shadow-2xl">
             <div aria-hidden="true" class="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-red-500/10 blur-3xl"></div>
             <div aria-hidden="true" class="absolute -left-16 -bottom-16 h-56 w-56 rounded-full bg-amber-500/10 blur-3xl"></div>
             <div class="relative">
+                @if($event->status === 'completed')
+                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-white/10 text-white/60 border border-white/20">
+                    EVENT COMPLETED
+                </span>
+                @else
                 <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-red-500/15 text-red-300 border border-red-500/30">
                     <span class="relative flex h-2 w-2" aria-hidden="true"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-red-400"></span></span>
                     LIVE
                 </span>
+                @endif
                 <h1 class="text-2xl sm:text-3xl font-extrabold font-heading mt-3 text-white">{{ $event->title }}</h1>
                 @if($event->resolvedVenueName())<p class="text-sm text-white/50 mt-2">📍 {{ $event->resolvedVenueName() }}</p>@endif
-                <p id="live-refresh-badge" class="text-[11px] text-white/30 mt-3" aria-live="polite">Auto-refreshing every 30 seconds</p>
+                <p id="live-refresh-badge" class="text-[11px] text-white/30 mt-3" aria-live="polite">{{ $event->status === 'completed' ? 'Final standings — this event has ended' : 'Auto-refreshing every 30 seconds' }}</p>
             </div>
         </header>
 
@@ -53,7 +59,7 @@
                 @forelse($scoreboard as $row)
                 <li class="grid grid-cols-[2rem_1fr_repeat(3,2.25rem)_3.5rem] gap-1.5 items-center px-3 py-2.5">
                     <span class="flex items-center">{!! $medalImg($row['rank']) !!}</span>
-                    <span class="text-white font-semibold text-sm truncate uppercase">{{ $row['school_name'] }}</span>
+                    <span class="text-white font-semibold text-sm uppercase">{{ $row['school_name'] }}</span>
                     <span class="text-center font-mono font-bold text-amber-300 text-sm">{{ $row['gold'] ?? 0 }}</span>
                     <span class="text-center font-mono font-bold text-slate-300 text-sm">{{ $row['silver'] ?? 0 }}</span>
                     <span class="text-center font-mono font-bold text-amber-600 text-sm">{{ $row['bronze'] ?? 0 }}</span>
@@ -65,7 +71,7 @@
             </ol>
         </div>
 
-        @if(count($houseScoreboard))
+        <div id="house-scoreboard-section" @if(!count($houseScoreboard)) hidden @endif>
         <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">House Standings</h2>
         <ol id="house-scoreboard" class="space-y-2">
             @foreach($houseScoreboard as $row)
@@ -75,12 +81,12 @@
             </li>
             @endforeach
         </ol>
-        @endif
+        </div>
 
-        @if(count($athleticRecords ?? []))
+        <div id="athletic-records-section" @if(!count($athleticRecords ?? [])) hidden @endif>
         <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Athletic Records</h2>
         <ol id="athletic-records" class="space-y-2 text-sm">
-            @foreach($athleticRecords as $r)
+            @foreach($athleticRecords ?? [] as $r)
             <li class="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3 text-white/80">
                 <span class="font-medium text-white">{{ $r['item'] }}</span>
                 <span class="text-white/40"> · {{ $r['class_group'] }} {{ $r['gender'] }}</span>
@@ -88,28 +94,28 @@
             </li>
             @endforeach
         </ol>
-        @endif
+        </div>
 
-        @if(count($recentBreaks ?? []))
+        <div id="recent-breaks-section" @if(!count($recentBreaks ?? [])) hidden @endif>
         <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Recent Record Breaks</h2>
         <ul id="recent-breaks" class="space-y-2 text-sm">
-            @foreach($recentBreaks as $b)
+            @foreach($recentBreaks ?? [] as $b)
             <li class="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
                 <strong class="text-white">{{ $b['name'] ?? 'Participant' }}</strong> <span class="text-white/60">— {{ $b['item'] }}</span>
                 <span class="block text-amber-300 font-mono mt-1">{{ $b['new_value'] }} {{ $b['unit'] }} · {{ $b['prize_label'] }}</span>
             </li>
             @endforeach
         </ul>
-        @endif
+        </div>
 
-        @if(count($categoryLinks ?? []))
+        <div id="category-links-section" @if(!count($categoryLinks ?? [])) hidden @endif>
         <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Category Scoreboards</h2>
         <div id="category-links" class="flex flex-wrap gap-2">
-            @foreach($categoryLinks as $link)
+            @foreach($categoryLinks ?? [] as $link)
             <a href="{{ $link['url'] }}" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-900/60 border border-slate-800 text-white/70 hover:border-amber-500/50 hover:text-white transition">{{ $link['label'] }}</a>
             @endforeach
         </div>
-        @endif
+        </div>
 
         <p class="mt-10 pt-6 border-t border-slate-800 text-center flex flex-wrap justify-center gap-5 text-xs">
             <a href="{{ route('tenant.fest.records', $event->id) }}" class="text-amber-400 font-semibold hover:underline">All records →</a>
@@ -122,6 +128,7 @@
     const root = document.getElementById('fest-live-root');
     if (!root) return;
     const url = root.dataset.liveUrl;
+    const isCompleted = root.dataset.eventStatus === 'completed';
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const medalFor = (rank) => (rank >= 1 && rank <= 3)
         ? `<img src="/images/fest/medals/rank-${rank}.webp" alt="Rank ${rank}" class="inline-block w-5 h-5 align-middle">`
@@ -138,7 +145,7 @@
         }
         el.innerHTML = rows.map(r => `<li class="grid grid-cols-[2rem_1fr_repeat(3,2.25rem)_3.5rem] gap-1.5 items-center px-3 py-2.5">
             <span class="flex items-center">${medalFor(r.rank)}</span>
-            <span class="text-white font-semibold text-sm truncate uppercase">${esc(r.school_name)}</span>
+            <span class="text-white font-semibold text-sm uppercase">${esc(r.school_name)}</span>
             <span class="text-center font-mono font-bold text-amber-300 text-sm">${esc(r.gold || 0)}</span>
             <span class="text-center font-mono font-bold text-slate-300 text-sm">${esc(r.silver || 0)}</span>
             <span class="text-center font-mono font-bold text-amber-600 text-sm">${esc(r.bronze || 0)}</span>
@@ -146,11 +153,42 @@
     }
 
     function renderHouse(rows) {
+        const section = document.getElementById('house-scoreboard-section');
         const el = document.getElementById('house-scoreboard');
+        if (section) section.hidden = !rows.length;
         if (!el) return;
         el.innerHTML = rows.map(r => `<li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
             <span class="text-white flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-full" style="background:${esc(r.color || '#fbbf24')}"></span>${medalFor(r.rank)} ${esc(r.house_name)}</span>
             <span class="font-mono font-bold text-white">${esc(r.total_points)}</span></li>`).join('');
+    }
+
+    function renderAthleticRecords(rows) {
+        const section = document.getElementById('athletic-records-section');
+        const el = document.getElementById('athletic-records');
+        if (section) section.hidden = !rows.length;
+        if (!el) return;
+        el.innerHTML = rows.map(r => `<li class="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3 text-white/80">
+            <span class="font-medium text-white">${esc(r.item)}</span>
+            <span class="text-white/40"> · ${esc(r.class_group)} ${esc(r.gender)}</span>
+            <span class="float-right font-mono text-amber-300">${esc(r.value)} ${esc(r.unit)}</span></li>`).join('');
+    }
+
+    function renderRecentBreaks(rows) {
+        const section = document.getElementById('recent-breaks-section');
+        const el = document.getElementById('recent-breaks');
+        if (section) section.hidden = !rows.length;
+        if (!el) return;
+        el.innerHTML = rows.map(b => `<li class="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+            <strong class="text-white">${esc(b.name || 'Participant')}</strong> <span class="text-white/60">— ${esc(b.item)}</span>
+            <span class="block text-amber-300 font-mono mt-1">${esc(b.new_value)} ${esc(b.unit)} · ${esc(b.prize_label)}</span></li>`).join('');
+    }
+
+    function renderCategoryLinks(links) {
+        const section = document.getElementById('category-links-section');
+        const el = document.getElementById('category-links');
+        if (section) section.hidden = !links.length;
+        if (!el) return;
+        el.innerHTML = links.map(l => `<a href="${esc(l.url)}" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-900/60 border border-slate-800 text-white/70 hover:border-amber-500/50 hover:text-white transition">${esc(l.label)}</a>`).join('');
     }
 
     function renderNow(p) {
@@ -171,13 +209,16 @@
             const data = await res.json();
             renderSchool(data.scoreboard || [], Boolean(data.standingsPublished), Boolean(data.standingsProvisional));
             renderHouse(data.houseScoreboard || []);
+            renderAthleticRecords(data.athleticRecords || []);
+            renderRecentBreaks(data.recentBreaks || []);
+            renderCategoryLinks(data.categoryLinks || []);
             renderNow(data.nowPerforming);
             const badge = document.getElementById('live-refresh-badge');
             if (badge && data.refreshedAt) badge.textContent = 'Updated ' + new Date(data.refreshedAt).toLocaleTimeString();
         } catch (e) { /* silent */ }
     }
 
-    setInterval(refresh, 30000);
+    if (!isCompleted) setInterval(refresh, 30000);
 })();
 </script>
 @endsection

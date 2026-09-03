@@ -24,7 +24,7 @@
             @if($public['school'])
             <div class="min-w-0">
                 <p class="text-[11px] uppercase tracking-wide text-white/40 font-bold">School</p>
-                <p class="font-bold text-white truncate uppercase">{{ $public['school'] }}</p>
+                <p class="font-bold text-white uppercase">{{ $public['school'] }}</p>
             </div>
             @endif
         </div>

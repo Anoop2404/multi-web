@@ -55,13 +55,17 @@ class FestPublicResultsTeamRosterTest extends TestCase
             'schedule_published' => true,
         ]);
 
-        // Individual item: Alpha takes gold, Beta takes silver.
+        // Individual item: Alpha takes gold, Beta takes silver. results_published_at is
+        // required in its own right now — an item's marks only show on /results once
+        // that item itself has published, the whole event's results_published flag no
+        // longer being a substitute (see FestPortalController::results()'s $marks query).
         $soloItem = FestEventItem::create([
             'event_id' => $this->event->id,
             'title' => 'Solo Song',
             'participant_type' => 'individual',
             'class_group' => 'hs',
             'is_enabled' => true,
+            'results_published_at' => now(),
         ]);
         $this->markSolo($soloItem, $this->schoolA, 'Anu Krishna', 1);
         $this->markSolo($soloItem, $this->schoolB, 'Beena Thomas', 2);
@@ -75,6 +79,7 @@ class FestPublicResultsTeamRosterTest extends TestCase
             'participant_type' => 'group',
             'class_group' => 'hs',
             'is_enabled' => true,
+            'results_published_at' => now(),
         ]);
         $this->markGroup($groupItem, $this->schoolA, ['Ravi Nair', 'Sita Menon', 'Meera Pillai'], 1);
 

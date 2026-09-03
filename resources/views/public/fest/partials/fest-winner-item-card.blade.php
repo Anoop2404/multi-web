@@ -1,7 +1,7 @@
 <article class="rounded-2xl bg-slate-900 border border-slate-800 shadow-md overflow-hidden">
     <div class="px-4 py-2.5 bg-white/5 border-b border-slate-800">
-        <p class="font-bold text-white text-sm truncate uppercase">{{ $itemGroup['item'] }}</p>
-        @if($itemGroup['head'])<p class="text-[11px] text-white/40 truncate">{{ $itemGroup['head'] }}</p>@endif
+        <p class="font-bold text-white text-sm uppercase">{{ $itemGroup['item'] }}</p>
+        @if($itemGroup['head'])<p class="text-[11px] text-white/40">{{ $itemGroup['head'] }}</p>@endif
     </div>
     {{-- flex-wrap, not divide-y: multiple awarded positions for the same item sit side by
          side in one row (wrapping only if there's genuinely no room), instead of stacking
@@ -44,7 +44,7 @@
                     </div>
                     @endif
                 </div>
-                <p class="text-xs text-slate-400 mt-3 truncate uppercase">{{ $winner['school'] }}</p>
+                <p class="text-xs text-slate-400 mt-3 uppercase">{{ $winner['school'] }}</p>
             </div>
         </div>
         @endforeach

@@ -16,7 +16,7 @@
     <header class="flex items-start justify-between gap-8 mb-5 pb-4 border-b border-slate-800 shrink-0">
         <div class="min-w-0">
             <p class="text-amber-400 font-extrabold uppercase tracking-widest text-sm">{{ $tenant->name ?? 'Sahodaya' }} · Live Screen</p>
-            <h1 class="text-3xl font-extrabold font-heading text-white mt-1 leading-tight truncate">{{ $event->title }}</h1>
+            <h1 class="text-3xl font-extrabold font-heading text-white mt-1 leading-tight line-clamp-2">{{ $event->title }}</h1>
         </div>
         <div class="text-right shrink-0">
             <div id="tv-clock" class="text-2xl font-mono font-extrabold text-amber-400 tracking-wider">--:--:--</div>

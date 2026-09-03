@@ -72,7 +72,7 @@ class FestPortalController extends Controller
         $itemGroups = FestEventItem::where('event_id', $event->id)
             ->with('head:id,name')
             ->orderBy('display_order')
-            ->get(['id', 'title', 'stage_type', 'category', 'class_group', 'age_group', 'participant_type', 'head_id', 'event_id', 'results_published_at'])
+            ->get(['id', 'title', 'stage_type', 'category', 'class_group', 'age_group', 'participant_type', 'head_id', 'event_id', 'results_published_at', 'results_hidden'])
             ->groupBy('event_id')
             ->map(fn ($groupItems) => [
                 'label' => $event->title,
@@ -100,10 +100,14 @@ class FestPortalController extends Controller
         if ($isResultsPublished) {
             $recentMarks = FestMark::where('event_id', $event->id)
                 ->whereIn('position', [1, 2, 3])
-                // An item explicitly unpublished after the event was published overall
-                // must never resurface here regardless of the event-wide flag — see
-                // FestItemResultsService::isItemVisible()/unpublishItem().
-                ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
+                // Matches the category/toppers scoreboard convention (see the comment on
+                // PublicFestScoreboardService::scoreboard()'s category branch): an item only
+                // belongs here once it has been individually published, and never again once
+                // explicitly unpublished — the event-wide flag alone isn't enough for either
+                // direction. Without whereNotNull() here, "Recently published" surfaced every
+                // item's winners the moment the event overall went public, even ones nobody
+                // had published yet.
+                ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
                 ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school'])
                 ->latest('updated_at')
                 ->limit(200)
@@ -169,7 +173,7 @@ class FestPortalController extends Controller
         $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
         $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
-        abort_unless($isPublished, 403, 'Public scoreboard & results are disabled for this event.');
+        abort_unless($isPublished || $this->hasPublishedItems($selectedScope['event_ids']), 403, 'Public scoreboard & results are disabled for this event.');
 
         $scopes = [$selectedScope];
         $tab = $request->query('tab', $selectedScope['results_published'] ? 'school' : 'item');
@@ -249,10 +253,11 @@ class FestPortalController extends Controller
         // showed zero item results even after results_published was cascaded true.
         $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
             ->whereIn('position', [1, 2, 3])
-            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
-            // Unconditional regardless of $isPublished — an explicitly unpublished item
-            // must never resurface just because the event overall got published later.
-            ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
+            // Unconditional, regardless of $isPublished: an item's own results_published_at
+            // is the only thing that makes its marks visible to the public, whole-event
+            // publish or not — see the comment on PublicFestScoreboardService::scoreboard()'s
+            // category branch for the production leak this convention exists to prevent.
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('item_id')
             ->orderBy('position')
@@ -696,20 +701,30 @@ class FestPortalController extends Controller
         abort_unless($isPublished, 403, 'Public results are disabled for this event.');
         abort_unless($isAdminPreview || app(FestItemResultsService::class)->isItemVisible($item, $event), 403, 'Results for this item are not published yet.');
 
+        $topN = min(50, max(1, $request->integer('top_n') ?: 10));
+
         $marks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
             ->with(['participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('position')
             ->orderByDesc('score')
+            ->limit($topN)
             ->get();
+
+        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event->rootEvent()));
 
         $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($item->title)) ?: 'item';
 
         return Pdf::loadView('fest.reports.item-wise', [
-        'orgName' => $tenant->name ?? 'Sahodaya',
-        'logoSrc' => TenantBranding::logoEmbedSrc($tenant),
-    ])->download("{$slug}-results.pdf");
-}
+            'event'         => $event,
+            'item'          => $item,
+            'categoryLabel' => $categoryLabel,
+            'marks'         => $marks,
+            'topN'          => $topN,
+            'orgName'       => $tenant->name ?? 'Sahodaya',
+            'logoSrc'       => TenantBranding::logoEmbedSrc($tenant),
+        ])->download("{$slug}-results.pdf");
+    }
 
 public function scoreboard(Request $request, int $eventId)
 {
@@ -793,20 +808,16 @@ public function tv(Request $request, int $eventId)
     $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
     $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
-    abort_unless($isPublished, 403, 'Public scoreboard is disabled for this event.');
+    abort_unless($isPublished || $this->hasPublishedItems($selectedScope['event_ids']), 403, 'Public scoreboard is disabled for this event.');
     $categories = $this->scoreboards->categories($event, $selectedScope);
 
     $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
         ->whereIn('position', [1, 2, 3])
         ->with(['item', 'participant.registration.school'])
-        // Same fallback as resolveScoreboard()/scoreboardDynamicData(): before the
-        // whole event is published, only count marks whose own item has published —
-        // so the medal columns line up with the provisional points column instead of
-        // sitting at 0 while points already show real numbers.
-        ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
-        // Unconditional regardless of $isPublished — an explicitly unpublished item
-        // must never resurface just because the event overall got published later.
-        ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
+        // Unconditional, regardless of $isPublished: an item's own results_published_at
+        // is the only thing that makes its marks visible to the public — see the note on
+        // results()'s $marks query above.
+        ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
         ->get()
         ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
         ->unique(fn (FestMark $m) => $m->deduplicationKey());
@@ -1060,7 +1071,7 @@ public function tv(Request $request, int $eventId)
                     ? $this->scoreboards->scoreboard($event, $selectedScope)
                     : $this->scoreboards->provisionalScoreboard($event, $selectedScope));
 
-            $medalTally = $this->schoolMedalTally($selectedScope['event_ids'], true);
+            $medalTally = $this->schoolMedalTally($selectedScope['event_ids']);
             $scoreboard = collect($rawScoreboard)
                 ->map(fn (array $row) => $row + [
                     'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
@@ -1136,30 +1147,36 @@ public function tv(Request $request, int $eventId)
         return $row;
     }
 
-    /** @return array<string, mixed> */
     /**
-     * The official points standing for a scope/category — scoreboard() plus the
-     * cumulative-championship override when one applies. Shared by
-     * scoreboardDynamicData() and tv() so the TV's medal-tally boards can never show a
-     * different point total than the real Scoreboard page for the same category.
-     *
-     * @return array{0: array, 1: ?array}
+     * Whether any item in this scope has been individually published (and not since
+     * hidden again) — the gate for "is there anything at all to show here" on a page
+     * that isn't behind the whole-event results_published flag yet. A school shouldn't
+     * get a blanket 403 on /results or /tv just because the official "Publish Results"
+     * action hasn't run, as long as at least one item has already published on its own.
      */
+    private function hasPublishedItems(array $eventIds): bool
+    {
+        return FestEventItem::whereIn('event_id', $eventIds)
+            ->whereNotNull('results_published_at')
+            ->where('results_hidden', false)
+            ->exists();
+    }
+
     /**
      * Gold/silver/bronze win-counts per school, keyed by school_id — same source marks
-     * tv() uses for its medal columns (top-3 marks, scoped to published items when the
-     * whole event isn't published yet), pulled out here so livePayload() can show the
-     * same breakdown without duplicating the query inline a second time.
+     * tv() uses for its medal columns (top-3 marks, scoped to published items), pulled
+     * out here so livePayload() can show the same breakdown without duplicating the
+     * query inline a second time.
      */
-    private function schoolMedalTally(array $eventIds, bool $isPublished): Collection
+    private function schoolMedalTally(array $eventIds): Collection
     {
         return FestMark::whereIn('event_id', $eventIds)
             ->whereIn('position', [1, 2, 3])
             ->with(['participant.registration.item', 'item'])
-            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
-            // Unconditional regardless of $isPublished — an explicitly unpublished item
-            // must never resurface just because the event overall got published later.
-            ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
+            // Unconditional: an item's own results_published_at is the only thing that
+            // makes its marks visible to the public — see the note on results()'s $marks
+            // query above.
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->get()
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
             ->unique(fn (FestMark $m) => $m->deduplicationKey())
@@ -1171,6 +1188,14 @@ public function tv(Request $request, int $eventId)
             ]);
     }
 
+    /**
+     * The official points standing for a scope/category — scoreboard() plus the
+     * cumulative-championship override when one applies. Shared by
+     * scoreboardDynamicData() and tv() so the TV's medal-tally boards can never show a
+     * different point total than the real Scoreboard page for the same category.
+     *
+     * @return array{0: array, 1: ?array}
+     */
     private function resolveScoreboard(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false): array
     {
         if (! $isPublished) {
@@ -1205,12 +1230,11 @@ public function tv(Request $request, int $eventId)
             // winners should show here (the widget already scrolls its own container).
             ->limit(200)
             // Whole-event publish gates nothing here — matches show()'s $recentResults:
-            // fall back to each item's own results_published_at so items published ahead
-            // of the official whole-event publish still show their winners.
-            ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
-            // Unconditional regardless of $isPublished — an explicitly unpublished item
-            // must never resurface just because the event overall got published later.
-            ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
+            // unconditionally require each item's own results_published_at (was
+            // previously only enforced when !$isPublished, so a mark from an item that
+            // never published on its own would resurface here the moment the event
+            // overall did — the same leak class already fixed on show() and scoreboard()).
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             // Selecting a category tab must scope BOTH panels — without this, Leading
             // Schools filtered to the chosen category while Latest Item Winners kept
             // showing every category's winners, which read as broken/inconsistent.
@@ -1407,6 +1431,8 @@ public function tv(Request $request, int $eventId)
                     'item_id' => $first->item_id,
                     'item_title' => $first->item?->title,
                     'category_label' => FestItemCategoryLabel::resolve($first->item, $classGroupLabels, config('fest_item_taxonomy.arts_category', [])),
+                    'results_published_at' => $first->item?->results_published_at,
+                    'results_hidden' => (bool) $first->item?->results_hidden,
                     'stage' => $first->stage,
                     'sort_order' => $first->sort_order,
                     'participant' => $first->participant

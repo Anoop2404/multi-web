@@ -36,7 +36,7 @@
             <li class="relative overflow-hidden rounded-2xl bg-slate-900 border {{ $rankClass }} p-4 shadow-lg">
                 <div class="absolute inset-y-0 left-0 bg-slate-800/40 pointer-events-none" style="width: {{ $pct }}%" aria-hidden="true"></div>
                 <div class="relative flex items-center justify-between gap-4">
-                    <div class="flex items-center gap-3 min-w-0"><span class="shrink-0 w-10 h-10 rounded-xl {{ $podium ? 'bg-amber-400/20' : 'bg-slate-800 text-slate-300 border border-slate-700' }} flex items-center justify-center font-extrabold">@if($podium)<img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-8 h-8">@else{{ $row['rank'] }}@endif</span><span class="font-bold text-white text-sm sm:text-base truncate">{{ $row['school_name'] }}</span></div>
+                    <div class="flex items-center gap-3 min-w-0"><span class="shrink-0 w-10 h-10 rounded-xl {{ $podium ? 'bg-amber-400/20' : 'bg-slate-800 text-slate-300 border border-slate-700' }} flex items-center justify-center font-extrabold">@if($podium)<img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-8 h-8">@else{{ $row['rank'] }}@endif</span><span class="font-bold text-white text-sm sm:text-base">{{ $row['school_name'] }}</span></div>
                     <div class="flex items-center gap-2 shrink-0">
                         <div class="text-right"><span class="font-mono font-extrabold text-xl text-amber-400">{{ $row['total_points'] }}</span><span class="text-[10px] text-slate-400 uppercase block font-bold">PTS</span></div>
                         <a href="{{ route('tenant.fest.results.school', array_filter(['event' => $event->id, 'school' => $row['school_id'], 'category' => $category ?? null])) }}"
@@ -64,7 +64,7 @@
                 <details class="group">
                     <summary class="list-none cursor-pointer flex items-center gap-3 px-4 py-3 pr-11 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400">
                         <span class="shrink-0 w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span>
-                        <span class="font-semibold text-sm text-white truncate flex-1">{{ $row['school_name'] }}</span>
+                        <span class="font-semibold text-sm text-white flex-1">{{ $row['school_name'] }}</span>
                         <span class="font-mono font-extrabold text-amber-400">{{ $row['total_points'] }}</span>
                         @if($cumulativeStanding ?? null)<span class="text-slate-500 group-open:rotate-180 transition" aria-hidden="true">⌄</span>@endif
                     </summary>

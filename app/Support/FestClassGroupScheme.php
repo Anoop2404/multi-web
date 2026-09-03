@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Services\Membership\EffectiveMasterDataResolver;
+use Illuminate\Support\Str;
 
 class FestClassGroupScheme
 {
@@ -155,7 +156,7 @@ class FestClassGroupScheme
     {
         $key = self::resolveItemKey($labels, $rawClassGroup);
 
-        return $labels[$key] ?? ucfirst($key);
+        return $labels[$key] ?? Str::title(str_replace('_', ' ', $key));
     }
 
     /** The matched key (raw value as-is, or its canonicalized form) — use this as the filter/group-by value so the same conceptual category never splits into separate entries just because two items spelled its class_group differently. */

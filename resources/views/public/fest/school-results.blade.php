@@ -46,7 +46,7 @@
                     <article class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
                         <div class="flex items-center justify-between gap-3 px-4 py-3 bg-white/5 border-b border-slate-800">
                             <div class="min-w-0">
-                                <p class="font-bold text-white truncate">{{ $winner['item'] }}</p>
+                                <p class="font-bold text-white">{{ $winner['item'] }}</p>
                                 <p class="text-xs text-white/40">{{ $winner['participant_type'] }}</p>
                             </div>
                             @if($winner['position'] && $winner['position'] <= 3)

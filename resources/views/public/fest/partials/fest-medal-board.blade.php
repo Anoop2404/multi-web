@@ -29,7 +29,7 @@
                 <span class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center text-sm font-extrabold">{{ $row['rank'] }}</span>
                 @endif
             </span>
-            <span class="font-bold text-white text-base truncate uppercase">{{ $row['school_name'] }}</span>
+            <span class="font-bold text-white text-base uppercase">{{ $row['school_name'] }}</span>
             <span class="text-center font-mono font-bold tabular-nums text-amber-300 text-base">{{ $row['gold'] }}</span>
             <span class="text-center font-mono font-bold tabular-nums text-slate-300 text-base">{{ $row['silver'] }}</span>
             <span class="text-center font-mono font-bold tabular-nums text-amber-600 text-base">{{ $row['bronze'] }}</span>
