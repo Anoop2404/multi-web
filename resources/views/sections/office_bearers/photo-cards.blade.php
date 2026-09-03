@@ -36,6 +36,12 @@
             </div>
             @endforeach
         </div>
+        <div class="text-center mt-10">
+            <a href="/office-bearers" class="inline-flex items-center gap-1.5 font-bold text-sm hover:underline" style="color: var(--color-primary)">
+                View all leadership
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+            </a>
+        </div>
         @else
         <x-section-empty-state
             title="Leadership Team Coming Soon"

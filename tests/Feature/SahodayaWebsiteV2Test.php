@@ -82,7 +82,12 @@ class SahodayaWebsiteV2Test extends TestCase
             ->assertSee('--color-primary: #7A0D11', false)
             ->assertSee('--color-accent: #E09A00', false)
             ->assertSee('Our network at a glance')
-            ->assertSee('Frequently asked questions');
+            ->assertSee('Frequently asked questions')
+            // Homepage shows a school-count preview, not the full directory, and
+            // links out to the dedicated Member Schools page.
+            ->assertSee('Find a Member School')
+            ->assertSee('href="/member-schools"', false)
+            ->assertDontSee('Search by school name, district or location.');
     }
 
     public function test_classic_site_does_not_receive_v2_section_width_constraints(): void

@@ -1310,6 +1310,17 @@ return [
                 ['key' => 'map_embed', 'type' => 'textarea', 'label' => 'Google Maps Embed HTML'],
             ],
         ],
+        'stats-preview' => [
+            'label' => 'Stats Preview',
+            'description' => 'School/district counts with a "find a school" link — for homepages that link out to a dedicated directory page instead of listing every school',
+            'fields' => [
+                ['key' => 'eyebrow',      'type' => 'text', 'label' => 'Eyebrow'],
+                ['key' => 'heading',      'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'subheading',   'type' => 'text', 'label' => 'Subheading'],
+                ['key' => 'cta_label',    'type' => 'text', 'label' => 'Button Label'],
+                ['key' => 'cta_url',      'type' => 'url',  'label' => 'Button URL'],
+            ],
+        ],
     ],
 
     'news_circulars' => [

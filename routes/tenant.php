@@ -106,6 +106,8 @@ Route::middleware([
         Route::get('/circulars/{circular}/download', [\App\Http\Controllers\Public\CircularController::class, 'download'])->name('tenant.circulars.download');
         Route::get('/events', [EventController::class, 'index'])->name('tenant.events.index');
         Route::get('/events/{slug}', [EventController::class, 'show'])->name('tenant.events.show');
+        Route::get('/member-schools', [\App\Http\Controllers\Public\MemberSchoolsController::class, 'index'])->name('tenant.member-schools.index');
+        Route::get('/office-bearers', [\App\Http\Controllers\Public\OfficeBearersController::class, 'index'])->name('tenant.office-bearers.index');
         Route::get('/results', [\App\Http\Controllers\Public\SchoolResultsController::class, 'index'])->name('tenant.results.index');
         Route::get('/results/{boardResult}/download', [\App\Http\Controllers\Public\SchoolResultsController::class, 'downloadPdf'])->name('tenant.results.download');
 
@@ -129,6 +131,7 @@ Route::middleware([
         Route::get('/moa/activities', fn () => app(SahodayaCmsPageController::class)->show('moa/activities'))->name('tenant.sahodaya.moa.activities');
         Route::get('/moa/election', fn () => app(SahodayaCmsPageController::class)->show('moa/election'))->name('tenant.sahodaya.moa.election');
 
+        Route::get('/gallery', [GalleryAlbumController::class, 'index'])->name('tenant.gallery.index');
         Route::get('/gallery/{slug}', [GalleryAlbumController::class, 'show'])->name('tenant.gallery.show');
 
         Route::get('/admission-enquiry', [AdmissionEnquiryController::class, 'create'])->name('admission-enquiry.create');

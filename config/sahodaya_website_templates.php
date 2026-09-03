@@ -172,7 +172,11 @@ return [
                     ['text' => 'A single membership and event registration process for every school.'],
                 ],
             ], 'layout' => ['width' => 'wide', 'spacing' => 'compact', 'surface' => 'canvas', 'heading_alignment' => 'center']],
-            ['section_type' => 'member_schools', 'variant' => 'map-view', 'config' => ['eyebrow' => 'Directory', 'heading' => 'Find a member school', 'subheading' => 'Search by school name, district or location.'], 'layout' => ['width' => 'wide', 'spacing' => 'spacious', 'surface' => 'muted', 'heading_alignment' => 'left']],
+            ['section_type' => 'member_schools', 'variant' => 'stats-preview', 'config' => [
+                'eyebrow' => 'Directory', 'heading' => 'Find a member school',
+                'subheading' => 'Search the full directory by school name, district or location.',
+                'cta_label' => 'Find a Member School', 'cta_url' => '/member-schools',
+            ], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'muted', 'heading_alignment' => 'center']],
             ['section_type' => 'about_sahodaya', 'variant' => 'with-timeline', 'config' => [
                 'eyebrow' => 'Our journey', 'heading' => 'Our journey',
                 'subtext' => 'Milestones in the growth of the {{name}} network.',
@@ -184,7 +188,7 @@ return [
             ], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'canvas', 'heading_alignment' => 'left']],
             ['section_type' => 'events_programs', 'variant' => 'upcoming-cards', 'config' => ['eyebrow' => 'What is next', 'heading' => 'Upcoming programmes'], 'layout' => ['width' => 'wide', 'spacing' => 'standard', 'surface' => 'canvas', 'heading_alignment' => 'left']],
             ['section_type' => 'office_bearers', 'variant' => 'photo-cards', 'config' => ['heading' => 'Network leadership'], 'layout' => ['width' => 'wide', 'spacing' => 'standard', 'surface' => 'muted', 'heading_alignment' => 'center']],
-            ['section_type' => 'gallery', 'variant' => 'masonry-grid', 'config' => ['eyebrow' => 'Media showcase', 'heading' => 'Sahodaya event gallery'], 'layout' => ['width' => 'wide', 'spacing' => 'spacious', 'surface' => 'dark', 'heading_alignment' => 'left']],
+            ['section_type' => 'gallery', 'variant' => 'preview-grid', 'config' => ['eyebrow' => 'Media showcase', 'heading' => 'Sahodaya event gallery', 'limit' => 8, 'view_more_label' => 'View full gallery', 'view_more_url' => '/gallery'], 'layout' => ['width' => 'wide', 'spacing' => 'spacious', 'surface' => 'dark', 'heading_alignment' => 'left']],
             ['section_type' => 'news_circulars', 'variant' => 'modern-feed', 'config' => ['heading' => 'Latest updates'], 'layout' => ['width' => 'standard', 'spacing' => 'standard', 'surface' => 'canvas', 'heading_alignment' => 'left']],
             ['section_type' => 'testimonials_sahodaya', 'variant' => 'principal-quotes', 'config' => [
                 'eyebrow' => 'Voices from the network', 'heading' => 'What our members say',
