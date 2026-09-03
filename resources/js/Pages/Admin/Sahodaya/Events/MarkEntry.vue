@@ -203,7 +203,7 @@
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
                                 <th class="p-3.5 w-44">Rank</th>
                                 <template v-if="hasJudgePanel">
-                                    <th v-for="j in judgeNumbers" :key="j" class="p-3.5 w-20">
+                                    <th v-for="j in judgeNumbers" :key="j" class="p-3.5 w-28">
                                         Judge {{ j }}
                                         <span v-if="perJudgeMax" class="block font-normal text-slate-400 normal-case">/ {{ perJudgeMax }}</span>
                                     </th>
@@ -278,7 +278,7 @@
                                     <td v-for="j in judgeNumbers" :key="j" class="p-3.5">
                                         <input v-model.number="judgeForms[participant.id][j]" type="number" min="0" step="0.5"
                                                :max="perJudgeMax"
-                                               class="field text-xs tabular-nums w-16" placeholder="0"
+                                               class="field text-xs tabular-nums w-24" placeholder="0"
                                                :disabled="isAbsent(participant, item) || itemLocked">
                                     </td>
                                     <td class="p-3.5 font-mono font-bold text-slate-900 tabular-nums">
