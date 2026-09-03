@@ -132,13 +132,32 @@ class NavConfigDefaults
             'layout_variant' => 'logo-left',
             'items'          => [
                 ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
-                ['label' => 'About', 'url' => '/about', 'external' => false, 'children' => []],
-                ['label' => 'Academics', 'url' => '/academics', 'external' => false, 'children' => []],
-                ['label' => 'Admissions', 'url' => '/admissions', 'external' => false, 'children' => []],
-                ['label' => 'Results', 'url' => '/results', 'external' => false, 'children' => []],
+                [
+                    'label' => 'About Us', 'url' => '/about', 'external' => false,
+                    'children' => [
+                        ['label' => 'Our Profile', 'url' => '/about', 'external' => false],
+                        ['label' => "Principal's Desk", 'url' => '/about#principals-desk', 'external' => false],
+                        ['label' => 'Why Choose Us', 'url' => '/about#why-choose', 'external' => false],
+                    ],
+                ],
+                [
+                    'label' => 'Academics', 'url' => '/academics', 'external' => false,
+                    'children' => [
+                        ['label' => 'School Overview', 'url' => '/academics', 'external' => false],
+                        ['label' => 'CBSE Mandatory Disclosure', 'url' => '/disclosure', 'external' => false],
+                        ['label' => 'Results & Achievements', 'url' => '/results', 'external' => false],
+                    ],
+                ],
+                [
+                    'label' => 'Admissions', 'url' => '/admissions', 'external' => false,
+                    'children' => [
+                        ['label' => 'Admission Information', 'url' => '/admissions', 'external' => false],
+                        ['label' => 'Admission Enquiry', 'url' => '/admission-enquiry', 'external' => false],
+                    ],
+                ],
+                ['label' => 'Faculty', 'url' => '/about#faculty', 'external' => false, 'children' => []],
                 ['label' => 'Gallery', 'url' => '/gallery', 'external' => false, 'children' => []],
-                ['label' => 'Mandatory Disclosure', 'url' => '/disclosure', 'external' => false, 'children' => []],
-                ['label' => 'Contact', 'url' => '/contact', 'external' => false, 'children' => []],
+                ['label' => 'Contact Us', 'url' => '/contact', 'external' => false, 'children' => []],
             ],
             'portal_cta' => SchoolPortalNavLinks::portalCtaDefaults(),
         ];
