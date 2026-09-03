@@ -28,7 +28,7 @@
                 <td class="p-3">
                     @if($row['item_id'] && $row['item_title'])
                     <a href="{{ route('tenant.fest.item-schedule', [$event->id, $row['item_id']]) }}" class="text-amber-400 hover:underline">{{ $row['item_title'] }}</a>
-                    @if(($row['results_published_at'] ?? null) || (($selectedScope['results_published'] ?? false) && !($row['results_hidden'] ?? false)) || ($isAdminPreview ?? false))
+                    @if(($row['results_published_at'] ?? null) || ($isAdminPreview ?? false))
                     <a href="{{ route('tenant.fest.item-results', [$event->id, $row['item_id']]) }}" class="ml-2 text-xs text-amber-300/70 hover:underline">Results →</a>
                     @endif
                     @if($row['category_label'] ?? null)

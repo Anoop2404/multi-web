@@ -69,11 +69,20 @@ class FestPortalController extends Controller
         $selectedScope = $this->operationalEvents->directScope($event);
         $scopes = [$selectedScope];
 
-        $itemGroups = FestEventItem::where('event_id', $event->id)
-            ->with('head:id,name')
+        $targetEvent = FestEventItem::where('event_id', $event->id)->where('is_enabled', true)->exists()
+            ? $event
+            : ($event->parent_event_id ? $event->rootEvent() : $event);
+
+        $rawItems = FestEventItem::where('event_id', $targetEvent->id)
+            ->where('is_enabled', true)
+            ->with(['head:id,name', 'phase:id,source_phase_id'])
             ->orderBy('display_order')
-            ->get(['id', 'title', 'stage_type', 'category', 'class_group', 'age_group', 'participant_type', 'head_id', 'event_id', 'results_published_at', 'results_hidden'])
-            ->groupBy('event_id')
+            ->orderBy('title')
+            ->get(['id', 'title', 'stage_type', 'category', 'class_group', 'age_group', 'participant_type', 'head_id', 'event_id', 'results_published_at', 'results_hidden', 'phase_id']);
+
+        $items = \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($rawItems, $event);
+
+        $itemGroups = $items->groupBy('event_id')
             ->map(fn ($groupItems) => [
                 'label' => $event->title,
                 'items' => $groupItems->values(),
@@ -132,9 +141,7 @@ class FestPortalController extends Controller
                 })
                 ->values();
 
-            $publishedItemCount = FestEventItem::where('event_id', $event->id)
-                ->whereNotNull('results_published_at')
-                ->count();
+            $publishedItemCount = $items->filter(fn ($i) => $i->results_published_at !== null && ! $i->results_hidden)->count();
         }
 
         // The item finder groups by class_group/age_group/category — resolve each raw

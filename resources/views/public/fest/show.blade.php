@@ -150,8 +150,8 @@
                     </div>
                     <div class="mt-auto pt-4 flex gap-2">
                         @if(($scopeSchedulePublished || ($isAdminPreview ?? false)) && $scheduledItemIds->contains($item->id))<a href="{{ route('tenant.fest.item-schedule', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold text-white hover:bg-white/15">Schedule</a>@endif
-                        @if(($item->results_published_at || $scopeResultsPublished || ($isAdminPreview ?? false)) && !$item->results_hidden)<a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>@endif
-                        @if(!(($scopeSchedulePublished || ($isAdminPreview ?? false)) && $scheduledItemIds->contains($item->id)) && !(($item->results_published_at || $scopeResultsPublished || ($isAdminPreview ?? false)) && !$item->results_hidden))
+                        @if(($item->results_published_at || ($isAdminPreview ?? false)) && !$item->results_hidden)<a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>@endif
+                        @if(!(($scopeSchedulePublished || ($isAdminPreview ?? false)) && $scheduledItemIds->contains($item->id)) && !(($item->results_published_at || ($isAdminPreview ?? false)) && !$item->results_hidden))
                         <span class="flex-1 rounded-xl border border-dashed border-slate-700 px-3 py-2 text-center text-xs font-semibold text-white/30">Not yet published</span>
                         @endif
                     </div>

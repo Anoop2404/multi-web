@@ -188,7 +188,7 @@ defineEmits(['add-student']);
 
 const { confirm } = useConfirm();
 
-const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'];
+const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u16', 'u17', 'u18', 'u19', 'open'];
 const SPORTS_MALE_VALS = new Set(['male', 'm', 'boys', 'boy']);
 const SPORTS_FEMALE_VALS = new Set(['female', 'f', 'girls', 'girl']);
 

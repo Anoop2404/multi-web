@@ -45,7 +45,7 @@
         </div>
         <p class="mt-5 flex flex-wrap gap-5">
             <a href="{{ route('tenant.fest.schedule', $event->id) }}" class="text-sm font-semibold text-amber-400 hover:underline">← Full schedule</a>
-            @if(($item->results_published_at || $event->results_published || ($isAdminPreview ?? false)) && !$item->results_hidden)
+            @if(($item->results_published_at || ($isAdminPreview ?? false)) && !$item->results_hidden)
             <a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="text-sm font-semibold text-amber-400 hover:underline">Results for this item →</a>
             @endif
             <a href="{{ route('tenant.fest.show', $event->id) }}" class="text-sm text-white/40 hover:text-white">Event page</a>

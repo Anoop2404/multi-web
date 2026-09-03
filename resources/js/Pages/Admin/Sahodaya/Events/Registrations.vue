@@ -1089,7 +1089,7 @@ async function runBulkReject() {
 }
 
 // ── Sports helpers ────────────────────────────────────────────────────────────
-const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'];
+const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u16', 'u17', 'u18', 'u19', 'open'];
 
 function ageGroupKey(reg) {
     return reg.item?.age_group

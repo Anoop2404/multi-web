@@ -12,7 +12,7 @@ use Carbon\Carbon;
 class FestSportsAgeGroup
 {
     /** @var list<string> */
-    public const KEYS = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'];
+    public const KEYS = ['u8', 'u10', 'u11', 'u12', 'u14', 'u16', 'u17', 'u18', 'u19', 'open'];
 
     /**
      * Cached per tenant per request. FestSportsAgeGroupRegistry::forTenant() returns
@@ -268,7 +268,7 @@ class FestSportsAgeGroup
             return self::registry($tenantId)->orderedAgeGroups();
         }
 
-        return ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19'];
+        return ['u8', 'u10', 'u11', 'u12', 'u14', 'u16', 'u17', 'u18', 'u19'];
     }
 
     public static function underAge(string $ageGroup, ?string $tenantId = null): ?int
