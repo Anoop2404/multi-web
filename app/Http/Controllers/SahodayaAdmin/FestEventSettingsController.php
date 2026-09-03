@@ -1489,25 +1489,36 @@ class FestEventSettingsController extends SahodayaAdminController
     }
 
     /**
-     * Every region-role descendant reachable from $event's root, up to two levels deep --
-     * not just $root's immediate children. Some hubs partition Hub -> Phase -> Region
-     * (a phase container sits between the hub and its actual region leaves), so limiting
-     * this to childrenForRoles(['region']) on the root alone silently misses every region
-     * nested under a phase. Mirrors FestEvent::reportableEventIds()'s children+grandchildren
-     * traversal, but keeps childrenForRoles()'s existing "is this actually a region leaf"
-     * filter at both levels instead of syncing onto phase containers themselves.
+     * Every operational LEAF under $event's root -- any descendant event that has no
+     * children of its own -- at whatever depth it actually sits. A first version of this
+     * only went two levels deep and filtered by the 'region' partition role, which broke
+     * on two real shapes seen live: (a) a phase with two regions under it (Hub -> Phase ->
+     * Region, 2 levels, fine) sitting alongside (b) a phase with NO further region split
+     * that's used directly as its own leaf (Hub -> Phase, 1 level, but role='phase' not
+     * 'region' so the old filter excluded it from being synced at all even though marks
+     * attach directly to it). Walking to actual leaves, regardless of role or depth, is
+     * the only shape-agnostic way to reach "wherever marks/registrations really attach."
+     * Bounded to 8 levels as a cycle safety net -- a real event tree is never that deep.
      */
     private function descendantRegionEvents(FestEvent $event): \Illuminate\Support\Collection
     {
         $root = $event->rootEvent();
-        $directChildren = FestEvent::where('parent_event_id', $root->id)->get();
+        $all = collect();
+        $frontierIds = [$root->id];
 
-        $level1 = $root->childrenForRoles(['region']);
-        $level2 = $directChildren->flatMap(fn (FestEvent $child) => $child->childrenForRoles(['region']));
+        for ($depth = 0; $depth < 8 && ! empty($frontierIds); $depth++) {
+            $children = FestEvent::whereIn('parent_event_id', $frontierIds)->get();
+            if ($children->isEmpty()) {
+                break;
+            }
+            $all = $all->merge($children);
+            $frontierIds = $children->pluck('id')->all();
+        }
 
-        return $level1->merge($level2)
-            ->unique('id')
-            ->reject(fn (FestEvent $descendant) => $descendant->id === $event->id)
+        $parentIds = $all->pluck('parent_event_id')->filter()->unique()->all();
+
+        return $all
+            ->reject(fn (FestEvent $descendant) => in_array($descendant->id, $parentIds, true) || $descendant->id === $event->id)
             ->values();
     }
 
