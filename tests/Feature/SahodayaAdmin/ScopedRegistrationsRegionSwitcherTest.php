@@ -8,6 +8,7 @@ use App\Models\Region;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\TenantUserCatalog;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -90,6 +91,9 @@ class ScopedRegistrationsRegionSwitcherTest extends TestCase
 
         $admin = User::factory()->create(['tenant_id' => $f['sahodaya']->id]);
         $admin->assignRole('region_admin');
+        // Matches how the admin UI actually provisions this role — without it, the
+        // registrations page under test 403s before reaching the switcher logic itself.
+        $admin->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('region_admin'));
         FestEventStaff::create([
             'event_id' => $f['childA']->id,
             'user_id' => $admin->id,
@@ -118,6 +122,9 @@ class ScopedRegistrationsRegionSwitcherTest extends TestCase
 
         $admin = User::factory()->create(['tenant_id' => $f['sahodaya']->id]);
         $admin->assignRole('region_admin');
+        // Matches how the admin UI actually provisions this role — without it, the
+        // registrations page under test 403s before reaching the switcher logic itself.
+        $admin->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('region_admin'));
         FestEventStaff::create([
             'event_id' => $f['hub']->id,
             'user_id' => $admin->id,

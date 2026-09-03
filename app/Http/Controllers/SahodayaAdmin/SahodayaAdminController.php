@@ -38,6 +38,18 @@ abstract class SahodayaAdminController extends Controller
                 abort(403, 'View-only access. Contact your Sahodaya administrator.');
             }
         }
+
+        // The check above only ever gated writes — a staff member with just fest.marks
+        // could still browse Registrations, Finance, Settings, etc. by typing the URL
+        // directly, since the nav hiding those links (staffCanSeeNavItem() in
+        // sahodayaEventNavPermissions.js) is a UI convenience, not access control. Only
+        // scoped to /events/{id} paths for now — see viewPermissionsForPath()'s docblock.
+        if ($this->isStaff && in_array($request->method(), ['GET', 'HEAD'], true)) {
+            $viewPermissions = \App\Support\TenantUserCatalog::viewPermissionsForPath($request->path());
+            if ($viewPermissions !== null && ! $request->user()?->hasAnyPermission($viewPermissions)) {
+                abort(403, 'You do not have access to this area. Contact your Sahodaya administrator.');
+            }
+        }
     }
 
     protected function assertStaffCan(string $permission): void

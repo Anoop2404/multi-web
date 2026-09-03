@@ -13,6 +13,7 @@ use App\Models\SchoolRegionAssignment;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\TenantUserCatalog;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -162,6 +163,10 @@ class RegionAdminReportContainmentTest extends TestCase
     {
         $admin = User::factory()->create(['tenant_id' => $sahodaya->id]);
         $admin->assignRole('region_admin');
+        // Matches how the admin UI actually provisions this role (TenantUserController's
+        // default-permissions fallback) — without it, the reports pages under test 403
+        // before ever reaching the region-containment logic these tests exist to check.
+        $admin->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('region_admin'));
 
         FestEventStaff::create([
             'event_id' => $scopedEvent->id,

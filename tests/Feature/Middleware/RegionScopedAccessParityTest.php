@@ -9,6 +9,7 @@ use App\Models\Region;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\TenantUserCatalog;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -92,6 +93,10 @@ class RegionScopedAccessParityTest extends TestCase
     {
         $admin = User::factory()->create(['tenant_id' => $sahodaya->id]);
         $admin->assignRole('region_admin');
+        // Matches how the admin UI actually provisions this role — without it, the
+        // dashboard route under test 403s before ever reaching the scope-parity logic
+        // this file exists to check.
+        $admin->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('region_admin'));
 
         FestEventStaff::create([
             'event_id' => $scopedEvent->id,
@@ -170,6 +175,7 @@ class RegionScopedAccessParityTest extends TestCase
     {
         $admin = User::factory()->create(['tenant_id' => $sahodaya->id]);
         $admin->assignRole('phase_admin');
+        $admin->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('phase_admin'));
 
         FestEventStaff::create([
             'event_id' => $scopedEvent->id,
@@ -186,6 +192,7 @@ class RegionScopedAccessParityTest extends TestCase
     {
         $admin = User::factory()->create(['tenant_id' => $sahodaya->id]);
         $admin->assignRole('event_admin');
+        $admin->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('event_admin'));
 
         FestEventStaff::create([
             'event_id' => $scopedEvent->id,

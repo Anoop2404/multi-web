@@ -570,6 +570,62 @@ class TenantUserCatalog
         return null;
     }
 
+    /**
+     * The set of permissions that satisfy a GET/view request to an /events/{id}/...
+     * path for a staff (non-full-admin) user — any ONE is enough. writePermissionForPath()
+     * only ever gated write actions, so a staff member with just fest.marks checked could
+     * still browse Registrations, Finance, Settings, etc. by typing the URL directly —
+     * the nav already hides those links (see staffCanSeeNavItem()/FEST_* groups in
+     * resources/js/support/sahodayaEventNavPermissions.js), but that's a UI convenience,
+     * not access control. This mirrors that same JS mapping so the backend actually
+     * enforces what the nav implies. Deliberately scoped to /events/{id} only — outside
+     * an event's own tabs (training, mcq, membership, the events list, etc.) GET stays
+     * ungated for now, matching pre-existing behavior.
+     *
+     * @return list<string>|null null = no additional view gate applies to this path
+     */
+    public static function viewPermissionsForPath(string $path): ?array
+    {
+        if (! preg_match('#/events/\d#', $path)) {
+            return null;
+        }
+
+        if (str_contains($path, '/registrations')) {
+            return ['fest.registrations', 'fest.manage'];
+        }
+        if (str_contains($path, '/marks')) {
+            return ['fest.marks', 'fest.manage'];
+        }
+        if (str_contains($path, '/results')) {
+            return ['fest.results', 'fest.manage'];
+        }
+        if (str_contains($path, '/finance') || str_contains($path, '/school-fees') || str_contains($path, '/fees') || str_contains($path, '/ledger')) {
+            return ['fest.finance'];
+        }
+        // Deliberately does NOT fall back to fest.manage — matches FEST_SCHEDULE in the
+        // JS nav filter (region_admin/phase_admin hold fest.manage by default for
+        // unrelated reasons — see defaultPermissionsForRole() — but are explicitly meant
+        // to be excluded from Schedule/Settings).
+        if (str_contains($path, '/schedule')) {
+            return ['fest.schedule'];
+        }
+        if (str_contains($path, '/certificates')) {
+            return ['fest.certificates', 'fest.manage'];
+        }
+        if (str_contains($path, '/catering') || str_contains($path, '/food-coupons')) {
+            return ['fest.catering', 'fest.manage'];
+        }
+        if (self::pathRequiresFestSettings($path)) {
+            return ['fest.settings'];
+        }
+
+        // The event's own dashboard, plus any other event-scoped page with no dedicated
+        // permission of its own (chest numbers, id-cards, event-staff list, items, judges,
+        // attendance, etc.) — any fest.* permission is enough to at least see it, matching
+        // FEST_VIEW in the JS nav filter.
+        return ['fest.view', 'fest.manage', 'fest.marks', 'fest.registrations', 'fest.results', 'fest.finance', 'fest.settings', 'fest.schedule', 'fest.certificates', 'fest.catering'];
+    }
+
     private static function pathRequiresFestSettings(string $path): bool
     {
         foreach ([
