@@ -77,7 +77,7 @@ class SahodayaWebsiteV2Test extends TestCase
         $this->assertSame('heritage-institutional', $site->template_key);
         $this->assertCount(13, $site->sectionQuery()->get());
 
-        $this->get('http://v2-site.sahodaya.test/')
+        $response = $this->get('http://v2-site.sahodaya.test/')
             ->assertOk()
             ->assertSee('--color-primary: #7A0D11', false)
             ->assertSee('--color-accent: #E09A00', false)
@@ -91,7 +91,16 @@ class SahodayaWebsiteV2Test extends TestCase
             // for every tenant regardless of real data.
             ->assertDontSee('CBSE Affiliation Renewal Guidelines & Event Schedules Published')
             ->assertDontSee('80+ CBSE Schools')
-            ->assertDontSee('Search by school name, district or location.');
+            ->assertDontSee('Search by school name, district or location.')
+            // Gallery preview used to render nothing at all with zero photos —
+            // now shows the same "coming soon" empty state every other section uses.
+            ->assertSee('Gallery Coming Soon')
+            ->assertSee('Membership services');
+
+        // The hero's own search form already shows "New school? Apply for
+        // membership" — the template config used to duplicate that line via a
+        // redundant secondary_text field.
+        $this->assertSame(1, substr_count($response->getContent(), 'Apply for membership'));
     }
 
     public function test_classic_site_does_not_receive_v2_section_width_constraints(): void

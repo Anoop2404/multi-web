@@ -452,7 +452,7 @@ class SahodayaTenantBranding
     private static function regionLabel(Tenant $tenant): string
     {
         $name = $tenant->name;
-        if (preg_match('/(\w+)\s+Sahodaya/i', $name, $m)) {
+        if (preg_match('/(.+?)\s+Sahodaya\b/i', $name, $m)) {
             return $m[1];
         }
 

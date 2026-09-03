@@ -160,7 +160,6 @@ return [
             ['section_type' => 'hero', 'variant' => 'gradient-split', 'config' => [
                 'eyebrow' => 'CBSE school network', 'heading' => '{{name}}',
                 'tagline' => 'Find schools, programmes and shared opportunities across {{region}}.',
-                'secondary_text' => 'New school? Apply for membership to join the network.',
                 'cta_label' => 'Membership services', 'cta_url' => '/school-register',
             ], 'layout' => ['width' => 'full', 'spacing' => 'spacious', 'surface' => 'dark', 'heading_alignment' => 'left']],
             ['section_type' => 'statistics', 'variant' => 'with-achievements', 'config' => [
