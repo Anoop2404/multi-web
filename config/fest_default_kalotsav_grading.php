@@ -14,10 +14,11 @@
  * score bounds are set to the same numbers so the band matches an item
  * whether or not it has a "Total Marks" value configured.
  *
- * point_rules: FestPointRule rows. `grade: null` = "Any Grade" (matches a mark
- * with no grade at all, not a mark literally graded 'No Grade' -- see
- * FestGradePointService::pointsForMark()'s matchesGrade()). `position: null`
- * = "Any Position".
+ * point_rules: FestPointRule rows. `position: null` = "Any Position". No
+ * blank/wildcard `grade: null` ("Any Grade") rows -- every mark resolves to a
+ * real grade (A/B/C/No Grade) via the bands above, so the 'No Grade' rules
+ * are the only fallback tier needed; a mark that somehow has no grade at all
+ * scores 0, deliberately (see FestGradePointService::pointsForMark()).
  */
 return [
     'grade_bands' => [
@@ -58,23 +59,14 @@ return [
         ['grade' => 'C', 'position' => null, 'is_group' => false, 'points' => 1],
         ['grade' => 'C', 'position' => null, 'is_group' => true, 'points' => 2],
 
-        // No Grade (the 0-49 band) -- a real, literal grade value, not the
-        // "Any Grade" wildcard. No "Any Position" row: a mark that's both
-        // gradeless-of-a-real-grade AND unranked scores 0, deliberately.
+        // No Grade (the 0-49 band) -- the sole fallback tier. No "Any
+        // Position" row: a mark that's both No-Grade AND unranked scores 0,
+        // deliberately.
         ['grade' => 'No Grade', 'position' => 1, 'is_group' => false, 'points' => 5],
         ['grade' => 'No Grade', 'position' => 1, 'is_group' => true, 'points' => 10],
         ['grade' => 'No Grade', 'position' => 2, 'is_group' => false, 'points' => 3],
         ['grade' => 'No Grade', 'position' => 2, 'is_group' => true, 'points' => 6],
         ['grade' => 'No Grade', 'position' => 3, 'is_group' => false, 'points' => 1],
         ['grade' => 'No Grade', 'position' => 3, 'is_group' => true, 'points' => 2],
-
-        // Any Grade (blank/wildcard) -- covers a mark with a position but no
-        // grade value set at all (e.g. a pure rank-only item).
-        ['grade' => null, 'position' => 1, 'is_group' => false, 'points' => 5],
-        ['grade' => null, 'position' => 1, 'is_group' => true, 'points' => 10],
-        ['grade' => null, 'position' => 2, 'is_group' => false, 'points' => 3],
-        ['grade' => null, 'position' => 2, 'is_group' => true, 'points' => 6],
-        ['grade' => null, 'position' => 3, 'is_group' => false, 'points' => 1],
-        ['grade' => null, 'position' => 3, 'is_group' => true, 'points' => 2],
     ],
 ];
