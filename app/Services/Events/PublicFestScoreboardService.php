@@ -313,6 +313,18 @@ class PublicFestScoreboardService
             ->whereHas('item', function ($query) use ($root, $category) {
                 $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
                 $query->where($column, $category);
+                // Same rule provisionalScoreboard() below already enforces, and that
+                // $marks in FestPortalController::results()/itemResults() enforce for
+                // the item-wise/individual-item pages — an item only counts once ITS
+                // OWN results have been published, and never again once explicitly
+                // hidden, regardless of the whole event's own results_published flag.
+                // This branch was missing both checks entirely, so a category's public
+                // standings/toppers showed every item's marks the moment the event got
+                // published, including items nobody had published or that were later
+                // unpublished — live production symptom: "Item-wise" tab correctly
+                // showing 0 published items while Category-wise/Toppers showed real
+                // school point totals for that same event.
+                $query->whereNotNull('results_published_at')->where('results_hidden', false);
             })
             ->get()
             ->unique(fn (FestMark $m) => $m->deduplicationKey());

@@ -198,6 +198,47 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertDontSee('South HS Winner');
     }
 
+    /**
+     * Regression test for a real production gap: PublicFestScoreboardService::
+     * scoreboard()'s category branch (used by the scoreboard's category filter, and
+     * by the Category-wise/Toppers tabs on the results page) summed every FestMark in
+     * the category with no regard for whether the contributing item had ever
+     * published its own results — so once the WHOLE EVENT's results_published flag
+     * flipped true, a school could get public credit for an item nobody had
+     * individually published, even while that same event's Item-wise tab correctly
+     * showed it as unpublished. provisionalScoreboard() (used only pre-event-publish)
+     * already had the correct gate; the official/published path didn't.
+     */
+    public function test_category_scoreboard_excludes_a_school_whose_only_win_is_an_unpublished_item(): void
+    {
+        // $this->north already has results_published => true (the event-level flag) —
+        // the exact condition under which the buggy path used to run unguarded.
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North HS Winner');
+
+        $unpublishedItem = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Never Published HS Item', 'category' => 'literary',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => null,
+        ]);
+        $this->markItemWinner($this->north, $unpublishedItem, $this->southSchool);
+
+        $response = $this->get(
+            "http://public-scoreboard.test/fest/{$this->north->id}/scoreboard?category=hs"
+        );
+
+        $response->assertOk();
+        $response->assertSee('North Star School');
+        $response->assertDontSee('South Valley School');
+
+        $resultsPage = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=category");
+        $resultsPage->assertOk();
+        $resultsPage->assertDontSee('South Valley School');
+
+        $toppersPage = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=toppers");
+        $toppersPage->assertOk();
+        $toppersPage->assertDontSee('South Valley School');
+    }
+
     public function test_scoreboard_category_filter_also_scopes_the_latest_item_winners_widget(): void
     {
         // Leading Schools was already category-scoped server-side (PublicFestScoreboardService::
@@ -890,6 +931,12 @@ class FestPublicScoreboardTest extends TestCase
             'class_group' => 'hs',
             'participant_type' => 'individual',
             'is_enabled' => true,
+            // PublicFestScoreboardService::scoreboard()'s category branch only counts a
+            // mark once its own item has actually published results — matching every
+            // other public results path (provisionalScoreboard(), the item-wise tab's
+            // marks query). Without this, every test using this helper was only passing
+            // because that per-item gate didn't exist yet.
+            'results_published_at' => now(),
         ]);
 
         $registration = FestRegistration::create([
