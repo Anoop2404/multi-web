@@ -1450,9 +1450,7 @@ class FestEventSettingsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $regionChildren = $event->rootEvent()->childrenForRoles(['region'])
-            ->reject(fn (FestEvent $child) => $child->id === $event->id)
-            ->values();
+        $regionChildren = $this->descendantRegionEvents($event);
 
         abort_if($regionChildren->isEmpty(), 422, 'No regions are linked to this event to sync to.');
 
@@ -1490,14 +1488,35 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', "Grade points synced to {$regionCount} region".($regionCount === 1 ? '' : 's').'.');
     }
 
+    /**
+     * Every region-role descendant reachable from $event's root, up to two levels deep --
+     * not just $root's immediate children. Some hubs partition Hub -> Phase -> Region
+     * (a phase container sits between the hub and its actual region leaves), so limiting
+     * this to childrenForRoles(['region']) on the root alone silently misses every region
+     * nested under a phase. Mirrors FestEvent::reportableEventIds()'s children+grandchildren
+     * traversal, but keeps childrenForRoles()'s existing "is this actually a region leaf"
+     * filter at both levels instead of syncing onto phase containers themselves.
+     */
+    private function descendantRegionEvents(FestEvent $event): \Illuminate\Support\Collection
+    {
+        $root = $event->rootEvent();
+        $directChildren = FestEvent::where('parent_event_id', $root->id)->get();
+
+        $level1 = $root->childrenForRoles(['region']);
+        $level2 = $directChildren->flatMap(fn (FestEvent $child) => $child->childrenForRoles(['region']));
+
+        return $level1->merge($level2)
+            ->unique('id')
+            ->reject(fn (FestEvent $descendant) => $descendant->id === $event->id)
+            ->values();
+    }
+
     /** Same "set once on the hub, push to every region" pattern as syncPointRulesToRegions() — see FestGradePointService::resolveGradeFromScore(). */
     public function syncGradeConfigsToRegions(string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $regionChildren = $event->rootEvent()->childrenForRoles(['region'])
-            ->reject(fn (FestEvent $child) => $child->id === $event->id)
-            ->values();
+        $regionChildren = $this->descendantRegionEvents($event);
 
         abort_if($regionChildren->isEmpty(), 422, 'No regions are linked to this event to sync to.');
 
