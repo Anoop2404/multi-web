@@ -269,7 +269,10 @@ class FestItemResultsService
         $event = $item->event ?? FestEvent::findOrFail($item->event_id);
         $itemIds = $event->reportableItemIds([$item->id]);
 
-        FestEventItem::whereIn('id', $itemIds)->update(['results_published_at' => now()]);
+        // results_hidden must clear here too: publishing an item that was previously
+        // explicitly unpublished should actually make it visible again, not leave the
+        // hidden flag from that earlier unpublish silently overriding this timestamp.
+        FestEventItem::whereIn('id', $itemIds)->update(['results_published_at' => now(), 'results_hidden' => false]);
     }
 
     public function unpublishItem(FestEventItem $item): void
@@ -277,11 +280,21 @@ class FestItemResultsService
         $event = $item->event ?? FestEvent::findOrFail($item->event_id);
         $itemIds = $event->reportableItemIds([$item->id]);
 
-        FestEventItem::whereIn('id', $itemIds)->update(['results_published_at' => null]);
+        // Nulling results_published_at alone isn't enough once the whole event has
+        // already been published: isItemVisible() falls back to event->results_published
+        // whenever an item's own timestamp is null, making that fallback indistinguishable
+        // from "never individually published" -- the item would stay visible via the
+        // event-wide flag regardless. results_hidden is the actual, unconditional
+        // "hide this item no matter what" signal that isItemVisible() checks first.
+        FestEventItem::whereIn('id', $itemIds)->update(['results_published_at' => null, 'results_hidden' => true]);
     }
 
     public function isItemVisible(FestEventItem $item, FestEvent $event): bool
     {
+        if ($item->results_hidden) {
+            return false;
+        }
+
         if ($item->results_published_at) {
             return true;
         }

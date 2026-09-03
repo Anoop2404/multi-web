@@ -21,7 +21,7 @@ class FestEventItem extends Model
         'owner_level', 'state_program_item_id', 'inherited_from_item_id', 'display_order',
         'fee_amount', 'group_item_flat_fee', 'group_item_per_participant_rate', 'is_enabled', 'is_mandatory', 'head_id', 'phase_id', 'area_id', 'reg_start', 'reg_end',
         'competition_start', 'competition_end', 'competition_time',
-        'results_published_at', 'item_reg_id_start', 'chest_no_start',
+        'results_published_at', 'results_hidden', 'item_reg_id_start', 'chest_no_start',
         'quota_eligible', 'tiebreak_mode', 'tiebreak_secondary', 'mark_judge_count',
     ];
 
@@ -41,6 +41,7 @@ class FestEventItem extends Model
         'competition_start' => 'date:Y-m-d',
         'competition_end' => 'date:Y-m-d',
         'results_published_at' => 'datetime',
+        'results_hidden' => 'boolean',
         'quota_eligible' => 'boolean',
     ];
 

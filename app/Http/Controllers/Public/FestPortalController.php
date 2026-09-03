@@ -19,6 +19,7 @@ use App\Services\Events\EventContext;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestCumulativeChampionshipService;
 use App\Services\Events\FestGradePointService;
+use App\Services\Events\FestItemResultsService;
 use App\Services\Events\FestNumberingService;
 use App\Services\Events\FestPhaseScoreboardService;
 use App\Services\Events\FestPublicVisibilityService;
@@ -99,6 +100,10 @@ class FestPortalController extends Controller
         if ($isResultsPublished) {
             $recentMarks = FestMark::where('event_id', $event->id)
                 ->whereIn('position', [1, 2, 3])
+                // An item explicitly unpublished after the event was published overall
+                // must never resurface here regardless of the event-wide flag — see
+                // FestItemResultsService::isItemVisible()/unpublishItem().
+                ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
                 ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school'])
                 ->latest('updated_at')
                 ->limit(200)
@@ -245,6 +250,9 @@ class FestPortalController extends Controller
         $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
             ->whereIn('position', [1, 2, 3])
             ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+            // Unconditional regardless of $isPublished — an explicitly unpublished item
+            // must never resurface just because the event overall got published later.
+            ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('item_id')
             ->orderBy('position')
@@ -500,6 +508,9 @@ class FestPortalController extends Controller
 
         $allSchoolMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
             ->when(! $scopePublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+            // Unconditional regardless of $scopePublished — an explicitly unpublished
+            // item must never resurface just because the event overall got published.
+            ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
             // Only set when schoolResults() was reached from a category-filtered
             // scoreboard — narrows the roster to that one category instead of the
             // school's full cross-category report.
@@ -604,6 +615,11 @@ class FestPortalController extends Controller
         $isPublished = (bool) $event->results_published || $isAdminPreview;
 
         abort_unless($isPublished, 403, 'Public results are disabled for this event.');
+        // The whole-event gate above only says results ARE published for at least
+        // something; it says nothing about THIS item. Direct-URL access previously
+        // skipped that check entirely, showing a still-unpublished (or explicitly
+        // hidden) item's winners the moment the event overall went public.
+        abort_unless($isAdminPreview || app(FestItemResultsService::class)->isItemVisible($item, $event), 403, 'Results for this item are not published yet.');
 
         $allMarks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
@@ -657,6 +673,7 @@ class FestPortalController extends Controller
         $isPublished = (bool) $event->results_published || $isAdminPreview;
 
         abort_unless($isPublished, 403, 'Public results are disabled for this event.');
+        abort_unless($isAdminPreview || app(FestItemResultsService::class)->isItemVisible($item, $event), 403, 'Results for this item are not published yet.');
         abort_if(! in_array((int) $mark->position, [1, 2, 3], true), 404);
 
         $rendered = $posters->render($event, $item, $mark, $tenant);
@@ -677,6 +694,7 @@ class FestPortalController extends Controller
         $isPublished = (bool) $event->results_published || $isAdminPreview;
 
         abort_unless($isPublished, 403, 'Public results are disabled for this event.');
+        abort_unless($isAdminPreview || app(FestItemResultsService::class)->isItemVisible($item, $event), 403, 'Results for this item are not published yet.');
 
         $marks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
@@ -786,6 +804,9 @@ public function tv(Request $request, int $eventId)
         // so the medal columns line up with the provisional points column instead of
         // sitting at 0 while points already show real numbers.
         ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+        // Unconditional regardless of $isPublished — an explicitly unpublished item
+        // must never resurface just because the event overall got published later.
+        ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
         ->get()
         ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
         ->unique(fn (FestMark $m) => $m->deduplicationKey());
@@ -1061,7 +1082,7 @@ public function tv(Request $request, int $eventId)
                 : [],
             'nowPerforming' => $nowPerforming,
             'athleticRecords' => $this->publicAthleticRecords($event),
-            'recentBreaks' => $this->recentRecordBreaks($event),
+            'recentBreaks' => $this->recentRecordBreaks($event, 5, $isAdminPreview),
             'refreshedAt' => now()->toIso8601String(),
         ];
     }
@@ -1136,6 +1157,9 @@ public function tv(Request $request, int $eventId)
             ->whereIn('position', [1, 2, 3])
             ->with(['participant.registration.item', 'item'])
             ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+            // Unconditional regardless of $isPublished — an explicitly unpublished item
+            // must never resurface just because the event overall got published later.
+            ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
             ->get()
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
             ->unique(fn (FestMark $m) => $m->deduplicationKey())
@@ -1184,6 +1208,9 @@ public function tv(Request $request, int $eventId)
             // fall back to each item's own results_published_at so items published ahead
             // of the official whole-event publish still show their winners.
             ->when(! $isPublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
+            // Unconditional regardless of $isPublished — an explicitly unpublished item
+            // must never resurface just because the event overall got published later.
+            ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
             // Selecting a category tab must scope BOTH panels — without this, Leading
             // Schools filtered to the chosen category while Latest Item Winners kept
             // showing every category's winners, which read as broken/inconsistent.
@@ -1249,7 +1276,7 @@ public function tv(Request $request, int $eventId)
         return $this->renderPublic('public.fest.records', $tenant, [
             'event' => $event,
             'records' => $this->publicAthleticRecords($event),
-            'breaks' => $this->recentRecordBreaks($event, 50),
+            'breaks' => $this->recentRecordBreaks($event, 50, $isAdminPreview),
             'isAdminPreview' => $isAdminPreview,
         ]);
     }
@@ -1434,18 +1461,30 @@ public function tv(Request $request, int $eventId)
             ->all();
     }
 
-    /** @return list<array<string, mixed>> */
-    private function recentRecordBreaks(FestEvent $event, int $limit = 5): array
+    /**
+     * Unlike publicAthleticRecords() (the standing all-time record table, always visible
+     * once tracking is on), a record BREAK names who broke it and when during THIS
+     * event's own competition — the same kind of result data everything else on this
+     * page gates behind item visibility, so an unpublished (or explicitly hidden) item's
+     * winner shouldn't be identifiable here just because record tracking is enabled.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function recentRecordBreaks(FestEvent $event, int $limit = 5, bool $isAdminPreview = false): array
     {
         if (! $event->record_tracking_enabled) {
             return [];
         }
 
+        $itemResults = app(FestItemResultsService::class);
+
         return FestRecordBreak::where('event_id', $event->id)
             ->with(['item', 'participant.student'])
+            ->when(! $isAdminPreview, fn ($q) => $q->whereHas('item', fn ($iq) => $iq->where('results_hidden', false)))
             ->orderByDesc('broken_at')
-            ->limit($limit)
             ->get()
+            ->filter(fn (FestRecordBreak $b) => $isAdminPreview || ($b->item && $itemResults->isItemVisible($b->item, $event)))
+            ->take($limit)
             ->map(fn (FestRecordBreak $b) => [
                 'item' => $b->item?->title,
                 'name' => $b->participant?->student?->name ?? $b->participant?->teacher?->name,

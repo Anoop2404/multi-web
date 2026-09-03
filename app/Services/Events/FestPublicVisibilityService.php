@@ -87,9 +87,25 @@ class FestPublicVisibilityService
         return (bool) $event->results_published;
     }
 
-    public function showIndividualMarks(FestEvent $event, bool $isAdminPreview = false): bool
+    /**
+     * $item lets this line up with showParticipantName()/isItemVisible(): an item's own
+     * publish state (including an explicit unpublish/hide) always wins over the event-wide
+     * flag when known, instead of this checking $event->results_published alone — which
+     * previously meant a mark's position/grade/score could still print here even for an
+     * item that was never individually published, or one an admin had explicitly hidden
+     * after the event overall went public.
+     */
+    public function showIndividualMarks(FestEvent $event, bool $isAdminPreview = false, ?FestEventItem $item = null): bool
     {
         if ($isAdminPreview) {
+            return true;
+        }
+
+        if ($item?->results_hidden) {
+            return false;
+        }
+
+        if ($item?->results_published_at) {
             return true;
         }
 
@@ -158,10 +174,10 @@ class FestPublicVisibilityService
         ?FestMark $mark = null,
         bool $isAdminPreview = false,
     ): array {
-        $showMarks = $this->showIndividualMarks($event, $isAdminPreview);
-        $showName = $this->showParticipantName($event, $participant, $participant->registration?->item, $isAdminPreview);
-
         $item = $participant->registration?->item;
+        $showMarks = $this->showIndividualMarks($event, $isAdminPreview, $item);
+        $showName = $this->showParticipantName($event, $participant, $item, $isAdminPreview);
+
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
         $categoryLabel = FestItemCategoryLabel::resolve($item, $classGroupLabels, config('fest_item_taxonomy.arts_category', []));
 
@@ -200,8 +216,6 @@ class FestPublicVisibilityService
      */
     public function publicParticipantItems(FestEvent $event, FestParticipant $participant, bool $isAdminPreview = false): array
     {
-        $showMarks = $this->showIndividualMarks($event, $isAdminPreview);
-
         $entries = FestParticipant::where('event_id', $participant->event_id)
             ->where('participant_role', '!=', 'standby')
             ->when($participant->student_id, fn ($q) => $q->where('student_id', $participant->student_id))
@@ -217,12 +231,18 @@ class FestPublicVisibilityService
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
 
         return $entries
-            ->map(function (FestParticipant $p) use ($event, $showMarks, $marksByParticipant, $isAdminPreview, $classGroupLabels) {
+            ->map(function (FestParticipant $p) use ($event, $marksByParticipant, $isAdminPreview, $classGroupLabels) {
                 $item = $p->registration?->item;
                 if (! $item) {
                     return null;
                 }
 
+                // Computed per-item, not once for the whole list — this participant can be
+                // registered for several items with different individual publish states,
+                // and a global $showMarks would have shown/hidden every one of them
+                // identically regardless of which items had actually been published.
+                $showMarks = $this->showIndividualMarks($event, $isAdminPreview, $item);
+                $itemVisible = $isAdminPreview || app(FestItemResultsService::class)->isItemVisible($item, $event);
                 $mark = $marksByParticipant->get($p->id);
 
                 return [
@@ -235,7 +255,7 @@ class FestPublicVisibilityService
                     'grade'            => $showMarks ? $mark?->grade : null,
                     'result'           => $showMarks ? trim(($mark?->measurement_value ?? '').' '.($mark?->measurement_unit ?? '')) : null,
                     'disqualified'     => (bool) $p->disqualified_at,
-                    'results_url'      => ($event->results_published || $isAdminPreview) ? route('tenant.fest.item-results', [$event->id, $item->id]) : null,
+                    'results_url'      => $itemVisible ? route('tenant.fest.item-results', [$event->id, $item->id]) : null,
                 ];
             })
             ->filter()
