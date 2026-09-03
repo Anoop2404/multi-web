@@ -22,11 +22,21 @@ use Illuminate\Support\Facades\Schema;
  * hydrateEventForSchoolRegistration()'s lazy-init fallback). A misplaced item's correctly-
  * scoped copy already exists independently on its rightful phase leaf (that leaf got it
  * via FestPhaseTopologyService::syncLeaf()'s own phase-aware copyItemsToPartition() call),
- * so removing the surplus copy here never loses the item itself.
+ * so hiding the surplus copy here never loses the item itself.
  *
- * Deliberately conservative: an item is only ever touched if it has zero registrations,
- * marks, AND schedule rows -- any one of those and it's left alone for manual review.
- * FestEventItem uses SoftDeletes, so even a committed delete is recoverable.
+ * Disables (is_enabled = false), never deletes -- same "can't remove, so disable instead"
+ * pattern FestItemSyncService::removeProgramItemFromAllPropagations() already uses
+ * elsewhere in this codebase. Every consumer that lists a leaf's items (Mark Entry, the
+ * item-counts report, the public portal's item finder, and others) already filters on
+ * is_enabled = true, so a disabled item disappears from all of them without any query
+ * changes and without touching a single row anyone might depend on. Fully reversible:
+ * re-enable via the Items & Catalog page, or `FestEventItem::whereIn('id', [...])
+ * ->update(['is_enabled' => true])`.
+ *
+ * Deliberately conservative on top of that: an item is only ever disabled if it has zero
+ * registrations, marks, AND schedule rows -- any one of those and it's left alone (and
+ * left enabled) for manual review, since disabling an item a school has already
+ * registered for would hide it from the admins managing that registration.
  *
  * Runs in --dry-run mode by default. Requires --commit to write changes.
  */
@@ -35,9 +45,9 @@ class FestRepairPhaseLeafItemScope extends Command
     protected $signature = 'fest:repair-phase-leaf-item-scope
         {--sahodaya= : Sahodaya tenant id or subdomain}
         {--event= : Target root fest_events id}
-        {--commit : Execute deletions (defaults to dry-run)}';
+        {--commit : Execute disables (defaults to dry-run)}';
 
-    protected $description = 'Remove items copied onto a phase leaf outside its own phase (fest:audit-event-topology\'s phase_leaf_item_scope_drift finding)';
+    protected $description = 'Disable items copied onto a phase leaf outside its own phase (fest:audit-event-topology\'s phase_leaf_item_scope_drift finding) -- never deletes';
 
     public function handle(): int
     {
@@ -104,6 +114,7 @@ class FestRepairPhaseLeafItemScope extends Command
         }
 
         $items = FestEventItem::where('event_id', $leaf->id)
+            ->where('is_enabled', true)
             ->whereNotNull('inherited_from_item_id')
             ->get(['id', 'title', 'inherited_from_item_id']);
 
@@ -132,17 +143,17 @@ class FestRepairPhaseLeafItemScope extends Command
             ->merge(Schema::hasTable('fest_schedules') ? FestSchedule::whereIn('item_id', $misplacedIds)->distinct('item_id')->pluck('item_id') : collect())
             ->unique();
 
-        $safeToDelete = $misplaced->reject(fn (FestEventItem $item) => $unsafeIds->contains($item->id));
+        $safeToDisable = $misplaced->reject(fn (FestEventItem $item) => $unsafeIds->contains($item->id));
 
-        $this->line("[{$tenant->id}] Leaf #{$leaf->id} ({$leaf->title}, phase '{$phase->name}'): {$misplaced->count()} misplaced item(s), {$safeToDelete->count()} safe to remove.");
+        $this->line("[{$tenant->id}] Leaf #{$leaf->id} ({$leaf->title}, phase '{$phase->name}'): {$misplaced->count()} misplaced item(s), {$safeToDisable->count()} safe to disable.");
 
         if ($unsafeIds->isNotEmpty()) {
             $this->warn("  {$unsafeIds->count()} misplaced item(s) have registrations/marks/a schedule row and were SKIPPED -- resolve manually: ".$misplaced->whereIn('id', $unsafeIds)->pluck('title')->implode(', '));
         }
 
-        if ($commit && $safeToDelete->isNotEmpty()) {
-            FestEventItem::whereIn('id', $safeToDelete->pluck('id'))->delete();
-            $this->info("  Deleted {$safeToDelete->count()} item(s) from leaf #{$leaf->id}.");
+        if ($commit && $safeToDisable->isNotEmpty()) {
+            FestEventItem::whereIn('id', $safeToDisable->pluck('id'))->update(['is_enabled' => false]);
+            $this->info("  Disabled {$safeToDisable->count()} item(s) on leaf #{$leaf->id}.");
         }
     }
 }

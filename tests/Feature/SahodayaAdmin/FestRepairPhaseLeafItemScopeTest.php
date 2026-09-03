@@ -113,12 +113,12 @@ class FestRepairPhaseLeafItemScopeTest extends TestCase
             '--sahodaya' => $sahodaya->id,
         ])->assertExitCode(0);
 
-        $this->assertNotNull($leafItemA->fresh());
-        $this->assertNotNull($leafItemB->fresh());
-        $this->assertNotNull($leafItemC->fresh());
+        $this->assertTrue((bool) $leafItemA->fresh()->is_enabled);
+        $this->assertTrue((bool) $leafItemB->fresh()->is_enabled);
+        $this->assertTrue((bool) $leafItemC->fresh()->is_enabled);
     }
 
-    public function test_commit_removes_only_misplaced_items_with_no_dependent_data(): void
+    public function test_commit_disables_only_misplaced_items_with_no_dependent_data(): void
     {
         ['sahodaya' => $sahodaya, 'leafItemA' => $leafItemA, 'leafItemB' => $leafItemB, 'leafItemC' => $leafItemC] = $this->makeHubWithLeaf('commit');
 
@@ -127,11 +127,14 @@ class FestRepairPhaseLeafItemScopeTest extends TestCase
             '--commit' => true,
         ])->assertExitCode(0);
 
-        // Correctly scoped: untouched.
+        // Correctly scoped: untouched. Never deleted, never disabled.
         $this->assertNull($leafItemA->fresh()->deleted_at);
-        // Misplaced, no dependent data: soft-deleted (FestEventItem uses SoftDeletes).
-        $this->assertNotNull($leafItemB->fresh()->deleted_at);
-        // Misplaced, but has a registration: left alone.
+        $this->assertTrue((bool) $leafItemA->fresh()->is_enabled);
+        // Misplaced, no dependent data: disabled, not deleted.
+        $this->assertNull($leafItemB->fresh()->deleted_at);
+        $this->assertFalse((bool) $leafItemB->fresh()->is_enabled);
+        // Misplaced, but has a registration: left alone (still enabled).
         $this->assertNull($leafItemC->fresh()->deleted_at);
+        $this->assertTrue((bool) $leafItemC->fresh()->is_enabled);
     }
 }
