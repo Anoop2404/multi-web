@@ -153,7 +153,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             $existingSchoolRegistrations = \App\Models\FestRegistration::whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $registerSchoolId)
                 ->with([
-                    'item:id,title,category_label,gender',
+                    'item:id,title,category,class_group,age_group,gender,item_code',
                     'participants' => fn ($q) => $q->with(['student:id,name,reg_no', 'teacher:id,name,reg_no']),
                 ])
                 ->get()
