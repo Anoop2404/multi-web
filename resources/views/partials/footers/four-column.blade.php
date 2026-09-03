@@ -3,7 +3,9 @@
         {{-- Branding --}}
         <div class="lg:col-span-1">
             @if(!empty($logo = \App\Support\TenantBranding::logoUrl($tenant)))
-            <img loading="lazy" src="{{ $logo }}" class="h-12 mb-3 brightness-0 invert" alt="{{ $tenant->name }}">
+            <span class="inline-block bg-white rounded-xl p-2 mb-3">
+                <img loading="lazy" src="{{ $logo }}" class="h-10 block" alt="{{ $tenant->name }}">
+            </span>
             @else
             <h3 class="text-white font-bold text-lg font-heading mb-3">{{ $tenant->name ?? 'School' }}</h3>
             @endif

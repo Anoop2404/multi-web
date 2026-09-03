@@ -157,11 +157,11 @@ return [
         ],
         'widgets' => ['news_ticker' => true, 'admission_banner' => false, 'social_strip' => true],
         'sections' => [
-            ['section_type' => 'hero', 'variant' => 'full-bleed', 'config' => [
+            ['section_type' => 'hero', 'variant' => 'gradient-split', 'config' => [
                 'eyebrow' => 'CBSE school network', 'heading' => '{{name}}',
                 'tagline' => 'Find schools, programmes and shared opportunities across {{region}}.',
-                'cta_label' => 'Find a member school', 'cta_url' => '#member-schools',
-                'secondary_cta_label' => 'Membership services', 'secondary_cta_url' => '/school-register',
+                'secondary_text' => 'New school? Apply for membership to join the network.',
+                'cta_label' => 'Membership services', 'cta_url' => '/school-register',
             ], 'layout' => ['width' => 'full', 'spacing' => 'spacious', 'surface' => 'dark', 'heading_alignment' => 'left']],
             ['section_type' => 'statistics', 'variant' => 'with-achievements', 'config' => [
                 'heading' => 'Our network at a glance',

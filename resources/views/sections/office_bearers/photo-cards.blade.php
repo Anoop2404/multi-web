@@ -23,9 +23,14 @@
                         }
                     }
                 @endphp
-                @if($photoUrl)
-                <img loading="lazy" src="{{ $photoUrl }}" alt="{{ $bearer->name ?? $bearer['name'] }}" class="w-24 h-24 rounded-full mx-auto object-cover mb-4">
-                @endif
+                <div class="w-24 h-24 rounded-full mx-auto mb-4 overflow-hidden flex items-center justify-center"
+                     style="background-color: var(--color-primary-light)">
+                    @if($photoUrl)
+                    <img loading="lazy" src="{{ $photoUrl }}" alt="{{ $bearer->name ?? $bearer['name'] }}" class="w-full h-full object-cover">
+                    @else
+                    <span class="text-2xl font-bold font-heading" style="color: var(--color-primary)">{{ substr($bearer->name ?? $bearer['name'] ?? '?', 0, 1) }}</span>
+                    @endif
+                </div>
                 <h3 class="font-bold font-heading text-gray-800">{{ $bearer->name ?? $bearer['name'] }}</h3>
                 <p class="text-sm" style="color: var(--color-primary)">{{ $bearer->role ?? $bearer['role'] ?? '' }}</p>
             </div>

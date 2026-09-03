@@ -3,7 +3,9 @@
         <div>
             <a href="/" class="flex items-center gap-3 mb-4">
                 @if(!empty($logo = \App\Support\TenantBranding::logoUrl($tenant)))
-                <img loading="lazy" src="{{ $logo }}" class="h-12 brightness-0 invert" alt="{{ $tenant->name }}">
+                <span class="inline-block bg-white rounded-xl p-2">
+                    <img loading="lazy" src="{{ $logo }}" class="h-10 block" alt="{{ $tenant->name }}">
+                </span>
                 @else
                 <span class="text-xl font-bold text-white font-heading">{{ $tenant->name ?? 'School' }}</span>
                 @endif
