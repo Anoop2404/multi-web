@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestEventPhase;
 use App\Models\FestEventStaff;
 use App\Models\FestMark;
@@ -32,6 +33,9 @@ use Illuminate\Support\Facades\Schema;
  *  - Sports roots already converted to a generic regional hub instead of using the
  *    sports_season/sports_discipline topology (G10)
  *  - phase definitions/assignments that differ between parent and children (G8)
+ *  - a phase leaf event holding items that don't belong to its own phase (items the
+ *    legacy, phase-blind copyItemsToPartition() call sites dumped onto it before that
+ *    was fixed -- see FestEventController::syncItemToExistingPartitions() commit)
  *  - school partition mappings that disagree with the active-year region assignment (G5)
  *  - staff assigned region_admin duty with no region_id (G1)
  *  - region admins assigned directly on a hub that currently exposes a Combined report
@@ -107,6 +111,7 @@ class FestAuditEventTopology extends Command
             $this->auditPhaseDrift($tenant, $root);
             $this->auditSchoolPartitionVsRegionAssignment($tenant, $root);
             $this->auditPhasedRegionalBilling($tenant, $root);
+            $this->auditPhaseLeafItemScope($tenant, $root);
         }
 
         $this->auditRegionAdminStaffing($tenant);
@@ -303,6 +308,70 @@ class FestAuditEventTopology extends Command
                     $this->addFinding($tenant->id, $root->id, 'mcs_invalid_school_phase_region', "School {$selection->school_id} selects a disabled region for phase #{$selection->phase_id}.");
                 }
             });
+    }
+
+    /**
+     * A phase leaf event's items should all trace back (via inherited_from_item_id) to a
+     * hub item whose own phase_id matches the leaf's source_phase_id -- that's the only
+     * correct way an item reaches a phase leaf (FestPhaseTopologyService::syncLeaf()'s own
+     * phase-aware copyItemsToPartition() call). Before that call site (and two siblings --
+     * FestEventController::syncItemToExistingPartitions(), FestItemSyncService::
+     * resyncAllItemsToPartitions(), FestRegistrationController::
+     * hydrateEventForSchoolRegistration()'s lazy-init fallback) were fixed to stop
+     * treating phase leaves as legacy partitions, a hub item create/update/import, the
+     * "Resync items to partitions" button, or even a school admin just loading their
+     * registration page could copy the ENTIRE hub catalog onto a single phase leaf
+     * regardless of phase assignment. This flags any leaf still carrying that leftover
+     * surplus, and how many registrations (if any) are attached to each misplaced item --
+     * an item with registrations needs a considered decision, not a blind delete.
+     */
+    private function auditPhaseLeafItemScope(Tenant $tenant, FestEvent $root): void
+    {
+        $leaves = FestEvent::where('parent_event_id', $root->id)
+            ->whereNotNull('source_phase_id')
+            ->get();
+
+        if ($leaves->isEmpty()) {
+            return;
+        }
+
+        $phasesById = FestEventPhase::where('event_id', $root->id)->get()->keyBy('id');
+
+        foreach ($leaves as $leaf) {
+            $phase = $phasesById->get($leaf->source_phase_id);
+            if (! $phase) {
+                continue;
+            }
+
+            $items = FestEventItem::where('event_id', $leaf->id)
+                ->whereNotNull('inherited_from_item_id')
+                ->get(['id', 'title', 'inherited_from_item_id']);
+
+            if ($items->isEmpty()) {
+                continue;
+            }
+
+            $hubItemsById = FestEventItem::whereIn('id', $items->pluck('inherited_from_item_id'))
+                ->get(['id', 'phase_id'])
+                ->keyBy('id');
+
+            $misplaced = $items->filter(function (FestEventItem $item) use ($hubItemsById, $phase) {
+                $hubItem = $hubItemsById->get($item->inherited_from_item_id);
+
+                return ! $hubItem || (int) ($hubItem->phase_id ?? 0) !== (int) $phase->id;
+            });
+
+            if ($misplaced->isEmpty()) {
+                continue;
+            }
+
+            $misplacedIds = $misplaced->pluck('id');
+            $registrationCount = FestRegistration::whereIn('item_id', $misplacedIds)->count();
+            $itemsWithRegistrations = FestRegistration::whereIn('item_id', $misplacedIds)->distinct('item_id')->count('item_id');
+
+            $this->addFinding($tenant->id, $root->id, 'phase_leaf_item_scope_drift',
+                "Phase leaf '{$leaf->title}' (#{$leaf->id}, phase '{$phase->name}') has {$misplaced->count()} item(s) that don't belong to its phase ({$itemsWithRegistrations} of them have {$registrationCount} total registration(s) attached -- review before removing).");
+        }
     }
 
     private function auditSchoolPartitionVsRegionAssignment(Tenant $tenant, FestEvent $root): void
