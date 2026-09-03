@@ -659,8 +659,14 @@ class FestRegistrationController extends SchoolAdminController
             // changes, and partition creation itself copies items at creation time
             // (copyItemsToPartition() is documented elsewhere as idempotent per item).
             // Only run it here as a lazy-init fallback for the case this partition
-            // genuinely has no items yet.
-            if (! FestEventItem::where('event_id', $event->id)->exists()) {
+            // genuinely has no items yet. Never for a phased-system leaf
+            // (source_phase_id set): that leaf's items are scoped to whichever phase
+            // it belongs to via FestPhaseTopologyService::syncLeaf()'s own phase-aware
+            // copyItemsToPartition() call -- this untargeted (no $phase argument) copy
+            // would dump every item in the whole hub's catalog onto it regardless of
+            // phase assignment the moment a school admin loaded this page before that
+            // leaf had been synced yet.
+            if ($event->source_phase_id === null && ! FestEventItem::where('event_id', $event->id)->exists()) {
                 app(\App\Services\Events\FestItemSyncService::class)
                     ->copyItemsToPartition($event->parentEvent, $event, $event->partition_role ?? 'region');
                 $event->unsetRelation('items');

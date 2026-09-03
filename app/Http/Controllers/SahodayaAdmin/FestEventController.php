@@ -1266,7 +1266,16 @@ class FestEventController extends SahodayaAdminController
         }
 
         $sync = app(\App\Services\Events\FestItemSyncService::class);
-        foreach ($partitions->partitions($event) as $child) {
+        // legacyPartitions(), not partitions() -- a phased hub's leaf events also carry
+        // partition_key/cluster_key (FestPhaseTopologyService::syncLeaf()'s own,
+        // unrelated reason: workflow_leaf_key derivation), so plain partitions() can't
+        // tell the two systems' children apart. Looping partitions() here was dumping
+        // every hub item onto every phase leaf regardless of that leaf's actual phase
+        // assignment (confirmed live: a "Digi Fest" phase leaf ended up with all 163
+        // catalog items instead of just the ones assigned to it) -- phased leaves get
+        // their items from FestPhaseTopologyService::syncLeaf()'s own phase-aware call
+        // to copyItemsToPartition(), never from this legacy sync path.
+        foreach ($partitions->legacyPartitions($event) as $child) {
             $role = $partitions->partitionRole($child) ?? 'region';
             $sync->copyItemsToPartition($event, $child, $role);
         }

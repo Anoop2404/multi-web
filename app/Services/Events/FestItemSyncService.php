@@ -205,7 +205,12 @@ class FestItemSyncService
         $hub->loadMissing('items');
         $count = 0;
 
-        foreach ($partitions->partitions($hub) as $child) {
+        // legacyPartitions(), not partitions() -- see the matching note in
+        // FestEventController::syncItemToExistingPartitions(). A phased hub's leaf
+        // events aren't legacy partitions even though they carry the same
+        // partition_key/cluster_key columns; they get their items from
+        // FestPhaseTopologyService::syncLeaf()'s own phase-aware sync, not this one.
+        foreach ($partitions->legacyPartitions($hub) as $child) {
             $role = $partitions->partitionRole($child) ?? 'region';
             $count += $this->copyItemsToPartition($hub, $child, $role);
         }
