@@ -108,8 +108,8 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $response->assertOk();
         $content = $response->getContent();
 
-        $this->assertMedalRow($content, 'Alpha School', gold: 2, silver: 0, bronze: 0);
-        $this->assertMedalRow($content, 'Beta School', gold: 0, silver: 1, bronze: 0);
+        $this->assertMedalCounts($content, $this->schoolA, gold: 2, silver: 0, bronze: 0);
+        $this->assertMedalCounts($content, $this->schoolB, gold: 0, silver: 1, bronze: 0);
     }
 
     public function test_results_item_tab_shows_full_roster_and_group_label_for_team_items(): void
@@ -135,16 +135,24 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $response->assertSee('Meera Pillai');
     }
 
-    private function assertMedalRow(string $html, string $schoolName, int $gold, int $silver, int $bronze): void
+    /**
+     * The school-wise tab shows a points summary table plus an expandable roster card
+     * per school (see resources/views/public/fest/results.blade.php) — there's no
+     * aggregated gold/silver/bronze count table anymore; medal tallies are conveyed per
+     * item via rank-N.webp badges inside each school's own card, so that's what this
+     * counts. Matched by school id (via data-school-id), not name, since
+     * Tenant::getNameAttribute() uppercases school-type tenant names on read.
+     */
+    private function assertMedalCounts(string $html, Tenant $school, int $gold, int $silver, int $bronze): void
     {
-        $pattern = '/'.preg_quote($schoolName, '/').'<\/td>\s*<td[^>]*>\s*(\d+)\s*<\/td>\s*<td[^>]*>\s*(\d+)\s*<\/td>\s*<td[^>]*>\s*(\d+)\s*<\/td>/s';
-        $this->assertMatchesRegularExpression($pattern, $html, "Could not find medal row for {$schoolName}");
-        preg_match($pattern, $html, $matches);
-        $this->assertSame(
-            [$gold, $silver, $bronze],
-            [(int) $matches[1], (int) $matches[2], (int) $matches[3]],
-            "Medal counts mismatch for {$schoolName}"
-        );
+        $cardPattern = '/data-school-winner-card data-school-id="'.preg_quote($school->id, '/').'">(.*?)<\/article>/s';
+        $this->assertMatchesRegularExpression($cardPattern, $html, "Could not find roster card for {$school->name} ({$school->id})");
+        preg_match($cardPattern, $html, $cardMatch);
+        $card = $cardMatch[1];
+
+        $this->assertSame($gold, substr_count($card, 'rank-1.webp'), "Gold count mismatch for {$school->name}");
+        $this->assertSame($silver, substr_count($card, 'rank-2.webp'), "Silver count mismatch for {$school->name}");
+        $this->assertSame($bronze, substr_count($card, 'rank-3.webp'), "Bronze count mismatch for {$school->name}");
     }
 
     private function school(string $name): Tenant
