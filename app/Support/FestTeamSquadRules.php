@@ -37,10 +37,19 @@ class FestTeamSquadRules
     /**
      * Whether squad-count rules should apply to this item: either its participant_type
      * marks it multi-person, or an admin has explicitly configured group size bounds
-     * (some items carry those bounds without a matching participant_type).
+     * (some items carry those bounds without a matching participant_type). An item
+     * explicitly marked 'individual' is never a squad, even if it happens to carry a
+     * stray min_group_size/max_group_size value (e.g. a leftover default of 1) --
+     * without this exclusion, such an item gets treated as a squad capped at that
+     * value and blocks selecting more than one student for what should be several
+     * independent single-student entries.
      */
     public static function hasSquadRules(\App\Models\FestEventItem $item): bool
     {
+        if ($item->participant_type === 'individual') {
+            return false;
+        }
+
         return self::isMultiPerson($item->participant_type)
             || (bool) $item->min_group_size
             || (bool) $item->max_group_size;

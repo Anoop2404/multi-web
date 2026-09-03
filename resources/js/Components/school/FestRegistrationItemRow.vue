@@ -481,8 +481,12 @@ const pickerSummary = computed(() => {
 // literally 'team'/'group'/'pair'/'trio' (matches the backend's hasSquadRules()
 // widening in FestTeamSquadRules::fromItem) -- key off the actual configured
 // bounds, not just the participant_type badge, so the count check can't be
-// silently skipped by a type mismatch.
+// silently skipped by a type mismatch. An item explicitly marked 'individual' is
+// never a squad even if it carries a stray min/max_group_size value (e.g. a
+// leftover default of 1) -- max_per_school (maxSelectedLimit) is what governs
+// how many separate single-student entries it allows, not this.
 const groupSizeBounds = computed(() => {
+    if (props.item.participant_type === 'individual') return null;
     if (!isGroup.value && !props.item.min_group_size && !props.item.max_group_size) return null;
     const min = Number(props.item.min_group_size || 1);
     const max = props.item.max_group_size ? Number(props.item.max_group_size) : null;
