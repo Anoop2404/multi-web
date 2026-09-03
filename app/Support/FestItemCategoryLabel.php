@@ -30,7 +30,10 @@ class FestItemCategoryLabel
         }
 
         if ($item->age_group) {
-            return $item->age_group;
+            $tenantId = $item->event?->tenant_id;
+            $labels = FestSportsAgeGroup::labels($tenantId);
+
+            return $labels[$item->age_group] ?? $item->age_group;
         }
 
         if ($item->category && $item->category !== 'general') {
