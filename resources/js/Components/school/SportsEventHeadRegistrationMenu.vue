@@ -62,7 +62,7 @@
                 <ul v-if="head.items?.length" class="divide-y divide-slate-100 max-h-52 overflow-y-auto">
                     <li v-for="item in head.items.slice(0, 12)" :key="item.id"
                         class="px-4 py-2 text-sm flex flex-wrap items-center justify-between gap-2">
-                        <span class="text-slate-800">{{ item.title }}</span>
+                        <span class="text-slate-800">{{ formatSportsItemTitle(item.title, item.gender) }}</span>
                         <span class="text-xs text-slate-500">
                             <span v-if="item.participant_count">{{ item.participant_count }} registered</span>
                             <span v-else class="text-slate-400">No entries yet</span>
@@ -84,6 +84,7 @@ import { computed } from 'vue';
 import EmptyState from '@/Components/ui/EmptyState.vue';
 import { Link } from '@inertiajs/vue3';
 import { studentDisplayName } from '@/support/studentDisplay.js';
+import { formatSportsItemTitle } from '@/support/festItemEligibility.js';
 
 const props = defineProps({
     event: { type: Object, required: true },

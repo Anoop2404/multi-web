@@ -57,7 +57,7 @@ class SportsAgeGroupController extends SahodayaAdminController
     {
         $data = $request->validate([
             'group_key'   => [
-                'required', 'string', 'max:20', 'regex:/^(open|u\d{1,2})$/',
+                'required', 'string', 'max:20', 'regex:/^[a-z][a-z0-9_]{0,19}$/',
                 Rule::unique('fest_sports_age_group_configs', 'group_key')
                     ->where('tenant_id', $this->sahodaya->id),
             ],

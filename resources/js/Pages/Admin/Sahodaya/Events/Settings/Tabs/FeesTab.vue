@@ -335,10 +335,16 @@
                     </p>
                     <FormField label="Slab is based on" hint="Which student count decides the slab bracket a school falls into">
                         <template #default="{ id }">
-                            <select :id="id" v-model="feeSettingsForm.student_count_slab_basis" class="field max-w-sm">
-                                <option value="event_registrations">Students registered for this event</option>
-                                <option value="school_total_enrollment">School's total student enrollment</option>
-                            </select>
+                            <SearchableSelect
+                                :id="id"
+                                v-model="feeSettingsForm.student_count_slab_basis"
+                                :options="[
+                                    { value: 'event_registrations', label: 'Students registered for this event' },
+                                    { value: 'school_total_enrollment', label: 'School\'s total student enrollment' }
+                                ]"
+                                :all-option="false"
+                                class="max-w-sm"
+                            />
                         </template>
                     </FormField>
                     <FormField label="Amount per participating student (₹) (optional)" hint="Charged per unique student registered for this event, in addition to the slab fee — always based on actual registrations, regardless of the slab basis above (e.g. ₹450 per student for Malabar Sahodaya)">
@@ -412,10 +418,16 @@
                         <h4 class="text-xs font-semibold text-slate-800 uppercase tracking-wide">School Registration Fee</h4>
                         <FormField label="How is the school fee decided?">
                             <template #default="{ id }">
-                                <select :id="id" v-model="feeSettingsForm.school_fee_mode" class="field max-w-sm">
-                                    <option value="class_tier">Flat or category-tiered (default)</option>
-                                    <option value="student_count_slab">School self-selects a student-strength band</option>
-                                </select>
+                                <SearchableSelect
+                                    :id="id"
+                                    v-model="feeSettingsForm.school_fee_mode"
+                                    :options="[
+                                        { value: 'class_tier', label: 'Flat or category-tiered (default)' },
+                                        { value: 'student_count_slab', label: 'School self-selects a student-strength band' }
+                                    ]"
+                                    :all-option="false"
+                                    class="max-w-sm"
+                                />
                             </template>
                         </FormField>
 

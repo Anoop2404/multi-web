@@ -53,8 +53,8 @@
                 <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
                     <div>
                         <label class="label-xs">Key</label>
-                        <input v-model="addForm.group_key" class="field font-mono" placeholder="u16" required pattern="^(open|u\d{1,2})$">
-                        <p class="text-[10px] text-gray-400 mt-0.5">e.g. u14, u17, open</p>
+                        <input v-model="addForm.group_key" class="field font-mono" placeholder="veteran" required pattern="^[a-z][a-z0-9_]{0,19}$">
+                        <p class="text-[10px] text-gray-400 mt-0.5">Lowercase letters, numbers, underscore — e.g. u14, u17, veteran, open</p>
                     </div>
                     <div class="sm:col-span-2">
                         <label class="label-xs">Label</label>

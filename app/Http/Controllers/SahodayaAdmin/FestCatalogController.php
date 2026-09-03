@@ -632,7 +632,7 @@ class FestCatalogController extends SahodayaAdminController
             'result_method'      => ['nullable', $registry->validationRule('result_method')],
             'gender'             => ['nullable', $registry->validationRule('gender')],
             'class_group'        => 'nullable|in:lp,up,hs,hss,open',
-            'age_group'          => 'nullable|in:u8,u10,u11,u12,u14,u17,u19,open',
+            'age_group'          => ['nullable', Rule::in(array_keys(FestSportsAgeGroup::labels($this->sahodaya->id)))],
             'kids_band'          => 'nullable|in:pre_kg,lkg,ukg,class1,class2,open',
             'qualify_count'      => 'nullable|integer|min:1',
             'max_per_school'     => 'nullable|integer|min:1',

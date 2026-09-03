@@ -1,6 +1,6 @@
 <template>
     <form class="card !p-4 mb-4 flex flex-wrap gap-3 items-end" @submit.prevent="$emit('apply')">
-        <FormField :label="resolvedLabel" class-extra="mb-0 min-w-[12rem]">
+        <FormField v-if="showHead" :label="resolvedLabel" class-extra="mb-0 min-w-[12rem]">
             <template #default="{ id }">
                 <SearchableSelect
                     :id="id"
@@ -20,6 +20,7 @@
                     :options="items"
                     :all-option="true"
                     :all-label="itemAllLabel"
+                    search-placeholder="Search items by name…"
                     @update:model-value="onItemChange"
                 />
             </template>
@@ -41,20 +42,28 @@ const props = defineProps({
     label: { type: String, default: null },
     allLabel: { type: String, default: null },
     isSports: { type: Boolean, default: false },
+    showHead: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue', 'update:itemId', 'apply']);
 
 const resolvedLabel = computed(() => props.label ?? (props.isSports ? 'Sport Event' : 'Item head'));
 const resolvedAllLabel = computed(() => props.allLabel ?? (props.isSports ? 'All sport events' : 'All heads'));
-const itemAllLabel = computed(() => `All items${props.modelValue ? ' in head' : ''}`);
+const itemAllLabel = computed(() => `All items${props.showHead && props.modelValue ? ' in head' : ''}`);
 
 const items = computed(() => {
-    if (!props.modelValue) {
-        return props.headItemGroups.flatMap((g) => g.items ?? []);
+    let list = [];
+    if (!props.showHead || !props.modelValue) {
+        list = props.headItemGroups.flatMap((g) => g.items ?? []);
+    } else {
+        const group = props.headItemGroups.find((g) => String(g.head_id) === String(props.modelValue));
+        list = group?.items ?? [];
     }
-    const group = props.headItemGroups.find((g) => String(g.head_id) === String(props.modelValue));
-    return group?.items ?? [];
+    return list.map((item) => ({
+        id: item.id ?? item.value,
+        name: item.title ?? item.name,
+        code: item.item_code ?? item.code,
+    }));
 });
 
 function onChange(value) {

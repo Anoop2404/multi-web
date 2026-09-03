@@ -127,4 +127,19 @@ class FestSportsAgeGroupTest extends TestCase
 
         $this->assertSame('Under 17 · Girls', FestSportsAgeGroup::itemEligibilityLabel($item, $event));
     }
+
+    public function test_event_item_formatted_title_appends_gender_in_parentheses(): void
+    {
+        $chessBoys = new FestEventItem(['title' => 'Chess U7', 'gender' => 'male']);
+        $chessGirls = new FestEventItem(['title' => 'Chess U7', 'gender' => 'female']);
+        $chessMixed = new FestEventItem(['title' => 'Chess U7', 'gender' => 'mixed']);
+        $chessAlreadyBoys = new FestEventItem(['title' => 'Chess U7 (Boys)', 'gender' => 'male']);
+        $chessOpen = new FestEventItem(['title' => 'Chess U7', 'gender' => 'open']);
+
+        $this->assertSame('Chess U7 (Boys)', $chessBoys->formattedTitle());
+        $this->assertSame('Chess U7 (Girls)', $chessGirls->formattedTitle());
+        $this->assertSame('Chess U7 (Mixed)', $chessMixed->formattedTitle());
+        $this->assertSame('Chess U7 (Boys)', $chessAlreadyBoys->formattedTitle());
+        $this->assertSame('Chess U7', $chessOpen->formattedTitle());
+    }
 }

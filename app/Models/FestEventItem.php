@@ -47,6 +47,7 @@ class FestEventItem extends Model
 
     protected $appends = [
         'squad_summary',
+        'formatted_title',
     ];
 
     protected static function booted(): void
@@ -70,6 +71,35 @@ class FestEventItem extends Model
     public function getSquadSummaryAttribute(): ?string
     {
         return $this->squadSummary();
+    }
+
+    public function getFormattedTitleAttribute(): string
+    {
+        return $this->formattedTitle();
+    }
+
+    public function formattedTitle(): string
+    {
+        $title = str_replace('_', ' ', $this->title ?? 'Item');
+        $gender = strtolower((string) ($this->gender ?? ''));
+
+        if (! $gender || $gender === 'open') {
+            return $title;
+        }
+
+        $lower = strtolower($title);
+        if (str_contains($lower, 'boys') || str_contains($lower, 'girls') || str_contains($lower, 'mixed')) {
+            return $title;
+        }
+
+        $label = match ($gender) {
+            'male', 'm', 'boy', 'boys' => 'Boys',
+            'female', 'f', 'girl', 'girls' => 'Girls',
+            'mixed', 'common' => 'Mixed',
+            default => null,
+        };
+
+        return $label ? "{$title} ({$label})" : $title;
     }
 
     public function event(): BelongsTo

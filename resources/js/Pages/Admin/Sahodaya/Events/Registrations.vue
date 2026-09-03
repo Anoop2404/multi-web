@@ -362,6 +362,54 @@
                             :all-option="false"
                         />
                     </FormField>
+                    <!-- Existing registration warning & details for selected item -->
+                    <div v-if="existingRegistrationForItem" class="rounded-lg border border-amber-200 bg-amber-50/90 p-3.5 text-xs space-y-2.5 text-amber-950">
+                        <div class="flex items-center justify-between font-semibold border-b border-amber-200/80 pb-2">
+                            <span class="flex items-center gap-1.5 text-amber-900">
+                                <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                School already has a registration for this item
+                            </span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-200 text-amber-900">
+                                {{ existingRegistrationForItem.status }}
+                            </span>
+                        </div>
+
+                        <div v-if="existingRegistrationForItem.team_name" class="text-amber-900">
+                            Team name: <strong>{{ existingRegistrationForItem.team_name }}</strong>
+                        </div>
+
+                        <div>
+                            <span class="font-semibold text-amber-900">Already Registered Performers:</span>
+                            <div v-if="existingRegistrationForItem.performers.length" class="flex flex-wrap gap-1 mt-1">
+                                <span v-for="p in existingRegistrationForItem.performers" :key="p.id" class="inline-flex items-center px-2 py-0.5 rounded bg-amber-200/80 text-amber-950 font-medium">
+                                    {{ p.reg_no ? p.reg_no + ' · ' + p.name : p.name }}
+                                </span>
+                            </div>
+                            <p v-else class="text-amber-700/80 italic mt-0.5">None</p>
+                        </div>
+
+                        <div>
+                            <span class="font-semibold text-amber-900">Already Registered Standbys:</span>
+                            <div v-if="existingRegistrationForItem.standbys.length" class="flex flex-wrap gap-1 mt-1">
+                                <span v-for="s in existingRegistrationForItem.standbys" :key="s.id" class="inline-flex items-center px-2 py-0.5 rounded bg-amber-300/70 text-amber-950 font-medium">
+                                    {{ s.reg_no ? s.reg_no + ' · ' + s.name : s.name }}
+                                </span>
+                            </div>
+                            <p v-else class="text-amber-700/80 italic mt-0.5">None</p>
+                        </div>
+                    </div>
+
+                    <!-- Summary of all registered items for selected school if no item selected yet -->
+                    <div v-else-if="onBehalfForm.school_id && !onBehalfForm.item_id && props.existingSchoolRegistrations?.length" class="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700">
+                        <span class="font-semibold">Registered items for this school ({{ props.existingSchoolRegistrations.length }}):</span>
+                        <div class="flex flex-wrap gap-1 mt-1.5 max-h-24 overflow-y-auto">
+                            <span v-for="reg in props.existingSchoolRegistrations" :key="reg.id" class="inline-flex items-center px-2 py-0.5 rounded bg-slate-200/80 text-slate-800 text-[11px]">
+                                {{ reg.item?.title || 'Item #' + reg.item_id }} ({{ reg.performers.length }} performers{{ reg.standbys.length ? `, ${reg.standbys.length} standby` : '' }})
+                            </span>
+                        </div>
+                    </div>
                     <FormField v-if="selectedItemIsGroup" label="Team name" required>
                         <input v-model="onBehalfForm.team_name" type="text" class="field text-sm" required>
                     </FormField>
@@ -466,9 +514,9 @@ import { useConfirm } from '@/composables/useConfirm';
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, registrations: Object, schools: Object, schoolNames: Object,
-    pendingMatchingCount: { type: Number, default: 0 },
     feeRequired: Boolean, activityLogs: { type: Array, default: () => [] },
     registerStudents: { type: Array, default: () => [] },
+    existingSchoolRegistrations: { type: Array, default: () => [] },
     registerSchoolId: { type: [String, Number], default: '' },
     eventItems: { type: Array, default: () => [] },
     classGroupOptions: { type: Array, default: () => [] },
@@ -496,7 +544,7 @@ const filterDescription = computed(() => {
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const { confirm, prompt } = useConfirm();
 
-function switchSportEvent(eventId) {
+function navigateEvent(eventId) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${eventId}/registrations`);
 }
 
@@ -543,10 +591,28 @@ function applyFilters() {
 
 const registrationsList = computed(() => props.registrations?.data ?? []);
 
-const eventItemOptions = computed(() => props.eventItems.map(i => ({
-    id: i.id,
-    name: i.category_label ? `${i.title} — ${i.category_label}` : i.title,
-})));
+function formatGenderLabel(gender) {
+    if (!gender) return null;
+    const g = String(gender).toLowerCase();
+    if (g === 'male' || g === 'boys') return 'Boys';
+    if (g === 'female' || g === 'girls') return 'Girls';
+    if (g === 'mixed') return 'Mixed';
+    if (g === 'open') return 'Open';
+    return g.charAt(0).toUpperCase() + g.slice(1);
+}
+
+const eventItemOptions = computed(() => props.eventItems.map(i => {
+    const genderLabel = formatGenderLabel(i.gender);
+    const details = [];
+    if (i.category_label) details.push(i.category_label);
+    if (genderLabel) details.push(genderLabel);
+
+    const name = details.length ? `${i.title} (${details.join(' · ')})` : i.title;
+    return {
+        id: i.id,
+        name,
+    };
+}));
 
 const schoolFilterOptions = computed(() => Object.entries(props.schoolNames).map(([id, name]) => ({
     value: id,
@@ -708,6 +774,13 @@ function openOnBehalf() {
     if (onBehalfForm.school_id) loadSchoolStudents();
 }
 
+const existingRegistrationForItem = computed(() => {
+    if (!onBehalfForm.school_id || !onBehalfForm.item_id) return null;
+    return (props.existingSchoolRegistrations ?? []).find(
+        r => String(r.item_id) === String(onBehalfForm.item_id)
+    ) ?? null;
+});
+
 function loadSchoolStudents() {
     onBehalfForm.student_ids = [];
     onBehalfForm.standby_ids = [];
@@ -715,7 +788,7 @@ function loadSchoolStudents() {
     router.get(`${base}/registrations`, { school_id: onBehalfForm.school_id }, {
         preserveScroll: true,
         preserveState: true,
-        only: ['registerStudents', 'registerSchoolId'],
+        only: ['registerStudents', 'registerSchoolId', 'existingSchoolRegistrations'],
     });
 }
 

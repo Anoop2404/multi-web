@@ -612,10 +612,12 @@ class FestEventReportAnalyticsService
         $items = FestEventItem::query()
             ->where('event_id', $targetEventId)
             ->where('is_enabled', true)
-            ->with('head:id,name,default_item_fee,extra_item_fee')
+            ->with(['head:id,name,default_item_fee,extra_item_fee', 'phase:id,source_phase_id'])
             ->orderBy('display_order')
             ->orderBy('title')
             ->get();
+
+        $items = \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($items, $this->event);
 
         if ($items->isEmpty()) {
             return [];

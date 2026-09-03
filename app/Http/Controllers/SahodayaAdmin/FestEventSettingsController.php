@@ -616,16 +616,11 @@ class FestEventSettingsController extends SahodayaAdminController
             unset($feeSettings['payment_qr_code']);
         }
 
-        $event->update(['fee_settings' => $feeSettings]);
-
-        // A region/finale partition child saving its own fee settings directly means
-        // this child's fees are no longer just an untouched copy of the hub's — protect
-        // it from FestSchoolEventFeeService::propagateFeeSettingsToChildren() reverting
-        // this save the next time the hub's own fee settings are saved. No-op (and never
-        // read) for a standalone event or the hub itself.
-        if ($event->parent_event_id !== null) {
-            $event->updateQuietly(['fee_customized_at' => now()]);
-        }
+        $feeSettings['sports_fees_configured'] = true;
+        $event->update([
+            'fee_settings' => $feeSettings,
+            'fee_customized_at' => now(),
+        ]);
 
         // Sports Head = Event: store composite fees on the FestEvent itself.
         if ($event->event_type === 'sports') {

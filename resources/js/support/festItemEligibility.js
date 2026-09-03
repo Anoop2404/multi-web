@@ -26,6 +26,21 @@ export function genderLabel(gender) {
     return genderLabels[normalized] ?? normalized;
 }
 
+export function formatSportsItemTitle(title, gender) {
+    if (!title) return '';
+    const clean = String(title).replace(/_/g, ' ').trim();
+    const g = normalizeFestItemGender(gender);
+    if (!g || g === 'open') {
+        return clean;
+    }
+    const lower = clean.toLowerCase();
+    if (lower.includes('boys') || lower.includes('girls') || lower.includes('mixed')) {
+        return clean;
+    }
+    const label = genderLabels[g];
+    return label ? `${clean} (${label})` : clean;
+}
+
 export function ageGroupLabel(key, labels = {}) {
     if (!key || key === 'open') return null;
     return labels[key] ?? String(key).toUpperCase();

@@ -1577,7 +1577,7 @@ class FestRegistrationController extends SchoolAdminController
     private function groupItemsForEvent(FestEvent $event, \Illuminate\Support\Collection $enabledItems): array
     {
         if ($event->event_type === 'sports') {
-            $ageLabels = FestSportsAgeGroup::labels();
+            $ageLabels = FestSportsAgeGroup::labels($event->tenant_id);
             $grouped = [];
 
             foreach ($enabledItems->groupBy(fn ($i) => $i['age_group'] ?: 'open') as $ageKey => $items) {
@@ -1585,7 +1585,8 @@ class FestRegistrationController extends SchoolAdminController
             }
 
             $ordered = [];
-            foreach (FestSportsAgeGroup::KEYS as $key) {
+            $orderedKeys = array_merge(FestSportsAgeGroup::orderedAgeGroups($event->tenant_id), ['open']);
+            foreach ($orderedKeys as $key) {
                 if (! empty($grouped[$key])) {
                     $ordered[$key] = $grouped[$key];
                 }

@@ -22,40 +22,49 @@
         <section v-if="!selectedHeadId && !selectedItemId">
             <p v-if="displayHint" class="text-sm text-slate-600 mb-4">{{ displayHint }}</p>
             <EmptyState v-if="!navGroups.length" title="No competition items" :description="emptyHeadsText" icon="📂" />
-            <div v-else-if="flatItemsMode" class="reports-tile-grid">
-                <Link v-for="item in flatItems" :key="item.id"
-                      :href="itemUrl(null, item.id)"
-                      class="reports-head-card group block hover:no-underline">
-                    <span v-if="item.registration_count || item.participant_count" class="reports-head-card__count">{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.participant_count) : (item.participant_count ?? item.registration_count) }}</span>
-                    <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-navy)]">{{ item.title }}</p>
-                    <p v-if="item.item_code" class="text-xs font-mono text-slate-500 mt-0.5">{{ item.item_code }}</p>
-                    <p v-if="item.category_label || item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.category_label || item.age_group }}</p>
-                    <dl v-if="showItemStats" class="mt-3 grid grid-cols-2 gap-2 text-xs border-t border-slate-100 pt-3">
-                        <div v-if="showResultStats">
-                            <dt class="text-slate-400">Marks</dt>
-                            <dd :class="item.marks_ready ? 'text-emerald-700 font-semibold' : 'text-amber-700'">
-                                {{ (item.participant_type && item.participant_type !== 'individual') ? (item.marks_ready ? (item.registration_count ?? item.performers) : Math.floor((item.marks_entered ?? 0) / Math.max(1, Math.round((item.performers ?? 1) / Math.max(1, item.registration_count ?? 1))))) : (item.marks_entered ?? 0) }}/{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.performers) : (item.performers ?? item.participant_count ?? 0) }}
-                            </dd>
-                        </div>
-                        <div v-if="showResultStats">
-                            <dt class="text-slate-400">Status</dt>
-                            <dd :class="item.results_published ? 'text-emerald-700 font-semibold' : 'text-slate-600'">
-                                {{ item.results_published ? 'Published' : (item.marks_ready ? 'Ready' : 'Pending') }}
-                            </dd>
-                        </div>
-                        <div v-if="!showResultStats">
-                            <dt class="text-slate-400">Chest start</dt>
-                            <dd class="font-mono font-semibold">{{ item.chest_no_start }}</dd>
-                        </div>
-                        <div v-if="!showResultStats">
-                            <dt class="text-slate-400">Assigned</dt>
-                            <dd :class="item.chest_missing ? 'text-amber-700' : 'text-emerald-700'">
-                                {{ item.chest_assigned }}/{{ item.participant_count }}
-                            </dd>
-                        </div>
-                    </dl>
-                    <p class="mt-3 text-xs font-semibold text-indigo-600 group-hover:underline">Open item →</p>
-                </Link>
+            <div v-else-if="flatItemsMode" class="space-y-4">
+                <div v-if="flatItems.length > 2" class="max-w-sm">
+                    <input v-model="itemSearchQuery"
+                           type="search"
+                           placeholder="Search items by name or code…"
+                           class="w-full text-xs px-3.5 py-2 bg-white border border-slate-200 rounded-xl shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                <EmptyState v-if="!filteredFlatItems.length" title="No items match search" :description="`No item found matching “${itemSearchQuery}”.`" icon="🔍" />
+                <div v-else class="reports-tile-grid">
+                    <Link v-for="item in filteredFlatItems" :key="item.id"
+                          :href="itemUrl(null, item.id)"
+                          class="reports-head-card group block hover:no-underline">
+                        <span v-if="item.registration_count || item.participant_count" class="reports-head-card__count">{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.participant_count) : (item.participant_count ?? item.registration_count) }}</span>
+                        <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-navy)]">{{ item.title }}</p>
+                        <p v-if="item.item_code" class="text-xs font-mono text-slate-500 mt-0.5">{{ item.item_code }}</p>
+                        <p v-if="item.category_label || item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.category_label || item.age_group }}</p>
+                        <dl v-if="showItemStats" class="mt-3 grid grid-cols-2 gap-2 text-xs border-t border-slate-100 pt-3">
+                            <div v-if="showResultStats">
+                                <dt class="text-slate-400">Marks</dt>
+                                <dd :class="item.marks_ready ? 'text-emerald-700 font-semibold' : 'text-amber-700'">
+                                    {{ (item.participant_type && item.participant_type !== 'individual') ? (item.marks_ready ? (item.registration_count ?? item.performers) : Math.floor((item.marks_entered ?? 0) / Math.max(1, Math.round((item.performers ?? 1) / Math.max(1, item.registration_count ?? 1))))) : (item.marks_entered ?? 0) }}/{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.performers) : (item.performers ?? item.participant_count ?? 0) }}
+                                </dd>
+                            </div>
+                            <div v-if="showResultStats">
+                                <dt class="text-slate-400">Status</dt>
+                                <dd :class="item.results_published ? 'text-emerald-700 font-semibold' : 'text-slate-600'">
+                                    {{ item.results_published ? 'Published' : (item.marks_ready ? 'Ready' : 'Pending') }}
+                                </dd>
+                            </div>
+                            <div v-if="!showResultStats">
+                                <dt class="text-slate-400">Chest start</dt>
+                                <dd class="font-mono font-semibold">{{ item.chest_no_start }}</dd>
+                            </div>
+                            <div v-if="!showResultStats">
+                                <dt class="text-slate-400">Assigned</dt>
+                                <dd :class="item.chest_missing ? 'text-amber-700' : 'text-emerald-700'">
+                                    {{ item.chest_assigned }}/{{ item.participant_count }}
+                                </dd>
+                            </div>
+                        </dl>
+                        <p class="mt-3 text-xs font-semibold text-indigo-600 group-hover:underline">Open item →</p>
+                    </Link>
+                </div>
             </div>
             <div v-else class="reports-tile-grid">
                 <Link v-for="head in navGroups" :key="head.head_id ?? 'other'"
@@ -85,40 +94,49 @@
                 <p class="text-sm text-slate-600">Select a competition item to continue.</p>
             </div>
             <EmptyState v-if="!selectedHead.items?.length" title="No items in this head" icon="📋" />
-            <div v-else class="reports-tile-grid">
-                <Link v-for="item in selectedHead.items" :key="item.id"
-                      :href="itemUrl(selectedHead.head_id, item.id)"
-                      class="reports-head-card group block hover:no-underline">
-                    <span v-if="item.registration_count || item.participant_count" class="reports-head-card__count">{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.participant_count) : (item.participant_count ?? item.registration_count) }}</span>
-                    <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-navy)]">{{ item.title }}</p>
-                    <p v-if="item.item_code" class="text-xs font-mono text-slate-500 mt-0.5">{{ item.item_code }}</p>
-                    <p v-if="item.category_label || item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.category_label || item.age_group }}</p>
-                    <dl v-if="showItemStats" class="mt-3 grid grid-cols-2 gap-2 text-xs border-t border-slate-100 pt-3">
-                        <div v-if="showResultStats">
-                            <dt class="text-slate-400">Marks</dt>
-                            <dd :class="item.marks_ready ? 'text-emerald-700 font-semibold' : 'text-amber-700'">
-                                {{ (item.participant_type && item.participant_type !== 'individual') ? (item.marks_ready ? (item.registration_count ?? item.performers) : Math.floor((item.marks_entered ?? 0) / Math.max(1, Math.round((item.performers ?? 1) / Math.max(1, item.registration_count ?? 1))))) : (item.marks_entered ?? 0) }}/{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.performers) : (item.performers ?? item.participant_count ?? 0) }}
-                            </dd>
-                        </div>
-                        <div v-if="showResultStats">
-                            <dt class="text-slate-400">Status</dt>
-                            <dd :class="item.results_published ? 'text-emerald-700 font-semibold' : 'text-slate-600'">
-                                {{ item.results_published ? 'Published' : (item.marks_ready ? 'Ready' : 'Pending') }}
-                            </dd>
-                        </div>
-                        <div v-if="!showResultStats">
-                            <dt class="text-slate-400">Chest start</dt>
-                            <dd class="font-mono font-semibold">{{ item.chest_no_start }}</dd>
-                        </div>
-                        <div v-if="!showResultStats">
-                            <dt class="text-slate-400">Assigned</dt>
-                            <dd :class="item.chest_missing ? 'text-amber-700' : 'text-emerald-700'">
-                                {{ item.chest_assigned }}/{{ item.participant_count }}
-                            </dd>
-                        </div>
-                    </dl>
-                    <p class="mt-3 text-xs font-semibold text-indigo-600 group-hover:underline">Open item →</p>
-                </Link>
+            <div v-else class="space-y-4">
+                <div v-if="selectedHead.items.length > 2" class="max-w-sm">
+                    <input v-model="itemSearchQuery"
+                           type="search"
+                           placeholder="Search items by name or code…"
+                           class="w-full text-xs px-3.5 py-2 bg-white border border-slate-200 rounded-xl shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                <EmptyState v-if="!filteredHeadItems.length" title="No items match search" :description="`No item found matching “${itemSearchQuery}”.`" icon="🔍" />
+                <div v-else class="reports-tile-grid">
+                    <Link v-for="item in filteredHeadItems" :key="item.id"
+                          :href="itemUrl(selectedHead.head_id, item.id)"
+                          class="reports-head-card group block hover:no-underline">
+                        <span v-if="item.registration_count || item.participant_count" class="reports-head-card__count">{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.participant_count) : (item.participant_count ?? item.registration_count) }}</span>
+                        <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-navy)]">{{ item.title }}</p>
+                        <p v-if="item.item_code" class="text-xs font-mono text-slate-500 mt-0.5">{{ item.item_code }}</p>
+                        <p v-if="item.category_label || item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.category_label || item.age_group }}</p>
+                        <dl v-if="showItemStats" class="mt-3 grid grid-cols-2 gap-2 text-xs border-t border-slate-100 pt-3">
+                            <div v-if="showResultStats">
+                                <dt class="text-slate-400">Marks</dt>
+                                <dd :class="item.marks_ready ? 'text-emerald-700 font-semibold' : 'text-amber-700'">
+                                    {{ (item.participant_type && item.participant_type !== 'individual') ? (item.marks_ready ? (item.registration_count ?? item.performers) : Math.floor((item.marks_entered ?? 0) / Math.max(1, Math.round((item.performers ?? 1) / Math.max(1, item.registration_count ?? 1))))) : (item.marks_entered ?? 0) }}/{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.performers) : (item.performers ?? item.participant_count ?? 0) }}
+                                </dd>
+                            </div>
+                            <div v-if="showResultStats">
+                                <dt class="text-slate-400">Status</dt>
+                                <dd :class="item.results_published ? 'text-emerald-700 font-semibold' : 'text-slate-600'">
+                                    {{ item.results_published ? 'Published' : (item.marks_ready ? 'Ready' : 'Pending') }}
+                                </dd>
+                            </div>
+                            <div v-if="!showResultStats">
+                                <dt class="text-slate-400">Chest start</dt>
+                                <dd class="font-mono font-semibold">{{ item.chest_no_start }}</dd>
+                            </div>
+                            <div v-if="!showResultStats">
+                                <dt class="text-slate-400">Assigned</dt>
+                                <dd :class="item.chest_missing ? 'text-amber-700' : 'text-emerald-700'">
+                                    {{ item.chest_assigned }}/{{ item.participant_count }}
+                                </dd>
+                            </div>
+                        </dl>
+                        <p class="mt-3 text-xs font-semibold text-indigo-600 group-hover:underline">Open item →</p>
+                    </Link>
+                </div>
             </div>
         </section>
 
@@ -144,9 +162,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import { useHeadItemNav } from '@/composables/useHeadItemNav.js';
+import EmptyState from '@/Components/ui/EmptyState.vue';
 
 const props = defineProps({
     groups: { type: Array, default: () => [] },
@@ -165,6 +184,8 @@ const props = defineProps({
 
 const { groups: navGroups, selectedHead, selectedItem } = useHeadItemNav(props);
 
+const itemSearchQuery = ref('');
+
 const flatItemsMode = computed(() => {
     if (!props.flatWhenSingleGroup) {
         return false;
@@ -176,6 +197,33 @@ const flatItemsMode = computed(() => {
 });
 
 const flatItems = computed(() => navGroups.value.flatMap((g) => g.items ?? []));
+
+const filteredFlatItems = computed(() => {
+    if (!itemSearchQuery.value.trim()) {
+        return flatItems.value;
+    }
+    const q = itemSearchQuery.value.toLowerCase().trim();
+    return flatItems.value.filter((item) => {
+        return (item.title && item.title.toLowerCase().includes(q))
+            || (item.item_code && item.item_code.toLowerCase().includes(q))
+            || (item.category_label && item.category_label.toLowerCase().includes(q))
+            || (item.age_group && item.age_group.toLowerCase().includes(q));
+    });
+});
+
+const filteredHeadItems = computed(() => {
+    const items = selectedHead.value?.items ?? [];
+    if (!itemSearchQuery.value.trim()) {
+        return items;
+    }
+    const q = itemSearchQuery.value.toLowerCase().trim();
+    return items.filter((item) => {
+        return (item.title && item.title.toLowerCase().includes(q))
+            || (item.item_code && item.item_code.toLowerCase().includes(q))
+            || (item.category_label && item.category_label.toLowerCase().includes(q))
+            || (item.age_group && item.age_group.toLowerCase().includes(q));
+    });
+});
 
 const displayHint = computed(() => {
     if (props.hint) {

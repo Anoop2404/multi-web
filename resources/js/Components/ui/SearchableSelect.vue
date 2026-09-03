@@ -140,7 +140,9 @@ const searchInputRef = ref(null);
 function normalizeOption(opt) {
     if (opt !== null && typeof opt === 'object') {
         const value = 'value' in opt ? opt.value : (opt.id ?? '');
-        const label = 'label' in opt ? opt.label : (opt.name ?? String(value));
+        const rawLabel = 'label' in opt ? opt.label : (opt.name ?? opt.title ?? String(value));
+        const codePrefix = opt.item_code && !('label' in opt) ? `[${opt.item_code}] ` : '';
+        const label = `${codePrefix}${rawLabel}`;
         return { value, label, disabled: !!opt.disabled };
     }
     return { value: opt, label: String(opt), disabled: false };

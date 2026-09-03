@@ -271,8 +271,9 @@ class FestEventFeeResolver
     {
         $defaults = FestSportsAgeGroup::defaultFees($tenantId);
         $normalized = [];
+        $keys = array_keys(FestSportsAgeGroup::labels($tenantId));
 
-        foreach (FestSportsAgeGroup::KEYS as $group) {
+        foreach ($keys as $group) {
             $value = $input[$group] ?? $defaults[$group] ?? null;
             if ($value !== null && $value !== '') {
                 $normalized[$group] = (float) $value;

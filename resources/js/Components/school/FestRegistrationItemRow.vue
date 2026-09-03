@@ -251,6 +251,7 @@
 import { computed, ref, watch } from 'vue';
 import FestStudentPickerModal from '@/Components/school/FestStudentPickerModal.vue';
 import { studentDisplayName } from '@/support/studentDisplay.js';
+import { formatSportsItemTitle } from '@/support/festItemEligibility.js';
 import { useSweetAlert } from '@/composables/useSweetAlert.js';
 import { formatDateTime } from '@/support/calendarDates.js';
 
@@ -320,7 +321,7 @@ const showStandbyPicker = computed(() => {
 
 const displayTitle = computed(() => {
     const raw = props.item?.clean_title || props.item?.title || '';
-    return String(raw).replace(/_/g, ' ');
+    return formatSportsItemTitle(raw, props.item?.gender);
 });
 
 const isGroup = computed(() => ['team', 'group', 'pair', 'trio'].includes(props.item.participant_type));

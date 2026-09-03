@@ -123,7 +123,8 @@ class FestEvent extends Model
     /** Whether composite sports fee columns are configured (checklist readiness). */
     public function hasSportsFeesConfigured(): bool
     {
-        return $this->school_registration_fee !== null
+        return (bool) ($this->fee_settings['sports_fees_configured'] ?? false)
+            || $this->school_registration_fee !== null
             || $this->student_registration_fee !== null
             || $this->team_registration_fee !== null
             || $this->default_item_fee !== null

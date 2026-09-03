@@ -492,7 +492,7 @@ class StateFestProgramController extends Controller
             'participant_type'   => 'nullable|in:individual,pair,trio,group,team',
             'gender'             => 'nullable|in:male,female,mixed,open',
             'class_group'        => 'nullable|alpha_dash|max:60',
-            'age_group'          => 'nullable|in:u8,u10,u11,u12,u14,u17,u19,open',
+            'age_group'          => 'nullable|string|max:20',
             'kids_band'          => 'nullable|in:pre_kg,lkg,ukg,class1,class2,open',
             'max_per_school'     => 'nullable|integer|min:1',
             'min_group_size'     => 'nullable|integer|min:1',

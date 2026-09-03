@@ -67,10 +67,19 @@ class FestHeadItemNavigationService
             $defaultChestStart = (int) ($numbering['chest_no_start'] ?? 1);
         }
 
-        $items = FestEventItem::query()
-            ->where('event_id', $event->id)
-            ->where('is_enabled', true)
-            ->get($itemColumns);
+        $targetEvent = $this->catalogScopeEvent($event);
+        if (! in_array('phase_id', $itemColumns, true)) {
+            $itemColumns[] = 'phase_id';
+        }
+
+        $items = self::filterToOwnPhase(
+            FestEventItem::query()
+                ->where('event_id', $targetEvent->id)
+                ->where('is_enabled', true)
+                ->with('phase:id,source_phase_id')
+                ->get($itemColumns),
+            $event,
+        );
 
         $itemsByHead = $items->groupBy(fn ($i) => $i->head_id ?? 0);
         $groups = [];
