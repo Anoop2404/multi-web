@@ -76,7 +76,7 @@
                                 </div>
                                 @endforeach
                             </div>
-                            <p class="text-xs text-white/40 mt-3 truncate uppercase">{{ $row['school'] }}</p>
+                            <p class="text-xs text-white/40 mt-3 uppercase">{{ $row['school'] }}</p>
                         </div>
                     </div>
                 @else
@@ -91,7 +91,7 @@
                                 <div class="shrink-0 w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-sm text-white font-black">{{ $pos ? '#' . $pos : '—' }}</div>
                             @endif
                             <div class="flex-1 min-w-0">
-                                <p class="font-bold text-sm text-white truncate uppercase">{{ $row['school'] }}</p>
+                                <p class="font-bold text-sm text-white uppercase">{{ $row['school'] }}</p>
                                 <p class="text-[11px] text-white/40">{{ count($roster) }} Team Members</p>
                             </div>
                         </div>
