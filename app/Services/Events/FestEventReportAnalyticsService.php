@@ -752,10 +752,27 @@ class FestEventReportAnalyticsService
      */
     public function uniqueStudentCount(?string $schoolId = null): int
     {
+        $targetEventId = $this->scope
+            ? $this->scope->targetEventId()
+            : ($this->event->parent_event_id ? $this->event->rootEvent()->id : $this->event->id);
+
+        $items = FestEventItem::query()
+            ->where('event_id', $targetEventId)
+            ->where('is_enabled', true)
+            ->get();
+
+        $items = \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($items, $this->event);
+        if ($items->isEmpty()) {
+            return 0;
+        }
+
+        [$allReportableItemIds] = $this->itemFamiliesFor($items);
+
         return FestParticipant::query()
             ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
             ->join('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
             ->whereIn('fest_registrations.event_id', $this->eventIds())
+            ->whereIn('fest_registrations.item_id', $allReportableItemIds)
             ->whereIn('fest_registrations.status', FestRegistration::ACTIVE_STATUSES)
             ->where('fest_event_items.is_enabled', true)
             ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))

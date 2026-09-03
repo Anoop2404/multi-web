@@ -77,9 +77,15 @@
             </div>
             <div class="card !py-4 px-5 border border-violet-100 bg-violet-50/20 shadow-sm flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-bold uppercase tracking-wider text-violet-600">Unique Students</p>
-                    <p class="text-2xl font-extrabold text-violet-900 mt-1">{{ totals.unique_students ?? 0 }}</p>
-                    <p class="text-[10px] text-slate-400 mt-0.5">across all items, not per-item filter</p>
+                    <p class="text-xs font-bold uppercase tracking-wider text-violet-600">
+                        {{ (headFilter || itemFilter) ? 'Filtered Participants' : 'Unique Students' }}
+                    </p>
+                    <p class="text-2xl font-extrabold text-violet-900 mt-1">
+                        {{ (headFilter || itemFilter) ? filteredTotals.participants : (totals.unique_students ?? 0) }}
+                    </p>
+                    <p class="text-[10px] text-slate-400 mt-0.5">
+                        {{ (headFilter || itemFilter) ? 'total participant entries for filtered items' : 'unique students in this phase' }}
+                    </p>
                 </div>
                 <span class="p-2.5 rounded-lg bg-violet-100 text-violet-700">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-3.87-5"/></svg>
@@ -237,9 +243,10 @@ const {
 
 const filteredTotals = computed(() => ({
     items: displayRows.value.length,
-    approved: displayRows.value.reduce((n, r) => n + r.approved, 0),
-    pending: displayRows.value.reduce((n, r) => n + r.pending, 0),
-    registrations: displayRows.value.reduce((n, r) => n + r.registration_count, 0),
+    approved: displayRows.value.reduce((n, r) => n + (r.approved ?? 0), 0),
+    pending: displayRows.value.reduce((n, r) => n + (r.pending ?? 0), 0),
+    registrations: displayRows.value.reduce((n, r) => n + (r.registration_count ?? 0), 0),
+    participants: displayRows.value.reduce((n, r) => n + (r.participant_count ?? r.registration_count ?? 0), 0),
 }));
 
 const filteredHeadSummary = computed(() => {
