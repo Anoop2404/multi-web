@@ -87,9 +87,15 @@ class FestPhaseTopologyService
             'registration_close' => $phase->registration_close,
             'event_start' => ($region ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->conduct_start_at : null) ?? $phase->starts_at ?? $root->event_start,
             'event_end' => ($region ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->conduct_end_at : null) ?? $phase->ends_at ?? $root->event_end,
-            'venue' => $region
-                ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->venue
-                : $root->venue,
+            // A region's own venue (set per-region since a regional phase can run in
+            // different halls per region) wins when set; otherwise fall back to the
+            // phase's own venue -- previously the non-regional branch skipped
+            // $phase->venue entirely and always took the ROOT event's venue instead,
+            // silently overwriting whatever venue the admin had set on the phase itself
+            // on every sync (including on every phase edit, since update() re-syncs).
+            'venue' => ($region ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->venue : null)
+                ?? $phase->venue
+                ?? $root->venue,
             'fee_type' => $root->fee_type,
             'fee_amount' => $root->fee_amount,
             'fee_settings' => $root->fee_settings,
