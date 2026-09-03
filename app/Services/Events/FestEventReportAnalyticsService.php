@@ -753,7 +753,7 @@ class FestEventReportAnalyticsService
     public function uniqueStudentCount(?string $schoolId = null): int
     {
         $targetEventId = $this->scope
-            ? $this->scope->targetEventId()
+            ? $this->scope->requestedEvent->id
             : ($this->event->parent_event_id ? $this->event->rootEvent()->id : $this->event->id);
 
         $items = FestEventItem::query()
