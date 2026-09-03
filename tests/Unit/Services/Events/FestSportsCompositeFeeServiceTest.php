@@ -300,7 +300,7 @@ class FestSportsCompositeFeeServiceTest extends TestCase
         // Let's verify the line label and quantity
         $line = collect($result['lines'])->firstWhere('line_type', 'team_fee');
         $this->assertNotNull($line);
-        $this->assertSame('U19 Chess Team (4 × ₹200)', $line['label']);
+        $this->assertSame('U19 Chess Team — Hs (4 × ₹200)', $line['label']);
         $this->assertSame(4, $line['quantity']);
         $this->assertSame(200.0, $line['unit_amount']);
     }

@@ -1375,9 +1375,25 @@ class FestSchoolEventFeeService
 
         if (in_array($feeModel, ['sports_composite', 'kalolsavam_composite'], true)) {
             if ($this->supportsFeeLines()) {
+                $lineItemIds = $fee->lines->pluck('meta')
+                    ->map(fn ($meta) => is_array($meta) ? ($meta['item_id'] ?? null) : null)
+                    ->filter()
+                    ->unique();
+                $itemsById = $lineItemIds->isNotEmpty()
+                    ? \App\Models\FestEventItem::whereIn('id', $lineItemIds)->get()->keyBy('id')
+                    : collect();
+
                 foreach ($fee->lines as $line) {
+                    $meta = is_array($line->meta) ? $line->meta : [];
+                    $itemId = $meta['item_id'] ?? null;
+                    $itemObj = $itemId ? ($itemsById[$itemId] ?? null) : null;
+                    $label = $line->label;
+                    if ($itemObj) {
+                        $suffix = str_contains($label, '(free quota)') ? ' (free quota)' : (str_contains($label, '(extra)') ? ' (extra)' : '');
+                        $label = $itemObj->formattedTitle() . $suffix;
+                    }
                     $items[] = [
-                        'label' => $line->label,
+                        'label' => $label,
                         'amount' => (float) $line->amount,
                         'line_type' => $line->line_type,
                         'quantity' => $line->quantity ?? 1,

@@ -408,7 +408,7 @@ class FestSportsCompositeFeeService
 
                 $lines[] = [
                     'line_type' => $waived ? 'item_fee_waived' : 'item_fee',
-                    'label' => ($registration->item->title ?? 'Item').($waived ? ' (free quota)' : ''),
+                    'label' => ($registration->item?->formattedTitle() ?? str_replace('_', ' ', $registration->item->title ?? 'Item')).($waived ? ' (free quota)' : ''),
                     'quantity' => 1,
                     'unit_amount' => $amount,
                     'amount' => $amount,
@@ -443,7 +443,7 @@ class FestSportsCompositeFeeService
             $eligible = (bool) ($registration->item->quota_eligible ?? false);
             $waived = $eligible && $teamQuotaUsed < $teamQuota;
             $itemOverride = $registration->item->fee_amount !== null ? (float) $registration->item->fee_amount : null;
-            $itemTitle = str_replace('_', ' ', $registration->item->title ?? 'Team item');
+            $itemTitle = $registration->item?->formattedTitle() ?? str_replace('_', ' ', $registration->item->title ?? 'Team item');
 
             if ($waived) {
                 $teamQuotaUsed++;
@@ -661,7 +661,8 @@ class FestSportsCompositeFeeService
                 );
                 $suffix = $beyondQuota ? ' (extra)' : '';
                 $lineType = $beyondQuota ? 'extra_item' : 'item_fee';
-                $label = ($registration->item?->title ?? 'Item').$suffix;
+                $itemTitle = $registration->item?->formattedTitle() ?? str_replace('_', ' ', $registration->item->title ?? 'Item');
+                $label = $itemTitle.$suffix;
                 $extraLines[] = [
                     'line_type' => $lineType,
                     'label' => $label,

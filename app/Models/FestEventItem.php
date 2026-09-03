@@ -85,7 +85,9 @@ class FestEventItem extends Model
 
         $catLabel = \App\Support\FestItemCategoryLabel::resolve($this, $classGroupLabels ?? [], $artsCategoryLabels ?? []);
         if ($catLabel && ! str_contains(strtolower($title), strtolower($catLabel))) {
-            $metaParts[] = $catLabel;
+            $metaParts[] = (str_starts_with(strtolower($catLabel), 'u') && strlen($catLabel) <= 4)
+                ? strtoupper($catLabel)
+                : $catLabel;
         }
 
         $gender = strtolower((string) ($this->gender ?? ''));
