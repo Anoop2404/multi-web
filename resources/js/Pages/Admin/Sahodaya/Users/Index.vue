@@ -572,10 +572,12 @@ function openEdit(user) {
     editForm.roles = [...user.roles];
     editForm.permissions = [...(user.permissions || [])];
 
-    const fest = user.fest_assignments?.[0];
+    const validDuties = new Set(props.dutyOptions.map(d => d.value));
+    const opsAssignments = (user.fest_assignments || []).filter(a => validDuties.has(a.duty));
+    const fest = opsAssignments[0];
     editForm.fest_ops_event_id = fest?.event_id ?? '';
     editForm.fest_ops_duties = fest
-        ? user.fest_assignments.filter(a => a.event_id === fest.event_id).map(a => a.duty)
+        ? opsAssignments.filter(a => a.event_id === fest.event_id).map(a => a.duty)
         : [];
 
     editForm.event_admin_event_ids = (user.fest_assignments || [])
