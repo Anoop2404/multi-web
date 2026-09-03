@@ -1059,6 +1059,7 @@ import { useConfirm } from '@/composables/useConfirm';
 import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import StudentCountSlabTable from '@/Components/ui/StudentCountSlabTable.vue';
+import { genderLabel } from '@/support/festItemEligibility.js';
 
 const {
     feeSettingsForm, feeModels, feePresets, event, classGroupLabels,
@@ -1307,9 +1308,15 @@ function itemMeta(row) {
         parts.push(row.item_code);
     }
     if (event.value.event_type === 'sports' && row.age_group) {
-        parts.push(ageGroupLabels.value[row.age_group] ?? row.age_group);
+        parts.push(ageGroupLabels.value[row.age_group] ?? String(row.age_group).toUpperCase());
     } else if (row.class_group) {
-        parts.push(effectiveClassGroupLabels.value[row.class_group] ?? row.class_group);
+        parts.push(effectiveClassGroupLabels.value[row.class_group] ?? String(row.class_group).replace(/[_-]/g, ' ').toUpperCase());
+    } else if (row.category_label) {
+        parts.push(row.category_label);
+    }
+    if (row.gender) {
+        const g = genderLabel(row.gender);
+        if (g) parts.push(g);
     }
     if (row.participant_type && row.participant_type !== 'individual') {
         parts.push(row.participant_type);

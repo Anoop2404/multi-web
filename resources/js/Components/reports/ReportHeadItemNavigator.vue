@@ -37,7 +37,7 @@
                         <span v-if="item.registration_count || item.participant_count" class="reports-head-card__count">{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.participant_count) : (item.participant_count ?? item.registration_count) }}</span>
                         <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-navy)]">{{ item.title }}</p>
                         <p v-if="item.item_code" class="text-xs font-mono text-slate-500 mt-0.5">{{ item.item_code }}</p>
-                        <p v-if="item.category_label || item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.category_label || item.age_group }}</p>
+                        <p v-if="itemMetaLabel(item)" class="text-xs text-slate-500 mt-0.5">{{ itemMetaLabel(item) }}</p>
                         <dl v-if="showItemStats" class="mt-3 grid grid-cols-2 gap-2 text-xs border-t border-slate-100 pt-3">
                             <div v-if="showResultStats">
                                 <dt class="text-slate-400">Marks</dt>
@@ -109,7 +109,7 @@
                         <span v-if="item.registration_count || item.participant_count" class="reports-head-card__count">{{ (item.participant_type && item.participant_type !== 'individual') ? (item.registration_count ?? item.participant_count) : (item.participant_count ?? item.registration_count) }}</span>
                         <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-navy)]">{{ item.title }}</p>
                         <p v-if="item.item_code" class="text-xs font-mono text-slate-500 mt-0.5">{{ item.item_code }}</p>
-                        <p v-if="item.category_label || item.age_group" class="text-xs text-slate-500 mt-0.5">{{ item.category_label || item.age_group }}</p>
+                        <p v-if="itemMetaLabel(item)" class="text-xs text-slate-500 mt-0.5">{{ itemMetaLabel(item) }}</p>
                         <dl v-if="showItemStats" class="mt-3 grid grid-cols-2 gap-2 text-xs border-t border-slate-100 pt-3">
                             <div v-if="showResultStats">
                                 <dt class="text-slate-400">Marks</dt>
@@ -166,6 +166,7 @@ import { ref, computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import { useHeadItemNav } from '@/composables/useHeadItemNav.js';
 import EmptyState from '@/Components/ui/EmptyState.vue';
+import { genderLabel } from '@/support/festItemEligibility.js';
 
 const props = defineProps({
     groups: { type: Array, default: () => [] },
@@ -277,5 +278,20 @@ function formatCompTime(hhmm) {
 function formatShortDate(iso) {
     const d = new Date(`${iso}T12:00:00`);
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function itemMetaLabel(item) {
+    if (!item) return '';
+    const parts = [];
+    const cat = item.category_label
+        || (item.age_group && item.age_group !== 'open' ? String(item.age_group).toUpperCase() : null)
+        || (item.class_group && item.class_group !== 'open' ? String(item.class_group).replace(/[_-]/g, ' ').toUpperCase() : null)
+        || (item.category && item.category !== 'general' ? String(item.category).replace(/[_-]/g, ' ') : null);
+    if (cat) parts.push(cat);
+
+    const g = genderLabel(item.gender);
+    if (g) parts.push(g);
+
+    return parts.join(' · ');
 }
 </script>

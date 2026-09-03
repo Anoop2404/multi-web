@@ -132,7 +132,13 @@
                     </thead>
                     <tbody class="divide-y divide-slate-50">
                         <tr v-for="row in itemRows" :key="row.id">
-                            <td class="px-3 py-2 font-medium text-slate-900 whitespace-normal">{{ row.title }}</td>
+                            <td class="px-3 py-2 font-medium text-slate-900 whitespace-normal">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <span>{{ row.title }}</span>
+                                    <span v-if="row.item_code" class="text-xs font-mono text-slate-400">[{{ row.item_code }}]</span>
+                                </div>
+                                <div v-if="itemMeta(row)" class="text-xs font-normal text-slate-500 mt-0.5">{{ itemMeta(row) }}</div>
+                            </td>
                             <td class="px-3 py-2"><input v-model="row.reg_start" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
                             <td class="px-3 py-2"><input v-model="row.reg_end" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
                             <td class="px-3 py-2"><input v-model="row.competition_start" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
@@ -158,6 +164,8 @@ import { computed, inject, ref, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+
+import { genderLabel } from '@/support/festItemEligibility.js';
 
 const { registrationSettingsForm, saveRegistrationSettings, saveItemWindow, saveAllItemWindows, bulkSavingItemWindows, saveHeadWindow, sahodaya, event, itemHeads, clusterRequireStudentVerification } = inject('eventSettings');
 
@@ -190,6 +198,12 @@ function mapItem(item) {
     return {
         id: item.id,
         title: item.title,
+        item_code: item.item_code ?? null,
+        category: item.category ?? null,
+        category_label: item.category_label ?? null,
+        class_group: item.class_group ?? null,
+        age_group: item.age_group ?? null,
+        gender: item.gender ?? null,
         head_id: item.head_id ?? item.head?.id ?? null,
         head_name: item.head?.name ?? null,
         reg_start: toDateInput(item.reg_start),
@@ -197,6 +211,20 @@ function mapItem(item) {
         competition_start: toDateInput(item.competition_start),
         competition_end: toDateInput(item.competition_end),
     };
+}
+
+function itemMeta(row) {
+    const parts = [];
+    const cat = row.category_label
+        || (row.age_group && row.age_group !== 'open' ? String(row.age_group).toUpperCase() : null)
+        || (row.class_group && row.class_group !== 'open' ? String(row.class_group).replace(/[_-]/g, ' ').toUpperCase() : null)
+        || (row.category && row.category !== 'general' ? String(row.category).replace(/[_-]/g, ' ') : null);
+    if (cat) parts.push(cat);
+
+    const g = genderLabel(row.gender);
+    if (g) parts.push(g);
+
+    return parts.join(' · ');
 }
 
 const itemRows = ref((eventVal.items ?? []).map(mapItem));

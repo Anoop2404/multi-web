@@ -84,6 +84,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { genderLabel } from '@/support/festItemEligibility.js';
 
 const props = defineProps({
     modelValue: [String, Number, Boolean],
@@ -140,8 +141,25 @@ const searchInputRef = ref(null);
 function normalizeOption(opt) {
     if (opt !== null && typeof opt === 'object') {
         const value = 'value' in opt ? opt.value : (opt.id ?? '');
-        const rawLabel = 'label' in opt ? opt.label : (opt.name ?? opt.title ?? String(value));
-        const codePrefix = opt.item_code && !('label' in opt) ? `[${opt.item_code}] ` : '';
+        let rawLabel = 'label' in opt ? opt.label : (opt.name ?? opt.title ?? String(value));
+
+        if (!('label' in opt) && (opt.category_label || opt.class_group || opt.age_group || opt.category || opt.gender)) {
+            const metaParts = [];
+            const cat = opt.category_label
+                || (opt.age_group && opt.age_group !== 'open' ? String(opt.age_group).toUpperCase() : null)
+                || (opt.class_group && opt.class_group !== 'open' ? String(opt.class_group).replace(/[_-]/g, ' ').toUpperCase() : null)
+                || (opt.category && opt.category !== 'general' ? String(opt.category).replace(/[_-]/g, ' ') : null);
+            if (cat && !rawLabel.toLowerCase().includes(cat.toLowerCase())) metaParts.push(cat);
+
+            const g = genderLabel(opt.gender);
+            if (g && !rawLabel.toLowerCase().includes(g.toLowerCase())) metaParts.push(g);
+
+            if (metaParts.length) {
+                rawLabel = `${rawLabel} — ${metaParts.join(' · ')}`;
+            }
+        }
+
+        const codePrefix = opt.item_code && !('label' in opt) && !rawLabel.includes(`[${opt.item_code}]`) ? `[${opt.item_code}] ` : '';
         const label = `${codePrefix}${rawLabel}`;
         return { value, label, disabled: !!opt.disabled };
     }
