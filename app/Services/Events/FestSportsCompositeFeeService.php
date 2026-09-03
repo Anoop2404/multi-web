@@ -280,15 +280,17 @@ class FestSportsCompositeFeeService
      */
     public function resolveSportsFeeSource(FestEvent $event): array
     {
+        $feeSettings = $event->fee_settings ?? [];
+
         if ($event->hasSportsFeesConfigured()) {
             return [
-                'school_registration_fee' => $event->school_registration_fee,
-                'student_registration_fee' => $event->student_registration_fee,
-                'team_registration_fee' => $event->team_registration_fee,
-                'included_items_per_student' => $event->included_items_per_student,
-                'included_teams' => $event->included_teams,
-                'default_item_fee' => $event->default_item_fee,
-                'extra_item_fee' => $event->extra_item_fee,
+                'school_registration_fee' => $event->school_registration_fee ?? $feeSettings['school_registration_fee'] ?? $feeSettings['school_registration_flat'] ?? 0,
+                'student_registration_fee' => $event->student_registration_fee ?? $feeSettings['student_registration_fee'] ?? $feeSettings['per_student_amount'] ?? 0,
+                'team_registration_fee' => $event->team_registration_fee ?? $feeSettings['team_registration_fee'] ?? 0,
+                'included_items_per_student' => $event->included_items_per_student ?? $feeSettings['included_items_per_student'] ?? 0,
+                'included_teams' => $event->included_teams ?? $feeSettings['included_teams'] ?? 0,
+                'default_item_fee' => $event->default_item_fee ?? $feeSettings['default_item_fee'] ?? null,
+                'extra_item_fee' => $event->extra_item_fee ?? $feeSettings['extra_item_fee'] ?? null,
             ];
         }
 
@@ -302,29 +304,22 @@ class FestSportsCompositeFeeService
 
         if ($head) {
             return [
-                'school_registration_fee' => $head->school_registration_fee,
-                'student_registration_fee' => $head->student_registration_fee,
-                'team_registration_fee' => $head->team_registration_fee,
-                'included_items_per_student' => $head->included_items_per_student,
-                'included_teams' => $head->included_teams,
+                'school_registration_fee' => $head->school_registration_fee ?? 0,
+                'student_registration_fee' => $head->student_registration_fee ?? 0,
+                'team_registration_fee' => $head->team_registration_fee ?? 0,
+                'included_items_per_student' => $head->included_items_per_student ?? 0,
+                'included_teams' => $head->included_teams ?? 0,
                 'default_item_fee' => $head->default_item_fee,
                 'extra_item_fee' => $head->extra_item_fee,
             ];
         }
 
-        // Nothing configured on the event itself and no linked legacy head — fall
-        // back to the sahodaya-wide sports fee defaults (config('fest_fees.level_defaults.sports')),
-        // same as resolveSchedule() does for display. Without this, a standalone
-        // sport event that was never opened on Settings → Fee settings silently
-        // billed everyone ₹0 while the Fees page schedule still showed the
-        // platform defaults as "active" — the actual charge and the displayed
-        // schedule disagreed.
         $defaults = config('fest_fees.level_defaults.sports', []);
 
         return [
-            'school_registration_fee' => $defaults['school_registration_flat'] ?? null,
-            'student_registration_fee' => $defaults['per_student_amount'] ?? null,
-            'team_registration_fee' => $defaults['team_registration_fee'] ?? null,
+            'school_registration_fee' => $defaults['school_registration_flat'] ?? 0,
+            'student_registration_fee' => $defaults['per_student_amount'] ?? 0,
+            'team_registration_fee' => $defaults['team_registration_fee'] ?? 0,
             'included_items_per_student' => $defaults['included_items_per_student'] ?? 0,
             'included_teams' => $defaults['included_teams'] ?? 0,
             'default_item_fee' => $defaults['default_item_fee'] ?? null,
@@ -806,6 +801,6 @@ class FestSportsCompositeFeeService
             return (float) ($amounts[$tier] ?? $amounts['secondary'] ?? 0);
         }
 
-        return (float) ($schedule['school_registration_flat'] ?? $schedule['flat_amount'] ?? 2000);
+        return (float) ($schedule['school_registration_flat'] ?? $schedule['flat_amount'] ?? 0);
     }
 }

@@ -158,11 +158,26 @@ class FestEventFeeResolver
         }
 
         if (in_array($model, ['sports_composite', 'kalolsavam_composite'], true)) {
-            $school = (float) ($schedule['school_registration_flat'] ?? 2000);
-            $student = (float) ($schedule['per_student_amount'] ?? 300);
-            $quota = (int) ($schedule['included_items_per_student'] ?? 2);
+            $school = (float) ($schedule['school_registration_flat'] ?? 0);
+            $student = (float) ($schedule['per_student_amount'] ?? 0);
+            $quota = (int) ($schedule['included_items_per_student'] ?? 0);
 
-            return "₹{$school} school + ₹{$student}/student + {$quota} free items, then ₹".((float) ($schedule['default_item_fee'] ?? 0))." extra/item";
+            $parts = [];
+            if ($school > 0) {
+                $parts[] = "₹{$school} school";
+            }
+            if ($student > 0) {
+                $parts[] = "₹{$student}/student";
+            }
+            if ($quota > 0) {
+                $parts[] = "{$quota} free items";
+            }
+            $itemFee = (float) ($schedule['default_item_fee'] ?? 0);
+            if ($itemFee > 0) {
+                $parts[] = "₹{$itemFee} per item";
+            }
+
+            return implode(' + ', $parts) ?: 'No fee configured';
         }
 
         return 'Fee applies per school for this event';
@@ -421,15 +436,15 @@ class FestEventFeeResolver
                     ? 'student_count_slab' : 'class_tier',
                 'student_count_slabs' => $this->normalizeStudentCountSlabs($input['student_count_slabs'] ?? []),
                 'school_registration_flat' => isset($input['school_registration_flat']) && $input['school_registration_flat'] !== ''
-                    ? (float) $input['school_registration_flat'] : 2000,
+                    ? (float) $input['school_registration_flat'] : 0,
                 // N-tier school registration map — same shape/fallback as cksc_tiered/item_catalog
                 // above (see normalizeSchoolRegistration()); absent/empty means "use the flat
                 // amount above", so an event that never configures this keeps today's behavior.
                 'school_registration' => $this->normalizeSchoolRegistration($input['school_registration'] ?? []),
                 'per_student_amount' => isset($input['per_student_amount']) && $input['per_student_amount'] !== ''
-                    ? (float) $input['per_student_amount'] : 300,
+                    ? (float) $input['per_student_amount'] : 0,
                 'included_items_per_student' => isset($input['included_items_per_student']) && $input['included_items_per_student'] !== ''
-                    ? (int) $input['included_items_per_student'] : 2,
+                    ? (int) $input['included_items_per_student'] : 0,
                 'default_item_fee' => isset($input['default_item_fee']) && $input['default_item_fee'] !== ''
                     ? (float) $input['default_item_fee'] : null,
                 // Phase L — same per-Sahodaya toggle used by the item_catalog model above:

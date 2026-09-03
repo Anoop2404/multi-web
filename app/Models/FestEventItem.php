@@ -78,28 +78,34 @@ class FestEventItem extends Model
         return $this->formattedTitle();
     }
 
-    public function formattedTitle(): string
+    public function formattedTitle(?array $classGroupLabels = null, ?array $artsCategoryLabels = null): string
     {
         $title = str_replace('_', ' ', $this->title ?? 'Item');
+        $metaParts = [];
+
+        $catLabel = \App\Support\FestItemCategoryLabel::resolve($this, $classGroupLabels ?? [], $artsCategoryLabels ?? []);
+        if ($catLabel && ! str_contains(strtolower($title), strtolower($catLabel))) {
+            $metaParts[] = $catLabel;
+        }
+
         $gender = strtolower((string) ($this->gender ?? ''));
+        if ($gender && $gender !== 'open') {
+            $gLabel = match ($gender) {
+                'male', 'm', 'boy', 'boys' => 'Boys',
+                'female', 'f', 'girl', 'girls' => 'Girls',
+                'mixed', 'common' => 'Mixed',
+                default => null,
+            };
+            if ($gLabel && ! str_contains(strtolower($title), strtolower($gLabel))) {
+                $metaParts[] = $gLabel;
+            }
+        }
 
-        if (! $gender || $gender === 'open') {
+        if (empty($metaParts)) {
             return $title;
         }
 
-        $lower = strtolower($title);
-        if (str_contains($lower, 'boys') || str_contains($lower, 'girls') || str_contains($lower, 'mixed')) {
-            return $title;
-        }
-
-        $label = match ($gender) {
-            'male', 'm', 'boy', 'boys' => 'Boys',
-            'female', 'f', 'girl', 'girls' => 'Girls',
-            'mixed', 'common' => 'Mixed',
-            default => null,
-        };
-
-        return $label ? "{$title} ({$label})" : $title;
+        return $title . ' — ' . implode(' · ', $metaParts);
     }
 
     public function event(): BelongsTo

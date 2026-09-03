@@ -88,10 +88,10 @@ return [
         ],
         'sports' => [
             'fee_model' => 'sports_composite',
-            'school_registration_flat' => 2000,
-            'per_student_amount' => 300,
-            'included_items_per_student' => 2,
-            'default_item_fee' => 150,
+            'school_registration_flat' => 0,
+            'per_student_amount' => 0,
+            'included_items_per_student' => 0,
+            'default_item_fee' => 0,
         ],
         'school' => [
             'fee_model' => 'none',
