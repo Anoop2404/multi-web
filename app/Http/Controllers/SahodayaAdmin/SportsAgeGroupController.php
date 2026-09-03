@@ -117,16 +117,6 @@ class SportsAgeGroupController extends SahodayaAdminController
     {
         abort_if($sportsAgeGroup->tenant_id !== $this->sahodaya->id, 403);
 
-        $inUse = FestEventItem::whereHas('event', fn ($q) => $q->where('tenant_id', $this->sahodaya->id))
-            ->where('age_group', $sportsAgeGroup->group_key)
-            ->exists();
-
-        if ($inUse) {
-            $sportsAgeGroup->update(['is_active' => false]);
-
-            return back()->with('success', 'Category deactivated (in use by event items).');
-        }
-
         $sportsAgeGroup->delete();
 
         return back()->with('success', 'Age category removed.');

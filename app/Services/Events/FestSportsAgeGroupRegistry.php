@@ -28,31 +28,28 @@ class FestSportsAgeGroupRegistry
             return;
         }
 
-        $sort = (int) ($this->query()->max('sort_order') ?? -1) + 1;
-        $addedNew = false;
+        if ($this->query()->exists()) {
+            return;
+        }
 
+        $sort = 0;
         foreach (config('fest_co_curricular.sports.age_groups', []) as $key => $row) {
             if (! is_array($row)) {
                 continue;
             }
 
-            if (! $this->query()->where('group_key', $key)->exists()) {
-                FestSportsAgeGroupConfig::create([
-                    'tenant_id'   => $this->tenantId,
-                    'group_key'   => $key,
-                    'label'       => $row['label'] ?? strtoupper($key),
-                    'under_age'   => $row['under_age'],
-                    'sort_order'  => $sort++,
-                    'default_fee' => config("fest_sports_age_groups.default_fees.{$key}"),
-                    'is_active'   => true,
-                ]);
-                $addedNew = true;
-            }
+            FestSportsAgeGroupConfig::create([
+                'tenant_id'   => $this->tenantId,
+                'group_key'   => $key,
+                'label'       => $row['label'] ?? strtoupper($key),
+                'under_age'   => $row['under_age'],
+                'sort_order'  => $sort++,
+                'default_fee' => config("fest_sports_age_groups.default_fees.{$key}"),
+                'is_active'   => true,
+            ]);
         }
 
-        if ($addedNew) {
-            $this->rows = null;
-        }
+        $this->rows = null;
     }
 
     /** @return Collection<int, FestSportsAgeGroupConfig> */
