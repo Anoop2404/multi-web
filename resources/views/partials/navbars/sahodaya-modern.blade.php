@@ -64,14 +64,11 @@
                         <span>{{ $label }}</span>
                         <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-200" :class="activeSubmenu === '{{ md5($label) }}' ? 'rotate-180 text-gray-900' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="activeSubmenu === '{{ md5($label) }}'"
-                         x-cloak x-transition:enter="transition ease-out duration-150"
-                         x-transition:enter-start="opacity-0 translate-y-1"
-                         x-transition:enter-end="opacity-100 translate-y-0"
-                         x-transition:leave="transition ease-in duration-100"
-                         x-transition:leave-start="opacity-100 translate-y-0"
-                         x-transition:leave-end="opacity-0 translate-y-1"
-                         class="absolute left-0 top-full pt-1.5 w-60 z-50">
+                    {{-- :class instead of x-show/x-transition — see logo-left.blade.php for
+                         why: Alpine's transition module intermittently left dropdown panels
+                         stuck invisible (or visible-but-unsized) after activeSubmenu changed. --}}
+                    <div :class="activeSubmenu === '{{ md5($label) }}' ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1 pointer-events-none'"
+                         class="absolute left-0 top-full pt-1.5 w-60 z-50 transition duration-150 ease-out">
                         <div class="bg-white rounded-xl shadow-xl border border-gray-100 py-2 overflow-hidden">
                             @foreach($item['children'] as $child)
                             <a href="{{ $child['url'] }}"
