@@ -395,7 +395,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, nextTick } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
@@ -543,9 +543,16 @@ function syncPermissionsFromRoles(roles, targetForm) {
     targetForm.permissions = [...new Set([...targetForm.permissions, ...defaults])];
 }
 
+// openEdit() below assigns editForm.roles as part of loading a user's saved state, not a
+// user-driven role change — this watcher (deep, so it fires on that assignment too, only
+// asynchronously after openEdit's synchronous body has already set editForm.permissions
+// to the real saved set) must not re-run the role-defaults merge for that assignment, or
+// it silently re-adds any default permission the user had deliberately unchecked.
+const hydratingEdit = ref(false);
+
 watch(() => form.roles, (roles) => syncPermissionsFromRoles(roles, form), { deep: true });
 watch(() => editForm.roles, (roles) => {
-    if (editing.value) {
+    if (editing.value && !hydratingEdit.value) {
         syncPermissionsFromRoles(roles, editForm);
     }
 }, { deep: true });
@@ -564,6 +571,7 @@ function createUser() {
 }
 
 function openEdit(user) {
+    hydratingEdit.value = true;
     editing.value = user;
     editForm.name = user.name;
     editForm.email = user.email;
@@ -599,6 +607,10 @@ function openEdit(user) {
     editForm.exam_staff_role = exam?.role ?? 'staff';
 
     editForm.region_ids = [...(user.region_ids || [])];
+
+    // Deferred past the watcher's own async flush, so it stays true for the deep watch
+    // triggered by editForm.roles above, not just for this synchronous body.
+    nextTick(() => { hydratingEdit.value = false; });
 }
 
 function saveEdit() {
