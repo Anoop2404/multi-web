@@ -25,6 +25,10 @@ use Illuminate\Support\Facades\DB;
  * every Sahodaya tenant, and/or omit --event to scan every phased_regional_billing root
  * event within whichever tenant(s) are in scope -- same "scan everything unless narrowed"
  * convention as fest:audit-event-topology.
+ *
+ * The report table only lists rows whose total_due would actually change -- across every
+ * Sahodaya most schools have nothing wrong, and printing every school regardless would
+ * bury the handful that actually need correcting.
  */
 class FestRecalculateBatchBilling extends Command
 {
@@ -63,15 +67,19 @@ class FestRecalculateBatchBilling extends Command
         $allRows = [];
         $totalSchools = 0;
         $totalChanged = 0;
+        $totalEvents = 0;
+        $failedTenants = [];
 
         foreach ($tenants as $tenant) {
             try {
-                $tenant->run(function () use ($tenant, $eventOpt, $commit, &$allRows, &$totalSchools, &$totalChanged) {
+                $tenant->run(function () use ($tenant, $eventOpt, $commit, &$allRows, &$totalSchools, &$totalChanged, &$totalEvents) {
                     $roots = FestEvent::query()
                         ->whereNull('parent_event_id')
                         ->where('workflow_mode', \App\Services\Events\FestPhasedWorkflowService::MODE)
                         ->when($eventOpt, fn ($q) => $q->whereKey($eventOpt))
                         ->get();
+
+                    $totalEvents += $roots->count();
 
                     foreach ($roots as $root) {
                         [$rows, $schoolCount, $changedCount] = $this->recalculate($tenant, $root, $commit);
@@ -80,6 +88,11 @@ class FestRecalculateBatchBilling extends Command
                         $totalChanged += $changedCount;
                     }
                 });
+            } catch (\Throwable $e) {
+                // A scan across every Sahodaya must not abort entirely just because one
+                // tenant is broken (e.g. a stale tenant record with no provisioned
+                // database) -- skip it, report it, and keep going.
+                $failedTenants[] = ($tenant->name ?? $tenant->id).': '.$e->getMessage();
             } finally {
                 if (function_exists('tenancy') && tenancy()->initialized) {
                     tenancy()->end();
@@ -87,7 +100,11 @@ class FestRecalculateBatchBilling extends Command
             }
         }
 
-        if ($allRows === []) {
+        foreach ($failedTenants as $failure) {
+            $this->error("Skipped — {$failure}");
+        }
+
+        if ($totalEvents === 0) {
             $this->warn($eventOpt
                 ? "Event #{$eventOpt} not found, or isn't using phased_regional_billing, in the tenant(s) checked."
                 : 'No phased_regional_billing events found in the tenant(s) checked.');
@@ -95,8 +112,14 @@ class FestRecalculateBatchBilling extends Command
             return self::SUCCESS;
         }
 
+        if ($allRows === []) {
+            $this->info("Checked {$totalSchools} school(s) across {$totalEvents} event(s) in ".count($tenants).' Sahodaya(s) -- every total_due already matches, nothing to fix.');
+
+            return self::SUCCESS;
+        }
+
         $this->table(
-            ['Sahodaya', 'Event', 'School', 'Level', 'Old total due (₹)', 'New total due (₹)', 'Changed', 'Amount paid'],
+            ['Sahodaya', 'Event', 'School', 'Level', 'Old total due (₹)', 'New total due (₹)', 'Amount paid'],
             $allRows,
         );
 
@@ -105,7 +128,7 @@ class FestRecalculateBatchBilling extends Command
         } else {
             $this->warn('DRY RUN — nothing was written. Re-run with --commit to apply.');
         }
-        $this->info("{$totalSchools} school(s) recalculated across ".count($tenants)." Sahodaya(s), {$totalChanged} row(s) with a different total_due.");
+        $this->info("{$totalChanged} row(s) with a stale total_due, out of {$totalSchools} school(s) checked across {$totalEvents} event(s) in ".count($tenants).' Sahodaya(s).');
 
         return self::SUCCESS;
     }
@@ -147,18 +170,20 @@ class FestRecalculateBatchBilling extends Command
                 $beforeFee = $before->get($key);
                 $oldTotal = $beforeFee ? round((float) $beforeFee->total_due, 2) : null;
                 $newTotal = round((float) $fee->total_due, 2);
-                if ($oldTotal !== null && $oldTotal !== $newTotal) {
-                    $changedCount++;
+                // A missing "before" row (no fee record existed yet) isn't a stale invoice
+                // to flag -- there was nothing wrong to begin with, just a first-time calc.
+                if ($oldTotal === null || $oldTotal === $newTotal) {
+                    continue;
                 }
+                $changedCount++;
 
                 $rows[] = [
                     'sahodaya' => $tenant->name ?? $tenant->id,
                     'event' => $root->title ?? "#{$root->id}",
                     'school' => $school?->name ?? $schoolId,
                     'row' => $key === 'rollup' ? 'COMBINED' : ($fee->registrationBatch?->name ?? $key),
-                    'old_total_due' => $oldTotal !== null ? number_format($oldTotal, 2) : '—',
+                    'old_total_due' => number_format($oldTotal, 2),
                     'new_total_due' => number_format($newTotal, 2),
-                    'changed' => ($oldTotal !== null && $oldTotal !== $newTotal) ? 'YES' : '',
                     'amount_paid' => number_format((float) $fee->amount_paid, 2).' (unchanged)',
                 ];
             }
