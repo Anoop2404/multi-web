@@ -68,7 +68,7 @@ return [
             ['section_type' => 'principal_message', 'variant' => 'split-portrait', 'config' => [
                 'lead_in' => 'A Message from the Principal',
                 'message' => "Welcome to {{name}}. Every child who walks through our gates is given the encouragement, discipline and care needed to discover their own potential. We believe education is not just about examinations, but about building character, curiosity and confidence for life.",
-                'name' => 'Principal, {{name}}', 'designation' => 'Principal',
+                'designation' => 'Principal',
             ], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'canvas', 'heading_alignment' => 'left']],
             ['section_type' => 'achievements', 'variant' => 'horizontal-scroll', 'config' => [
                 'eyebrow' => 'Celebrating Success', 'heading' => 'Recent Achievements', 'limit' => 8,
@@ -223,7 +223,7 @@ return [
             ['section_type' => 'principal_message', 'variant' => 'split-portrait', 'config' => [
                 'lead_in' => 'A Message from the Principal',
                 'message' => 'Welcome to {{name}}. We take pride in a tradition of discipline, scholarship and service that has guided generations of students toward purposeful lives.',
-                'name' => 'Principal, {{name}}', 'designation' => 'Principal',
+                'designation' => 'Principal',
             ], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'muted', 'heading_alignment' => 'left']],
             ['section_type' => 'academic_programmes', 'variant' => 'cards', 'config' => [
                 'heading' => 'Academic Programme',
@@ -363,7 +363,7 @@ return [
             ['section_type' => 'principal_message', 'variant' => 'split-portrait', 'config' => [
                 'lead_in' => 'A Message from the Principal',
                 'message' => 'Welcome to {{name}}. We believe every student has a champion inside them — our job is to help them find it, on the field and in the classroom.',
-                'name' => 'Principal, {{name}}', 'designation' => 'Principal',
+                'designation' => 'Principal',
             ], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'muted', 'heading_alignment' => 'left']],
             ['section_type' => 'staff', 'variant' => 'card-grid', 'config' => [
                 'eyebrow' => 'Meet the Team', 'heading' => 'Our Faculty & Coaches', 'limit' => 12,
@@ -459,7 +459,7 @@ return [
             ['section_type' => 'principal_message', 'variant' => 'split-portrait', 'config' => [
                 'lead_in' => 'A Message from the Principal',
                 'message' => 'Welcome to {{name}}. We hold ourselves to a high standard — for our students, our teachers and our results — because that is what every family deserves.',
-                'name' => 'Principal, {{name}}', 'designation' => 'Principal',
+                'designation' => 'Principal',
             ], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'canvas', 'heading_alignment' => 'left']],
             ['section_type' => 'achievements', 'variant' => 'horizontal-scroll', 'config' => [
                 'eyebrow' => 'Celebrating Success', 'heading' => 'Recent Achievements', 'limit' => 8,
@@ -542,7 +542,7 @@ return [
             ['section_type' => 'principal_message', 'variant' => 'split-portrait', 'config' => [
                 'lead_in' => 'A Message from the Principal',
                 'message' => 'Welcome to {{name}}. Ours is a small community by design — small enough that every child is known, encouraged, and given room to grow.',
-                'name' => 'Principal, {{name}}', 'designation' => 'Principal',
+                'designation' => 'Principal',
             ], 'layout' => ['width' => 'standard', 'spacing' => 'spacious', 'surface' => 'muted', 'heading_alignment' => 'left']],
             ['section_type' => 'gallery', 'variant' => 'preview-grid', 'config' => [
                 'eyebrow' => 'Life at {{name}}', 'heading' => 'Moments Beyond Learning', 'limit' => 8,

@@ -43,8 +43,11 @@
         {{-- Primary Navigation Row --}}
         {{-- No overflow-x here on purpose: any overflow-x value forces the browser to also
              clip overflow-y (a CSS overflow spec quirk), which silently hides every
-             dropdown's flyout panel — see logo-left.blade.php for the same fix. --}}
-        <div class="hidden lg:flex items-center gap-1 xl:gap-2 pb-2.5 -mt-0.5 flex-wrap">
+             dropdown's flyout panel — see logo-left.blade.php for the same fix.
+             Text/gap size bumps are deferred to 2xl (1536px), not xl (1280px), for the
+             same reason as logo-left.blade.php: bumping right at 1280 widens the row
+             exactly where it has the least slack to spare. --}}
+        <div class="hidden lg:flex items-center gap-1 2xl:gap-2 pb-2.5 -mt-0.5 flex-wrap">
             @foreach($items as $item)
                 @php
                     $label = $item['label'] ?? '';
@@ -57,7 +60,7 @@
                 @if(!empty($item['children']))
                 <div class="relative shrink-0" @mouseenter="activeSubmenu = '{{ md5($label) }}'" @mouseleave="activeSubmenu = null">
                     <button type="button"
-                            class="px-3 py-1.5 text-xs xl:text-sm font-semibold rounded-lg transition flex items-center gap-1.5 whitespace-nowrap {{ $isCurrent ? 'bg-gray-100 text-gray-900 font-bold' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70' }}">
+                            class="px-3 py-1.5 text-xs 2xl:text-sm font-semibold rounded-lg transition flex items-center gap-1.5 whitespace-nowrap {{ $isCurrent ? 'bg-gray-100 text-gray-900 font-bold' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70' }}">
                         <span>{{ $label }}</span>
                         <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-200" :class="activeSubmenu === '{{ md5($label) }}' ? 'rotate-180 text-gray-900' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
@@ -82,14 +85,14 @@
                 </div>
                 @elseif($isCta)
                 <a href="{{ $url }}"
-                   class="px-3.5 py-1.5 text-xs xl:text-sm font-bold rounded-lg transition whitespace-nowrap shrink-0 shadow-sm flex items-center gap-1.5 {{ Str::contains($url, ['login']) ? 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300/80' : 'text-white' }}"
+                   class="px-3.5 py-1.5 text-xs 2xl:text-sm font-bold rounded-lg transition whitespace-nowrap shrink-0 shadow-sm flex items-center gap-1.5 {{ Str::contains($url, ['login']) ? 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300/80' : 'text-white' }}"
                    @if(!Str::contains($url, ['login'])) style="background-color: var(--color-primary, #4f46e5)" @endif
                    @if($item['external'] ?? false) target="_blank" rel="noopener" @endif>
                     <span>{{ $label }}</span>
                 </a>
                 @else
                 <a href="{{ $url }}"
-                   class="px-3 py-1.5 text-xs xl:text-sm font-semibold rounded-lg transition whitespace-nowrap shrink-0 {{ $isCurrent ? 'bg-gray-100 text-gray-900 font-bold' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70' }}"
+                   class="px-3 py-1.5 text-xs 2xl:text-sm font-semibold rounded-lg transition whitespace-nowrap shrink-0 {{ $isCurrent ? 'bg-gray-100 text-gray-900 font-bold' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70' }}"
                    @if($item['external'] ?? false) target="_blank" rel="noopener" @endif>
                     {{ $label }}
                 </a>

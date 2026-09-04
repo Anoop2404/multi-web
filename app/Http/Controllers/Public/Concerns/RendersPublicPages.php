@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Public\Concerns;
 
 use App\Models\Tenant;
+use App\Support\SchoolPortalNavLinks;
 use App\Support\TenantBranding;
 use App\Support\TenantCache;
 use Illuminate\Http\Response;
@@ -26,7 +27,7 @@ trait RendersPublicPages
             now()->addHour(),
             fn () => [
                 'navConfig' => $tenant->settings()->where('key', 'nav_config')->first()?->value ?? [],
-                'footerConfig' => $tenant->settings()->where('key', 'footer_config')->first()?->value ?? [],
+                'footerConfig' => $this->footerConfigFor($tenant),
                 'theme' => $tenant->settings()->where('key', 'theme')->first()?->value ?? [],
                 'widgets' => $tenant->settings()->where('key', 'widgets')->first()?->value ?? [],
                 'seo' => $tenant->settings()->where('key', 'seo')->first()?->value ?? [],
@@ -34,6 +35,38 @@ trait RendersPublicPages
                 'logo' => TenantBranding::logoUrl($tenant),
             ]
         );
+    }
+
+    /**
+     * The footer editor (School Admin → Site Builder → Footer) is a separate, easy-to-miss
+     * screen from the main Settings page where a school actually enters its phone/email/
+     * address — most schools only ever fill in Settings, leaving footer_config's contact
+     * fields (and quick links) permanently empty. Fall back to the Settings-page `contact`
+     * setting, and to the standard Admissions/Admin-Login quick links, whenever the footer
+     * editor hasn't been used to override them explicitly.
+     *
+     * @return array<string, mixed>
+     */
+    private function footerConfigFor(Tenant $tenant): array
+    {
+        $footerConfig = $tenant->settings()->where('key', 'footer_config')->first()?->value ?? [];
+
+        if ($tenant->type !== 'school') {
+            return $footerConfig;
+        }
+
+        $contact = $tenant->settings()->where('key', 'contact')->first()?->value ?? [];
+        foreach (['address', 'phone', 'email'] as $field) {
+            if (empty($footerConfig[$field]) && ! empty($contact[$field])) {
+                $footerConfig[$field] = $contact[$field];
+            }
+        }
+
+        if (empty($footerConfig['quick_links'])) {
+            $footerConfig = SchoolPortalNavLinks::ensureFooterLinks($footerConfig);
+        }
+
+        return $footerConfig;
     }
 
     protected function tenantCacheRemember(Tenant $tenant, string $key, $ttl, callable $callback): mixed

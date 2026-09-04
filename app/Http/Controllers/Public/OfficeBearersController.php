@@ -13,6 +13,9 @@ class OfficeBearersController extends Controller
     public function index()
     {
         $tenant = $this->resolveTenant();
+        // Office bearers (President, Secretary, Treasurer...) is Sahodaya cluster
+        // governance — an individual school's staff is covered by the Faculty section.
+        abort_unless($tenant->type === 'sahodaya', 404);
 
         return $this->renderPublic('public.office-bearers.index', $tenant, [
             'bearers' => SahodayaPublicData::officeBearers($tenant->id),

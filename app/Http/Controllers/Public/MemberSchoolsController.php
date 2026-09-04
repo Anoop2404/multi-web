@@ -13,6 +13,9 @@ class MemberSchoolsController extends Controller
     public function index()
     {
         $tenant = $this->resolveTenant();
+        // A member-school directory only makes sense for a Sahodaya cluster —
+        // an individual school has no members of its own.
+        abort_unless($tenant->type === 'sahodaya', 404);
 
         $schools = SahodayaPublicData::memberSchools($tenant->id);
 

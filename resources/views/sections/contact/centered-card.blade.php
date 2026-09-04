@@ -1,3 +1,6 @@
+@php
+    $contact = $tenant->getSetting('contact', []);
+@endphp
 <section class="py-16 px-4 bg-gray-50">
     <div class="max-w-3xl mx-auto">
         <div class="bg-white rounded-2xl shadow-sm p-8 md:p-12">
@@ -10,6 +13,29 @@
                 <p class="text-gray-500">{{ $config['intro'] }}</p>
                 @endif
             </div>
+
+            @if(!empty($contact['phone']) || !empty($contact['email']) || !empty($contact['address']))
+            <div class="grid sm:grid-cols-3 gap-4 mb-8 text-center text-sm">
+                @if(!empty($contact['phone']))
+                <a href="tel:{{ preg_replace('/\s+/', '', $contact['phone']) }}" class="rounded-xl bg-gray-50 px-3 py-3 hover:bg-gray-100 transition">
+                    <span class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Phone</span>
+                    <span class="font-semibold text-gray-800">{{ $contact['phone'] }}</span>
+                </a>
+                @endif
+                @if(!empty($contact['email']))
+                <a href="mailto:{{ $contact['email'] }}" class="rounded-xl bg-gray-50 px-3 py-3 hover:bg-gray-100 transition">
+                    <span class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Email</span>
+                    <span class="font-semibold text-gray-800 break-all">{{ $contact['email'] }}</span>
+                </a>
+                @endif
+                @if(!empty($contact['address']))
+                <div class="rounded-xl bg-gray-50 px-3 py-3">
+                    <span class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Address</span>
+                    <span class="font-semibold text-gray-800">{{ $contact['address'] }}</span>
+                </div>
+                @endif
+            </div>
+            @endif
 
             @if(session('success'))
             <div class="mb-6 rounded-lg px-4 py-3 text-sm" style="background-color: color-mix(in srgb, var(--color-primary) 12%, white); color: var(--color-primary)">

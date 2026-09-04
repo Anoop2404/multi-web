@@ -4,7 +4,7 @@ namespace App\Support;
 
 class SchoolPortalNavLinks
 {
-    public const ADMISSIONS_URL = '/#admissions';
+    public const ADMISSIONS_URL = '/admissions';
 
     public const LOGIN_URL = '/login';
 

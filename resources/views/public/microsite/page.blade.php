@@ -86,14 +86,28 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-700">
-            <a href="{{ $micrositeHome }}/about" class="hover:text-primary transition-colors">About</a>
-            <a href="{{ $micrositeHome }}/member-schools" class="hover:text-primary transition-colors">Directory</a>
-            <a href="{{ $micrositeHome }}/office-bearers" class="hover:text-primary transition-colors">Leadership</a>
-            <a href="{{ $micrositeHome }}/gallery" class="hover:text-primary transition-colors">Gallery</a>
-            <a href="{{ $micrositeHome }}/announcements" class="hover:text-primary transition-colors">Circulars</a>
-            <a href="{{ $micrositeHome }}/events" class="hover:text-primary transition-colors">Events</a>
-            <a href="{{ $micrositeHome }}/downloads" class="hover:text-primary transition-colors">Downloads</a>
-            <a href="{{ $micrositeHome }}/contact" class="hover:text-primary transition-colors">Contact</a>
+            @if(($tenant->type ?? null) === 'sahodaya')
+                <a href="{{ $micrositeHome }}/about" class="hover:text-primary transition-colors">About</a>
+                <a href="{{ $micrositeHome }}/member-schools" class="hover:text-primary transition-colors">Directory</a>
+                <a href="{{ $micrositeHome }}/office-bearers" class="hover:text-primary transition-colors">Leadership</a>
+                <a href="{{ $micrositeHome }}/gallery" class="hover:text-primary transition-colors">Gallery</a>
+                {{-- /announcements only resolves under a microsite's catch-all {page} route;
+                     the primary site's own sub-pages use the real /circulars and /downloads
+                     routes instead. --}}
+                <a href="{{ $micrositeHome ? $micrositeHome.'/announcements' : '/circulars' }}" class="hover:text-primary transition-colors">Circulars</a>
+                <a href="{{ $micrositeHome }}/events" class="hover:text-primary transition-colors">Events</a>
+                <a href="{{ $micrositeHome ? $micrositeHome.'/downloads' : '/downloads' }}" class="hover:text-primary transition-colors">Downloads</a>
+                <a href="{{ $micrositeHome }}/contact" class="hover:text-primary transition-colors">Contact</a>
+            @else
+                {{-- Individual school: link to pages that actually exist for a school site,
+                     not Sahodaya cluster concepts like a member directory or office bearers. --}}
+                <a href="/about" class="hover:text-primary transition-colors">About</a>
+                <a href="/academics" class="hover:text-primary transition-colors">Academics</a>
+                <a href="/admissions" class="hover:text-primary transition-colors">Admissions</a>
+                <a href="/gallery" class="hover:text-primary transition-colors">Gallery</a>
+                <a href="/results" class="hover:text-primary transition-colors">Results</a>
+                <a href="/contact" class="hover:text-primary transition-colors">Contact</a>
+            @endif
         </div>
     </div>
 </section>

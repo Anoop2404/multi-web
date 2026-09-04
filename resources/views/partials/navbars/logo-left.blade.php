@@ -44,13 +44,19 @@
             </div>
         </a>
 
-        <div class="hidden lg:flex items-center gap-3 xl:gap-4 min-w-0 ml-4">
+        <div class="hidden lg:flex items-center gap-3 2xl:gap-4 min-w-0 ml-4">
             {{-- No overflow-x here on purpose: any overflow-x value forces the browser to
                  also clip overflow-y (a CSS overflow spec quirk), which was silently
                  hiding every dropdown's flyout panel — hover/click worked, the menu was
                  rendered, it was just invisible. flex-wrap is the safety net if items
-                 ever don't fit at the narrowest lg width instead. --}}
-            <div class="flex flex-wrap items-center gap-1 xl:gap-2.5">
+                 ever don't fit at the narrowest lg width instead.
+
+                 Spacing/text-size bumps below are deferred from xl (1280px, the same
+                 pixel `lg:flex` first has room to breathe) to 2xl (1536px) — bumping
+                 right at 1280 was self-defeating: it widened gaps and text at exactly
+                 the width with the least slack, which is what caused "Contact Us" to
+                 wrap onto its own row on a plain 1280px laptop screen. --}}
+            <div class="flex flex-wrap items-center gap-1 2xl:gap-2.5">
                 @foreach($items as $item)
                     @php
                         $label = $item['label'] ?? '';
@@ -63,7 +69,7 @@
                     @if(!empty($item['children']))
                         <div class="relative shrink-0" @mouseenter="activeSubmenu = '{{ md5($label) }}'" @mouseleave="activeSubmenu = null">
                             <button type="button"
-                                    class="px-3 py-2 text-xs xl:text-sm font-semibold rounded-lg transition whitespace-nowrap flex items-center gap-1.5 {{ $isCurrent ? 'text-primary font-bold bg-slate-100' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80' }}">
+                                    class="px-3 py-2 text-xs 2xl:text-sm font-semibold rounded-lg transition whitespace-nowrap flex items-center gap-1.5 {{ $isCurrent ? 'text-primary font-bold bg-slate-100' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80' }}">
                                 <span>{{ $label }}</span>
                                 <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-200" :class="activeSubmenu === '{{ md5($label) }}' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                             </button>
@@ -88,13 +94,13 @@
                         </div>
                     @elseif($isCta)
                         <a href="{{ $url }}"
-                           class="px-3.5 py-1.5 rounded-lg text-xs xl:text-sm font-bold whitespace-nowrap shrink-0 transition-all shadow-sm flex items-center gap-1.5 {{ Str::contains($url, ['login']) ? 'bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300' : 'bg-primary text-white hover:opacity-95' }}"
+                           class="px-3.5 py-1.5 rounded-lg text-xs 2xl:text-sm font-bold whitespace-nowrap shrink-0 transition-all shadow-sm flex items-center gap-1.5 {{ Str::contains($url, ['login']) ? 'bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300' : 'bg-primary text-white hover:opacity-95' }}"
                            @if($item['external'] ?? false) target="_blank" rel="noopener" @endif>
                             <span>{{ $label }}</span>
                         </a>
                     @else
                         <a href="{{ $url }}"
-                           class="px-3 py-2 text-xs xl:text-sm font-semibold rounded-lg transition whitespace-nowrap shrink-0 {{ $isCurrent ? 'text-primary font-bold bg-slate-100' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80' }}"
+                           class="px-3 py-2 text-xs 2xl:text-sm font-semibold rounded-lg transition whitespace-nowrap shrink-0 {{ $isCurrent ? 'text-primary font-bold bg-slate-100' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80' }}"
                            @if($item['external'] ?? false) target="_blank" rel="noopener" @endif>
                             {{ $label }}
                         </a>
