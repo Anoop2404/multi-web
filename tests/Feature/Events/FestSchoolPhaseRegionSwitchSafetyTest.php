@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Events;
 
+use App\Models\FeeReceipt;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestEventPhase;
@@ -36,11 +37,7 @@ class FestSchoolPhaseRegionSwitchSafetyTest extends TestCase
     {
         [$root, $school, $phase, $regions, $leafItemA] = $this->fixtureWithRegisteredSchool();
 
-        // recalculateAll() inside the fixture already created this school's fee row;
-        // mark it paid rather than creating a second one for the same (event, school,
-        // batch) key.
-        FestSchoolEventFee::where('event_id', $root->id)->where('school_id', $school->id)
-            ->update(['amount_paid' => 100]);
+        $this->payTheBatchFee($root, $school);
 
         $selector = app(FestSchoolPhaseRegionService::class);
 
@@ -48,17 +45,40 @@ class FestSchoolPhaseRegionSwitchSafetyTest extends TestCase
         $selector->select($root, $phase, $school->id, $regions[1]->id, null, true, 'Testing');
     }
 
-    public function test_acknowledging_the_paid_invoice_lets_the_switch_proceed(): void
+    public function test_acknowledging_the_paid_invoice_lets_the_switch_proceed_and_refreshes_the_invoice(): void
     {
         [$root, $school, $phase, $regions] = $this->fixtureWithRegisteredSchool();
 
-        FestSchoolEventFee::where('event_id', $root->id)->where('school_id', $school->id)
-            ->update(['amount_paid' => 100]);
+        $this->payTheBatchFee($root, $school);
+        $paidAmount = (float) FestSchoolEventFee::where('event_id', $root->id)->where('school_id', $school->id)
+            ->whereNotNull('registration_batch_id')->value('amount_paid');
+        $this->assertGreaterThan(0, $paidAmount);
 
         $selector = app(FestSchoolPhaseRegionService::class);
         $selection = $selector->select($root, $phase, $school->id, $regions[1]->id, null, true, 'Testing', acknowledgePaidInvoice: true);
 
         $this->assertSame($regions[1]->id, $selection->region_id);
+
+        $newLeaf = FestEvent::where('parent_event_id', $root->id)
+            ->where('source_phase_id', $phase->id)
+            ->where('region_id', $regions[1]->id)
+            ->firstOrFail();
+
+        // Acknowledging didn't just let the switch through -- it also had to actually
+        // force the invoice's line items to refresh (not just leave them "immutable" as
+        // recalculateBatch() would by default for a paid record), so they now point at
+        // the NEW leaf's registration instead of the old one.
+        // Excludes the whole-event rollup row (registration_batch_id = null, no line
+        // items of its own) -- item_fee lines live on the per-batch record.
+        $fee = FestSchoolEventFee::where('event_id', $root->id)->where('school_id', $school->id)
+            ->whereNotNull('registration_batch_id')->with('lines')->firstOrFail();
+        $itemLine = $fee->lines->firstWhere('line_type', 'item_fee');
+        $this->assertNotNull($itemLine);
+        $this->assertSame($newLeaf->id, $itemLine->meta['operational_event_id']);
+        // amount_paid must land back at the same real, receipt-backed total regardless
+        // of the forced recalculation -- it's derived from actual approved receipts,
+        // which the switch never touches.
+        $this->assertSame($paidAmount, (float) $fee->amount_paid);
     }
 
     public function test_switching_moves_participants_to_the_new_leaf_too(): void
@@ -131,6 +151,31 @@ class FestSchoolPhaseRegionSwitchSafetyTest extends TestCase
             $this->assertSame(422, $e->getStatusCode());
             $this->assertStringContainsString("isn't linked to a shared catalog item", $e->getMessage());
         }
+    }
+
+    /**
+     * Records a real approved FeeReceipt against the school's batch-level fee record and
+     * derives amount_paid from it via refreshPaidState() -- amount_paid is a computed
+     * field (TracksPartialPayments::refreshPaidState() sums approved receipts and
+     * force-fills it on every recalculation), so directly UPDATE-ing the column would get
+     * silently overwritten back to 0 the next time anything recalculates this fee, which
+     * a region switch always does.
+     */
+    private function payTheBatchFee(FestEvent $root, Tenant $school): void
+    {
+        $fee = FestSchoolEventFee::where('event_id', $root->id)->where('school_id', $school->id)
+            ->whereNotNull('registration_batch_id')->firstOrFail();
+
+        FeeReceipt::create([
+            'feeable_type' => $fee->getMorphClass(),
+            'feeable_id' => $fee->id,
+            'file_path' => 'test-receipts/placeholder.pdf',
+            'amount' => $fee->total_due,
+            'status' => FeeReceipt::STATUS_APPROVED,
+            'payment_date' => now(),
+        ]);
+
+        $fee->refreshPaidState();
     }
 
     /**

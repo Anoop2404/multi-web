@@ -61,7 +61,7 @@ class FestSchoolPhaseRegionService
             }
         }
 
-        return DB::transaction(function () use ($root, $phase, $schoolId, $regionId, $actorId, $override, $reason, $allowed) {
+        return DB::transaction(function () use ($root, $phase, $schoolId, $regionId, $actorId, $override, $reason, $allowed, $acknowledgePaidInvoice) {
             $selection = FestSchoolPhaseRegionSelection::where('event_id', $root->id)
                 ->where('phase_id', $phase->id)
                 ->where('school_id', $schoolId)
@@ -106,7 +106,7 @@ class FestSchoolPhaseRegionService
             $selection->save();
 
             if ($changed && $override) {
-                $this->migrateRegistrations($root, $phase, $schoolId, (int) $oldRegionId, $regionId);
+                $this->migrateRegistrations($root, $phase, $schoolId, (int) $oldRegionId, $regionId, $acknowledgePaidInvoice);
             }
 
             return $selection->fresh(['phase', 'region']);
@@ -195,6 +195,7 @@ class FestSchoolPhaseRegionService
         string $schoolId,
         int $oldRegionId,
         int $newRegionId,
+        bool $forceFeeRecalc = false,
     ): void {
         $oldLeaf = FestEvent::where('parent_event_id', $root->id)
             ->where('source_phase_id', $phase->id)
@@ -268,6 +269,15 @@ class FestSchoolPhaseRegionService
             app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
         }
 
-        app(FestRegistrationBatchFeeService::class)->recalculateAll($root, $schoolId);
+        // Without force: true, recalculateBatch() deliberately leaves a paid fee record's
+        // total_due/line items untouched ("paid invoices are immutable" -- protects
+        // against silently rewriting financial history on an ordinary registration
+        // edit). A region switch is not an ordinary edit: the admin already explicitly
+        // acknowledged the paid invoice above to get here at all, so the whole point of
+        // that acknowledgement is that the invoice SHOULD now be corrected to match
+        // where the registrations actually ended up -- not left stale, requiring a
+        // developer to separately run fest:recalculate-batch-billing by hand.
+        // amount_paid itself is still never touched by recalculateBatch() regardless.
+        app(FestRegistrationBatchFeeService::class)->recalculateAll($root, $schoolId, force: $forceFeeRecalc);
     }
 }
