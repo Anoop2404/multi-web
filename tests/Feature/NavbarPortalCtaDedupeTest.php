@@ -81,18 +81,26 @@ class NavbarPortalCtaDedupeTest extends TestCase
         $this->assertSame(1, substr_count($this->desktopRegion($html), 'href="'.SchoolPortalNavLinks::LOGIN_URL.'"'));
     }
 
-    public function test_default_cta_points_at_portal_login_not_admin_login(): void
+    public function test_default_cta_is_hidden_and_points_at_portal_login_not_admin_login_when_shown(): void
     {
-        // Public visitors have no use for an admin login CTA. The default button now
-        // points at the student/parent portal, and admin login isn't in the nav at all
-        // (it's still reachable via the footer — see SchoolPortalNavLinks::ensureFooterLinks).
-        $html = $this->renderNavbar(items: [
+        // Public visitors have no use for an admin login CTA, so show_in_navbar
+        // defaults to false and the button doesn't render at all unless a school
+        // opts in via navConfig. But whenever it IS shown, it must point at the
+        // student/parent portal, never at admin login (which stays reachable only
+        // via the footer — see SchoolPortalNavLinks::ensureFooterLinks).
+        $hiddenHtml = $this->desktopRegion($this->renderNavbar(items: [
             ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
-        ], portalCtaOverrides: []);
+        ], portalCtaOverrides: []));
 
-        $desktop = $this->desktopRegion($html);
-        $this->assertSame(1, substr_count($desktop, 'href="'.SchoolPortalNavLinks::PORTAL_LOGIN_URL.'"'));
-        $this->assertSame(0, substr_count($desktop, 'href="'.SchoolPortalNavLinks::LOGIN_URL.'"'));
+        $this->assertSame(0, substr_count($hiddenHtml, 'href="'.SchoolPortalNavLinks::PORTAL_LOGIN_URL.'"'));
+        $this->assertSame(0, substr_count($hiddenHtml, 'href="'.SchoolPortalNavLinks::LOGIN_URL.'"'));
+
+        $shownHtml = $this->desktopRegion($this->renderNavbar(items: [
+            ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
+        ], portalCtaOverrides: ['show_in_navbar' => true]));
+
+        $this->assertSame(1, substr_count($shownHtml, 'href="'.SchoolPortalNavLinks::PORTAL_LOGIN_URL.'"'));
+        $this->assertSame(0, substr_count($shownHtml, 'href="'.SchoolPortalNavLinks::LOGIN_URL.'"'));
     }
 
     public function test_sahodaya_homepage_keeps_distinct_school_login_and_portal_links(): void

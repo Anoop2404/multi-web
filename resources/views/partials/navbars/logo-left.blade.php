@@ -45,7 +45,12 @@
         </a>
 
         <div class="hidden lg:flex items-center gap-3 xl:gap-4 min-w-0 ml-4">
-            <div class="flex items-center gap-1 xl:gap-2.5 nav-scroll overflow-x-auto no-scrollbar">
+            {{-- No overflow-x here on purpose: any overflow-x value forces the browser to
+                 also clip overflow-y (a CSS overflow spec quirk), which was silently
+                 hiding every dropdown's flyout panel — hover/click worked, the menu was
+                 rendered, it was just invisible. flex-wrap is the safety net if items
+                 ever don't fit at the narrowest lg width instead. --}}
+            <div class="flex flex-wrap items-center gap-1 xl:gap-2.5">
                 @foreach($items as $item)
                     @php
                         $label = $item['label'] ?? '';

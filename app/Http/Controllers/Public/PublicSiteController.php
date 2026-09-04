@@ -20,7 +20,12 @@ class PublicSiteController extends Controller
         $site = WebsiteSite::ensurePrimary($tenant->id);
 
         return $this->renderPublic('public.home', $tenant, [
-            'sections' => $site->sectionQuery()->forPublic()->orderBy('display_order')->get(),
+            // Mandatory disclosure is dense compliance content, not a homepage
+            // teaser — it lives only on its own /disclosure page (see page()
+            // below), never inline on the homepage.
+            'sections' => $site->sectionQuery()->forPublic()
+                ->where('section_type', '!=', 'mandatory_disclosure')
+                ->orderBy('display_order')->get(),
             'site' => $site,
             'experience' => $this->experienceData($site),
         ]);

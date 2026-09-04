@@ -41,7 +41,10 @@
         </div>
 
         {{-- Primary Navigation Row --}}
-        <div class="hidden lg:flex items-center gap-1 xl:gap-2 pb-2.5 -mt-0.5 nav-scroll overflow-x-auto no-scrollbar">
+        {{-- No overflow-x here on purpose: any overflow-x value forces the browser to also
+             clip overflow-y (a CSS overflow spec quirk), which silently hides every
+             dropdown's flyout panel — see logo-left.blade.php for the same fix. --}}
+        <div class="hidden lg:flex items-center gap-1 xl:gap-2 pb-2.5 -mt-0.5 flex-wrap">
             @foreach($items as $item)
                 @php
                     $label = $item['label'] ?? '';

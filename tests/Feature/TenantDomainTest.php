@@ -196,7 +196,8 @@ class TenantDomainTest extends TestCase
         $response = $this->get('http://stmarys.edu.in/');
 
         $response->assertOk();
-        $response->assertSee('St Marys School');
+        // Tenant::getNameAttribute() uppercases school-type tenant names on read.
+        $response->assertSee('ST MARYS SCHOOL');
     }
 
     public function test_public_url_helper(): void
