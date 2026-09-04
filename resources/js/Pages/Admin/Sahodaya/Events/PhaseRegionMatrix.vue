@@ -42,6 +42,10 @@
                                         <textarea v-model="overrideForm.reason" class="field !py-1 !text-xs" rows="2" placeholder="Reason (required)"></textarea>
                                         <p v-if="overrideForm.errors.reason" class="text-[11px] text-red-600">{{ overrideForm.errors.reason }}</p>
                                         <p v-if="overrideForm.errors.region_id" class="text-[11px] text-red-600">{{ overrideForm.errors.region_id }}</p>
+                                        <label v-if="isPaidInvoiceWarning(overrideForm.errors.region_id)" class="flex items-start gap-1.5 text-[11px] text-amber-800">
+                                            <input type="checkbox" v-model="overrideForm.acknowledge_paid_invoice" class="mt-0.5">
+                                            <span>I understand — switch anyway, then run a billing recalculation for this school afterward.</span>
+                                        </label>
                                         <div class="flex gap-2">
                                             <button type="button" class="btn-primary text-xs" :disabled="overrideForm.processing" @click="saveOverride(school, phase)">Save</button>
                                             <button type="button" class="btn-ghost text-xs" @click="editingCell = null">Cancel</button>
@@ -118,6 +122,14 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
+// Both the inline "Change region" form and the region-change-request approval below
+// can be blocked by FestSchoolPhaseRegionService::select()'s paid-invoice guard — same
+// distinctive wording either way, used to decide when to show the checkbox / confirm
+// dialog instead of just displaying the error and dead-ending.
+function isPaidInvoiceWarning(message) {
+    return typeof message === 'string' && message.includes('already paid');
+}
+
 const props = defineProps({
     sahodaya: Object,
     event: Object,
@@ -128,7 +140,7 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
-const { prompt } = useConfirm();
+const { prompt, confirm } = useConfirm();
 
 const schoolSearch = ref('');
 const filteredSchools = computed(() => {
@@ -138,7 +150,7 @@ const filteredSchools = computed(() => {
 });
 
 const editingCell = ref(null);
-const overrideForm = useForm({ region_id: null, reason: '' });
+const overrideForm = useForm({ region_id: null, reason: '', acknowledge_paid_invoice: false });
 
 function currentCell(school, phase) {
     return props.selections[`${school.id}:${phase.id}`] || null;
@@ -167,8 +179,23 @@ function saveOverride(school, phase) {
     });
 }
 
-function approveRequest(r) {
-    router.post(`${base}/region-change-requests/${r.id}/approve`, {}, { preserveScroll: true });
+function approveRequest(r, acknowledgePaidInvoice = false) {
+    router.post(`${base}/region-change-requests/${r.id}/approve`,
+        { acknowledge_paid_invoice: acknowledgePaidInvoice },
+        {
+            preserveScroll: true,
+            onError: async (errors) => {
+                if (!acknowledgePaidInvoice && isPaidInvoiceWarning(errors.region_id)) {
+                    const ok = await confirm({
+                        title: 'Paid invoice on file',
+                        message: errors.region_id,
+                        confirmLabel: 'Switch anyway',
+                    });
+                    if (ok) approveRequest(r, true);
+                }
+            },
+        },
+    );
 }
 
 async function rejectRequest(r) {

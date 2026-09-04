@@ -6,10 +6,12 @@ use App\Models\FestEvent;
 use App\Models\FestEventPhase;
 use App\Models\FestPhaseRegion;
 use App\Models\FestRegistration;
+use App\Models\FestSchoolEventFee;
 use App\Models\FestSchoolPhaseRegionSelection;
 use App\Models\FestEventItem;
 use App\Models\FestAttendance;
 use App\Models\FestMark;
+use App\Models\FestParticipant;
 use App\Models\FestSchedule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +26,7 @@ class FestSchoolPhaseRegionService
         ?int $actorId = null,
         bool $override = false,
         ?string $reason = null,
+        bool $acknowledgePaidInvoice = false,
     ): FestSchoolPhaseRegionSelection {
         $root = $event->rootEvent();
         abort_unless($root->workflow_mode === FestPhasedWorkflowService::MODE, 422, 'This event does not use phase-specific region selection.');
@@ -34,6 +37,29 @@ class FestSchoolPhaseRegionService
             ->where('enabled', true)
             ->first();
         abort_if(! $allowed, 422, 'That region is not enabled for this phase.');
+
+        // A school with an already-paid invoice can be moved with $override=true (that
+        // flag only bypasses the lock-after-registration-started check above) with zero
+        // warning otherwise -- migrateRegistrations() itself never touches amount_paid,
+        // but the invoice's total_due/line items stay frozen on the OLD registrations
+        // ("paid invoices are immutable", see FestRegistrationBatchFeeService::
+        // recalculateBatch()) until someone explicitly runs a forced recalculation. Make
+        // that consequence something the admin has to actively acknowledge, not a silent
+        // side effect they discover later as "the billing looks wrong."
+        if ($override && ! $acknowledgePaidInvoice) {
+            $paidTotal = (float) FestSchoolEventFee::where('event_id', $root->id)
+                ->where('school_id', $schoolId)
+                ->where('amount_paid', '>', 0)
+                ->sum('amount_paid');
+            if ($paidTotal > 0) {
+                throw ValidationException::withMessages([
+                    'region_id' => sprintf(
+                        'This school has already paid ₹%s toward this event. Switching regions will not update that invoice automatically -- run fest:recalculate-batch-billing afterward to reconcile it. Confirm to proceed anyway.',
+                        number_format($paidTotal, 2),
+                    ),
+                ]);
+            }
+        }
 
         return DB::transaction(function () use ($root, $phase, $schoolId, $regionId, $actorId, $override, $reason, $allowed) {
             $selection = FestSchoolPhaseRegionSelection::where('event_id', $root->id)
@@ -205,12 +231,40 @@ class FestSchoolPhaseRegionService
 
         foreach ($registrations as $registration) {
             $rootItemId = $registration->item?->inherited_from_item_id;
+            // A null inherited_from_item_id means this item was authored directly on the
+            // OLD leaf, never copied down from a hub item via FestItemSyncService --
+            // there is no reliable way to know which item on the new leaf corresponds to
+            // it. ->where('inherited_from_item_id', null) would silently become
+            // whereNull() and ->first() would pick an arbitrary un-inherited item on the
+            // new leaf, reassigning a registration (possibly already paid for) to a
+            // completely different competition item with a different fee. Refuse instead.
+            abort_if($rootItemId === null, 422, "\"{$registration->item?->title}\" isn't linked to a shared catalog item, so it can't be safely matched to an item in the new region. Fix the item's catalog link first.");
+
             $targetItem = FestEventItem::where('event_id', $newLeaf->id)
                 ->where('inherited_from_item_id', $rootItemId)
                 ->first();
             abort_if(! $targetItem, 422, 'The selected region is missing a registered item. Synchronize topology and try again.');
 
+            // The new leaf may already have its own active registration for this exact
+            // school+item (e.g. the school registered there directly before the switch,
+            // or a previous switch attempt partially applied before this fix). Postgres
+            // enforces a unique (event_id, school_id, item_id) index for non-withdrawn/
+            // rejected rows, so blindly re-pointing into that would throw a raw
+            // constraint-violation exception mid-loop. Surface it clearly instead, naming
+            // the conflicting registration so an admin can resolve it deliberately.
+            $collision = FestRegistration::where('event_id', $newLeaf->id)
+                ->where('school_id', $schoolId)
+                ->where('item_id', $targetItem->id)
+                ->whereNotIn('status', ['withdrawn', 'rejected'])
+                ->first();
+            abort_if($collision, 422, "This school already has an active registration (#{$collision?->id}) for \"{$targetItem->title}\" in the target region. Resolve or withdraw that registration before switching.");
+
             $registration->update(['event_id' => $newLeaf->id, 'item_id' => $targetItem->id]);
+            // migrateRegistrations() only ever moved the registration itself -- its
+            // participants (fest_participants.event_id, the scope column chest-number
+            // uniqueness is enforced against) silently stayed on the old leaf, unlike
+            // FestRegionRoundMigrationService's migration which updates both.
+            FestParticipant::where('registration_id', $registration->id)->update(['event_id' => $newLeaf->id]);
             app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
         }
 

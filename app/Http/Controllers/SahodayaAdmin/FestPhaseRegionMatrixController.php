@@ -117,6 +117,7 @@ class FestPhaseRegionMatrixController extends SahodayaAdminController
 
         $data = $request->validate([
             'resolution_note' => 'nullable|string|max:2000',
+            'acknowledge_paid_invoice' => 'nullable|boolean',
         ]);
 
         $phase = FestEventPhase::findOrFail($regionChangeRequest->phase_id);
@@ -129,6 +130,7 @@ class FestPhaseRegionMatrixController extends SahodayaAdminController
             $request->user()?->id,
             true,
             $data['resolution_note'] ?? $regionChangeRequest->reason,
+            (bool) ($data['acknowledge_paid_invoice'] ?? false),
         );
 
         $regionChangeRequest->update([

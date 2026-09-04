@@ -76,6 +76,7 @@ class FestPhasedWorkflowController extends SahodayaAdminController
             'region_id' => ['required', 'integer', Rule::exists('regions', 'id')->where(fn ($q) => $q->where('tenant_id', $this->sahodaya->id)
                 ->where(fn ($q2) => $q2->whereNull('fest_event_id')->orWhere('fest_event_id', $event->id)))],
             'reason' => 'required|string|max:1000',
+            'acknowledge_paid_invoice' => 'nullable|boolean',
         ]);
 
         $selection = $selections->select(
@@ -86,6 +87,7 @@ class FestPhasedWorkflowController extends SahodayaAdminController
             $request->user()?->id,
             true,
             $data['reason'],
+            (bool) ($data['acknowledge_paid_invoice'] ?? false),
         );
         $audit->festEvent($event, FestPageActivity::REGISTRATIONS, 'fest.phase_region.overridden', 'Overrode school phase region', [
             'phase_id' => $phase->id,
