@@ -41,7 +41,9 @@
                     <select name="class_applying" required
                             class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white">
                         <option value="">-- Select --</option>
-                        @foreach(['Nursery','LKG','UKG'] + range(1,12) as $cls)
+                        {{-- array_merge, not `+` — see admission-enquiry.blade.php for why
+                             `+` silently drops Class 1-3 here. --}}
+                        @foreach(array_merge(['Nursery','LKG','UKG'], range(1,12)) as $cls)
                         <option value="{{ $cls }}" {{ old('class_applying') == $cls ? 'selected' : '' }}>
                             {{ is_numeric($cls) ? "Class $cls" : $cls }}
                         </option>
