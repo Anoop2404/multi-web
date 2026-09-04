@@ -72,9 +72,10 @@ class SchoolPortalNavLinks
     {
         $links = $footerConfig['quick_links'] ?? [];
 
+        // Admin login has no place in a public visitor's quick links — real school
+        // sites keep staff/admin access out of visitor-facing navigation entirely.
         foreach ([
             ['label' => 'Admissions', 'url' => self::ADMISSIONS_URL],
-            ['label' => 'Admin Login', 'url' => self::LOGIN_URL],
         ] as $link) {
             $exists = collect($links)->contains(fn ($l) => ($l['url'] ?? '') === $link['url']);
             if (! $exists) {

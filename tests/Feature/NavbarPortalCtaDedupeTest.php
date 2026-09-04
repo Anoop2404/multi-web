@@ -86,8 +86,9 @@ class NavbarPortalCtaDedupeTest extends TestCase
         // Public visitors have no use for an admin login CTA, so show_in_navbar
         // defaults to false and the button doesn't render at all unless a school
         // opts in via navConfig. But whenever it IS shown, it must point at the
-        // student/parent portal, never at admin login (which stays reachable only
-        // via the footer — see SchoolPortalNavLinks::ensureFooterLinks).
+        // student/parent portal, never at admin login — which isn't surfaced to
+        // public visitors anywhere by default, footer included (see
+        // SchoolPortalNavLinks::ensureFooterLinks).
         $hiddenHtml = $this->desktopRegion($this->renderNavbar(items: [
             ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
         ], portalCtaOverrides: []));
