@@ -32,7 +32,7 @@
             <div class="flex flex-wrap gap-2 items-end">
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by category</label>
-                    <SearchableSelect v-model="filterCategory" class="mt-1 w-44" :options="categoryOptions"
+                    <SearchableSelect v-model="filterCategory" class="mt-1 w-44" :options="categoryOptionsFromLeaderboard"
                                       :all-option="true" all-label="All categories" />
                 </div>
                 <div>
@@ -41,6 +41,58 @@
                                       :options="[{ value: 'male', label: 'Boys' }, { value: 'female', label: 'Girls' }]"
                                       :all-option="true" all-label="All genders" />
                 </div>
+            </div>
+        </div>
+
+        <!-- Category merge rules -->
+        <div class="card mb-6 space-y-3">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="section-title !mb-0">Category merge rules</h3>
+                    <p class="section-desc mt-0.5">
+                        Tally two or more categories together as one bucket instead of scoring them separately — e.g. merge "Category 3" into "Open".
+                        Applies to this school/team overall scoreboard for any target category; the individual leaderboard above only honors a merge whose target is LP, UP, HS, HSS, or Open.
+                    </p>
+                </div>
+                <button type="button" class="btn-secondary text-xs whitespace-nowrap" @click="addingMergeRule = !addingMergeRule">
+                    {{ addingMergeRule ? 'Cancel' : '+ Add merge rule' }}
+                </button>
+            </div>
+
+            <div v-if="mergeGroups.length" class="space-y-2">
+                <div v-for="(group, idx) in mergeGroups" :key="idx"
+                     class="flex flex-wrap items-center gap-2 text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <span v-for="src in group.sources" :key="src" class="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-xs font-medium text-slate-700">
+                        {{ labelFor(src) }}
+                    </span>
+                    <span class="text-slate-400">→</span>
+                    <span class="px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-700">{{ labelFor(group.target) }}</span>
+                    <button type="button" class="ml-auto text-xs font-semibold text-rose-600" @click="removeMergeGroup(idx)">Remove</button>
+                </div>
+            </div>
+            <p v-else class="text-xs text-slate-400">No merge rules — every category scores on its own.</p>
+
+            <div v-if="addingMergeRule" class="border-t border-slate-200 pt-3 space-y-3">
+                <div>
+                    <p class="text-xs font-semibold text-gray-600 mb-1.5">Categories to merge (pick 2 or more)</p>
+                    <div class="flex flex-wrap gap-2">
+                        <label v-for="opt in categoryOptions" :key="opt.value"
+                               class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border cursor-pointer"
+                               :class="newGroupSources.includes(opt.value) ? 'bg-indigo-50 border-indigo-300 text-indigo-800' : 'bg-white border-slate-200 text-slate-600'">
+                            <input type="checkbox" class="rounded" :value="opt.value" v-model="newGroupSources">
+                            {{ opt.label }}
+                        </label>
+                    </div>
+                </div>
+                <div v-if="newGroupSources.length >= 2">
+                    <p class="text-xs font-semibold text-gray-600 mb-1.5">Merge into which one?</p>
+                    <SearchableSelect v-model="newGroupTarget" class="w-56"
+                                      :options="categoryOptions.filter(o => newGroupSources.includes(o.value))"
+                                      :all-option="false" placeholder="Choose target category" />
+                </div>
+                <button type="button" class="btn-primary text-xs" :disabled="newGroupSources.length < 2 || !newGroupTarget" @click="saveMergeGroup">
+                    Save merge rule
+                </button>
             </div>
         </div>
 
@@ -83,6 +135,8 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, leaderboard: Array,
     activityLogs: { type: Array, default: () => [] },
+    categoryOptions: { type: Array, default: () => [] },
+    categoryMergeGroups: { type: Array, default: () => [] },
 });
 
 const filterCategory = ref('');
@@ -96,7 +150,35 @@ const categories = computed(() => {
     return [...set];
 });
 
-const categoryOptions = computed(() => categories.value.map(cat => ({ value: cat, label: cat.toUpperCase() })));
+const categoryOptionsFromLeaderboard = computed(() => categories.value.map(cat => ({ value: cat, label: cat.toUpperCase() })));
+
+const mergeGroups = ref(props.categoryMergeGroups.map(g => ({ ...g })));
+const addingMergeRule = ref(false);
+const newGroupSources = ref([]);
+const newGroupTarget = ref(null);
+
+function labelFor(key) {
+    return props.categoryOptions.find(o => o.value === key)?.label ?? key;
+}
+
+function removeMergeGroup(idx) {
+    mergeGroups.value.splice(idx, 1);
+    saveMergeGroups();
+}
+
+function saveMergeGroup() {
+    mergeGroups.value.push({ target: newGroupTarget.value, sources: [...newGroupSources.value] });
+    newGroupSources.value = [];
+    newGroupTarget.value = null;
+    addingMergeRule.value = false;
+    saveMergeGroups();
+}
+
+function saveMergeGroups() {
+    router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/category-merge`, {
+        groups: mergeGroups.value,
+    }, { preserveScroll: true });
+}
 
 const stats = computed(() => {
     const points = (props.leaderboard ?? []).map(r => Number(r.points || 0));

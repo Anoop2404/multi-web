@@ -1402,6 +1402,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/certificates/bulk-collect', [FestCertificateOpsController::class, 'bulkCollect'])->name('certificates.bulk-collect');
             Route::get('/{event}/championship', [FestChampionshipController::class, 'index'])->name('championship.index');
             Route::post('/{event}/championship/recalculate', [FestChampionshipController::class, 'recalculate'])->name('championship.recalculate');
+            Route::put('/{event}/championship/category-merge', [FestChampionshipController::class, 'updateCategoryMerge'])->name('championship.category-merge');
             Route::get('/{event}/marks/import', [FestMarksImportController::class, 'importForm'])->name('marks.import');
             Route::get('/{event}/marks/import-template', [FestMarksImportController::class, 'importTemplate'])->name('marks.import-template');
             Route::post('/{event}/marks/import', [FestMarksImportController::class, 'importStore'])->name('marks.import.store');
