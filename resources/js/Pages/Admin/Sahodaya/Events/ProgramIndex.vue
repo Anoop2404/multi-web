@@ -14,26 +14,15 @@
             </template>
         </PageHeader>
 
-        <!-- Sports season guidance banner -->
+        <!-- Sports guidance banner -->
         <div v-if="isSports" class="rounded-xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50/80 to-teal-50/40 p-4 mb-6 text-sm text-emerald-950 shadow-sm">
-            <div class="flex items-center gap-2 mb-2">
+            <div class="flex items-center gap-2 mb-1">
                 <span class="text-base" aria-hidden="true">🏆</span>
-                <p class="font-bold text-emerald-900">Sports Meet — Season &amp; Sport Events Workspace</p>
+                <p class="font-bold text-emerald-900">About Sports Meet events</p>
             </div>
-            <ol class="grid sm:grid-cols-3 gap-2 mt-2 text-xs text-emerald-900/90 font-medium">
-                <li class="flex items-center gap-2 bg-white/60 rounded-lg p-2 border border-emerald-100">
-                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">1</span>
-                    <span>Configure age groups &amp; master catalog on <strong>Season</strong>.</span>
-                </li>
-                <li class="flex items-center gap-2 bg-white/60 rounded-lg p-2 border border-emerald-100">
-                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">2</span>
-                    <span>Each sport (Athletics, Chess...) is its own <strong>Event</strong> with fees.</span>
-                </li>
-                <li class="flex items-center gap-2 bg-white/60 rounded-lg p-2 border border-emerald-100">
-                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">3</span>
-                    <span>Open registration, record marks &amp; publish results per sport.</span>
-                </li>
-            </ol>
+            <p class="text-xs text-emerald-900/90">
+                A sports event works just like any other event — create it, add items, open registration. Want to group several disciplines (Chess, Athletics, Aquatics...) under one umbrella instead? Add them from that event's Setup hub any time — entirely optional, not required to get started.
+            </p>
         </div>
 
         <div v-if="isSports && seasonRemittance"
@@ -189,10 +178,10 @@
             <div v-if="showCreateForm" class="card border-2 border-indigo-100 bg-gradient-to-b from-indigo-50/50 to-white shadow-md p-5 space-y-4">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h3 class="section-title !mb-0">{{ isSports ? 'Create Sports Meet Season' : `Create ${program.label} Event` }}</h3>
+                        <h3 class="section-title !mb-0">Create {{ program.label }} Event</h3>
                         <p class="section-desc mt-0.5">
                             {{ isSports
-                                ? 'Creates the season (age groups, cutoff, remittance). Add each sport (Athletics, Chess...) from its Setup hub afterwards.'
+                                ? 'Add a new sports event — a standalone sport, or a hub you can add more sports to later from its Setup hub. Either way, you can start adding items right after.'
                                 : 'Add a new round or season for this program.' }}
                         </p>
                     </div>
@@ -494,6 +483,12 @@ const breakdownSum = computed(() => (
     (Number(form.max_onstage_per_student) || 0)
     + (Number(form.max_offstage_per_student) || 0)
     + (Number(form.max_group_per_student) || 0)
+));
+
+const breakdownExceedsTotal = computed(() => (
+    form.max_total_per_student !== null
+    && form.max_total_per_student !== ''
+    && breakdownSum.value > Number(form.max_total_per_student)
 ));
 
 const selectableLevelLabels = computed(() => {
