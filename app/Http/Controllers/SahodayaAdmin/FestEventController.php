@@ -280,13 +280,12 @@ class FestEventController extends SahodayaAdminController
         app(\App\Services\Events\FestRegionPartitionService::class)
             ->autoSyncIfApplicable($event);
 
-        // Sports: a new top-level event is the season container — land the admin on
-        // its Setup hub where "+ Add sport" lives (sports are added explicitly now).
-        if ($event->event_type === 'sports' && $event->parent_event_id === null) {
-            return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup")
-                ->with('success', "Season \"{$event->title}\" created — set age groups & cutoff, then add each sport with \"+ Add sport\".");
-        }
-
+        // A new sports event lands on its own event page just like every other event
+        // type — isSportsSeasonEvent() only starts treating it as a multi-sport season
+        // once child sport events actually exist under it (see redirectSportsSeasonToHub()
+        // below), so a plain single sport never gets forced through a "season" concept.
+        // Setup Hub (where "+ Add sport" lives, for admins who deliberately want several
+        // disciplines under one umbrella) stays one click away via the event's sub-nav.
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}")
             ->with('success', "Event \"{$event->title}\" created.");
     }
