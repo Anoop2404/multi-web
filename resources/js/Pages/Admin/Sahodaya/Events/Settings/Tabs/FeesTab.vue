@@ -510,6 +510,17 @@
                         </span>
                     </label>
                 </div>
+
+                <div class="space-y-3 border-t border-slate-100 pt-4">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Download gates</p>
+                    <label class="flex items-start gap-2 text-sm">
+                        <input type="checkbox" v-model="feeSettingsForm.id_card_allowed_with_pending_fees" class="mt-0.5">
+                        <span>
+                            Allow ID card downloads with pending fees
+                            <span class="block text-xs text-slate-500 mt-0.5">Off by default — a school with an unpaid or partially paid fee for this event cannot download ID cards. Turn on to let them download anyway (Sahodaya membership fee still has to be clear).</span>
+                        </span>
+                    </label>
+                </div>
             </section>
 
             <section v-if="event.event_type === 'sports' && !feeSettingsForm.head_fees.length && feeSettingsForm.fee_model !== 'sports_composite'" class="card space-y-3">

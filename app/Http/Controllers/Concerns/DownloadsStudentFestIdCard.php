@@ -21,7 +21,7 @@ trait DownloadsStudentFestIdCard
         abort_if($student->tenant_id !== $school->id, 403);
         abort_if($event->tenant_id !== $school->parent_id, 403);
 
-        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $school, $headId);
+        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $school, $headId, null, null, 'id_card');
 
         $hasRegistration = FestParticipant::query()
             ->where('student_id', $student->id)

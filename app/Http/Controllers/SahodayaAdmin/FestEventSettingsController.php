@@ -521,6 +521,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'require_fee_before_registration' => 'nullable|boolean',
             'require_verified_students' => 'nullable|boolean',
             'require_prior_batch_payment' => 'nullable|boolean',
+            'id_card_allowed_with_pending_fees' => 'nullable|boolean',
             'payment_bank_name' => 'nullable|string|max:255',
             'payment_account_no' => 'nullable|string|max:64',
             'payment_ifsc' => 'nullable|string|max:20',
@@ -578,6 +579,8 @@ class FestEventSettingsController extends SahodayaAdminController
                     ? (bool) $data['require_verified_students'] : null,
                 'require_prior_batch_payment' => array_key_exists('require_prior_batch_payment', $data)
                     ? (bool) $data['require_prior_batch_payment'] : null,
+                'id_card_allowed_with_pending_fees' => array_key_exists('id_card_allowed_with_pending_fees', $data)
+                    ? (bool) $data['id_card_allowed_with_pending_fees'] : null,
                 'payment_bank_name' => array_key_exists('payment_bank_name', $data)
                     ? (filled($data['payment_bank_name']) ? trim((string) $data['payment_bank_name']) : null) : null,
                 'payment_account_no' => array_key_exists('payment_account_no', $data)

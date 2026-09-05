@@ -411,4 +411,112 @@ class SchoolDocumentDownloadGateServiceTest extends TestCase
         $this->assertTrue($downloadGate->festEventFeeCleared($event, $school, null, $freePhase->id));
         $downloadGate->assertFestEventFeeForDownloads($event, $school, null, $freePhase->id);
     }
+
+    /**
+     * fee_settings.id_card_allowed_with_pending_fees is an event-level escape hatch, off by
+     * default, that only ID card downloads may opt into (via $documentType = 'id_card') —
+     * every other document type (admit cards, hall tickets, etc.) must keep enforcing the
+     * fee gate exactly as before regardless of this setting.
+     */
+    public function test_id_card_pending_fees_flag_only_unlocks_id_card_downloads(): void
+    {
+        $sahodaya = Tenant::create([
+            'id' => 'sahodaya-dl-gate-idcard-flag',
+            'name' => 'Sahodaya DL Gate ID Card Flag Test',
+            'type' => 'sahodaya',
+            'status' => 'active',
+            'is_active' => true,
+            'membership_status' => 'approved',
+        ]);
+
+        $year = AcademicYear::forSahodaya($sahodaya->id);
+
+        $school = Tenant::create([
+            'id' => 'school-dl-gate-idcard-flag',
+            'parent_id' => $sahodaya->id,
+            'name' => 'School DL Gate ID Card Flag Test',
+            'type' => 'school',
+            'status' => 'active',
+            'is_active' => true,
+            'membership_status' => 'approved',
+        ]);
+
+        Registration::create([
+            'school_id' => $school->id,
+            'academic_year' => $year,
+            'registration_status' => 'completed',
+        ]);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'ID Card Pending Fee Flag Test Event',
+            'event_type' => 'kalotsav',
+            'status' => 'registration_open',
+            'approval_policy' => 'auto',
+            'fee_settings' => [
+                'fee_model' => 'per_item',
+                'per_item_amount' => 100,
+                'require_verified_students' => false,
+                // The flag under test — off means the default, unconditional block.
+                'id_card_allowed_with_pending_fees' => false,
+            ],
+        ]);
+
+        $item = FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => 'Folk Dance',
+            'participant_type' => 'single',
+            'is_enabled' => true,
+        ]);
+
+        $schoolClass = SchoolClass::create([
+            'tenant_id' => $school->id,
+            'name' => 'Class 10',
+            'class_number' => 10,
+        ]);
+
+        $student = Student::create([
+            'tenant_id' => $school->id,
+            'school_class_id' => $schoolClass->id,
+            'name' => 'Jane Student',
+            'status' => 'active',
+            'verification_status' => 'verified',
+            'eligible_kalolsav' => true,
+        ]);
+
+        app(FestRegistrationCreateService::class)->createForSchool($event, $item, $school, [$student->id]);
+
+        $downloadGate = app(SchoolDocumentDownloadGateService::class);
+
+        // Flag off (default): both document types stay blocked, same as today.
+        $this->assertFalse($downloadGate->festEventFeeCleared($event, $school, documentType: 'default'));
+        $this->assertFalse($downloadGate->festEventFeeCleared($event, $school, documentType: 'id_card'));
+        try {
+            $downloadGate->assertFestEventFeeForDownloads($event, $school, documentType: 'id_card');
+            $this->fail('Expected HttpException 422 was not thrown');
+        } catch (HttpException $e) {
+            $this->assertEquals(422, $e->getStatusCode());
+        }
+
+        $event->update(['fee_settings' => array_merge($event->fee_settings, ['id_card_allowed_with_pending_fees' => true])]);
+        $event->refresh();
+
+        // Flag on: only the 'id_card' document type is unlocked, fee still pending.
+        $this->assertFalse($downloadGate->festEventFeeCleared($event, $school, documentType: 'default'));
+        $this->assertTrue($downloadGate->festEventFeeCleared($event, $school, documentType: 'id_card'));
+        $downloadGate->assertFestEventFeeForDownloads($event, $school, documentType: 'id_card');
+
+        $payload = $downloadGate->payload($school, $event, documentType: 'id_card');
+        $this->assertFalse($payload['blocked']);
+
+        // The unrelated admit-cards/hall-ticket path (documentType left at 'default') must
+        // still enforce the gate -- the flag is scoped to ID cards only, not a blanket
+        // "ignore this event's fees" switch.
+        try {
+            $downloadGate->assertFestEventFeeForDownloads($event, $school, documentType: 'default');
+            $this->fail('Expected HttpException 422 was not thrown for the non-id_card document type');
+        } catch (HttpException $e) {
+            $this->assertEquals(422, $e->getStatusCode());
+        }
+    }
 }

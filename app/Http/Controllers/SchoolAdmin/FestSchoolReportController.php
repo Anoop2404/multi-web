@@ -872,7 +872,7 @@ class FestSchoolReportController extends SchoolAdminController
         $itemLevels = $this->itemLevelMap($event);
 
         $downloadGate = app(SchoolDocumentDownloadGateService::class)
-            ->payload($this->school, $event, null, null, null, $defaultLevelId);
+            ->payload($this->school, $event, null, null, null, $defaultLevelId, 'id_card');
 
         return $this->inertia('School/Events/ReportIdCards', [
             'program'     => $meta['slug'],
@@ -1093,7 +1093,7 @@ class FestSchoolReportController extends SchoolAdminController
         }
 
         $downloadGate = app(SchoolDocumentDownloadGateService::class)
-            ->payload($this->school, $event, null, $headId, $phaseId, $levelId);
+            ->payload($this->school, $event, null, $headId, $phaseId, $levelId, 'id_card');
 
         if ($downloadGate['blocked']) {
             return response()->json(['cards' => [], 'downloadGate' => $downloadGate]);
@@ -1139,7 +1139,7 @@ class FestSchoolReportController extends SchoolAdminController
         }
 
         app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
-            $event, $this->school, $filters['head_id'] ?? null, $this->resolvePhaseIdForItem($filters['item_id'] ?? null), $levelId,
+            $event, $this->school, $filters['head_id'] ?? null, $this->resolvePhaseIdForItem($filters['item_id'] ?? null), $levelId, 'id_card',
         );
 
         $cluster = Tenant::findOrFail($this->school->parent_id);
@@ -1177,7 +1177,7 @@ class FestSchoolReportController extends SchoolAdminController
         }
 
         app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
-            $event, $this->school, $filters['head_id'] ?? null, $this->resolvePhaseIdForItem($filters['item_id'] ?? null), $levelId,
+            $event, $this->school, $filters['head_id'] ?? null, $this->resolvePhaseIdForItem($filters['item_id'] ?? null), $levelId, 'id_card',
         );
 
         $cluster = Tenant::findOrFail($this->school->parent_id);
@@ -1216,7 +1216,7 @@ class FestSchoolReportController extends SchoolAdminController
         $levelId = $this->resolveIdCardLevelId($request, $event);
 
         app(SchoolDocumentDownloadGateService::class)
-            ->assertFestEventFeeForDownloads($event, $this->school, null, null, $levelId);
+            ->assertFestEventFeeForDownloads($event, $this->school, null, null, $levelId, 'id_card');
 
         $cluster = Tenant::findOrFail($this->school->parent_id);
         $filters = array_filter([
@@ -1263,7 +1263,7 @@ class FestSchoolReportController extends SchoolAdminController
         $levelId = $this->resolveIdCardLevelId($request, $event);
 
         app(SchoolDocumentDownloadGateService::class)
-            ->assertFestEventFeeForDownloads($event, $this->school, null, null, $levelId);
+            ->assertFestEventFeeForDownloads($event, $this->school, null, null, $levelId, 'id_card');
 
         $cluster = Tenant::findOrFail($this->school->parent_id);
         $filters = array_filter([

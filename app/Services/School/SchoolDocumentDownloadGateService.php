@@ -66,9 +66,17 @@ class SchoolDocumentDownloadGateService
      *                         once EVERY level is paid, which wrongly blocked Level 1 ID cards
      *                         for a school whose Level 1 invoice is approved while Level 2 is
      *                         still outstanding.
+     * @param  string  $documentType  'id_card' opts into the event's own
+     *                                fee_settings.id_card_allowed_with_pending_fees escape hatch
+     *                                below; every other caller (e.g. admit cards) passes the
+     *                                default and always enforces the fee gate as before.
      */
-    public function festEventFeeCleared(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null): bool
+    public function festEventFeeCleared(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null, string $documentType = 'default'): bool
     {
+        if ($documentType === 'id_card' && (bool) ($event->fee_settings['id_card_allowed_with_pending_fees'] ?? false)) {
+            return true;
+        }
+
         if ($batchId !== null && $event->usesPhasedRegionalBilling()) {
             return $this->batchFees->isBatchPaid($event, $school->id, $batchId);
         }
@@ -114,11 +122,11 @@ class SchoolDocumentDownloadGateService
         abort(422, 'Sahodaya membership fee payment is pending. Pay and get it verified before downloading ID cards or hall tickets.');
     }
 
-    public function assertFestEventFeeForDownloads(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null): void
+    public function assertFestEventFeeForDownloads(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null, string $documentType = 'default'): void
     {
         $this->assertMembershipFeeForDownloads($school);
 
-        if ($this->festEventFeeCleared($event, $school, $headId, $phaseId, $batchId)) {
+        if ($this->festEventFeeCleared($event, $school, $headId, $phaseId, $batchId, $documentType)) {
             return;
         }
 
@@ -152,10 +160,10 @@ class SchoolDocumentDownloadGateService
      * @param  ?int  $phaseId  See festEventFeeCleared().
      * @return array{blocked: bool, reason: ?string, membership_cleared: bool, event_fee_cleared: bool|null, mcq_fee_cleared: bool|null}
      */
-    public function payload(Tenant $school, ?FestEvent $event = null, ?McqExam $exam = null, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null): array
+    public function payload(Tenant $school, ?FestEvent $event = null, ?McqExam $exam = null, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null, string $documentType = 'default'): array
     {
         $membershipCleared = $this->membershipFeeCleared($school);
-        $eventFeeCleared = $event ? $this->festEventFeeCleared($event, $school, $headId, $phaseId, $batchId) : null;
+        $eventFeeCleared = $event ? $this->festEventFeeCleared($event, $school, $headId, $phaseId, $batchId, $documentType) : null;
         $mcqFeeCleared = $exam ? $this->mcqExamFeeCleared($exam, $school) : null;
 
         $reason = null;
