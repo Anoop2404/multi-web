@@ -621,11 +621,7 @@ class FestIdCardService
                 ];
             })->values()->all();
 
-            $rawDate = $event->event_start ?? $event->starts_at ?? $event->start_date;
-            $eventDate = $rawDate ? date('jS M Y', strtotime((string) $rawDate)) : null;
-            if (! $eventDate && $event->event_end) {
-                $eventDate = date('jS M Y', strtotime((string) $event->event_end));
-            }
+            $eventDate = $this->resolveEventDate($event, null, $registration);
             $venue = $this->resolveVenue($event, null, $registration);
             $qrPayload = $this->qrPayload($event, 'registration', (string) $registration->id, $festId);
             $leafEvent = $registration->event ?? $event;
@@ -720,11 +716,7 @@ class FestIdCardService
         $photoUrl = $this->portraitUrl($p);
         $photoSrc = $this->resolveParticipantPhotoSrc($p, $gender, $includeDataUris);
 
-        $rawDate = $event->event_start ?? $event->starts_at ?? $event->start_date;
-        $eventDate = $rawDate ? date('jS M Y', strtotime((string) $rawDate)) : null;
-        if (! $eventDate && $event->event_end) {
-            $eventDate = date('jS M Y', strtotime((string) $event->event_end));
-        }
+        $eventDate = $this->resolveEventDate($event, $p);
         $venue = $this->resolveVenue($event, $p);
         $sahodayaName = $event->tenant?->name
             ?? \App\Models\Tenant::where('id', $event->tenant_id)->value('name')
@@ -887,6 +879,77 @@ class FestIdCardService
         }
 
         return '—';
+    }
+
+    /**
+     * Same region a card is scheduled for a single day; the event date shown on
+     * the card must match that region's actual conduct dates — a phase like
+     * Sargadhara runs Tirur Region and Manjeri Region on different days, each
+     * overriding the hub event's own event_start/event_end (mirrors the
+     * per-region lookup in resolveVenue() above).
+     */
+    private function resolveEventDate(FestEvent $event, ?FestParticipant $p = null, ?FestRegistration $registration = null): ?string
+    {
+        $regEvent = $p?->registration?->event ?? $registration?->event;
+        $schoolId = $p?->registration?->school_id ?? $registration?->school_id;
+
+        $targetRegionId = $event->region_id ?? $regEvent?->region_id;
+
+        if (! $targetRegionId && $schoolId) {
+            $targetRegionId = \App\Models\SchoolRegionAssignment::forTenant($event->tenant_id)
+                ->where('school_id', $schoolId)
+                ->value('region_id')
+                ?? \App\Models\FestSchoolPhaseRegionSelection::where('school_id', $schoolId)
+                    ->value('region_id');
+        }
+
+        $start = $event->event_start;
+        $end = $event->event_end;
+
+        $phaseId = $event->source_phase_id ?? $regEvent?->source_phase_id;
+        if ($phaseId && $targetRegionId) {
+            $phaseRegion = \App\Models\FestPhaseRegion::where('phase_id', $phaseId)
+                ->where('region_id', $targetRegionId)
+                ->first();
+
+            if ($phaseRegion?->conduct_start_at) {
+                $start = $phaseRegion->conduct_start_at;
+                $end = $phaseRegion->conduct_end_at ?: $start;
+            }
+        }
+
+        return $this->formatEventDateRange($start, $end);
+    }
+
+    private function formatEventDateRange(mixed $start, mixed $end): ?string
+    {
+        if (! $start) {
+            $start = $end;
+        }
+        if (! $start) {
+            return null;
+        }
+
+        $startTs = strtotime((string) $start);
+        $endTs = $end ? strtotime((string) $end) : $startTs;
+
+        if (! $startTs) {
+            return null;
+        }
+
+        if (! $endTs || date('Y-m-d', $startTs) === date('Y-m-d', $endTs)) {
+            return date('jS M Y', $startTs);
+        }
+
+        if (date('Y-m', $startTs) === date('Y-m', $endTs)) {
+            return date('jS', $startTs).' – '.date('jS M Y', $endTs);
+        }
+
+        if (date('Y', $startTs) === date('Y', $endTs)) {
+            return date('jS M', $startTs).' – '.date('jS M Y', $endTs);
+        }
+
+        return date('jS M Y', $startTs).' – '.date('jS M Y', $endTs);
     }
 
     private function qrPayload(FestEvent $event, string $kind, string $entityId, string $festId): string
