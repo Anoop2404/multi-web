@@ -49,14 +49,14 @@ class PortalVerifyEmail extends VerifyEmail
         $copy = NotificationTemplate::renderOrDefault(
             'email.auth.verify_email',
             ['school_name' => $school?->name ?? '', 'sahodaya_name' => $branding['sahodayaName'] ?? ''],
-            'Verify your Gmail address',
+            'Verify your email address',
             $school
-                ? 'Your school {{school_name}} is registered with {{sahodaya_name}}. Please confirm your Gmail address to activate your school portal account.'
-                : 'Welcome to {{sahodaya_name}}. Please confirm your Gmail address to activate your school portal account.',
+                ? 'Your school {{school_name}} is registered with {{sahodaya_name}}. Please confirm your email address to activate your school portal account.'
+                : 'Welcome to {{sahodaya_name}}. Please confirm your email address to activate your school portal account.',
         );
 
         return array_merge($branding, [
-            'headerTitle'      => 'Gmail Verification',
+            'headerTitle'      => 'Email Verification',
             'headerSubtitle'   => $school?->name,
             'headerEyebrow'    => 'School Portal',
             'title'            => $copy['title'],
@@ -74,7 +74,7 @@ class PortalVerifyEmail extends VerifyEmail
         $sahodaya = $school?->parent_id ? Tenant::query()->find($school->parent_id) : $school;
         $branding = EmailBranding::forTenant($sahodaya);
 
-        return 'Verify your Gmail — '.($branding['sahodayaName'] ?? config('app.name'));
+        return 'Verify your email — '.($branding['sahodayaName'] ?? config('app.name'));
     }
 
     protected function verificationUrl($notifiable): string

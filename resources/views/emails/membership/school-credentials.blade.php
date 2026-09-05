@@ -5,11 +5,11 @@
 
     <p>Hello,</p>
 
-    <p>{{ $body ?? $school->name.' has been registered with '.$sahodayaName.'. Use the credentials below to sign in and complete Gmail verification.' }}</p>
+    <p>{{ $body ?? $school->name.' has been registered with '.$sahodayaName.'. Use the credentials below to sign in and complete email verification.' }}</p>
 
     @include('emails.partials.detail-table', ['rows' => [
         'School' => $school->name,
-        'Login email (Gmail)' => $user->email,
+        'Login email' => $user->email,
         'Temporary password' => $plainPassword,
     ]])
 
@@ -21,7 +21,7 @@
     <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#041525;">Next steps</p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px;">
         @foreach([
-            'Click the Gmail verification link in the separate email we sent you',
+            'Click the email verification link in the separate email we sent you',
             'Open the school portal and sign in with the credentials below',
             'Change your password after your first login',
         ] as $i => $step)

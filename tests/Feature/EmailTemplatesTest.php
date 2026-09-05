@@ -64,7 +64,7 @@ class EmailTemplatesTest extends TestCase
 
         $templates = [
             'emails.verify-email' => array_merge($branding, [
-                'headerTitle' => 'Gmail Verification',
+                'headerTitle' => 'Email Verification',
                 'userName' => $user->name,
                 'schoolName' => $school->name,
                 'verificationUrl' => 'https://malappuramcentralsahodaya.org/email/verify/1/abc',
@@ -188,8 +188,8 @@ class EmailTemplatesTest extends TestCase
         $mail = (new PortalVerifyEmail)->toMail($admin);
         $html = View::make($mail->view, $mail->viewData)->render();
 
-        $this->assertStringContainsString('Verify your Gmail address', $html);
-        $this->assertStringContainsString('Verify Gmail &amp; open portal', $html);
+        $this->assertStringContainsString('Verify your email address', $html);
+        $this->assertStringContainsString('Verify Email &amp; open portal', $html);
     }
 
     public function test_public_form_emails_render_with_branding(): void

@@ -56,12 +56,12 @@ class MembershipNotifier
             'email.membership.credentials_issued',
             ['school_name' => $school->name, 'sahodaya_name' => $sahodayaName],
             'Your school portal is ready',
-            '{{school_name}} has been registered with {{sahodaya_name}}. Use the credentials below to sign in and complete Gmail verification.',
+            '{{school_name}} has been registered with {{sahodaya_name}}. Use the credentials below to sign in and complete email verification.',
         );
 
         $this->mailerFor($school->parent_id)->sendView(
             $user->email,
-            'School Portal Login — Verify Gmail & Sign In',
+            'School Portal Login — Verify Email & Sign In',
             'emails.membership.school-credentials',
             [
                 'headerTitle'    => 'School Portal Access',
