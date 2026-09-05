@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
 use App\Models\Tenant;
+use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestSportsAgeGroup;
 use Illuminate\Support\Collection;
@@ -235,16 +236,23 @@ class PublicFestScoreboardService
         $root = $this->rootEvent($event);
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
 
-        return FestEventItem::whereIn('event_id', $scope['event_ids'])
+        $rawKeys = FestEventItem::whereIn('event_id', $scope['event_ids'])
             ->where('is_enabled', true)
             ->whereNotNull($column)
             ->where($column, '!=', 'open')
             ->distinct()
             ->pluck($column)
             ->filter()
-            ->sort()
             ->values()
             ->all();
+
+        // Collapse any merged categories (aggregation_config.championship_category_map)
+        // down to their target key so a merged bucket appears once in the filter list,
+        // not once per raw category that now feeds it.
+        $collapsed = FestCategoryMerge::collapse($root, $rawKeys);
+        sort($collapsed);
+
+        return $collapsed;
     }
 
     public function categoryLabel(FestEvent $event, string $category): string
@@ -308,11 +316,15 @@ class PublicFestScoreboardService
 
         // Pair/group items save one FestMark per teammate (same registration_id,
         // same position/score) — count each registration once, not once per teammate.
+        $sourceCategoryKeys = FestCategoryMerge::sourceKeysFor($root, $category);
         $marks = FestMark::whereIn('event_id', $scope['event_ids'])
             ->with(['participant.registration.item', 'item'])
-            ->whereHas('item', function ($query) use ($root, $category) {
+            ->whereHas('item', function ($query) use ($root, $sourceCategoryKeys) {
                 $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
-                $query->where($column, $category);
+                // A merged category (e.g. "Open") counts marks from every raw category
+                // folded into it (e.g. "Category 3") as well as its own -- see
+                // FestCategoryMerge::sourceKeysFor().
+                $query->whereIn($column, $sourceCategoryKeys);
                 // Same rule provisionalScoreboard() below already enforces, and that
                 // $marks in FestPortalController::results()/itemResults() enforce for
                 // the item-wise/individual-item pages — an item only counts once ITS
@@ -363,12 +375,13 @@ class PublicFestScoreboardService
     {
         $root = $this->rootEvent($event);
         $categoryColumn = $root->event_type === 'sports' ? 'age_group' : 'class_group';
+        $sourceCategoryKeys = $category ? FestCategoryMerge::sourceKeysFor($root, $category) : null;
 
         $marks = FestMark::whereIn('event_id', $scope['event_ids'])
-            ->whereHas('item', function ($query) use ($category, $categoryColumn) {
+            ->whereHas('item', function ($query) use ($sourceCategoryKeys, $categoryColumn) {
                 $query->whereNotNull('results_published_at');
-                if ($category) {
-                    $query->where($categoryColumn, $category);
+                if ($sourceCategoryKeys) {
+                    $query->whereIn($categoryColumn, $sourceCategoryKeys);
                 }
             })
             ->with(['participant.registration.item', 'item'])

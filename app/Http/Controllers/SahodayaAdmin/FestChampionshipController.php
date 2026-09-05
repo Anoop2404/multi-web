@@ -21,29 +21,46 @@ class FestChampionshipController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $rows = FestIndividualChampionshipPoint::where('event_id', $event->id)
+        $allRows = FestIndividualChampionshipPoint::where('event_id', $event->id)
             ->with(['student'])
             ->orderByDesc('points')
             ->orderByDesc('group_points')
             ->orderBy('student_id')
-            ->get()
-            ->map(function (FestIndividualChampionshipPoint $row, int $index) {
-                $school = Tenant::find($row->student?->tenant_id);
+            ->get();
 
-                return [
-                    'rank'     => $index + 1,
-                    'points'   => $row->points,
-                    'group_points' => $row->group_points,
-                    'category' => $row->category,
-                    'gender'   => $row->gender,
-                    'student'  => [
-                        'id'   => $row->student_id,
-                        'name' => $row->student?->name,
-                        'reg_no' => $row->student?->reg_no,
-                    ],
-                    'school' => $school?->name,
-                ];
-            });
+        // Rank within each category (LP/UP/HS/HSS/Open) -- a school's "HS champion" is
+        // whoever ranks #1 among HS students, not wherever they happen to land in one
+        // flat list dominated by whichever category has the highest-scoring items. A
+        // single global rank made every other category's "#1" look like "#47" the
+        // moment you filtered down to it.
+        $rankedByCategory = $allRows->groupBy('category')->flatMap(function ($categoryRows) {
+            return $categoryRows->values()->map(fn (FestIndividualChampionshipPoint $row, int $index) => [$row, $index + 1]);
+        });
+
+        $overallRankByStudent = $allRows->values()->mapWithKeys(fn (FestIndividualChampionshipPoint $row, int $index) => [$row->student_id => $index + 1]);
+
+        $rows = $rankedByCategory->map(function (array $pair) use ($overallRankByStudent) {
+            [$row, $categoryRank] = $pair;
+            $school = Tenant::find($row->student?->tenant_id);
+
+            return [
+                'rank'     => $categoryRank,
+                'overall_rank' => $overallRankByStudent[$row->student_id] ?? null,
+                'points'   => $row->points,
+                'group_points' => $row->group_points,
+                'category' => $row->category,
+                'gender'   => $row->gender,
+                'student'  => [
+                    'id'   => $row->student_id,
+                    'name' => $row->student?->name,
+                    'reg_no' => $row->student?->reg_no,
+                ],
+                'school' => $school?->name,
+            ];
+        })->sortBy([
+            ['category', 'asc'],
+            ['rank', 'asc'],
+        ])->values();
 
         $root = $event->rootEvent();
         $categoryLabels = FestClassGroupScheme::labels(null, $root);
@@ -105,12 +122,7 @@ class FestChampionshipController extends SahodayaAdminController
     /** @return array<string, string> */
     private function categoryMergeMap(FestEvent $root): array
     {
-        $map = ($root->aggregation_config ?? [])['championship_category_map'] ?? [];
-
-        // Per-phase-keyed overrides (a numeric-string phase id key holding its own
-        // sub-array) aren't editable from this global UI yet — only the flat, event-wide
-        // entries are, so strip anything that isn't a plain "source => target" string pair.
-        return collect($map)->filter(fn ($target) => is_string($target))->all();
+        return \App\Support\FestCategoryMerge::map($root);
     }
 
     /** @return list<array{target: string, sources: list<string>}> */

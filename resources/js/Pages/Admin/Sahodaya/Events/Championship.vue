@@ -100,8 +100,9 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b"><tr>
-                        <th class="p-3 text-left">Rank</th><th class="p-3 text-left">Student</th>
-                        <th class="p-3 text-left">School</th><th class="p-3 text-left">Category</th><th class="p-3 text-right">Points</th>
+                        <th class="p-3 text-left">Category rank</th><th class="p-3 text-left">Student</th>
+                        <th class="p-3 text-left">School</th><th class="p-3 text-left">Category</th>
+                        <th class="p-3 text-right">Points</th><th class="p-3 text-right">Overall rank</th>
                     </tr></thead>
                     <tbody>
                         <tr v-for="row in filteredLeaderboard" :key="row.student.id" class="border-t">
@@ -113,8 +114,9 @@
                             <td class="p-3 text-slate-600">{{ row.school }}</td>
                             <td class="p-3 uppercase text-xs text-indigo-700 font-medium">{{ row.category }} · {{ row.gender }}</td>
                             <td class="p-3 text-right font-mono font-semibold text-slate-900">{{ row.points }}</td>
+                            <td class="p-3 text-right font-mono text-xs text-slate-400">#{{ row.overall_rank }}</td>
                         </tr>
-                        <tr v-if="!filteredLeaderboard.length"><td colspan="5" class="p-8 text-gray-400 text-center">No matching leaderboard entries</td></tr>
+                        <tr v-if="!filteredLeaderboard.length"><td colspan="6" class="p-8 text-gray-400 text-center">No matching leaderboard entries</td></tr>
                     </tbody>
                 </table>
             </div>

@@ -16,6 +16,7 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
@@ -113,6 +114,44 @@ class FestChampionshipCategoryMergeTest extends TestCase
         $this->assertDatabaseHas('fest_individual_championship_points', [
             'event_id' => $event->id, 'student_id' => $student->id, 'category' => 'hs',
         ]);
+    }
+
+    /**
+     * Regression: index() used to assign one flat, global rank across every category
+     * combined, so a school's "HS champion" (rank #1 among HS students) could show up
+     * as rank #47 the moment the page was filtered to just HS -- there was no real
+     * category-wise ranking, only a category-blind list with a category label on it.
+     */
+    public function test_leaderboard_ranks_students_within_their_own_category_not_globally(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeFixture();
+        $school = Tenant::where('parent_id', $sahodaya->id)->firstOrFail();
+
+        // HS: two students, 30 then 20 points. LP: one student with only 5 points, but
+        // since LP has just one entrant they must still be LP's #1 -- not buried behind
+        // HS's two higher-scoring students in a single global ranking.
+        $hsTop = Student::create(['tenant_id' => $school->id, 'school_class_id' => SchoolClass::create(['tenant_id' => $school->id, 'name' => 'C9', 'class_number' => 9])->id, 'name' => 'HS Top', 'status' => 'active', 'verification_status' => 'verified', 'eligible_kalolsav' => true]);
+        $hsSecond = Student::create(['tenant_id' => $school->id, 'school_class_id' => $hsTop->school_class_id, 'name' => 'HS Second', 'status' => 'active', 'verification_status' => 'verified', 'eligible_kalolsav' => true]);
+        $lpOnly = Student::create(['tenant_id' => $school->id, 'school_class_id' => $hsTop->school_class_id, 'name' => 'LP Only', 'status' => 'active', 'verification_status' => 'verified', 'eligible_kalolsav' => true]);
+
+        FestIndividualChampionshipPoint::create(['event_id' => $event->id, 'student_id' => $hsTop->id, 'category' => 'hs', 'gender' => 'open', 'points' => 30, 'group_points' => 0]);
+        FestIndividualChampionshipPoint::create(['event_id' => $event->id, 'student_id' => $hsSecond->id, 'category' => 'hs', 'gender' => 'open', 'points' => 20, 'group_points' => 0]);
+        FestIndividualChampionshipPoint::create(['event_id' => $event->id, 'student_id' => $lpOnly->id, 'category' => 'lp', 'gender' => 'open', 'points' => 5, 'group_points' => 0]);
+
+        $this->actingAs($admin)
+            ->get(route('sahodaya.events.championship.index', ['tenantId' => $sahodaya->id, 'event' => $event->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Sahodaya/Events/Championship', false)
+                // Sorted by category key ("hs" before "lp"), then rank within it.
+                ->where('leaderboard.0.student.id', $hsTop->id)
+                ->where('leaderboard.0.rank', 1)
+                ->where('leaderboard.0.overall_rank', 1)
+                ->where('leaderboard.1.student.id', $hsSecond->id)
+                ->where('leaderboard.1.rank', 2)
+                ->where('leaderboard.1.overall_rank', 2)
+                ->where('leaderboard.2.student.id', $lpOnly->id)
+                ->where('leaderboard.2.rank', 1)
+                ->where('leaderboard.2.overall_rank', 3));
     }
 
     public function test_a_source_category_cannot_be_merged_into_two_different_targets(): void
