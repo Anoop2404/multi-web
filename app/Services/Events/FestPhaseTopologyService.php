@@ -83,8 +83,10 @@ class FestPhaseTopologyService
             'partition_key' => $key,
             'cluster_key' => $key,
             'cluster_label' => $phase->name.($region ? ' — '.$region->name : ''),
-            'registration_open' => $phase->registration_open,
-            'registration_close' => $phase->registration_close,
+            // A region's own registration window wins when set (mirrors event_start/
+            // event_end below); otherwise fall back to the phase's own window.
+            'registration_open' => ($region ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->registration_open : null) ?? $phase->registration_open,
+            'registration_close' => ($region ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->registration_close : null) ?? $phase->registration_close,
             'event_start' => ($region ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->conduct_start_at : null) ?? $phase->starts_at ?? $root->event_start,
             'event_end' => ($region ? $phase->allowedRegions->firstWhere('region_id', $region->id)?->conduct_end_at : null) ?? $phase->ends_at ?? $root->event_end,
             // A region's own venue (set per-region since a regional phase can run in

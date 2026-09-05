@@ -9,12 +9,14 @@ class FestPhaseRegion extends Model
 {
     protected $fillable = [
         'phase_id', 'region_id', 'venue', 'conduct_start_at', 'conduct_end_at',
-        'capacity', 'enabled',
+        'registration_open', 'registration_close', 'capacity', 'enabled',
     ];
 
     protected $casts = [
         'conduct_start_at' => 'datetime',
         'conduct_end_at' => 'datetime',
+        'registration_open' => 'datetime',
+        'registration_close' => 'datetime',
         'capacity' => 'integer',
         'enabled' => 'boolean',
     ];

@@ -52,10 +52,15 @@ class FestPhasedWorkflowController extends SahodayaAdminController
             ],
             'venues' => 'nullable|array',
             'venues.*' => 'nullable|string|max:255',
+            'dates' => 'nullable|array',
+            'dates.*.conduct_start' => 'nullable|date',
+            'dates.*.conduct_end' => 'nullable|date|after_or_equal:dates.*.conduct_start',
+            'dates.*.registration_open' => 'nullable|date',
+            'dates.*.registration_close' => 'nullable|date|after_or_equal:dates.*.registration_open',
         ]);
 
         $phase->update(['is_regional' => true]);
-        $workflow->syncAllowedRegions($phase, $data['region_ids'], $data['venues'] ?? []);
+        $workflow->syncAllowedRegions($phase, $data['region_ids'], $data['venues'] ?? [], $data['dates'] ?? []);
         $topology->sync($event->fresh());
 
         return back()->with('success', "Regions updated for {$phase->name}.");

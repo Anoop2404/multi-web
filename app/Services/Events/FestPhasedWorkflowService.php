@@ -34,8 +34,13 @@ class FestPhasedWorkflowService
      * @param  array<int, ?string>  $venues  Venue per region_id. A region_id absent from this
      *   array leaves its existing venue untouched (callers that don't manage venue, e.g. the
      *   config-driven FestPhasedStructureConfigurator, don't need to pass this at all).
+     * @param  array<int, array{conduct_start?: ?string, conduct_end?: ?string, registration_open?: ?string, registration_close?: ?string}>  $dates
+     *   Per-region conduct and registration window — a regional phase can run on different
+     *   actual dates per region (e.g. Tirur Region vs Manjeri Region), overriding the
+     *   phase/event's own dates. A region_id absent from this array leaves its existing
+     *   dates untouched.
      */
-    public function syncAllowedRegions(FestEventPhase $phase, array $regionIds, array $venues = []): void
+    public function syncAllowedRegions(FestEventPhase $phase, array $regionIds, array $venues = [], array $dates = []): void
     {
         $regionIds = collect($regionIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
 
@@ -71,6 +76,12 @@ class FestPhasedWorkflowService
             $attrs = ['enabled' => true];
             if (array_key_exists($regionId, $venues)) {
                 $attrs['venue'] = $venues[$regionId] ?: null;
+            }
+            if (array_key_exists($regionId, $dates)) {
+                $attrs['conduct_start_at'] = $dates[$regionId]['conduct_start'] ?? null;
+                $attrs['conduct_end_at'] = $dates[$regionId]['conduct_end'] ?? null;
+                $attrs['registration_open'] = $dates[$regionId]['registration_open'] ?? null;
+                $attrs['registration_close'] = $dates[$regionId]['registration_close'] ?? null;
             }
             FestPhaseRegion::updateOrCreate(
                 ['phase_id' => $phase->id, 'region_id' => $regionId],

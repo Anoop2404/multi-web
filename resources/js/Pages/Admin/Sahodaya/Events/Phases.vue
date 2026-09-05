@@ -332,6 +332,28 @@
                                 </div>
                             </div>
 
+                            <div v-if="regionEditIds.length" class="space-y-1.5">
+                                <p class="text-xs font-semibold text-slate-600">Fest dates per region</p>
+                                <p class="text-[11px] text-slate-400">Leave blank to use the phase's own event dates for that region.</p>
+                                <div v-for="region in regions.filter((r) => regionEditIds.includes(r.id))" :key="`fest-dates-${region.id}`" class="flex items-center gap-2">
+                                    <span class="text-xs text-slate-500 w-32 shrink-0 truncate">{{ region.name }}</span>
+                                    <input v-model="regionEditFestStart[region.id]" type="date" class="field !py-1 !text-xs flex-1">
+                                    <span class="text-xs text-slate-400">&rarr;</span>
+                                    <input v-model="regionEditFestEnd[region.id]" type="date" class="field !py-1 !text-xs flex-1">
+                                </div>
+                            </div>
+
+                            <div v-if="regionEditIds.length" class="space-y-1.5">
+                                <p class="text-xs font-semibold text-slate-600">Registration dates per region</p>
+                                <p class="text-[11px] text-slate-400">Leave blank to use the phase's own registration window for that region.</p>
+                                <div v-for="region in regions.filter((r) => regionEditIds.includes(r.id))" :key="`reg-dates-${region.id}`" class="flex items-center gap-2">
+                                    <span class="text-xs text-slate-500 w-32 shrink-0 truncate">{{ region.name }}</span>
+                                    <input v-model="regionEditRegStart[region.id]" type="date" class="field !py-1 !text-xs flex-1">
+                                    <span class="text-xs text-slate-400">&rarr;</span>
+                                    <input v-model="regionEditRegEnd[region.id]" type="date" class="field !py-1 !text-xs flex-1">
+                                </div>
+                            </div>
+
                             <div v-if="showAddRegionId === phase.id" class="flex items-center gap-2">
                                 <input v-model="addRegionForm.name" type="text" class="field !py-1 !text-xs flex-1" placeholder="New region name" @keyup.enter="createRegion(phase)">
                                 <button type="button" class="btn-primary text-xs shrink-0" :disabled="addRegionForm.processing || !addRegionForm.name" @click="createRegion(phase)">Add</button>
@@ -484,7 +506,11 @@ const editBatchForm = reactive({ name: '', code: '', school_base_fee: 0, student
 const regionEditId = ref(null);
 const regionEditIds = ref([]);
 const regionEditVenues = ref({});
-const regionEditForm = useForm({ region_ids: [], venues: {} });
+const regionEditFestStart = ref({});
+const regionEditFestEnd = ref({});
+const regionEditRegStart = ref({});
+const regionEditRegEnd = ref({});
+const regionEditForm = useForm({ region_ids: [], venues: {}, dates: {} });
 
 // Inline "create a region scoped to this event only" -- posts to
 // FestEventPhaseController::storeRegion(), which sets fest_event_id so the new region
@@ -611,12 +637,24 @@ function startRegionEdit(phase) {
     const enabled = (phase.allowed_regions || []).filter((r) => r.enabled);
     regionEditIds.value = enabled.map((r) => r.region_id);
     regionEditVenues.value = Object.fromEntries(enabled.map((r) => [r.region_id, r.venue || '']));
+    regionEditFestStart.value = Object.fromEntries(enabled.map((r) => [r.region_id, toDatetimeLocal(r.conduct_start_at)]));
+    regionEditFestEnd.value = Object.fromEntries(enabled.map((r) => [r.region_id, toDatetimeLocal(r.conduct_end_at)]));
+    regionEditRegStart.value = Object.fromEntries(enabled.map((r) => [r.region_id, toDatetimeLocal(r.registration_open)]));
+    regionEditRegEnd.value = Object.fromEntries(enabled.map((r) => [r.region_id, toDatetimeLocal(r.registration_close)]));
 }
 
 function saveRegionEdit(phase) {
     regionEditForm.region_ids = regionEditIds.value;
     regionEditForm.venues = Object.fromEntries(
         regionEditIds.value.map((id) => [id, regionEditVenues.value[id] || ''])
+    );
+    regionEditForm.dates = Object.fromEntries(
+        regionEditIds.value.map((id) => [id, {
+            conduct_start: regionEditFestStart.value[id] || null,
+            conduct_end: regionEditFestEnd.value[id] || null,
+            registration_open: regionEditRegStart.value[id] || null,
+            registration_close: regionEditRegEnd.value[id] || null,
+        }])
     );
     regionEditForm.post(`${base}/phases/${phase.id}/regions`, {
         preserveScroll: true,
