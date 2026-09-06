@@ -1245,6 +1245,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/mark-sheet-uploads/{upload}', [FestMarkEntryController::class, 'downloadSheetUpload'])->name('mark-sheet-uploads.download');
             Route::delete('/{event}/mark-sheet-uploads/{upload}', [FestMarkEntryController::class, 'destroySheetUpload'])->name('mark-sheet-uploads.destroy');
             Route::post('/{event}/items/{item}/auto-rank', [FestMarkEntryController::class, 'autoRankItem'])->name('items.auto-rank');
+            Route::post('/{event}/marks/{participant}/order-no', [FestMarkEntryController::class, 'setOrderNo'])->name('marks.order-no.set');
             Route::get('/{event}/results', [FestResultsController::class, 'show'])->name('results.show');
             Route::get('/{event}/results/items/{item}/download', [FestResultsController::class, 'downloadItemResults'])->name('results.items.download');
             Route::post('/{event}/results/publish', [FestResultsController::class, 'publish'])->name('results.publish');

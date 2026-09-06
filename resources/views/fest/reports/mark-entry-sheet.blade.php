@@ -29,7 +29,7 @@
                 @include('partials.pdf-branding-header', [
                     'orgName' => $sahodaya->name ?? 'Sahodaya',
                     'logoSrc' => $logoSrc ?? null,
-                    'docTitle' => !empty($sheet['sheet_label']) ? $sheet['sheet_label'] : 'MARK ENTRY SHEET',
+                    'docTitle' => (!empty($sheet['sheet_label']) ? $sheet['sheet_label'] : 'MARK ENTRY SHEET').(($blankChest ?? false) ? ' — BLANK CHEST NO' : ''),
                 ])
                 <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">{{ $event->title }}</div>
 
@@ -58,7 +58,7 @@
                             <tr>
                                 <td class="center" style="color: #64748b; font-weight: bold;">{{ $idx + 1 }}</td>
                                 <td style="font-weight: bold; font-family: monospace; font-size: 12px; color: #0f172a;">
-                                    {{ $row['chest_no'] ? '#'.$row['chest_no'] : '—' }}
+                                    {{ ($blankChest ?? false) ? '' : ($row['chest_no'] ? '#'.$row['chest_no'] : '—') }}
                                 </td>
                                 @for($j = 1; $j <= $sheet['judge_count']; $j++)
                                     <td></td>
@@ -95,7 +95,7 @@
                             <tr>
                                 <td class="center" style="color: #64748b; font-weight: bold;">{{ $idx + 1 }}</td>
                                 <td style="font-weight: bold; font-family: monospace; font-size: 12px; color: #0f172a;">
-                                    {{ $row['chest_no'] ? '#'.$row['chest_no'] : '—' }}
+                                    {{ ($blankChest ?? false) ? '' : ($row['chest_no'] ? '#'.$row['chest_no'] : '—') }}
                                 </td>
                                 @if($sheet['criteria']->isNotEmpty())
                                     @foreach($sheet['criteria'] as $c)

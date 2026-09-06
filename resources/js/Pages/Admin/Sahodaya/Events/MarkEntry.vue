@@ -17,8 +17,14 @@
                     <a :href="markEntrySheetUrl" target="_blank" class="btn-secondary text-xs shrink-0 whitespace-nowrap !bg-indigo-50 !text-indigo-800 hover:!bg-indigo-100 font-bold border-indigo-200">
                         🖨️ Print Blank Judge Sheets (Paper)
                     </a>
+                    <a :href="markEntrySheetBlankChestUrl" target="_blank" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
+                        🖨️ Judge Sheets — No Chest No
+                    </a>
                     <a v-if="cumulativeSheetUrl" :href="cumulativeSheetUrl" target="_blank" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
                         📊 Digital Sum Sheet (Online Tabulation)
+                    </a>
+                    <a v-if="cumulativeSheetBlankChestUrl" :href="cumulativeSheetBlankChestUrl" target="_blank" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
+                        📊 Sum Sheet — No Chest No
                     </a>
                     <Link :href="importUrl" class="btn-primary text-xs shrink-0 whitespace-nowrap">
                         Import Marks
@@ -198,6 +204,7 @@
                                      reaching Save requires scrolling all the way back. -->
                                 <th class="p-3.5 w-10 text-center sticky left-0 z-20 bg-slate-50 border-r border-slate-200">#</th>
                                 <th class="p-3.5 w-32">Chest No.</th>
+                                <th class="p-3.5 w-32">Order</th>
                                 <th class="p-3.5 w-36">Reg No.</th>
                                 <th class="p-3.5 w-32">Attendance</th>
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
@@ -228,6 +235,25 @@
                                         #{{ participant.chest_no }}
                                     </span>
                                     <span v-else class="text-slate-400 font-normal">—</span>
+                                </td>
+
+                                <!-- Order No. — unique per item, manually assigned; once set
+                                     it becomes this row's position in the table below. -->
+                                <td class="p-3.5">
+                                    <div class="flex items-center gap-1">
+                                        <input v-model="orderDrafts[participant.id]" type="number" min="1" max="65535"
+                                               class="field text-xs font-mono w-16" placeholder="—"
+                                               :disabled="itemLocked"
+                                               @input="clearOrderFeedback(participant.id)"
+                                               @keydown.enter.prevent="saveOrderNo(participant)">
+                                        <button type="button" class="btn-secondary text-[11px] !py-1 !px-2 whitespace-nowrap"
+                                                :disabled="itemLocked || savingOrderId === participant.id || orderUnchanged(participant)"
+                                                @click="saveOrderNo(participant)">
+                                            {{ savingOrderId === participant.id ? '...' : 'Save' }}
+                                        </button>
+                                    </div>
+                                    <p v-if="orderSavedIds.has(participant.id)" class="text-[11px] font-semibold text-emerald-600 mt-0.5">Saved ✓</p>
+                                    <p v-else-if="orderErrors[participant.id]" class="text-[11px] font-semibold text-rose-600 mt-0.5">{{ orderErrors[participant.id] }}</p>
                                 </td>
 
                                 <!-- Reg No. -->
@@ -406,6 +432,18 @@ const markEntrySheetUrl = computed(() => {
     }
     return url;
 });
+
+// Separate downloads (not a toggle on the sheets above) for handing out sheets before
+// chest numbers are assigned, or to keep judges blind to them on paper — the Chest No
+// column prints as an empty box to write into by hand instead of "#123"/"—".
+const markEntrySheetBlankChestUrl = computed(() =>
+    `${markEntrySheetUrl.value}${markEntrySheetUrl.value.includes('?') ? '&' : '?'}blank_chest=1`
+);
+const cumulativeSheetBlankChestUrl = computed(() =>
+    props.cumulativeSheetUrl
+        ? `${props.cumulativeSheetUrl}${props.cumulativeSheetUrl.includes('?') ? '&' : '?'}blank_chest=1`
+        : null
+);
 
 const filterDescription = computed(() => (
     isSports.value
@@ -612,6 +650,15 @@ for (const reg of props.registrations ?? []) {
     }
 }
 
+// Order No draft per row — mirrors judgeForms' seeding, reading the group's shared
+// value for team items the same way chest_no already does elsewhere on this page.
+const orderDrafts = reactive({});
+for (const reg of props.registrations ?? []) {
+    for (const p of reg.participants ?? []) {
+        orderDrafts[p.id] = (p.group?.order_no ?? p.order_no) ?? '';
+    }
+}
+
 // Tab/Shift+Tab should hop between judge score cells only — the native tab order would
 // otherwise pass through Attendance/Rank/Grade/Save on every row, which is unusable when
 // entering marks for 30+ participants judge-by-judge. Query all enabled judge inputs in
@@ -755,6 +802,59 @@ function markSaveOutcome(participantId) {
     failedIds.value = nextFailed;
 }
 const bulkSaving = ref(false);
+
+// Order No: unlike Rank (which allows ties and lives on the FestMark), this is a strict,
+// unique-per-item sequence stored on the participant/group and validated server-side —
+// see FestMarkEntryController::setOrderNo(). Saving it changes useFestMarkEntryDisplay's
+// sort, so the row visibly moves once applied.
+const savingOrderId = ref(null);
+const orderSavedIds = ref(new Set());
+const orderErrors = reactive({});
+
+function clearOrderFeedback(id) {
+    if (orderSavedIds.value.has(id)) {
+        const next = new Set(orderSavedIds.value);
+        next.delete(id);
+        orderSavedIds.value = next;
+    }
+    delete orderErrors[id];
+}
+
+function orderUnchanged(participant) {
+    const raw = orderDrafts[participant.id];
+    const draftVal = raw === '' || raw === null || raw === undefined ? null : Number(raw);
+
+    return draftVal === (participant.order_no ?? null);
+}
+
+function saveOrderNo(participant) {
+    const raw = orderDrafts[participant.id];
+    const orderNo = raw === '' || raw === null || raw === undefined ? null : Number(raw);
+    if (orderNo !== null && (!Number.isInteger(orderNo) || orderNo <= 0)) return;
+    if (orderUnchanged(participant)) return;
+
+    savingOrderId.value = participant.id;
+    router.post(`${marksBaseUrl.value}/${participant.id}/order-no`, { order_no: orderNo }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            const err = usePage().props.flash?.error;
+            if (err) {
+                if (orderSavedIds.value.has(participant.id)) {
+                    const next = new Set(orderSavedIds.value);
+                    next.delete(participant.id);
+                    orderSavedIds.value = next;
+                }
+                orderErrors[participant.id] = err;
+            } else {
+                delete orderErrors[participant.id];
+                const next = new Set(orderSavedIds.value);
+                next.add(participant.id);
+                orderSavedIds.value = next;
+            }
+        },
+        onFinish: () => { savingOrderId.value = null; },
+    });
+}
 
 function payloadFor(participant, item) {
     const form = markForms[participant.id];

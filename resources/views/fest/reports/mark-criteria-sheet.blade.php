@@ -80,7 +80,7 @@
             @forelse($rows as $row)
                 <tr>
                     <td class="center">{{ $loop->iteration }}</td>
-                    <td style="font-weight: bold; font-family: monospace;">{{ $row['chest_no'] ? '#'.$row['chest_no'] : '—' }}</td>
+                    <td style="font-weight: bold; font-family: monospace;">{{ ($blankChest ?? false) ? '' : ($row['chest_no'] ? '#'.$row['chest_no'] : '—') }}</td>
                     @if($judgeCount > 1)
                         @foreach($row['scores'] as $s)
                             <td class="num">{{ $s === null ? '' : rtrim(rtrim(number_format($s, 2), '0'), '.') }}</td>

@@ -6,6 +6,7 @@ use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
 use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestGroup;
 use App\Models\FestMark;
 use App\Models\FestMarkCriterion;
 use App\Models\FestMarkSheetUpload;
@@ -27,6 +28,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class FestMarkEntryController extends SahodayaAdminController
@@ -818,6 +820,10 @@ class FestMarkEntryController extends SahodayaAdminController
         $itemId = $request->integer('item_id');
         abort_unless($itemId, 422, 'Select an item.');
 
+        // Same "hand out before chest numbers exist / keep judges blind on paper" option
+        // as markEntrySheet() — a separate download, sort order untouched.
+        $blankChest = $request->boolean('blank_chest');
+
         $item = FestEventItem::findOrFail($itemId);
         abort_if($item->event_id !== $event->id, 404);
 
@@ -892,17 +898,21 @@ class FestMarkEntryController extends SahodayaAdminController
         }
         $nameParts[] = $item->title;
         $nameParts[] = $sheetTitle;
+        if ($blankChest) {
+            $nameParts[] = 'blank chest';
+        }
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-criteria-sheet', [
             'event'         => $event,
             'item'          => $item,
             'judgeCount'    => $judgeCount,
-            'sheetTitle'    => $sheetTitle,
+            'sheetTitle'    => $sheetTitle.($blankChest ? ' — Blank Chest No' : ''),
             'categoryLabel' => $categoryLabel,
             'rows'          => $rows,
             'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
             'logoSrc'       => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'blankChest'    => $blankChest,
         ])->setPaper('a4', 'portrait')->download($fileName);
     }
 
@@ -917,6 +927,13 @@ class FestMarkEntryController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $itemId = $request->integer('item_id');
+
+        // A separate download, not a toggle on the normal sheet — organizers sometimes
+        // want to hand out the scoring sheet before chest numbers are even assigned (or
+        // deliberately keep judges blind to them on paper), so the Chest No column is
+        // left as a truly blank box to write into by hand instead of showing "#123"/"—".
+        // Rows/sort order are unaffected — only what the Blade view prints in that cell.
+        $blankChest = $request->boolean('blank_chest');
 
         $query = FestEventItem::where('event_id', $event->id)->where('is_enabled', true);
         if ($itemId) {
@@ -1011,10 +1028,11 @@ class FestMarkEntryController extends SahodayaAdminController
         }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-entry-sheet', [
-            'sahodaya' => $this->sahodaya,
-            'event'    => $event,
-            'sheets'   => $sheets,
-            'logoSrc'  => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'sahodaya'   => $this->sahodaya,
+            'event'      => $event,
+            'sheets'     => $sheets,
+            'logoSrc'    => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'blankChest' => $blankChest,
         ])->setPaper('a4', 'portrait');
 
         $nameParts = [$event->title];
@@ -1027,6 +1045,9 @@ class FestMarkEntryController extends SahodayaAdminController
             $nameParts[] = $singleItem->title;
         }
         $nameParts[] = 'mark entry sheet';
+        if ($blankChest) {
+            $nameParts[] = 'blank chest';
+        }
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
         return $pdf->download($fileName);
@@ -1052,6 +1073,69 @@ class FestMarkEntryController extends SahodayaAdminController
         $result = $ranker->rankItem($event, $item);
 
         return back()->with('success', "Auto-ranked {$result['ranked']} athlete(s) for {$result['item_title']}.");
+    }
+
+    /**
+     * The Mark Entry page's own display-order number — distinct from Rank (which allows
+     * ties and lives on the FestMark) and from chest_no (which can be shared across a
+     * sports head's items). This is a strict per-item sequence: unique within the single
+     * item being marked, one shared number per squad for team/group items (mirroring how
+     * chest_no already works for those), and used to sort the Mark Entry roster once set.
+     */
+    public function setOrderNo(Request $request, string $tenantId, FestEvent $event, FestParticipant $participant, FestNumberingService $numbering, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($participant->registration->event_id !== $event->id, 403);
+
+        $data = $request->validate([
+            'order_no' => 'nullable|integer|min:1|max:65535',
+        ]);
+        $orderNo = $data['order_no'] ?? null;
+
+        $participant->loadMissing('registration.item', 'group');
+        $item = $participant->registration?->item;
+        abort_unless($item, 404);
+
+        if ($numbering->isGroupItem($item) && $participant->group_id && $participant->group) {
+            $group = $participant->group;
+
+            if ($orderNo !== null) {
+                $conflict = FestGroup::whereHas('registration', fn ($q) => $q->where('item_id', $item->id))
+                    ->where('event_id', $event->id)
+                    ->where('order_no', $orderNo)
+                    ->where('id', '!=', $group->id)
+                    ->exists();
+
+                if ($conflict) {
+                    throw new HttpException(422, "Order number {$orderNo} is already used by another team in this item.");
+                }
+            }
+
+            $group->update(['order_no' => $orderNo]);
+        } else {
+            if ($orderNo !== null) {
+                $conflict = FestParticipant::whereHas('registration', fn ($q) => $q
+                        ->where('event_id', $event->id)
+                        ->where('item_id', $item->id))
+                    ->where('order_no', $orderNo)
+                    ->where('id', '!=', $participant->id)
+                    ->exists();
+
+                if ($conflict) {
+                    throw new HttpException(422, "Order number {$orderNo} is already used by another participant in this item.");
+                }
+            }
+
+            $participant->update(['order_no' => $orderNo]);
+        }
+
+        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.order_no.set', 'Mark entry order number updated', [
+            'participant_id' => $participant->id,
+            'item_id'        => $item->id,
+            'order_no'       => $orderNo,
+        ]);
+
+        return back()->with('success', $orderNo !== null ? "Order number {$orderNo} saved." : 'Order number cleared.');
     }
 
     /**

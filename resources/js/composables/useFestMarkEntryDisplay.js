@@ -30,6 +30,7 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
             byKey.set(key, {
                 ...p,
                 chest_no: p.group?.chest_no ?? p.chest_no,
+                order_no: p.group?.order_no ?? p.order_no,
                 _is_team: Boolean(p.group_id),
                 _member_count: 1,
                 _team_name: p.group?.team_name || 'Team',
@@ -69,6 +70,20 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
         const sectionList = [...byItem.values()];
         for (const sec of sectionList) {
             sec.rows.sort((a, b) => {
+                // Order No (set from this page, unique per item) takes priority over
+                // chest No whenever both rows have one — that's the whole point of
+                // assigning it. Falls through to the existing chest-no ordering when
+                // either side has no order yet, so an item with only some rows numbered
+                // still shows a sane order instead of shuffling unrelated rows around.
+                const orderA = a.participant?.order_no;
+                const orderB = b.participant?.order_no;
+                const hasOrderA = orderA !== null && orderA !== undefined;
+                const hasOrderB = orderB !== null && orderB !== undefined;
+
+                if (hasOrderA && hasOrderB && orderA !== orderB) return orderA - orderB;
+                if (hasOrderA && !hasOrderB) return -1;
+                if (!hasOrderA && hasOrderB) return 1;
+
                 const chestAStr = String(a.participant?.group?.chest_no ?? a.participant?.chest_no ?? '');
                 const chestBStr = String(b.participant?.group?.chest_no ?? b.participant?.chest_no ?? '');
                 const numA = parseInt(chestAStr.replace(/\D/g, ''), 10);
