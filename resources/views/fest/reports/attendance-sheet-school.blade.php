@@ -5,7 +5,7 @@
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }} — {{ strtoupper($school->name) }}</h2>
-<table><thead><tr><th style="width: 35px; text-align: center;">Sl No</th><th class="photo"></th><th>Student</th>@if($showDob ?? false)<th style="width: 75px; text-align: center;">DOB</th>@elseif($showClass ?? false)<th style="width: 55px; text-align: center;">Class</th>@endif<th>Items (Chest No)</th><th style="width: 70px; text-align: center;">Present</th></tr></thead>
+<table><thead><tr><th style="width: 35px; text-align: center;">Sl No</th><th class="photo"></th><th>Student</th>@if($showDob ?? false)<th style="width: 75px; text-align: center;">DOB</th>@elseif($showClass ?? false)<th style="width: 55px; text-align: center;">Class</th>@endif<th>Items</th><th style="width: 70px; text-align: center;">Present</th></tr></thead>
 <tbody>
 @foreach($studentRows as $row)
 <tr>
@@ -17,7 +17,7 @@
 @elseif($showClass ?? false)
 <td style="text-align: center;">{{ $row['class'] ?? '—' }}</td>
 @endif
-<td>@foreach($row['events'] as $e){{ $e['event_name'] }} ({{ $e['chest_number'] }})@if(!$loop->last), @endif @endforeach</td>
+<td>@foreach($row['events'] as $e){{ $e['event_name'] }}@if(!$loop->last), @endif @endforeach</td>
 <td style="text-align: center;"></td>
 </tr>
 @endforeach

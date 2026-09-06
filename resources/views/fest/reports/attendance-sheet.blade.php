@@ -15,7 +15,7 @@
            has no equivalent native mechanism, so it still gets a branding row baked
            into each item table's <thead>/<tfoot> — the one repeat-per-page trick that
            reliably works there (dompdf reprints thead/tfoot on every page a table
-           spans, which is also why the SL/Chest No/... column header repeats).
+           spans, which is also why the SL/Name/... column header repeats).
            The on-screen preview has no concept of pages at all, so it keeps a simple
            normal-flow header/footer shown once at the top/bottom. */
         @page {
@@ -105,11 +105,6 @@
         }
         .text-center {
             text-align: center;
-        }
-        .chest-no {
-            font-weight: bold;
-            color: #0f172a;
-            font-size: 11.5px;
         }
         .school-name {
             text-transform: uppercase;
@@ -333,7 +328,7 @@
         $cleanTitle = str_replace('_', ' ', $itemName);
         $showDob = collect($rows)->contains(fn ($row) => !empty($row['_uses_age']));
         $showClass = !$showDob && collect($rows)->contains(fn ($row) => !empty($row['_uses_class']));
-        $colspan = 6 + ($showDob || $showClass ? 1 : 0);
+        $colspan = 5 + ($showDob || $showClass ? 1 : 0);
 
         // Team-based items (chess, quiz, group items, sports team events, etc.) group
         // several members under one chest/registration; count teams for those instead
@@ -398,7 +393,6 @@
                 <tr>
                     <th style="width: 28px;" class="text-center">Sl</th>
                     <th class="photo-cell"></th>
-                    <th style="width: 55px;" class="text-center">Chest No</th>
                     <th>Participant / Team Name</th>
                     @if($showDob)
                         <th style="width: 75px;" class="text-center">DOB</th>
@@ -444,7 +438,6 @@
                                 <span class="initials">{{ strtoupper(substr($row['name'] ?? '?', 0, 1)) }}</span>
                             @endif
                         </td>
-                        <td class="text-center chest-no">{{ $row['reference'] ?? '—' }}</td>
                         <td>
                             <strong style="font-size: 9px;">{{ $row['name'] ?? '' }}</strong>
                             @if(!empty($row['team_name']))

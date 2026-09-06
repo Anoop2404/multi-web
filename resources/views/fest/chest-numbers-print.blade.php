@@ -30,7 +30,6 @@
             <tr>
                 <th style="width: 70px;">Chest No</th>
                 <th style="width: 70px;">Fest ID</th>
-                <th style="width: 70px;">Item Reg</th>
                 <th>Name</th>
                 @if(empty($item))<th>Item</th>@endif
                 <th>Category</th>
@@ -42,7 +41,6 @@
             <tr>
                 <td class="chest-no">{{ $row['chest_no'] }}</td>
                 <td>{{ $row['fest_id'] ?? '—' }}</td>
-                <td>{{ $row['item_reg'] ?? '—' }}</td>
                 <td>{{ $row['name'] }}</td>
                 @if(empty($item))<td>{{ $row['item'] }}</td>@endif
                 <td>{{ $row['category'] ?? '—' }}</td>
@@ -50,7 +48,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="{{ empty($item) ? 7 : 6 }}" style="text-align: center; padding: 16px; color: #64748b;">No chest numbers assigned yet.</td>
+                <td colspan="{{ empty($item) ? 6 : 5 }}" style="text-align: center; padding: 16px; color: #64748b;">No chest numbers assigned yet.</td>
             </tr>
             @endforelse
         </tbody>

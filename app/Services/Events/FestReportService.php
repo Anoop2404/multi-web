@@ -769,7 +769,6 @@ class FestReportService
                 $p->student?->reg_no,
                 $p->student?->schoolClass?->name,
                 $p->chest_no,
-                $p->item_registration_number,
                 $p->level_registration_number,
             ])
             ->values()
@@ -777,7 +776,7 @@ class FestReportService
 
         return ExcelExport::download($this->slug().'-item-participants', [
             'Item Head', 'Item', 'Class Group', 'School', 'Participant', 'Reg No',
-            'Class', 'Chest No', 'Item Reg No', 'Fest ID',
+            'Class', 'Chest No', 'Fest ID',
         ], $rows);
     }
 

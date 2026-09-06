@@ -109,13 +109,12 @@ class FestSchoolReportExportService
             $r['reg_no'] ?? '—',
             $r['class'] ?? '—',
             $r['fest_id'] ?? '—',
-            $r['item_reg'] ?? '—',
             ucfirst((string) ($r['status'] ?? '—')),
         ]);
 
         return ExcelExport::download(
             str($event->title)->slug()->limit(30).'-'.str($title)->slug()->limit(24).'-participants',
-            ['Participant', 'Reg no', 'Class', 'Fest ID', 'Item reg', 'Status'],
+            ['Participant', 'Reg no', 'Class', 'Fest ID', 'Status'],
             $data,
         );
     }
@@ -137,12 +136,11 @@ class FestSchoolReportExportService
             $r['reg_status'] ?? '',
             $r['role'] ?? '',
             $r['fest_id'] ?? '',
-            $r['item_reg'] ?? '',
         ]);
 
         return ExcelExport::download(
             str($event->title)->slug()->limit(40).'-numbering-register',
-            ['Head', 'Item', 'Participant', 'Reg no', 'Reg status', 'Role', 'Fest ID', 'Item reg'],
+            ['Head', 'Item', 'Participant', 'Reg no', 'Reg status', 'Role', 'Fest ID'],
             $data,
         );
     }
