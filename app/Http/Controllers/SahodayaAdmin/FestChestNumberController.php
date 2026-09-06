@@ -254,10 +254,11 @@ class FestChestNumberController extends SahodayaAdminController
             $out = fopen('php://output', 'w');
             CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
             CsvSafety::fputcsv($out, []);
-            CsvSafety::fputcsv($out, ['Chest No', 'Fest ID', 'Participant', 'Item', 'Category', 'School']);
+            CsvSafety::fputcsv($out, ['Chest No', 'Order No', 'Fest ID', 'Participant', 'Item', 'Category', 'School']);
             foreach ($rows as $row) {
                 CsvSafety::fputcsv($out, [
                     $row['chest_no'],
+                    $row['order_no'] ?? '',
                     $row['fest_id'],
                     $row['name'],
                     $row['item'],
@@ -418,6 +419,7 @@ class FestChestNumberController extends SahodayaAdminController
             ->whereNotNull('chest_no')
             ->map(fn (FestParticipant $p) => [
                 'chest_no' => $p->chest_no,
+                'order_no' => $p->order_no,
                 'fest_id'  => $p->level_registration_number,
                 'item_reg' => $p->item_registration_number,
                 'name'     => $p->student?->name ?? $p->teacher?->name,
@@ -435,6 +437,7 @@ class FestChestNumberController extends SahodayaAdminController
 
                 return [
                     'chest_no' => $group->chest_no,
+                    'order_no' => $group->order_no,
                     'fest_id'  => null,
                     'item_reg' => $first->item_registration_number,
                     'name'     => ($group->team_name ?: 'Team').' ('.$members->count().' members)',
