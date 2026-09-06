@@ -1124,6 +1124,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-assignment-completeness',
             ['Head', 'Item', 'Approved', 'Pending', 'Performers', 'Chest OK', 'Chest missing', 'Item reg OK', 'Item reg missing', 'Item scheduled', 'Participants scheduled', 'Marks entered', 'Marks pending', 'Judges'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -1145,6 +1146,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-numbering-register',
             ['Head', 'Item', 'School', 'Participant', 'Reg no', 'Reg status', 'Role', 'Fest ID', 'Chest'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -1162,6 +1164,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-pending-approvals',
             ['School', 'Head', 'Item', 'Participants', 'Names'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -1397,6 +1400,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-discipline-registration',
             ['Discipline', 'Items', 'Approved regs', 'Pending regs'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -1418,6 +1422,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-age-group-matrix',
             $headers,
             collect($rows),
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -1431,6 +1436,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-fee-pending',
             ['School', 'Due', 'Status', 'Receipt'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -1444,6 +1450,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-head-wise-participants',
             ['Head', 'School', 'Participant', 'School reg', 'Item', 'Fest ID', 'Chest'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -1621,6 +1628,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-area-wise-participants',
             ['Area', 'School', 'Participant', 'School reg', 'Item', 'Fest ID', 'Chest'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -1727,6 +1735,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-volunteer-roster',
             ['Name', 'Phone', 'Duty', 'Notes'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -1748,6 +1757,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-catering-by-school',
             ['School', 'Orders', 'Total heads', 'Confirmed orders', 'Pending orders', 'Breakfast heads', 'Lunch heads', 'Dinner heads', 'Snacks heads'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -2084,6 +2094,7 @@ class FestEventReportAnalyticsService
             str($this->event->title)->slug()->limit(40).'-absent-report',
             ['Item', 'Item Code', 'Category', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Chest No', 'Marked By', 'Marked At'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 

@@ -950,6 +950,8 @@ class FestReportController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Fest ID', 'Chest', 'Status', 'Grade', 'Rank', 'Score']);
             foreach ($rows as $row) {
                 CsvSafety::fputcsv($out, [

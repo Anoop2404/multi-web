@@ -5,7 +5,7 @@
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2>{{ $event->title }}</h2>
-<p style="text-align:center;color:#555">{{ $school->name }} — Participation limits</p>
+<p style="text-align:center;color:#555">{{ $school->name }} — Participation limits · Generated on {{ now()->format('d M Y, h:i A') }}</p>
 <table><thead><tr><th>Limit type</th><th>Used</th><th>Limit</th></tr></thead>
 <tbody>
 @foreach($used as $type => $count)

@@ -197,6 +197,8 @@ class StateFestProgramController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, ['Participant', 'Reg No', 'School', 'Item', 'Category', 'Grade', 'From Event', 'Next Level', 'Promoted At']);
             foreach ($rows as $w) {
                 CsvSafety::fputcsv($out, [
@@ -522,6 +524,7 @@ class StateFestProgramController extends Controller
             'level_fees'         => 'nullable|array',
             'level_fees.*.fee_model' => ['nullable', Rule::in(array_keys(config('fest_fees.fee_models', [])))],
             'level_fees.state.individual_amount' => 'nullable|numeric|min:0',
+            'level_fees.state.sahodaya_registration_fee' => 'nullable|numeric|min:0',
             'level_fees.*.class_group_scheme' => 'nullable|in:cbse,sahodaya',
             'level_fees.*.first_item' => 'nullable|numeric|min:0',
             'level_fees.*.additional_item' => 'nullable|numeric|min:0',

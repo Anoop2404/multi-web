@@ -6,18 +6,28 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExcelExport
 {
+    /** "Generated on 06 Sep 2026, 03:45 PM" — the standard wording used across every
+     *  fest report (Blade PDFs, CSVs, and this class), so a caller doesn't need to
+     *  repeat the format string themselves. */
+    public static function generatedOnNote(): string
+    {
+        return 'Generated on '.now()->format('d M Y, h:i A');
+    }
+
     /**
      * @param  list<string>  $headers
      * @param  iterable<int, list<string|int|float|null>>  $rows
+     * @param  string|null  $generatedNote  Optional note row (e.g. self::generatedOnNote())
+     *                                      written above the header row in every sheet.
      */
-    public static function download(string $filename, array $headers, iterable $rows): StreamedResponse
+    public static function download(string $filename, array $headers, iterable $rows, ?string $generatedNote = null): StreamedResponse
     {
         if (! str_ends_with(strtolower($filename), '.xls')) {
             $filename .= '.xls';
         }
 
         return response()->streamDownload(
-            fn () => print(self::spreadsheetXml($headers, $rows)),
+            fn () => print(self::spreadsheetXml($headers, $rows, $generatedNote)),
             $filename,
             [
                 'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
@@ -31,24 +41,25 @@ class ExcelExport
      * @param  list<string>  $headers
      * @param  iterable<int, list<string|int|float|null>>  $rows
      */
-    public static function spreadsheetXml(array $headers, iterable $rows): string
+    public static function spreadsheetXml(array $headers, iterable $rows, ?string $generatedNote = null): string
     {
-        return self::workbookXml(['Sheet1' => ['headers' => $headers, 'rows' => $rows]]);
+        return self::workbookXml(['Sheet1' => ['headers' => $headers, 'rows' => $rows]], $generatedNote);
     }
 
     /**
      * Multi-sheet workbook — one tab per entry in $sheets, in the order given.
      *
      * @param  array<string, array{headers: list<string>, rows: iterable<int, list<string|int|float|null>>}>  $sheets  sheet name => {headers, rows}
+     * @param  string|null  $generatedNote  Optional note row written above the header row in every sheet.
      */
-    public static function downloadMultiSheet(string $filename, array $sheets): StreamedResponse
+    public static function downloadMultiSheet(string $filename, array $sheets, ?string $generatedNote = null): StreamedResponse
     {
         if (! str_ends_with(strtolower($filename), '.xls')) {
             $filename .= '.xls';
         }
 
         return response()->streamDownload(
-            fn () => print(self::workbookXml($sheets)),
+            fn () => print(self::workbookXml($sheets, $generatedNote)),
             $filename,
             [
                 'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
@@ -61,7 +72,7 @@ class ExcelExport
     /**
      * @param  array<string, array{headers: list<string>, rows: iterable<int, list<string|int|float|null>>}>  $sheets
      */
-    private static function workbookXml(array $sheets): string
+    private static function workbookXml(array $sheets, ?string $generatedNote = null): string
     {
         $escape = static fn ($value): string => htmlspecialchars((string) ($value ?? ''), ENT_XML1 | ENT_QUOTES, 'UTF-8');
 
@@ -78,6 +89,7 @@ class ExcelExport
         $xml .= '<Styles>';
         $xml .= '<Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/><Alignment ss:Vertical="Center"/></Style>';
         $xml .= '<Style ss:ID="body"><Alignment ss:Vertical="Center"/></Style>';
+        $xml .= '<Style ss:ID="note"><Font ss:Italic="1" ss:Color="#64748B"/></Style>';
         $xml .= '</Styles>'."\n";
 
         // Excel sheet names: no fresh worksheet at all is invalid, so an empty $sheets
@@ -97,6 +109,11 @@ class ExcelExport
             $xml .= '<Worksheet ss:Name="'.$escape($safeName).'">';
             $xml .= '<Table>'."\n";
             $xml .= self::columnWidthsXml($sheet['headers'], $rows);
+
+            if ($generatedNote !== null && $generatedNote !== '') {
+                $mergeAcross = max(0, count($sheet['headers']) - 1);
+                $xml .= '<Row ss:StyleID="note"><Cell ss:MergeAcross="'.$mergeAcross.'"><Data ss:Type="String">'.$escape($generatedNote).'</Data></Cell></Row>'."\n";
+            }
 
             $xml .= '<Row ss:StyleID="header">';
             foreach ($sheet['headers'] as $header) {

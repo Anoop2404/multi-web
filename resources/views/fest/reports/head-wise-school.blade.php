@@ -13,7 +13,7 @@ th{background:#f1f5f9;font-size:10px;text-transform:uppercase}
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2>{{ $event->title }}</h2>
-<p class="meta">{{ strtoupper($school->name) }} — Head-wise participants</p>
+<p class="meta">{{ strtoupper($school->name) }} — Head-wise participants · Generated on {{ now()->format('d M Y, h:i A') }}</p>
 
 <p class="section">Summary by head</p>
 <table>

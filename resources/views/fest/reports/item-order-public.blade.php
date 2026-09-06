@@ -5,6 +5,7 @@
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }}</h2>
+<p style="text-align:center;font-size:10px;color:#64748b;margin-top:2px">Generated on {{ now()->format('d M Y, h:i A') }}</p>
 <h3 style="text-align:center">{{ $item->title }} — Performance Order</h3>
 <p style="text-align:center;color:#666;font-size:11px">Public copy — chest / level registration numbers only</p>
 <table><thead><tr><th>Order</th><th>Time</th><th>Ref</th><th>Stage</th></tr></thead>

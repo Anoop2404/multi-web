@@ -57,6 +57,9 @@
                     </td>
                     <td style="padding: 2px 0; text-align: right;"><strong>TOTAL PARTICIPANTS:</strong> {{ count($rows) }}</td>
                 </tr>
+                <tr>
+                    <td colspan="2" style="padding: 2px 0; text-align: right;"><strong>GENERATED:</strong> {{ now()->format('d M Y, h:i A') }}</td>
+                </tr>
             </table>
         </div>
     </div>

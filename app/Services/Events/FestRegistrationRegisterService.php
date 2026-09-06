@@ -327,6 +327,8 @@ class FestRegistrationRegisterService
             if ($includeChestNo) {
                 $header[] = 'Chest no';
             }
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, array_merge($header, ['Item fee', 'School total due', 'Fee status']));
             foreach ($data['rows'] as $row) {
                 $line = [

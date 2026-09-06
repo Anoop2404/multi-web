@@ -7,7 +7,7 @@
 <h2>{{ $event->title }}</h2>
 <p style="text-align:center;color:#555">{{ $school->name }} — Mark entry status</p>
 <p style="text-align:center;font-size:11px">
-    Items: {{ $summary['items'] ?? 0 }} · Participants: {{ $summary['participants'] ?? 0 }} · Marked: {{ $summary['marked'] ?? 0 }}
+    Items: {{ $summary['items'] ?? 0 }} · Participants: {{ $summary['participants'] ?? 0 }} · Marked: {{ $summary['marked'] ?? 0 }} · Generated on {{ now()->format('d M Y, h:i A') }}
 </p>
 <table><thead><tr><th>Item</th><th>Participants</th><th>Marked</th><th>Pending</th><th>Status</th></tr></thead>
 <tbody>

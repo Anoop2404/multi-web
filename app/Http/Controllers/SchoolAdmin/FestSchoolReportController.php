@@ -271,6 +271,8 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, [
                 'Reg No', 'Name',
                 'On-stage used', 'On-stage limit',
@@ -584,6 +586,8 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($event, $rows) {
             $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, ['Reg / Adm No', 'Name', 'Gender', 'Item Count', 'Registered Items', 'Total Score']);
             foreach ($rows as $row) {
                 $itemTitles = collect($row['items'])->pluck('item_title')->filter()->implode('; ');
@@ -609,6 +613,8 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($event, $itemsByTeacher, $marksByTeacher) {
             $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, ['Reg No', 'Name', 'Designation', 'Items', 'Total Score', 'Results']);
             $teachers = \App\Models\Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no', 'designation']);
             foreach ($teachers as $teacher) {
@@ -630,6 +636,8 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Fest ID', 'Chest', 'Status', 'Grade', 'Rank', 'Score']);
             foreach ($rows as $row) {
                 CsvSafety::fputcsv($out, [
@@ -709,6 +717,8 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($event, $usage) {
             $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, ['Event', 'Limit type', 'Used', 'Limit']);
             foreach ($usage['used'] as $type => $count) {
                 CsvSafety::fputcsv($out, [
@@ -739,6 +749,8 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, ['Participant', 'Reg No', 'Item', 'From event', 'From level', 'Next event', 'Next level', 'Promoted at']);
             foreach ($rows as $q) {
                 CsvSafety::fputcsv($out, [
@@ -1908,6 +1920,7 @@ class FestSchoolReportController extends SchoolAdminController
             str($event->title)->slug('-').'-mark-entry-status',
             ['Item', 'Participants', 'Marked', 'Pending', 'Status'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 

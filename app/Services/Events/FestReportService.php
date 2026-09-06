@@ -171,7 +171,7 @@ class FestReportService
             ? [$r['school_name'], $r['phase_name'], $r['active_count'], $r['item_count'], $r['unique_student_count']]
             : [$r['school_name'], $r['active_count'], $r['item_count'], $r['unique_student_count']]);
 
-        return ExcelExport::download($this->slug().'-school-participation', $header, $rows);
+        return ExcelExport::download($this->slug().'-school-participation', $header, $rows, ExcelExport::generatedOnNote());
     }
 
     /**
@@ -223,7 +223,7 @@ class FestReportService
 
         return ExcelExport::download($this->slug().'-student-limits', [
             'Student', 'Reg No', 'School', 'On-stage', 'Off-stage', 'Individual', 'Group', 'Total', 'Exceeds limit?',
-        ], $rows);
+        ], $rows, ExcelExport::generatedOnNote());
     }
 
     public function schools(): Collection
@@ -744,7 +744,7 @@ class FestReportService
         return ExcelExport::download($this->slug().'-category-wise-students', [
             'Category', 'Class', 'Reg No', 'Admission No', 'Student', 'Gender', 'DOB',
             'School', 'Item', 'Item Head', 'Chest No', 'Fest ID',
-        ], $rows);
+        ], $rows, ExcelExport::generatedOnNote());
     }
 
     private function itemParticipantsXls(Request $request): StreamedResponse
@@ -777,7 +777,7 @@ class FestReportService
         return ExcelExport::download($this->slug().'-item-participants', [
             'Item Head', 'Item', 'Class Group', 'School', 'Participant', 'Reg No',
             'Class', 'Chest No', 'Fest ID',
-        ], $rows);
+        ], $rows, ExcelExport::generatedOnNote());
     }
 
     private function studentWisePdf(Request $request): \Symfony\Component\HttpFoundation\Response
@@ -824,7 +824,7 @@ class FestReportService
         return ExcelExport::download($this->slug().'-student-wise-report', [
             'School', 'School Code', 'Reg No', 'Student', 'Gender', 'Item', 'Category',
             'Rank', 'Mark', 'Grade',
-        ], $rows);
+        ], $rows, ExcelExport::generatedOnNote());
     }
 
     private function registrationListPdf(Request $request): \Symfony\Component\HttpFoundation\Response
@@ -895,7 +895,7 @@ class FestReportService
             return $row;
         });
 
-        return ExcelExport::download($this->slug().'-category-item-matrix', $headers, $rows);
+        return ExcelExport::download($this->slug().'-category-item-matrix', $headers, $rows, ExcelExport::generatedOnNote());
     }
 
     private function categoryItemMatrixPdf(FestEventReportAnalyticsService $analytics): \Symfony\Component\HttpFoundation\Response
@@ -1239,6 +1239,7 @@ class FestReportService
             $studentRows[$id]['events'][] = [
                 'event_name'   => $p->registration?->item?->title ?? '',
                 'chest_number' => $p->group?->chest_no ?? $p->chest_no ?? '—',
+                'order_no'     => $p->group?->order_no ?? $p->order_no,
             ];
         }
 
@@ -1362,7 +1363,7 @@ class FestReportService
 
         return ExcelExport::download($this->slug().'-mark-entry-status', [
             'Item', 'Class', 'Judges Assigned', 'Participants', 'Marked', 'Pending',
-        ], $rows);
+        ], $rows, ExcelExport::generatedOnNote());
     }
 
     private function resultsPendingCsv(): StreamedResponse
@@ -1374,7 +1375,7 @@ class FestReportService
 
         return ExcelExport::download($this->slug().'-results-pending', [
             'Item', 'Item Code', 'Category', 'Head', 'Performers', 'Marks Entered', 'Judges Assigned',
-        ], $rows);
+        ], $rows, ExcelExport::generatedOnNote());
     }
 
     private function clashesCsv(Request $request): StreamedResponse
@@ -1508,7 +1509,7 @@ class FestReportService
 
         return ExcelExport::download($this->slug().'-certificate-counts', [
             'School', 'A/A+ Results', 'B Results', 'Certificates Issued',
-        ], $rows);
+        ], $rows, ExcelExport::generatedOnNote());
     }
 
     private function cateringCsv(): StreamedResponse
@@ -1530,7 +1531,7 @@ class FestReportService
 
         return ExcelExport::download($this->slug().'-catering', [
             'School', 'Date', 'Meal', 'Heads', 'Status', 'Notes',
-        ], $rows);
+        ], $rows, ExcelExport::generatedOnNote());
     }
 
     private function studentsCsv(): StreamedResponse
@@ -1554,7 +1555,7 @@ class FestReportService
 
         return ExcelExport::download($this->slug().'-students', [
             'Reg No', 'Name', 'Gender', 'DOB', 'Class', 'School', 'Status',
-        ], $rows);
+        ], $rows, ExcelExport::generatedOnNote());
     }
 
     public function downloadAdmitCards(Request $request): \Symfony\Component\HttpFoundation\Response
@@ -1613,6 +1614,6 @@ class FestReportService
 
         return ExcelExport::download($this->slug().'-student-participation', [
             'Reg No', 'Name', 'School', 'Item', 'Class Group', 'Chest No', 'Level Reg No',
-        ], $rows);
+        ], $rows, ExcelExport::generatedOnNote());
     }
 }

@@ -116,6 +116,7 @@ class FestSchoolReportExportService
             str($event->title)->slug()->limit(30).'-'.str($title)->slug()->limit(24).'-participants',
             ['Participant', 'Reg no', 'Class', 'Fest ID', 'Status'],
             $data,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -142,6 +143,7 @@ class FestSchoolReportExportService
             str($event->title)->slug()->limit(40).'-numbering-register',
             ['Head', 'Item', 'Participant', 'Reg no', 'Reg status', 'Role', 'Fest ID'],
             $data,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -225,6 +227,7 @@ class FestSchoolReportExportService
             str($event->title)->slug()->limit(40).'-item-counts',
             ['Head', 'Item', 'Code', 'Age/Class', 'Approved', 'Pending', 'Total regs', 'Participants', 'Item IDs', 'Max/school', 'Fee/item', 'Line fee'],
             $data,
+            ExcelExport::generatedOnNote(),
         );
     }
 }

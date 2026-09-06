@@ -20,6 +20,7 @@ th{background:#f1f5f9;font-size:10px;text-transform:uppercase}
     Total due: <strong>₹{{ $summary['total_due'] ?? '—' }}</strong> &nbsp;|&nbsp;
     Fee status: <strong>{{ ucfirst($summary['fee_status'] ?? '—') }}</strong>
     @if(!empty($summary['receipt_no'])) &nbsp;|&nbsp; Receipt: <strong>{{ $summary['receipt_no'] }}</strong>@endif
+    &nbsp;|&nbsp; Generated on {{ now()->format('d M Y, h:i A') }}
 </div>
 @endif
 <table>

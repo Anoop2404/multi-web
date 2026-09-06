@@ -5,6 +5,7 @@
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }} — Team / Group Squads</h2>
+<p style="text-align:center;font-size:10px;color:#64748b;margin-top:2px">Generated on {{ now()->format('d M Y, h:i A') }}</p>
 @forelse($rows as $row)
 <h3>{{ $row['item_title'] }} — {{ strtoupper($row['school_name'] ?? 'School') }}</h3>
 <table><thead><tr><th>Sl No</th><th>Name</th><th>Reg no</th><th>Role</th></tr></thead>

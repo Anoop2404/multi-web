@@ -36,7 +36,7 @@
                 @include('partials.pdf-item-info-bar', ['item' => $sheet['item'], 'category' => $sheet['category_label'] ?? null])
 
                 <div style="font-size: 10px; color: #475569; text-align: right; margin-top: -6px;">
-                    <strong>Total Participants:</strong> {{ count($sheet['rows']) }}
+                    <strong>Total Participants:</strong> {{ count($sheet['rows']) }} · Generated on {{ now()->format('d M Y, h:i A') }}
                 </div>
             </div>
 

@@ -5,6 +5,7 @@
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }} — Cumulative Points</h2>
+<p style="text-align:center;font-size:10px;color:#64748b;margin-top:2px">Generated on {{ now()->format('d M Y, h:i A') }}</p>
 <table><thead><tr><th>Sl No</th><th>Rank</th><th>School</th><th>Total Points</th></tr></thead>
 <tbody>
 @foreach($schools as $s)

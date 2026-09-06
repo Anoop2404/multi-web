@@ -16,6 +16,7 @@ tbody td.overall-col{background:#c8d6ea;color:#1d3557}
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }} — Category & Item-wise Consolidated Report</h2>
+<p style="text-align:center;font-size:10px;color:#64748b;margin-top:2px">Generated on {{ now()->format('d M Y, h:i A') }}</p>
 
 <table>
     <thead>

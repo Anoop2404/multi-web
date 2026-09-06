@@ -8,6 +8,7 @@
 <p style="text-align:center;font-size:11px;color:#444">
 @if($schedule) {{ $schedule->scheduled_at?->format('d M Y H:i') }} · Stage: {{ $schedule->stage ?? '—' }} @else Schedule TBA @endif
 @if(($audience ?? 'staff') === 'public') · Public copy (chest/reg only) @endif
+· Generated on {{ now()->format('d M Y, h:i A') }}
 </p>
 <table><thead><tr><th>Sl No</th><th>Order</th><th>Ref</th>
 @if(($audience ?? 'staff') === 'staff')<th>School</th><th>Participant</th>@endif

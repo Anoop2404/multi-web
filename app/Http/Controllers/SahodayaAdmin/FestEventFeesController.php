@@ -484,6 +484,8 @@ class FestEventFeesController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows, $event) {
             $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, ['Event', 'School', 'Head / payment level', 'Status', 'School reg fee', 'Participation fee', 'Total due', 'Receipt #', 'Payment date', 'Transaction ref', 'Credit owed']);
             foreach ($rows as $fee) {
                 CsvSafety::fputcsv($out, [

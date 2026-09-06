@@ -51,6 +51,6 @@ th,td{border:1px solid #ccc;padding:4px 5px;font-size:10.5px} th{background:#f3f
 @endforeach
 </tbody></table>
 <p style="text-align:right;font-size:11px">
-    Total registrations: {{ $totals['registrations'] ?? 0 }} · Estimated fee: ₹{{ $totals['estimated_fee'] ?? 0 }}
+    Total registrations: {{ $totals['registrations'] ?? 0 }} · Estimated fee: ₹{{ $totals['estimated_fee'] ?? 0 }} · Generated on {{ now()->format('d M Y, h:i A') }}
 </p>
 </body></html>

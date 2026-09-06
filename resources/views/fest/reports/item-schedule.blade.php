@@ -8,6 +8,7 @@
 <p class="meta" style="text-align:center">
     {{ $summary['scheduled'] }} scheduled · {{ $summary['unscheduled'] }} not scheduled · {{ $summary['total'] }} items
     @if($date) · Date filter: {{ $date }} @endif
+    · Generated on {{ now()->format('d M Y, h:i A') }}
 </p>
 <table>
 <thead><tr><th>Item</th><th>Category</th><th>Date</th><th>Time</th><th>Venue</th><th>Stage</th></tr></thead>

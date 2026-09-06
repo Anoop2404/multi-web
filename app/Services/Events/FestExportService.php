@@ -51,6 +51,7 @@ class FestExportService
             $this->filename($event, 'registrations'),
             ['School', 'Item', 'Status', 'Chest No', 'Participant', 'Fee Amount', 'Fee Status'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -81,6 +82,7 @@ class FestExportService
             $this->filename($event, 'results'),
             ['Item', 'School', 'Participant', 'Chest No', 'Position', 'Grade', 'Score'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -164,6 +166,7 @@ class FestExportService
             $this->filename($event, $filenameSuffix),
             ['Sl No', 'Item', 'Participant', 'Doc', 'School', 'Chest No', 'Status', 'Marked At'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -225,6 +228,7 @@ class FestExportService
             $this->filename($event, 'fees'),
             $headers,
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -279,6 +283,7 @@ class FestExportService
             $this->filename($event, 'fee-breakdown'),
             ['School', 'Line type', 'Label', 'Qty', 'Unit', 'Amount', 'Status'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
@@ -304,6 +309,7 @@ class FestExportService
             $this->filename($event, 'student-event-registrations'),
             ['School', 'Reg no', 'Student', 'Event reg ID', 'Status', 'Registered at'],
             $rows,
+            ExcelExport::generatedOnNote(),
         );
     }
 
