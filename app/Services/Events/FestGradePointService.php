@@ -181,8 +181,26 @@ class FestGradePointService
             ? config("fest_confed_kalotsav_scoring.place_points.{$scale}.{$mark->position}")
             : null;
 
-        if ($gradePoints !== null && $placePoints !== null && ($gradePoints + $placePoints) === $total) {
-            return ['rank_points' => $placePoints, 'grade_points' => $gradePoints, 'total' => $total];
+        // Both components apply (1st-3rd place): only trust the split when they actually
+        // sum to the mark's real total -- a custom "any position" rule or a hand-edited
+        // value has no defined rank/grade split, so forcing one here would show numbers
+        // nobody configured.
+        if ($gradePoints !== null && $placePoints !== null) {
+            if (($gradePoints + $placePoints) === $total) {
+                return ['rank_points' => $placePoints, 'grade_points' => $gradePoints, 'total' => $total];
+            }
+
+            return ['rank_points' => null, 'grade_points' => null, 'total' => $total];
+        }
+
+        // place_points only covers 1st-3rd, so 4th place and below (or an unranked mark)
+        // has no rank component to award -- that's correct, not a bug. But it used to
+        // null out grade_points too just because placePoints came back null, hiding a
+        // perfectly valid grade even though the mark's whole total came from the grade
+        // alone. Only bail to "both null" when the grade-only total doesn't actually
+        // account for the mark's real points (a custom rule producing a different value).
+        if ($gradePoints !== null && $placePoints === null && $gradePoints === $total) {
+            return ['rank_points' => null, 'grade_points' => $gradePoints, 'total' => $total];
         }
 
         return ['rank_points' => null, 'grade_points' => null, 'total' => $total];
