@@ -4,8 +4,10 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestGroup;
 use App\Models\FestParticipant;
 use App\Models\FestSchedule;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class FestChestNumberService
@@ -113,6 +115,70 @@ class FestChestNumberService
         return $revealed;
     }
 
+    /**
+     * Organizer-entered chest number, replacing auto-generation for this participant
+     * (or their whole squad, for team/group items). Locked and scope-checked the same
+     * way as nextChestNumber() so a manual entry can't collide with a number another
+     * organizer is assigning at the same moment.
+     */
+    public function setChest(FestParticipant $participant, int $chestNo): void
+    {
+        $participant->loadMissing('registration.event', 'registration.item', 'group');
+        $event = $participant->registration?->event;
+        $item = $participant->registration?->item;
+        abort_unless($event && $item, 404);
+
+        $numbering = app(FestNumberingService::class);
+
+        DB::transaction(function () use ($participant, $event, $item, $chestNo, $numbering) {
+            FestEvent::where('id', $event->id)->lockForUpdate()->first();
+
+            if ($numbering->isGroupItem($item) && $participant->group_id && $participant->group) {
+                $group = $participant->group;
+
+                if ($group->chest_is_manual) {
+                    throw new HttpException(422, 'This team already has a manually-entered chest number. Clear it first before entering a new one.');
+                }
+
+                $conflict = FestGroup::where('event_id', $event->id)
+                    ->where('chest_no', $chestNo)
+                    ->where('id', '!=', $group->id)
+                    ->exists();
+
+                if ($conflict) {
+                    throw new HttpException(422, "Chest number {$chestNo} is already assigned to another team.");
+                }
+
+                $group->update(['event_id' => $event->id, 'chest_no' => $chestNo, 'chest_is_manual' => true]);
+
+                return;
+            }
+
+            if ($participant->chest_is_manual) {
+                throw new HttpException(422, 'This participant already has a manually-entered chest number. Clear it first before entering a new one.');
+            }
+
+            $headScope = $numbering->chestHeadScope($event, $item);
+
+            $conflict = FestParticipant::where('event_id', $event->id)
+                ->where('chest_head_id', $headScope)
+                ->where('chest_no', $chestNo)
+                ->where('id', '!=', $participant->id)
+                ->exists();
+
+            if ($conflict) {
+                throw new HttpException(422, "Chest number {$chestNo} is already assigned to another participant.");
+            }
+
+            $participant->update([
+                'event_id'        => $event->id,
+                'chest_head_id'   => $headScope,
+                'chest_no'        => $chestNo,
+                'chest_is_manual' => true,
+            ]);
+        });
+    }
+
     public function clearChest(FestParticipant $participant): void
     {
         $participant->loadMissing('registration.event', 'registration.item', 'group');
@@ -125,6 +191,7 @@ class FestChestNumberService
             // whole squad's shared number.
             $participant->group->update([
                 'chest_no'          => null,
+                'chest_is_manual'   => false,
                 'chest_revealed_at' => null,
             ]);
 
@@ -150,6 +217,7 @@ class FestChestNumberService
 
         $query->update([
             'chest_no'          => null,
+            'chest_is_manual'   => false,
             'chest_revealed_at' => null,
         ]);
     }
@@ -167,6 +235,7 @@ class FestChestNumberService
 
         $participantQuery->update([
             'chest_no'          => null,
+            'chest_is_manual'   => false,
             'chest_revealed_at' => null,
         ]);
 
@@ -179,6 +248,7 @@ class FestChestNumberService
 
         $groupQuery->update([
             'chest_no'          => null,
+            'chest_is_manual'   => false,
             'chest_revealed_at' => null,
         ]);
 

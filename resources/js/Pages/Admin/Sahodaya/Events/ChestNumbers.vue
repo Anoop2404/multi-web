@@ -45,26 +45,39 @@
                                    @change="togglePending">
                             Include submitted (pending approval)
                         </label>
+                        <span v-if="totalCount" class="text-xs font-semibold px-2.5 py-1 rounded-full"
+                              :class="assignedCount === totalCount ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">
+                            {{ assignedCount === totalCount ? '✓' : '⏳' }} {{ assignedCount }}/{{ totalCount }} chest numbers assigned
+                        </span>
                     </div>
 
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" class="btn-primary text-sm" @click="generate">Assign missing chest</button>
-                        <button type="button" class="btn-secondary text-sm" @click="assignItemReg">Assign missing item reg</button>
-                        <button type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-50 border-rose-200 font-semibold" @click="clearEntireEventChests">
-                            Reset All Chests (Entire Event)
-                        </button>
-                        <button v-if="selectedItemId" type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-50 border-rose-200 font-semibold" @click="clearAllChests">
-                            Clear Item Chests
-                        </button>
-                        <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}inline=1`" target="_blank" class="btn-secondary text-sm">Preview list</a>
-                        <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}download=1`" target="_blank" class="btn-secondary text-sm">Download list (PDF)</a>
-                        <a :href="csvUrl" class="btn-secondary text-sm">CSV</a>
-                        <button v-if="item?.stage_type === 'on_stage' && event.chest_reveal_mode === 'stage_entry'"
-                                type="button" class="btn-secondary text-sm"
-                                :class="showGreen ? 'border-emerald-400 bg-emerald-50' : ''"
-                                @click="showGreen = !showGreen">
-                            Green room ({{ greenRoom.length }})
-                        </button>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="btn-primary text-sm" @click="generate">Assign missing chest</button>
+                            <button type="button" class="btn-secondary text-sm" @click="assignItemReg">Assign missing item reg</button>
+                            <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}inline=1`" target="_blank" class="btn-secondary text-sm">Preview list</a>
+                            <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}download=1`" target="_blank" class="btn-secondary text-sm">Download list (PDF)</a>
+                            <a :href="csvUrl" class="btn-secondary text-sm">CSV</a>
+                            <button v-if="item?.stage_type === 'on_stage' && event.chest_reveal_mode === 'stage_entry'"
+                                    type="button" class="btn-secondary text-sm"
+                                    :class="showGreen ? 'border-emerald-400 bg-emerald-50' : ''"
+                                    @click="showGreen = !showGreen">
+                                Green room ({{ greenRoom.length }})
+                            </button>
+                        </div>
+
+                        <!-- Kept visually apart from the safe/utility actions above — both of
+                             these wipe already-assigned numbers (including manual ones), which
+                             is easy to fat-finger when it's sitting in the same row as "CSV". -->
+                        <div class="flex flex-wrap gap-2 border border-rose-200 bg-rose-50/50 rounded-lg p-2">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-rose-500 self-center pl-1">Danger zone</span>
+                            <button type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-100 !bg-white border-rose-300 font-semibold" @click="clearEntireEventChests">
+                                Reset All Chests (Entire Event)
+                            </button>
+                            <button v-if="selectedItemId" type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-100 !bg-white border-rose-300 font-semibold" @click="clearAllChests">
+                                Clear Item Chests
+                            </button>
+                        </div>
                     </div>
 
                     <div v-if="showGreen" class="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
@@ -100,9 +113,28 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="(p, idx) in participants" :key="p.id" class="border-t">
+                                <tr v-for="(p, idx) in participants" :key="p.id" class="border-t"
+                                    :class="p.chest_no ? 'hover:bg-slate-50' : 'bg-amber-50/60 hover:bg-amber-50'">
                                     <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
-                                    <td class="p-3 font-mono font-bold">{{ p.chest_no ?? '—' }}</td>
+                                    <td class="p-3">
+                                        <div class="flex items-center gap-1">
+                                            <input v-model="chestDrafts[p.id]" type="number" min="1" max="65535"
+                                                   class="field text-xs font-mono font-bold w-20 chest-no-input" placeholder="—"
+                                                   :data-participant-id="p.id"
+                                                   :disabled="p.chest_is_manual"
+                                                   :title="p.chest_is_manual ? 'Manually entered — clear it first to change' : ''"
+                                                   @input="clearRowFeedback(p.id)"
+                                                   @keydown.enter.prevent="saveChest(p.id)">
+                                            <button v-if="!p.chest_is_manual" type="button" class="btn-secondary text-[11px] !py-1 !px-2 whitespace-nowrap"
+                                                    :disabled="savingChestId === p.id || !chestDrafts[p.id] || Number(chestDrafts[p.id]) === (p.chest_no ?? null)"
+                                                    @click="saveChest(p.id)">
+                                                {{ savingChestId === p.id ? '...' : 'Save' }}
+                                            </button>
+                                            <span v-else class="text-[10px] font-semibold text-indigo-700 whitespace-nowrap">🔒 Manual</span>
+                                        </div>
+                                        <p v-if="savedIds.has(p.id)" class="text-[11px] font-semibold text-emerald-600 mt-0.5">Saved ✓</p>
+                                        <p v-else-if="rowErrors[p.id]" class="text-[11px] font-semibold text-rose-600 mt-0.5">{{ rowErrors[p.id] }}</p>
+                                    </td>
                                     <td class="p-3 font-mono text-xs text-[#0f3d7a]">{{ p.fest_id ?? '—' }}</td>
                                     <td class="p-3 font-mono text-xs">{{ p.item_reg ?? '—' }}</td>
                                     <td class="p-3">
@@ -145,8 +177,8 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
@@ -183,6 +215,8 @@ const childEventOptions = computed(() =>
 
 const showGreen = ref(props.view === 'green-room');
 const hasTeamRows = computed(() => props.participants.some((p) => p.is_team));
+const assignedCount = computed(() => props.participants.filter((p) => p.chest_no).length);
+const totalCount = computed(() => props.participants.length);
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/chest-numbers`);
 const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
 const numberingUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/settings/numbering`);
@@ -204,9 +238,14 @@ const csvUrl = computed(() =>
 
 const { confirm } = useConfirm();
 
+// preserveState: true on every action below (bulk and per-row) so this component
+// instance survives each round trip instead of being torn down and remounted — that's
+// what makes the per-row Saved/Error feedback below actually visible (a fresh mount
+// would reset savedIds/rowErrors to empty before the user ever sees them) and avoids a
+// jarring scroll/flash on every click for what's often a single-field change.
 function postAction(path) {
     if (!props.selectedItemId) return;
-    router.post(path, { item_id: props.selectedItemId }, { preserveScroll: true });
+    router.post(path, { item_id: props.selectedItemId }, { preserveScroll: true, preserveState: true });
 }
 function generate() { postAction(`${base.value}/generate`); }
 function assignItemReg() { postAction(`${base.value}/assign-item-ids`); }
@@ -217,7 +256,7 @@ async function clearEntireEventChests() {
     }
     if (!(await confirm({ message, destructive: true }))) return;
 
-    router.post(`${base.value}/clear-all`, {}, { preserveScroll: true });
+    router.post(`${base.value}/clear-all`, {}, { preserveScroll: true, preserveState: true });
 }
 async function clearAllChests() {
     let message = `Are you sure you want to clear chest numbers for item "${props.selectedItem?.title || ''}"?`;
@@ -226,7 +265,7 @@ async function clearAllChests() {
     }
     if (!(await confirm({ message, destructive: props.itemHasMarksOrAttendance }))) return;
 
-    router.post(`${base.value}/clear-all`, { item_id: props.selectedItemId }, { preserveScroll: true });
+    router.post(`${base.value}/clear-all`, { item_id: props.selectedItemId }, { preserveScroll: true, preserveState: true });
 }
 async function clearChest(id) {
     let message = 'Clear chest number?';
@@ -234,10 +273,121 @@ async function clearChest(id) {
         message += '\n\n⚠️ Marks or attendance already exist for this item. If a judge has a printed sheet with the old chest number, it will no longer match.';
     }
     if (!(await confirm({ message, destructive: props.itemHasMarksOrAttendance }))) return;
-    router.post(`${base.value}/${id}/clear`, {}, { preserveScroll: true });
+
+    clearRowFeedback(id);
+    router.post(`${base.value}/${id}/clear`, {}, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+            const err = usePage().props.flash?.error;
+            if (err) markRowError(id, err); else markRowSaved(id);
+        },
+    });
 }
 function reveal(id) {
-    router.post(`${base.value}/${id}/reveal`, {}, { preserveScroll: true });
+    router.post(`${base.value}/${id}/reveal`, {}, { preserveScroll: true, preserveState: true });
+}
+
+// Manual chest entry: each row keeps its own draft value, seeded from the assigned
+// number (blank when unassigned) so the organizer can type a custom number instead of
+// relying on "Assign missing chest" auto-numbering. With preserveState above keeping
+// this component mounted across saves, a watcher (below) re-syncs drafts to the
+// server's copy whenever participants refresh — covering every action that can change
+// someone else's row (generate, assign-missing, clear-all), not just this row's own save.
+const chestDrafts = reactive({});
+for (const p of props.participants) {
+    chestDrafts[p.id] = p.chest_no ?? '';
+}
+const savingChestId = ref(null);
+const savedIds = ref(new Set());
+const rowErrors = reactive({});
+let savedTimer = null;
+
+watch(() => props.participants, (list) => {
+    for (const p of list) {
+        if (savingChestId.value === p.id) continue;
+        chestDrafts[p.id] = p.chest_no ?? '';
+    }
+});
+
+function clearRowFeedback(id) {
+    if (savedIds.value.has(id)) {
+        const next = new Set(savedIds.value);
+        next.delete(id);
+        savedIds.value = next;
+    }
+    delete rowErrors[id];
+}
+
+function markRowSaved(id) {
+    delete rowErrors[id];
+    const next = new Set(savedIds.value);
+    next.add(id);
+    savedIds.value = next;
+    // Fades on its own rather than lingering forever once the row is visibly updated.
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(() => {
+        const cleared = new Set(savedIds.value);
+        cleared.delete(id);
+        savedIds.value = cleared;
+    }, 2500);
+}
+
+function markRowError(id, message) {
+    if (savedIds.value.has(id)) {
+        const next = new Set(savedIds.value);
+        next.delete(id);
+        savedIds.value = next;
+    }
+    rowErrors[id] = message || 'Could not save — please try again.';
+}
+
+// Jump straight to the next row's chest field on success so entering numbers for a
+// long roster doesn't require reaching for the mouse after every single Save. Waits a
+// tick for Vue to apply the just-saved row's own disabled state first — otherwise, if
+// that row already dropped out of a ":not(:disabled)" query by the time this runs, the
+// lookup for "this row's position" fails and focus jumps to row 1 instead of the next
+// one. Finding the index among ALL inputs (disabled included), then walking forward
+// past any locked ones, keeps that lookup correct regardless of the timing.
+async function focusNextChestInput(afterId) {
+    await nextTick();
+    const inputs = Array.from(document.querySelectorAll('input.chest-no-input'));
+    const idx = inputs.findIndex((el) => Number(el.dataset.participantId) === Number(afterId));
+    if (idx === -1) return;
+
+    for (let i = idx + 1; i < inputs.length; i++) {
+        if (!inputs[i].disabled) {
+            inputs[i].focus();
+            inputs[i].select();
+            return;
+        }
+    }
+}
+
+function saveChest(id) {
+    const raw = chestDrafts[id];
+    const chestNo = Number(raw);
+    if (!raw || !Number.isInteger(chestNo) || chestNo <= 0) return;
+
+    const participant = props.participants.find((p) => p.id === id);
+    if (participant && chestNo === (participant.chest_no ?? null)) return;
+
+    savingChestId.value = id;
+    router.post(`${base.value}/${id}/set`, { chest_no: chestNo }, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+            const err = usePage().props.flash?.error;
+            if (err) {
+                markRowError(id, err);
+            } else {
+                markRowSaved(id);
+                focusNextChestInput(id);
+            }
+        },
+        onError: (errors) => markRowError(id, errors?.chest_no),
+        onFinish: () => { savingChestId.value = null; },
+    });
 }
 function togglePending(e) {
     if (!props.selectedItemId) return;

@@ -278,8 +278,9 @@
                                     <td v-for="j in judgeNumbers" :key="j" class="p-3.5">
                                         <input v-model.number="judgeForms[participant.id][j]" type="number" min="0" step="0.5"
                                                :max="perJudgeMax"
-                                               class="field text-xs tabular-nums w-24" placeholder="0"
-                                               :disabled="isAbsent(participant, item) || itemLocked">
+                                               class="field text-xs tabular-nums w-24 judge-mark-input" placeholder="0"
+                                               :disabled="isAbsent(participant, item) || itemLocked"
+                                               @keydown="onJudgeInputKeydown">
                                     </td>
                                     <td class="p-3.5 font-mono font-bold text-slate-900 tabular-nums">
                                         {{ participantGrandTotal(participant.id, item) }}
@@ -608,6 +609,24 @@ for (const reg of props.registrations ?? []) {
             row[j] = existing[j] ?? null;
         }
         judgeForms[p.id] = row;
+    }
+}
+
+// Tab/Shift+Tab should hop between judge score cells only — the native tab order would
+// otherwise pass through Attendance/Rank/Grade/Save on every row, which is unusable when
+// entering marks for 30+ participants judge-by-judge. Query all enabled judge inputs in
+// DOM order rather than tracking refs, since rows can be shown/hidden (absent participants
+// disable their inputs) and the grid can span multiple item sections.
+function onJudgeInputKeydown(e) {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    const inputs = Array.from(document.querySelectorAll('input.judge-mark-input:not(:disabled)'));
+    const idx = inputs.indexOf(e.target);
+    if (idx === -1) return;
+    const next = inputs[idx + (e.shiftKey ? -1 : 1)];
+    if (next) {
+        next.focus();
+        next.select();
     }
 }
 
