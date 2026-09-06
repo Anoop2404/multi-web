@@ -1323,7 +1323,6 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/chest-numbers/assign-item-ids', [FestChestNumberController::class, 'assignItemRegIds'])->name('chest-numbers.assign-item-ids');
             Route::post('/{event}/chest-numbers/clear-all', [FestChestNumberController::class, 'clearAll'])->name('chest-numbers.clear-all');
             Route::post('/{event}/chest-numbers/{participant}/clear', [FestChestNumberController::class, 'clearChest'])->name('chest-numbers.clear');
-            Route::post('/{event}/chest-numbers/{participant}/set', [FestChestNumberController::class, 'setChest'])->name('chest-numbers.set');
             Route::post('/{event}/chest-numbers/{participant}/reveal', [FestChestNumberController::class, 'revealChest'])->name('chest-numbers.reveal');
             Route::get('/{event}/chest-numbers/print', [FestChestNumberController::class, 'print'])->name('chest-numbers.print');
             Route::get('/{event}/chest-numbers/csv', [FestChestNumberController::class, 'csv'])->name('chest-numbers.csv');

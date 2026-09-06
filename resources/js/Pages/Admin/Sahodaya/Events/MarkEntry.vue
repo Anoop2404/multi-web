@@ -237,23 +237,16 @@
                                     <span v-else class="text-slate-400 font-normal">—</span>
                                 </td>
 
-                                <!-- Order No. — unique per item, manually assigned; once set
-                                     it becomes this row's position in the table below. -->
+                                <!-- Order No. — unique per item. Options scale with the item's
+                                     own participant count (like Rank), and selecting one
+                                     saves immediately (like Attendance) — no separate Save
+                                     click — then re-sorts the table below by it. -->
                                 <td class="p-3.5">
-                                    <div class="flex items-center gap-1">
-                                        <input v-model="orderDrafts[participant.id]" type="number" min="1" max="65535"
-                                               class="field text-xs font-mono w-16" placeholder="—"
-                                               :disabled="itemLocked"
-                                               @input="clearOrderFeedback(participant.id)"
-                                               @keydown.enter.prevent="saveOrderNo(participant)">
-                                        <button type="button" class="btn-secondary text-[11px] !py-1 !px-2 whitespace-nowrap"
-                                                :disabled="itemLocked || savingOrderId === participant.id || orderUnchanged(participant)"
-                                                @click="saveOrderNo(participant)">
-                                            {{ savingOrderId === participant.id ? '...' : 'Save' }}
-                                        </button>
-                                    </div>
-                                    <p v-if="orderSavedIds.has(participant.id)" class="text-[11px] font-semibold text-emerald-600 mt-0.5">Saved ✓</p>
-                                    <p v-else-if="orderErrors[participant.id]" class="text-[11px] font-semibold text-rose-600 mt-0.5">{{ orderErrors[participant.id] }}</p>
+                                    <SearchableSelect :model-value="participant.order_no ?? ''"
+                                            :disabled="itemLocked"
+                                            :options="orderOptionsFor(section, participant.id).map((n) => ({ value: n, label: String(n) }))"
+                                            :all-option="true" all-label="— No order —"
+                                            @update:model-value="(value) => saveOrderNo(participant, value)" />
                                 </td>
 
                                 <!-- Reg No. -->
@@ -650,15 +643,6 @@ for (const reg of props.registrations ?? []) {
     }
 }
 
-// Order No draft per row — mirrors judgeForms' seeding, reading the group's shared
-// value for team items the same way chest_no already does elsewhere on this page.
-const orderDrafts = reactive({});
-for (const reg of props.registrations ?? []) {
-    for (const p of reg.participants ?? []) {
-        orderDrafts[p.id] = (p.group?.order_no ?? p.order_no) ?? '';
-    }
-}
-
 // Tab/Shift+Tab should hop between judge score cells only — the native tab order would
 // otherwise pass through Attendance/Rank/Grade/Save on every row, which is unusable when
 // entering marks for 30+ participants judge-by-judge. Query all enabled judge inputs in
@@ -805,55 +789,30 @@ const bulkSaving = ref(false);
 
 // Order No: unlike Rank (which allows ties and lives on the FestMark), this is a strict,
 // unique-per-item sequence stored on the participant/group and validated server-side —
-// see FestMarkEntryController::setOrderNo(). Saving it changes useFestMarkEntryDisplay's
-// sort, so the row visibly moves once applied.
-const savingOrderId = ref(null);
-const orderSavedIds = ref(new Set());
-const orderErrors = reactive({});
+// see FestMarkEntryController::setOrderNo(). Options run 1..N for however many entries
+// this item currently has (dynamic, not a fixed list like Rank's padded-to-6 options).
+// Selecting a value saves immediately, same as Attendance — no separate Save click —
+// and changes useFestMarkEntryDisplay's sort, so the row visibly moves once applied.
+// Already-taken numbers (by any OTHER row in this item) are dropped from the list so
+// picking a colliding value isn't even offered — only this row's own current value (if
+// any) stays in its own dropdown. preserveState on the save below keeps this component
+// mounted so the pick disappears from every other row's list immediately, without a
+// full page reload.
+function orderOptionsFor(section, currentParticipantId) {
+    const count = section?.rows?.length ?? 0;
+    const taken = new Set(
+        (section?.rows ?? [])
+            .filter((r) => r.participant?.id !== currentParticipantId)
+            .map((r) => r.participant?.order_no)
+            .filter((n) => n !== null && n !== undefined)
+    );
 
-function clearOrderFeedback(id) {
-    if (orderSavedIds.value.has(id)) {
-        const next = new Set(orderSavedIds.value);
-        next.delete(id);
-        orderSavedIds.value = next;
-    }
-    delete orderErrors[id];
+    return Array.from({ length: count }, (_, i) => i + 1).filter((n) => !taken.has(n));
 }
 
-function orderUnchanged(participant) {
-    const raw = orderDrafts[participant.id];
-    const draftVal = raw === '' || raw === null || raw === undefined ? null : Number(raw);
-
-    return draftVal === (participant.order_no ?? null);
-}
-
-function saveOrderNo(participant) {
-    const raw = orderDrafts[participant.id];
-    const orderNo = raw === '' || raw === null || raw === undefined ? null : Number(raw);
-    if (orderNo !== null && (!Number.isInteger(orderNo) || orderNo <= 0)) return;
-    if (orderUnchanged(participant)) return;
-
-    savingOrderId.value = participant.id;
-    router.post(`${marksBaseUrl.value}/${participant.id}/order-no`, { order_no: orderNo }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            const err = usePage().props.flash?.error;
-            if (err) {
-                if (orderSavedIds.value.has(participant.id)) {
-                    const next = new Set(orderSavedIds.value);
-                    next.delete(participant.id);
-                    orderSavedIds.value = next;
-                }
-                orderErrors[participant.id] = err;
-            } else {
-                delete orderErrors[participant.id];
-                const next = new Set(orderSavedIds.value);
-                next.add(participant.id);
-                orderSavedIds.value = next;
-            }
-        },
-        onFinish: () => { savingOrderId.value = null; },
-    });
+function saveOrderNo(participant, value) {
+    const orderNo = value === '' || value === null || value === undefined ? null : Number(value);
+    router.post(`${marksBaseUrl.value}/${participant.id}/order-no`, { order_no: orderNo }, { preserveScroll: true, preserveState: true });
 }
 
 function payloadFor(participant, item) {

@@ -55,6 +55,12 @@
                         <div class="flex flex-wrap gap-2">
                             <button type="button" class="btn-primary text-sm" @click="generate">Assign missing chest</button>
                             <button type="button" class="btn-secondary text-sm" @click="assignItemReg">Assign missing item reg</button>
+                            <button v-if="selectedItemId" type="button" class="btn-secondary text-sm" @click="openItemNumberingModal(item)">
+                                🔢 Set starting no (this item)
+                            </button>
+                            <button type="button" class="btn-secondary text-sm" @click="openBulkNumberingModal">
+                                🔢 Set common starting no (all items)
+                            </button>
                             <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}inline=1`" target="_blank" class="btn-secondary text-sm">Preview list</a>
                             <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}download=1`" target="_blank" class="btn-secondary text-sm">Download list (PDF)</a>
                             <a :href="csvUrl" class="btn-secondary text-sm">CSV</a>
@@ -67,8 +73,8 @@
                         </div>
 
                         <!-- Kept visually apart from the safe/utility actions above — both of
-                             these wipe already-assigned numbers (including manual ones), which
-                             is easy to fat-finger when it's sitting in the same row as "CSV". -->
+                             these wipe already-assigned numbers, which is easy to fat-finger
+                             when it's sitting in the same row as "CSV". -->
                         <div class="flex flex-wrap gap-2 border border-rose-200 bg-rose-50/50 rounded-lg p-2">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-rose-500 self-center pl-1">Danger zone</span>
                             <button type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-100 !bg-white border-rose-300 font-semibold" @click="clearEntireEventChests">
@@ -107,7 +113,7 @@
                         <table class="w-full text-sm">
                             <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                                 <tr>
-                                    <th class="p-3">Sl No</th><th class="p-3">Chest</th><th class="p-3">Fest ID</th><th class="p-3">Item reg</th>
+                                    <th class="p-3">Sl No</th><th class="p-3">Chest</th><th class="p-3">Order</th><th class="p-3">Fest ID</th><th class="p-3">Item reg</th>
                                     <th class="p-3">Participant / Team</th><th class="p-3">School</th><th class="p-3">Status</th>
                                     <th class="p-3">{{ hasTeamRows ? 'Members' : 'Team' }}</th><th class="p-3"></th>
                                 </tr>
@@ -116,24 +122,12 @@
                                 <tr v-for="(p, idx) in participants" :key="p.id" class="border-t"
                                     :class="p.chest_no ? 'hover:bg-slate-50' : 'bg-amber-50/60 hover:bg-amber-50'">
                                     <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
+                                    <td class="p-3 font-mono font-bold">{{ p.chest_no ?? '—' }}</td>
                                     <td class="p-3">
-                                        <div class="flex items-center gap-1">
-                                            <input v-model="chestDrafts[p.id]" type="number" min="1" max="65535"
-                                                   class="field text-xs font-mono font-bold w-20 chest-no-input" placeholder="—"
-                                                   :data-participant-id="p.id"
-                                                   :disabled="p.chest_is_manual"
-                                                   :title="p.chest_is_manual ? 'Manually entered — clear it first to change' : ''"
-                                                   @input="clearRowFeedback(p.id)"
-                                                   @keydown.enter.prevent="saveChest(p.id)">
-                                            <button v-if="!p.chest_is_manual" type="button" class="btn-secondary text-[11px] !py-1 !px-2 whitespace-nowrap"
-                                                    :disabled="savingChestId === p.id || !chestDrafts[p.id] || Number(chestDrafts[p.id]) === (p.chest_no ?? null)"
-                                                    @click="saveChest(p.id)">
-                                                {{ savingChestId === p.id ? '...' : 'Save' }}
-                                            </button>
-                                            <span v-else class="text-[10px] font-semibold text-indigo-700 whitespace-nowrap">🔒 Manual</span>
-                                        </div>
-                                        <p v-if="savedIds.has(p.id)" class="text-[11px] font-semibold text-emerald-600 mt-0.5">Saved ✓</p>
-                                        <p v-else-if="rowErrors[p.id]" class="text-[11px] font-semibold text-rose-600 mt-0.5">{{ rowErrors[p.id] }}</p>
+                                        <SearchableSelect :model-value="p.order_no ?? ''"
+                                                :options="orderOptionsFor(p.id).map((n) => ({ value: n, label: String(n) }))"
+                                                :all-option="true" all-label="— No order —"
+                                                @update:model-value="(value) => saveOrderNo(p.id, value)" />
                                     </td>
                                     <td class="p-3 font-mono text-xs text-[#0f3d7a]">{{ p.fest_id ?? '—' }}</td>
                                     <td class="p-3 font-mono text-xs">{{ p.item_reg ?? '—' }}</td>
@@ -153,7 +147,7 @@
                                     </td>
                                 </tr>
                                 <tr v-if="!participants.length">
-                                    <td colspan="9" class="p-0">
+                                    <td colspan="10" class="p-0">
                                         <EmptyState title="No participants for this item"
                                             description="Approve registrations for this item first, then chest numbers can be generated." icon="🔢" class="py-8">
                                             <template #action>
@@ -172,19 +166,58 @@
             </template>
         </ReportHeadItemNavigator>
 
+        <!-- Per-item starting-number popup — quick alternative to the full table on the
+             Settings > Numbering tab, scoped to just the item currently open here. -->
+        <Modal :show="showItemNumberingModal" title="Set starting numbers"
+               :subtitle="itemNumberingTitle" size="sm" @close="showItemNumberingModal = false">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Chest start #</label>
+                    <input v-model.number="itemNumberingForm.chest_no_start" type="number" min="1" class="field w-full">
+                </div>
+                <p class="text-xs text-slate-400">Only affects numbers not yet assigned — existing chest numbers for this item are untouched.</p>
+            </div>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn-secondary text-sm" @click="showItemNumberingModal = false">Cancel</button>
+                    <button type="button" class="btn-primary text-sm" @click="saveItemNumbering">Save</button>
+                </div>
+            </template>
+        </Modal>
+
+        <!-- Bulk "common starting number" popup — writes the same chest start into every
+             item in the event at once; still editable per item afterward (here or on the
+             Settings > Numbering tab). -->
+        <Modal :show="showBulkNumberingModal" title="Set common starting no for all items"
+               subtitle="Applies this chest start number to every item in the event." size="sm"
+               @close="showBulkNumberingModal = false">
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Chest start # (all items)</label>
+                <input v-model.number="bulkChestStart" type="number" min="1" class="field w-full">
+                <p class="text-xs text-slate-400 mt-2">Each item's own item-reg start number is left as-is. You can still fine-tune any single item's chest start afterward.</p>
+            </div>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn-secondary text-sm" @click="showBulkNumberingModal = false">Cancel</button>
+                    <button type="button" class="btn-primary text-sm" @click="saveBulkNumbering">Apply to all items</button>
+                </div>
+            </template>
+        </Modal>
+
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>
 </template>
 
 <script setup>
-import { computed, nextTick, reactive, ref, watch } from 'vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { computed, reactive, ref } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import Modal from '@/Components/ui/Modal.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -273,122 +306,102 @@ async function clearChest(id) {
         message += '\n\n⚠️ Marks or attendance already exist for this item. If a judge has a printed sheet with the old chest number, it will no longer match.';
     }
     if (!(await confirm({ message, destructive: props.itemHasMarksOrAttendance }))) return;
-
-    clearRowFeedback(id);
-    router.post(`${base.value}/${id}/clear`, {}, {
-        preserveScroll: true,
-        preserveState: true,
-        onSuccess: () => {
-            const err = usePage().props.flash?.error;
-            if (err) markRowError(id, err); else markRowSaved(id);
-        },
-    });
+    router.post(`${base.value}/${id}/clear`, {}, { preserveScroll: true, preserveState: true });
 }
 function reveal(id) {
     router.post(`${base.value}/${id}/reveal`, {}, { preserveScroll: true, preserveState: true });
 }
 
-// Manual chest entry: each row keeps its own draft value, seeded from the assigned
-// number (blank when unassigned) so the organizer can type a custom number instead of
-// relying on "Assign missing chest" auto-numbering. With preserveState above keeping
-// this component mounted across saves, a watcher (below) re-syncs drafts to the
-// server's copy whenever participants refresh — covering every action that can change
-// someone else's row (generate, assign-missing, clear-all), not just this row's own save.
-const chestDrafts = reactive({});
-for (const p of props.participants) {
-    chestDrafts[p.id] = p.chest_no ?? '';
-}
-const savingChestId = ref(null);
-const savedIds = ref(new Set());
-const rowErrors = reactive({});
-let savedTimer = null;
+// Order No — same field/endpoint as the Mark Entry page (FestMarkEntryController::
+// setOrderNo()), just editable from here too since organizers often set it while
+// they're already assigning chest numbers. Options run 1..N for the current item's
+// participant count, same dynamic-per-item behavior as Mark Entry — and already-taken
+// numbers (by any OTHER row) are dropped from the list so a colliding pick is never
+// offered in the first place.
+function orderOptionsFor(currentParticipantId) {
+    const count = props.participants.length;
+    const taken = new Set(
+        props.participants
+            .filter((p) => p.id !== currentParticipantId)
+            .map((p) => p.order_no)
+            .filter((n) => n !== null && n !== undefined)
+    );
 
-watch(() => props.participants, (list) => {
-    for (const p of list) {
-        if (savingChestId.value === p.id) continue;
-        chestDrafts[p.id] = p.chest_no ?? '';
-    }
-});
-
-function clearRowFeedback(id) {
-    if (savedIds.value.has(id)) {
-        const next = new Set(savedIds.value);
-        next.delete(id);
-        savedIds.value = next;
-    }
-    delete rowErrors[id];
+    return Array.from({ length: count }, (_, i) => i + 1).filter((n) => !taken.has(n));
 }
 
-function markRowSaved(id) {
-    delete rowErrors[id];
-    const next = new Set(savedIds.value);
-    next.add(id);
-    savedIds.value = next;
-    // Fades on its own rather than lingering forever once the row is visibly updated.
-    clearTimeout(savedTimer);
-    savedTimer = setTimeout(() => {
-        const cleared = new Set(savedIds.value);
-        cleared.delete(id);
-        savedIds.value = cleared;
-    }, 2500);
+function saveOrderNo(id, value) {
+    const orderNo = value === '' || value === null || value === undefined ? null : Number(value);
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/${id}/order-no`,
+        { order_no: orderNo },
+        { preserveScroll: true, preserveState: true },
+    );
 }
 
-function markRowError(id, message) {
-    if (savedIds.value.has(id)) {
-        const next = new Set(savedIds.value);
-        next.delete(id);
-        savedIds.value = next;
-    }
-    rowErrors[id] = message || 'Could not save — please try again.';
+// Per-item / bulk "starting number" popups — a quicker alternative to the full table
+// on Settings > Numbering (still there, unchanged), reusing that exact same endpoint
+// (FestEventSettingsController::updateItemNumbering) so both stay in sync.
+const showItemNumberingModal = ref(false);
+const itemNumberingForm = reactive({ chest_no_start: null });
+const itemNumberingTitle = ref('');
+let itemNumberingItemId = null;
+// Kept but not shown in the form — updateItemNumbering() writes both fields together
+// per row, so this item's own item-reg start has to be resent unchanged or it'd be
+// nulled out by a chest-only save.
+let itemNumberingItemRegStart = null;
+
+function openItemNumberingModal(item) {
+    if (!item?.id) return;
+    itemNumberingItemId = item.id;
+    itemNumberingTitle.value = item.title ?? '';
+    itemNumberingForm.chest_no_start = item.chest_no_start ?? null;
+    itemNumberingItemRegStart = item.item_reg_id_start ?? null;
+    showItemNumberingModal.value = true;
 }
 
-// Jump straight to the next row's chest field on success so entering numbers for a
-// long roster doesn't require reaching for the mouse after every single Save. Waits a
-// tick for Vue to apply the just-saved row's own disabled state first — otherwise, if
-// that row already dropped out of a ":not(:disabled)" query by the time this runs, the
-// lookup for "this row's position" fails and focus jumps to row 1 instead of the next
-// one. Finding the index among ALL inputs (disabled included), then walking forward
-// past any locked ones, keeps that lookup correct regardless of the timing.
-async function focusNextChestInput(afterId) {
-    await nextTick();
-    const inputs = Array.from(document.querySelectorAll('input.chest-no-input'));
-    const idx = inputs.findIndex((el) => Number(el.dataset.participantId) === Number(afterId));
-    if (idx === -1) return;
-
-    for (let i = idx + 1; i < inputs.length; i++) {
-        if (!inputs[i].disabled) {
-            inputs[i].focus();
-            inputs[i].select();
-            return;
-        }
-    }
-}
-
-function saveChest(id) {
-    const raw = chestDrafts[id];
-    const chestNo = Number(raw);
-    if (!raw || !Number.isInteger(chestNo) || chestNo <= 0) return;
-
-    const participant = props.participants.find((p) => p.id === id);
-    if (participant && chestNo === (participant.chest_no ?? null)) return;
-
-    savingChestId.value = id;
-    router.post(`${base.value}/${id}/set`, { chest_no: chestNo }, {
+function saveItemNumbering() {
+    router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/item-numbering`, {
+        items: [{
+            id: itemNumberingItemId,
+            chest_no_start: itemNumberingForm.chest_no_start || null,
+            item_reg_id_start: itemNumberingItemRegStart,
+        }],
+    }, {
         preserveScroll: true,
-        preserveState: true,
-        onSuccess: () => {
-            const err = usePage().props.flash?.error;
-            if (err) {
-                markRowError(id, err);
-            } else {
-                markRowSaved(id);
-                focusNextChestInput(id);
-            }
-        },
-        onError: (errors) => markRowError(id, errors?.chest_no),
-        onFinish: () => { savingChestId.value = null; },
+        onSuccess: () => { showItemNumberingModal.value = false; },
     });
 }
+
+const showBulkNumberingModal = ref(false);
+const bulkChestStart = ref(null);
+
+function openBulkNumberingModal() {
+    bulkChestStart.value = null;
+    showBulkNumberingModal.value = true;
+}
+
+// Every item keeps its own item_reg_id_start untouched — only chest_no_start gets the
+// common value, since updateItemNumbering() overwrites both fields together per row.
+function saveBulkNumbering() {
+    if (!bulkChestStart.value) return;
+
+    const items = props.headItemGroups
+        .flatMap((g) => g.items ?? [])
+        .map((it) => ({
+            id: it.id,
+            chest_no_start: bulkChestStart.value,
+            item_reg_id_start: it.item_reg_id_start ?? null,
+        }));
+
+    if (!items.length) return;
+
+    router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/item-numbering`, { items }, {
+        preserveScroll: true,
+        onSuccess: () => { showBulkNumberingModal.value = false; },
+    });
+}
+
 function togglePending(e) {
     if (!props.selectedItemId) return;
     const params = { item_id: props.selectedItemId, include_pending: e.target.checked ? 1 : undefined };

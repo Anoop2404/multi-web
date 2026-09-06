@@ -11,12 +11,11 @@ class FestGroup extends Model
     protected $fillable = [
         'registration_id', 'event_id', 'team_name', 'status',
         'coach_name', 'coach_phone', 'manager_name', 'manager_phone',
-        'chest_no', 'chest_is_manual', 'chest_revealed_at', 'order_no',
+        'chest_no', 'chest_revealed_at', 'order_no',
     ];
 
     protected $casts = [
         'chest_revealed_at' => 'datetime',
-        'chest_is_manual'   => 'boolean',
     ];
 
     public function registration(): BelongsTo

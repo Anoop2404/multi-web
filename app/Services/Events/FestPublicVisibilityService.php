@@ -319,6 +319,10 @@ class FestPublicVisibilityService
             'name'          => $showName ? ($participant->student?->name ?? $participant->teacher?->name) : null,
             'school'        => $showSchool ? ($schoolName ?? '') : null,
             'order'         => $schedule?->sort_order,
+            // Mark Entry's unique-per-item Order No (distinct from `order` above, which is
+            // the stage schedule's own sort_order) — null when not yet assigned, which the
+            // attendance sheet prints as a blank cell rather than a placeholder dash.
+            'order_no'      => $participant->group?->order_no ?? $participant->order_no,
             'item'          => $participant->registration?->item?->title,
             'item_category' => $category,
             'item_type'     => $itemType,

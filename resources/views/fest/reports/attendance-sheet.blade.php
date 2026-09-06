@@ -328,7 +328,7 @@
         $cleanTitle = str_replace('_', ' ', $itemName);
         $showDob = collect($rows)->contains(fn ($row) => !empty($row['_uses_age']));
         $showClass = !$showDob && collect($rows)->contains(fn ($row) => !empty($row['_uses_class']));
-        $colspan = 5 + ($showDob || $showClass ? 1 : 0);
+        $colspan = 6 + ($showDob || $showClass ? 1 : 0);
 
         // Team-based items (chess, quiz, group items, sports team events, etc.) group
         // several members under one chest/registration; count teams for those instead
@@ -392,6 +392,7 @@
             <thead>
                 <tr>
                     <th style="width: 28px;" class="text-center">Sl</th>
+                    <th style="width: 50px;" class="text-center">Order</th>
                     <th class="photo-cell"></th>
                     <th>Participant / Team Name</th>
                     @if($showDob)
@@ -431,6 +432,7 @@
 
                     <tr>
                         <td class="text-center">{{ $serialOffset + $i + 1 }}</td>
+                        <td class="text-center">{{ $row['order_no'] ?? '' }}</td>
                         <td class="photo-cell text-center">
                             @if(!empty($row['photo_url']))
                                 <img src="{{ $row['photo_url'] }}" alt="">

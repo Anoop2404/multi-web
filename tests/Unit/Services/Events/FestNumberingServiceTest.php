@@ -242,6 +242,44 @@ class FestNumberingServiceTest extends TestCase
         $this->assertTrue($persist);
     }
 
+    /**
+     * Regression coverage for a real bug report: an admin sets item B's own
+     * chest_no_start (e.g. 500) expecting its numbering to start there, but once
+     * item A (sharing the same head) has already assigned numbers past 500, every
+     * new item B participant silently jumped onto item A's sequence instead —
+     * nextChestNumber() only ever tracked the single highest number in the shared
+     * head and always continued past it (max($start, $highest + 1)), so a later
+     * item's own configured start could never "win" once a sibling had climbed
+     * above it. Fixed by scanning for the lowest number at-or-above the item's own
+     * start that isn't already used anywhere in the head, instead of always
+     * jumping past the head-wide maximum.
+     */
+    public function test_next_chest_number_honors_independent_per_item_start_within_shared_head(): void
+    {
+        ['event' => $event, 'itemA' => $itemA, 'itemB' => $itemB, 'school' => $school] = $this->sportsContext();
+        $itemA->update(['chest_no_start' => 100]);
+        $itemB->update(['chest_no_start' => 500]);
+
+        $service = app(FestNumberingService::class);
+
+        // Item A's own range starts at 100, untouched by item B.
+        $this->assertSame(100, $service->nextChestNumber($event, $itemA->fresh()));
+        $this->participant($event, $itemA, $school, $this->student($school, 'Athlete A1'), 100);
+
+        // Item B has its own independent range starting at 500 -- previously this
+        // would have returned 101 (head-wide max of 100, plus one), silently
+        // ignoring item B's own configured start.
+        $this->assertSame(500, $service->nextChestNumber($event, $itemB->fresh()));
+        $this->participant($event, $itemB, $school, $this->student($school, 'Athlete B1'), 500);
+
+        // Item A keeps advancing within its own low range, unaffected by item B
+        // now holding a higher number under the same head.
+        $this->assertSame(101, $service->nextChestNumber($event, $itemA->fresh()));
+
+        // Item B keeps advancing within its own range too.
+        $this->assertSame(501, $service->nextChestNumber($event, $itemB->fresh()));
+    }
+
     public function test_assigns_chest_on_create_for_first_sports_item_in_head(): void
     {
         ['event' => $event, 'itemA' => $itemA, 'school' => $school] = $this->sportsContext();

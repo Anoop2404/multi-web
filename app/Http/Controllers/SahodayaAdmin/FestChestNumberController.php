@@ -164,25 +164,6 @@ class FestChestNumberController extends SahodayaAdminController
         return back()->with('success', 'Chest number cleared.');
     }
 
-    public function setChest(Request $request, string $tenantId, FestEvent $event, FestParticipant $participant, FestChestNumberService $service, PlatformAuditLogger $audit)
-    {
-        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($participant->registration->event_id !== $event->id, 403);
-
-        $data = $request->validate([
-            'chest_no' => 'required|integer|min:1|max:65535',
-        ]);
-
-        $service->setChest($participant, $data['chest_no']);
-
-        $audit->festEvent($event, FestPageActivity::CHEST_NUMBERS, 'fest.chest_number.set_manual', "Chest number {$data['chest_no']} entered manually", [
-            'participant_id' => $participant->id,
-            'chest_no'       => $data['chest_no'],
-        ]);
-
-        return back()->with('success', "Chest number {$data['chest_no']} saved.");
-    }
-
     public function clearAll(Request $request, string $tenantId, FestEvent $event, FestChestNumberService $service, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -271,6 +252,8 @@ class FestChestNumberController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
+            CsvSafety::fputcsv($out, []);
             CsvSafety::fputcsv($out, ['Chest No', 'Fest ID', 'Participant', 'Item', 'Category', 'School']);
             foreach ($rows as $row) {
                 CsvSafety::fputcsv($out, [
@@ -325,7 +308,7 @@ class FestChestNumberController extends SahodayaAdminController
                     'is_team'           => true,
                     'member_count'      => $members->count(),
                     'chest_no'          => $group?->chest_no,
-                    'chest_is_manual'   => (bool) $group?->chest_is_manual,
+                    'order_no'          => $group?->order_no,
                     'chest_revealed_at' => $group?->chest_revealed_at,
                     'fest_id'           => null,
                     'item_reg'          => $first->item_registration_number,
@@ -347,7 +330,7 @@ class FestChestNumberController extends SahodayaAdminController
             'id'                => $p->id,
             'is_team'           => false,
             'chest_no'          => $p->chest_no,
-            'chest_is_manual'   => (bool) $p->chest_is_manual,
+            'order_no'          => $p->order_no,
             'chest_revealed_at' => $p->chest_revealed_at,
             'fest_id'           => $p->level_registration_number,
             'item_reg'          => $p->item_registration_number,

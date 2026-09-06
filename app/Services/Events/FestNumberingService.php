@@ -88,19 +88,38 @@ class FestNumberingService
             $eventIds = $event->reportableEventIds();
             $itemIds = $event->reportableItemIds([$item->id]);
 
-            $max = FestParticipant::whereIn('event_id', $eventIds)
+            // Every item sharing a head shares one identity space (a student keeps the same
+            // chest number across sibling items — see resolveChestAssignment()), so a new
+            // number can never collide with ANY number already used anywhere in that head,
+            // regardless of which item handed it out. Previously this only tracked the
+            // single highest number in scope and always continued past it
+            // (max($start, $highest + 1)) — so once any sibling item's numbering climbed
+            // above this item's own configured chest_no_start, that start was silently
+            // superseded and every item under a shared head was forced onto one combined
+            // sequence. Scanning for the lowest free slot at or above this item's own start
+            // instead lets each item's configured range apply independently (e.g. item A
+            // starting at 100, item B at 500) while still guaranteeing uniqueness within the
+            // shared head.
+            $usedByParticipants = FestParticipant::whereIn('event_id', $eventIds)
                 ->where('chest_head_id', $headScope)
                 ->whereNotNull('chest_no')
-                ->max('chest_no');
+                ->pluck('chest_no');
 
-            $groupMax = FestGroup::whereIn('event_id', $eventIds)
+            $usedByGroups = FestGroup::whereIn('event_id', $eventIds)
                 ->whereHas('registration', fn ($q) => $q->whereIn('item_id', $itemIds))
                 ->whereNotNull('chest_no')
-                ->max('chest_no');
+                ->pluck('chest_no');
 
-            $highest = max((int) $max, (int) $groupMax);
+            $used = $usedByParticipants->merge($usedByGroups)
+                ->map(fn ($n) => (int) $n)
+                ->flip();
 
-            return $highest > 0 ? max($start, $highest + 1) : $start;
+            $candidate = $start;
+            while ($used->has($candidate)) {
+                $candidate++;
+            }
+
+            return $candidate;
         });
     }
 
