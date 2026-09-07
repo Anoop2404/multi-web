@@ -1308,55 +1308,48 @@ class FestRegistrationController extends SchoolAdminController
             ->where('school_id', $this->school->id)
             ->with('feeReceipt');
 
-        if ($event->usesPhasedRegionalBilling()) {
-            $batchId = (int) ($request->input('registration_batch_id') ?: $request->input('batch_id') ?: $request->query('registration_batch_id') ?: $request->query('batch_id'));
-            if ($batchId > 0) {
-                $query->where('registration_batch_id', $batchId);
-            } else {
-                $latest = (clone $query)->latest('id')->first();
-                if ($latest) {
-                    $query->where('id', $latest->id);
-                } else {
-                    abort(422, 'Select which registration-level receipt to view.');
-                }
-            }
-        } elseif ($feeService->usesPerHeadBilling($event)) {
-            $headId = (int) ($request->input('head_id') ?: $request->query('head_id'));
-            if ($headId > 0) {
-                $query->where('head_id', $headId);
-            } else {
-                $latest = (clone $query)->latest('id')->first();
-                if ($latest) {
-                    $query->where('id', $latest->id);
-                } else {
-                    abort(422, 'Select which Event Head receipt to view.');
-                }
-            }
-        } elseif ($feeService->usesPerPhaseBilling($event)) {
-            $phaseId = (int) ($request->input('phase_id') ?: $request->query('phase_id'));
-            if ($phaseId > 0) {
-                $query->where('phase_id', $phaseId);
-            } else {
-                $latest = (clone $query)->latest('id')->first();
-                if ($latest) {
-                    $query->where('id', $latest->id);
-                } else {
-                    abort(422, 'Select which phase receipt to view.');
-                }
-            }
+        $batchId = (int) ($request->input('registration_batch_id')
+            ?? $request->input('batch_id')
+            ?? $request->query('registration_batch_id')
+            ?? $request->query('batch_id')
+            ?? $request->route('registration_batch_id')
+            ?? $request->route('batch_id')
+            ?? 0);
+
+        $headId = (int) ($request->input('head_id') ?? $request->query('head_id') ?? $request->route('head_id') ?? 0);
+        $phaseId = (int) ($request->input('phase_id') ?? $request->query('phase_id') ?? $request->route('phase_id') ?? 0);
+
+        if ($batchId > 0) {
+            $query->where('registration_batch_id', $batchId);
+        } elseif ($headId > 0) {
+            $query->where('head_id', $headId);
+        } elseif ($phaseId > 0) {
+            $query->where('phase_id', $phaseId);
         } else {
-            if (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'head_id')) {
-                $query->whereNull('head_id');
-            }
-            if (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'phase_id')) {
-                $query->whereNull('phase_id');
+            $approved = (clone $query)->whereHas('feeReceipt', fn ($q) => $q->where('status', 'approved'))->latest('id')->first();
+            if ($approved) {
+                $query->where('id', $approved->id);
+            } else {
+                $latest = (clone $query)->latest('id')->first();
+                if ($latest) {
+                    $query->where('id', $latest->id);
+                } else {
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'head_id')) {
+                        $query->whereNull('head_id');
+                    }
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'phase_id')) {
+                        $query->whereNull('phase_id');
+                    }
+                }
             }
         }
 
-        $schoolFee = $query->firstOrFail();
+        $schoolFee = $query->first();
+
+        abort_unless($schoolFee, 404, 'No registration fee record found for this school.');
 
         $receipt = $schoolFee->feeReceipt;
-        abort_if(! $receipt || $receipt->status !== 'approved', 403, 'Receipt is not yet approved.');
+        abort_if(! $receipt || $receipt->status !== 'approved', 403, 'Receipt is not yet approved by Sahodaya admin.');
 
         $batchRegistrationIds = $schoolFee->registration_batch_id
             ? $schoolFee->lines()->get()->pluck('meta')->map(fn ($meta) => $meta['registration_id'] ?? null)->filter()->all()
