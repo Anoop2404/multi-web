@@ -802,6 +802,7 @@ class FestIdCardService
             $registration?->event_id,
             $regEvent?->parent_event_id,
         ])));
+        $phaseId = $event->source_phase_id ?? $regEvent?->source_phase_id;
 
         // 1. Check FestVenue table for matching region_id if targetRegionId exists
         if ($targetRegionId) {
@@ -822,11 +823,19 @@ class FestIdCardService
                 return $regionalVenue->name;
             }
 
-            // Check FestPhaseRegion table if phase region venue is set
-            $phaseRegionVenue = \App\Models\FestPhaseRegion::where('region_id', $targetRegionId)
-                ->whereNotNull('venue')
-                ->where('venue', '!=', '')
-                ->value('venue');
+            // Check FestPhaseRegion table if phase region venue is set — scoped to THIS
+            // phase, not just region_id. Same "wrong venue is loaded" class of bug as the
+            // FestVenue query above: without the phase_id scope, a region_id that's also
+            // used by some unrelated phase (any phase on the tenant that happens to reuse
+            // the same region) could silently win with that other phase's venue instead of
+            // falling through to this event's own venue below.
+            $phaseRegionVenue = $phaseId
+                ? \App\Models\FestPhaseRegion::where('phase_id', $phaseId)
+                    ->where('region_id', $targetRegionId)
+                    ->whereNotNull('venue')
+                    ->where('venue', '!=', '')
+                    ->value('venue')
+                : null;
 
             if ($phaseRegionVenue) {
                 return $phaseRegionVenue;
@@ -851,7 +860,6 @@ class FestIdCardService
         // 2.5. This leaf's own phase-level venue — only ever set for a non-regional phase
         // (see FestEventPhase::venue's migration comment; a regional phase's venue lives
         // on FestPhaseRegion instead, already checked in step 1 above).
-        $phaseId = $event->source_phase_id ?? $regEvent?->source_phase_id;
         if ($phaseId) {
             $phaseVenue = \App\Models\FestEventPhase::where('id', $phaseId)->value('venue');
             if (! empty($phaseVenue)) {
