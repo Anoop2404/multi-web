@@ -133,8 +133,14 @@ class FestSchoolEventFeeService
 
             // Head = Event: once fees are configured on the sport event (Settings →
             // Fee settings), its unified columns are the single source of truth.
-            // Blank columns then mean ₹0 — NOT "fall back to config defaults",
-            // otherwise schools see phantom ₹300/₹150 charges the admin never set.
+            // Blank columns then mean ₹0 — NOT "fall back to config defaults" — but the
+            // false branch here used to just skip overwriting these keys, leaving whatever
+            // $event->fee_settings (merged in above) or $sportsDefaults happened to carry —
+            // typically stale JSON from before this event had its own dedicated fee columns,
+            // or from a generic (non-sports) fee form field reusing the same key names. That
+            // silently resurrected exactly the "phantom ₹300/item fee" charge this comment
+            // says can't happen. Explicitly zero every composite key instead of leaving them
+            // untouched, so "not configured" always means ₹0, never "whatever's left over".
             if ($event->hasSportsFeesConfigured()) {
                 $schedule['school_registration_flat'] = (float) ($event->school_registration_fee ?? 0);
                 $schedule['per_student_amount'] = (float) ($event->student_registration_fee ?? 0);
@@ -145,6 +151,14 @@ class FestSchoolEventFeeService
                     : ($schedule['extra_item_fee'] ?? null);
                 $schedule['included_items_per_student'] = (int) ($event->included_items_per_student ?? 0);
                 $schedule['included_teams'] = (int) ($event->included_teams ?? 0);
+            } else {
+                $schedule['school_registration_flat'] = 0.0;
+                $schedule['per_student_amount'] = 0.0;
+                $schedule['team_registration_fee'] = 0.0;
+                $schedule['default_item_fee'] = 0.0;
+                $schedule['extra_item_fee'] = null;
+                $schedule['included_items_per_student'] = 0;
+                $schedule['included_teams'] = 0;
             }
         }
 

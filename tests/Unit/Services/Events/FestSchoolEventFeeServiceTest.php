@@ -543,6 +543,38 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame('sports_composite', $schedule['fee_model']);
     }
 
+    public function test_sports_event_with_no_dedicated_fees_ignores_stale_fee_settings_json(): void
+    {
+        ['sahodaya' => $sahodaya] = $this->festContext();
+
+        // Simulates an event whose fee_settings JSON still carries values from before it had
+        // its own dedicated fee columns (or a generic form field reusing these key names) —
+        // school_registration_fee/student_registration_fee/default_item_fee etc. are all left
+        // null, i.e. hasSportsFeesConfigured() is false, so "not configured" must mean ₹0
+        // everywhere, not "whatever fee_settings happens to still contain".
+        $sportsEvent = FestEvent::create([
+            'tenant_id'    => $sahodaya->id,
+            'title'        => 'Skating Championship',
+            'event_type'   => 'sports',
+            'level_round'  => 'sahodaya',
+            'status'       => 'registration_open',
+            'fee_settings' => [
+                'fee_model'          => 'sports_composite',
+                'per_student_amount' => 300,
+                'default_item_fee'   => 400,
+                'school_registration_flat' => 2000,
+            ],
+        ]);
+
+        $this->assertFalse($sportsEvent->hasSportsFeesConfigured());
+
+        $schedule = app(FestSchoolEventFeeService::class)->resolveSchedule($sportsEvent->fresh());
+
+        $this->assertSame(0.0, $schedule['per_student_amount']);
+        $this->assertSame(0.0, $schedule['default_item_fee']);
+        $this->assertSame(0.0, $schedule['school_registration_flat']);
+    }
+
     public function test_id_cards_require_item_for_students(): void
     {
         $service = app(FestIdCardService::class);
