@@ -564,10 +564,10 @@ class FestSportsCompositeFeeService
         $school = Tenant::find($schoolId);
         $schoolReg = $school
             ? $this->schoolRegistrationAmount($school, $schedule, $event)
-            : (float) ($schedule['school_registration_flat'] ?? $schedule['flat_amount'] ?? 2000);
+            : (float) ($schedule['school_registration_flat'] ?? $schedule['flat_amount'] ?? 0);
 
-        $perStudent = (float) ($schedule['per_student_amount'] ?? 300);
-        $includedQuota = max(0, (int) ($schedule['included_items_per_student'] ?? 2));
+        $perStudent = (float) ($schedule['per_student_amount'] ?? 0);
+        $includedQuota = max(0, (int) ($schedule['included_items_per_student'] ?? 0));
 
         $eventIds = $event->reportableEventIds();
 
