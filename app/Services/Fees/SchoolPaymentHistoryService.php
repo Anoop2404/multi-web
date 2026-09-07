@@ -158,6 +158,7 @@ class SchoolPaymentHistoryService
             'transaction_ref'      => $p->transaction_ref,
             'receipt_number'       => $p->feeReceipt?->receipt_number,
             'proof_url'            => $this->membershipProofUrl($p, $urlSchoolId),
+            'attachments'          => $this->programAttachmentUrls($p->feeReceipt, $urlSchoolId, $sahodayaId),
             'receipt_url'          => $this->membershipReceiptUrl($p, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $p->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $p->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -198,6 +199,7 @@ class SchoolPaymentHistoryService
             'transaction_ref'      => $primaryReceipt?->transaction_ref,
             'receipt_number'       => $primaryReceipt?->receipt_number,
             'proof_url'            => $this->programProofUrl($primaryReceipt, $schoolId, $urlSchoolId, $sahodayaId, $f->event, $f->id),
+            'attachments'          => $this->programAttachmentUrls($primaryReceipt, $urlSchoolId, $sahodayaId),
             'receipt_url'          => $this->programReceiptUrl($primaryReceipt, $schoolId, $urlSchoolId, $sahodayaId, $f->event),
             'receipt_email_status' => $primaryReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $primaryReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -243,6 +245,7 @@ class SchoolPaymentHistoryService
             'transaction_ref'      => $primaryReceipt?->transaction_ref,
             'receipt_number'       => $primaryReceipt?->receipt_number,
             'proof_url'            => $this->programProofUrl($primaryReceipt, $schoolId, $urlSchoolId, $sahodayaId),
+            'attachments'          => $this->programAttachmentUrls($primaryReceipt, $urlSchoolId, $sahodayaId),
             'receipt_url'          => $this->programReceiptUrl($primaryReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $primaryReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $primaryReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -282,6 +285,7 @@ class SchoolPaymentHistoryService
             'transaction_ref'      => $primaryReceipt?->transaction_ref,
             'receipt_number'       => $primaryReceipt?->receipt_number,
             'proof_url'            => $this->programProofUrl($primaryReceipt, $schoolId, $urlSchoolId, $sahodayaId),
+            'attachments'          => $this->programAttachmentUrls($primaryReceipt, $urlSchoolId, $sahodayaId),
             'receipt_url'          => $this->programReceiptUrl($primaryReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $primaryReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $primaryReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -321,6 +325,7 @@ class SchoolPaymentHistoryService
             'transaction_ref'      => $primaryReceipt?->transaction_ref,
             'receipt_number'       => $primaryReceipt?->receipt_number,
             'proof_url'            => $this->programProofUrl($primaryReceipt, $schoolId, $urlSchoolId, $sahodayaId),
+            'attachments'          => $this->programAttachmentUrls($primaryReceipt, $urlSchoolId, $sahodayaId),
             'receipt_url'          => $this->programReceiptUrl($primaryReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $primaryReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $primaryReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -364,6 +369,7 @@ class SchoolPaymentHistoryService
             'transaction_ref'      => $primaryReceipt?->transaction_ref,
             'receipt_number'       => $primaryReceipt?->receipt_number,
             'proof_url'            => $this->programProofUrl($primaryReceipt, $schoolId, $urlSchoolId, $sahodayaId),
+            'attachments'          => $this->programAttachmentUrls($primaryReceipt, $urlSchoolId, $sahodayaId),
             'receipt_url'          => $this->programReceiptUrl($primaryReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $primaryReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $primaryReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -408,6 +414,11 @@ class SchoolPaymentHistoryService
             $receipts = collect([$feeable->feeReceipt]);
         }
 
+        // $receipts is a plain Support Collection when it came from the single
+        // feeReceipt fallback above, so loadMissing() (an Eloquent Collection method)
+        // isn't safe to call on it directly — load per-model instead.
+        $receipts->each(fn (FeeReceipt $r) => $r->loadMissing('attachments'));
+
         $schoolId = $feeable->school_id ?? null;
 
         $receiptRows = $receipts
@@ -428,6 +439,10 @@ class SchoolPaymentHistoryService
                     'receipt_number'   => $r->receipt_number,
                     'proof_url'        => $this->programProofUrl($r, (string) $schoolId, $urlSchoolId, $sahodayaId, $event, $feeable->id ?? null),
                     'receipt_url'      => $this->programReceiptUrl($r, (string) $schoolId, $urlSchoolId, $sahodayaId, $event),
+                    // Extra proof images/PDFs beyond the primary file (see
+                    // FeeReceiptAttachmentService::attachExtra()) — same submission, just
+                    // more evidence images, so surfaced alongside proof_url above.
+                    'attachments'      => $this->programAttachmentUrls($r, $urlSchoolId, $sahodayaId),
                 ];
             });
 
@@ -558,6 +573,24 @@ class SchoolPaymentHistoryService
         }
 
         return null;
+    }
+
+    /**
+     * @return list<array{id: int, url: string}>
+     */
+    private function programAttachmentUrls(?FeeReceipt $receipt, ?string $urlSchoolId, ?string $sahodayaId): array
+    {
+        if (! $receipt || $receipt->isSystemCredit()) {
+            return [];
+        }
+
+        return $receipt->attachments->map(function (\App\Models\FeeReceiptAttachment $a) use ($urlSchoolId, $sahodayaId) {
+            $url = $urlSchoolId
+                ? "/school-admin/{$urlSchoolId}/payments/attachments/{$a->id}"
+                : ($sahodayaId ? "/sahodaya-admin/{$sahodayaId}/finance/payments/attachments/{$a->id}" : null);
+
+            return $url ? ['id' => $a->id, 'url' => $url] : null;
+        })->filter()->values()->all();
     }
 
     private function programReceiptUrl(

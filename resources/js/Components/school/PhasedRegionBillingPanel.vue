@@ -187,6 +187,7 @@
                                 <th class="px-3 py-2 text-right">Amount (₹)</th>
                                 <th class="px-3 py-2">Status</th>
                                 <th class="px-3 py-2">Reviewed</th>
+                                <th class="px-3 py-2">Proof</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 bg-white">
@@ -207,6 +208,15 @@
                                 <td class="px-3 py-2 text-slate-500">
                                     <span v-if="receipt.reviewed_at">{{ formatDate(receipt.reviewed_at) }}<span v-if="receipt.reviewed_by"> · {{ receipt.reviewed_by }}</span></span>
                                     <span v-else>—</span>
+                                </td>
+                                <td class="px-3 py-2">
+                                    <div class="flex flex-wrap gap-2">
+                                        <a v-if="receipt.proof_url" :href="receipt.proof_url" target="_blank" rel="noopener"
+                                           class="text-indigo-600 hover:text-indigo-800 font-semibold underline">View</a>
+                                        <a v-for="(att, idx) in receipt.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener"
+                                           class="text-indigo-600 hover:text-indigo-800 font-semibold underline">+{{ idx + 1 }}</a>
+                                        <span v-if="!receipt.proof_url" class="text-slate-400">—</span>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>

@@ -1461,7 +1461,7 @@ class FestRegistrationController extends SchoolAdminController
     private function receiptHistoryPayload(FestSchoolEventFee $fee): array
     {
         return $fee->receipts()
-            ->with('reviewedBy:id,name')
+            ->with(['reviewedBy:id,name', 'attachments'])
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (FeeReceipt $r) => [
@@ -1476,6 +1476,16 @@ class FestRegistrationController extends SchoolAdminController
                 'reviewed_by'      => $r->reviewedBy?->name,
                 'rejection_reason' => $r->rejection_reason,
                 'receipt_number'   => $r->receipt_number,
+                // The primary proof file plus any extra images/PDFs attached to the same
+                // submission (FeeReceiptAttachmentService::attachExtra()) — the school
+                // should be able to review what it actually sent, not just re-type-in data.
+                'proof_url'        => $r->file_path
+                    ? route('school.payments.program.proof', ['tenantId' => $this->school->id, 'feeReceipt' => $r->id])
+                    : null,
+                'attachments'      => $r->attachments->map(fn (\App\Models\FeeReceiptAttachment $a) => [
+                    'id'  => $a->id,
+                    'url' => route('school.payments.attachment', ['tenantId' => $this->school->id, 'attachment' => $a->id]),
+                ])->values()->all(),
             ])
             ->values()
             ->all();

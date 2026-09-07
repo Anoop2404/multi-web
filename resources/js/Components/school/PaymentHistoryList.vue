@@ -18,6 +18,10 @@
                     Uploaded {{ formatDateTime(row.uploaded_at) }}
                     <span v-if="row.transaction_ref"> · Ref {{ row.transaction_ref }}</span>
                 </div>
+                <div v-if="row.proof_url || row.attachments?.length" class="mt-0.5 flex flex-wrap gap-1.5">
+                    <a v-if="row.proof_url" :href="row.proof_url" target="_blank" rel="noopener" class="text-indigo-700 underline font-semibold">View proof</a>
+                    <a v-for="(att, idx) in row.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener" class="text-indigo-700 underline font-semibold">+{{ idx + 1 }}</a>
+                </div>
                 <div v-if="row.reviewed_at" class="text-slate-500">
                     Reviewed {{ formatDateTime(row.reviewed_at) }}
                     <span v-if="row.reviewed_by"> by {{ row.reviewed_by }}</span>

@@ -114,6 +114,7 @@
                             <div class="flex items-center gap-2">
                                 <a v-if="r.receipt_url" :href="r.receipt_url" target="_blank" rel="noopener" class="text-indigo-600 font-semibold hover:underline">Receipt ↗</a>
                                 <a v-if="r.proof_url" :href="r.proof_url" target="_blank" rel="noopener" class="text-slate-600 font-semibold hover:underline">Proof ↗</a>
+                                <a v-for="(att, idx) in r.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener" class="text-slate-600 font-semibold hover:underline">Proof +{{ idx + 1 }} ↗</a>
                                 <a v-if="r.credit_note_url" :href="r.credit_note_url" target="_blank" rel="noopener" class="text-amber-700 font-semibold hover:underline">Credit note ↗</a>
                             </div>
                         </div>
@@ -135,6 +136,10 @@
                             @click="openProofPreview(p)">
                         Proof
                     </button>
+                    <a v-for="(att, idx) in p.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener"
+                       class="btn-secondary text-xs !py-1.5 !px-3">
+                        +{{ idx + 1 }}
+                    </a>
                 </div>
             </div>
         </div>
