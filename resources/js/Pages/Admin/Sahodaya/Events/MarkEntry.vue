@@ -203,12 +203,12 @@
                                      Rank/Score/Grade loses track of which row you're on, and
                                      reaching Save requires scrolling all the way back. -->
                                 <th class="p-3.5 w-10 text-center sticky left-0 z-20 bg-slate-50 border-r border-slate-200">#</th>
-                                <th class="p-3.5 w-32">Chest No.</th>
-                                <th class="p-3.5 w-32">Order</th>
-                                <th class="p-3.5 w-36">Reg No.</th>
+                                <th class="p-3.5 w-24">Chest No.</th>
+                                <th class="p-3.5 w-28">Order</th>
+                                <th class="p-3.5 w-28">Reg No.</th>
                                 <th class="p-3.5 w-32">Attendance</th>
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
-                                <th class="p-3.5 w-44">Rank</th>
+                                <th class="p-3.5 w-32">Rank</th>
                                  <template v-if="hasJudgePanel">
                                     <th v-for="j in judgeNumbers" :key="j" class="p-3.5 w-32">
                                         Judge {{ j }}
@@ -245,7 +245,7 @@
                                     <SearchableSelect :model-value="participant.order_no ?? ''"
                                             :disabled="itemLocked"
                                             :options="orderOptionsFor(section, participant.id).map((n) => ({ value: n, label: String(n) }))"
-                                            :all-option="true" all-label="— No order —"
+                                            :all-option="true" all-label="—"
                                             @update:model-value="(value) => saveOrderNo(participant, value)" />
                                 </td>
 
@@ -288,7 +288,7 @@
                                     <SearchableSelect :model-value="markForms[participant.id].position ?? ''"
                                             :disabled="isAbsent(participant, item) || itemLocked"
                                             :options="rankOptionsFor(section).map((opt) => ({ value: opt.rank, label: opt.label }))"
-                                            :all-option="true" all-label="— Select Rank —"
+                                            :all-option="true" all-label="—"
                                             @update:model-value="(value) => setRank(participant.id, item, markForms, value)" />
                                 </td>
 
