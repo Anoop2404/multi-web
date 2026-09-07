@@ -47,6 +47,24 @@ class FestRegistrationBatchFeeService
                 $root, $schoolId, $batch, $schedule, $composite, $primaryBatch, $force,
             ));
 
+        $rollup = $this->syncRollup($root, $schoolId, $records);
+
+        // Offset any outstanding FestFeeCredit (e.g. from a rejection/cancellation that
+        // freed up part of what was paid — see rejectMany()/cancelWithRefund()) against the
+        // rollup, the same record currentFeeRecordFor() resolves credits against for phased-
+        // billing events. Mirrors FestSchoolEventFeeService::recalculate()'s identical call
+        // for every other billing mode — previously missing here, so a batch-billed school's
+        // credit just sat there forever instead of reducing their next outstanding balance.
+        $this->fees->applyAvailableCredit($rollup, $root);
+
+        // applyAvailableCredit() ends with a generic refreshPaidState() call, which derives
+        // amount_paid from ONLY the rollup's own receipts (the new system credit receipt it
+        // just created) — it has no notion of syncRollup()'s combined-across-batches sum, so
+        // it would otherwise clobber amount_paid down to just the credit amount, discarding
+        // every batch's real payment. Re-syncing recomputes the correct combined figure
+        // (rollup's own receipts, now including that credit receipt, PLUS each batch's own
+        // amount_paid) — a no-op, still-correct extra write on the far more common path
+        // where there was no outstanding credit to apply at all.
         $this->syncRollup($root, $schoolId, $records);
 
         return $records;
@@ -483,7 +501,7 @@ class FestRegistrationBatchFeeService
     }
 
     /** @param Collection<int, FestSchoolEventFee> $records */
-    private function syncRollup(FestEvent $root, string $schoolId, Collection $records): void
+    private function syncRollup(FestEvent $root, string $schoolId, Collection $records): FestSchoolEventFee
     {
         // firstOrNew() + save() alone is a check-then-write race: two overlapping requests
         // recalculating the same school at once (e.g. two admin actions moments apart, since
@@ -492,7 +510,7 @@ class FestRegistrationBatchFeeService
         // registration_batch_id=null rows that then double-count in every dashboard/report
         // that sums this table. lockForUpdate() inside a transaction matches the pattern
         // recalculateBatch() already uses for the same reason. See Documents/Path_breaks.md.
-        DB::transaction(function () use ($root, $schoolId, $records) {
+        return DB::transaction(function () use ($root, $schoolId, $records) {
             $rollup = FestSchoolEventFee::where([
                 'event_id' => $root->id,
                 'school_id' => $schoolId,
@@ -523,6 +541,8 @@ class FestRegistrationBatchFeeService
                     : ($combinedPaid > 0 ? 'partial' : 'pending'),
             ]);
             $rollup->save();
+
+            return $rollup;
         });
     }
 

@@ -41,11 +41,12 @@ class FestSchoolPhaseRegionService
         // A school with an already-paid invoice can be moved with $override=true (that
         // flag only bypasses the lock-after-registration-started check above) with zero
         // warning otherwise -- migrateRegistrations() itself never touches amount_paid,
-        // but the invoice's total_due/line items stay frozen on the OLD registrations
-        // ("paid invoices are immutable", see FestRegistrationBatchFeeService::
-        // recalculateBatch()) until someone explicitly runs a forced recalculation. Make
-        // that consequence something the admin has to actively acknowledge, not a silent
-        // side effect they discover later as "the billing looks wrong."
+        // and total_due DOES now update automatically to match wherever the registrations
+        // end up (recalculateBatch() no longer freezes a paid level's total_due -- see its
+        // own docblock). Still worth an explicit acknowledgement, though: switching regions
+        // can genuinely change what a school owes (different phase, different fee), and
+        // that's a real financial consequence the admin should consciously confirm, not
+        // discover later as "why did the invoice change."
         if ($override && ! $acknowledgePaidInvoice) {
             $paidTotal = (float) FestSchoolEventFee::where('event_id', $root->id)
                 ->where('school_id', $schoolId)
@@ -54,7 +55,7 @@ class FestSchoolPhaseRegionService
             if ($paidTotal > 0) {
                 throw ValidationException::withMessages([
                     'region_id' => sprintf(
-                        'This school has already paid ₹%s toward this event. Switching regions will not update that invoice automatically -- run fest:recalculate-batch-billing afterward to reconcile it. Confirm to proceed anyway.',
+                        'This school has already paid ₹%s toward this event. Switching regions may change what is owed, and the invoice will update automatically to match. Confirm to proceed anyway.',
                         number_format($paidTotal, 2),
                     ),
                 ]);
@@ -269,14 +270,10 @@ class FestSchoolPhaseRegionService
             app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
         }
 
-        // Without force: true, recalculateBatch() deliberately leaves a paid fee record's
-        // total_due/line items untouched ("paid invoices are immutable" -- protects
-        // against silently rewriting financial history on an ordinary registration
-        // edit). A region switch is not an ordinary edit: the admin already explicitly
-        // acknowledged the paid invoice above to get here at all, so the whole point of
-        // that acknowledgement is that the invoice SHOULD now be corrected to match
-        // where the registrations actually ended up -- not left stale, requiring a
-        // developer to separately run fest:recalculate-batch-billing by hand.
+        // recalculateBatch() always recomputes total_due live now (see its own docblock),
+        // so this brings the invoice in line with wherever the registrations actually ended
+        // up with no further action needed. $forceFeeRecalc/force is kept only for backward
+        // compatibility with recalculateBatch()'s signature -- it no longer changes anything.
         // amount_paid itself is still never touched by recalculateBatch() regardless.
         app(FestRegistrationBatchFeeService::class)->recalculateAll($root, $schoolId, force: $forceFeeRecalc);
     }

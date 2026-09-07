@@ -110,10 +110,17 @@ class FestRegistrationBulkService
                 // Lock the school's aggregate fee record (if one exists yet) for the duration
                 // of the before/after snapshot below, so two reject/cancel actions racing on
                 // the same school can't both read the same "before" state and either compute
-                // a wrong delta or double-issue a credit.
+                // a wrong delta or double-issue a credit. Must match currentFeeRecordFor()'s
+                // own scoping exactly (the extra registration_batch_id filter for phased
+                // events) — without it, whereNull('head_id') alone matches BOTH the rollup
+                // row AND every individual payment-level row (they all have head_id = null
+                // too), so ->first() could lock an arbitrary level row instead of the rollup
+                // the before/after snapshot and credit creation actually read/write, leaving
+                // the race this lock exists to prevent unprotected for phased-billing events.
                 FestSchoolEventFee::where('event_id', $feeOwnerEventId)
                     ->where('school_id', $registration->school_id)
                     ->whereNull('head_id')
+                    ->when($event->usesPhasedRegionalBilling(), fn ($q) => $q->whereNull('registration_batch_id'))
                     ->lockForUpdate()
                     ->first();
 

@@ -1777,6 +1777,12 @@ class FestSchoolEventFeeService
      * actually create FestFeeCredit rows (see currentFeeRecordFor()'s docblock) — a no-op for
      * per-head-billed records.
      *
+     * Public so FestRegistrationBatchFeeService::recalculateAll() can call it on the rollup
+     * record too (phased_regional_billing events) — that's the record currentFeeRecordFor()
+     * resolves to, and thus where rejectMany()/cancelWithRefund() attach a FestFeeCredit for
+     * those events, but nothing previously offset it back against a later invoice the way this
+     * already does for every other billing mode.
+     *
      * Deliberately does NOT fold the credit into total_due or write amount_paid directly —
      * refreshPaidState() recomputes amount_paid from scratch as sum(approved FeeReceipt) every
      * time it runs (see TracksPartialPayments), so anything bypassing that would be silently
@@ -1795,7 +1801,7 @@ class FestSchoolEventFeeService
      *
      * See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.2/§13.3.
      */
-    private function applyAvailableCredit(FestSchoolEventFee $record, FestEvent $event): void
+    public function applyAvailableCredit(FestSchoolEventFee $record, FestEvent $event): void
     {
         if ($record->head_id !== null || ! $record->exists) {
             return;

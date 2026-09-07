@@ -55,10 +55,15 @@ class FestRegistrationService
             // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4. Must lock under the fee
             // OWNER event (the hub, for a partitioned child) — recalculate() always persists
             // the record there, so locking by $event->id directly locked a row that never
-            // existed for a region child, silently defeating the lock.
+            // existed for a region child, silently defeating the lock. Also needs the same
+            // registration_batch_id scoping currentFeeRecordFor() uses for phased-billing
+            // events — whereNull('head_id') alone matches both the rollup row and every
+            // individual payment-level row, so without it this could lock an arbitrary level
+            // row instead of the one recalculate() actually reads/writes.
             FestSchoolEventFee::where('event_id', $feeOwnerEventId)
                 ->where('school_id', $registration->school_id)
                 ->whereNull('head_id')
+                ->when($event->usesPhasedRegionalBilling(), fn ($q) => $q->whereNull('registration_batch_id'))
                 ->lockForUpdate()
                 ->first();
 
@@ -153,10 +158,12 @@ class FestRegistrationService
         $studentIds = $registration->participants->pluck('student_id')->filter()->unique();
 
         $creditAmount = DB::transaction(function () use ($event, $registration, $feeService, $reason, $participantIds, $studentIds, $feeOwnerEventId) {
-            // Locked under the fee OWNER event — see cancel() above for why.
+            // Locked under the fee OWNER event, with the same registration_batch_id scoping
+            // for phased-billing events — see cancel() above for why both matter.
             FestSchoolEventFee::where('event_id', $feeOwnerEventId)
                 ->where('school_id', $registration->school_id)
                 ->whereNull('head_id')
+                ->when($event->usesPhasedRegionalBilling(), fn ($q) => $q->whereNull('registration_batch_id'))
                 ->lockForUpdate()
                 ->first();
 

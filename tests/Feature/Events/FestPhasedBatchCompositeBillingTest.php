@@ -325,4 +325,59 @@ class FestPhasedBatchCompositeBillingTest extends TestCase
         $this->assertNotSame('approved', $recalculated->status);
         $this->assertSame('submitted', $registration1->fresh()->status);
     }
+
+    public function test_a_credit_auto_applies_against_the_rollups_next_outstanding_balance(): void
+    {
+        ['school' => $school, 'root' => $root, 'digiItem' => $digiItem, 'sargadharaItem' => $sargadharaItem, 'level1' => $level1, 'level2' => $level2] = $this->mcsFixture();
+        $student = $this->makeStudent($school);
+        $this->register($root, $digiItem, $school, $student);
+        $this->register($root, $sargadharaItem, $school, $student);
+
+        $service = app(FestRegistrationBatchFeeService::class);
+        $level1Fee = $service->recalculateBatch($root, $school->id, $level1);
+        $service->recalculateBatch($root, $school->id, $level2);
+
+        // Pay Level 1 in full; leave Level 2 unpaid, so the rollup carries an outstanding
+        // balance for the credit below to have something to offset against.
+        FeeReceipt::create([
+            'feeable_type' => FestSchoolEventFee::class,
+            'feeable_id' => $level1Fee->id,
+            'file_path' => 'test/receipt.pdf',
+            'payment_date' => now()->toDateString(),
+            'amount' => (float) $level1Fee->total_due,
+            'status' => 'approved',
+        ]);
+        $level1Fee->refreshPaidState();
+
+        $service->recalculateAll($root, $school->id);
+        $rollup = FestSchoolEventFee::where('event_id', $root->id)->where('school_id', $school->id)
+            ->whereNull('registration_batch_id')->whereNull('head_id')->firstOrFail();
+        $outstandingBefore = (float) $rollup->outstandingBalance();
+        $this->assertGreaterThan(0, $outstandingBefore, 'Level 2 should still be outstanding after only Level 1 is paid.');
+
+        // Simulate a rejection freeing up part of what was already paid — exactly what
+        // FestRegistrationBulkService::rejectMany()/FestRegistrationService::
+        // cancelWithRefund() create, attached to the rollup (currentFeeRecordFor()'s target
+        // for phased-billing events).
+        $creditAmount = min(500.0, $outstandingBefore);
+        $credit = \App\Models\FestFeeCredit::create([
+            'fest_school_event_fee_id' => $rollup->id,
+            'amount' => $creditAmount,
+            'reason' => 'Test credit',
+        ]);
+
+        // recalculateAll() with nothing else changed must auto-offset the credit against
+        // the still-outstanding Level 2 balance — previously nothing did this for
+        // phased-billing events, so an issued credit just sat there forever.
+        $service->recalculateAll($root, $school->id);
+        $rollup = $rollup->fresh();
+
+        $this->assertNotNull($credit->fresh()->applied_at, 'The credit must be marked applied.');
+        $this->assertSame(round($outstandingBefore - $creditAmount, 2), (float) $rollup->outstandingBalance());
+        $this->assertTrue(
+            FeeReceipt::where('feeable_id', $rollup->id)->where('feeable_type', FestSchoolEventFee::class)
+                ->where('is_system_credit', true)->exists(),
+            'A system credit-adjustment receipt must be created.',
+        );
+    }
 }
