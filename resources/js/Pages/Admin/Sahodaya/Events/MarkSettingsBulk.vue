@@ -93,6 +93,37 @@
             </div>
         </div>
 
+        <!-- BULK RUBRIC TEMPLATE ASSIGNMENT -->
+        <div v-if="rubricTemplates.length" class="card !p-4 mb-5 bg-emerald-50/40 border-emerald-100 space-y-3">
+            <div class="flex items-center gap-2 border-b border-emerald-100/80 pb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1">
+                    <span>📋 Bulk Apply Judging Sheet (Rubric Template)</span>
+                </span>
+                <span class="text-[11px] text-slate-500 font-medium">
+                    ({{ selectedIds.length ? `${selectedIds.length} items selected` : 'Applies to all filtered items' }})
+                </span>
+            </div>
+
+            <div class="flex flex-wrap items-end gap-3 text-xs">
+                <div class="flex-1 min-w-[14rem]">
+                    <label class="font-bold text-slate-800 block mb-1">Rubric Template</label>
+                    <SearchableSelect v-model="templateForm.template_id" :options="templateOptions" :all-option="false"
+                                      placeholder="Select a judging sheet..." />
+                </div>
+                <label class="flex items-center gap-1.5 text-slate-700 font-semibold pb-2">
+                    <input type="checkbox" v-model="templateForm.sync_to_child_events" class="rounded border-slate-300 text-emerald-600">
+                    <span>Also sync to matching items on other regions/phases</span>
+                </label>
+                <button type="button" class="btn-primary text-xs !bg-emerald-600 hover:!bg-emerald-700 font-bold shrink-0"
+                        :disabled="applyingTemplate || !templateForm.template_id" @click="applyTemplateToSelection">
+                    {{ applyingTemplate ? 'Applying...' : '📋 Apply Judging Sheet' }}
+                </button>
+            </div>
+            <p class="text-[11px] text-slate-500">
+                Replaces the scoring columns on every selected item with this template's criteria — any existing per-item criteria are overwritten.
+            </p>
+        </div>
+
         <!-- SEARCH & FILTERS BAR -->
         <div class="card !p-4 space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
@@ -198,6 +229,7 @@ import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, items: { type: Array, default: () => [] },
+    rubricTemplates: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
 });
@@ -306,6 +338,41 @@ function applyBatch(field) {
             settingsState[item.id].judge_count = batchForm.judge_count;
         }
     }
+}
+
+const templateOptions = computed(() => (props.rubricTemplates ?? []).map(t => ({
+    value: String(t.id),
+    label: t.name,
+})));
+
+const templateForm = reactive({
+    template_id: '',
+    sync_to_child_events: false,
+});
+
+const applyingTemplate = ref(false);
+
+function applyTemplateToSelection() {
+    if (!templateForm.template_id) return;
+
+    const targetIds = selectedIds.value.length
+        ? selectedIds.value
+        : filteredItems.value.map(i => i.id);
+
+    if (!targetIds.length) return;
+
+    applyingTemplate.value = true;
+
+    router.post(`${base}/mark-settings/bulk-apply-template`, {
+        template_id: Number(templateForm.template_id),
+        item_ids: targetIds,
+        sync_to_child_events: templateForm.sync_to_child_events,
+    }, {
+        preserveScroll: true,
+        onFinish: () => {
+            applyingTemplate.value = false;
+        },
+    });
 }
 
 function saveAll() {

@@ -224,6 +224,33 @@ class FestMarkCriteriaService
     }
 
     /**
+     * Apply one rubric template to many items in a single pass — the bulk counterpart to
+     * applyTemplateToItem(), for configuring a whole event's judging sheets (e.g. every
+     * Kalotsav item) in one action instead of opening each item individually.
+     *
+     * @param  list<int>  $itemIds  ids of FestEventItem rows belonging to $event
+     * @return array{applied: int, synced: int}
+     */
+    public function applyTemplateToItems(FestEvent $event, FestScoringRubricTemplate $template, array $itemIds, bool $syncToChildEvents = false): array
+    {
+        $items = FestEventItem::where('event_id', $event->id)->whereIn('id', $itemIds)->get();
+
+        $applied = 0;
+        $synced = 0;
+
+        foreach ($items as $item) {
+            $this->applyTemplateToItem($event, $template, $item);
+            $applied++;
+
+            if ($syncToChildEvents) {
+                $synced += $this->syncCriteriaToChildEvents($event, $item);
+            }
+        }
+
+        return ['applied' => $applied, 'synced' => $synced];
+    }
+
+    /**
      * Propagate an item's criteria, judge count, and total marks to matching items
      * across all related child/hub events (e.g. phases/regions).
      */

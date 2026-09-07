@@ -656,11 +656,58 @@ class FestMarkEntryController extends SahodayaAdminController
             ])
             ->values();
 
+        $rubricTemplates = FestScoringRubricTemplate::forTenant($this->sahodaya->id)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return $this->inertia('Sahodaya/Events/MarkSettingsBulk', $this->withEventActivity($event, FestPageActivity::MARK_SETTINGS, [
-            'event'       => $event,
-            'items'       => $items,
-            'childEvents' => $this->scopedChildEventOptions($event),
+            'event'           => $event,
+            'items'           => $items,
+            'rubricTemplates' => $rubricTemplates,
+            'childEvents'     => $this->scopedChildEventOptions($event),
         ]));
+    }
+
+    /**
+     * Bulk counterpart to applyTemplate() — assigns one rubric template's judging sheet
+     * to every selected item in one pass (e.g. all Kalotsav items of a given type), with
+     * an option to also propagate to matching items on region/phase partition copies.
+     */
+    public function bulkApplyTemplate(Request $request, string $tenantId, FestEvent $event, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'template_id'          => 'required|integer|exists:fest_scoring_rubric_templates,id',
+            'item_ids'             => 'required|array|min:1',
+            'item_ids.*'           => 'integer|exists:fest_event_items,id',
+            'sync_to_child_events' => 'nullable|boolean',
+        ]);
+
+        $template = FestScoringRubricTemplate::findOrFail($data['template_id']);
+        abort_if($template->tenant_id !== $this->sahodaya->id, 404);
+
+        $result = $criteriaService->applyTemplateToItems(
+            $event,
+            $template,
+            $data['item_ids'],
+            (bool) ($data['sync_to_child_events'] ?? false),
+        );
+
+        $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.criteria.template_bulk_applied', "Rubric template \"{$template->name}\" bulk-applied to {$result['applied']} item(s)", [
+            'template_id'   => $template->id,
+            'item_ids'      => $data['item_ids'],
+            'applied_count' => $result['applied'],
+            'synced_count'  => $result['synced'],
+        ]);
+
+        $message = "Rubric template \"{$template->name}\" applied to {$result['applied']} item(s).";
+        if ($result['synced'] > 0) {
+            $message .= " Synced to {$result['synced']} matching item(s) on other regions/phases.";
+        }
+
+        return back()->with('success', $message);
     }
 
     public function bulkUpdateMarkSettings(Request $request, string $tenantId, FestEvent $event, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)

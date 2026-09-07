@@ -1236,6 +1236,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/mark-settings', [FestMarkEntryController::class, 'markSettings'])->name('mark-settings.index');
             Route::get('/{event}/mark-settings/bulk', [FestMarkEntryController::class, 'markSettingsBulk'])->name('mark-settings.bulk');
             Route::post('/{event}/mark-settings/bulk', [FestMarkEntryController::class, 'bulkUpdateMarkSettings'])->name('mark-settings.bulk-update');
+            Route::post('/{event}/mark-settings/bulk-apply-template', [FestMarkEntryController::class, 'bulkApplyTemplate'])->name('mark-settings.bulk-apply-template');
             Route::post('/{event}/items/{item}/mark-criteria', [FestMarkEntryController::class, 'saveCriteria'])->name('items.mark-criteria.save');
             Route::post('/{event}/items/{item}/mark-criteria/copy', [FestMarkEntryController::class, 'copyCriteria'])->name('items.mark-criteria.copy');
             Route::post('/{event}/items/{item}/mark-criteria/apply-template', [FestMarkEntryController::class, 'applyTemplate'])->name('items.mark-criteria.apply-template');
