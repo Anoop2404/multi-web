@@ -21,6 +21,14 @@ use Tests\TestCase;
  * scan every Sahodaya/event in one run, matching fest:audit-event-topology's convention.
  * Covers: the new no-filter scan reaches multiple tenants, dry-run never writes, and
  * --commit actually persists a corrected total_due without touching amount_paid.
+ *
+ * recalculateBatch() itself now keeps total_due live on every registration change, even
+ * for a paid level (see FestRegistrationBatchFeeService — the immutability freeze this
+ * command was originally built to work around is gone), so drift can no longer accumulate
+ * going forward. These tests still manufacture a stale stored total_due directly (bypassing
+ * recalculateBatch entirely) to exercise the command's general-purpose "stored value doesn't
+ * match a fresh calculation" repair path — useful for historic rows and any other source of
+ * drift, not just the removed freeze.
  */
 class FestRecalculateBatchBillingCommandTest extends TestCase
 {
@@ -76,9 +84,11 @@ class FestRecalculateBatchBillingCommandTest extends TestCase
     }
 
     /**
-     * A school pays for ONE registered item, then registers a SECOND item afterward --
-     * total_due stays frozen at the paid ("immutable") amount, silently excluding the
-     * second item's fee, exactly the live gap this command exists to correct.
+     * A school pays for one registered item, then registers a second item afterward and
+     * gets billed correctly (total_due live-tracks both, ₹100) — then the stored total_due
+     * is forced back down to ₹50 directly (bypassing recalculateBatch), simulating a stale
+     * row from any source, which is what fest:recalculate-batch-billing exists to detect and
+     * repair.
      *
      * @return array{sahodaya: Tenant, school: Tenant, root: FestEvent}
      */
@@ -163,9 +173,10 @@ class FestRecalculateBatchBillingCommandTest extends TestCase
             ]);
             $fee->refreshPaidState();
 
-            // Registered AFTER payment -- an ordinary registration action, not the bug
-            // itself. This is what recalculateBatch()'s immutability guard then silently
-            // never bills for.
+            // Registered AFTER payment — an ordinary registration action. recalculateAll()
+            // correctly bills both items live (₹100), so the row is force-reset to the
+            // stale ₹50 below to simulate drift from any other source (a historic row
+            // from before this fix, a direct DB edit, etc.) for the command to repair.
             FestRegistration::create([
                 'event_id' => $root->id,
                 'item_id' => $item2->id,
@@ -174,6 +185,10 @@ class FestRecalculateBatchBillingCommandTest extends TestCase
                 'submitted_at' => now(),
             ]);
             app(FestRegistrationBatchFeeService::class)->recalculateAll($root, $school->id);
+
+            FestSchoolEventFee::where('event_id', $root->id)->where('school_id', $school->id)
+                ->whereNotNull('registration_batch_id')
+                ->update(['total_due' => 50]);
         });
 
         return ['sahodaya' => $sahodaya, 'school' => $school, 'root' => $root];

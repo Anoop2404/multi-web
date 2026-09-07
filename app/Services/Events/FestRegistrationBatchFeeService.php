@@ -52,6 +52,12 @@ class FestRegistrationBatchFeeService
         return $records;
     }
 
+    /**
+     * $force is accepted only for backward compatibility with existing callers
+     * (fest:recalculate-batch-billing, FestSchoolPhaseRegionService's region-switch
+     * override) — recalculation is unconditional now, see the comment above the
+     * $wasFullyPaidAndApproved snapshot below for why.
+     */
     public function recalculateBatch(
         FestEvent $event,
         string $schoolId,
@@ -64,7 +70,7 @@ class FestRegistrationBatchFeeService
         $root = $event->rootEvent();
         abort_unless($batch->event_id === $root->id, 422, 'Payment level does not belong to this event.');
 
-        return DB::transaction(function () use ($root, $schoolId, $batch, $schedule, $composite, $primaryBatch, $force) {
+        return DB::transaction(function () use ($root, $schoolId, $batch, $schedule, $composite, $primaryBatch) {
             $registrations = $this->registrations($root, $schoolId, $batch);
             $schedule ??= $this->fees->resolveSchedule($root);
             $feeModel = $schedule['fee_model'] ?? 'none';
@@ -240,15 +246,20 @@ class FestRegistrationBatchFeeService
                     'registration_batch_id' => $batch->id,
                 ]);
 
-            if (! $force && $record->exists && (float) $record->amount_paid > 0 && round((float) $record->total_due, 2) !== $total) {
-                // Paid invoices are immutable. Registration changes require the existing
-                // credit/adjustment workflow rather than silently rewriting history. A
-                // deliberate corrective recalculation (see FestRecalculateBatchBilling) may
-                // pass force: true to push a fixed total_due through anyway — amount_paid
-                // itself is never touched by this method regardless, so money already
-                // recorded as paid is unaffected either way.
-                return $record->fresh(['lines', 'registrationBatch']);
-            }
+            // total_due always tracks the school's CURRENT registrations, paid or not —
+            // mirrors FestSchoolEventFeeService::recalculate()'s non-batch behavior (which
+            // never froze this). A previous version of this method froze total_due once
+            // amount_paid > 0, requiring the admin to periodically run
+            // fest:recalculate-batch-billing --commit by hand to catch up on registrations
+            // added/removed after payment — that's what left MES CENTRAL SCHOOL (and others)
+            // silently over/under-billed until manually reconciled. amount_paid itself is
+            // still never written by this method either way — refreshPaidState() below
+            // derives it fresh from actual approved receipts every time, and the
+            // wasFullyPaidAndApproved/demoteSiblingApprovals() pair further down keeps
+            // "approved" honest ("currently backed by payment") instead of a frozen label.
+            // $force is kept only so existing callers (fest:recalculate-batch-billing,
+            // FestSchoolPhaseRegionService's region-switch override) keep working unchanged.
+            $wasFullyPaidAndApproved = $record->exists && $record->status === 'approved' && $record->isFullyPaid();
 
             $record->fill(array_filter([
                 'head_id' => null,
@@ -308,8 +319,51 @@ class FestRegistrationBatchFeeService
 
             $record->refreshPaidState();
 
+            if ($wasFullyPaidAndApproved && ! $record->isFullyPaid()) {
+                $this->demoteSiblingApprovals($root, $schoolId, $batch, $record, $registrations);
+            }
+
             return $record->fresh(['lines', 'registrationBatch']);
         });
+    }
+
+    /**
+     * Batch-scoped twin of FestSchoolEventFeeService::demoteSiblingApprovals() — when a batch
+     * that was fully paid and approved no longer covers its (now higher) total_due, e.g. the
+     * school added more items after paying, every 'approved' registration under THIS batch is
+     * demoted back to 'submitted' so "approved" keeps meaning "currently backed by payment,"
+     * not "was paid once, before something else got added." Scoped per-batch, not per-event —
+     * levels are independently payable and approved (see isPaidForRegistration()/isBatchPaid()
+     * above), so paying off Level 1 again must not touch Level 2's own registrations.
+     * Deliberately does NOT touch chest numbers or marks — a payment-status reversal, not a
+     * withdrawal. $registrations is the same set recalculateBatch() just billed, reused here
+     * rather than re-queried, so what gets demoted can never diverge from what was priced.
+     *
+     * @param  Collection<int, FestRegistration>  $registrations
+     */
+    private function demoteSiblingApprovals(FestEvent $root, string $schoolId, FestRegistrationBatch $batch, FestSchoolEventFee $fee, Collection $registrations): void
+    {
+        $approvedIds = $registrations->where('status', 'approved')->pluck('id');
+        if ($approvedIds->isEmpty()) {
+            return;
+        }
+
+        FestRegistration::whereIn('id', $approvedIds)->update(['status' => 'submitted']);
+
+        app(\App\Services\Audit\PlatformAuditLogger::class)->log(
+            action: 'fest.registration.demoted_unpaid',
+            description: "{$approvedIds->count()} approved registration(s) demoted back to submitted — {$batch->name} balance for \"{$root->title}\" is unpaid again after new items were added",
+            subject: $fee,
+            properties: [
+                'event_id' => $root->id,
+                'registration_batch_id' => $batch->id,
+                'school_id' => $schoolId,
+                'registration_ids' => $approvedIds->all(),
+                'total_due' => (float) $fee->total_due,
+                'amount_paid' => (float) $fee->amount_paid,
+            ],
+            category: 'finance',
+        );
     }
 
     public function batchForRegistration(FestEvent $event, FestRegistration $registration): ?FestRegistrationBatch

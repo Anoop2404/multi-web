@@ -264,7 +264,7 @@ class FestPhasedBatchCompositeBillingTest extends TestCase
         $this->assertSame(1000.0, (float) $rollup->amount_paid);
     }
 
-    public function test_force_recalculation_updates_total_due_on_a_paid_invoice_without_touching_amount_paid(): void
+    public function test_recalculation_stays_live_on_a_paid_invoice_without_touching_amount_paid(): void
     {
         ['school' => $school, 'root' => $root, 'digiItem' => $digiItem, 'sargadharaItem' => $sargadharaItem, 'level1' => $level1] = $this->mcsFixture();
         $student = $this->makeStudent($school);
@@ -283,16 +283,46 @@ class FestPhasedBatchCompositeBillingTest extends TestCase
         $fee->refreshPaidState();
         $this->assertSame(4400.0, (float) $fee->fresh()->amount_paid);
 
-        // A second registration changes what LEVEL_1's true total should be, but the
-        // immutability guard normally blocks this once amount_paid > 0.
+        // A second registration changes what LEVEL_1's true total should be — recalculation
+        // must reflect that live, with no need for a separate forced/manual step, so a school
+        // can never be left silently over/under-billed until someone happens to run the
+        // fest:recalculate-batch-billing command by hand.
         $this->register($root, $sargadharaItem, $school, $student);
         FestEventItem::whereKey($sargadharaItem->id)->update(['phase_id' => $level1->phases()->first()?->id]);
 
-        $unforced = app(FestRegistrationBatchFeeService::class)->recalculateBatch($root, $school->id, $level1);
-        $this->assertSame(4400.0, (float) $unforced->total_due, 'Immutability guard should still apply without force.');
+        $recalculated = app(FestRegistrationBatchFeeService::class)->recalculateBatch($root, $school->id, $level1);
+        $this->assertNotSame(4400.0, (float) $recalculated->total_due);
+        $this->assertSame(4400.0, (float) $recalculated->amount_paid, 'amount_paid must stay untouched by recalculation.');
+    }
 
-        $forced = app(FestRegistrationBatchFeeService::class)->recalculateBatch($root, $school->id, $level1, force: true);
-        $this->assertNotSame(4400.0, (float) $forced->total_due);
-        $this->assertSame(4400.0, (float) $forced->amount_paid, 'amount_paid must stay untouched by a forced recalculation.');
+    public function test_a_batch_that_was_fully_paid_demotes_its_approved_registrations_when_new_items_push_the_total_up(): void
+    {
+        ['school' => $school, 'root' => $root, 'digiItem' => $digiItem, 'sargadharaItem' => $sargadharaItem, 'level1' => $level1] = $this->mcsFixture();
+        $student = $this->makeStudent($school);
+        $registration1 = $this->register($root, $digiItem, $school, $student);
+
+        $fee = app(FestRegistrationBatchFeeService::class)->recalculateBatch($root, $school->id, $level1);
+        FeeReceipt::create([
+            'feeable_type' => FestSchoolEventFee::class,
+            'feeable_id' => $fee->id,
+            'file_path' => 'test/receipt.pdf',
+            'payment_date' => now()->toDateString(),
+            'amount' => (float) $fee->total_due,
+            'status' => 'approved',
+        ]);
+        $fee->refreshPaidState();
+        $this->assertSame('approved', $fee->fresh()->status);
+        $this->assertSame('approved', $registration1->fresh()->status);
+
+        // A new registration pushes LEVEL_1's total back above what's actually been paid —
+        // the level's own status must stop reading "approved" (it's no longer backed by
+        // payment), and the registration that was approved under the old, now-insufficient
+        // total must be sent back to 'submitted' rather than staying misleadingly approved.
+        $this->register($root, $sargadharaItem, $school, $student);
+        FestEventItem::whereKey($sargadharaItem->id)->update(['phase_id' => $level1->phases()->first()?->id]);
+
+        $recalculated = app(FestRegistrationBatchFeeService::class)->recalculateBatch($root, $school->id, $level1);
+        $this->assertNotSame('approved', $recalculated->status);
+        $this->assertSame('submitted', $registration1->fresh()->status);
     }
 }
