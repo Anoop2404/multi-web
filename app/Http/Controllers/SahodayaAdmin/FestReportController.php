@@ -983,12 +983,18 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
-    /** All-items CSV — companion export to itemWise() above, honoring the same FestReportScope (phase/region query params). */
+    /** All-items CSV — companion export to itemWise() above, honoring the same FestReportScope (phase/region query params) and filters. */
     public function exportItemWiseAll(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows();
+        $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows(
+            schoolId: null,
+            category: $request->input('category'),
+            markStatus: $request->input('mark_status'),
+            search: $request->input('search'),
+            itemId: $request->integer('item_id') ?: null,
+        );
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
@@ -1009,16 +1015,19 @@ class FestReportController extends SahodayaAdminController
 
     /**
      * Mark entry report as PDF — chest no / grade / rank / score per registration, same
-     * FestReportScope (phase/region) as itemWise() above. Stamps who generated it and
-     * when (no prior view in this codebase recorded the generating user — every other
-     * "Generated on {date}" footer is timestamp-only), and an optional free-text
-     * ?for_whom= line for a named recipient/audience note.
+     * FestReportScope (phase/region) as itemWise() above and filtered by active category/status/search.
      */
     public function itemWisePdf(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows();
+        $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows(
+            schoolId: null,
+            category: $request->input('category'),
+            markStatus: $request->input('mark_status'),
+            search: $request->input('search'),
+            itemId: $request->integer('item_id') ?: null,
+        );
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.item-wise-marks', [
             'sahodaya'    => $this->sahodaya,

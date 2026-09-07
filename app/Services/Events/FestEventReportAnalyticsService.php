@@ -1939,7 +1939,7 @@ class FestEventReportAnalyticsService
      *                             on the constructor's FestReportScope for authorization).
      * @return list<array<string, mixed>>
      */
-    public function itemWiseReportRows(?string $schoolId = null): array
+    public function itemWiseReportRows(?string $schoolId = null, ?string $category = null, ?string $markStatus = null, ?string $search = null, ?int $itemId = null): array
     {
         // "Category" here means class category (e.g. "Category 1 — Classes 3 & 4"), not the
         // item's arts genre — matches how the item catalog and Fees listing both group/label
@@ -1951,7 +1951,7 @@ class FestEventReportAnalyticsService
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $usesPhasedRegionalBilling = $this->event->rootEvent()->usesPhasedRegionalBilling();
 
-        return FestParticipant::query()
+        $rows = FestParticipant::query()
             ->whereHas('registration', function ($q) use ($schoolId) {
                 $q->whereIn('event_id', $this->eventIds())->active();
                 if ($schoolId) {
@@ -2000,8 +2000,33 @@ class FestEventReportAnalyticsService
                     'position'        => $p->mark?->position,
                     'score'           => $p->mark?->score,
                 ];
-            })
-            ->sortBy(['item_title', 'participant'])
+            });
+
+        if ($category !== null && $category !== '') {
+            $rows = $rows->filter(fn ($r) => $r['category'] === $category);
+        }
+
+        if ($itemId !== null && $itemId > 0) {
+            $rows = $rows->filter(fn ($r) => (int) $r['item_id'] === $itemId);
+        }
+
+        if ($markStatus === 'pending') {
+            $rows = $rows->filter(fn ($r) => $r['grade'] === null && $r['position'] === null && $r['score'] === null);
+        } elseif ($markStatus === 'marked') {
+            $rows = $rows->filter(fn ($r) => $r['grade'] !== null || $r['position'] !== null || $r['score'] !== null);
+        }
+
+        if ($search !== null && trim($search) !== '') {
+            $term = mb_strtolower(trim($search));
+            $rows = $rows->filter(function ($r) use ($term) {
+                return str_contains(mb_strtolower((string) $r['item_title']), $term)
+                    || str_contains(mb_strtolower((string) $r['school_name']), $term)
+                    || str_contains(mb_strtolower((string) $r['participant']), $term)
+                    || str_contains(mb_strtolower((string) $r['item_code']), $term);
+            });
+        }
+
+        return $rows->sortBy(['item_title', 'participant'])
             ->values()
             ->all();
     }

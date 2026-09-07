@@ -164,11 +164,18 @@ watch(availableRegions, (newRegions) => {
     }
 });
 
+const categoryFilter = ref(props.reportScopeSelection.category || '');
+const markStatusFilter = ref(props.reportScopeSelection.mark_status || '');
+const search = ref(props.reportScopeSelection.search || '');
+
 function scopeParams() {
     return {
         scope_mode: scopeRegionId.value ? 'region' : 'combined',
         competition_phase_id: scopePhaseId.value || undefined,
         region_id: scopeRegionId.value || undefined,
+        category: categoryFilter.value || undefined,
+        mark_status: markStatusFilter.value || undefined,
+        search: search.value || undefined,
     };
 }
 
@@ -188,10 +195,6 @@ function scopedUrl(baseUrl, extraParams = {}) {
 
 const exportUrl = computed(() => scopedUrl(props.xlsUrl));
 const pdfExportUrl = computed(() => scopedUrl(props.pdfUrl, { for_whom: forWhom.value }));
-
-const categoryFilter = ref('');
-const markStatusFilter = ref('');
-const search = ref('');
 
 const categoryOptions = computed(() => props.categories.map((c) => ({ value: c.key, label: c.label })));
 const markStatusOptions = [
