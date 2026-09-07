@@ -1309,11 +1309,11 @@ class FestRegistrationController extends SchoolAdminController
             ->with('feeReceipt');
 
         if ($event->usesPhasedRegionalBilling()) {
-            $batchId = (int) ($request->query('registration_batch_id') ?: $request->query('batch_id'));
+            $batchId = (int) ($request->input('registration_batch_id') ?: $request->input('batch_id') ?: $request->query('registration_batch_id') ?: $request->query('batch_id'));
             if ($batchId > 0) {
                 $query->where('registration_batch_id', $batchId);
             } else {
-                $latest = (clone $query)->whereHas('feeReceipt', fn ($q) => $q->where('status', 'approved'))->latest('id')->first();
+                $latest = (clone $query)->latest('id')->first();
                 if ($latest) {
                     $query->where('id', $latest->id);
                 } else {
@@ -1321,11 +1321,11 @@ class FestRegistrationController extends SchoolAdminController
                 }
             }
         } elseif ($feeService->usesPerHeadBilling($event)) {
-            $headId = (int) $request->query('head_id');
+            $headId = (int) ($request->input('head_id') ?: $request->query('head_id'));
             if ($headId > 0) {
                 $query->where('head_id', $headId);
             } else {
-                $latest = (clone $query)->whereHas('feeReceipt', fn ($q) => $q->where('status', 'approved'))->latest('id')->first();
+                $latest = (clone $query)->latest('id')->first();
                 if ($latest) {
                     $query->where('id', $latest->id);
                 } else {
@@ -1333,11 +1333,11 @@ class FestRegistrationController extends SchoolAdminController
                 }
             }
         } elseif ($feeService->usesPerPhaseBilling($event)) {
-            $phaseId = (int) $request->query('phase_id');
+            $phaseId = (int) ($request->input('phase_id') ?: $request->query('phase_id'));
             if ($phaseId > 0) {
                 $query->where('phase_id', $phaseId);
             } else {
-                $latest = (clone $query)->whereHas('feeReceipt', fn ($q) => $q->where('status', 'approved'))->latest('id')->first();
+                $latest = (clone $query)->latest('id')->first();
                 if ($latest) {
                     $query->where('id', $latest->id);
                 } else {
