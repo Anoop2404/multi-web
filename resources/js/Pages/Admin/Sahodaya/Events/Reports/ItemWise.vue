@@ -4,8 +4,7 @@
         <PageHeader :title="`${event.title} — Item-wise report`" eyebrow="Reports"
                     description="Every item's registered students, in one table — filter by phase, region, category, or search.">
             <template #actions>
-                <a :href="exportUrl" target="_blank" rel="noopener" class="btn-secondary text-sm">Download CSV ↓</a>
-                <a :href="pdfExportUrl" target="_blank" rel="noopener" class="btn-primary text-sm">Download PDF ↓</a>
+                <ReportDownloadButtons :pdf-url="pdfExportUrl" :csv-url="exportUrl" />
             </template>
         </PageHeader>
 
@@ -150,6 +149,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,

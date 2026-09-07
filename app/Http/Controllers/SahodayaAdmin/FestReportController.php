@@ -1047,7 +1047,13 @@ class FestReportController extends SahodayaAdminController
             'logoSrc'     => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
         ])->setPaper('a4', 'landscape');
 
-        return $pdf->download("{$event->id}-mark-entry-report.pdf");
+        $filename = "{$event->id}-mark-entry-report.pdf";
+
+        if ($request->boolean('inline') || $request->boolean('preview')) {
+            return $pdf->stream($filename);
+        }
+
+        return $pdf->download($filename);
     }
 
     public function categoryWisePoints(Request $request, string $tenantId, FestEvent $event)

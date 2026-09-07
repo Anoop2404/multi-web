@@ -140,6 +140,15 @@ class FestItemWiseReportTest extends TestCase
         ]));
         $pdfResponse->assertOk();
         $this->assertSame('application/pdf', $pdfResponse->headers->get('content-type'));
+
+        $previewPdfResponse = $this->actingAs($admin)->get(route('sahodaya.events.reports.item-wise.pdf', [
+            'tenantId' => $sahodaya->id,
+            'event' => $hub->id,
+            'inline' => 1,
+        ]));
+        $previewPdfResponse->assertOk();
+        $this->assertSame('application/pdf', $previewPdfResponse->headers->get('content-type'));
+        $this->assertStringContainsString('inline', (string) $previewPdfResponse->headers->get('content-disposition'));
     }
 
     public function test_school_item_wise_report_is_scoped_to_own_school_and_shows_school_name(): void
