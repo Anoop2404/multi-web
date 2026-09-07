@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Models\FestAppeal;
 use App\Models\FestEvent;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestAppealWildcardService;
 use Illuminate\Http\Request;
 
 class FestAppealsHubController extends SahodayaAdminController
@@ -33,6 +34,9 @@ class FestAppealsHubController extends SahodayaAdminController
                 'participant.student:id,name,reg_no',
                 'participant.registration.item:id,title',
                 'participant.registration.school:id,name',
+                'student:id,name,reg_no',
+                'item:id,title',
+                'grantedRegistration.school:id,name',
             ])
             ->latest()
             ->paginate(25)
@@ -54,7 +58,7 @@ class FestAppealsHubController extends SahodayaAdminController
         ]);
     }
 
-    public function resolve(Request $request, string $tenantId, FestAppeal $appeal, PlatformAuditLogger $audit)
+    public function resolve(Request $request, string $tenantId, FestAppeal $appeal, PlatformAuditLogger $audit, FestAppealWildcardService $wildcards)
     {
         $event = FestEvent::findOrFail($appeal->event_id);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -64,12 +68,7 @@ class FestAppealsHubController extends SahodayaAdminController
             'resolution_note' => 'nullable|string|max:1000',
         ]);
 
-        $appeal->update([
-            'status'              => $data['status'],
-            'resolution_note'     => $data['resolution_note'] ?? null,
-            'resolved_by_user_id' => $request->user()->id,
-            'resolved_at'         => now(),
-        ]);
+        $wildcards->resolve($appeal, $data['status'], $data['resolution_note'] ?? null, $request->user()->id);
 
         $audit->festAppealResolved($appeal, $data['status']);
 

@@ -9,13 +9,14 @@ use App\Services\Ledger\StateRemittanceLedgerService;
 use App\Services\Notifications\SahodayaAdminNotifier;
 use App\Support\StateScope;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
 
 class StateRemittanceController extends Controller
 {
     public function index(Request $request)
     {
-        $remittances = StateScope::apply(StateRemittance::with('sahodaya'))
+        $remittances = StateScope::apply(StateRemittance::with(['sahodaya', 'lines']))
             ->when($request->get('academic_year'), fn ($q, $y) => $q->where('academic_year', $y))
             ->when($request->get('status'), fn ($q, $s) => $q->where('status', $s))
             ->orderByDesc('created_at')
@@ -37,6 +38,41 @@ class StateRemittanceController extends Controller
             'sahodayas'   => $sahodayas,
             'summary'     => $summary,
             'filters'     => ['status' => $request->get('status', '')],
+            'exportUrl'   => route('admin.state-remittances.export', $request->only(['status', 'academic_year']), false),
+        ]);
+    }
+
+    public function exportCsv(Request $request)
+    {
+        $remittances = StateScope::apply(StateRemittance::with(['lines', 'sahodaya']))
+            ->when($request->get('academic_year'), fn ($q, $y) => $q->where('academic_year', $y))
+            ->when($request->get('status'), fn ($q, $s) => $q->where('status', $s))
+            ->orderBy('sahodaya_id')
+            ->get();
+
+        return Response::streamDownload(function () use ($remittances) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Sahodaya', 'Title', 'Academic Year', 'Status', 'Line Type', 'Label', 'Quantity', 'Unit Amount', 'Line Amount', 'Remittance Total']);
+            foreach ($remittances as $remittance) {
+                $lines = $remittance->lines->isEmpty() ? [null] : $remittance->lines;
+                foreach ($lines as $line) {
+                    fputcsv($out, [
+                        $remittance->sahodaya?->name ?? $remittance->sahodaya_id,
+                        $remittance->title,
+                        $remittance->academic_year,
+                        $remittance->status,
+                        $line?->line_type ?? '',
+                        $line?->label ?? '',
+                        $line?->quantity ?? '',
+                        $line?->unit_amount ?? '',
+                        $line?->amount ?? '',
+                        $remittance->amount,
+                    ]);
+                }
+            }
+            fclose($out);
+        }, 'state-remittances-itemized.csv', [
+            'Content-Type' => 'text/csv',
         ]);
     }
 

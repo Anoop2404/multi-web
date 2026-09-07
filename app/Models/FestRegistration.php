@@ -15,7 +15,7 @@ class FestRegistration extends Model
     public const ACTIVE_STATUSES = ['submitted', 'proof_uploaded', 'pending_proof', 'partial', 'approved'];
 
     protected $fillable = [
-        'event_id', 'item_id', 'school_id', 'mode', 'status',
+        'event_id', 'item_id', 'school_id', 'origin_school_id', 'mode', 'status',
         'fee_receipt_id', 'submitted_at',
         'rejection_reason', 'rejected_at', 'rejected_by_user_id',
     ];
@@ -43,6 +43,12 @@ class FestRegistration extends Model
     public function school(): BelongsTo
     {
         return $this->belongsToCentralTenant('school_id');
+    }
+
+    /** Set only for a wildcard/appeal registration — the student's real school, for certificates. */
+    public function originSchool(): BelongsTo
+    {
+        return $this->belongsToCentralTenant('origin_school_id');
     }
 
     public function groups(): HasMany

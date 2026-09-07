@@ -1309,17 +1309,41 @@ class FestRegistrationController extends SchoolAdminController
             ->with('feeReceipt');
 
         if ($event->usesPhasedRegionalBilling()) {
-            $batchId = (int) $request->query('registration_batch_id');
-            abort_unless($batchId > 0, 422, 'Select which registration-level receipt to view.');
-            $query->where('registration_batch_id', $batchId);
+            $batchId = (int) ($request->query('registration_batch_id') ?: $request->query('batch_id'));
+            if ($batchId > 0) {
+                $query->where('registration_batch_id', $batchId);
+            } else {
+                $latest = (clone $query)->whereHas('feeReceipt', fn ($q) => $q->where('status', 'approved'))->latest('id')->first();
+                if ($latest) {
+                    $query->where('id', $latest->id);
+                } else {
+                    abort(422, 'Select which registration-level receipt to view.');
+                }
+            }
         } elseif ($feeService->usesPerHeadBilling($event)) {
             $headId = (int) $request->query('head_id');
-            abort_unless($headId > 0, 422, 'Select which Event Head receipt to view.');
-            $query->where('head_id', $headId);
+            if ($headId > 0) {
+                $query->where('head_id', $headId);
+            } else {
+                $latest = (clone $query)->whereHas('feeReceipt', fn ($q) => $q->where('status', 'approved'))->latest('id')->first();
+                if ($latest) {
+                    $query->where('id', $latest->id);
+                } else {
+                    abort(422, 'Select which Event Head receipt to view.');
+                }
+            }
         } elseif ($feeService->usesPerPhaseBilling($event)) {
             $phaseId = (int) $request->query('phase_id');
-            abort_unless($phaseId > 0, 422, 'Select which phase receipt to view.');
-            $query->where('phase_id', $phaseId);
+            if ($phaseId > 0) {
+                $query->where('phase_id', $phaseId);
+            } else {
+                $latest = (clone $query)->whereHas('feeReceipt', fn ($q) => $q->where('status', 'approved'))->latest('id')->first();
+                if ($latest) {
+                    $query->where('id', $latest->id);
+                } else {
+                    abort(422, 'Select which phase receipt to view.');
+                }
+            }
         } else {
             if (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'head_id')) {
                 $query->whereNull('head_id');

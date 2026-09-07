@@ -33,7 +33,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     protected $fillable = [
         'id', 'type', 'name', 'domain', 'subdomain',
         'parent_id', 'plan', 'is_active', 'fest_registration_closed',
-        'school_prefix', 'membership_status', 'is_non_affiliated', 'renewal_status', 'application_payload', 'prefixes_locked',
+        'school_prefix', 'membership_status', 'is_non_affiliated', 'is_appeal_pool', 'renewal_status', 'application_payload', 'prefixes_locked',
         'school_setup_wizard_dismissed', 'nav_overrides',
     ];
 
@@ -41,6 +41,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'is_active'                 => 'boolean',
         'fest_registration_closed'  => 'boolean',
         'is_non_affiliated'         => 'boolean',
+        'is_appeal_pool'            => 'boolean',
         'data'                      => 'array',
         'application_payload'       => 'array',
         'nav_overrides'             => 'array',
@@ -53,7 +54,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return [
             'id', 'type', 'name', 'domain', 'subdomain', 'parent_id', 'plan', 'is_active',
             'fest_registration_closed',
-            'school_prefix', 'membership_status', 'is_non_affiliated', 'renewal_status', 'application_payload', 'prefixes_locked',
+            'school_prefix', 'membership_status', 'is_non_affiliated', 'is_appeal_pool', 'renewal_status', 'application_payload', 'prefixes_locked',
             'school_setup_wizard_dismissed', 'nav_overrides',
         ];
     }
@@ -140,6 +141,23 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function scopeActive($q)    { return $q->where('is_active', true); }
     public function scopeSchools($q)   { return $q->where('type', 'school'); }
     public function scopeSahodayas($q) { return $q->where('type', 'sahodaya'); }
+
+    /** Real, competing schools only — excludes the per-Sahodaya wildcard-appeal placeholder. */
+    public function scopeExcludingAppealPools($q) { return $q->where('is_appeal_pool', false); }
+
+    /**
+     * The school ids that must never be credited in a real school's championship
+     * total (each is a per-Sahodaya placeholder wildcard-appeal registrations are
+     * filed under). Callers should fetch this once per scoreboard computation and
+     * reuse it across the mark loop, not re-query per mark.
+     *
+     * @return array<string, true>
+     */
+    public static function appealPoolSchoolIds(): array
+    {
+        return self::query()->where('is_appeal_pool', true)->pluck('id')
+            ->flip()->map(fn () => true)->all();
+    }
 
     public function payments(): \Illuminate\Database\Eloquent\Relations\HasMany
     {

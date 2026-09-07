@@ -36,11 +36,12 @@
                                 <tr v-for="a in filteredAppeals" :key="a.id" class="border-t align-top">
                                     <td class="p-3 font-medium">
                                         {{ participantName(a) }}
-                                        <p v-if="a.participant?.student?.reg_no" class="text-xs font-mono text-[#0f3d7a]">{{ a.participant.student.reg_no }}</p>
+                                        <p v-if="(a.participant ?? a).student?.reg_no" class="text-xs font-mono text-[#0f3d7a]">{{ (a.participant ?? a).student.reg_no }}</p>
+                                        <span v-if="wildcardLabel(a)" class="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">{{ wildcardLabel(a) }}</span>
                                     </td>
                                     <td class="p-3 text-xs">
-                                        <p>{{ a.participant?.registration?.school?.name ?? '—' }}</p>
-                                        <p class="text-slate-500">{{ a.participant?.registration?.item?.title }}</p>
+                                        <p>{{ a.participant?.registration?.school?.name ?? a.grantedRegistration?.school?.name ?? '—' }}</p>
+                                        <p class="text-slate-500">{{ a.participant?.registration?.item?.title ?? a.item?.title }}</p>
                                     </td>
                                     <td class="p-3 text-xs max-w-xs">
                                         <p>{{ a.reason }}</p>
@@ -148,6 +149,15 @@ const filteredAppeals = computed(() => {
 function participantName(a) {
     const p = a.participant ?? a;
     return p.student?.name ?? p.teacher?.name ?? 'Participant';
+}
+
+const WILDCARD_LABELS = {
+    sahodaya_wildcard: 'Wildcard → Sahodaya',
+    state_wildcard: 'Wildcard → State',
+};
+
+function wildcardLabel(a) {
+    return WILDCARD_LABELS[a.appeal_type] ?? null;
 }
 
 function statusClass(status) {

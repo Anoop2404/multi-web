@@ -296,7 +296,7 @@ class FestSportsCompositeFeeService
                 'team_registration_fee' => (float) ($event->team_registration_fee ?? 0),
                 'included_items_per_student' => (int) ($event->included_items_per_student ?? 0),
                 'included_teams' => (int) ($event->included_teams ?? 0),
-                'default_item_fee' => $event->default_item_fee !== null ? (float) $event->default_item_fee : null,
+                'default_item_fee' => $event->default_item_fee !== null ? (float) $event->default_item_fee : (($event->student_registration_fee ?? 0) > 0 ? 0.0 : null),
                 'extra_item_fee' => $event->extra_item_fee !== null ? (float) $event->extra_item_fee : null,
             ];
         }

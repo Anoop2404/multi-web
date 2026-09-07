@@ -309,6 +309,10 @@ class FestParticipationLimitService
             $errors[] = 'Your school already has an entry for this item.';
         }
 
+        if ($conflict = $this->exclusiveGroupConflict($item, $schoolId, $policy, $excludeRegistrationId)) {
+            $errors[] = $conflict;
+        }
+
         $errors = array_merge($errors, $this->validateHeadCapacity($item, $policy, $schoolId, $excludeRegistrationId));
 
         $regs = $this->schoolRegistrations($schoolId, $policy, $excludeRegistrationId);
@@ -683,6 +687,34 @@ class FestParticipationLimitService
         }
 
         return $errors;
+    }
+
+    /**
+     * Items sharing an exclusive_group_key are alternatives of each other (e.g.
+     * "STEM — Science, Category I" vs. "STEM — Maths, Category I") — a school may hold
+     * an active registration on at most one of them at a time. Withdrawing the existing
+     * one (status leaves the countable set) frees the school to register the other.
+     */
+    private function exclusiveGroupConflict(FestEventItem $item, string $schoolId, array $policy, ?int $excludeRegistrationId = null): ?string
+    {
+        if (! filled($item->exclusive_group_key)) {
+            return null;
+        }
+
+        $conflicting = FestRegistration::whereIn('event_id', $this->scopeEventIds())
+            ->where('school_id', $schoolId)
+            ->whereIn('status', $this->countableStatuses($policy))
+            ->where('item_id', '!=', $item->id)
+            ->whereHas('item', fn ($q) => $q->where('exclusive_group_key', $item->exclusive_group_key))
+            ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
+            ->with('item:id,title')
+            ->first();
+
+        if (! $conflicting) {
+            return null;
+        }
+
+        return "Your school already has an active entry for \"{$conflicting->item?->title}\" — withdraw it first to register for this item instead.";
     }
 
     private function schoolHasItemEntry(string $schoolId, int $itemId, array $policy, ?int $excludeRegistrationId = null): bool

@@ -255,6 +255,7 @@ class FestItemSyncService
             $target->update([
                 'title'              => $item->title,
                 'item_code'          => $item->item_code,
+                'exclusive_group_key' => $item->exclusive_group_key,
                 'category'           => $item->category,
                 'stage_type'         => $item->stage_type,
                 'venue_type'         => $item->venue_type,
@@ -537,6 +538,7 @@ class FestItemSyncService
         return [
             'title'              => $item->title,
             'item_code'          => $item->item_code,
+            'exclusive_group_key' => $item->exclusive_group_key,
             'category'           => $item->category,
             'stage_type'         => $item->stage_type,
             'venue_type'         => $item->venue_type,

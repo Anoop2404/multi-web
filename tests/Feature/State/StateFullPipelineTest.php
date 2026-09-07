@@ -78,7 +78,7 @@ class StateFullPipelineTest extends TestCase
             ],
         ];
 
-        $intakeService = new StateQualifierIntakeService();
+        $intakeService = app(StateQualifierIntakeService::class);
         $intake = $intakeService->receive('pipeline:idempotency:1', $intakePayload, 'tenant-sahodaya-1');
         $approvedIntake = $intakeService->approve($intake, 1, 'Approved by Scrutiny');
 

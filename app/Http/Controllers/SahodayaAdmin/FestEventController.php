@@ -1009,6 +1009,7 @@ class FestEventController extends SahodayaAdminController
         $data = $request->validate(array_merge([
             'title'                => 'required|string|max:255',
             'item_code'            => 'nullable|string|max:20',
+            'exclusive_group_key'  => 'nullable|string|max:64',
             'duration_minutes'     => 'nullable|integer|min:1|max:480',
             'total_marks'          => 'nullable|numeric|min:0',
             'max_per_school'       => 'nullable|integer|min:1',
@@ -1033,6 +1034,7 @@ class FestEventController extends SahodayaAdminController
         ], $this->taxonomyValidationRules($registry, $event)));
 
         $data['participant_type'] = $data['participant_type'] ?? 'individual';
+        $data['exclusive_group_key'] = filled($data['exclusive_group_key'] ?? null) ? trim($data['exclusive_group_key']) : null;
         $data = FestEventItemPayload::applyDefaults($data);
 
         if (FestTeamSquadRules::isMultiPerson($data['participant_type'])) {
@@ -1088,6 +1090,7 @@ class FestEventController extends SahodayaAdminController
         $data = $request->validate(array_merge([
             'title'          => 'required|string|max:255',
             'item_code'      => 'nullable|string|max:20',
+            'exclusive_group_key' => 'nullable|string|max:64',
             'qualify_count'  => 'nullable|integer|min:1',
             'max_per_school' => 'nullable|integer|min:1',
             'fee_amount'     => 'nullable|numeric|min:0',
@@ -1112,6 +1115,7 @@ class FestEventController extends SahodayaAdminController
         ], $this->taxonomyValidationRules($registry, $event)));
 
         $participantType = $data['participant_type'] ?? $item->participant_type;
+        $data['exclusive_group_key'] = filled($data['exclusive_group_key'] ?? null) ? trim($data['exclusive_group_key']) : null;
 
         if (FestTeamSquadRules::isMultiPerson($participantType)) {
             $squadInput = $request->only([

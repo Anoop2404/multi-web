@@ -49,7 +49,7 @@ class StateAdminFlowHttpTest extends TestCase
             'event_type' => 'kalolsavam',
             'conduct_levels' => ['sahodaya', 'state'],
             'status' => 'published',
-            'level_fees' => ['state' => ['fee_model' => 'per_student', 'individual_amount' => 500]],
+            'level_fees' => ['state' => ['fee_model' => 'per_student', 'sahodaya_registration_fee' => 500]],
         ]);
         $sahodaya = Tenant::create([
             'id' => 'state-http-sahodaya',

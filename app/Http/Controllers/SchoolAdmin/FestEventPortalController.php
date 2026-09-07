@@ -6,8 +6,10 @@ use App\Models\Certificate;
 use App\Models\FestAppeal;
 use App\Models\FestCateringOrder;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\Student;
 use App\Services\Events\EventContext;
 use App\Services\Events\FestCertificateService;
 use App\Services\Events\FestIdCardQrService;
@@ -101,10 +103,49 @@ class FestEventPortalController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $data = $request->validate([
-            'participant_id' => 'required|exists:fest_participants,id',
+            'appeal_type'    => 'nullable|in:dispute,sahodaya_wildcard,state_wildcard',
+            'participant_id' => 'nullable|exists:fest_participants,id',
+            'student_id'     => 'nullable|exists:students,id',
+            'item_id'        => 'nullable|exists:fest_event_items,id',
             'reason'         => 'required|string|max:2000',
         ]);
 
+        $appealType = $data['appeal_type'] ?? FestAppeal::TYPE_DISPUTE;
+
+        if ($appealType !== FestAppeal::TYPE_DISPUTE) {
+            abort_if(empty($data['student_id']), 422, 'student_id is required for a wildcard appeal.');
+            abort_if(empty($data['item_id']), 422, 'item_id is required for a wildcard appeal.');
+
+            $student = Student::findOrFail($data['student_id']);
+            abort_if($student->tenant_id !== $this->school->id, 403);
+
+            $item = FestEventItem::findOrFail($data['item_id']);
+            abort_if($item->event_id !== $event->id, 422, 'Item does not belong to this event.');
+            abort_if(! $event->appeals_open, 422, 'Appeals are not open for this event.');
+
+            $duplicate = FestAppeal::where('event_id', $event->id)
+                ->where('student_id', $student->id)
+                ->where('item_id', $item->id)
+                ->whereIn('appeal_type', FestAppeal::WILDCARD_TYPES)
+                ->whereIn('status', ['pending', 'approved'])
+                ->exists();
+            abort_if($duplicate, 422, 'An active wildcard appeal already exists for this student and item.');
+
+            FestAppeal::create([
+                'event_id'             => $event->id,
+                'appeal_type'          => $appealType,
+                'student_id'           => $student->id,
+                'item_id'              => $item->id,
+                'reason'               => $data['reason'],
+                'fee_amount'           => $event->appeal_fee_amount,
+                'status'               => 'pending',
+                'submitted_by_user_id' => $request->user()->id,
+            ]);
+
+            return back()->with('success', 'Appeal submitted.');
+        }
+
+        abort_if(empty($data['participant_id']), 422, 'participant_id is required for this appeal.');
         $participant = FestParticipant::findOrFail($data['participant_id']);
         abort_if($participant->registration->school_id !== $this->school->id, 403);
         abort_unless(in_array($participant->registration->event_id, $event->reportableEventIds(), true), 403);
@@ -135,8 +176,10 @@ class FestEventPortalController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $appeals = FestAppeal::where('event_id', $event->id)
-            ->whereHas('participant.registration', fn ($q) => $q->where('school_id', $this->school->id))
-            ->with(['participant.student', 'participant.teacher', 'participant.registration.item'])
+            ->where(fn ($q) => $q
+                ->whereHas('participant.registration', fn ($r) => $r->where('school_id', $this->school->id))
+                ->orWhereHas('student', fn ($s) => $s->where('tenant_id', $this->school->id)))
+            ->with(['participant.student', 'participant.teacher', 'participant.registration.item', 'student', 'item'])
             ->latest()
             ->get();
 
@@ -150,6 +193,13 @@ class FestEventPortalController extends SchoolAdminController
             'event'         => $event->only('id', 'title', 'status', 'appeals_open', 'appeal_fee_amount'),
             'appeals'       => $appeals,
             'registrations' => $registrations,
+            // For the "request a wildcard slot" form — a wildcard appeal has no
+            // existing FestParticipant to pick from, so the school admin instead
+            // picks a student and an item directly.
+            'items'         => FestEventItem::where('event_id', $event->id)->where('is_enabled', true)
+                ->orderBy('display_order')->get(['id', 'title']),
+            'students'      => Student::where('tenant_id', $this->school->id)->where('status', 'active')
+                ->orderBy('name')->get(['id', 'name', 'reg_no', 'admission_number']),
         ]);
     }
 

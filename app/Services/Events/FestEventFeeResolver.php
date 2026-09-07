@@ -211,6 +211,7 @@ class FestEventFeeResolver
                     // configured — same policy as StateRemittanceService::calculateDemand()
                     // and the sports composite fee fix.
                     'individual_amount' => (float) ($row['individual_amount'] ?? $row['per_student_amount'] ?? 0),
+                    'sahodaya_registration_fee' => (float) ($row['sahodaya_registration_fee'] ?? 0),
                 ];
 
                 continue;

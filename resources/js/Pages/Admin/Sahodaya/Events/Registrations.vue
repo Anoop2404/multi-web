@@ -273,7 +273,7 @@
                 <div class="flex items-center justify-between gap-2">
                     <div class="min-w-0">
                         <h3 class="font-semibold">Manage participants</h3>
-                        <p class="text-xs text-gray-500 truncate">{{ manageReg.item?.title }} · {{ (schoolNames[manageReg.school_id] ?? '').toString().toUpperCase() }}</p>
+                        <p class="text-xs text-gray-500 truncate">{{ manageRegItemTitleWithGender }} · {{ (schoolNames[manageReg.school_id] ?? '').toString().toUpperCase() }}</p>
                     </div>
                     <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl leading-none shrink-0" @click="closeManageParticipants">&times;</button>
                 </div>
@@ -283,7 +283,8 @@
                         <div class="min-w-0">
                             <p class="text-sm font-medium text-slate-800 truncate">{{ p.student?.name ?? p.teacher?.name ?? '—' }}</p>
                             <p class="text-[11px] text-slate-500">
-                                {{ p.participant_role || 'performer' }}<span v-if="p.student?.reg_no"> · {{ p.student.reg_no }}</span>
+                                <span class="capitalize font-semibold text-slate-700">{{ p.participant_role || 'performer' }}</span>
+                                <span v-if="p.student?.reg_no"> · {{ p.student.reg_no }}</span>
                             </p>
                         </div>
                         <button type="button" class="text-red-600 text-xs font-semibold shrink-0 disabled:opacity-40"
@@ -311,7 +312,7 @@
         <FestStudentPickerModal
             v-model="addParticipantPickerOpen"
             title="Add participant"
-            :subtitle="manageReg?.item?.title"
+            :subtitle="manageRegItemTitleWithGender"
             :entries="addParticipantEntries"
             v-model:selected-ids="addParticipantSelectedIds"
             :max-selected="1"
@@ -638,6 +639,17 @@ const substituteReg = ref(null);
 const substituteForm = ref({ performer_id: '', standby_id: '' });
 
 const manageReg = ref(null);
+
+const manageRegItemTitleWithGender = computed(() => {
+    if (!manageReg.value?.item) return '';
+    const item = manageReg.value.item;
+    const genderLabel = formatGenderLabel(item.gender);
+    const details = [];
+    if (item.category_label) details.push(item.category_label);
+    if (genderLabel) details.push(genderLabel);
+    return details.length ? `${item.title} (${details.join(' · ')})` : item.title;
+});
+
 const addParticipantRole = ref('performer');
 const addParticipantPickerOpen = ref(false);
 const addParticipantEntries = ref([]);

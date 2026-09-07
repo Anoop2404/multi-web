@@ -612,7 +612,18 @@ class SchoolPaymentHistoryService
                     default     => 'kalotsav',
                 };
 
-                return "/school-admin/{$urlSchoolId}/programs/{$slug}/events/{$event->id}/receipt";
+                $queryParams = [];
+                if (! empty($receipt->feeable?->registration_batch_id)) {
+                    $queryParams['registration_batch_id'] = $receipt->feeable->registration_batch_id;
+                } elseif (! empty($receipt->feeable?->head_id)) {
+                    $queryParams['head_id'] = $receipt->feeable->head_id;
+                } elseif (! empty($receipt->feeable?->phase_id)) {
+                    $queryParams['phase_id'] = $receipt->feeable->phase_id;
+                }
+
+                $queryString = $queryParams ? '?'.http_build_query($queryParams) : '';
+
+                return "/school-admin/{$urlSchoolId}/programs/{$slug}/events/{$event->id}/receipt{$queryString}";
             }
 
             return "/school-admin/{$urlSchoolId}/payments/receipts/{$receipt->id}";

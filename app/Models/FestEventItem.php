@@ -14,7 +14,7 @@ class FestEventItem extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'event_id', 'title', 'item_code', 'category', 'stage_type', 'venue_type',
+        'event_id', 'title', 'item_code', 'exclusive_group_key', 'category', 'stage_type', 'venue_type',
         'competition_format', 'sport_discipline', 'ranking_direction', 'result_method', 'duration_minutes', 'criteria_json', 'total_marks',
         'participant_type', 'gender', 'class_group', 'age_group', 'kids_band',
         'max_per_school', 'min_group_size', 'max_group_size', 'qualify_count',

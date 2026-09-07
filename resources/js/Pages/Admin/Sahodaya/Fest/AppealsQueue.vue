@@ -50,11 +50,12 @@
                             </td>
                             <td class="p-3 font-medium">
                                 {{ participantName(a) }}
-                                <p v-if="a.participant?.student?.reg_no" class="text-xs font-mono text-slate-500">{{ a.participant.student.reg_no }}</p>
+                                <p v-if="participantRegNo(a)" class="text-xs font-mono text-slate-500">{{ participantRegNo(a) }}</p>
+                                <span v-if="wildcardLabel(a)" class="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">{{ wildcardLabel(a) }}</span>
                             </td>
                             <td class="p-3 text-xs">
-                                <p>{{ a.participant?.registration?.school?.name ?? '—' }}</p>
-                                <p class="text-slate-500">{{ a.participant?.registration?.item?.title }}</p>
+                                <p>{{ schoolLabel(a) }}</p>
+                                <p class="text-slate-500">{{ a.participant?.registration?.item?.title ?? a.item?.title }}</p>
                             </td>
                             <td class="p-3 text-xs max-w-xs">{{ a.reason }}</td>
                             <td class="p-3">
@@ -137,7 +138,29 @@ function setStatus(status) {
 }
 
 function participantName(appeal) {
-    return appeal.participant?.student?.name ?? 'Participant';
+    return appeal.participant?.student?.name ?? appeal.student?.name ?? 'Participant';
+}
+
+function participantRegNo(appeal) {
+    return appeal.participant?.student?.reg_no ?? appeal.student?.reg_no ?? null;
+}
+
+const WILDCARD_LABELS = {
+    sahodaya_wildcard: 'Wildcard → Sahodaya',
+    state_wildcard: 'Wildcard → State',
+};
+
+function wildcardLabel(appeal) {
+    return WILDCARD_LABELS[appeal.appeal_type] ?? null;
+}
+
+function schoolLabel(appeal) {
+    // A wildcard appeal has no participant/registration until granted — after
+    // approval, grantedRegistration.school is the placeholder "Appeal School",
+    // shown here so it's clear at a glance this wasn't filed under a real school.
+    return appeal.participant?.registration?.school?.name
+        ?? appeal.grantedRegistration?.school?.name
+        ?? '—';
 }
 
 function statusClass(status) {

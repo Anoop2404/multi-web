@@ -288,4 +288,54 @@ class FestParticipationLimitServiceTest extends TestCase
         $optionForLp = collect($options)->firstWhere('id', $lpItem->id);
         $this->assertSame($lpCategoryKey, $optionForLp['category_key']);
     }
+
+    public function test_exclusive_group_key_blocks_registering_a_sibling_item(): void
+    {
+        [$event, $schoolId] = $this->fixture();
+        $studentId = 1;
+
+        $science = FestEventItem::create(['event_id' => $event->id, 'title' => 'STEM Science Cat I', 'item_code' => 'STC1', 'exclusive_group_key' => 'stem_cat1', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $maths = FestEventItem::create(['event_id' => $event->id, 'title' => 'STEM Maths Cat I', 'item_code' => 'STM1', 'exclusive_group_key' => 'stem_cat1', 'participant_type' => 'individual', 'is_enabled' => true]);
+
+        $this->registerStudentFor($event, $schoolId, $studentId, $science);
+
+        $service = new FestParticipationLimitService($event);
+        $errors = $service->validateRegistration($maths, $schoolId, [$studentId]);
+
+        $this->assertNotEmpty($errors, 'a school already registered for one item in the exclusive group must be blocked from the sibling item');
+        $this->assertStringContainsString('STEM Science Cat I', implode(' ', $errors));
+    }
+
+    public function test_exclusive_group_key_allows_switching_after_withdrawal(): void
+    {
+        [$event, $schoolId] = $this->fixture();
+        $studentId = 1;
+
+        $science = FestEventItem::create(['event_id' => $event->id, 'title' => 'STEM Science Cat I', 'item_code' => 'STC1', 'exclusive_group_key' => 'stem_cat1', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $maths = FestEventItem::create(['event_id' => $event->id, 'title' => 'STEM Maths Cat I', 'item_code' => 'STM1', 'exclusive_group_key' => 'stem_cat1', 'participant_type' => 'individual', 'is_enabled' => true]);
+
+        $this->registerStudentFor($event, $schoolId, $studentId, $science);
+        FestRegistration::where('school_id', $schoolId)->where('item_id', $science->id)->update(['status' => 'withdrawn']);
+
+        $service = new FestParticipationLimitService($event);
+        $errors = $service->validateRegistration($maths, $schoolId, [$studentId]);
+
+        $this->assertSame([], $errors, 'once the Science entry is withdrawn, the school must be free to register for Maths in the same group');
+    }
+
+    public function test_items_without_an_exclusive_group_key_never_conflict(): void
+    {
+        [$event, $schoolId] = $this->fixture();
+        $studentId = 1;
+
+        $itemA = FestEventItem::create(['event_id' => $event->id, 'title' => 'Item A', 'item_code' => 'IA1', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $itemB = FestEventItem::create(['event_id' => $event->id, 'title' => 'Item B', 'item_code' => 'IB1', 'participant_type' => 'individual', 'is_enabled' => true]);
+
+        $this->registerStudentFor($event, $schoolId, $studentId, $itemA);
+
+        $service = new FestParticipationLimitService($event);
+        $errors = $service->validateRegistration($itemB, $schoolId, [$studentId]);
+
+        $this->assertSame([], $errors, 'items with no exclusive_group_key must never be treated as mutually exclusive');
+    }
 }

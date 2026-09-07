@@ -23,7 +23,7 @@ class StateQualifierMaterializationService
             StateQualifierEntry::where('intake_id', $intake->id)
                 ->where('status', 'approved')
                 ->orderBy('item_code')
-                ->chunkById(100, function ($entries) use ($event, &$registrations, &$participants) {
+                ->chunkById(100, function ($entries) use ($event, $intake, &$registrations, &$participants) {
                     foreach ($entries as $entry) {
                         $registration = StateFestRegistration::updateOrCreate(
                             [
@@ -33,6 +33,7 @@ class StateQualifierMaterializationService
                             [
                                 'school_id' => $entry->school_id,
                                 'school_name' => $entry->school_name,
+                                'sahodaya_id' => $intake->source_tenant_id,
                                 'item_id' => $entry->item_id,
                                 'item_code' => $entry->item_code,
                                 'status' => 'approved',
@@ -89,7 +90,7 @@ class StateQualifierMaterializationService
         });
     }
 
-    private function stateEventFor(StateQualifierIntake $intake): StateFestEvent
+    public function stateEventFor(StateQualifierIntake $intake): StateFestEvent
     {
         $program = FestStateProgram::find($intake->state_program_id);
 

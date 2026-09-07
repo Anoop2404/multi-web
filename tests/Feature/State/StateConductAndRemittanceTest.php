@@ -3,10 +3,13 @@
 namespace Tests\Feature\State;
 
 use App\Models\FestStateProgram;
+use App\Models\FestStateProgramItem;
 use App\Models\State\StateFestEvent;
 use App\Models\State\StateFestParticipant;
 use App\Models\State\StateFestRegistration;
 use App\Models\State\StateFestMark;
+use App\Models\State\StateQualifierEntry;
+use App\Models\State\StateQualifierIntake;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\State\StateConductService;
@@ -49,6 +52,83 @@ class StateConductAndRemittanceTest extends TestCase
         $verified = $service->verifyProof($remittance, $reviewer->id, 'Paid via NEFT UTR987654');
         $this->assertEquals('verified', $verified->status);
         $this->assertEquals($reviewer->id, $verified->reviewed_by);
+    }
+
+    public function test_itemized_remittance_demand_includes_base_fee_and_per_item_lines(): void
+    {
+        $program = FestStateProgram::create([
+            'title'          => 'Itemized Fee Program',
+            'event_type'     => 'kalolsavam',
+            'conduct_levels' => ['state'],
+            'status'         => 'published',
+            'level_fees'     => ['state' => ['sahodaya_registration_fee' => 1000]],
+        ]);
+        $item = FestStateProgramItem::create([
+            'state_program_id' => $program->id, 'title' => 'Mono Act', 'item_code' => 'MA01', 'fee_amount' => 150,
+        ]);
+        $sahodaya = Tenant::create(['id' => 'sahodaya-itemized', 'name' => 'Itemized Sahodaya', 'type' => 'sahodaya']);
+
+        $intake = StateQualifierIntake::create([
+            'state_program_id' => $program->id, 'source_tenant_id' => $sahodaya->id, 'source_event_id' => 1,
+            'idempotency_key' => 'itemized-key', 'status' => 'received', 'payload' => [],
+        ]);
+        foreach ([1, 2] as $i) {
+            StateQualifierEntry::create([
+                'intake_id' => $intake->id, 'school_id' => "sch-{$i}", 'item_id' => $item->id,
+                'item_code' => $item->item_code, 'student_name' => "Student {$i}", 'status' => 'approved',
+            ]);
+        }
+
+        $service = app(StateRemittanceService::class);
+        $remittance = $service->calculateDemandFromApprovedQualifiers($program, $sahodaya);
+
+        $this->assertEquals(1300.00, (float) $remittance->amount);
+        $this->assertCount(2, $remittance->lines);
+
+        $baseLine = $remittance->lines->firstWhere('line_type', 'sahodaya_registration');
+        $itemLine = $remittance->lines->firstWhere('line_type', 'item_fee');
+        $this->assertEquals(1000.00, (float) $baseLine->amount);
+        $this->assertEquals(2, $itemLine->quantity);
+        $this->assertEquals(300.00, (float) $itemLine->amount);
+    }
+
+    public function test_recalculating_a_submitted_remittance_does_not_touch_its_lines(): void
+    {
+        $program = FestStateProgram::create([
+            'title' => 'Locked Remittance Program', 'event_type' => 'kalolsavam',
+            'conduct_levels' => ['state'], 'status' => 'published',
+            'level_fees' => ['state' => ['sahodaya_registration_fee' => 500]],
+        ]);
+        $item = FestStateProgramItem::create([
+            'state_program_id' => $program->id, 'title' => 'Elocution', 'item_code' => 'EL01', 'fee_amount' => 100,
+        ]);
+        $sahodaya = Tenant::create(['id' => 'sahodaya-locked', 'name' => 'Locked Sahodaya', 'type' => 'sahodaya']);
+
+        $intake = StateQualifierIntake::create([
+            'state_program_id' => $program->id, 'source_tenant_id' => $sahodaya->id, 'source_event_id' => 1,
+            'idempotency_key' => 'locked-key', 'status' => 'received', 'payload' => [],
+        ]);
+        StateQualifierEntry::create([
+            'intake_id' => $intake->id, 'school_id' => 'sch-1', 'item_id' => $item->id,
+            'item_code' => $item->item_code, 'student_name' => 'Student 1', 'status' => 'approved',
+        ]);
+
+        $service = app(StateRemittanceService::class);
+        $remittance = $service->calculateDemandFromApprovedQualifiers($program, $sahodaya);
+        $remittance->update(['status' => 'submitted']);
+        $originalAmount = (float) $remittance->amount;
+        $originalLineCount = $remittance->lines()->count();
+
+        StateQualifierEntry::create([
+            'intake_id' => $intake->id, 'school_id' => 'sch-2', 'item_id' => $item->id,
+            'item_code' => $item->item_code, 'student_name' => 'Student 2', 'status' => 'approved',
+        ]);
+
+        $recomputed = $service->calculateDemandFromApprovedQualifiers($program, $sahodaya);
+
+        $this->assertEquals($remittance->id, $recomputed->id);
+        $this->assertEquals($originalAmount, (float) $recomputed->amount);
+        $this->assertEquals($originalLineCount, $recomputed->lines()->count());
     }
 
     public function test_state_conduct_chest_number_assignment_and_public_results(): void

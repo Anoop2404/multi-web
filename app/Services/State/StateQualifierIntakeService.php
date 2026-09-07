@@ -3,6 +3,7 @@
 namespace App\Services\State;
 
 use App\Models\FestStateProgram;
+use App\Models\State\StateFestEvent;
 use App\Models\State\StateQualifierEntry;
 use App\Models\State\StateQualifierIntake;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,12 @@ use Illuminate\Validation\ValidationException;
 
 class StateQualifierIntakeService
 {
+    public function __construct(
+        private StateParticipationLimitService $limits,
+        private StateQualifierMaterializationService $materializer,
+    ) {
+    }
+
     /** @param array<string, mixed> $payload */
     public function receive(string $idempotencyKey, array $payload, string $sourceTenantId): StateQualifierIntake
     {
@@ -76,6 +83,21 @@ class StateQualifierIntakeService
         }
 
         DB::connection('state')->transaction(function () use ($intake, $reviewedBy, $notes) {
+            $hasPendingItemEntries = StateQualifierEntry::where('intake_id', $intake->id)
+                ->where('status', 'pending')
+                ->whereNotNull('item_id')
+                ->exists();
+
+            // Only take the lock (which creates this program's StateFestEvent row if it
+            // doesn't exist yet) when there's actually something to check against a limit
+            // — an intake with nothing pending, or nothing tied to a real catalog item,
+            // shouldn't spawn an event row as a side effect of a no-op approval.
+            if ($hasPendingItemEntries) {
+                $this->lockStateEventFor($intake);
+                $violations = $this->limits->validateBulkApproval($intake);
+                abort_if($violations !== [], 422, implode(' ', $violations));
+            }
+
             StateQualifierEntry::where('intake_id', $intake->id)
                 ->where('status', 'pending')
                 ->update(['status' => 'approved']);
@@ -107,8 +129,28 @@ class StateQualifierIntakeService
             throw ValidationException::withMessages(['entry' => 'This intake has already been finalized.']);
         }
 
-        $entry->update(['status' => $status]);
+        DB::connection('state')->transaction(function () use ($intake, $entry, $status) {
+            if ($status === 'approved' && $entry->item_id) {
+                $this->lockStateEventFor($intake);
+                $violations = $this->limits->validateEntryApproval($entry);
+                abort_if($violations !== [], 422, implode(' ', $violations));
+            }
+
+            $entry->update(['status' => $status]);
+        });
 
         return $entry->fresh();
+    }
+
+    /**
+     * Row-locks this program's single StateFestEvent (created ahead of time if
+     * materialization hasn't run yet) so concurrent approvals — bulk or
+     * single-entry, same or different intake — serialize on the same
+     * approved-entry counts before either checks limits or writes.
+     */
+    private function lockStateEventFor(StateQualifierIntake $intake): void
+    {
+        $event = $this->materializer->stateEventFor($intake);
+        StateFestEvent::whereKey($event->id)->lockForUpdate()->first();
     }
 }

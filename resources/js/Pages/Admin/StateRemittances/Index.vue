@@ -41,15 +41,17 @@
             <div class="lg:col-span-2 bg-white border rounded-xl overflow-hidden">
                 <div class="p-4 border-b flex items-center justify-between">
                     <h3 class="font-semibold text-sm">All Remittances</h3>
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 items-center">
                         <SearchableSelect v-model="filterStatus" @change="applyFilter"
                             :options="[{ value: 'pending', label: 'Pending' }, { value: 'submitted', label: 'Submitted' }, { value: 'verified', label: 'Verified' }, { value: 'rejected', label: 'Rejected' }]"
                             :all-option="true" all-label="All statuses" />
+                        <a :href="exportUrl" class="text-xs link-brand font-semibold whitespace-nowrap">⬇ Export CSV</a>
                     </div>
                 </div>
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase">
                         <tr>
+                            <th class="p-3"></th>
                             <th class="p-3">Sahodaya</th>
                             <th class="p-3">Title</th>
                             <th class="p-3">Amount</th>
@@ -59,31 +61,61 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="r in remittances.data" :key="r.id" class="border-t align-top">
-                            <td class="p-3 text-xs">{{ r.sahodaya?.name }}</td>
-                            <td class="p-3">
-                                <p>{{ r.title }}</p>
-                                <p v-if="r.academic_year" class="text-xs text-gray-400">{{ r.academic_year }}</p>
-                            </td>
-                            <td class="p-3 font-mono">₹{{ fmt(r.amount) }}</td>
-                            <td class="p-3 text-xs text-gray-500">{{ r.due_date || '—' }}</td>
-                            <td class="p-3">
-                                <span :class="statusClass(r.status)" class="text-xs font-semibold px-2 py-0.5 rounded">{{ r.status }}</span>
-                                <p v-if="r.rejection_reason" class="text-xs text-red-500 mt-1">{{ r.rejection_reason }}</p>
-                            </td>
-                            <td class="p-3 text-right space-y-1">
-                                <template v-if="r.status === 'submitted'">
-                                    <div class="flex gap-2 justify-end">
-                                        <a :href="`/admin/state-remittances/${r.id}/proof`" target="_blank" rel="noopener"
-                                           class="text-xs link-brand">Proof ↗</a>
-                                        <button @click="verify(r)" class="text-xs text-green-600 font-semibold">Verify</button>
-                                        <button @click="reject(r)" class="text-xs text-red-600 font-semibold">Reject</button>
-                                    </div>
-                                </template>
-                            </td>
-                        </tr>
+                        <template v-for="r in remittances.data" :key="r.id">
+                            <tr class="border-t align-top">
+                                <td class="p-3">
+                                    <button v-if="r.lines?.length" @click="toggleLines(r.id)" class="text-xs text-gray-500 hover:text-gray-800 font-bold">
+                                        {{ expandedId === r.id ? '▾' : '▸' }}
+                                    </button>
+                                </td>
+                                <td class="p-3 text-xs">{{ r.sahodaya?.name }}</td>
+                                <td class="p-3">
+                                    <p>{{ r.title }}</p>
+                                    <p v-if="r.academic_year" class="text-xs text-gray-400">{{ r.academic_year }}</p>
+                                </td>
+                                <td class="p-3 font-mono">₹{{ fmt(r.amount) }}</td>
+                                <td class="p-3 text-xs text-gray-500">{{ r.due_date || '—' }}</td>
+                                <td class="p-3">
+                                    <span :class="statusClass(r.status)" class="text-xs font-semibold px-2 py-0.5 rounded">{{ r.status }}</span>
+                                    <p v-if="r.rejection_reason" class="text-xs text-red-500 mt-1">{{ r.rejection_reason }}</p>
+                                </td>
+                                <td class="p-3 text-right space-y-1">
+                                    <template v-if="r.status === 'submitted'">
+                                        <div class="flex gap-2 justify-end">
+                                            <a :href="`/admin/state-remittances/${r.id}/proof`" target="_blank" rel="noopener"
+                                               class="text-xs link-brand">Proof ↗</a>
+                                            <button @click="verify(r)" class="text-xs text-green-600 font-semibold">Verify</button>
+                                            <button @click="reject(r)" class="text-xs text-red-600 font-semibold">Reject</button>
+                                        </div>
+                                    </template>
+                                </td>
+                            </tr>
+                            <tr v-if="expandedId === r.id" class="bg-gray-50/60 border-t">
+                                <td></td>
+                                <td colspan="6" class="p-3">
+                                    <table class="w-full text-xs">
+                                        <thead class="text-gray-400 uppercase">
+                                            <tr>
+                                                <th class="py-1 pr-3 text-left">Line</th>
+                                                <th class="py-1 pr-3 text-center">Qty</th>
+                                                <th class="py-1 pr-3 text-right">Unit</th>
+                                                <th class="py-1 text-right">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="line in r.lines" :key="line.id" class="border-t border-gray-200/60">
+                                                <td class="py-1.5 pr-3">{{ line.label }}</td>
+                                                <td class="py-1.5 pr-3 text-center font-mono">{{ line.quantity }}</td>
+                                                <td class="py-1.5 pr-3 text-right font-mono">₹{{ fmt(line.unit_amount) }}</td>
+                                                <td class="py-1.5 text-right font-mono">₹{{ fmt(line.amount) }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr>
+                        </template>
                         <tr v-if="!remittances.data.length">
-                            <td colspan="6" class="p-8 text-center text-gray-400">No remittances yet</td>
+                            <td colspan="7" class="p-8 text-center text-gray-400">No remittances yet</td>
                         </tr>
                     </tbody>
                 </table>
@@ -116,12 +148,17 @@ import { Link, useForm, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
-const props = defineProps({ remittances: Object, sahodayas: Array, summary: Object, filters: Object });
+const props = defineProps({ remittances: Object, sahodayas: Array, summary: Object, filters: Object, exportUrl: String });
 
 const form = useForm({ sahodaya_id: '', title: '', description: '', amount: '', academic_year: '', due_date: '' });
 const filterStatus = ref(props.filters?.status ?? '');
 const rejectTarget = ref(null);
 const rejectReason = ref('');
+const expandedId = ref(null);
+
+function toggleLines(id) {
+    expandedId.value = expandedId.value === id ? null : id;
+}
 
 function fmt(v) {
     return Number(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

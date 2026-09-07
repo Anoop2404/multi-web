@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class StateRemittance extends Model
@@ -45,5 +46,10 @@ class StateRemittance extends Model
     public function reviewedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function lines(): HasMany
+    {
+        return $this->hasMany(StateRemittanceLine::class);
     }
 }

@@ -184,11 +184,12 @@ class FestCumulativeChampionshipService
         $marks = FestMark::where('event_id', $event->id)
             ->with(['item', 'participant.registration.item'])
             ->get()->unique(fn (FestMark $mark) => $mark->deduplicationKey());
+        $appealPoolIds = Tenant::appealPoolSchoolIds();
         foreach ($marks as $mark) {
             $schoolId = $mark->participant?->registration?->school_id;
             $sourceCategory = (string) ($mark->item?->{$column} ?? 'open');
             $category = $this->championshipCategoryKey($root, $event, $sourceCategory);
-            if (! $schoolId || $mark->participant?->disqualified_at) {
+            if (! $schoolId || $mark->participant?->disqualified_at || isset($appealPoolIds[$schoolId])) {
                 continue;
             }
             $rows->push([

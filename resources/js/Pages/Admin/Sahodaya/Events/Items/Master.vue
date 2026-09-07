@@ -268,6 +268,10 @@
                         <input v-model="itemForm.item_code" class="field font-mono" placeholder="e.g. ATH-101">
                     </FormField>
 
+                    <FormField label="Exclusive Group Key" hint="Schools may register for only ONE item sharing this key (e.g. 'stem_cat1' for Science vs Maths, Category I)">
+                        <input v-model="itemForm.exclusive_group_key" class="field font-mono" placeholder="e.g. stem_cat1">
+                    </FormField>
+
                     <FormField v-if="isArts" label="Stage Type">
                         <SearchableSelect v-model="itemForm.stage_type"
                                           :options="[{ value: 'on_stage', label: 'On Stage' }, { value: 'off_stage', label: 'Off Stage' }]"
@@ -392,6 +396,10 @@
 
                         <FormField label="Item Code">
                             <input v-model="editForm.item_code" class="field font-mono" placeholder="e.g. ATH-101">
+                        </FormField>
+
+                        <FormField label="Exclusive Group Key" hint="Schools may register for only ONE item sharing this key">
+                            <input v-model="editForm.exclusive_group_key" class="field font-mono" placeholder="e.g. stem_cat1">
                         </FormField>
 
                         <FormField v-if="isSports" label="Age Group">
@@ -728,7 +736,7 @@ async function deleteItem(item) {
 }
 
 const itemForm = useForm({
-    title: '', item_code: '', participant_type: 'individual', result_method: '', stage_type: '', venue_type: '',
+    title: '', item_code: '', exclusive_group_key: '', participant_type: 'individual', result_method: '', stage_type: '', venue_type: '',
     competition_format: '', sport_discipline: '', class_group: '', age_group: '', kids_band: '', gender: 'open',
     category: '', area_id: '', tiebreak_mode: 'none',
     max_per_school: null, qualify_count: null, duration_minutes: null, total_marks: null,
@@ -748,7 +756,7 @@ function addItem() {
 
 const editingItem = ref(null);
 const editForm = useForm({
-    title: '', item_code: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
+    title: '', item_code: '', exclusive_group_key: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
     stage_type: '', venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', result_method: '',
     category: '', area_id: '', tiebreak_mode: 'none',
     max_per_school: null, qualify_count: null, duration_minutes: null, total_marks: null,
@@ -760,6 +768,7 @@ function startEditItem(item) {
     editingItem.value = item;
     editForm.title = item.title ?? '';
     editForm.item_code = item.item_code ?? '';
+    editForm.exclusive_group_key = item.exclusive_group_key ?? '';
     editForm.gender = item.gender ?? 'open';
     editForm.class_group = item.class_group ?? '';
     editForm.age_group = item.age_group ?? '';

@@ -147,6 +147,7 @@ class EventContext
         $marks = $marksQuery->get()
             ->unique(fn (FestMark $m) => $m->deduplicationKey());
         $pointsBySchool = [];
+        $appealPoolIds = Tenant::appealPoolSchoolIds();
 
         foreach ($marks as $mark) {
             $participant = $mark->participant;
@@ -155,7 +156,7 @@ class EventContext
             }
 
             $schoolId = $participant->registration?->school_id;
-            if (! $schoolId) {
+            if (! $schoolId || isset($appealPoolIds[$schoolId])) {
                 continue;
             }
 
@@ -201,6 +202,7 @@ class EventContext
             ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
         $pointsBySchool = [];
+        $appealPoolIds = Tenant::appealPoolSchoolIds();
 
         foreach ($marks as $mark) {
             $participant = $mark->participant;
@@ -209,7 +211,7 @@ class EventContext
             }
 
             $schoolId = $participant->registration?->school_id;
-            if (! $schoolId) {
+            if (! $schoolId || isset($appealPoolIds[$schoolId])) {
                 continue;
             }
 
@@ -351,6 +353,7 @@ class EventContext
             ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
         $pointsBySchool = [];
+        $appealPoolIds = Tenant::appealPoolSchoolIds();
 
         foreach ($marks as $mark) {
             $participant = $mark->participant;
@@ -359,7 +362,7 @@ class EventContext
             }
 
             $schoolId = $participant->registration?->school_id;
-            if (! $schoolId) {
+            if (! $schoolId || isset($appealPoolIds[$schoolId])) {
                 continue;
             }
 

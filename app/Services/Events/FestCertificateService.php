@@ -766,7 +766,14 @@ class FestCertificateService
             ?? $student?->name
             ?? '';
 
-        $schoolName = $recordBreak?->participant?->registration?->school?->name
+        // A wildcard-appeal registration is filed under the Sahodaya's placeholder
+        // "Appeal School" (so it's excluded from real-school championship totals) —
+        // origin_school_id carries the student's real school, which the certificate
+        // must show instead of the placeholder. Null on every normal registration,
+        // so this falls through to registration->school->name unchanged for those.
+        $schoolName = $recordBreak?->participant?->registration?->originSchool?->name
+            ?? $recordBreak?->participant?->registration?->school?->name
+            ?? $payload['participant']?->registration?->originSchool?->name
             ?? $payload['participant']?->registration?->school?->name
             ?? '';
 
@@ -1155,7 +1162,7 @@ class FestCertificateService
         $participantEntityIds = $certificates->where('entity_type', FestParticipant::class)->pluck('entity_id');
         $recordBreakEntityIds = $certificates->where('entity_type', FestRecordBreak::class)->pluck('entity_id');
 
-        $participants = FestParticipant::with(['student', 'registration.item', 'registration.event', 'registration.school'])
+        $participants = FestParticipant::with(['student', 'registration.item', 'registration.event', 'registration.school', 'registration.originSchool'])
             ->whereIn('id', $participantEntityIds)
             ->get()
             ->keyBy('id');
@@ -1175,6 +1182,7 @@ class FestCertificateService
             'item',
             'participant.student',
             'participant.registration.school',
+            'participant.registration.originSchool',
         ])->whereIn('id', $recordBreakEntityIds)
             ->get()
             ->keyBy('id');
