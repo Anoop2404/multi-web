@@ -9,6 +9,7 @@ class TenantBranding
 {
     /** Default logos keyed by subdomain (demo / seed assets). */
     private const DEFAULT_LOGOS = [
+        'al-farooque' => '/images/tenants/al-farooque-logo.jpg',
         'malappuram' => '/images/tenants/malappuram-logo.png',
     ];
 
