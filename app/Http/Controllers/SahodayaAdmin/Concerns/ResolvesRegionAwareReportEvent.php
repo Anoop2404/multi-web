@@ -16,19 +16,30 @@ trait ResolvesRegionAwareReportEvent
 {
     private function regionAwareTargetEvent(Request $request, FestEvent $event): FestEvent
     {
+        $root = $event->rootEvent();
+        $regionId = $request->integer('region_id') ?: null;
+        $phaseId = $request->integer('competition_phase_id') ?: null;
+
+        if ($regionId !== null) {
+            if ($root->usesPhasedRegionalBilling()) {
+                $child = FestEvent::where('parent_event_id', $root->id)
+                    ->where('region_id', $regionId)
+                    ->when($phaseId, fn ($q) => $q->where('source_phase_id', $phaseId))
+                    ->first();
+            } else {
+                $child = $root->regionalChild($regionId);
+            }
+
+            if ($child) {
+                return $this->detachedFromParent($child);
+            }
+        }
+
         if ($event->parent_event_id !== null) {
             return $this->detachedFromParent($event);
         }
 
-        $regionId = $request->integer('region_id') ?: null;
-        if ($regionId === null) {
-            return $event;
-        }
-
-        $child = $event->regionalChild($regionId);
-        abort_unless($child, 404, 'No matching region for this event.');
-
-        return $this->detachedFromParent($child);
+        return $event;
     }
 
     private function detachedFromParent(FestEvent $child): FestEvent

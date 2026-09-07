@@ -209,12 +209,15 @@ class FestReportScopeResolver
         // as it stands today, not as it stood when that event actually ran.
         // Falls back to the live current year only if the event predates
         // academic_year_id being populated (older historical events).
-        if ($root->usesPhasedRegionalBilling() && $phaseId) {
-            $schoolIds = FestSchoolPhaseRegionSelection::where('event_id', $root->id)
-                ->where('phase_id', $phaseId)
-                ->where('region_id', $regionId)
-                ->pluck('school_id')
-                ->all();
+        if ($root->usesPhasedRegionalBilling()) {
+            $schoolIdsQuery = FestSchoolPhaseRegionSelection::where('event_id', $root->id)
+                ->where('region_id', $regionId);
+
+            if ($phaseId) {
+                $schoolIdsQuery->where('phase_id', $phaseId);
+            }
+
+            $schoolIds = $schoolIdsQuery->pluck('school_id')->unique()->all();
         } else {
             $year = $root->academicYear?->label ?? AcademicYear::forSahodaya($root->tenant_id);
             $schoolIds = SchoolRegionAssignment::forTenant($root->tenant_id)
