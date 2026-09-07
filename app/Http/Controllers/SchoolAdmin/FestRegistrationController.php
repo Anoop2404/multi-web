@@ -851,6 +851,8 @@ class FestRegistrationController extends SchoolAdminController
                     'amount_paid' => (float) $fee->amount_paid,
                     'outstanding' => (float) $fee->outstandingBalance(),
                     'status' => $fee->status,
+                    'fee_receipt_id' => $fee->fee_receipt_id,
+                    'fee_receipt' => $fee->feeReceipt ? ['id' => $fee->feeReceipt->id, 'status' => $fee->feeReceipt->status] : null,
                     'payment_details_text' => $phase ? $phase->paymentDetailsText($event) : $event->paymentDetailsText(),
                     'payment_qr_code_url' => $phase ? $phase->paymentQrCodeUrl($event) : $event->paymentQrCodeUrl(),
                     'lines' => $fee->lines->map(function ($line) use ($classGroupByItemId, $classGroupLabels) {

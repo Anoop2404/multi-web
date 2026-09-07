@@ -118,6 +118,12 @@ foreach ($festPrograms as $cfg) {
         Route::get('/events/{event}/receipt', [FestRegistrationController::class, 'feeReceipt'])
             ->defaults('program', $slug)
             ->name('event.receipt');
+        Route::get('/events/{event}/fee-receipt', [FestRegistrationController::class, 'feeReceipt'])
+            ->defaults('program', $slug)
+            ->name('event.fee-receipt');
+        Route::get('/events/{event}/receipt-file', [FestRegistrationController::class, 'feeReceipt'])
+            ->defaults('program', $slug)
+            ->name('event.receipt-file');
         Route::get('/events/{event}/invoice', [FestRegistrationController::class, 'eventInvoice'])
             ->defaults('program', $slug)
             ->name('event.invoice');

@@ -180,7 +180,7 @@
                 <p v-if="outstanding > 0 && ['pending', 'partial', 'rejected'].includes(event.school_fee?.status)"
                    class="text-[10px] text-slate-400 -mt-1">Up to 5 images for this one payment.</p>
                 <a v-if="event.school_fee?.status === 'approved'"
-                   :href="`${programBase}/events/${event.id}/receipt`"
+                   :href="(event.school_fee?.fee_receipt_id || event.school_fee?.fee_receipt?.id) ? `/school-admin/${schoolId}/payments/receipts/${event.school_fee.fee_receipt_id || event.school_fee.fee_receipt?.id}` : `${programBase}/events/${event.id}/fee-receipt`"
                    target="_blank" rel="noopener"
                    class="px-2 py-1 bg-green-50 border border-green-300 text-green-700 text-xs font-semibold rounded">
                     View Receipt ↗

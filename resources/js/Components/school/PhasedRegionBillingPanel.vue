@@ -161,7 +161,7 @@
                     <span>📄 View / Print Invoice</span>
                 </a>
                 <a v-if="fee.status === 'approved'"
-                   :href="`${eventBase}/receipt?registration_batch_id=${fee.registration_batch_id}`"
+                   :href="(fee.fee_receipt?.id || fee.fee_receipt_id) ? `/school-admin/${schoolId}/payments/receipts/${fee.fee_receipt?.id || fee.fee_receipt_id}` : `${eventBase}/fee-receipt?registration_batch_id=${fee.registration_batch_id}`"
                    target="_blank"
                    class="btn-secondary text-xs font-semibold inline-flex items-center gap-1 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100">
                     <span>🧾 Official Receipt</span>
