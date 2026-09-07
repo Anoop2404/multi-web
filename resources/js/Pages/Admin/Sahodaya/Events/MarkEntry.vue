@@ -209,14 +209,14 @@
                                 <th class="p-3.5 w-32">Attendance</th>
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
                                 <th class="p-3.5 w-44">Rank</th>
-                                <template v-if="hasJudgePanel">
-                                    <th v-for="j in judgeNumbers" :key="j" class="p-3.5 w-28">
+                                 <template v-if="hasJudgePanel">
+                                    <th v-for="j in judgeNumbers" :key="j" class="p-3.5 w-32">
                                         Judge {{ j }}
                                         <span v-if="perJudgeMax" class="block font-normal text-slate-400 normal-case">/ {{ perJudgeMax }}</span>
                                     </th>
-                                    <th class="p-3.5 w-24">Grand Total</th>
+                                    <th class="p-3.5 w-28">Grand Total</th>
                                 </template>
-                                <th v-else class="p-3.5 w-28">Marks / Score</th>
+                                <th v-else class="p-3.5 w-32">Marks / Score</th>
                                 <th v-if="showGradeColumn" class="p-3.5 w-24">Grade</th>
                                 <th class="p-3.5 text-right w-24 sticky right-0 z-20 bg-slate-50 border-l border-slate-200">Actions</th>
                             </tr>
@@ -273,11 +273,11 @@
                                 <td v-if="showMeasurement(section.item)" class="p-3.5">
                                     <div class="flex items-center gap-1">
                                         <input v-model="markForms[participant.id].measurement_value"
-                                               class="field text-xs"
+                                               class="field text-sm !py-2"
                                                placeholder="7.45"
                                                :disabled="isAbsent(participant, item) || itemLocked">
                                         <input v-model="markForms[participant.id].measurement_unit"
-                                               class="field text-xs w-16"
+                                               class="field text-sm w-16 !py-2"
                                                placeholder="s/m"
                                                :disabled="isAbsent(participant, item) || itemLocked">
                                     </div>
@@ -297,11 +297,11 @@
                                     <td v-for="j in judgeNumbers" :key="j" class="p-3.5">
                                         <input v-model.number="judgeForms[participant.id][j]" type="number" min="0" step="0.5"
                                                :max="perJudgeMax"
-                                               class="field text-xs tabular-nums w-24 judge-mark-input" placeholder="0"
+                                               class="field text-sm font-semibold tabular-nums w-28 !py-2 !px-3 judge-mark-input" placeholder="0"
                                                :disabled="isAbsent(participant, item) || itemLocked"
                                                @keydown="onJudgeInputKeydown">
                                     </td>
-                                    <td class="p-3.5 font-mono font-bold text-slate-900 tabular-nums">
+                                    <td class="p-3.5 font-mono text-base font-bold text-slate-900 tabular-nums">
                                         {{ participantGrandTotal(participant.id, item) }}
                                     </td>
                                 </template>
@@ -309,7 +309,7 @@
                                 <!-- Marks / Score (Optional) -->
                                 <td v-else class="p-3.5">
                                     <input v-model.number="markForms[participant.id].score" type="number" min="0" step="0.5"
-                                           class="field text-xs font-bold tabular-nums" placeholder="Pts (Optional)"
+                                           class="field text-sm font-bold tabular-nums w-28 !py-2 !px-3" placeholder="Pts (Optional)"
                                            :disabled="isAbsent(participant, item) || itemLocked"
                                            @input="onScoreInput(participant.id, item)">
                                 </td>
