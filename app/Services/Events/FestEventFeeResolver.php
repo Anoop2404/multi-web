@@ -207,7 +207,10 @@ class FestEventFeeResolver
                 $row = $input[$level] ?? [];
                 $normalized[$level] = [
                     'fee_model' => 'per_student',
-                    'individual_amount' => (float) ($row['individual_amount'] ?? $row['per_student_amount'] ?? 500),
+                    // Blank means ₹0, not a silent ₹500/nominee remittance charge nobody
+                    // configured — same policy as StateRemittanceService::calculateDemand()
+                    // and the sports composite fee fix.
+                    'individual_amount' => (float) ($row['individual_amount'] ?? $row['per_student_amount'] ?? 0),
                 ];
 
                 continue;

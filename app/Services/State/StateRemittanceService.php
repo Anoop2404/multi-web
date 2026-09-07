@@ -15,7 +15,10 @@ class StateRemittanceService
     public function calculateDemand(FestStateProgram $program, Tenant $sahodaya, int $acceptedNomineeCount): StateRemittance
     {
         $stateFees = $program->level_fees['state'] ?? [];
-        $individualRate = (float) ($stateFees['individual_amount'] ?? 500);
+        // Blank means ₹0, not a silent ₹500/nominee charge nobody configured — same policy
+        // as calculateDemandFromApprovedQualifiers() below, and the sports composite fee
+        // fix in FestSportsCompositeFeeService::resolveSportsFeeSource().
+        $individualRate = (float) ($stateFees['individual_amount'] ?? 0);
 
         $totalDemand = $acceptedNomineeCount * $individualRate;
 

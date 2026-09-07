@@ -280,17 +280,24 @@ class FestSportsCompositeFeeService
      */
     public function resolveSportsFeeSource(FestEvent $event): array
     {
-        $feeSettings = $event->fee_settings ?? [];
-
         if ($event->hasSportsFeesConfigured()) {
+            // Head = Event: the event's own dedicated columns are the single source of
+            // truth once ANY of them has been set — never fall back to $event->fee_settings
+            // (JSON) here. That JSON blob can carry stale values from before this event had
+            // its own fee columns, or from an admin clearing one field (e.g. school fee) but
+            // leaving unrelated fee_settings keys (e.g. a leftover school_registration_flat/
+            // per_student_amount from a different fee model) untouched — falling back to it
+            // silently resurrected exactly the "phantom charge" a null column is meant to
+            // rule out. A genuinely blank column means ₹0/no quota, full stop. Mirrors the
+            // equivalent fix already applied to FestSchoolEventFeeService::resolveSchedule().
             return [
-                'school_registration_fee' => $event->school_registration_fee ?? $feeSettings['school_registration_fee'] ?? $feeSettings['school_registration_flat'] ?? 0,
-                'student_registration_fee' => $event->student_registration_fee ?? $feeSettings['student_registration_fee'] ?? $feeSettings['per_student_amount'] ?? 0,
-                'team_registration_fee' => $event->team_registration_fee ?? $feeSettings['team_registration_fee'] ?? 0,
-                'included_items_per_student' => $event->included_items_per_student ?? $feeSettings['included_items_per_student'] ?? 0,
-                'included_teams' => $event->included_teams ?? $feeSettings['included_teams'] ?? 0,
-                'default_item_fee' => $event->default_item_fee ?? $feeSettings['default_item_fee'] ?? null,
-                'extra_item_fee' => $event->extra_item_fee ?? $feeSettings['extra_item_fee'] ?? null,
+                'school_registration_fee' => (float) ($event->school_registration_fee ?? 0),
+                'student_registration_fee' => (float) ($event->student_registration_fee ?? 0),
+                'team_registration_fee' => (float) ($event->team_registration_fee ?? 0),
+                'included_items_per_student' => (int) ($event->included_items_per_student ?? 0),
+                'included_teams' => (int) ($event->included_teams ?? 0),
+                'default_item_fee' => $event->default_item_fee !== null ? (float) $event->default_item_fee : null,
+                'extra_item_fee' => $event->extra_item_fee !== null ? (float) $event->extra_item_fee : null,
             ];
         }
 

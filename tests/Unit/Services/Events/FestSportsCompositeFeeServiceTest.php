@@ -448,4 +448,51 @@ class FestSportsCompositeFeeServiceTest extends TestCase
 
         $this->assertSame('submitted', $waitlisted->fresh()->status);
     }
+
+    public function test_resolve_sports_fee_source_ignores_stale_fee_settings_json_when_columns_are_cleared(): void
+    {
+        $this->seed(SahodayaMasterDataSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Stale Fee JSON Sahodaya',
+            'domain' => 'stale-fee-json.test',
+            'is_active' => true,
+        ]);
+
+        // Reproduces the exact reported bug: an admin previously configured school/student
+        // fees (which flips fee_settings['sports_fees_configured'] = true — see
+        // FestEventSettingsController::updateFeeSettings() — and, at the time, also left
+        // school_registration_flat/per_student_amount sitting in fee_settings from the
+        // event's other fee-model normalization), then blanked the dedicated columns and
+        // saved again. hasSportsFeesConfigured() stays true forever once that flag is set,
+        // so the event is still "configured" — it must now mean ₹0, not "read whatever is
+        // still in fee_settings".
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Skating Championship',
+            'event_type' => 'sports',
+            'level_round' => 'sahodaya',
+            'status' => 'registration_open',
+            'school_registration_fee' => null,
+            'student_registration_fee' => null,
+            'default_item_fee' => null,
+            'fee_settings' => [
+                'fee_model' => 'sports_composite',
+                'sports_fees_configured' => true,
+                'school_registration_flat' => 2000,
+                'per_student_amount' => 300,
+                'default_item_fee' => 400,
+            ],
+        ]);
+
+        $this->assertTrue($event->fresh()->hasSportsFeesConfigured());
+
+        $fees = app(FestSportsCompositeFeeService::class)->resolveSportsFeeSource($event->fresh());
+
+        $this->assertSame(0.0, $fees['school_registration_fee']);
+        $this->assertSame(0.0, $fees['student_registration_fee']);
+        $this->assertNull($fees['default_item_fee']);
+    }
 }
