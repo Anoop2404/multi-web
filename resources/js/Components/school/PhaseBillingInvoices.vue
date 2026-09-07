@@ -19,8 +19,11 @@
                     <span class="font-semibold shrink-0">₹{{ formatMoney(line.amount) }}</span>
                 </li>
             </ul>
+            <!-- Deliberately NOT called "registrations" — see HeadBillingInvoices.vue's
+                 identical note: this counts billable student-item entries, not Register
+                 submissions/rows, so it won't match Step 2's own registration count. -->
             <p v-if="totalRegCount(phaseFee) > 0" class="text-xs text-indigo-700">
-                Total registrations: {{ totalRegCount(phaseFee) }}
+                Billed entries: {{ totalRegCount(phaseFee) }} (student × item)
             </p>
             <div class="flex flex-wrap justify-between gap-2 text-xs pt-2 border-t border-indigo-100">
                 <span class="text-indigo-800">

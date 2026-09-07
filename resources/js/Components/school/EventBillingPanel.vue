@@ -108,9 +108,12 @@
                 </li>
             </ul>
             <p v-else class="text-xs text-indigo-800">Register items above to see item fees here.</p>
+            <!-- Deliberately NOT called "registrations" — see HeadBillingInvoices.vue's
+                 identical note: this counts billable student-item entries, not Register
+                 submissions/rows, so it won't match Step 2's own registration count. -->
             <p v-if="itemFeeLines.length" class="text-xs text-indigo-700 mt-1">
                 Item fees: ₹{{ formatMoney(itemFeesDue) }}
-                <template v-if="itemUnitCount > 0">— Total registrations: {{ itemUnitCount }}</template>
+                <template v-if="itemUnitCount > 0">— Billed entries: {{ itemUnitCount }} (student × item)</template>
             </p>
             <p class="font-semibold text-indigo-900 mt-2 pt-2 border-t border-indigo-100">
                 Total fees due: ₹{{ formatMoney(totalDue) }}

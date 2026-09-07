@@ -19,8 +19,14 @@
                     <span class="font-semibold shrink-0">₹{{ formatMoney(line.amount) }}</span>
                 </li>
             </ul>
+            <!-- Deliberately NOT called "registrations" — that word is already used
+                 elsewhere (Step 2 · Item Registration's "N item registrations here") for
+                 the count of Register submissions/rows, which is smaller: one row can carry
+                 2 students for an individual item with a 2-per-school quota. This counts
+                 billable student-item entries instead (what's actually being charged), so
+                 the two numbers won't match and shouldn't be read as the same thing. -->
             <p v-if="totalRegCount(headFee) > 0" class="text-xs text-indigo-700">
-                Total registrations: {{ totalRegCount(headFee) }}
+                Billed entries: {{ totalRegCount(headFee) }} (student × item)
             </p>
             <div class="flex flex-wrap justify-between gap-2 text-xs pt-2 border-t border-indigo-100">
                 <span class="text-indigo-800">
