@@ -70,8 +70,15 @@ class FestPublicVisibilityService
         // timestamp, not just the event's catch-all flag. That flag flips once
         // for the whole festival and would otherwise reveal every participant
         // the moment any part of the event finalizes, including items that
-        // haven't run or been judged yet.
+        // haven't run or been judged yet. An item explicitly unpublished/hidden
+        // via results_hidden always wins here too — same rule showIndividualMarks()
+        // already applies, previously missing here meant a name could still show
+        // (with marks correctly hidden) for an item an admin had explicitly hidden.
         if ($item) {
+            if ($item->results_hidden) {
+                return false;
+            }
+
             return (bool) $item->results_published_at;
         }
 
