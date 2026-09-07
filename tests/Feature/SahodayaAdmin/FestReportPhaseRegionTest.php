@@ -111,5 +111,17 @@ class FestReportPhaseRegionTest extends TestCase
 
             return true;
         });
+
+        // Test item-wise PDF with scope params
+        $pdfResponse = $this->actingAs($admin)->get(
+            route('sahodaya.events.reports.item-wise.pdf', [
+                'tenantId' => $sahodaya->id,
+                'event' => $event->id,
+                'scope_mode' => 'region',
+                'competition_phase_id' => $phaseOffStage->id,
+                'region_id' => $region1->id,
+            ])
+        );
+        $pdfResponse->assertOk();
     }
 }
