@@ -333,7 +333,7 @@
         $cleanTitle = str_replace('_', ' ', $itemName);
         $showDob = collect($rows)->contains(fn ($row) => !empty($row['_uses_age']));
         $showClass = !$showDob && collect($rows)->contains(fn ($row) => !empty($row['_uses_class']));
-        $colspan = 7 + ($showDob || $showClass ? 1 : 0) + (($showChest ?? false) ? 1 : 0);
+        $colspan = 8 + ($showDob || $showClass ? 1 : 0) + (($showChest ?? false) ? 1 : 0);
 
         // Team-based items (chess, quiz, group items, sports team events, etc.) group
         // several members under one chest/registration; count teams for those instead
@@ -359,7 +359,7 @@
         }
     @endphp
     <div style="margin-bottom: 18px; @if(empty($isPreview) && ($isDomPdf ?? true) && $sectionIndex > 0) page-break-before: always; @endif">
-        @if(empty($isPreview) && ($isDomPdf ?? true))
+        @if(empty($isPreview) && ($isDomPdf ?? true) && $sectionIndex > 0)
         <div class="report-header">
             <table class="brand-cell-table">
                 <tr>
@@ -411,6 +411,7 @@
                     @endif
                     <th style="width: 28%;">School</th>
                     <th style="width: 80px;" class="text-center">Attendance</th>
+                    <th style="width: 80px;" class="text-center">Sign</th>
                 </tr>
             </thead>
             <tbody>
@@ -465,6 +466,7 @@
                             <td class="text-center" style="font-size: 8px; color: #475569;">{{ $row['class'] ?? '—' }}</td>
                         @endif
                         <td class="school-name">{{ strtoupper($school) }}</td>
+                        <td class="text-center"></td>
                         <td class="text-center"></td>
                     </tr>
                 @endforeach

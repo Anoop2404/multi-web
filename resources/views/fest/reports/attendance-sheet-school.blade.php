@@ -6,7 +6,7 @@
 
 <h2 style="text-align:center">{{ $event->title }} — {{ strtoupper($school->name) }}</h2>
 <p style="text-align:center;font-size:10px;color:#64748b">Generated on {{ now()->format('d M Y, h:i A') }}</p>
-<table><thead><tr><th style="width: 35px; text-align: center;">Sl No</th><th class="photo"></th><th>Student</th>@if($showDob ?? false)<th style="width: 75px; text-align: center;">DOB</th>@elseif($showClass ?? false)<th style="width: 55px; text-align: center;">Class</th>@endif<th>Items</th><th style="width: 70px; text-align: center;">Present</th></tr></thead>
+<table><thead><tr><th style="width: 35px; text-align: center;">Sl No</th><th class="photo"></th><th>Student</th>@if($showDob ?? false)<th style="width: 75px; text-align: center;">DOB</th>@elseif($showClass ?? false)<th style="width: 55px; text-align: center;">Class</th>@endif<th>Items</th><th style="width: 70px; text-align: center;">Present</th><th style="width: 70px; text-align: center;">Sign</th></tr></thead>
 <tbody>
 @foreach($studentRows as $row)
 <tr>
@@ -19,6 +19,7 @@
 <td style="text-align: center;">{{ $row['class'] ?? '—' }}</td>
 @endif
 <td>@foreach($row['events'] as $e){{ $e['event_name'] }} <span style="color:#64748b">(Fest ID: {{ $e['fest_id'] }})</span>@if(!$loop->last), @endif @endforeach</td>
+<td style="text-align: center;"></td>
 <td style="text-align: center;"></td>
 </tr>
 @endforeach
