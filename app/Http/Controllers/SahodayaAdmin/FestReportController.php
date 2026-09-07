@@ -60,28 +60,41 @@ class FestReportController extends SahodayaAdminController
 
         $headContext = $this->itemHeadReportContext($event, null, $tenantId);
 
-        $regions = \App\Models\Region::forTenant($tenantId)
-            ->globalOnly()
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get(['id', 'name', 'code'])
-            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'code' => $r->code])
-            ->values()
-            ->all();
+        $competitionPhases = $rootEvent->usesPhasedRegionalBilling()
+            ? $rootEvent->phases()
+                ->orderBy('sort_order')
+                ->with(['allowedRegions' => function ($q) {
+                    $q->where('enabled', true)->with('region:id,name,code,sort_order');
+                }])
+                ->get(['id', 'name', 'code', 'is_regional', 'region_partition_group', 'sort_order'])
+                ->map(function (\App\Models\FestEventPhase $phase) {
+                    $isRegional = $phase->isRegional();
+                    $phaseRegions = [];
 
-        // Detect whether this is a partitioned parent with region children so that Hub
-        // and Downloads can render per-region navigation cards.
-        //
-        // Most tiles still link to the child event's own id/URL — that's each region
-        // child's own report, and it's already correctly isolated to that child. The
-        // exception is FestReportCatalog::REGION_ID_AWARE_IDS: those builders resolve
-        // data via $event->reportableEventIds()/reportableItemIds(), which, run
-        // directly on the child, pulls in the hub's own uncopied item/registration rows
-        // alongside the child's own. For just those ids, regionScopedRows() reroutes the
-        // tile through the parent hub with an explicit region_id instead (same pattern
-        // already used for Registration Register / Overall Ranking), which every
-        // controller method behind those ids now understands via regionAwareTargetEvent().
-        // See FestReportCatalog::REGION_ID_AWARE_IDS docblock for the current list.
+                    if ($isRegional) {
+                        $phaseRegions = $phase->allowedRegions
+                            ->filter(fn ($pr) => (bool) $pr->enabled && $pr->region !== null)
+                            ->sortBy(fn ($pr) => [$pr->region->sort_order ?? 0, $pr->region->name ?? ''])
+                            ->map(fn ($pr) => [
+                                'id'   => $pr->region->id,
+                                'name' => $pr->region->name,
+                                'code' => $pr->region->code,
+                            ])
+                            ->values()
+                            ->all();
+                    }
+
+                    return [
+                        'id'          => $phase->id,
+                        'name'        => $phase->name,
+                        'code'        => $phase->code,
+                        'is_regional' => $isRegional,
+                        'regions'     => $phaseRegions,
+                    ];
+                })
+                ->values()
+            : collect();
+
         $regionChildren = $event->childrenForRoles(['region'])
             ->load('region:id,name,code')
             ->sortBy('sort_order')
@@ -111,6 +124,37 @@ class FestReportController extends SahodayaAdminController
             && count($regionChildren) > 0
             && ! $rootEvent->usesPhasedRegionalBilling();
 
+        if ($rootEvent->usesPhasedRegionalBilling()) {
+            $regions = $competitionPhases
+                ->pluck('regions')
+                ->flatten(1)
+                ->unique('id')
+                ->values()
+                ->all();
+        } elseif (count($regionChildren) > 0) {
+            $regions = collect($regionChildren)
+                ->map(fn ($c) => [
+                    'id'   => $c['region_id'],
+                    'name' => $c['region_name'],
+                    'code' => $c['region_code'],
+                ])
+                ->filter(fn ($r) => ! empty($r['id']))
+                ->unique('id')
+                ->values()
+                ->all();
+        } else {
+            $event->loadMissing('region:id,name,code');
+            if ($event->region) {
+                $regions = [[
+                    'id'   => $event->region->id,
+                    'name' => $event->region->name,
+                    'code' => $event->region->code,
+                ]];
+            } else {
+                $regions = [];
+            }
+        }
+
         return array_merge([
             'event'               => $event->only([
                 'id', 'title', 'event_type', 'status', 'event_start', 'event_end',
@@ -125,9 +169,7 @@ class FestReportController extends SahodayaAdminController
             'isPartitionedParent' => $isPartitionedParent,
             'regionChildren'      => $regionChildren,
             'childEvents'         => $this->scopedChildEventOptions($event),
-            'competitionPhases'   => $rootEvent->usesPhasedRegionalBilling()
-                ? $rootEvent->phases()->get(['id', 'name', 'code', 'is_regional'])
-                : collect(),
+            'competitionPhases'   => $competitionPhases,
             'registrationBatches' => $rootEvent->usesPhasedRegionalBilling()
                 ? $rootEvent->registrationBatches()->get(['id', 'name', 'code'])
                 : collect(),

@@ -12,8 +12,8 @@
                     <label class="text-xs font-semibold text-slate-600">Competition phase
                         <SearchableSelect v-model="scopePhaseId" class="mt-1 w-full" :options="competitionPhases" :all-option="true" all-label="All phases" />
                     </label>
-                    <label class="text-xs font-semibold text-slate-600">Region
-                        <SearchableSelect v-model="scopeRegionId" class="mt-1 w-full" :options="regions" :all-option="true" all-label="Combined" />
+                    <label v-if="availableRegions.length" class="text-xs font-semibold text-slate-600">Region
+                        <SearchableSelect v-model="scopeRegionId" class="mt-1 w-full" :options="availableRegions" :all-option="true" all-label="Combined" />
                     </label>
                     <label class="text-xs font-semibold text-slate-600">Registration / payment level
                         <SearchableSelect v-model="scopeBatchId" class="mt-1 w-full" :options="registrationBatches" :all-option="true" all-label="All levels" />
@@ -193,7 +193,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
@@ -239,6 +239,23 @@ const activeCategory = ref(null);
 const scopePhaseId = ref(props.reportScopeSelection.competition_phase_id || '');
 const scopeRegionId = ref(props.reportScopeSelection.region_id || '');
 const scopeBatchId = ref(props.reportScopeSelection.registration_batch_id || '');
+
+const availableRegions = computed(() => {
+    if (!scopePhaseId.value) {
+        return props.regions;
+    }
+    const phase = props.competitionPhases.find((p) => String(p.id) === String(scopePhaseId.value));
+    if (!phase || !phase.is_regional || !phase.regions) {
+        return [];
+    }
+    return phase.regions;
+});
+
+watch(availableRegions, (newRegions) => {
+    if (!newRegions.length || (scopeRegionId.value && !newRegions.some((r) => String(r.id) === String(scopeRegionId.value)))) {
+        scopeRegionId.value = '';
+    }
+});
 
 const itemsList = computed(() => props.items ?? []);
 const reportsBase = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports`);
