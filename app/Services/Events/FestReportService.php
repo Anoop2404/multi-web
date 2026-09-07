@@ -736,14 +736,13 @@ class FestReportService
                 $p->registration?->item?->title,
                 $p->registration?->item?->head?->name,
                 $p->chest_no,
-                $p->level_registration_number,
             ])
             ->values()
             ->all();
 
         return ExcelExport::download($this->slug().'-category-wise-students', [
             'Category', 'Class', 'Reg No', 'Admission No', 'Student', 'Gender', 'DOB',
-            'School', 'Item', 'Item Head', 'Chest No', 'Fest ID',
+            'School', 'Item', 'Item Head', 'Chest No',
         ], $rows, ExcelExport::generatedOnNote());
     }
 
@@ -769,14 +768,13 @@ class FestReportService
                 $p->student?->reg_no,
                 $p->student?->schoolClass?->name,
                 $p->chest_no,
-                $p->level_registration_number,
             ])
             ->values()
             ->all();
 
         return ExcelExport::download($this->slug().'-item-participants', [
             'Item Head', 'Item', 'Class Group', 'School', 'Participant', 'Reg No',
-            'Class', 'Chest No', 'Fest ID',
+            'Class', 'Chest No',
         ], $rows, ExcelExport::generatedOnNote());
     }
 
@@ -1025,6 +1023,11 @@ class FestReportService
 
     private function attendanceSheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
+        // Off by default (chest no was dropped from this sheet entirely per organizer
+        // feedback — it's just a hand-marking checklist), but some organizers still want
+        // it shown, e.g. to double-check attendance against a printed chest-number list.
+        $showChest = $request->boolean('show_chest');
+
         $participants = $this->participantsFlat(
             $request->integer('item_id') ?: null,
             $request->input('class_group'),
@@ -1126,6 +1129,7 @@ class FestReportService
             // Chromium-based converter (PDF_CONVERTER_URL) does not, so avoid printing
             // unresolved placeholder text on that path.
             'isDomPdf'          => $isDomPdf,
+            'showChest'         => $showChest,
         ];
 
         // Preview mode: return raw HTML (browser handles S3 images, proper page layout)
@@ -1239,7 +1243,6 @@ class FestReportService
             $studentRows[$id]['events'][] = [
                 'event_name'   => $p->registration?->item?->title ?? '',
                 'chest_number' => $p->group?->chest_no ?? $p->chest_no ?? '—',
-                'order_no'     => $p->group?->order_no ?? $p->order_no,
             ];
         }
 

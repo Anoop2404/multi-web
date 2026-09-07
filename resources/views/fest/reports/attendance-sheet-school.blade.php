@@ -18,7 +18,7 @@
 @elseif($showClass ?? false)
 <td style="text-align: center;">{{ $row['class'] ?? '—' }}</td>
 @endif
-<td>@foreach($row['events'] as $e){{ $e['event_name'] }}@if(!empty($e['order_no'])) (Order {{ $e['order_no'] }})@endif@if(!$loop->last), @endif @endforeach</td>
+<td>@foreach($row['events'] as $e){{ $e['event_name'] }}@if(!$loop->last), @endif @endforeach</td>
 <td style="text-align: center;"></td>
 </tr>
 @endforeach

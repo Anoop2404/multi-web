@@ -638,12 +638,12 @@ class FestSchoolReportController extends SchoolAdminController
             $out = fopen('php://output', 'w');
             CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
             CsvSafety::fputcsv($out, []);
-            CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Fest ID', 'Chest', 'Status', 'Grade', 'Rank', 'Score']);
+            CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Chest', 'Status', 'Grade', 'Rank', 'Score']);
             foreach ($rows as $row) {
                 CsvSafety::fputcsv($out, [
                     $row['category_label'], $row['item_title'], $row['item_code'],
                     $row['phase_name'], $row['region_name'], $row['school_name'],
-                    $row['participant'], $row['reg_no'], $row['fest_id'], $row['chest_no'],
+                    $row['participant'], $row['reg_no'], $row['chest_no'],
                     $row['status'], $row['grade'], $row['position'], $row['score'],
                 ]);
             }

@@ -1138,13 +1138,12 @@ class FestEventReportAnalyticsService
             $r['reg_no'] ?? '',
             $r['reg_status'] ?? '',
             $r['role'] ?? '',
-            $r['fest_id'] ?? '',
             $r['chest_no'] ?? '',
         ]);
 
         return ExcelExport::download(
             str($this->event->title)->slug()->limit(40).'-numbering-register',
-            ['Head', 'Item', 'School', 'Participant', 'Reg no', 'Reg status', 'Role', 'Fest ID', 'Chest'],
+            ['Head', 'Item', 'School', 'Participant', 'Reg no', 'Reg status', 'Role', 'Chest'],
             $rows,
             ExcelExport::generatedOnNote(),
         );
@@ -1443,12 +1442,12 @@ class FestEventReportAnalyticsService
     public function exportHeadWiseParticipants(?int $headId = null, ?string $schoolId = null): StreamedResponse
     {
         $rows = collect($this->headWiseParticipantRows($headId, $schoolId))->map(fn ($r) => [
-            $r['head_name'], $r['school'], $r['student'], $r['reg_no'], $r['item'], $r['fest_id'], $r['chest_no'],
+            $r['head_name'], $r['school'], $r['student'], $r['reg_no'], $r['item'], $r['chest_no'],
         ]);
 
         return ExcelExport::download(
             str($this->event->title)->slug()->limit(40).'-head-wise-participants',
-            ['Head', 'School', 'Participant', 'School reg', 'Item', 'Fest ID', 'Chest'],
+            ['Head', 'School', 'Participant', 'School reg', 'Item', 'Chest'],
             $rows,
             ExcelExport::generatedOnNote(),
         );
@@ -1621,12 +1620,12 @@ class FestEventReportAnalyticsService
     public function exportAreaWiseParticipants(?int $areaId = null, ?string $schoolId = null): StreamedResponse
     {
         $rows = collect($this->areaWiseParticipantRows($areaId, $schoolId))->map(fn ($r) => [
-            $r['area_name'], $r['school'], $r['student'], $r['reg_no'], $r['item'], $r['fest_id'], $r['chest_no'],
+            $r['area_name'], $r['school'], $r['student'], $r['reg_no'], $r['item'], $r['chest_no'],
         ]);
 
         return ExcelExport::download(
             str($this->event->title)->slug()->limit(40).'-area-wise-participants',
-            ['Area', 'School', 'Participant', 'School reg', 'Item', 'Fest ID', 'Chest'],
+            ['Area', 'School', 'Participant', 'School reg', 'Item', 'Chest'],
             $rows,
             ExcelExport::generatedOnNote(),
         );

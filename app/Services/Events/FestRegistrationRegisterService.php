@@ -323,7 +323,7 @@ class FestRegistrationRegisterService
 
         return response()->streamDownload(function () use ($data, $includeChestNo) {
             $out = fopen('php://output', 'w');
-            $header = ['School', 'Student', 'School reg no', 'Fest ID', 'Item', 'Phase', 'Level', 'Reg status', 'Role'];
+            $header = ['School', 'Student', 'School reg no', 'Item', 'Phase', 'Level', 'Reg status', 'Role'];
             if ($includeChestNo) {
                 $header[] = 'Chest no';
             }
@@ -335,7 +335,6 @@ class FestRegistrationRegisterService
                     $row['school_name'],
                     $row['participant_name'],
                     $row['participant_reg_no'],
-                    $row['level_reg'],
                     $row['item_title'],
                     $row['phase_name'] ?? '—',
                     $row['batch_name'] ?? '—',

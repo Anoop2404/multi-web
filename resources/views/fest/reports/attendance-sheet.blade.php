@@ -106,6 +106,11 @@
         .text-center {
             text-align: center;
         }
+        .chest-no {
+            font-weight: bold;
+            color: #0f172a;
+            font-size: 11.5px;
+        }
         .school-name {
             text-transform: uppercase;
             color: #334155;
@@ -328,7 +333,7 @@
         $cleanTitle = str_replace('_', ' ', $itemName);
         $showDob = collect($rows)->contains(fn ($row) => !empty($row['_uses_age']));
         $showClass = !$showDob && collect($rows)->contains(fn ($row) => !empty($row['_uses_class']));
-        $colspan = 6 + ($showDob || $showClass ? 1 : 0);
+        $colspan = 6 + ($showDob || $showClass ? 1 : 0) + (($showChest ?? false) ? 1 : 0);
 
         // Team-based items (chess, quiz, group items, sports team events, etc.) group
         // several members under one chest/registration; count teams for those instead
@@ -393,6 +398,9 @@
                 <tr>
                     <th style="width: 28px;" class="text-center">Sl</th>
                     <th style="width: 50px;" class="text-center">Order</th>
+                    @if($showChest ?? false)
+                        <th style="width: 55px;" class="text-center">Chest No</th>
+                    @endif
                     <th class="photo-cell"></th>
                     <th>Participant / Team Name</th>
                     @if($showDob)
@@ -433,6 +441,9 @@
                     <tr>
                         <td class="text-center">{{ $serialOffset + $i + 1 }}</td>
                         <td class="text-center">{{ $row['order_no'] ?? '' }}</td>
+                        @if($showChest ?? false)
+                            <td class="text-center chest-no">{{ $row['reference'] ?? '' }}</td>
+                        @endif
                         <td class="photo-cell text-center">
                             @if(!empty($row['photo_url']))
                                 <img src="{{ $row['photo_url'] }}" alt="">

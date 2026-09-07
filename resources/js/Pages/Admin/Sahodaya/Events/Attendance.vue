@@ -14,6 +14,10 @@
                        class="btn-secondary text-xs flex items-center gap-1">
                         <span>Download XLSX report ↓</span>
                     </a>
+                    <label class="text-xs flex items-center gap-1.5 cursor-pointer select-none px-1">
+                        <input type="checkbox" v-model="showChestOnSheet">
+                        <span>Show chest no.</span>
+                    </label>
                     <a :href="attendanceSheetPreviewHref" target="_blank" rel="noopener"
                        class="btn-secondary text-xs flex items-center gap-1">
                         <span>Preview PDF ↗</span>
@@ -240,6 +244,7 @@ const childEventOptions = computed(() => (props.childEvents ?? []).map((ev) => (
 // once" action, so this page requires an item to be selected rather than
 // offering an "All items" combined view. Default to the first item.
 const itemFilter = ref(props.event.items?.[0]?.id ?? '');
+const showChestOnSheet = ref(false);
 const searchQuery = ref('');
 const showImportModal = ref(false);
 const importFile = ref(null);
@@ -389,13 +394,17 @@ const attendanceXlsxHref = computed(() => {
 });
 
 const attendanceSheetPdfHref = computed(() => {
-    const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet?download=1`;
-    return itemFilter.value ? `${base}&item_id=${itemFilter.value}` : base;
+    let href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet?download=1`;
+    if (itemFilter.value) href += `&item_id=${itemFilter.value}`;
+    if (showChestOnSheet.value) href += '&show_chest=1';
+    return href;
 });
 
 const attendanceSheetPreviewHref = computed(() => {
-    const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet?preview=1`;
-    return itemFilter.value ? `${base}&item_id=${itemFilter.value}` : base;
+    let href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet?preview=1`;
+    if (itemFilter.value) href += `&item_id=${itemFilter.value}`;
+    if (showChestOnSheet.value) href += '&show_chest=1';
+    return href;
 });
 
 function attendanceKey(p) {

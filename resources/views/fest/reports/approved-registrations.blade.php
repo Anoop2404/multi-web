@@ -70,7 +70,6 @@
                 <th>PARTICIPANT / TEAM</th>
                 <th>SCHOOL</th>
                 <th>COMPETITION ITEM</th>
-                <th style="width: 90px;">FEST ID</th>
                 <th class="center" style="width: 70px;">STATUS</th>
             </tr>
         </thead>
@@ -89,14 +88,13 @@
                     </td>
                     <td style="font-size: 10.5px; text-transform: uppercase; color: #334155;">{{ $r['school_name'] }}</td>
                     <td style="font-weight: 600; color: #1e293b;">{{ $r['item_title'] }}</td>
-                    <td style="font-family: monospace; font-size: 10.5px; color: #0f3d7a;">{{ $r['fest_id'] }}</td>
                     <td class="center">
                         <span class="badge-approved">APPROVED</span>
                     </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="center" style="padding: 16px; color: #64748b;">
+                    <td colspan="6" class="center" style="padding: 16px; color: #64748b;">
                         No approved registrations found.
                     </td>
                 </tr>
