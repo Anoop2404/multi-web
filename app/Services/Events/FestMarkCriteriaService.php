@@ -222,4 +222,46 @@ class FestMarkCriteriaService
 
         return $map;
     }
+
+    /**
+     * Propagate an item's criteria, judge count, and total marks to matching items
+     * across all related child/hub events (e.g. phases/regions).
+     */
+    public function syncCriteriaToChildEvents(FestEvent $event, FestEventItem $sourceItem): int
+    {
+        $rootEvent = $event->parent_event_id ? $event->parentEvent : $event;
+        if (! $rootEvent) {
+            return 0;
+        }
+
+        $targetEvents = FestEvent::where('id', $rootEvent->id)
+            ->orWhere('parent_event_id', $rootEvent->id)
+            ->get();
+
+        if ($targetEvents->isEmpty()) {
+            return 0;
+        }
+
+        $syncedCount = 0;
+
+        $childItems = FestEventItem::whereIn('event_id', $targetEvents->pluck('id'))
+            ->where('id', '!=', $sourceItem->id)
+            ->when(
+                ! empty($sourceItem->item_code),
+                fn ($q) => $q->where('item_code', $sourceItem->item_code),
+                fn ($q) => $q->where('title', $sourceItem->title)->where('class_group', $sourceItem->class_group)
+            )
+            ->with('event')
+            ->get();
+
+        foreach ($childItems as $childItem) {
+            if ($childItem->event) {
+                $this->copyCriteriaFromItem($childItem->event, $sourceItem, $childItem);
+                $childItem->update(['total_marks' => $sourceItem->total_marks]);
+                $syncedCount++;
+            }
+        }
+
+        return $syncedCount;
+    }
 }

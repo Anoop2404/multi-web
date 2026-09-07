@@ -479,6 +479,7 @@ class FestMarkEntryController extends SahodayaAdminController
         $data = $request->validate([
             'judge_count'           => 'nullable|integer|min:1|max:20',
             'total_marks'           => 'nullable|numeric|min:0',
+            'sync_to_child_events'  => 'nullable|boolean',
             'criteria'              => 'nullable|array',
             'criteria.*.id'         => 'nullable|integer',
             'criteria.*.label'      => 'required|string|max:100',
@@ -489,13 +490,29 @@ class FestMarkEntryController extends SahodayaAdminController
         $criteriaService->setJudgeCount($item, $data['judge_count'] ?? 1);
         $item->update(['total_marks' => $data['total_marks'] ?? null]);
 
-        $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.criteria.saved', "Mark criteria updated for item #{$item->id}", [
+        $syncedCount = 0;
+        if (! empty($data['sync_to_child_events'])) {
+            $syncedCount = $criteriaService->syncCriteriaToChildEvents($event, $item);
+        }
+
+        $auditLog = "Mark criteria updated for item #{$item->id}";
+        if ($syncedCount > 0) {
+            $auditLog .= " and synced to {$syncedCount} child event item(s)";
+        }
+
+        $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.criteria.saved', $auditLog, [
             'item_id' => $item->id,
             'criteria_count' => $criteria->count(),
             'judge_count' => $data['judge_count'] ?? 1,
+            'synced_child_count' => $syncedCount,
         ]);
 
-        return back()->with('success', 'Marking criteria saved.');
+        $msg = 'Marking criteria saved.';
+        if ($syncedCount > 0) {
+            $msg .= " Synced to {$syncedCount} child event item(s).";
+        }
+
+        return back()->with('success', $msg);
     }
 
     public function copyCriteria(Request $request, string $tenantId, FestEvent $event, FestEventItem $item, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)

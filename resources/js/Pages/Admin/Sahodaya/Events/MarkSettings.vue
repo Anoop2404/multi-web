@@ -141,7 +141,13 @@
                 </button>
             </div>
 
-            <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <label v-if="childEvents.length" class="flex items-center gap-2 text-xs font-semibold text-indigo-900 bg-indigo-50/80 border border-indigo-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-indigo-100/80 transition">
+                    <input v-model="syncToChildEvents" type="checkbox" class="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500">
+                    <span>⚡ Sync criteria & mark settings to all child events (phases / regions)</span>
+                </label>
+                <div v-else></div>
+
                 <button type="button" class="btn-primary text-xs !py-1.5 !px-4"
                         :disabled="savingColumns" @click="saveColumnConfig">
                     {{ savingColumns ? 'Saving…' : 'Save Settings' }}
@@ -215,6 +221,7 @@ const configuredCount = computed(() => (props.configuredItemIds ?? []).length);
 let draftKeySeq = 0;
 const totalMarksDraft = ref(props.selectedItem?.total_marks ?? null);
 const judgeCountDraft = ref(props.judgeCount ?? 1);
+const syncToChildEvents = ref(true);
 const columnDraft = reactive(
     (props.criteria ?? []).map((c) => ({
         _key: draftKeySeq++,
@@ -245,7 +252,12 @@ function saveColumnConfig() {
 
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria`,
-        { judge_count: judgeCountDraft.value || 1, criteria: rows, total_marks: totalMarksDraft.value || null },
+        {
+            judge_count: judgeCountDraft.value || 1,
+            criteria: rows,
+            total_marks: totalMarksDraft.value || null,
+            sync_to_child_events: Boolean(syncToChildEvents.value && props.childEvents?.length),
+        },
         {
             preserveScroll: true,
             onFinish: () => {
