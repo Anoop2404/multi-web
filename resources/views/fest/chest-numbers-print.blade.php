@@ -34,6 +34,7 @@
                 @if(empty($item))<th>Item</th>@endif
                 <th>Category</th>
                 <th>School</th>
+                <th style="width: 80px; text-align: center;">Sign</th>
             </tr>
         </thead>
         <tbody>
@@ -45,10 +46,11 @@
                 @if(empty($item))<td>{{ $row['item'] }}</td>@endif
                 <td>{{ $row['category'] ?? '—' }}</td>
                 <td>{{ $row['school'] }}</td>
+                <td style="width: 80px;"></td>
             </tr>
             @empty
             <tr>
-                <td colspan="{{ empty($item) ? 6 : 5 }}" style="text-align: center; padding: 16px; color: #64748b;">No chest numbers assigned yet.</td>
+                <td colspan="{{ empty($item) ? 7 : 6 }}" style="text-align: center; padding: 16px; color: #64748b;">No chest numbers assigned yet.</td>
             </tr>
             @endforelse
         </tbody>
