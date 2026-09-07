@@ -229,35 +229,37 @@ class FestMarkCriteriaService
      */
     public function syncCriteriaToChildEvents(FestEvent $event, FestEventItem $sourceItem): int
     {
-        $rootEvent = $event->parent_event_id ? $event->parentEvent : $event;
-        if (! $rootEvent) {
-            return 0;
-        }
+        $rootEventId = $event->root_event_id ?: ($event->parent_event_id ?: $event->id);
+        $rootEvent = FestEvent::find($rootEventId) ?? $event;
+        $eventIds = $rootEvent->reportableEventIds();
 
-        $targetEvents = FestEvent::where('id', $rootEvent->id)
-            ->orWhere('parent_event_id', $rootEvent->id)
-            ->get();
-
-        if ($targetEvents->isEmpty()) {
+        if (empty($eventIds)) {
             return 0;
         }
 
         $syncedCount = 0;
 
-        $childItems = FestEventItem::whereIn('event_id', $targetEvents->pluck('id'))
+        $targetItems = FestEventItem::whereIn('event_id', $eventIds)
             ->where('id', '!=', $sourceItem->id)
-            ->when(
-                ! empty($sourceItem->item_code),
-                fn ($q) => $q->where('item_code', $sourceItem->item_code),
-                fn ($q) => $q->where('title', $sourceItem->title)->where('class_group', $sourceItem->class_group)
-            )
+            ->where(function ($q) use ($sourceItem) {
+                if (! empty($sourceItem->item_code)) {
+                    $q->where('item_code', $sourceItem->item_code)
+                      ->orWhere(function ($q2) use ($sourceItem) {
+                          $q2->where('title', $sourceItem->title)
+                             ->where('class_group', $sourceItem->class_group);
+                      });
+                } else {
+                    $q->where('title', $sourceItem->title)
+                      ->where('class_group', $sourceItem->class_group);
+                }
+            })
             ->with('event')
             ->get();
 
-        foreach ($childItems as $childItem) {
-            if ($childItem->event) {
-                $this->copyCriteriaFromItem($childItem->event, $sourceItem, $childItem);
-                $childItem->update(['total_marks' => $sourceItem->total_marks]);
+        foreach ($targetItems as $targetItem) {
+            if ($targetItem->event) {
+                $this->copyCriteriaFromItem($targetItem->event, $sourceItem, $targetItem);
+                $targetItem->update(['total_marks' => $sourceItem->total_marks]);
                 $syncedCount++;
             }
         }

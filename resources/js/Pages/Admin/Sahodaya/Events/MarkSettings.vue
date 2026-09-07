@@ -142,9 +142,9 @@
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                <label v-if="childEvents.length" class="flex items-center gap-2 text-xs font-semibold text-indigo-900 bg-indigo-50/80 border border-indigo-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-indigo-100/80 transition">
+                <label v-if="hasPartitionEvents" class="flex items-center gap-2 text-xs font-semibold text-indigo-900 bg-indigo-50/80 border border-indigo-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-indigo-100/80 transition">
                     <input v-model="syncToChildEvents" type="checkbox" class="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500">
-                    <span>⚡ Sync criteria & mark settings to all child events (phases / regions)</span>
+                    <span>⚡ Sync criteria & mark settings to all phases / regions</span>
                 </label>
                 <div v-else></div>
 
@@ -189,6 +189,7 @@ const props = defineProps({
 
 const isSports = computed(() => props.event?.event_type === 'sports');
 const selectedItem = computed(() => props.selectedItem);
+const hasPartitionEvents = computed(() => Boolean((props.childEvents ?? []).length || props.event?.parent_event_id));
 
 const marksUrl = computed(() => {
     let url = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`;
@@ -256,7 +257,7 @@ function saveColumnConfig() {
             judge_count: judgeCountDraft.value || 1,
             criteria: rows,
             total_marks: totalMarksDraft.value || null,
-            sync_to_child_events: Boolean(syncToChildEvents.value && props.childEvents?.length),
+            sync_to_child_events: Boolean(syncToChildEvents.value && hasPartitionEvents.value),
         },
         {
             preserveScroll: true,
