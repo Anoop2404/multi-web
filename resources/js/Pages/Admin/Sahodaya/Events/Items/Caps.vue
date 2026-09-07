@@ -210,6 +210,7 @@
                                 <div class="text-[11px] text-slate-500 font-mono mt-0.5 flex flex-wrap gap-2">
                                     <span v-if="item.item_code">Code: {{ item.item_code }}</span>
                                     <span>{{ itemCategoryLabel(item) }}</span>
+                                    <span>· {{ itemGenderLabel(item) }}</span>
                                 </div>
                             </td>
 
@@ -329,6 +330,11 @@ function itemCategoryLabel(item) {
         return props.taxonomy?.arts_category?.[item.category] ?? item.category;
     }
     return 'General';
+}
+
+function itemGenderLabel(item) {
+    if (!item.gender || item.gender === 'open') return 'Open';
+    return props.taxonomy?.gender?.[item.gender] ?? item.gender;
 }
 
 const capsState = reactive({});
