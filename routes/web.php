@@ -1126,8 +1126,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/', [FestEventController::class, 'store'])->name('store');
             Route::get('/{event}/items/list', [FestEventController::class, 'itemsList'])->name('items.list');
             Route::get('/{event}/items/caps', [FestEventController::class, 'itemsCaps'])->name('items.caps');
+            Route::get('/{event}/items/details', [FestEventController::class, 'itemsDetails'])->name('items.details');
             Route::get('/{event}/items', [FestEventController::class, 'items'])->name('items.index');
             Route::post('/{event}/items/bulk-caps', [FestEventController::class, 'bulkUpdateItemCaps'])->name('items.bulk-caps');
+            Route::post('/{event}/items/bulk-details', [FestEventController::class, 'bulkUpdateItemDetails'])->name('items.bulk-details');
             Route::post('/{event}/items/import-catalog', [FestEventController::class, 'importCatalog'])->name('items.import-catalog');
             Route::get('/{event}/levels', [FestEventController::class, 'levels'])->name('levels');
             Route::get('/{event}/activity', [\App\Http\Controllers\SahodayaAdmin\FestEventActivityController::class, 'index'])->name('activity');
@@ -1237,6 +1239,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/mark-settings/bulk', [FestMarkEntryController::class, 'markSettingsBulk'])->name('mark-settings.bulk');
             Route::post('/{event}/mark-settings/bulk', [FestMarkEntryController::class, 'bulkUpdateMarkSettings'])->name('mark-settings.bulk-update');
             Route::post('/{event}/mark-settings/bulk-apply-template', [FestMarkEntryController::class, 'bulkApplyTemplate'])->name('mark-settings.bulk-apply-template');
+            Route::post('/{event}/mark-settings/sync-total-marks', [FestMarkEntryController::class, 'bulkSyncTotalMarks'])->name('mark-settings.sync-total-marks');
+            Route::post('/{event}/mark-settings/judge-count', [FestMarkEntryController::class, 'bulkUpdateJudgeCount'])->name('mark-settings.judge-count');
+            Route::get('/{event}/judging-setup', [FestMarkEntryController::class, 'judgingSetup'])->name('judging-setup.index');
             Route::post('/{event}/items/{item}/mark-criteria', [FestMarkEntryController::class, 'saveCriteria'])->name('items.mark-criteria.save');
             Route::post('/{event}/items/{item}/mark-criteria/copy', [FestMarkEntryController::class, 'copyCriteria'])->name('items.mark-criteria.copy');
             Route::post('/{event}/items/{item}/mark-criteria/apply-template', [FestMarkEntryController::class, 'applyTemplate'])->name('items.mark-criteria.apply-template');

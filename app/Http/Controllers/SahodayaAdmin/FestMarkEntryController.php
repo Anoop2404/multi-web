@@ -551,14 +551,24 @@ class FestMarkEntryController extends SahodayaAdminController
         abort_if($template->tenant_id !== $this->sahodaya->id, 404);
 
         $criteria = $criteriaService->applyTemplateToItem($event, $template, $item);
+        // The judging sheet (and its total marks) is common across an item's whole family
+        // (hub/phases/regions), never a per-region choice — propagate it. Judge count is the
+        // one field left alone, since that's allowed to differ by region.
+        $synced = $criteriaService->syncCriteriaToChildEvents($event, $item);
 
         $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.criteria.template_applied', "Rubric template \"{$template->name}\" applied to item #{$item->id}", [
             'template_id' => $template->id,
             'item_id'     => $item->id,
             'criteria_count' => $criteria->count(),
+            'synced_count' => $synced,
         ]);
 
-        return back()->with('success', "Rubric template \"{$template->name}\" applied.");
+        $message = "Rubric template \"{$template->name}\" applied.";
+        if ($synced > 0) {
+            $message .= " Synced to {$synced} matching item(s) on other regions/phases.";
+        }
+
+        return back()->with('success', $message);
     }
 
     /** Per-item marking config: judge count, scoring criteria columns, total marks. */
@@ -670,30 +680,26 @@ class FestMarkEntryController extends SahodayaAdminController
     }
 
     /**
-     * Bulk counterpart to applyTemplate() — assigns one rubric template's judging sheet
-     * to every selected item in one pass (e.g. all Kalotsav items of a given type), with
-     * an option to also propagate to matching items on region/phase partition copies.
+     * Bulk counterpart to applyTemplate() — assigns one rubric template's judging sheet to
+     * every selected item in one pass (e.g. all Kalotsav items of a given type). The judging
+     * sheet is common across an item's whole family, so this always propagates to matching
+     * items on other region/phase partition copies too (see FestMarkCriteriaService's
+     * class docblock) — total marks is left alone, since that may differ per region.
      */
     public function bulkApplyTemplate(Request $request, string $tenantId, FestEvent $event, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'template_id'          => 'required|integer|exists:fest_scoring_rubric_templates,id',
-            'item_ids'             => 'required|array|min:1',
-            'item_ids.*'           => 'integer|exists:fest_event_items,id',
-            'sync_to_child_events' => 'nullable|boolean',
+            'template_id' => 'required|integer|exists:fest_scoring_rubric_templates,id',
+            'item_ids'    => 'required|array|min:1',
+            'item_ids.*'  => 'integer|exists:fest_event_items,id',
         ]);
 
         $template = FestScoringRubricTemplate::findOrFail($data['template_id']);
         abort_if($template->tenant_id !== $this->sahodaya->id, 404);
 
-        $result = $criteriaService->applyTemplateToItems(
-            $event,
-            $template,
-            $data['item_ids'],
-            (bool) ($data['sync_to_child_events'] ?? false),
-        );
+        $result = $criteriaService->applyTemplateToItems($event, $template, $data['item_ids']);
 
         $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.criteria.template_bulk_applied', "Rubric template \"{$template->name}\" bulk-applied to {$result['applied']} item(s)", [
             'template_id'   => $template->id,
@@ -744,6 +750,209 @@ class FestMarkEntryController extends SahodayaAdminController
         ]);
 
         return back()->with('success', "Total Marks / Judge Count saved for {$updatedCount} item(s).");
+    }
+
+    /**
+     * Total marks is common across an item's whole family (hub/phases/regions) — unlike
+     * bulkUpdateMarkSettings() (scoped to exactly this event, for an admin intentionally
+     * setting Total Marks and Judge Count for one event at a time), this sets total marks for
+     * each listed item AND propagates it to every matching item elsewhere in the family, via
+     * FestMarkCriteriaService::syncTotalMarksToFamily(). Used by the Judging Setup listing
+     * (one row per item, judge count broken out per region) when only Total Marks changes.
+     */
+    public function bulkSyncTotalMarks(Request $request, string $tenantId, FestEvent $event, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'items'               => 'required|array',
+            'items.*.id'          => 'required|integer|exists:fest_event_items,id',
+            'items.*.total_marks' => 'nullable|numeric|min:0',
+        ]);
+
+        $updatedCount = 0;
+        $syncedCount = 0;
+
+        DB::transaction(function () use ($data, $event, $criteriaService, &$updatedCount, &$syncedCount) {
+            $itemIds = collect($data['items'])->pluck('id');
+            $items = FestEventItem::where('event_id', $event->id)->whereIn('id', $itemIds)->get()->keyBy('id');
+
+            foreach ($data['items'] as $itemData) {
+                $item = $items->get($itemData['id']);
+                if (! $item) {
+                    continue;
+                }
+
+                $syncedCount += $criteriaService->syncTotalMarksToFamily($event, $item, $itemData['total_marks'] ?? null);
+                $updatedCount++;
+            }
+        });
+
+        $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.settings.total_marks_synced', "Total marks synced for {$updatedCount} item(s)", [
+            'updated_count' => $updatedCount,
+            'synced_count'  => $syncedCount,
+        ]);
+
+        return back()->with('success', "Total marks saved for {$updatedCount} item(s), synced to {$syncedCount} matching item(s) on other regions/phases.");
+    }
+
+    /**
+     * Judge count is the one field allowed to differ per region — this sets it for exactly
+     * the listed items (each already scoped to its own region/phase's event on the Judging
+     * Setup page) with NO propagation, unlike bulkSyncTotalMarks() above. Total marks is
+     * deliberately not part of this request at all, so a judge-count-only save can never
+     * accidentally clear another field.
+     */
+    public function bulkUpdateJudgeCount(Request $request, string $tenantId, FestEvent $event, FestMarkCriteriaService $criteriaService, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'items'               => 'required|array',
+            'items.*.id'          => 'required|integer|exists:fest_event_items,id',
+            'items.*.judge_count' => 'required|integer|min:1|max:20',
+        ]);
+
+        $updatedCount = 0;
+
+        DB::transaction(function () use ($data, $event, $criteriaService, &$updatedCount) {
+            $itemIds = collect($data['items'])->pluck('id');
+            $items = FestEventItem::where('event_id', $event->id)->whereIn('id', $itemIds)->get()->keyBy('id');
+
+            foreach ($data['items'] as $itemData) {
+                $item = $items->get($itemData['id']);
+                if (! $item) {
+                    continue;
+                }
+
+                $criteriaService->setJudgeCount($item, $itemData['judge_count']);
+                $updatedCount++;
+            }
+        });
+
+        $audit->festEvent($event, FestPageActivity::MARK_SETTINGS, 'fest.mark.settings.judge_count_updated', "Judge count updated for {$updatedCount} item(s)", [
+            'updated_count' => $updatedCount,
+        ]);
+
+        return back()->with('success', "Judge count saved for {$updatedCount} item(s).");
+    }
+
+    /**
+     * One-stop judging config screen: one row per item — never one row per item×region, since
+     * criteria and total marks are common across the whole event family (hub, every phase,
+     * every region) and only judge count is allowed to differ per region. Each row carries the
+     * item's single shared judging sheet + total marks, plus a small judge-count input per
+     * region/phase where that item exists. A region/phase-scoped admin only ever sees the
+     * regions scopedChildEventOptions() already allows them (same scoping used elsewhere);
+     * editing Total Marks/the judging sheet propagates to the whole family, editing one
+     * region's judge count touches only that region.
+     */
+    public function judgingSetup(Request $request, string $tenantId, FestEvent $event, FestMarkCriteriaService $criteriaService)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $rootEvent = $event->rootEvent();
+        $eventOptions = $this->scopedChildEventOptions($rootEvent);
+
+        // No region/phase partitioning on this event family (or nothing this admin can see
+        // via that topology) — fall back to just the one event the route already resolved.
+        if (empty($eventOptions)) {
+            $eventOptions = [[
+                'id' => $event->id, 'title' => $event->title, 'short_title' => $event->title,
+                'parent_event_id' => null, 'is_hub' => true,
+            ]];
+        }
+
+        $eventLabels = collect($eventOptions)->keyBy('id');
+        $eventIds = $eventLabels->keys()->map(fn ($id) => (int) $id)->all();
+        $multiRegion = count($eventOptions) > 1;
+
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $rootEvent);
+
+        $rubricTemplates = FestScoringRubricTemplate::forTenant($this->sahodaya->id)
+            ->with('criteria')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $allItems = FestEventItem::whereIn('event_id', $eventIds)->get();
+        $criteriaByItem = $criteriaService->criteriaForItems($allItems);
+
+        // Group every region/phase's copy of "the same item" together — same matching rule
+        // FestMarkCriteriaService uses for sync: item_code, else title+class_group.
+        $groups = $allItems->groupBy(fn (FestEventItem $item) => $item->item_code ?: "{$item->title}|{$item->class_group}");
+
+        $items = $groups
+            ->map(function (Collection $group) use ($criteriaService, $classGroupLabels, $rubricTemplates, $criteriaByItem, $eventLabels, $multiRegion) {
+                // Any member represents the shared (common) fields — prefer the hub's own
+                // copy when present, since that's the family's canonical definition.
+                $representative = $group->first(fn (FestEventItem $i) => (bool) ($eventLabels->get($i->event_id)['is_hub'] ?? false)) ?? $group->first();
+
+                $criteria = ($criteriaByItem->get($representative->id) ?? collect())->values();
+                $match = $this->matchRubricTemplate($criteria, $rubricTemplates);
+
+                $regions = $group
+                    ->map(fn (FestEventItem $item) => [
+                        'item_id'      => $item->id,
+                        'event_id'     => $item->event_id,
+                        'region_label' => $multiRegion ? ($eventLabels->get($item->event_id)['short_title'] ?? null) : null,
+                        'judge_count'  => $criteriaService->judgeCountForItem($item),
+                    ])
+                    ->sortBy('region_label')
+                    ->values()
+                    ->all();
+
+                return [
+                    'key'                 => $representative->item_code ?: "{$representative->title}|{$representative->class_group}",
+                    'representative_id'   => $representative->id,
+                    'representative_event_id' => $representative->event_id,
+                    'title'               => $representative->title,
+                    'item_code'           => $representative->item_code,
+                    'category_label'      => $this->itemCategoryLabel($representative, $classGroupLabels),
+                    'total_marks'         => $representative->total_marks,
+                    'criteria'            => $criteria->map(fn (FestMarkCriterion $c) => ['label' => $c->label, 'max_score' => (float) $c->max_score])->values()->all(),
+                    'criteria_count'      => $criteria->count(),
+                    'criteria_sum'        => (float) $criteria->sum(fn (FestMarkCriterion $c) => (float) $c->max_score),
+                    'matched_template_id' => $match?->id,
+                    'rubric_status'       => $match ? $match->name : ($criteria->isEmpty() ? null : 'custom'),
+                    'regions'             => $regions,
+                ];
+            })
+            ->sortBy('title')
+            ->values();
+
+        return $this->inertia('Sahodaya/Events/JudgingSetup', $this->withEventActivity($event, FestPageActivity::MARK_SETTINGS, [
+            'event'           => $event,
+            'items'           => $items,
+            'rubricTemplates' => $rubricTemplates->map->only('id', 'name'),
+        ]));
+    }
+
+    /**
+     * Whether an item's current criteria (in order) exactly match a known rubric template's
+     * — items are decoupled copies (see applyTemplateToItem()'s docblock), so this is a
+     * best-effort label/max_score comparison, not a stored reference.
+     *
+     * @param  Collection<int, FestMarkCriterion>  $criteria
+     * @param  Collection<int, FestScoringRubricTemplate>  $templates
+     */
+    private function matchRubricTemplate(Collection $criteria, Collection $templates): ?FestScoringRubricTemplate
+    {
+        if ($criteria->isEmpty()) {
+            return null;
+        }
+
+        $criteriaShape = $criteria->map(fn ($c) => [$c->label, (float) $c->max_score])->values()->all();
+
+        foreach ($templates as $template) {
+            $templateShape = $template->criteria->map(fn ($c) => [$c->label, (float) $c->max_score])->values()->all();
+
+            if ($templateShape === $criteriaShape) {
+                return $template;
+            }
+        }
+
+        return null;
     }
 
     /**

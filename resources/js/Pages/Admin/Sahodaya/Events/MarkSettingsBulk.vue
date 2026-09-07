@@ -32,6 +32,10 @@
                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm">
                 <span>⚡ Bulk Total Marks & Judges</span>
             </Link>
+            <Link :href="`${base}/judging-setup`"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200">
+                <span>🧩 Judging Setup</span>
+            </Link>
         </div>
 
         <div v-if="childEvents.length" class="card !p-4 space-y-3 mb-5">
@@ -110,17 +114,15 @@
                     <SearchableSelect v-model="templateForm.template_id" :options="templateOptions" :all-option="false"
                                       placeholder="Select a judging sheet..." />
                 </div>
-                <label class="flex items-center gap-1.5 text-slate-700 font-semibold pb-2">
-                    <input type="checkbox" v-model="templateForm.sync_to_child_events" class="rounded border-slate-300 text-emerald-600">
-                    <span>Also sync to matching items on other regions/phases</span>
-                </label>
                 <button type="button" class="btn-primary text-xs !bg-emerald-600 hover:!bg-emerald-700 font-bold shrink-0"
                         :disabled="applyingTemplate || !templateForm.template_id" @click="applyTemplateToSelection">
                     {{ applyingTemplate ? 'Applying...' : '📋 Apply Judging Sheet' }}
                 </button>
             </div>
             <p class="text-[11px] text-slate-500">
-                Replaces the scoring columns on every selected item with this template's criteria — any existing per-item criteria are overwritten.
+                Replaces the scoring columns on every selected item with this template's criteria (existing per-item criteria are overwritten) and
+                automatically syncs the same judging sheet to matching items on every other region/phase — the judging sheet is common across an
+                item's whole family, only Total Marks may differ per region.
             </p>
         </div>
 
@@ -347,7 +349,6 @@ const templateOptions = computed(() => (props.rubricTemplates ?? []).map(t => ({
 
 const templateForm = reactive({
     template_id: '',
-    sync_to_child_events: false,
 });
 
 const applyingTemplate = ref(false);
@@ -366,7 +367,6 @@ function applyTemplateToSelection() {
     router.post(`${base}/mark-settings/bulk-apply-template`, {
         template_id: Number(templateForm.template_id),
         item_ids: targetIds,
-        sync_to_child_events: templateForm.sync_to_child_events,
     }, {
         preserveScroll: true,
         onFinish: () => {

@@ -32,6 +32,10 @@
                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm">
                 <span>⚡ Bulk Limit Caps & Squad Rules</span>
             </Link>
+            <Link :href="`${base}/items/details`"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200">
+                <span>🏷️ Bulk Item Code</span>
+            </Link>
         </div>
 
         <!-- EXPLANATION BANNER: Qualifier Count, School Limits & Squad Caps -->

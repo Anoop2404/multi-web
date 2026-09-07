@@ -294,14 +294,27 @@ class FestKalotsavamDefaultRubricSeeder extends Seeder
     public function run(): void
     {
         $sahodayas = Tenant::query()->where('type', 'sahodaya')->get();
+        $succeeded = 0;
+        $failed = [];
 
         foreach ($sahodayas as $sahodaya) {
-            $sahodaya->run(function () use ($sahodaya): void {
-                $this->seedForTenant($sahodaya->id);
-            });
+            try {
+                $sahodaya->run(function () use ($sahodaya): void {
+                    $this->seedForTenant($sahodaya->id);
+                });
+                $succeeded++;
+            } catch (\Throwable $e) {
+                // Mirrors sahodaya:provision-databases' own convention (see docs/erp/24-LIVE_SERVER_DEPLOYMENT.md):
+                // one Sahodaya with a broken/missing/unreachable tenant database must not abort seeding for
+                // every other tenant — report it and move on.
+                $failed[] = "{$sahodaya->name} ({$sahodaya->id}): {$e->getMessage()}";
+            }
         }
 
-        $this->command?->info('Seeded '.count(self::TEMPLATES)." default Kalotsavam rubric templates across {$sahodayas->count()} Sahodaya tenant(s).");
+        $this->command?->info("Seeded {$succeeded}/{$sahodayas->count()} Sahodaya tenant(s) with ".count(self::TEMPLATES).' default Kalotsavam rubric templates.');
+        foreach ($failed as $line) {
+            $this->command?->warn("  Skipped: {$line}");
+        }
     }
 
     private function seedForTenant(string $tenantId): void

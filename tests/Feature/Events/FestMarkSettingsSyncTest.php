@@ -19,7 +19,7 @@ class FestMarkSettingsSyncTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_saving_criteria_with_sync_option_copies_criteria_judge_count_and_total_marks_to_child_events(): void
+    public function test_saving_criteria_with_sync_option_copies_criteria_and_total_marks_but_not_judge_count_to_child_events(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
 
@@ -96,7 +96,7 @@ class FestMarkSettingsSyncTest extends TestCase
 
         $criteriaService = app(FestMarkCriteriaService::class);
         $this->assertEquals(3, $criteriaService->judgeCountForItem($item1));
-        $this->assertEquals(3, $criteriaService->judgeCountForItem($item2));
+        $this->assertEquals(1, $criteriaService->judgeCountForItem($item2), 'judge count is the one field allowed to differ per region, so sync must never touch it');
 
         $item2Criteria = FestMarkCriterion::where('item_id', $item2->id)->orderBy('sort_order')->pluck('label')->all();
         $this->assertEquals([

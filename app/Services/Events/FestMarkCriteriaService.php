@@ -226,12 +226,16 @@ class FestMarkCriteriaService
     /**
      * Apply one rubric template to many items in a single pass — the bulk counterpart to
      * applyTemplateToItem(), for configuring a whole event's judging sheets (e.g. every
-     * Kalotsav item) in one action instead of opening each item individually.
+     * Kalotsav item) in one action instead of opening each item individually. Criteria and
+     * total marks are both common across an item's whole family (hub/phases/regions), so
+     * this always propagates both to matching items elsewhere in the family — judge count is
+     * the one field left untouched, since (unlike criteria/total marks) it may differ per
+     * region.
      *
      * @param  list<int>  $itemIds  ids of FestEventItem rows belonging to $event
      * @return array{applied: int, synced: int}
      */
-    public function applyTemplateToItems(FestEvent $event, FestScoringRubricTemplate $template, array $itemIds, bool $syncToChildEvents = false): array
+    public function applyTemplateToItems(FestEvent $event, FestScoringRubricTemplate $template, array $itemIds): array
     {
         $items = FestEventItem::where('event_id', $event->id)->whereIn('id', $itemIds)->get();
 
@@ -241,32 +245,50 @@ class FestMarkCriteriaService
         foreach ($items as $item) {
             $this->applyTemplateToItem($event, $template, $item);
             $applied++;
-
-            if ($syncToChildEvents) {
-                $synced += $this->syncCriteriaToChildEvents($event, $item);
-            }
+            $synced += $this->syncCriteriaToChildEvents($event, $item);
         }
 
         return ['applied' => $applied, 'synced' => $synced];
     }
 
     /**
-     * Propagate an item's criteria, judge count, and total marks to matching items
-     * across all related child/hub events (e.g. phases/regions).
+     * Total marks is common across an item's whole family too, just like criteria — set it
+     * here and it's mirrored to every matching item elsewhere in the family (same "item_code,
+     * else title+class_group" matching as syncCriteriaToChildEvents()). Use this when only
+     * Total Marks changes, without re-applying the whole judging sheet. Judge count is
+     * deliberately never touched here — it's the one field allowed to differ per region.
      */
-    public function syncCriteriaToChildEvents(FestEvent $event, FestEventItem $sourceItem): int
+    public function syncTotalMarksToFamily(FestEvent $event, FestEventItem $item, ?float $totalMarks): int
+    {
+        $item->update(['total_marks' => $totalMarks]);
+
+        $synced = 0;
+        foreach ($this->matchingFamilyItems($event, $item) as $targetItem) {
+            $targetItem->update(['total_marks' => $totalMarks]);
+            $synced++;
+        }
+
+        return $synced;
+    }
+
+    /**
+     * Every item elsewhere in $sourceItem's event family (hub, every phase, every region)
+     * that represents "the same item" — matched by item_code, else by title+class_group —
+     * the shared matching rule behind both criteria/judge-count sync and rubric propagation.
+     *
+     * @return Collection<int, FestEventItem>
+     */
+    private function matchingFamilyItems(FestEvent $event, FestEventItem $sourceItem): Collection
     {
         $rootEventId = $event->root_event_id ?: ($event->parent_event_id ?: $event->id);
         $rootEvent = FestEvent::find($rootEventId) ?? $event;
         $eventIds = $rootEvent->reportableEventIds();
 
         if (empty($eventIds)) {
-            return 0;
+            return collect();
         }
 
-        $syncedCount = 0;
-
-        $targetItems = FestEventItem::whereIn('event_id', $eventIds)
+        return FestEventItem::whereIn('event_id', $eventIds)
             ->where('id', '!=', $sourceItem->id)
             ->where(function ($q) use ($sourceItem) {
                 if (! empty($sourceItem->item_code)) {
@@ -282,13 +304,32 @@ class FestMarkCriteriaService
             })
             ->with('event')
             ->get();
+    }
 
-        foreach ($targetItems as $targetItem) {
-            if ($targetItem->event) {
-                $this->copyCriteriaFromItem($targetItem->event, $sourceItem, $targetItem);
-                $targetItem->update(['total_marks' => $sourceItem->total_marks]);
-                $syncedCount++;
+    /**
+     * Propagate an item's criteria and total marks to matching items across all related
+     * child/hub events (e.g. phases/regions) — both are common across an item's whole
+     * family. Judge count is deliberately never propagated here (unlike copyCriteriaFromItem(),
+     * which this does NOT call) — it's the one field allowed to differ per region, so each
+     * region's own judge count is left exactly as it was.
+     */
+    public function syncCriteriaToChildEvents(FestEvent $event, FestEventItem $sourceItem): int
+    {
+        $rows = $this->criteriaForItem($sourceItem)
+            ->map(fn (FestMarkCriterion $c) => ['label' => $c->label, 'max_score' => $c->max_score])
+            ->values()
+            ->all();
+
+        $syncedCount = 0;
+
+        foreach ($this->matchingFamilyItems($event, $sourceItem) as $targetItem) {
+            if (! $targetItem->event) {
+                continue;
             }
+
+            $this->saveCriteria($targetItem->event, $targetItem, $rows);
+            $targetItem->update(['total_marks' => $sourceItem->total_marks]);
+            $syncedCount++;
         }
 
         return $syncedCount;

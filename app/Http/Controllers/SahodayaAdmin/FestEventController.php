@@ -522,6 +522,58 @@ class FestEventController extends SahodayaAdminController
         return back()->with('success', "Updated limit caps for {$updatedCount} item(s).");
     }
 
+    /**
+     * Bulk item_code editor — fill in every item's code across the whole event in one pass
+     * instead of opening each item individually. Category/gender/participant_type are shown
+     * on this page for reference only (read-only); editing those stays on the item's own
+     * form (see storeItem()/updateItem()).
+     */
+    public function itemsDetails(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        if ($redirect = $this->redirectSportsSeasonToHub($event, 'Item details are per sport event — open Chess, Aquatics, etc.')) {
+            return $redirect;
+        }
+
+        $ctx = $this->eventPageContext($event);
+
+        return $this->inertia('Sahodaya/Events/Items/Details', $ctx + [
+            'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::ITEMS),
+        ]);
+    }
+
+    public function bulkUpdateItemDetails(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'items'             => 'required|array',
+            'items.*.id'        => 'required|integer|exists:fest_event_items,id',
+            'items.*.item_code' => 'nullable|string|max:20',
+        ]);
+
+        $updatedCount = 0;
+
+        DB::transaction(function () use ($data, $event, &$updatedCount) {
+            foreach ($data['items'] as $itemData) {
+                $item = FestEventItem::where('event_id', $event->id)->find($itemData['id']);
+                if (! $item) {
+                    continue;
+                }
+
+                $item->update(['item_code' => filled($itemData['item_code'] ?? null) ? $itemData['item_code'] : null]);
+                $updatedCount++;
+            }
+        });
+
+        $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.items.bulk_details_updated', "Bulk updated item code for {$updatedCount} item(s)");
+
+        $this->syncItemToExistingPartitions($event);
+
+        return back()->with('success', "Updated {$updatedCount} item(s).");
+    }
+
     public function levels(string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

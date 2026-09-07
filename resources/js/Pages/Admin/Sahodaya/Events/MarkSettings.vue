@@ -27,6 +27,10 @@
                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200">
                 <span>⚡ Bulk Total Marks & Judges</span>
             </Link>
+            <Link :href="judgingSetupUrl"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200">
+                <span>🧩 Judging Setup</span>
+            </Link>
         </div>
 
         <div class="card !p-4 space-y-3 mb-5">
@@ -198,6 +202,7 @@ const marksUrl = computed(() => {
 });
 const settingsBaseUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/mark-settings`);
 const bulkSettingsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/mark-settings/bulk`);
+const judgingSetupUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/judging-setup`);
 
 const flatItems = computed(() => (props.headItemGroups ?? []).flatMap((h) => h.items ?? []));
 

@@ -46,6 +46,10 @@
                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200">
                 <span>⚡ Bulk Limit Caps & Squad Rules</span>
             </Link>
+            <Link :href="`${base}/items/details`"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200">
+                <span>🏷️ Bulk Item Code</span>
+            </Link>
         </div>
 
         <div v-if="showTrashed" id="trashed-items-section" class="card !p-4 space-y-2 mb-5 border-amber-300 bg-amber-50/70 shadow-md transition-all">
