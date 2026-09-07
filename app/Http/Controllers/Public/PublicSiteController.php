@@ -107,7 +107,7 @@ class PublicSiteController extends Controller
                 $pageConfig = [
                     'title' => 'Contact Us',
                     'eyebrow' => 'Get In Touch',
-                    'subheading' => 'Contact our administrative desk or send us an enquiry.',
+                    'subheading' => 'Call, email, or send us an enquiry.',
                     'section_types' => ['contact'],
                 ];
                 break;

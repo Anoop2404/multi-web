@@ -78,7 +78,8 @@
                          style="background-image: url('{{ $imgUrl }}');">
                     </div>
                 @else
-                    <div class="absolute inset-0 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900"></div>
+                    <div class="absolute inset-0"
+                         style="background: linear-gradient(120deg, #111827 0%, var(--color-primary) 52%, var(--color-accent) 100%)"></div>
                 @endif
 
                 <!-- Dark Gradient Overlay for optimal readability -->
@@ -91,8 +92,9 @@
                         
                         <!-- Subtitle / Eyebrow Badge -->
                         @if(!empty($slide['subtitle']))
-                            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/80 text-amber-950 font-bold text-xs md:text-sm tracking-wider uppercase backdrop-blur-md shadow-lg">
-                                <span class="w-2 h-2 rounded-full bg-amber-950 animate-pulse"></span>
+                            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-white font-bold text-xs md:text-sm tracking-wider uppercase backdrop-blur-md shadow-lg"
+                                 style="background-color: color-mix(in srgb, var(--color-accent) 88%, transparent)">
+                                <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
                                 <span>{{ $slide['subtitle'] }}</span>
                             </div>
                         @endif
@@ -116,7 +118,8 @@
                             <div class="flex flex-wrap items-center gap-3 pt-2">
                                 @if(!empty($slide['cta_label']) && !empty($slide['cta_url']))
                                     <a href="{{ $slide['cta_url'] }}"
-                                       class="inline-flex items-center gap-2 px-6 py-3 md:px-7 md:py-3.5 rounded-xl bg-amber-500 text-slate-950 font-extrabold text-sm md:text-base hover:bg-amber-400 hover:scale-105 transition-all shadow-xl">
+                                       class="inline-flex items-center gap-2 px-6 py-3 md:px-7 md:py-3.5 rounded-xl text-white font-extrabold text-sm md:text-base hover:scale-105 hover:brightness-110 transition-all shadow-xl"
+                                       style="background-color: var(--color-accent)">
                                         <span>{{ $slide['cta_label'] }}</span>
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                                     </a>

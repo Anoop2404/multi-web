@@ -124,7 +124,7 @@
     }
     .v2-btn-accent:hover {
         filter: brightness(1.1);
-        box-shadow: 0 10px 25px -5px rgba(217, 119, 6, 0.3);
+        box-shadow: 0 10px 25px -5px color-mix(in srgb, var(--color-accent) 30%, transparent);
     }
     @endif
 

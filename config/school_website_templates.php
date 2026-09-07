@@ -7,9 +7,9 @@ return [
         'purpose' => 'A warm, photo-forward school site with admissions, achievements and CBSE disclosure front and center.',
         'audience' => 'Prospective and current parents, students and staff',
         'character' => 'Warm, generous whitespace, rounded imagery',
-        'accent' => 'Green brand, photo-led',
+        'accent' => 'School green with a restrained red accent, emblem-led',
         'design' => [
-            'primary' => '#04906D', 'secondary' => '#037559', 'accent_color' => '#F59E0B',
+            'primary' => '#166534', 'secondary' => '#14532D', 'accent_color' => '#C00000',
             'display_font' => 'Inter', 'body_font' => 'Inter', 'type_scale' => 'balanced',
             'density' => 'comfortable', 'surface' => 'elevated', 'corners' => 'soft',
             'buttons' => 'solid', 'images' => 'documentary', 'motion' => 'restrained',

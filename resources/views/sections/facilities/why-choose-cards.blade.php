@@ -31,12 +31,13 @@
                 $bg = $item['bg_color'] ?? null;
                 $stroke = $item['stroke_color'] ?? null;
                 $path = $icons[$item['icon'] ?? ''] ?? $defaultIcon;
+                $themeColor = $loop->odd ? 'var(--color-primary)' : 'var(--color-accent)';
             @endphp
             <div class="text-center p-7 rounded-2xl border-[1.5px] hover:-translate-y-1.5 transition"
-                 style="border-color: color-mix(in srgb, var(--color-primary) 10%, #eef2f7)">
+                 style="border-color: color-mix(in srgb, {{ $themeColor }} 12%, #eef2f7)">
                 <div class="w-[58px] h-[58px] mx-auto rounded-2xl flex items-center justify-center mb-4"
-                     style="background-color: {{ $bg ?: 'color-mix(in srgb, var(--color-primary) 12%, transparent)' }}">
-                    <svg class="w-7 h-7" style="color: {{ $stroke ?: 'var(--color-primary)' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     style="background-color: {{ $bg ?: 'color-mix(in srgb, '.$themeColor.' 12%, transparent)' }}">
+                    <svg class="w-7 h-7" style="color: {{ $stroke ?: $themeColor }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="{{ $path }}"/>
                     </svg>
                 </div>

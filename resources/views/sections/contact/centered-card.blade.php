@@ -6,7 +6,7 @@
         <div class="bg-white rounded-2xl shadow-sm p-8 md:p-12">
             <div class="text-center mb-8">
                 @if(!empty($config['badge']))
-                <p class="text-sm font-semibold uppercase tracking-widest mb-2" style="color: var(--color-primary)">{{ $config['badge'] }}</p>
+                <p class="text-sm font-semibold uppercase tracking-widest mb-2" style="color: var(--color-accent)">{{ $config['badge'] }}</p>
                 @endif
                 <h2 class="text-3xl font-bold font-heading text-gray-900 mb-3">{{ $config['heading'] ?? 'Contact Us' }}</h2>
                 @if(!empty($config['intro']))
@@ -62,7 +62,7 @@
                 <div class="text-center pt-2">
                     <button type="submit"
                             class="font-semibold px-8 py-3 rounded-full text-white hover:opacity-90 transition"
-                            style="background-color: var(--color-primary)">
+                            style="background-color: var(--color-accent)">
                         {{ $config['submit_label'] ?? 'Send Message' }}
                     </button>
                 </div>
