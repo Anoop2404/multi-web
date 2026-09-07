@@ -14,11 +14,14 @@
                 Reason: {{ phaseFee.rejection_reason }}
             </p>
             <ul v-if="(phaseFee.breakdown?.items ?? []).length" class="text-xs text-indigo-900 space-y-1">
-                <li v-for="(line, i) in phaseFee.breakdown.items" :key="i" class="flex justify-between gap-4">
+                <li v-for="(line, i) in groupedLines(phaseFee)" :key="i" class="flex justify-between gap-4">
                     <span>{{ line.label }}</span>
                     <span class="font-semibold shrink-0">₹{{ formatMoney(line.amount) }}</span>
                 </li>
             </ul>
+            <p v-if="totalRegCount(phaseFee) > 0" class="text-xs text-indigo-700">
+                Total registrations: {{ totalRegCount(phaseFee) }}
+            </p>
             <div class="flex flex-wrap justify-between gap-2 text-xs pt-2 border-t border-indigo-100">
                 <span class="text-indigo-800">
                     Due ₹{{ formatMoney(phaseFee.total_due) }}
@@ -85,6 +88,7 @@
 
 <script setup>
 import PaymentHistoryList from '@/Components/school/PaymentHistoryList.vue';
+import { groupItemFeeLines, totalItemRegistrationCount } from '@/support/feeLines.js';
 
 const props = defineProps({
     eventId: [String, Number],
@@ -103,6 +107,14 @@ defineEmits([
     'update-phase-bank',
     'update-phase-amount',
 ]);
+
+function groupedLines(phaseFee) {
+    return groupItemFeeLines(phaseFee.breakdown?.items ?? []);
+}
+
+function totalRegCount(phaseFee) {
+    return totalItemRegistrationCount(phaseFee.breakdown?.items ?? []);
+}
 
 function formatMoney(val) {
     const n = Number(val ?? 0);

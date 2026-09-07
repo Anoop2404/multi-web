@@ -102,7 +102,7 @@
                     <span>{{ studentRegLine.label }}</span>
                     <span class="font-semibold shrink-0">₹{{ formatMoney(studentRegLine.amount) }}</span>
                 </li>
-                <li v-for="(line, i) in itemFeeLines" :key="i" class="flex justify-between gap-4">
+                <li v-for="(line, i) in groupedItemFeeLines" :key="i" class="flex justify-between gap-4">
                     <span>{{ line.label }}</span>
                     <span class="font-semibold shrink-0">₹{{ formatMoney(line.amount) }}</span>
                 </li>
@@ -110,7 +110,7 @@
             <p v-else class="text-xs text-indigo-800">Register items above to see item fees here.</p>
             <p v-if="itemFeeLines.length" class="text-xs text-indigo-700 mt-1">
                 Item fees: ₹{{ formatMoney(itemFeesDue) }}
-                <template v-if="itemUnitCount > 0">({{ itemUnitCount }} item{{ itemUnitCount === 1 ? '' : 's' }})</template>
+                <template v-if="itemUnitCount > 0">— Total registrations: {{ itemUnitCount }}</template>
             </p>
             <p class="font-semibold text-indigo-900 mt-2 pt-2 border-t border-indigo-100">
                 Total fees due: ₹{{ formatMoney(totalDue) }}
@@ -206,6 +206,7 @@ import { computed } from 'vue';
 import HeadBillingInvoices from '@/Components/school/HeadBillingInvoices.vue';
 import PhaseBillingInvoices from '@/Components/school/PhaseBillingInvoices.vue';
 import PaymentHistoryList from '@/Components/school/PaymentHistoryList.vue';
+import { groupItemFeeLines } from '@/support/feeLines.js';
 
 const props = defineProps({
     event: { type: Object, required: true },
@@ -258,6 +259,8 @@ const resolvedPaymentQrCodeUrl = computed(() => {
 // subtotal passed in via itemFeesDue, which excludes the school registration fee and
 // can be ₹0 while the school still genuinely owes money. See FestRegistrationController::
 // hydrateEventForSchoolRegistration() for where these are computed server-side.
+const groupedItemFeeLines = computed(() => groupItemFeeLines(props.itemFeeLines));
+
 const schoolRegFee = computed(() => Number(props.event.school_fee?.school_registration_fee ?? 0));
 const totalDue = computed(() => Number(props.event.school_fee?.total_due ?? 0));
 const amountPaid = computed(() => Number(props.event.school_fee?.amount_paid ?? 0));
