@@ -56,8 +56,30 @@
         </div>
 
         <div class="card card--flush overflow-hidden">
-            <div class="px-5 py-3 border-b bg-slate-50/80 flex items-center justify-between">
-                <h3 class="section-title text-sm">{{ filteredRows.length }} registration{{ filteredRows.length === 1 ? '' : 's' }}</h3>
+            <div class="px-5 py-3 border-b bg-slate-50/80 flex items-center justify-between flex-wrap gap-2">
+                <h3 class="section-title text-sm mb-0">
+                    {{ filteredRows.length }} registration{{ filteredRows.length === 1 ? '' : 's' }}
+                    <span v-if="filteredRows.length > 0 && perPage !== 'all'" class="text-xs font-normal text-slate-500 ml-1">
+                        (Showing {{ (currentPage - 1) * perPage + 1 }}–{{ Math.min(currentPage * perPage, filteredRows.length) }})
+                    </span>
+                </h3>
+                <div v-if="filteredRows.length > 50" class="flex items-center gap-3">
+                    <label class="text-xs text-slate-600 flex items-center gap-1.5">
+                        Per page:
+                        <select v-model="perPage" class="field text-xs !py-1 !px-2 rounded border-slate-300">
+                            <option :value="50">50</option>
+                            <option :value="100">100</option>
+                            <option :value="250">250</option>
+                            <option :value="500">500</option>
+                            <option value="all">All</option>
+                        </select>
+                    </label>
+                    <div v-if="totalPages > 1" class="flex items-center gap-1 text-xs">
+                        <button type="button" class="px-2.5 py-1 border rounded bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" :disabled="currentPage <= 1" @click="currentPage--">← Prev</button>
+                        <span class="px-2 font-medium text-slate-700">Page {{ currentPage }} of {{ totalPages }}</span>
+                        <button type="button" class="px-2.5 py-1 border rounded bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" :disabled="currentPage >= totalPages" @click="currentPage++">Next →</button>
+                    </div>
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table w-full text-sm">
@@ -81,8 +103,8 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(r, idx) in filteredRows" :key="r.id">
-                            <td class="text-xs text-slate-400">{{ idx + 1 }}</td>
+                        <tr v-for="(r, idx) in paginatedRows" :key="r.id">
+                            <td class="text-xs text-slate-400">{{ (perPage === 'all' ? 0 : (currentPage - 1) * perPage) + idx + 1 }}</td>
                             <td class="text-xs">{{ r.category_label }}</td>
                             <td class="font-medium">
                                 {{ r.item_title }}
@@ -106,6 +128,14 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div v-if="totalPages > 1" class="px-5 py-3 border-t bg-slate-50/50 flex items-center justify-between text-xs">
+                <span class="text-slate-500">Showing {{ (currentPage - 1) * perPage + 1 }} to {{ Math.min(currentPage * perPage, filteredRows.length) }} of {{ filteredRows.length }} registrations</span>
+                <div class="flex items-center gap-1">
+                    <button type="button" class="px-2.5 py-1 border rounded bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" :disabled="currentPage <= 1" @click="currentPage--">← Prev</button>
+                    <span class="px-2 font-medium text-slate-700">Page {{ currentPage }} of {{ totalPages }}</span>
+                    <button type="button" class="px-2.5 py-1 border rounded bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" :disabled="currentPage >= totalPages" @click="currentPage++">Next →</button>
+                </div>
             </div>
         </div>
 
@@ -221,5 +251,29 @@ const filteredRows = computed(() => {
             .filter(Boolean)
             .some((v) => v.toLowerCase().includes(term));
     });
+});
+
+const perPage = ref(100);
+const currentPage = ref(1);
+
+watch([categoryFilter, markStatusFilter, search, scopePhaseId, scopeRegionId], () => {
+    currentPage.value = 1;
+});
+
+watch(perPage, () => {
+    currentPage.value = 1;
+});
+
+const totalPages = computed(() => {
+    if (perPage.value === 'all' || !perPage.value) return 1;
+    return Math.ceil(filteredRows.value.length / perPage.value) || 1;
+});
+
+const paginatedRows = computed(() => {
+    if (perPage.value === 'all' || !perPage.value) {
+        return filteredRows.value;
+    }
+    const start = (currentPage.value - 1) * perPage.value;
+    return filteredRows.value.slice(start, start + perPage.value);
 });
 </script>

@@ -988,6 +988,9 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
+
         $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows(
             schoolId: null,
             category: $request->input('category'),
@@ -1020,6 +1023,9 @@ class FestReportController extends SahodayaAdminController
     public function itemWisePdf(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
 
         $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows(
             schoolId: null,
