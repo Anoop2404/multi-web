@@ -886,18 +886,12 @@ function editTemplate(template) {
     form.item_id = template.item_id ?? null;
     form.also_apply_to_event_ids = [];
     form.title = template.title || 'Certificate of Participation';
-    // A template whose body is intentionally null because its custom_fields already
-    // cover every blank (see certificate-body.blade.php's matching fallback rule) must
-    // stay empty here too -- backfilling a default sentence looked harmless in the
-    // editor but silently duplicated text across the certificate the moment the form
-    // was saved with it still in place.
-    {
-        const hasCustomFields = Array.isArray(template.layout_json?.custom_fields) && template.layout_json.custom_fields.length > 0;
-        const defaultForType = form.event_type === 'fest' ? (props.defaultFestBody || '')
-            : form.event_type === 'topper' ? (props.defaultTopperBody || '')
-            : props.defaultBody;
-        form.body = template.body ?? (hasCustomFields ? '' : defaultForType);
-    }
+    // Never backfill a default sentence when editing an existing template -- that
+    // convenience belongs only to brand-new templates (see the create-flow watcher and
+    // cancelEdit() below). An admin who cleared the body text (with or without
+    // custom_fields covering the blanks) and saved it that way must see it stay empty
+    // on re-opening, not have the default silently reappear as if they'd typed it.
+    form.body = template.body ?? '';
     form.is_active = template.is_active ?? true;
     form.template_file = null;
     form.converted_background_png = null;
