@@ -618,7 +618,18 @@ function removeCustomField(index) {
 // so the (fairly large) pdf.js bundle should only load for admins who need it.
 async function renderPdfFirstPageToPngBlob(file) {
     const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
+    const workerUrl = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
+    // pdf.js loads its worker as `new Worker(url, {type:'module'})`, which browsers
+    // refuse to run unless the response's Content-Type is a JS MIME type -- plenty of
+    // nginx configs (this app's included, on at least one deployment) don't map .mjs
+    // to one and serve application/octet-stream instead, silently breaking the worker
+    // regardless of how correct the build output itself is. Fetching the script and
+    // re-wrapping it in a same-origin Blob with an explicit, correct type sidesteps
+    // the server's header entirely.
+    const workerSource = await fetch(workerUrl).then((res) => res.text());
+    pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(
+        new Blob([workerSource], { type: 'text/javascript' })
+    );
 
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -692,6 +703,8 @@ async function onFileChange(e) {
         // already-rendered PNG directly, instead of needing to rasterize the PDF itself.
         form.converted_background_png = new File([pngBlob], 'background.png', { type: 'image/png' });
     } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Client-side PDF rendering failed, falling back to server conversion:', err);
         await previewBackgroundViaServer(file);
     } finally {
         backgroundPreviewLoading.value = false;
