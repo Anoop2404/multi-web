@@ -51,6 +51,23 @@ class FestEventController extends SahodayaAdminController
         }
 
         $events = $q->get();
+
+        // An event_admin only sees this list to pick which of their assigned events to
+        // work on — with exactly one, there's nothing to pick, so skip straight to that
+        // event's own dashboard instead of a one-card list. Guarded on eventAdminEventIds
+        // actually being set (not just the tenant coincidentally having one event) and on
+        // holding event_admin specifically — region_admin/phase_admin land on the general
+        // dashboard, not here, and keep that behavior.
+        if ($events->count() === 1
+            && $request->attributes->has('eventAdminEventIds')
+            && $request->user()?->hasRole('event_admin')
+        ) {
+            return redirect()->route('sahodaya.events.show', [
+                'tenantId' => $this->sahodaya->id,
+                'event' => $events->first()->id,
+            ]);
+        }
+
         $activeStatuses = ['published', 'registration_open', 'ongoing'];
 
         return $this->inertia('Sahodaya/Events/Index', [
