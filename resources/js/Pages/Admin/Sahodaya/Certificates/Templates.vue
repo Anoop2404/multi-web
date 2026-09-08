@@ -504,8 +504,9 @@ const placeholderTokens = computed(() => {
     if (form.event_type === 'fest') {
         // venue/grade/salutation were already resolved server-side (FestCertificateService::
         // resolveFieldValues()) but missing from this button list — worked if typed by hand,
-        // just undiscoverable.
-        return ['{salutation}', '{recipient_name}', '{school_name}', '{event_title}', '{event_name}', '{item_title}', '{item_details}', '{category_name}', '{participation_type}', '{event_dates}', '{venue}', '{achievement_line}', '{grade}', '{sahodaya_name}', '{certificate_date}'];
+        // just undiscoverable. {class} (student's class, empty for teacher-fest recipients)
+        // reuses the same token name the topper template list already uses above.
+        return ['{salutation}', '{recipient_name}', '{class}', '{school_name}', '{event_title}', '{event_name}', '{item_title}', '{item_details}', '{category_name}', '{participation_type}', '{event_dates}', '{venue}', '{achievement_line}', '{grade}', '{sahodaya_name}', '{certificate_date}'];
     }
     return ['{salutation}', '{recipient_name}', '{designation}', '{school_name}', '{program_title}', '{sahodaya_name}', '{venue}', '{conducted_on}', '{certificate_date}'];
 });

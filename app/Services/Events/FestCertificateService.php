@@ -777,6 +777,13 @@ class FestCertificateService
             ?? $payload['participant']?->registration?->school?->name
             ?? '';
 
+        // Teacher-fest certificates carry no schoolClass at all (Teacher, not Student) —
+        // empty string there, same as every other field this template system leaves
+        // blank rather than erroring on, when a token doesn't apply to the recipient type.
+        $className = $recordBreak?->participant?->student?->schoolClass?->name
+            ?? $student?->schoolClass?->name
+            ?? '';
+
         $positionLabel = match ($mark?->position) {
             1 => 'First Prize',
             2 => 'Second Prize',
@@ -848,6 +855,9 @@ class FestCertificateService
         return [
             'salutation'          => $salutation,
             'recipient_name'      => $recipientName,
+            // Matches the {class} token name the training/topper certificate templates
+            // already use, rather than inventing a differently-named fest equivalent.
+            'class'               => $className,
             'school_name'         => $schoolName,
             'event_title'         => $event?->title ?? '',
             // Alias of event_title — some templates reference {event_name} instead.
