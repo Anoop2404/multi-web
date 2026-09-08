@@ -322,6 +322,10 @@ class FestScheduleController extends SahodayaAdminController
                 ->get(),
             'venues'    => FestVenue::where('event_id', $event->id)->orderBy('name')->get(['id', 'name', 'location']),
             'ageGroups' => $event->items->pluck('age_group')->filter()->unique()->values(),
+            'phases'    => \App\Models\FestEventPhase::where('event_id', $event->id)
+                ->with(['allowedRegions' => fn ($q) => $q->where('enabled', true)->with('region:id,name')])
+                ->orderBy('sort_order')
+                ->get(['id', 'event_id', 'name', 'is_regional', 'sort_order']),
         ]));
     }
 
@@ -337,6 +341,7 @@ class FestScheduleController extends SahodayaAdminController
             'rows.*.scheduled_time'=> 'nullable|string|max:10',
             'rows.*.stage_id'      => 'nullable|integer',
             'rows.*.stage'         => 'nullable|string|max:100',
+            'rows.*.venue_id'      => 'nullable|integer',
             'rows.*.sort_order'    => 'nullable|integer|min:0',
             'rows.*.timing_mode'   => 'nullable|in:fixed,per_participant',
             'rows.*.duration_minutes' => 'nullable|integer|min:1|max:600',
@@ -362,6 +367,7 @@ class FestScheduleController extends SahodayaAdminController
             'start_at'   => 'required|date',
             'stage_id'   => 'nullable|exists:fest_stages,id',
             'stage'      => 'nullable|string|max:100',
+            'venue_id'   => 'nullable|exists:fest_venues,id',
         ]);
 
         $result = $itemSchedule->autoSequence(
@@ -370,6 +376,7 @@ class FestScheduleController extends SahodayaAdminController
             \Carbon\Carbon::parse($data['start_at']),
             $data['stage_id'] ?? null,
             $data['stage'] ?? null,
+            $data['venue_id'] ?? null,
         );
 
         $audit->festEvent($event, FestPageActivity::SCHEDULE, 'fest.item_schedule.auto_sequenced', "Auto-sequenced {$result['count']} item(s)", [

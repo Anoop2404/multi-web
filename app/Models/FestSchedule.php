@@ -9,7 +9,7 @@ class FestSchedule extends Model
 {
     protected $fillable = [
         'event_id', 'item_id', 'participant_id',
-        'scheduled_at', 'stage', 'stage_id', 'sort_order', 'called_at',
+        'scheduled_at', 'stage', 'stage_id', 'venue_id', 'sort_order', 'called_at',
     ];
 
     protected $casts = [
@@ -35,5 +35,11 @@ class FestSchedule extends Model
     public function festStage(): BelongsTo
     {
         return $this->belongsTo(FestStage::class, 'stage_id');
+    }
+
+    /** A plain room/venue for offstage items (e.g. Pencil Drawing) that don't need a performance stage. */
+    public function venue(): BelongsTo
+    {
+        return $this->belongsTo(FestVenue::class, 'venue_id');
     }
 }

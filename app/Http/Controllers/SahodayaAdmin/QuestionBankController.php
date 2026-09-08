@@ -33,7 +33,10 @@ class QuestionBankController extends SahodayaAdminController
             'master_class_id' => 'required|integer',
             'subject'         => 'nullable|string|max:100',
             'academic_year'   => 'nullable|string|max:20',
-            'file'            => 'required|mimes:pdf,doc,docx|max:10240',
+            // Question papers (scanned/multi-page) run larger than a typical circular —
+            // matches the same ceiling as other document-upload features in this app
+            // (TeacherQuestionPaperController, BoardResultController, DownloadController).
+            'file'            => 'required|mimes:pdf,doc,docx|max:20480',
         ]);
 
         $data['tenant_id'] = $this->sahodaya->id;

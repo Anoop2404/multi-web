@@ -27,7 +27,8 @@
         <div v-if="!venues.length && !stages.length" class="notice-banner notice-banner--info mb-4 text-sm">
             Add venues and stages under
             <a :href="settingsUrl" class="link-brand font-semibold">Event settings → Venues</a>
-            first, then pick a stage here (venue is shown from the stage).
+            first — pick a Stage for onstage items with a performance order, or a plain Venue
+            for offstage items (e.g. Pencil Drawing) that just need a room.
         </div>
 
         <div class="flex flex-wrap gap-2 items-end mb-4">
@@ -38,6 +39,10 @@
                               :all-label="event.event_type === 'sports' ? 'All Event Heads' : 'All item heads'" />
             <SearchableSelect v-if="ageGroups.length" v-model="ageFilter" class="max-w-[10rem]"
                               :options="ageGroupOptions" :all-option="true" all-label="All age groups" />
+            <SearchableSelect v-if="regionOptions.length" v-model="regionFilter" class="max-w-[10rem]"
+                              :options="regionOptions" :all-option="true" all-label="All regions" />
+            <SearchableSelect v-if="phases.length" v-model="phaseFilter" class="max-w-[12rem]"
+                              :options="phaseOptions" :all-option="true" all-label="All phases" />
             <SearchableSelect v-model="statusFilter" class="max-w-[10rem]"
                               :options="[{ value: 'scheduled', label: 'Scheduled only' }, { value: 'unscheduled', label: 'Not scheduled' }]"
                               :all-option="true" all-label="All items" />
@@ -69,6 +74,11 @@
                     <input v-else v-model="autoSeq.stage" type="text" class="field !py-1.5 !text-xs w-40" placeholder="Stage name">
                 </div>
                 <div>
+                    <label class="text-xs font-semibold text-slate-600 block mb-1">Venue</label>
+                    <SearchableSelect v-model="autoSeq.venue_id" class="w-40"
+                                      :options="venueOptions" :all-option="true" all-label="— None —" />
+                </div>
+                <div>
                     <label class="text-xs font-semibold text-slate-600 block mb-1">Start date</label>
                     <input v-model="autoSeq.date" type="date" class="field !py-1.5 !text-xs">
                 </div>
@@ -96,13 +106,14 @@
                             <th class="w-20 text-center">Est.</th>
                             <th class="w-36">Date</th>
                             <th class="w-28">Time</th>
-                            <th class="min-w-[140px]">Stage / venue</th>
+                            <th class="min-w-[130px]">Stage</th>
+                            <th class="min-w-[130px]">Venue</th>
                         </tr>
                     </thead>
                     <tbody>
                         <template v-for="group in groupedFilteredRows" :key="group.key">
                             <tr class="bg-indigo-50/60">
-                                <td colspan="8" class="px-3 py-2 text-xs font-bold uppercase tracking-wide text-indigo-800">
+                                <td colspan="9" class="px-3 py-2 text-xs font-bold uppercase tracking-wide text-indigo-800">
                                     {{ group.label }} · {{ group.rows.length }} item{{ group.rows.length === 1 ? '' : 's' }}
                                 </td>
                             </tr>
@@ -146,10 +157,14 @@
                                     <input v-else v-model="draft[row.item_id].stage" type="text" class="field !py-1 !text-xs"
                                            placeholder="Stage name">
                                 </td>
+                                <td>
+                                    <SearchableSelect v-model="draft[row.item_id].venue_id"
+                                                      :options="venueOptions" :all-option="true" all-label="— Optional —" />
+                                </td>
                             </tr>
                         </template>
                         <tr v-if="!filteredRows.length">
-                            <td colspan="8" class="p-6 text-center text-slate-400">No items match your filters.</td>
+                            <td colspan="9" class="p-6 text-center text-slate-400">No items match your filters.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -181,12 +196,15 @@ const props = defineProps({
     stages: Array,
     venues: Array,
     ageGroups: Array,
+    phases: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
 });
 
 const search = ref('');
 const headFilter = ref('');
 const ageFilter = ref('');
+const regionFilter = ref('');
+const phaseFilter = ref('');
 const statusFilter = ref('');
 const importFile = ref(null);
 const importForm = useForm({ file: null });
@@ -222,6 +240,7 @@ function initDraft() {
             scheduled_time: row.scheduled_time ?? '',
             stage_id: row.stage_id ? String(row.stage_id) : '',
             stage: row.stage ?? '',
+            venue_id: row.venue_id ? String(row.venue_id) : '',
             timing_mode: row.timing_mode ?? 'per_participant',
             duration_minutes: row.duration_minutes ?? null,
             calling_buffer_minutes: row.calling_buffer_minutes ?? null,
@@ -267,6 +286,11 @@ const filteredRows = computed(() => {
         if (headFilter.value === 'other' && row.head_id) return false;
         if (headFilter.value && headFilter.value !== 'other' && String(row.head_id ?? '') !== String(headFilter.value)) return false;
         if (ageFilter.value && row.age_group !== ageFilter.value) return false;
+        if (phaseFilter.value && String(row.phase_id ?? '') !== String(phaseFilter.value)) return false;
+        if (regionFilter.value && !phaseFilter.value) {
+            const allowedPhaseIds = phaseIdsForRegion(regionFilter.value);
+            if (!allowedPhaseIds.includes(row.phase_id)) return false;
+        }
         const hasSchedule = Boolean(row.scheduled_date || row.scheduled_time || row.stage_id || row.stage);
         if (statusFilter.value === 'scheduled' && !hasSchedule) return false;
         if (statusFilter.value === 'unscheduled' && hasSchedule) return false;
@@ -292,7 +316,31 @@ const headFilterOptions = computed(() => [
 
 const ageGroupOptions = computed(() => (props.ageGroups ?? []).map((g) => ({ value: g, label: String(g).toUpperCase() })));
 
+const regionOptions = computed(() => {
+    const map = new Map();
+    for (const phase of props.phases ?? []) {
+        for (const link of phase.allowed_regions ?? []) {
+            if (link.region) map.set(String(link.region.id), link.region.name);
+        }
+    }
+    return [...map.entries()].map(([value, label]) => ({ value, label }));
+});
+
+function phaseIdsForRegion(regionId) {
+    return (props.phases ?? [])
+        .filter((phase) => (phase.allowed_regions ?? []).some((link) => String(link.region_id ?? link.region?.id) === String(regionId)))
+        .map((phase) => phase.id);
+}
+
+const phaseOptions = computed(() => {
+    const list = regionFilter.value
+        ? (props.phases ?? []).filter((phase) => phaseIdsForRegion(regionFilter.value).includes(phase.id))
+        : (props.phases ?? []);
+    return list.map((phase) => ({ value: String(phase.id), label: phase.name }));
+});
+
 const stageOptions = computed(() => (props.stages ?? []).map((s) => ({ value: String(s.id), label: stageLabel(s) })));
+const venueOptions = computed(() => (props.venues ?? []).map((v) => ({ value: String(v.id), label: v.name })));
 
 const groupedFilteredRows = computed(() => {
     const groups = [];
@@ -338,6 +386,7 @@ function saveAll() {
             scheduled_time: d.scheduled_time || null,
             stage_id: d.stage_id ? Number(d.stage_id) : null,
             stage: d.stage || null,
+            venue_id: d.venue_id ? Number(d.venue_id) : null,
             timing_mode: d.timing_mode || null,
             duration_minutes: d.duration_minutes || null,
             calling_buffer_minutes: d.calling_buffer_minutes ?? null,
@@ -346,8 +395,8 @@ function saveAll() {
     bulkForm.post(`${base.value}/schedule/items/bulk`, { preserveScroll: true });
 }
 
-const autoSeq = reactive({ stage_id: '', stage: '', date: '', time: '' });
-const autoSeqForm = useForm({ item_ids: [], start_at: '', stage_id: null, stage: null });
+const autoSeq = reactive({ stage_id: '', stage: '', venue_id: '', date: '', time: '' });
+const autoSeqForm = useForm({ item_ids: [], start_at: '', stage_id: null, stage: null, venue_id: null });
 
 const canAutoSequence = computed(() => Boolean(autoSeq.date && autoSeq.time && filteredRows.value.length));
 
@@ -366,6 +415,7 @@ function runAutoSequence() {
     autoSeqForm.start_at = `${autoSeq.date} ${autoSeq.time}:00`;
     autoSeqForm.stage_id = autoSeq.stage_id ? Number(autoSeq.stage_id) : null;
     autoSeqForm.stage = autoSeq.stage || null;
+    autoSeqForm.venue_id = autoSeq.venue_id ? Number(autoSeq.venue_id) : null;
     autoSeqForm.post(`${base.value}/schedule/items/auto-sequence`, { preserveScroll: true });
 }
 </script>

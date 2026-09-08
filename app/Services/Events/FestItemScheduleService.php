@@ -7,6 +7,7 @@ use App\Models\FestEventItem;
 use App\Models\FestRegistration;
 use App\Models\FestSchedule;
 use App\Models\FestStage;
+use App\Models\FestVenue;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
 use Carbon\Carbon;
@@ -18,7 +19,7 @@ class FestItemScheduleService
     {
         $schedules = FestSchedule::where('event_id', $event->id)
             ->whereNull('participant_id')
-            ->with(['festStage.venue'])
+            ->with(['festStage.venue', 'venue'])
             ->get()
             ->keyBy('item_id');
 
@@ -55,6 +56,7 @@ class FestItemScheduleService
             'category_label'  => FestItemCategoryLabel::resolve($item, $classGroupLabels),
             'gender'          => $item->gender,
             'participant_type' => $item->participant_type,
+            'phase_id'        => $item->phase_id,
             'timing_mode'            => $item->timing_mode ?? 'per_participant',
             'duration_minutes'       => $item->duration_minutes,
             'calling_buffer_minutes' => $item->calling_buffer_minutes,
@@ -66,7 +68,8 @@ class FestItemScheduleService
             'scheduled_time' => $at?->format('H:i'),
             'stage_id'       => $schedule?->stage_id,
             'stage'          => $schedule?->stage,
-            'venue'          => $schedule?->festStage?->venue?->name,
+            'venue_id'       => $schedule?->venue_id,
+            'venue'          => $schedule?->venue?->name ?? $schedule?->festStage?->venue?->name,
             'sort_order'     => $schedule?->sort_order,
         ];
     }
@@ -126,13 +129,18 @@ class FestItemScheduleService
             $scheduledAt = $this->resolveDateTime($row);
             $stageId = ! empty($row['stage_id']) ? (int) $row['stage_id'] : null;
             $stageName = trim((string) ($row['stage'] ?? ''));
+            $venueId = ! empty($row['venue_id']) ? (int) $row['venue_id'] : null;
 
             if ($stageId) {
                 $stage = FestStage::where('event_id', $event->id)->findOrFail($stageId);
                 $stageName = $stage->name;
             }
 
-            $hasData = $scheduledAt !== null || $stageId || $stageName !== '';
+            if ($venueId) {
+                FestVenue::where('event_id', $event->id)->findOrFail($venueId);
+            }
+
+            $hasData = $scheduledAt !== null || $stageId || $stageName !== '' || $venueId;
 
             if (! $hasData) {
                 FestSchedule::where('event_id', $event->id)
@@ -153,6 +161,7 @@ class FestItemScheduleService
                     'scheduled_at' => $scheduledAt,
                     'stage_id'     => $stageId,
                     'stage'        => $stageName !== '' ? $stageName : null,
+                    'venue_id'     => $venueId,
                     'sort_order'   => isset($row['sort_order']) ? (int) $row['sort_order'] : (FestSchedule::where('event_id', $event->id)->max('sort_order') ?? 0) + 1,
                 ]
             );
@@ -197,7 +206,7 @@ class FestItemScheduleService
      * @param  list<int>  $orderedItemIds
      * @return array{count: int, ends_at: Carbon}
      */
-    public function autoSequence(FestEvent $event, array $orderedItemIds, Carbon $startAt, ?int $stageId = null, ?string $stageName = null): array
+    public function autoSequence(FestEvent $event, array $orderedItemIds, Carbon $startAt, ?int $stageId = null, ?string $stageName = null, ?int $venueId = null): array
     {
         $items = FestEventItem::where('event_id', $event->id)
             ->whereIn('id', $orderedItemIds)
@@ -207,6 +216,7 @@ class FestItemScheduleService
 
         $stage = $stageId ? FestStage::where('event_id', $event->id)->findOrFail($stageId) : null;
         $resolvedStageName = $stage?->name ?? $stageName;
+        $venue = $venueId ? FestVenue::where('event_id', $event->id)->findOrFail($venueId) : null;
 
         $cursor = $startAt->copy();
         $sortOrder = FestSchedule::where('event_id', $event->id)->max('sort_order') ?? 0;
@@ -225,6 +235,7 @@ class FestItemScheduleService
                     'scheduled_at' => $cursor->copy(),
                     'stage_id'     => $stage?->id,
                     'stage'        => $resolvedStageName,
+                    'venue_id'     => $venue?->id,
                     'sort_order'   => ++$sortOrder,
                 ]
             );

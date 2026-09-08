@@ -6,8 +6,12 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\FestEventPhase;
+use App\Models\FestPhaseRegion;
 use App\Models\FestSchedule;
 use App\Models\FestStage;
+use App\Models\FestVenue;
+use App\Models\Region;
 use App\Models\SahodayaProfile;
 use App\Models\SchoolClass;
 use App\Models\Student;
@@ -132,6 +136,54 @@ class FestItemTimingTest extends TestCase
         $this->assertSame('per_participant', $item->timing_mode);
         $this->assertSame(5, $item->duration_minutes);
         $this->assertSame(3, $item->calling_buffer_minutes);
+    }
+
+    public function test_bulk_item_schedule_save_can_assign_a_plain_venue_without_a_stage(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->fixture();
+
+        $item = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Pencil Drawing', 'participant_type' => 'individual', 'is_enabled' => true,
+        ]);
+        $venue = FestVenue::create(['tenant_id' => $sahodaya->id, 'event_id' => $event->id, 'name' => 'Classroom Block A', 'is_active' => true]);
+
+        $response = $this->actingAs($admin)->post(route('sahodaya.events.schedule.items.bulk', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]), [
+            'rows' => [[
+                'item_id' => $item->id,
+                'venue_id' => $venue->id,
+            ]],
+        ]);
+
+        $response->assertRedirect();
+        $schedule = FestSchedule::where('item_id', $item->id)->whereNull('participant_id')->firstOrFail();
+        $this->assertSame($venue->id, $schedule->venue_id);
+        $this->assertNull($schedule->stage_id);
+    }
+
+    public function test_item_schedule_page_exposes_phases_with_their_allowed_regions(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->fixture();
+
+        $region = Region::create(['tenant_id' => $sahodaya->id, 'name' => 'North Zone', 'code' => 'NZ', 'is_active' => true]);
+        $phase = FestEventPhase::create(['event_id' => $event->id, 'name' => 'Sargadhara', 'is_regional' => true, 'sort_order' => 1]);
+        FestPhaseRegion::create(['phase_id' => $phase->id, 'region_id' => $region->id, 'enabled' => true]);
+
+        FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Recitation', 'participant_type' => 'individual',
+            'is_enabled' => true, 'phase_id' => $phase->id,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.schedule.items', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]));
+
+        $response->assertOk();
+        $props = $response->viewData('page')['props'];
+        $this->assertSame('Sargadhara', $props['phases'][0]['name']);
+        $this->assertSame('North Zone', $props['phases'][0]['allowed_regions'][0]['region']['name']);
+        $this->assertSame($phase->id, $props['rows'][0]['phase_id']);
     }
 
     public function test_auto_sequence_cascades_start_times_across_items_on_a_stage(): void
