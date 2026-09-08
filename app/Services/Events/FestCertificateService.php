@@ -806,12 +806,25 @@ class FestCertificateService
             default => 'participated',
         };
 
-        $eventDates = $event
-            ? trim(collect([
-                $event->event_start?->format('d M Y'),
-                $event->event_end && $event->event_end->ne($event->event_start) ? $event->event_end->format('d M Y') : null,
-            ])->filter()->implode(' - '))
-            : '';
+        // Ordinal ("18th - 19th September 2026") to match certificate_date's convention
+        // below — a plain "18 Sep - 19 Sep 2026" read as inconsistent next to it on the
+        // same certificate. Collapses to a single ordinal date when the event is one day
+        // (or has no end date), and only repeats the month/year on the end date when it
+        // actually differs from the start date's.
+        $eventDates = '';
+        if ($event?->event_start) {
+            $start = $event->event_start;
+            $end = $event->event_end && !$event->event_end->isSameDay($start) ? $event->event_end : null;
+            if (!$end) {
+                $eventDates = $start->format('jS F Y');
+            } elseif ($start->isSameMonth($end) && $start->isSameYear($end)) {
+                $eventDates = $start->format('jS').' - '.$end->format('jS F Y');
+            } elseif ($start->isSameYear($end)) {
+                $eventDates = $start->format('jS F').' - '.$end->format('jS F Y');
+            } else {
+                $eventDates = $start->format('jS F Y').' - '.$end->format('jS F Y');
+            }
+        }
 
         // certificate_date: an explicit per-event override (FestEventSettingsController's
         // certificate tab) takes priority, then the event's own end/start date, then

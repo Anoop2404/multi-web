@@ -44,6 +44,10 @@
             padding: 40px 52px 56px;
             background: #fff;
             box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            /* .cert-viewport is a flex container; without this, flexbox shrinks the
+               page below its fixed width to fit a narrow window instead of letting
+               the viewport's overflow:auto scroll to it. */
+            flex-shrink: 0;
         }
 
         .page.has-background {

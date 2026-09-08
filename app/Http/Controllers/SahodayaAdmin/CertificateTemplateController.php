@@ -91,13 +91,20 @@ class CertificateTemplateController extends SahodayaAdminController
                     'category_name'    => 'Category I',
                     'category_short'   => 'I',
                     'participation_type' => 'Individual',
-                    'event_dates'      => '12-14 October 2026',
+                    'event_dates'      => '12th - 14th October 2026',
                     'venue'            => 'Sample Model School',
                     'achievement_line' => 'First Prize with A Grade',
                     'position'         => 'First',
                     'grade'            => 'A',
                     'sahodaya_name'    => strtoupper($this->sahodaya->name),
-                    'certificate_date' => now()->format('j F Y'),
+                    // A fixed illustrative date (matching event_dates' sample end date
+                    // above), not today's real date — every other sample value here is a
+                    // static example, and now()-based text made this one look like real
+                    // data rather than a placeholder while editing. Markup matches
+                    // FestCertificateService::resolveFieldValues()'s real ordinal-suffix
+                    // format exactly, so the admin's live preview shows the same "14th
+                    // October 2026" styling actual certificates get.
+                    'certificate_date' => '<strong>14</strong><sup>th</sup> October <strong>2026</strong>',
                 ],
                 'logoUrl'       => $template->logo_path ? TenantStorage::logoUrl($this->sahodaya, $template->logo_path) : TenantBranding::logoUrl($this->sahodaya),
                 'sealUrl'       => $template->seal_path ? TenantStorage::logoUrl($this->sahodaya, $template->seal_path) : null,

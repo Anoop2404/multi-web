@@ -157,6 +157,22 @@ class FestCertificateAbsenceAndDateTest extends TestCase
         $this->assertStringNotContainsString('July', $dateHtml);
     }
 
+    public function test_event_dates_formats_a_multi_day_span_with_ordinal_suffixes(): void
+    {
+        $f = $this->fixture(['event_start' => '2026-09-22', 'event_end' => '2026-09-26']);
+        $item = FestEventItem::create(['event_id' => $f['event']->id, 'title' => 'Solo Song', 'item_code' => 'CD3']);
+        $participant = $this->registerParticipant($f['event'], $item, $f['school']->id, 605);
+
+        $certificate = Certificate::create([
+            'entity_type' => FestParticipant::class, 'entity_id' => $participant->id,
+            'cert_type' => 'participation', 'verification_uuid' => (string) Str::uuid(), 'generated_at' => now(),
+        ]);
+
+        $context = app(FestCertificateService::class)->renderContext($certificate);
+
+        $this->assertSame('22nd - 26th September 2026', $context['fieldValues']['event_dates']);
+    }
+
     public function test_update_certificate_date_route_sets_and_clears_the_override(): void
     {
         $f = $this->fixture();
