@@ -254,11 +254,12 @@ class FestChestNumberController extends SahodayaAdminController
             $out = fopen('php://output', 'w');
             CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
             CsvSafety::fputcsv($out, []);
-            CsvSafety::fputcsv($out, ['Chest No', 'Order No', 'Participant', 'Item', 'Category', 'School']);
+            CsvSafety::fputcsv($out, ['Chest No', 'Order No', 'Fest ID', 'Participant', 'Item', 'Category', 'School']);
             foreach ($rows as $row) {
                 CsvSafety::fputcsv($out, [
                     $row['chest_no'],
                     $row['order_no'] ?? '',
+                    $row['fest_id'] ?? '',
                     $row['name'],
                     $row['item'],
                     $row['category'] ?? '',
