@@ -29,6 +29,10 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            /* Shown at true A4 size (no auto-shrink-to-fit-window) -- an admin checking
+               exact placement needs the real, unscaled render; a narrower window just
+               scrolls to it instead of silently rescaling the page underneath them. */
+            overflow: auto;
         }
 
         .page {
@@ -159,35 +163,6 @@
         @include('fest.partials.certificate-body')
     </div>
 
-    <script>
-        (function () {
-            function fitToScreen() {
-                var page = document.querySelector('.page');
-                if (!page) return;
-                page.style.transform = 'none';
-                page.style.marginBottom = '0px';
-                var rect = page.getBoundingClientRect();
-                var scale = Math.min(
-                    (window.innerWidth - 32) / rect.width,
-                    (window.innerHeight - 32) / rect.height,
-                    1
-                );
-                page.style.transformOrigin = 'top center';
-                page.style.transform = 'scale(' + scale + ')';
-                page.style.marginBottom = (-(rect.height * (1 - scale))) + 'px';
-            }
-            window.addEventListener('load', fitToScreen);
-            window.addEventListener('resize', fitToScreen);
-            window.addEventListener('beforeprint', function () {
-                var page = document.querySelector('.page');
-                if (page) {
-                    page.style.transform = 'none';
-                    page.style.marginBottom = '0px';
-                }
-            });
-            window.addEventListener('afterprint', fitToScreen);
-        })();
-    </script>
     @include('fest.partials.certificate-fit-text-script')
 </body>
 </html>

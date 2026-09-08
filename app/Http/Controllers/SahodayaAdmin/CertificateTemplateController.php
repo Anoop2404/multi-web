@@ -89,6 +89,7 @@ class CertificateTemplateController extends SahodayaAdminController
                     'item_title'       => 'Classical Music (Solo)',
                     'item_details'     => 'Classical Music (Solo)',
                     'category_name'    => 'Category I',
+                    'category_short'   => 'I',
                     'participation_type' => 'Individual',
                     'event_dates'      => '12-14 October 2026',
                     'venue'            => 'Sample Model School',

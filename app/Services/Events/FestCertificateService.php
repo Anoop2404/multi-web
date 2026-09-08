@@ -834,6 +834,12 @@ class FestCertificateService
         // student whose items are all "Category 1" sees it once, not three times.
         $taxonomies = $event ? $items->map(fn (FestEventItem $i) => $this->itemTaxonomyLabels($i, $event)) : collect();
         $categoryName = $this->humanJoin($taxonomies->pluck('category')->unique()->values()->all());
+        // For a background that already prints the word "category" itself (e.g. "...of
+        // category ___ held as..."), repeating it in {category_name} ("Category I") reads
+        // redundant and is often too wide for a pre-sized blank -- strips a leading
+        // "Category "/"Cat. " so only the identifying part ("I", "1", "A", ...) remains.
+        // Falls back to the full label unchanged when it doesn't start with that prefix.
+        $categoryShort = preg_replace('/^(category|cat\.?)\s+/i', '', $categoryName) ?? $categoryName;
         $participationType = $this->humanJoin($taxonomies->pluck('type')->unique()->values()->all());
 
         // Same "aggregate across the person's full participant group" need as $items
@@ -882,6 +888,7 @@ class FestCertificateService
             // when a multi-item participation certificate's joined sentence overflows.
             'item_titles'         => $items->pluck('title')->all(),
             'category_name'       => $categoryName,
+            'category_short'      => $categoryShort,
             'participation_type'  => $participationType,
             'event_dates'         => $eventDates,
             'achievement_line'    => $achievementLine,

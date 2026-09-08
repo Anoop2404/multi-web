@@ -221,6 +221,7 @@ const sampleData = computed(() => {
         item_details: '100m Sprint Boys (U17)',
         event_name: props.title || 'Annual Sports Meet 2026',
         category_name: 'Category I',
+        category_short: 'I',
         participation_type: 'Individual',
         event_dates: '21st - 23rd July 2026',
         conducted_on: '22nd July 2026',
