@@ -104,6 +104,7 @@
                             <th class="hidden sm:table-cell">Class</th>
                             <th class="hidden sm:table-cell">Subject</th>
                             <th class="hidden lg:table-cell">Academic Year</th>
+                            <th class="hidden lg:table-cell">Size</th>
                             <th class="hidden lg:table-cell">Downloads</th>
                             <th class="w-28 text-right"></th>
                         </tr>
@@ -120,6 +121,7 @@
                             </td>
                             <td class="hidden sm:table-cell text-xs text-slate-500">{{ d.subject || '—' }}</td>
                             <td class="hidden lg:table-cell text-xs text-slate-500">{{ d.academic_year || '—' }}</td>
+                            <td class="hidden lg:table-cell text-xs text-slate-500">{{ d.file_size_label || '—' }}</td>
                             <td class="hidden lg:table-cell text-xs text-slate-500">{{ d.download_count ?? 0 }}</td>
                             <td class="text-right whitespace-nowrap space-x-2">
                                 <button type="button" @click="openEditForm(d)" class="text-xs text-indigo-600 hover:text-indigo-800">Edit</button>
@@ -139,7 +141,7 @@
                     </div>
                     <p v-if="d.subject" class="text-xs text-slate-500">{{ d.subject }}</p>
                     <p class="text-xs text-slate-500">
-                        {{ d.academic_year || 'No year set' }} · {{ d.download_count ?? 0 }} downloads
+                        {{ d.academic_year || 'No year set' }}<span v-if="d.file_size_label"> · {{ d.file_size_label }}</span> · {{ d.download_count ?? 0 }} downloads
                     </p>
                     <div class="flex gap-3 pt-1">
                         <button type="button" @click="openEditForm(d)" class="text-xs text-indigo-600 hover:text-indigo-800">Edit</button>

@@ -26,6 +26,7 @@ class QuestionBankController extends Controller
 
         $documents = $documents->map(function ($document) use ($masterClasses) {
             $document->setAttribute('class_name', $masterClasses->get($document->master_class_id)?->name);
+            $document->backfillFileSizeIfMissing();
 
             return $document;
         })->values();

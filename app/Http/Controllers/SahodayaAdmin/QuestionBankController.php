@@ -15,7 +15,8 @@ class QuestionBankController extends SahodayaAdminController
         $documents = QuestionBankDocument::where('tenant_id', $this->sahodaya->id)
             ->with('masterClass')
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->each(fn (QuestionBankDocument $document) => $document->backfillFileSizeIfMissing());
 
         $masterClasses = $masterData->masterClasses($this->sahodaya->id)
             ->map(fn ($class) => ['id' => $class->id, 'name' => $class->name]);
@@ -42,6 +43,7 @@ class QuestionBankController extends SahodayaAdminController
         ]);
 
         $data['tenant_id'] = $this->sahodaya->id;
+        $data['file_size'] = $request->file('file')->getSize();
         $data['file_path'] = $request->file('file')->store(
             'sahodaya/'.$this->sahodaya->id.'/question-bank',
             TenantStorage::uploadDisk()
@@ -68,6 +70,7 @@ class QuestionBankController extends SahodayaAdminController
 
         if ($request->hasFile('file')) {
             $oldPath = $questionBankDocument->file_path;
+            $data['file_size'] = $request->file('file')->getSize();
             $data['file_path'] = $request->file('file')->store(
                 'sahodaya/'.$this->sahodaya->id.'/question-bank',
                 TenantStorage::uploadDisk()

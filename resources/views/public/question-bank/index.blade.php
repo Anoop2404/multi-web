@@ -61,6 +61,7 @@
                     @if($document->class_name)<span class="qb-class-badge">Class {{ $document->class_name }}</span>@endif
                     @if($document->subject) <span>{{ $document->subject }}</span>@endif
                     @if($document->academic_year) <span>{{ $document->academic_year }}</span>@endif
+                    @if($document->file_size_label) <span>{{ $document->file_size_label }}</span>@endif
                 </div>
             </div>
             <div class="qb-doc-actions">
