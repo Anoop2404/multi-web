@@ -393,7 +393,11 @@ class CertificateTemplateController extends SahodayaAdminController
             // validate() only returns keys listed in its rules, so any event/item change
             // submitted from the edit form was silently discarded below regardless of
             // what the admin picked in the dropdown. store() already validated these
-            // correctly; this mirrors it.
+            // correctly; this mirrors it. event_type/certificate_type had the exact same
+            // gap — changing either dropdown on an existing template looked like it saved
+            // (redirect, no error) but silently left both columns untouched.
+            'event_type'          => 'nullable|string|max:50',
+            'certificate_type'    => 'nullable|string|max:50',
             'event_id'            => 'nullable|integer|exists:fest_events,id',
             'item_id'             => 'nullable|integer|exists:fest_event_items,id',
             'template_file'       => 'nullable|file|mimes:pdf,png,jpg,jpeg|max:10240',
@@ -498,6 +502,14 @@ class CertificateTemplateController extends SahodayaAdminController
         if (array_key_exists('body', $data)) {
             $updates['body'] = $data['body'];
         }
+        // Both are required selects on the edit form (never legitimately blank), unlike
+        // title/body above — no reason to support clearing them to null.
+        if (! empty($data['event_type'])) {
+            $updates['event_type'] = $data['event_type'];
+        }
+        if (! empty($data['certificate_type'])) {
+            $updates['certificate_type'] = $data['certificate_type'];
+        }
 
         $detectedOrientation = null;
         if ($request->hasFile('template_file')) {
@@ -551,18 +563,21 @@ class CertificateTemplateController extends SahodayaAdminController
         }
 
         // The scope this save is actually landing on — not necessarily $template's current
-        // event_id/item_id, since this request may itself be moving the template to a
-        // different event (see the event_id/item_id validation above). The dedup check
-        // below must guard the *destination* scope, or moving a template onto an event
-        // that already has an active one there silently leaves two active at once.
+        // event_type/certificate_type/event_id/item_id, since this request may itself be
+        // moving the template to a different event, or changing its type (see the
+        // validation above). The dedup check below must guard the *destination* scope, or
+        // moving a template onto a scope that already has an active one there silently
+        // leaves two active at once.
+        $targetEventType = $updates['event_type'] ?? $template->event_type;
+        $targetCertificateType = $updates['certificate_type'] ?? $template->certificate_type;
         $targetEventId = array_key_exists('event_id', $data) ? $data['event_id'] : $template->event_id;
         $targetItemId = array_key_exists('item_id', $data) ? $data['item_id'] : $template->item_id;
 
         $deactivatedCount = 0;
         if (array_key_exists('is_active', $data) && $data['is_active']) {
             $deactivatedCount = CertificateTemplate::where('tenant_id', $this->sahodaya->id)
-                ->where('event_type', $template->event_type)
-                ->where('certificate_type', $template->certificate_type)
+                ->where('event_type', $targetEventType)
+                ->where('certificate_type', $targetCertificateType)
                 ->when($targetEventId, fn ($q) => $q->where('event_id', $targetEventId), fn ($q) => $q->whereNull('event_id'))
                 ->when($targetItemId, fn ($q) => $q->where('item_id', $targetItemId), fn ($q) => $q->whereNull('item_id'))
                 ->where('id', '!=', $template->id)

@@ -189,6 +189,31 @@ class CertificateTemplateDeactivationTest extends TestCase
     }
 
     /**
+     * Regression test: the same missing-validation-rule gap as event_id/item_id above,
+     * just never noticed for these two — update()'s validate() call had no
+     * event_type/certificate_type rules at all, so changing either dropdown on an
+     * existing template looked like it saved (redirect, success banner) but silently
+     * left both columns untouched.
+     */
+    public function test_updating_a_template_can_change_its_certificate_type(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeSahodayaAdminAndEvent();
+
+        $template = CertificateTemplate::create([
+            'tenant_id' => $sahodaya->id, 'event_type' => 'fest', 'event_id' => $event->id,
+            'certificate_type' => 'participation', 'title' => 'Retypeable Template', 'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('sahodaya.certificate-templates.update', [
+            'tenantId' => $sahodaya->id, 'template' => $template->id,
+        ]), ['certificate_type' => 'winner']);
+
+        $response->assertRedirect();
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertSame('winner', $template->fresh()->certificate_type);
+    }
+
+    /**
      * Regression test: update()'s $updates array used to be built with
      * array_filter(..., fn($v) => $v !== null), which silently dropped 'body' from the
      * update whenever it was null — including when an admin deliberately cleared the
