@@ -84,7 +84,7 @@
             @if($showCertificateDate)
                 @php $d = $layout['certificate_date'] ?? []; $dateValue = $fieldValues['certificate_date'] ?? now()->format('j F Y'); @endphp
                 <div class="overlay-field cert-date" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($d, ['top' => 72, 'left' => 8, 'width' => 42, 'font_size' => 12, 'font_family' => 'Montserrat', 'align' => 'left']) }}">
-                    @if($boldVariables)<strong>Date :</strong> <strong>{{ $dateValue }}</strong>@else Date : {{ $dateValue }}@endif
+                    @if($boldVariables)<strong>Date :</strong> <strong>{!! $dateValue !!}</strong>@else Date : {!! $dateValue !!}@endif
                 </div>
             @endif
 
@@ -143,7 +143,7 @@
                     <p>{!! nl2br($paragraph) !!}</p>
                 @endforeach
                 @if($showCertificateDate)
-                    <p class="date-line" style="{{ $dStyle }}"><strong>Date:</strong> {{ $fieldValues['certificate_date'] ?? now()->format('j F Y') }}</p>
+                    <p class="date-line" style="{{ $dStyle }}"><strong>Date:</strong> {!! $fieldValues['certificate_date'] ?? now()->format('j F Y') !!}</p>
                 @endif
             </div>
 
