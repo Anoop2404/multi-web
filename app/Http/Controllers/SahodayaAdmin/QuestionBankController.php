@@ -33,10 +33,12 @@ class QuestionBankController extends SahodayaAdminController
             'master_class_id' => 'required|integer',
             'subject'         => 'nullable|string|max:100',
             'academic_year'   => 'nullable|string|max:20',
-            // Question papers (scanned/multi-page) run larger than a typical circular —
-            // matches the same ceiling as other document-upload features in this app
-            // (TeacherQuestionPaperController, BoardResultController, DownloadController).
-            'file'            => 'required|mimes:pdf,doc,docx|max:20480',
+            // Scanned/multi-page question papers can run well over 100MB. This is the
+            // application-level ceiling only — the actual limit a request can reach also
+            // depends on the server's own php.ini (upload_max_filesize, post_max_size) and,
+            // if there's a reverse proxy in front, its body-size limit (e.g. nginx's
+            // client_max_body_size) — those must allow at least this size too.
+            'file'            => 'required|mimes:pdf,doc,docx|max:307200',
         ]);
 
         $data['tenant_id'] = $this->sahodaya->id;
