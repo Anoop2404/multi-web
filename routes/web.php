@@ -1697,6 +1697,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::prefix('certificate-templates')->name('certificate-templates.')->group(function () {
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'index'])->name('index');
             Route::post('/', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'store'])->name('store');
+            Route::post('/preview-background', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'previewBackgroundUpload'])->name('preview-background');
             Route::get('/{template}/preview', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'preview'])->name('preview');
             Route::get('/{template}/preview-pdf', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'previewPdf'])->name('preview-pdf');
             Route::put('/{template}', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'update'])->name('update');

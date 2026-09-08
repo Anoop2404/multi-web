@@ -85,6 +85,13 @@
                      :style="overlayStyle(uuidLayout, { top: 92, left: 5, width: 90, font_size: 8, font_family: 'Arial' })">
                     Verification: Sample-Demo-UUID-12345
                 </div>
+
+                <!-- Independently-positioned custom text fields -->
+                <div v-for="(cf, idx) in customFields" :key="idx"
+                     class="absolute text-slate-700 leading-relaxed"
+                     :style="overlayStyle(cf, { top: 50, left: 10, width: 30, font_size: 14, font_family: 'Montserrat', align: 'left' })"
+                     v-html="substituteCustomFieldText(cf.text)">
+                </div>
             </div>
         </div>
 
@@ -157,6 +164,7 @@ const recipientNameLayout = computed(() => props.layout?.recipient_name);
 const bodyLayout = computed(() => props.layout?.body);
 const dateLayout = computed(() => props.layout?.certificate_date);
 const uuidLayout = computed(() => props.layout?.uuid);
+const customFields = computed(() => Array.isArray(props.layout?.custom_fields) ? props.layout.custom_fields : []);
 
 const fontFamilyStackMap = {
     'Montserrat': 'Montserrat, Arial, sans-serif',
@@ -229,6 +237,7 @@ const sampleData = computed(() => {
         percentage: '98.4%',
         rank: 'First Rank',
         achievement_line: 'secured First Place in 100m Sprint',
+        position: 'First',
         grade: 'A',
     };
 });
@@ -243,9 +252,33 @@ const participationItemsBoxSample = '<div style="border:1px solid #d6a95c;border
     + '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;"><span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>Long Jump</strong> <span style="font-size:0.86em;font-weight:400;color:#64748b;">(Category I &bull; Individual)</span></span></td>'
     + '</tr></table></div>';
 
+// Shared by the single `body` paragraph and each independently-positioned custom
+// field below — mirrors CertificateTemplate::substituteTokens() server-side so the
+// authoring preview matches what the real render will do.
+function substituteTokens(raw) {
+    // Special-cased like resolveFieldValues() does server-side: this is a pre-built HTML
+    // blob standing in for participation_items_box, not a plain-text value, so it must
+    // not be run through the <strong>-wrapping loop below like the other tokens.
+    raw = raw.replace(/\{participation_items_box\}/gi, participationItemsBoxSample);
+
+    for (const [key, val] of Object.entries(sampleData.value)) {
+        const pattern = new RegExp(`\\{${key}\\}`, 'gi');
+        const formattedVal = boldVariables.value ? `<strong>${val}</strong>` : val;
+        raw = raw.replace(pattern, formattedVal);
+    }
+
+    return raw;
+}
+
 const paragraphs = computed(() => {
     let raw = props.bodyText;
-    if (!raw) {
+    // An empty Body text is ambiguous on its own -- "haven't typed anything yet" (show a
+    // sample so the preview isn't blank) vs. "deliberately left blank because every value
+    // is placed via custom_fields instead" (showing the sample here would double up with
+    // them, as seen live: {recipient_name} in a custom field rendering right on top of
+    // this same fallback paragraph's own {recipient_name}). Custom fields existing is
+    // reasonable signal for the latter.
+    if (!raw && customFields.value.length === 0) {
         if (props.eventType === 'fest') {
             raw = 'This is to certify that {recipient_name} of {school_name} has participated in {event_title} for {item_title} held on {event_dates}.';
         } else if (props.eventType === 'topper') {
@@ -255,18 +288,10 @@ const paragraphs = computed(() => {
         }
     }
 
-    // Special-cased like resolveFieldValues() does server-side: this is a pre-built HTML
-    // blob standing in for participation_items_box, not a plain-text value, so it must
-    // not be run through the <strong>-wrapping loop below like the other tokens.
-    raw = raw.replace(/\{participation_items_box\}/gi, participationItemsBoxSample);
-
-    // Replace placeholder tokens
-    for (const [key, val] of Object.entries(sampleData.value)) {
-        const pattern = new RegExp(`\\{${key}\\}`, 'gi');
-        const formattedVal = boldVariables.value ? `<strong>${val}</strong>` : val;
-        raw = raw.replace(pattern, formattedVal);
-    }
-
-    return raw.split(/\n\s*\n/).filter(p => p.trim());
+    return substituteTokens(raw).split(/\n\s*\n/).filter(p => p.trim());
 });
+
+function substituteCustomFieldText(text) {
+    return substituteTokens(text || '');
+}
 </script>

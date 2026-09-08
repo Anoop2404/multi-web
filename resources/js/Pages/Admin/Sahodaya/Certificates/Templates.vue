@@ -293,6 +293,75 @@
                                     </template>
                                 </FormField>
                             </div>
+
+                            <div class="sm:col-span-2 space-y-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-bold text-slate-800 text-xs uppercase tracking-wider">Custom text fields</p>
+                                        <p class="text-xs text-slate-500 mt-0.5">For a background whose own artwork already has separate blanks (e.g. "of class ___" on its own line) — each field gets its own position instead of sharing the one Body text box above.</p>
+                                    </div>
+                                    <button type="button" class="btn-secondary text-xs whitespace-nowrap" @click="addCustomField">+ Add field</button>
+                                </div>
+
+                                <div v-for="(cf, idx) in form.layout_json.custom_fields" :key="idx" class="space-y-2 p-3 bg-white border border-slate-200 rounded-lg">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-bold text-slate-500">Field {{ idx + 1 }}</span>
+                                        <button type="button" class="text-xs font-semibold text-rose-600" @click="removeCustomField(idx)">Remove</button>
+                                    </div>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <button v-for="token in placeholderTokens" :key="token" type="button"
+                                                class="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 text-slate-700 transition"
+                                                @click="cf.text += token">
+                                            {{ token }}
+                                        </button>
+                                    </div>
+                                    <input v-model="cf.text" class="field font-mono text-xs" placeholder="e.g. Master/Miss {recipient_name} of class {class}">
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        <FormField label="Top %">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model.number="cf.top" type="number" min="0" max="100" class="field">
+                                            </template>
+                                        </FormField>
+                                        <FormField label="Left %">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model.number="cf.left" type="number" min="0" max="100" class="field">
+                                            </template>
+                                        </FormField>
+                                        <FormField label="Width %">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model.number="cf.width" type="number" min="1" max="100" class="field">
+                                            </template>
+                                        </FormField>
+                                        <FormField label="Font size (px)">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model.number="cf.font_size" type="number" min="6" max="96" class="field">
+                                            </template>
+                                        </FormField>
+                                    </div>
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+                                        <FormField label="Font family">
+                                            <template #default="{ id }">
+                                                <SearchableSelect :id="id" v-model="cf.font_family" :options="fontFamilies"
+                                                    :all-option="false" placeholder="Select font" />
+                                            </template>
+                                        </FormField>
+                                        <FormField label="Align">
+                                            <template #default="{ id }">
+                                                <SearchableSelect :id="id" v-model="cf.align"
+                                                    :options="[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]"
+                                                    :all-option="false" placeholder="Select text align" />
+                                            </template>
+                                        </FormField>
+                                        <label class="flex items-center gap-1.5 text-sm pb-2.5">
+                                            <input v-model="cf.font_weight" type="checkbox" true-value="bold" false-value="normal"> Bold
+                                        </label>
+                                        <label class="flex items-center gap-1.5 text-sm pb-2.5">
+                                            <input v-model="cf.font_style" type="checkbox" true-value="italic" false-value="normal"> Italic
+                                        </label>
+                                    </div>
+                                </div>
+                                <p v-if="!form.layout_json.custom_fields.length" class="text-xs text-slate-400">No custom fields yet — the Body text paragraph below covers everything.</p>
+                            </div>
                         </template>
 
                         <FormField label="Body text" class-extra="sm:col-span-2">
@@ -339,7 +408,10 @@
                         <h3 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                             <span>👁️</span> Live Visual Preview
                         </h3>
-                        <span class="text-xs text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                        <span v-if="backgroundPreviewLoading" class="text-xs text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                            Converting PDF…
+                        </span>
+                        <span v-else class="text-xs text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
                             Updates Before Save
                         </span>
                     </div>
@@ -491,6 +563,7 @@ const fontFamilies = props.fontFamilyOptions;
 
 const activeCategoryTab = ref('all');
 const localFilePreviewUrl = ref(null);
+const backgroundPreviewLoading = ref(false);
 
 const filteredTemplates = computed(() => {
     if (activeCategoryTab.value === 'all') return props.templates;
@@ -506,7 +579,7 @@ const placeholderTokens = computed(() => {
         // resolveFieldValues()) but missing from this button list — worked if typed by hand,
         // just undiscoverable. {class} (student's class, empty for teacher-fest recipients)
         // reuses the same token name the topper template list already uses above.
-        return ['{salutation}', '{recipient_name}', '{class}', '{school_name}', '{event_title}', '{event_name}', '{item_title}', '{item_details}', '{category_name}', '{participation_type}', '{event_dates}', '{venue}', '{achievement_line}', '{grade}', '{sahodaya_name}', '{certificate_date}'];
+        return ['{salutation}', '{recipient_name}', '{class}', '{school_name}', '{event_title}', '{event_name}', '{item_title}', '{item_details}', '{category_name}', '{participation_type}', '{event_dates}', '{venue}', '{achievement_line}', '{position}', '{grade}', '{sahodaya_name}', '{certificate_date}'];
     }
     return ['{salutation}', '{recipient_name}', '{designation}', '{school_name}', '{program_title}', '{sahodaya_name}', '{venue}', '{conducted_on}', '{certificate_date}'];
 });
@@ -515,18 +588,51 @@ function insertPlaceholder(token) {
     form.body = (form.body || '') + token;
 }
 
+function addCustomField() {
+    form.layout_json.custom_fields.push({
+        text: '', top: 50, left: 10, width: 30, font_size: 14,
+        font_family: 'Montserrat', font_weight: 'normal', font_style: 'normal', align: 'left',
+    });
+}
+
+function removeCustomField(index) {
+    form.layout_json.custom_fields.splice(index, 1);
+}
+
 function onFileChange(e) {
     const file = e.target.files[0] ?? null;
     form.template_file = file;
-    if (file) {
-        if (file.type.startsWith('image/')) {
-            localFilePreviewUrl.value = URL.createObjectURL(file);
-        } else {
-            localFilePreviewUrl.value = null;
-        }
-    } else {
+    if (!file) {
         localFilePreviewUrl.value = null;
+        return;
     }
+
+    if (file.type.startsWith('image/')) {
+        localFilePreviewUrl.value = URL.createObjectURL(file);
+        return;
+    }
+
+    // A PDF can't be shown directly as a CSS background-image -- convert page 1
+    // server-side (same rasterization Save uses) just for this live-editor preview,
+    // so positions can be lined up against the real artwork before ever saving.
+    localFilePreviewUrl.value = null;
+    backgroundPreviewLoading.value = true;
+    const formData = new FormData();
+    formData.append('file', file);
+    fetch(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates/preview-background`, {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+        body: formData,
+        credentials: 'same-origin',
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+        .then((data) => { localFilePreviewUrl.value = data.data_uri ?? null; })
+        .catch(() => { localFilePreviewUrl.value = null; })
+        .finally(() => { backgroundPreviewLoading.value = false; });
 }
 
 const trainingCertificateTypes = [
@@ -633,6 +739,16 @@ function layoutDefaults(from = null) {
                 height: src.participation_label_cover?.height ?? d.participation_label_cover?.height,
             }
             : null,
+        // Independently-positioned text fields beyond the fixed recipient_name/body/
+        // certificate_date trio -- for backgrounds whose own artwork already lays out
+        // several separate blanks. Falls back to the Sahodaya-wide default's own custom
+        // fields only when this template has none of its own yet.
+        custom_fields: (src.custom_fields ?? d.custom_fields ?? []).map((cf) => ({
+            text: cf.text ?? '',
+            ...textFieldDefaults(cf, null, {
+                top: 50, left: 10, width: 30, font_size: 14, font_family: 'Montserrat', align: 'left',
+            }),
+        })),
     };
 }
 

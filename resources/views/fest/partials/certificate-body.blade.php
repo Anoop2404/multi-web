@@ -19,41 +19,18 @@
         $showRecipientName = (bool) ($layout['show_recipient_name'] ?? true);
         $showParticipationLabel = (bool) ($layout['show_participation_label'] ?? true);
         $showCertificateDate = (bool) ($layout['show_certificate_date'] ?? true);
-        $body = $template?->body ?? \App\Models\CertificateTemplate::defaultFestBody();
-        $itemTitlesList = $fieldValues['item_titles'] ?? [];
-        foreach (($fieldValues ?? []) as $key => $value) {
-            // item_titles is the raw list behind item_title/item_details (see
-            // FestCertificateService::resolveFieldValues()) — read above for the
-            // cert-item-list span, never itself substituted as a {token}.
-            if (is_array($value)) {
-                continue;
-            }
-            // Already-rendered, self-contained HTML (FestCertificateService::
-            // participationItemsBoxHtml()) — never escaped or bold-wrapped like a plain
-            // text token, and substituted before the generic path below so it's not
-            // touched twice.
-            if ($key === 'participation_items_box') {
-                $body = str_replace('{'.$key.'}', $value, $body);
-                continue;
-            }
-            // certificate_date carries a real <sup> tag around its ordinal suffix (see
-            // resolveFieldValues()) — server-built from now()->format(), never user
-            // input, so skipping escaping here is safe and lets the tag actually render
-            // instead of showing as literal "&lt;sup&gt;" text.
-            $safe = $key === 'certificate_date' ? (string) $value : e((string) $value);
-            if ($boldVariables && $safe !== '') {
-                $safe = '<strong>'.$safe.'</strong>';
-            }
-            // A multi-item participation certificate's item_title is a comma-joined
-            // sentence with no natural upper bound — wrap it in an addressable span the
-            // fit-text script (certificate-fit-text-script.blade.php) can shorten to
-            // "first 3 and N more" if the full list overflows its box. Left unwrapped
-            // below the 3-item threshold so the common case renders no extra markup.
-            if (($key === 'item_title' || $key === 'item_details') && count($itemTitlesList) > 3) {
-                $safe = '<span class="cert-item-list" data-items-json="'.e(json_encode($itemTitlesList)).'">'.$safe.'</span>';
-            }
-            $body = str_replace('{'.$key.'}', $safe, $body);
+        $customFields = $layout['custom_fields'] ?? [];
+        // Laravel's ConvertEmptyStringsToNull middleware turns a deliberately-cleared
+        // Body text textarea into a NULL column, indistinguishable from "never touched"
+        // — so this must not fall back to the generic sample paragraph when the admin
+        // is placing every value via custom_fields instead (an empty body just means
+        // "nothing else to add"), only when there's truly no body AND no custom fields
+        // either, which is the only genuine "never configured this template at all" case.
+        $rawBody = $template?->body;
+        if ($rawBody === null && $customFields === []) {
+            $rawBody = \App\Models\CertificateTemplate::defaultFestBody();
         }
+        $body = \App\Models\CertificateTemplate::substituteTokens($rawBody ?? '', $fieldValues ?? [], $boldVariables);
         $paragraphs = array_filter(array_map('trim', preg_split('/\n\s*\n/', $body)));
         $hasBackground = ! empty($backgroundUrl) || ! empty($template);
     @endphp
@@ -116,6 +93,12 @@
                     {{ $certificate->verification_uuid }}
                 </div>
             @endif
+
+            @foreach($customFields as $cf)
+                <div class="overlay-field custom-field" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($cf, ['top' => 50, 'left' => 10, 'width' => 30, 'font_size' => 14, 'font_family' => 'Montserrat', 'align' => 'left']) }}">
+                    {!! \App\Models\CertificateTemplate::substituteTokens($cf['text'] ?? '', $fieldValues ?? [], $boldVariables) !!}
+                </div>
+            @endforeach
         </div>
     @else
         @php

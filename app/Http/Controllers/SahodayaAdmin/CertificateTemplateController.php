@@ -93,6 +93,7 @@ class CertificateTemplateController extends SahodayaAdminController
                     'event_dates'      => '12-14 October 2026',
                     'venue'            => 'Sample Model School',
                     'achievement_line' => 'First Prize with A Grade',
+                    'position'         => 'First',
                     'grade'            => 'A',
                     'sahodaya_name'    => strtoupper($this->sahodaya->name),
                     'certificate_date' => now()->format('j F Y'),
@@ -151,6 +152,34 @@ class CertificateTemplateController extends SahodayaAdminController
         return \App\Support\PdfGenerator::download($html, 'certificate-template-preview.pdf', true, true);
     }
 
+    /**
+     * Instant client-side preview of a not-yet-saved background upload — the editor's
+     * live canvas can render an image file directly via URL.createObjectURL(), but a PDF
+     * needs the same server-side rasterization storeFromUpload() does at real save time
+     * (Imagick/pdftoppm/qlmanage). Rather than persist anything, this just converts page
+     * 1 and hands the bytes back as a data URI so the admin can see and position fields
+     * over their actual artwork before ever hitting Save.
+     */
+    public function previewBackgroundUpload(Request $request, string $tenantId, CertificateBackgroundConverter $converter)
+    {
+        $data = $request->validate([
+            'file' => 'required|file|mimes:pdf,png,jpg,jpeg|max:10240',
+        ]);
+
+        $file = $data['file'];
+        $ext = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: '');
+
+        if (in_array($ext, ['png', 'jpg', 'jpeg'], true) || str_starts_with((string) $file->getMimeType(), 'image/')) {
+            $bytes = (string) file_get_contents($file->getRealPath());
+            $mime = (string) $file->getMimeType() ?: 'image/png';
+        } else {
+            $bytes = $converter->pdfFirstPageToPng($file->getRealPath());
+            $mime = 'image/png';
+        }
+
+        return response()->json(['data_uri' => 'data:'.$mime.';base64,'.base64_encode($bytes)]);
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -206,6 +235,16 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.certificate_date.align' => 'nullable|in:left,right,center,none,justify',
             'layout_json.participation_label_cover.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.participation_label_cover.height' => 'nullable|numeric|min:1|max:30',
+            'layout_json.custom_fields'                    => 'nullable|array',
+            'layout_json.custom_fields.*.text'              => 'nullable|string|max:500',
+            'layout_json.custom_fields.*.top'               => 'nullable|numeric|min:0|max:100',
+            'layout_json.custom_fields.*.left'              => 'nullable|numeric|min:0|max:100',
+            'layout_json.custom_fields.*.width'             => 'nullable|numeric|min:1|max:100',
+            'layout_json.custom_fields.*.font_size'         => 'nullable|numeric|min:6|max:96',
+            'layout_json.custom_fields.*.font_family'       => ['nullable', 'string', Rule::in(CertificateTemplate::fontFamilyOptions())],
+            'layout_json.custom_fields.*.font_weight'       => 'nullable|in:normal,bold',
+            'layout_json.custom_fields.*.font_style'        => 'nullable|in:normal,italic',
+            'layout_json.custom_fields.*.align'             => 'nullable|in:left,right,center,none,justify',
             'is_active'           => 'nullable|boolean',
             'also_apply_to_event_ids'   => 'nullable|array',
             'also_apply_to_event_ids.*' => 'integer|exists:fest_events,id',
@@ -394,6 +433,16 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.certificate_date.align' => 'nullable|in:left,right,center,none,justify',
             'layout_json.participation_label_cover.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.participation_label_cover.height' => 'nullable|numeric|min:1|max:30',
+            'layout_json.custom_fields'                    => 'nullable|array',
+            'layout_json.custom_fields.*.text'              => 'nullable|string|max:500',
+            'layout_json.custom_fields.*.top'               => 'nullable|numeric|min:0|max:100',
+            'layout_json.custom_fields.*.left'              => 'nullable|numeric|min:0|max:100',
+            'layout_json.custom_fields.*.width'             => 'nullable|numeric|min:1|max:100',
+            'layout_json.custom_fields.*.font_size'         => 'nullable|numeric|min:6|max:96',
+            'layout_json.custom_fields.*.font_family'       => ['nullable', 'string', Rule::in(CertificateTemplate::fontFamilyOptions())],
+            'layout_json.custom_fields.*.font_weight'       => 'nullable|in:normal,bold',
+            'layout_json.custom_fields.*.font_style'        => 'nullable|in:normal,italic',
+            'layout_json.custom_fields.*.align'             => 'nullable|in:left,right,center,none,justify',
             'is_active'           => 'nullable|boolean',
         ]);
 
@@ -574,6 +623,16 @@ class CertificateTemplateController extends SahodayaAdminController
                 $input[$key],
                 array_flip($allowed),
             ));
+        }
+
+        if (isset($input['custom_fields']) && is_array($input['custom_fields'])) {
+            $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style', 'align'];
+            $allowed = array_merge($textKeys, ['text']);
+            $layout['custom_fields'] = collect($input['custom_fields'])
+                ->filter(fn ($field) => is_array($field))
+                ->map(fn ($field) => array_intersect_key($field, array_flip($allowed)))
+                ->values()
+                ->all();
         }
 
         return $layout;

@@ -790,6 +790,11 @@ class FestCertificateService
             3 => 'Third Prize',
             default => null,
         };
+        // The bare ordinal ("First"/"Second"/"Third") without " Prize" -- for templates
+        // whose own background already prints "who won ___ place" and just needs the
+        // word filled in, as distinct from {achievement_line}'s full "secured First
+        // Prize with A Grade" sentence.
+        $positionOrdinal = $positionLabel ? str_replace(' Prize', '', $positionLabel) : '';
         $winnerGrade = ($certType === 'winner' && $event && $item) ? $this->effectiveGrade($mark, $event, $item->id) : $mark?->grade;
         $gradeSuffix = ($certType === 'winner' && $winnerGrade) ? ' with '.$winnerGrade.' Grade' : '';
 
@@ -880,6 +885,7 @@ class FestCertificateService
             'participation_type'  => $participationType,
             'event_dates'         => $eventDates,
             'achievement_line'    => $achievementLine,
+            'position'            => $positionOrdinal,
             // Distinct grade(s) across every item that actually has one — empty when
             // nobody graded any of this person's items, one value for a single grade,
             // joined ("A and B") if different items landed different grades.

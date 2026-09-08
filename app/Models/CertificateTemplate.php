@@ -113,6 +113,15 @@ class CertificateTemplate extends Model
                 'font_weight' => 'normal',
                 'font_style' => 'normal',
             ],
+            // Independently-positioned text fields beyond the fixed recipient_name/body/
+            // certificate_date trio — for a background whose own artwork already lays
+            // out several separate blanks (e.g. "Master/Miss ___ of class ___", "from
+            // ___", "who won ___ place with ___ grade in ___" each on their own line),
+            // where one flowing body paragraph can't land each value on its own
+            // pre-printed line. Each entry: {text, top, left, width, font_size,
+            // font_family, font_weight, font_style, align} — `text` runs through the
+            // same {token} substitution as `body` (see substituteTokens()).
+            'custom_fields' => [],
         ];
     }
 
@@ -185,6 +194,46 @@ class CertificateTemplate extends Model
         return filled($this->background_path);
     }
 
+    /**
+     * Substitutes every {token} in $text with its resolved value from $fieldValues —
+     * shared by the single `body` paragraph and each independently-positioned
+     * `custom_fields` entry (see certificate-body.blade.php), so both go through
+     * identical escaping/bold-wrapping/special-casing instead of two copies drifting
+     * apart. Extracted from certificate-body.blade.php's original inline loop.
+     *
+     * @param  array<string, mixed>  $fieldValues
+     */
+    public static function substituteTokens(string $text, array $fieldValues, bool $boldVariables): string
+    {
+        $itemTitlesList = $fieldValues['item_titles'] ?? [];
+
+        foreach ($fieldValues as $key => $value) {
+            if (is_array($value)) {
+                continue;
+            }
+            // Already-rendered, self-contained HTML (FestCertificateService::
+            // participationItemsBoxHtml()) — never escaped or bold-wrapped like a plain
+            // text token.
+            if ($key === 'participation_items_box') {
+                $text = str_replace('{'.$key.'}', $value, $text);
+                continue;
+            }
+            // certificate_date carries a real <sup> tag around its ordinal suffix —
+            // server-built, never user input, so skipping escaping here is safe and
+            // lets the tag actually render instead of showing as literal text.
+            $safe = $key === 'certificate_date' ? (string) $value : e((string) $value);
+            if ($boldVariables && $safe !== '') {
+                $safe = '<strong>'.$safe.'</strong>';
+            }
+            if (($key === 'item_title' || $key === 'item_details') && count($itemTitlesList) > 3) {
+                $safe = '<span class="cert-item-list" data-items-json="'.e(json_encode($itemTitlesList)).'">'.$safe.'</span>';
+            }
+            $text = str_replace('{'.$key.'}', $safe, $text);
+        }
+
+        return $text;
+    }
+
     /** @return array<string, mixed> */
     public function overlayLayout(): array
     {
@@ -220,6 +269,15 @@ class CertificateTemplate extends Model
                 $defaults[$key],
                 array_intersect_key($custom[$key], array_flip($allowed)),
             );
+        }
+
+        if (isset($custom['custom_fields']) && is_array($custom['custom_fields'])) {
+            $allowed = array_merge($textKeys, ['text']);
+            $defaults['custom_fields'] = collect($custom['custom_fields'])
+                ->filter(fn ($field) => is_array($field))
+                ->map(fn ($field) => array_intersect_key($field, array_flip($allowed)))
+                ->values()
+                ->all();
         }
 
         return $defaults;
