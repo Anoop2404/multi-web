@@ -198,6 +198,10 @@ class CertificateTemplateController extends SahodayaAdminController
             'title'               => 'nullable|string|max:255',
             'body'                => 'nullable|string',
             'template_file'       => 'nullable|file|mimes:pdf,png,jpg,jpeg|max:10240',
+            // Client-rendered (pdf.js) page-1 PNG sent alongside a PDF template_file, so
+            // the server can persist it directly instead of needing Imagick/pdftoppm
+            // installed to rasterize the PDF itself — see CertificateBackgroundConverter.
+            'converted_background_png' => 'nullable|file|mimes:png|max:10240',
             'logo'                => 'nullable|image|max:2048',
             'seal'                => 'nullable|image|max:2048',
             'signatories'         => 'nullable|array',
@@ -291,7 +295,7 @@ class CertificateTemplateController extends SahodayaAdminController
         $detectedOrientation = null;
         if ($request->hasFile('template_file')) {
             $stored = app(CertificateBackgroundConverter::class)
-                ->storeFromUpload($request->file('template_file'), $baseDir, $disk);
+                ->storeFromUpload($request->file('template_file'), $baseDir, $disk, $request->file('converted_background_png'));
             $templatePath = $stored['template_file_path'];
             $backgroundPath = $stored['background_path'];
             $detectedOrientation = $stored['orientation'];
@@ -393,6 +397,10 @@ class CertificateTemplateController extends SahodayaAdminController
             'event_id'            => 'nullable|integer|exists:fest_events,id',
             'item_id'             => 'nullable|integer|exists:fest_event_items,id',
             'template_file'       => 'nullable|file|mimes:pdf,png,jpg,jpeg|max:10240',
+            // Client-rendered (pdf.js) page-1 PNG sent alongside a PDF template_file, so
+            // the server can persist it directly instead of needing Imagick/pdftoppm
+            // installed to rasterize the PDF itself — see CertificateBackgroundConverter.
+            'converted_background_png' => 'nullable|file|mimes:png|max:10240',
             'logo'                => 'nullable|image|max:2048',
             'seal'                => 'nullable|image|max:2048',
             'signatories'         => 'nullable|array',
@@ -474,7 +482,7 @@ class CertificateTemplateController extends SahodayaAdminController
         $detectedOrientation = null;
         if ($request->hasFile('template_file')) {
             $stored = app(CertificateBackgroundConverter::class)
-                ->storeFromUpload($request->file('template_file'), $baseDir, $disk);
+                ->storeFromUpload($request->file('template_file'), $baseDir, $disk, $request->file('converted_background_png'));
             $updates['template_file_path'] = $stored['template_file_path'];
             $updates['background_path'] = $stored['background_path'];
             $detectedOrientation = $stored['orientation'];

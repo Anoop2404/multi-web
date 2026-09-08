@@ -611,28 +611,44 @@ function removeCustomField(index) {
     form.layout_json.custom_fields.splice(index, 1);
 }
 
-function onFileChange(e) {
-    const file = e.target.files[0] ?? null;
-    form.template_file = file;
-    if (!file) {
-        localFilePreviewUrl.value = null;
-        return;
-    }
+// Renders a PDF's first page to a PNG entirely in the browser via pdf.js, so neither
+// the live preview nor the actual Save depends on the server having Imagick or
+// pdftoppm installed to rasterize it -- servers with neither used to reject every PDF
+// background outright. Dynamically imported: most templates use an image background,
+// so the (fairly large) pdf.js bundle should only load for admins who need it.
+async function renderPdfFirstPageToPngBlob(file) {
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
 
-    if (file.type.startsWith('image/')) {
-        localFilePreviewUrl.value = URL.createObjectURL(file);
-        return;
-    }
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+    // Matches the 150dpi the server-side Imagick/pdftoppm paths render at (PDF's
+    // default viewport unit is 1/72in, so scale = dpi/72).
+    const viewport = page.getViewport({ scale: 150 / 72 });
 
-    // A PDF can't be shown directly as a CSS background-image -- convert page 1
-    // server-side (same rasterization Save uses) just for this live-editor preview,
-    // so positions can be lined up against the real artwork before ever saving.
-    localFilePreviewUrl.value = null;
-    backgroundPreviewError.value = '';
-    backgroundPreviewLoading.value = true;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d');
+    // PDFs commonly have a transparent page background; a certificate rendered onto
+    // that would show through as black in some browsers instead of white.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('canvas.toBlob returned null'))), 'image/png');
+    });
+}
+
+// Fallback for the rare case pdf.js itself fails on a malformed/unusual PDF -- asks
+// the server to try its own conversion (Imagick/pdftoppm/qlmanage) instead, exactly
+// as this always worked before the client-side renderer existed.
+function previewBackgroundViaServer(file) {
     const formData = new FormData();
     formData.append('file', file);
-    fetch(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates/preview-background`, {
+    return fetch(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates/preview-background`, {
         method: 'POST',
         headers: {
             Accept: 'application/json',
@@ -646,14 +662,40 @@ function onFileChange(e) {
         .then((data) => { localFilePreviewUrl.value = data.data_uri ?? null; })
         .catch((body) => {
             localFilePreviewUrl.value = null;
-            // Live preview failing (e.g. no PDF rasterizer on this server) doesn't block
-            // Save itself — the same conversion runs again there and its own error, if any,
-            // surfaces through form.errors.template_file. This is just an early heads-up.
             backgroundPreviewError.value = body?.message
                 || body?.errors?.template_file?.[0]
                 || 'Could not generate a preview for this file. You can still try saving — upload a PNG/JPG if it fails.';
-        })
-        .finally(() => { backgroundPreviewLoading.value = false; });
+        });
+}
+
+async function onFileChange(e) {
+    const file = e.target.files[0] ?? null;
+    form.template_file = file;
+    form.converted_background_png = null;
+    if (!file) {
+        localFilePreviewUrl.value = null;
+        return;
+    }
+
+    if (file.type.startsWith('image/')) {
+        localFilePreviewUrl.value = URL.createObjectURL(file);
+        return;
+    }
+
+    localFilePreviewUrl.value = null;
+    backgroundPreviewError.value = '';
+    backgroundPreviewLoading.value = true;
+    try {
+        const pngBlob = await renderPdfFirstPageToPngBlob(file);
+        localFilePreviewUrl.value = URL.createObjectURL(pngBlob);
+        // Sent alongside the original PDF on Save so the server can persist this
+        // already-rendered PNG directly, instead of needing to rasterize the PDF itself.
+        form.converted_background_png = new File([pngBlob], 'background.png', { type: 'image/png' });
+    } catch (err) {
+        await previewBackgroundViaServer(file);
+    } finally {
+        backgroundPreviewLoading.value = false;
+    }
 }
 
 const trainingCertificateTypes = [
@@ -783,6 +825,11 @@ const form = useForm({
     body: props.defaultFestBody,
     is_active: true,
     template_file: null,
+    // Rendered client-side (see onFileChange) whenever template_file is a PDF, so the
+    // server can persist this PNG straight to disk instead of needing Imagick/pdftoppm
+    // installed to rasterize the PDF itself -- servers without either package used to
+    // reject every PDF upload outright.
+    converted_background_png: null,
     logo: null,
     seal: null,
     layout_json: layoutDefaults(),
@@ -840,6 +887,7 @@ function editTemplate(template) {
     }
     form.is_active = template.is_active ?? true;
     form.template_file = null;
+    form.converted_background_png = null;
     form.logo = null;
     form.seal = null;
     form.clearErrors();
@@ -872,6 +920,7 @@ function cancelEdit() {
     form.body = props.defaultFestBody;
     form.is_active = true;
     form.template_file = null;
+    form.converted_background_png = null;
     form.logo = null;
     form.seal = null;
     form.layout_json = layoutDefaults();
@@ -889,7 +938,7 @@ function upload() {
         forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
-            form.reset('template_file', 'logo', 'seal');
+            form.reset('template_file', 'converted_background_png', 'logo', 'seal');
             form.signatories.forEach(s => { s.signature = null; });
             if (editingId.value) {
                 cancelEdit();

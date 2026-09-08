@@ -15,9 +15,14 @@ use Illuminate\Validation\ValidationException;
 class CertificateBackgroundConverter
 {
     /**
+     * @param  ?UploadedFile  $preConvertedPng  Page-1 PNG already rendered client-side
+     *     (pdf.js — see Templates.vue's onFileChange), used as-is instead of rasterizing
+     *     $file server-side when $file is a PDF. Lets a PDF background save successfully
+     *     on a server with neither Imagick nor pdftoppm installed. Ignored when $file
+     *     isn't a PDF.
      * @return array{template_file_path: ?string, background_path: string, orientation: string}
      */
-    public function storeFromUpload(UploadedFile $file, string $baseDir, string $disk): array
+    public function storeFromUpload(UploadedFile $file, string $baseDir, string $disk, ?UploadedFile $preConvertedPng = null): array
     {
         $ext = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: '');
         $mime = (string) $file->getMimeType();
@@ -41,13 +46,17 @@ class CertificateBackgroundConverter
         }
 
         $originalPath = $this->storeSafely($file, $baseDir, $disk);
-        $absolutePdf = $this->absoluteLocalPath($originalPath, $disk);
 
-        try {
-            $pngBytes = $this->pdfFirstPageToPng($absolutePdf);
-        } finally {
-            if (str_starts_with($absolutePdf, storage_path('app/tmp/'))) {
-                @unlink($absolutePdf);
+        if ($preConvertedPng !== null) {
+            $pngBytes = (string) file_get_contents($preConvertedPng->getRealPath());
+        } else {
+            $absolutePdf = $this->absoluteLocalPath($originalPath, $disk);
+            try {
+                $pngBytes = $this->pdfFirstPageToPng($absolutePdf);
+            } finally {
+                if (str_starts_with($absolutePdf, storage_path('app/tmp/'))) {
+                    @unlink($absolutePdf);
+                }
             }
         }
 
