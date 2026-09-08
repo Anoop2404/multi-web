@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestRegistration;
 use App\Models\FestSchedule;
 use App\Models\FestStage;
 use App\Support\FestClassGroupScheme;
@@ -27,6 +28,7 @@ class FestItemScheduleService
             ->where('event_id', $event->id)
             ->where('is_enabled', true)
             ->with('head:id,name')
+            ->withCount(['registrations' => fn ($q) => $q->whereIn('status', FestRegistration::ACTIVE_STATUSES)])
             ->orderBy('display_order')
             ->orderBy('title')
             ->get()
@@ -42,15 +44,22 @@ class FestItemScheduleService
     public function rowFromItem(FestEventItem $item, ?FestSchedule $schedule = null, array $classGroupLabels = []): array
     {
         $at = $schedule?->scheduled_at;
+        $participantCount = $item->registrations_count ?? null;
 
         return [
-            'item_id'        => $item->id,
-            'title'          => $item->title,
-            'head_id'        => $item->head_id,
-            'head_name'      => $item->head?->name,
-            'age_group'      => $item->age_group,
-            'category_label' => FestItemCategoryLabel::resolve($item, $classGroupLabels),
-            'gender'         => $item->gender,
+            'item_id'         => $item->id,
+            'title'           => $item->title,
+            'head_id'         => $item->head_id,
+            'head_name'       => $item->head?->name,
+            'age_group'       => $item->age_group,
+            'category_label'  => FestItemCategoryLabel::resolve($item, $classGroupLabels),
+            'gender'          => $item->gender,
+            'participant_type' => $item->participant_type,
+            'timing_mode'            => $item->timing_mode ?? 'per_participant',
+            'duration_minutes'       => $item->duration_minutes,
+            'calling_buffer_minutes' => $item->calling_buffer_minutes,
+            'registrations_count'    => $participantCount,
+            'estimated_minutes'      => $item->estimatedDurationMinutes($participantCount),
             'schedule_id'    => $schedule?->id,
             'scheduled_at'   => $at?->format('Y-m-d\TH:i'),
             'scheduled_date' => $at?->format('Y-m-d'),
@@ -109,11 +118,10 @@ class FestItemScheduleService
                 continue;
             }
 
-            abort_unless(
-                FestEventItem::where('event_id', $event->id)->where('id', $itemId)->exists(),
-                422,
-                "Item {$itemId} does not belong to this event."
-            );
+            $item = FestEventItem::where('event_id', $event->id)->where('id', $itemId)->first();
+            abort_unless($item, 422, "Item {$itemId} does not belong to this event.");
+
+            $this->applyTimingFields($item, $row);
 
             $scheduledAt = $this->resolveDateTime($row);
             $stageId = ! empty($row['stage_id']) ? (int) $row['stage_id'] : null;
@@ -153,6 +161,79 @@ class FestItemScheduleService
         }
 
         return $saved;
+    }
+
+    /** @param array<string, mixed> $row */
+    private function applyTimingFields(FestEventItem $item, array $row): void
+    {
+        $dirty = false;
+
+        if (! empty($row['timing_mode'])) {
+            $item->timing_mode = $row['timing_mode'];
+            $dirty = true;
+        }
+        if (array_key_exists('duration_minutes', $row)) {
+            $item->duration_minutes = $row['duration_minutes'] !== null && $row['duration_minutes'] !== ''
+                ? (int) $row['duration_minutes']
+                : null;
+            $dirty = true;
+        }
+        if (array_key_exists('calling_buffer_minutes', $row)) {
+            $item->calling_buffer_minutes = $row['calling_buffer_minutes'] !== null && $row['calling_buffer_minutes'] !== ''
+                ? (int) $row['calling_buffer_minutes']
+                : null;
+            $dirty = true;
+        }
+
+        if ($dirty) {
+            $item->save();
+        }
+    }
+
+    /**
+     * Cascades a start time across an ordered list of items on one stage: item 1 gets
+     * $startAt, item 2 starts when item 1's estimated duration ends, and so on.
+     *
+     * @param  list<int>  $orderedItemIds
+     * @return array{count: int, ends_at: Carbon}
+     */
+    public function autoSequence(FestEvent $event, array $orderedItemIds, Carbon $startAt, ?int $stageId = null, ?string $stageName = null): array
+    {
+        $items = FestEventItem::where('event_id', $event->id)
+            ->whereIn('id', $orderedItemIds)
+            ->withCount(['registrations' => fn ($q) => $q->whereIn('status', FestRegistration::ACTIVE_STATUSES)])
+            ->get()
+            ->keyBy('id');
+
+        $stage = $stageId ? FestStage::where('event_id', $event->id)->findOrFail($stageId) : null;
+        $resolvedStageName = $stage?->name ?? $stageName;
+
+        $cursor = $startAt->copy();
+        $sortOrder = FestSchedule::where('event_id', $event->id)->max('sort_order') ?? 0;
+        $count = 0;
+
+        foreach ($orderedItemIds as $itemId) {
+            $item = $items->get((int) $itemId);
+            if (! $item) {
+                continue;
+            }
+
+            FestSchedule::updateOrCreate(
+                ['item_id' => $item->id, 'participant_id' => null],
+                [
+                    'event_id'     => $event->id,
+                    'scheduled_at' => $cursor->copy(),
+                    'stage_id'     => $stage?->id,
+                    'stage'        => $resolvedStageName,
+                    'sort_order'   => ++$sortOrder,
+                ]
+            );
+
+            $cursor = $cursor->copy()->addMinutes($item->estimatedDurationMinutes($item->registrations_count));
+            $count++;
+        }
+
+        return ['count' => $count, 'ends_at' => $cursor];
     }
 
     /** @return array{imported: int, errors: list<string>} */

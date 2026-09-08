@@ -15,7 +15,7 @@ class FestEventItem extends Model
 
     protected $fillable = [
         'event_id', 'title', 'item_code', 'exclusive_group_key', 'category', 'stage_type', 'venue_type',
-        'competition_format', 'sport_discipline', 'ranking_direction', 'result_method', 'duration_minutes', 'criteria_json', 'total_marks',
+        'competition_format', 'sport_discipline', 'ranking_direction', 'result_method', 'duration_minutes', 'timing_mode', 'calling_buffer_minutes', 'criteria_json', 'total_marks',
         'participant_type', 'gender', 'class_group', 'age_group', 'kids_band',
         'max_per_school', 'min_group_size', 'max_group_size', 'qualify_count',
         'owner_level', 'state_program_item_id', 'inherited_from_item_id', 'display_order',
@@ -174,5 +174,34 @@ class FestEventItem extends Model
     public function isTeamItem(): bool
     {
         return FestTeamSquadRules::isMultiPerson($this->participant_type);
+    }
+
+    /**
+     * Total stage/venue time this item needs, in minutes — the figure used to cascade the
+     * next item's start time during schedule auto-sequencing and by FestScheduleConflictService.
+     * 'fixed' items (e.g. offstage Pencil Drawing: everyone sits for one 1-hour block) use
+     * duration_minutes as-is. 'per_participant' items (e.g. onstage Recitation: 5 minutes per
+     * performer, one after another) multiply duration_minutes by how many are registered.
+     * calling_buffer_minutes is a one-off setup/calling allowance added once per item either way.
+     */
+    public function estimatedDurationMinutes(?int $participantCount = null): int
+    {
+        $buffer = $this->calling_buffer_minutes ?? 0;
+
+        if ($this->duration_minutes === null) {
+            // No per-item timing configured yet — same conservative flat window used
+            // before per-item timing existed, so unconfigured items don't under-count.
+            return 60 + $buffer;
+        }
+
+        if ($this->timing_mode === 'fixed') {
+            return $this->duration_minutes + $buffer;
+        }
+
+        $count = $participantCount
+            ?? $this->registrations_count
+            ?? $this->registrations()->whereIn('status', FestRegistration::ACTIVE_STATUSES)->count();
+
+        return ($this->duration_minutes * max($count, 1)) + $buffer;
     }
 }

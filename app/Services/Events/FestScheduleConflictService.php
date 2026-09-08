@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestParticipant;
+use App\Models\FestRegistration;
 use App\Models\FestSchedule;
 use App\Models\Student;
 use App\Models\Tenant;
@@ -19,7 +20,10 @@ class FestScheduleConflictService
     {
         $schedules = FestSchedule::where('event_id', $this->event->id)
             ->whereNotNull('scheduled_at')
-            ->with(['item.head', 'participant.student', 'participant.registration'])
+            ->with([
+                'item' => fn ($q) => $q->with('head')->withCount(['registrations' => fn ($r) => $r->whereIn('status', FestRegistration::ACTIVE_STATUSES)]),
+                'participant.student', 'participant.registration',
+            ])
             ->get();
 
         $clashes = [];
@@ -27,7 +31,7 @@ class FestScheduleConflictService
 
         foreach ($schedules as $s1) {
             $start1 = $s1->scheduled_at;
-            $end1 = $start1?->copy()->addMinutes($s1->item?->duration_minutes ?? 60);
+            $end1 = $start1?->copy()->addMinutes($s1->item?->estimatedDurationMinutes() ?? 60);
             if (! $start1) {
                 continue;
             }
@@ -40,7 +44,7 @@ class FestScheduleConflictService
                 }
 
                 $start2 = $s2->scheduled_at;
-                $end2 = $start2->copy()->addMinutes($s2->item?->duration_minutes ?? 60);
+                $end2 = $start2->copy()->addMinutes($s2->item?->estimatedDurationMinutes() ?? 60);
 
                 if ($start1->greaterThanOrEqualTo($end2) || $start2->greaterThanOrEqualTo($end1)) {
                     continue;
@@ -91,7 +95,10 @@ class FestScheduleConflictService
     {
         $schedules = FestSchedule::where('event_id', $this->event->id)
             ->whereNotNull('scheduled_at')
-            ->with(['item.head', 'festStage.venue'])
+            ->with([
+                'item' => fn ($q) => $q->with('head')->withCount(['registrations' => fn ($r) => $r->whereIn('status', FestRegistration::ACTIVE_STATUSES)]),
+                'festStage.venue',
+            ])
             ->get()
             ->filter(fn (FestSchedule $schedule) => $schedule->stage_id || filled($schedule->stage));
 
@@ -104,7 +111,7 @@ class FestScheduleConflictService
                 continue;
             }
 
-            $end1 = $start1->copy()->addMinutes($s1->item?->duration_minutes ?? 60);
+            $end1 = $start1->copy()->addMinutes($s1->item?->estimatedDurationMinutes() ?? 60);
             $stageKey1 = $this->stageKey($s1);
 
             foreach ($schedules as $s2) {
@@ -117,7 +124,7 @@ class FestScheduleConflictService
                 }
 
                 $start2 = $s2->scheduled_at;
-                $end2 = $start2->copy()->addMinutes($s2->item?->duration_minutes ?? 60);
+                $end2 = $start2->copy()->addMinutes($s2->item?->estimatedDurationMinutes() ?? 60);
 
                 if ($start1->greaterThanOrEqualTo($end2) || $start2->greaterThanOrEqualTo($end1)) {
                     continue;

@@ -338,6 +338,9 @@ class FestScheduleController extends SahodayaAdminController
             'rows.*.stage_id'      => 'nullable|integer',
             'rows.*.stage'         => 'nullable|string|max:100',
             'rows.*.sort_order'    => 'nullable|integer|min:0',
+            'rows.*.timing_mode'   => 'nullable|in:fixed,per_participant',
+            'rows.*.duration_minutes' => 'nullable|integer|min:1|max:600',
+            'rows.*.calling_buffer_minutes' => 'nullable|integer|min:0|max:120',
         ]);
 
         $saved = $itemSchedule->bulkSave($event, $data['rows']);
@@ -347,6 +350,34 @@ class FestScheduleController extends SahodayaAdminController
         ]);
 
         return back()->with('success', "Schedule saved for {$saved} item(s).");
+    }
+
+    public function autoSequenceItems(Request $request, string $tenantId, FestEvent $event, FestItemScheduleService $itemSchedule, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'item_ids'   => 'required|array|min:1',
+            'item_ids.*' => 'integer',
+            'start_at'   => 'required|date',
+            'stage_id'   => 'nullable|exists:fest_stages,id',
+            'stage'      => 'nullable|string|max:100',
+        ]);
+
+        $result = $itemSchedule->autoSequence(
+            $event,
+            $data['item_ids'],
+            \Carbon\Carbon::parse($data['start_at']),
+            $data['stage_id'] ?? null,
+            $data['stage'] ?? null,
+        );
+
+        $audit->festEvent($event, FestPageActivity::SCHEDULE, 'fest.item_schedule.auto_sequenced', "Auto-sequenced {$result['count']} item(s)", [
+            'count'   => $result['count'],
+            'ends_at' => $result['ends_at']->toDateTimeString(),
+        ]);
+
+        return back()->with('success', "Auto-sequenced {$result['count']} item(s) — last item ends around {$result['ends_at']->format('d M, H:i')}.");
     }
 
     public function itemImportTemplate(string $tenantId, FestEvent $event, FestItemScheduleService $itemSchedule)
