@@ -483,6 +483,7 @@
                 <table class="w-full text-sm">
                     <thead class="bg-slate-100/70 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                         <tr>
+                            <th class="px-4 py-3 text-left">#</th>
                             <th class="px-4 py-3 text-left">Event Type</th>
                             <th class="px-4 py-3 text-left">Scope</th>
                             <th class="px-4 py-3 text-left">Certificate Type</th>
@@ -494,6 +495,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         <tr v-for="t in filteredTemplates" :key="t.id" class="hover:bg-slate-50/70 transition-colors">
+                            <td class="px-4 py-3 text-xs font-mono text-slate-400">#{{ t.id }}</td>
                             <td class="px-4 py-3 font-bold text-slate-900 capitalize">{{ t.event_type.replace('_', ' ') }}</td>
                             <td class="px-4 py-3 text-xs text-slate-600">
                                 <template v-if="t.event_type === 'fest'">
