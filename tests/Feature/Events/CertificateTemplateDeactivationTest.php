@@ -188,6 +188,70 @@ class CertificateTemplateDeactivationTest extends TestCase
         $this->assertSame($eventTwo->id, $template->fresh()->event_id);
     }
 
+    /**
+     * Regression test: update()'s $updates array used to be built with
+     * array_filter(..., fn($v) => $v !== null), which silently dropped 'body' from the
+     * update whenever it was null — including when an admin deliberately cleared the
+     * Body text textarea and saved (ConvertEmptyStringsToNull turns '' into null before
+     * validation). The clear looked like it worked (redirect, no error) but the column
+     * was never actually touched, so the old text silently reappeared every time the
+     * template was reopened for editing.
+     */
+    public function test_clearing_the_body_text_and_saving_actually_persists_the_clear(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeSahodayaAdminAndEvent();
+
+        $template = CertificateTemplate::create([
+            'tenant_id' => $sahodaya->id, 'event_type' => 'fest', 'event_id' => $event->id,
+            'certificate_type' => 'participation', 'title' => 'Has Default Body',
+            'body' => 'This default sentence must not survive an explicit clear.',
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('sahodaya.certificate-templates.update', [
+            'tenantId' => $sahodaya->id, 'template' => $template->id,
+        ]), ['body' => '']);
+
+        $response->assertRedirect();
+        $this->assertNull(
+            $template->fresh()->body,
+            'Clearing the body text and saving must actually null the column, not silently leave the old text in place.'
+        );
+    }
+
+    public function test_updating_a_template_can_also_apply_the_change_to_other_events(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $eventOne] = $this->makeSahodayaAdminAndEvent();
+        $eventTwo = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Second Event', 'event_type' => 'kalolsavam']);
+
+        $template = CertificateTemplate::create([
+            'tenant_id' => $sahodaya->id, 'event_type' => 'fest', 'event_id' => $eventOne->id,
+            'certificate_type' => 'participation', 'title' => 'Original Title', 'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('sahodaya.certificate-templates.update', [
+            'tenantId' => $sahodaya->id, 'template' => $template->id,
+        ]), [
+            'title'                   => 'Updated Title',
+            'is_active'               => true,
+            'also_apply_to_event_ids' => [$eventTwo->id],
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', fn ($message) => str_contains($message, 'applied to 1 other event'));
+
+        $this->assertSame('Updated Title', $template->fresh()->title);
+        $copy = CertificateTemplate::where('tenant_id', $sahodaya->id)
+            ->where('event_id', $eventTwo->id)
+            ->where('title', 'Updated Title')
+            ->first();
+        $this->assertNotNull($copy, 'A new independent copy should have been created for event two.');
+        $this->assertNull($copy->item_id);
+
+        // Editing the copy afterwards must not touch the original.
+        $copy->update(['title' => 'Edited Copy Only']);
+        $this->assertSame('Updated Title', $template->fresh()->title);
+    }
+
     public function test_updating_a_template_into_an_occupied_scope_deactivates_the_incumbent_there(): void
     {
         ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $eventOne] = $this->makeSahodayaAdminAndEvent();

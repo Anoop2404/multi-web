@@ -401,6 +401,12 @@ class CertificateTemplateController extends SahodayaAdminController
             // the server can persist it directly instead of needing Imagick/pdftoppm
             // installed to rasterize the PDF itself — see CertificateBackgroundConverter.
             'converted_background_png' => 'nullable|file|mimes:png|max:10240',
+            // Same "apply to other events" copy mechanism store() already offers when
+            // creating a template, now also reachable from Edit — see the copy-creation
+            // block below $template->update() for why these become independent rows
+            // rather than a shared many-to-many scope.
+            'also_apply_to_event_ids'   => 'nullable|array',
+            'also_apply_to_event_ids.*' => 'integer|exists:fest_events,id',
             'logo'                => 'nullable|image|max:2048',
             'seal'                => 'nullable|image|max:2048',
             'signatories'         => 'nullable|array',
@@ -474,10 +480,24 @@ class CertificateTemplateController extends SahodayaAdminController
 
         $baseDir = 'sahodaya/'.$this->sahodaya->id.'/certificate-templates';
         $disk = TenantStorage::uploadDisk();
-        $updates = array_filter([
-            'title' => $data['title'] ?? null,
-            'body'  => $data['body'] ?? null,
-        ], fn ($v) => $v !== null);
+        // array_filter(..., fn($v) => $v !== null) used to sit here, which silently
+        // dropped 'body' from the update whenever it was null — including when an admin
+        // deliberately cleared the Body text field and saved: ConvertEmptyStringsToNull
+        // turns that '' into null, the filter then stripped the key entirely, and
+        // $template->update() never touched the column at all. The clear looked like it
+        // worked (no error, form reset) but the old text was silently still there,
+        // reappearing every time the template was reopened. array_key_exists() (already
+        // the pattern used for event_id/item_id/layout_json below) distinguishes "field
+        // submitted as empty, actually clear it" from "field never sent, leave it
+        // alone" — the form.post() this controller expects always sends every field, so
+        // in practice both keys are always present here.
+        $updates = [];
+        if (array_key_exists('title', $data)) {
+            $updates['title'] = $data['title'];
+        }
+        if (array_key_exists('body', $data)) {
+            $updates['body'] = $data['body'];
+        }
 
         $detectedOrientation = null;
         if ($request->hasFile('template_file')) {
@@ -554,7 +574,54 @@ class CertificateTemplateController extends SahodayaAdminController
 
         $template->update($updates);
 
-        $message = 'Template updated.';
+        // Mirrors store()'s own "also apply to other events" behaviour: independent
+        // copies of the just-saved template, one per additional event, each becoming
+        // its own row that editing this one later won't touch. Only coherent alongside
+        // a specific primary event (never for a Sahodaya-wide default) and always
+        // item-wide on the copies, matching store()'s reasoning.
+        $createdCopies = 0;
+        if (! empty($targetEventId) && ! empty($data['also_apply_to_event_ids'])) {
+            $additionalEventIds = FestEvent::where('tenant_id', $this->sahodaya->id)
+                ->whereIn('id', $data['also_apply_to_event_ids'])
+                ->where('id', '!=', $targetEventId)
+                ->pluck('id')
+                ->unique()
+                ->values()
+                ->all();
+
+            $fresh = $template->fresh();
+            foreach ($additionalEventIds as $eventId) {
+                if ($fresh->is_active) {
+                    CertificateTemplate::where('tenant_id', $this->sahodaya->id)
+                        ->where('event_type', $fresh->event_type)
+                        ->where('certificate_type', $fresh->certificate_type)
+                        ->where('event_id', $eventId)
+                        ->whereNull('item_id')
+                        ->update(['is_active' => false]);
+                }
+
+                CertificateTemplate::create([
+                    'tenant_id'           => $this->sahodaya->id,
+                    'event_type'          => $fresh->event_type,
+                    'event_id'            => $eventId,
+                    'item_id'             => null,
+                    'certificate_type'    => $fresh->certificate_type,
+                    'title'               => $fresh->title,
+                    'body'                => $fresh->body,
+                    'template_file_path'  => $fresh->template_file_path,
+                    'background_path'     => $fresh->background_path,
+                    'logo_path'           => $fresh->logo_path,
+                    'seal_path'           => $fresh->seal_path,
+                    'signatories'         => $fresh->signatories,
+                    'dynamic_fields_json' => $fresh->dynamic_fields_json,
+                    'layout_json'         => $fresh->layout_json,
+                    'is_active'           => $fresh->is_active,
+                ]);
+                $createdCopies++;
+            }
+        }
+
+        $message = $createdCopies > 0 ? "Template updated and also applied to {$createdCopies} other event(s)." : 'Template updated.';
         if ($deactivatedCount > 0) {
             $message .= " {$deactivatedCount} existing template(s) for this exact event/item/type were automatically deactivated so only one is active at a time.";
         }

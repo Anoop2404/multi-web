@@ -78,10 +78,12 @@
                         </FormField>
 
                         <FormField
-                            v-if="!editingId && form.event_id && otherEventOptions.length"
+                            v-if="form.event_id && otherEventOptions.length"
                             label="Also apply to other events"
                             class-extra="sm:col-span-2"
-                            hint="Creates an independent copy of this template (same background, body, and layout) for each event checked — editing one afterwards won't affect the others."
+                            :hint="editingId
+                                ? 'Creates an independent copy of this template (with everything just saved above) for each event checked — a separate row that editing this one afterwards won\'t affect.'
+                                : 'Creates an independent copy of this template (same background, body, and layout) for each event checked — editing one afterwards won\'t affect the others.'"
                         >
                             <template #default>
                                 <div class="grid max-h-40 grid-cols-1 gap-1 overflow-y-auto rounded border border-slate-200 p-2 sm:grid-cols-2">
