@@ -32,7 +32,7 @@ Route::middleware([
     Route::get('/office-bearers/{bearer}/photo', [\App\Http\Controllers\Public\OfficeBearerPhotoController::class, 'show'])
         ->name('tenant.office-bearers.photo');
 
-    // Impersonation handoff (FRD-13 §12) —�� see ImpersonationService's docblock for why this
+    // Impersonation handoff (FRD-13 §12) — see ImpersonationService's docblock for why this
     // has to be a cross-host redirect rather than a same-session guard swap.
     Route::get('/impersonate/consume/{token}', [\App\Http\Controllers\Public\ImpersonationBridgeController::class, 'consume'])
         ->middleware('throttle:10,1')
