@@ -10,7 +10,7 @@ class StateFestParticipant extends StateModel
     protected $table = 'state_fest_participants';
 
     protected $fillable = [
-        'state_event_id', 'registration_id', 'student_name', 'class_name', 'chest_number', 'meta',
+        'state_event_id', 'registration_id', 'student_name', 'roll_number', 'class_name', 'chest_number', 'meta',
     ];
 
     protected $casts = [

@@ -10,7 +10,7 @@ class FestStateNominationSelection extends Model
     protected $fillable = [
         'batch_id', 'item_id', 'item_code', 'item_title',
         'source_event_id', 'mark_id', 'registration_id', 'participant_id', 'partition_key',
-        'school_id', 'school_name', 'student_name', 'class_name', 'source_position', 'grade', 'score',
+        'school_id', 'school_name', 'student_name', 'roll_number', 'class_name', 'source_position', 'grade', 'score',
         'nomination_type', 'priority_order', 'skip_reason', 'status', 'selected_by',
     ];
 

@@ -202,4 +202,71 @@ class StateParticipationLimitService
             ];
         })->sortByDesc('exceeds')->values()->all();
     }
+
+    /**
+     * One row per participating Sahodaya: total approved entries, distinct
+     * schools, distinct items — the "separate list of Sahodayas" view.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function sahodayaSummaryRows(FestStateProgram $program): array
+    {
+        $rows = StateQualifierEntry::query()
+            ->join('state_qualifier_intakes', 'state_qualifier_intakes.id', '=', 'state_qualifier_entries.intake_id')
+            ->where('state_qualifier_entries.status', 'approved')
+            ->where('state_qualifier_intakes.state_program_id', $program->id)
+            ->selectRaw('state_qualifier_intakes.source_tenant_id as sahodaya_id, count(*) as approved_count, count(distinct state_qualifier_entries.school_id) as school_count, count(distinct state_qualifier_entries.item_id) as item_count')
+            ->groupBy('state_qualifier_intakes.source_tenant_id')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $sahodayas = Tenant::whereIn('id', $rows->pluck('sahodaya_id')->unique())->pluck('name', 'id');
+
+        return $rows->map(fn ($row) => [
+            'sahodaya_id' => $row->sahodaya_id,
+            'sahodaya_name' => $sahodayas->get($row->sahodaya_id) ?? $row->sahodaya_id,
+            'approved_count' => (int) $row->approved_count,
+            'school_count' => (int) $row->school_count,
+            'item_count' => (int) $row->item_count,
+        ])->sortBy('sahodaya_name')->values()->all();
+    }
+
+    /**
+     * Full approved-entry roster for the program: Sahodaya, School, Item,
+     * Student, Roll No — the Sahodaya -> School -> Student drill-down list.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function approvedRosterRows(FestStateProgram $program): array
+    {
+        $entries = StateQualifierEntry::query()
+            ->join('state_qualifier_intakes', 'state_qualifier_intakes.id', '=', 'state_qualifier_entries.intake_id')
+            ->where('state_qualifier_entries.status', 'approved')
+            ->where('state_qualifier_intakes.state_program_id', $program->id)
+            ->select('state_qualifier_entries.*', 'state_qualifier_intakes.source_tenant_id as sahodaya_id')
+            ->orderBy('state_qualifier_intakes.source_tenant_id')
+            ->orderBy('state_qualifier_entries.school_name')
+            ->get();
+
+        if ($entries->isEmpty()) {
+            return [];
+        }
+
+        $sahodayas = Tenant::whereIn('id', $entries->pluck('sahodaya_id')->unique())->pluck('name', 'id');
+
+        return $entries->map(fn ($entry) => [
+            'sahodaya_id' => $entry->sahodaya_id,
+            'sahodaya_name' => $sahodayas->get($entry->sahodaya_id) ?? $entry->sahodaya_id,
+            'school_name' => $entry->school_name ?: $entry->school_id,
+            'item_title' => $entry->item_name ?: $entry->item_code,
+            'item_code' => $entry->item_code,
+            'student_name' => $entry->student_name,
+            'roll_number' => $entry->roll_number,
+            'grade' => $entry->grade,
+            'position' => $entry->position,
+        ])->values()->all();
+    }
 }

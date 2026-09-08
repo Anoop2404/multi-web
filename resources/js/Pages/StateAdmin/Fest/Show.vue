@@ -45,6 +45,7 @@
                         <th class="p-2">Chest No</th>
                         <th class="p-2">Item</th>
                         <th class="p-2">Participant</th>
+                        <th class="p-2">Roll No</th>
                         <th class="p-2">School</th>
                         <th class="p-2">Status</th>
                         <th class="p-2">Mark (coordinator entry)</th>
@@ -56,6 +57,7 @@
                         <td class="p-2 font-mono">{{ registration.participants?.[0]?.chest_number || '—' }}</td>
                         <td class="p-2">{{ registration.item_code }}</td>
                         <td class="p-2">{{ registration.participants?.[0]?.student_name || 'Participant' }}</td>
+                        <td class="p-2 font-mono">{{ registration.participants?.[0]?.roll_number || '—' }}</td>
                         <td class="p-2">{{ (registration.school_name || '').toUpperCase() || registration.school_id }}</td>
                         <td class="p-2">{{ registration.status }}</td>
                         <td class="p-2" v-if="registration.participants?.[0]">

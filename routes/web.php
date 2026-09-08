@@ -82,6 +82,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
         Route::prefix('state-remittances')->name('state-remittances.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Admin\StateRemittanceController::class, 'index'])->name('index');
             Route::post('/', [\App\Http\Controllers\Admin\StateRemittanceController::class, 'store'])->name('store');
+            Route::get('/export', [\App\Http\Controllers\Admin\StateRemittanceController::class, 'exportCsv'])->name('export');
             Route::post('/{remittance}/verify', [\App\Http\Controllers\Admin\StateRemittanceController::class, 'verify'])->name('verify');
             Route::post('/{remittance}/reject', [\App\Http\Controllers\Admin\StateRemittanceController::class, 'reject'])->name('reject');
             Route::get('/{remittance}/proof', [\App\Http\Controllers\Admin\StateRemittanceController::class, 'proof'])->name('proof');
@@ -146,6 +147,9 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::delete('/fest/{event}/judges/{assignment}', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'unassignJudge'])->name('fest.judges.unassign');
             Route::post('/fest/{event}/marks', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'enterMark'])->name('fest.marks.enter');
             Route::post('/fest/{event}/publish-results', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'publishResults'])->name('fest.results.publish');
+
+            Route::get('/reports/participation/{stateProgram}', [\App\Http\Controllers\StateAdmin\StateParticipationReportController::class, 'index'])->name('reports.participation');
+            Route::get('/reports/participation/{stateProgram}/export', [\App\Http\Controllers\StateAdmin\StateParticipationReportController::class, 'export'])->name('reports.participation.export');
         });
 
         Route::get('/sahodayas', [TenantController::class, 'indexSahodayas'])->name('sahodayas.index');
@@ -856,6 +860,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/circulars',              [\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'index'])->name('circulars.index');
         Route::post('/circulars',             [\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'store'])->name('circulars.store');
         Route::delete('/circulars/{circular}',[\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'destroy'])->name('circulars.destroy');
+
+        Route::get('/question-bank',                  [\App\Http\Controllers\SahodayaAdmin\QuestionBankController::class, 'index'])->name('question-bank.index');
+        Route::post('/question-bank',                 [\App\Http\Controllers\SahodayaAdmin\QuestionBankController::class, 'store'])->name('question-bank.store');
+        Route::delete('/question-bank/{questionBankDocument}', [\App\Http\Controllers\SahodayaAdmin\QuestionBankController::class, 'destroy'])->name('question-bank.destroy');
         }); // public.website.admin.cms
 
         // Portal & website content (portal always available; full website tabs when enabled)
@@ -1222,6 +1230,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/schedule/import', [FestScheduleController::class, 'importStore'])->name('schedule.import');
             Route::get('/{event}/schedule/items', [FestScheduleController::class, 'itemsIndex'])->name('schedule.items');
             Route::post('/{event}/schedule/items/bulk', [FestScheduleController::class, 'bulkStoreItems'])->name('schedule.items.bulk');
+            Route::post('/{event}/schedule/items/auto-sequence', [FestScheduleController::class, 'autoSequenceItems'])->name('schedule.items.auto-sequence');
             Route::get('/{event}/schedule/items/import-template', [FestScheduleController::class, 'itemImportTemplate'])->name('schedule.items.import-template');
             Route::post('/{event}/schedule/items/import', [FestScheduleController::class, 'itemImportStore'])->name('schedule.items.import');
             Route::delete('/{event}/schedule/{schedule}', [FestScheduleController::class, 'destroy'])->name('schedule.destroy');

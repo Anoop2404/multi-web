@@ -51,6 +51,7 @@ class StateQualifierMaterializationService
                             $roster = collect([[
                                 'source_participant_id' => $entry->source_participant_id,
                                 'student_name' => $entry->student_name,
+                                'roll_number' => $entry->roll_number,
                                 'class_name' => $entry->class_name,
                             ]]);
                         }
@@ -64,6 +65,7 @@ class StateQualifierMaterializationService
                                 ],
                                 [
                                     'state_event_id' => $event->id,
+                                    'roll_number' => $member['roll_number'] ?? $entry->roll_number,
                                     'class_name' => $member['class_name'] ?? $entry->class_name,
                                     'meta' => [
                                         'source_participant_id' => $sourceParticipantId,

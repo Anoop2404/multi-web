@@ -9,7 +9,7 @@ class StateQualifierEntry extends StateModel
     protected $fillable = [
         'intake_id', 'source_registration_id', 'source_participant_id',
         'school_id', 'school_name', 'item_id', 'item_code', 'item_name',
-        'student_name', 'class_name', 'position', 'grade', 'points',
+        'student_name', 'roll_number', 'class_name', 'position', 'grade', 'points',
         'partition_key', 'qualifier_type', 'status', 'meta',
     ];
 

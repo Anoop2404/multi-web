@@ -107,6 +107,7 @@ class StateQualifierReviewController extends Controller
         $data = $request->validate([
             'student_name' => 'required|string|max:255',
             'school_name'  => 'required|string|max:255',
+            'roll_number'  => 'nullable|string|max:32',
             'item_code'    => 'nullable|string|max:20',
             'item_name'    => 'nullable|string|max:255',
             'position'     => 'required|integer|min:1',
@@ -117,6 +118,7 @@ class StateQualifierReviewController extends Controller
         $intake->entries()->create([
             'student_name' => $data['student_name'],
             'school_name'  => $data['school_name'],
+            'roll_number'  => $data['roll_number'] ?? null,
             'school_id'    => str()->slug($data['school_name']),
             'item_id'      => str()->uuid()->toString(),
             'item_code'    => $data['item_code'] ?? 'AUTO',
@@ -137,6 +139,7 @@ class StateQualifierReviewController extends Controller
         $data = $request->validate([
             'student_name' => 'required|string|max:255',
             'school_name'  => 'required|string|max:255',
+            'roll_number'  => 'nullable|string|max:32',
             'item_code'    => 'nullable|string|max:20',
             'item_name'    => 'nullable|string|max:255',
             'position'     => 'required|integer|min:1',

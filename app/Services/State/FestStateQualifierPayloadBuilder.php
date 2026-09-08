@@ -9,6 +9,7 @@ use App\Models\FestRegistration;
 use App\Models\FestStateNominationBatch;
 use App\Models\FestStateProgram;
 use App\Models\FestStateSubmissionOutbox;
+use App\Models\Tenant;
 use App\Services\Events\FestPartitionService;
 
 class FestStateQualifierPayloadBuilder
@@ -73,14 +74,16 @@ class FestStateQualifierPayloadBuilder
                 'source_registration_id' => (string) ($selection->registration_id ?? ''),
                 'source_participant_id' => (string) ($selection->participant_id ?? ''),
                 'school_id' => $selection->school_id,
+                'school_name' => $selection->school_name ?: Tenant::find($selection->school_id)?->name,
                 'item_id' => $selection->item_id,
                 'item_code' => $selection->item_code,
                 'item_name' => $selection->item_title,
                 'student_name' => $selection->student_name ?? 'Participant',
+                'roll_number' => $selection->roll_number,
                 'class_name' => $selection->class_name,
                 'position' => $selection->source_position,
                 'grade' => $selection->grade,
-                'points' => $selection->score ?? 0,
+                'points' => (int) round($selection->score ?? 0),
                 'partition_key' => $selection->partition_key,
                 'qualifier_type' => 'state_nominated',
                 'participant_type' => $registration?->item?->participant_type,
@@ -143,6 +146,7 @@ class FestStateQualifierPayloadBuilder
                         'source_registration_id' => (string) $registration->id,
                         'source_participant_id' => (string) $participant->id,
                         'school_id' => $registration->school_id,
+                        'school_name' => Tenant::find($registration->school_id)?->name,
                         // The canonical State catalog item UUID (FestStateProgramItem.id), not this
                         // Sahodaya's own tenant-local FestEventItem.id — that integer is only unique
                         // within this one tenant database and means nothing at State level. State's
@@ -151,10 +155,11 @@ class FestStateQualifierPayloadBuilder
                         'item_code' => $item->item_code,
                         'item_name' => $item->title,
                         'student_name' => $student?->name ?? $participant->display_name ?? 'Participant',
+                        'roll_number' => $student?->roll_number,
                         'class_name' => $student?->class_name,
                         'position' => $mark->position,
                         'grade' => $mark->grade,
-                        'points' => $mark->score ?? 0,
+                        'points' => (int) round($mark->score ?? 0),
                         'partition_key' => $this->partitions->partitionKey($event),
                         'qualifier_type' => match (true) {
                             $role === 'finale' => 'district_winner',
@@ -260,7 +265,7 @@ class FestStateQualifierPayloadBuilder
             || ($criteria['state_eligible'] ?? true) === false;
     }
 
-    /** @return list<array{source_participant_id: string, student_name: string, class_name: ?string}> */
+    /** @return list<array{source_participant_id: string, student_name: string, roll_number: ?string, class_name: ?string}> */
     private function participantRoster(?FestRegistration $registration): array
     {
         if (! $registration) {
@@ -273,6 +278,7 @@ class FestStateQualifierPayloadBuilder
             ->map(fn ($participant) => [
                 'source_participant_id' => (string) $participant->id,
                 'student_name' => $participant->student?->name ?? $participant->display_name ?? 'Participant',
+                'roll_number' => $participant->student?->roll_number,
                 'class_name' => $participant->student?->class_name,
             ])
             ->values()

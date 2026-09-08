@@ -386,6 +386,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
                 { label: 'Content', href: `${base}/public-content`, icon: 'edit' },
                 { label: 'Office Bearers', href: `${base}/office-bearers`, icon: 'users' },
                 { label: 'Circulars', href: `${base}/circulars`, icon: 'file-text' },
+                { label: 'Question Bank', href: `${base}/question-bank`, icon: 'book-open' },
             ],
         });
     }

@@ -16,10 +16,12 @@ class StateParticipationReportController extends Controller
         StateScope::assertOwns($stateProgram->state_id);
 
         return Inertia::render('StateAdmin/Reports/ParticipationLimits', [
-            'stateProgram' => $stateProgram->only(['id', 'title']),
-            'sahodayaRows' => $service->sahodayaComplianceRows($stateProgram),
-            'itemRows'     => $service->itemUtilizationRows($stateProgram),
-            'exportUrl'    => route('admin.state.reports.participation.export', $stateProgram, false),
+            'stateProgram'   => $stateProgram->only(['id', 'title']),
+            'sahodayaRows'   => $service->sahodayaComplianceRows($stateProgram),
+            'itemRows'       => $service->itemUtilizationRows($stateProgram),
+            'sahodayaList'   => $service->sahodayaSummaryRows($stateProgram),
+            'rosterRows'     => $service->approvedRosterRows($stateProgram),
+            'exportUrl'      => route('admin.state.reports.participation.export', $stateProgram, false),
         ]);
     }
 

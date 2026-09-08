@@ -32,7 +32,7 @@ Route::middleware([
     Route::get('/office-bearers/{bearer}/photo', [\App\Http\Controllers\Public\OfficeBearerPhotoController::class, 'show'])
         ->name('tenant.office-bearers.photo');
 
-    // Impersonation handoff (FRD-13 §12) — see ImpersonationService's docblock for why this
+    // Impersonation handoff (FRD-13 §12) —�� see ImpersonationService's docblock for why this
     // has to be a cross-host redirect rather than a same-session guard swap.
     Route::get('/impersonate/consume/{token}', [\App\Http\Controllers\Public\ImpersonationBridgeController::class, 'consume'])
         ->middleware('throttle:10,1')
@@ -92,6 +92,14 @@ Route::middleware([
         Route::get('/papers', [McqArchiveController::class, 'index'])->name('archive');
         Route::get('/papers/{exam}/download', [McqArchiveController::class, 'download'])->name('archive.download');
     });
+
+    // Question bank downloads (always available on Sahodaya tenants — not gated by the
+    // public-website toggle, same as the fest portal and MCQ archive above, since a
+    // Sahodaya that hasn't set up a full public site should still be able to share this
+    // download link directly).
+    Route::get('/question-bank', [\App\Http\Controllers\Public\QuestionBankController::class, 'index'])->name('tenant.question-bank.index');
+    Route::get('/question-bank/{questionBankDocument}/view', [\App\Http\Controllers\Public\QuestionBankController::class, 'view'])->name('tenant.question-bank.view');
+    Route::get('/question-bank/{questionBankDocument}/download', [\App\Http\Controllers\Public\QuestionBankController::class, 'download'])->name('tenant.question-bank.download');
 
     Route::prefix('academic-results')->name('tenant.academic-results.')->middleware('throttle:60,1')->group(function () {
         Route::get('/', [\App\Http\Controllers\Public\AcademicResultsPortalController::class, 'index'])->name('index');

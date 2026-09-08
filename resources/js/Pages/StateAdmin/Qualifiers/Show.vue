@@ -47,6 +47,7 @@
                             <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-100">
                                 <th class="py-3 px-4">Item</th>
                                 <th class="py-3 px-4">Student</th>
+                                <th class="py-3 px-4">Roll No</th>
                                 <th class="py-3 px-4">School</th>
                                 <th class="py-3 px-4 text-center">Position</th>
                                 <th class="py-3 px-4 text-center">Grade</th>
@@ -62,6 +63,9 @@
                                 </td>
                                 <td class="py-3.5 px-4 font-semibold text-slate-800">
                                     {{ e.student_name }}
+                                </td>
+                                <td class="py-3.5 px-4 font-mono text-slate-600">
+                                    {{ e.roll_number || '—' }}
                                 </td>
                                 <td class="py-3.5 px-4 text-slate-600">
                                     {{ e.school_name || e.school_id }}
@@ -102,7 +106,7 @@
                                 </td>
                             </tr>
                             <tr v-if="!intake.entries?.length">
-                                <td colspan="7" class="py-8 text-center text-slate-400">
+                                <td colspan="8" class="py-8 text-center text-slate-400">
                                     No qualifier entries found in this intake. Click "+ Add Entry" above to add one manually.
                                 </td>
                             </tr>
@@ -132,6 +136,11 @@
                             <div class="sm:col-span-2">
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">School Name *</label>
                                 <input v-model="entryForm.school_name" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" required>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Roll No</label>
+                                <input v-model="entryForm.roll_number" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="e.g. 24">
                             </div>
 
                             <div>
@@ -195,6 +204,7 @@ const editingEntry = ref(null);
 const entryForm = useForm({
     student_name: '',
     school_name: '',
+    roll_number: '',
     item_code: '',
     item_name: '',
     position: 1,
@@ -214,6 +224,7 @@ function openEditEntryModal(entry) {
     editingEntry.value = entry;
     entryForm.student_name = entry.student_name ?? '';
     entryForm.school_name = entry.school_name ?? entry.school_id ?? '';
+    entryForm.roll_number = entry.roll_number ?? '';
     entryForm.item_code = entry.item_code ?? '';
     entryForm.item_name = entry.item_name ?? '';
     entryForm.position = entry.position ?? 1;

@@ -61,6 +61,7 @@ class StateQualifierIntakeService
                     'item_code'              => $entry['item_code'] ?? null,
                     'item_name'              => $entry['item_name'] ?? null,
                     'student_name'           => $entry['student_name'],
+                    'roll_number'            => $entry['roll_number'] ?? null,
                     'class_name'             => $entry['class_name'] ?? null,
                     'position'               => $entry['position'] ?? null,
                     'grade'                  => $entry['grade'] ?? null,
