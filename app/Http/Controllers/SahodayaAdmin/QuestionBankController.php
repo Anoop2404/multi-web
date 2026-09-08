@@ -53,6 +53,34 @@ class QuestionBankController extends SahodayaAdminController
         return back()->with('success', 'Question bank document uploaded.');
     }
 
+    public function update(Request $request, string $tenantId, QuestionBankDocument $questionBankDocument)
+    {
+        abort_if($questionBankDocument->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'title'           => 'required|string|max:255',
+            'master_class_id' => 'required|integer',
+            'subject'         => 'nullable|string|max:100',
+            'academic_year'   => 'nullable|string|max:20',
+            // File is optional on edit — omit it to keep the currently uploaded file.
+            'file'            => 'nullable|mimes:pdf,doc,docx|max:307200',
+        ]);
+
+        if ($request->hasFile('file')) {
+            $oldPath = $questionBankDocument->file_path;
+            $data['file_path'] = $request->file('file')->store(
+                'sahodaya/'.$this->sahodaya->id.'/question-bank',
+                TenantStorage::uploadDisk()
+            );
+            Storage::disk(TenantStorage::uploadDisk())->delete($oldPath);
+        }
+
+        unset($data['file']);
+        $questionBankDocument->update($data);
+
+        return back()->with('success', 'Question bank document updated.');
+    }
+
     public function destroy(string $tenantId, QuestionBankDocument $questionBankDocument)
     {
         abort_if($questionBankDocument->tenant_id !== $this->sahodaya->id, 403);

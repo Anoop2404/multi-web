@@ -11,14 +11,14 @@
             description="Upload class-wise question papers for public download from your website."
         >
             <template #actions>
-                <button type="button" class="btn-secondary text-sm" @click="showForm = !showForm">
+                <button type="button" class="btn-secondary text-sm" @click="showForm ? closeForm() : openAddForm()">
                     {{ showForm ? 'Hide upload form' : 'Upload document' }}
                 </button>
             </template>
         </PageHeader>
 
-        <form v-show="showForm" @submit.prevent="upload" class="card mb-6 space-y-4">
-            <h3 class="section-title">Upload new document</h3>
+        <form v-show="showForm" @submit.prevent="submitForm" class="card mb-6 space-y-4">
+            <h3 class="section-title">{{ isEditing ? 'Edit document' : 'Upload new document' }}</h3>
             <FormGrid>
                 <FormField label="Title" class-extra="sm:col-span-2" required>
                     <template #default="{ id }">
@@ -41,7 +41,7 @@
                         <input :id="id" v-model="form.academic_year" type="text" placeholder="2025-26" class="field">
                     </template>
                 </FormField>
-                <FormField label="PDF / document" class-extra="sm:col-span-2" required>
+                <FormField :label="isEditing ? 'PDF / document (leave blank to keep current file)' : 'PDF / document'" class-extra="sm:col-span-2" :required="!isEditing">
                     <template #default="{ id }">
                         <label :for="id"
                                class="flex flex-col items-center justify-center w-full min-h-[7rem] border-2 border-dashed rounded-xl cursor-pointer transition"
@@ -56,15 +56,16 @@
                             <div v-else class="text-center px-4">
                                 <p class="text-sm text-slate-500">Drop PDF here or <span class="text-violet-600 font-semibold">browse</span></p>
                             </div>
-                            <input :id="id" type="file" accept=".pdf,.doc,.docx" class="sr-only" required
+                            <input :id="id" type="file" accept=".pdf,.doc,.docx" class="sr-only" :required="!isEditing"
                                    @change="form.file = $event.target.files[0]">
                         </label>
                     </template>
                 </FormField>
             </FormGrid>
             <FormActions>
-                <button type="submit" class="btn-primary" :disabled="form.processing || !form.file || !form.master_class_id">
-                    {{ form.processing ? 'Uploading…' : 'Upload document' }}
+                <button v-if="isEditing" type="button" class="btn-secondary" @click="closeForm">Cancel</button>
+                <button type="submit" class="btn-primary" :disabled="form.processing || (!isEditing && !form.file) || !form.master_class_id">
+                    {{ form.processing ? (isEditing ? 'Saving…' : 'Uploading…') : (isEditing ? 'Save changes' : 'Upload document') }}
                 </button>
             </FormActions>
         </form>
@@ -121,6 +122,7 @@
                             <td class="hidden lg:table-cell text-xs text-slate-500">{{ d.academic_year || '—' }}</td>
                             <td class="hidden lg:table-cell text-xs text-slate-500">{{ d.download_count ?? 0 }}</td>
                             <td class="text-right whitespace-nowrap space-x-2">
+                                <button type="button" @click="openEditForm(d)" class="text-xs text-indigo-600 hover:text-indigo-800">Edit</button>
                                 <button type="button" @click="remove(d)" class="text-xs text-red-600 hover:text-red-800">Delete</button>
                             </td>
                         </tr>
@@ -140,6 +142,7 @@
                         {{ d.academic_year || 'No year set' }} · {{ d.download_count ?? 0 }} downloads
                     </p>
                     <div class="flex gap-3 pt-1">
+                        <button type="button" @click="openEditForm(d)" class="text-xs text-indigo-600 hover:text-indigo-800">Edit</button>
                         <button type="button" @click="remove(d)" class="text-xs text-red-600 hover:text-red-800">Delete</button>
                     </div>
                 </article>
@@ -174,6 +177,8 @@ const showForm = ref(false);
 const dragover = ref(false);
 const activeClass = ref('');
 const searchQuery = ref('');
+const isEditing = ref(false);
+const editingDocument = ref(null);
 
 const filtered = computed(() => {
     let rows = props.documents;
@@ -199,11 +204,46 @@ function onDrop(e) {
     if (f) form.file = f;
 }
 
-function upload() {
-    form.post(`/sahodaya-admin/${props.sahodaya.id}/question-bank`, {
-        forceFormData: true,
-        onSuccess: () => { form.reset(); showForm.value = false; },
-    });
+function openAddForm() {
+    isEditing.value = false;
+    editingDocument.value = null;
+    form.reset();
+    form.clearErrors();
+    showForm.value = true;
+}
+
+function openEditForm(d) {
+    isEditing.value = true;
+    editingDocument.value = d;
+    form.clearErrors();
+    form.title = d.title;
+    form.master_class_id = d.master_class_id;
+    form.subject = d.subject ?? '';
+    form.academic_year = d.academic_year ?? '';
+    form.file = null;
+    showForm.value = true;
+}
+
+function closeForm() {
+    showForm.value = false;
+    isEditing.value = false;
+    editingDocument.value = null;
+    form.reset();
+    form.clearErrors();
+}
+
+function submitForm() {
+    if (isEditing.value && editingDocument.value) {
+        form.transform((data) => ({ ...data, _method: 'put' })).post(
+            `/sahodaya-admin/${props.sahodaya.id}/question-bank/${editingDocument.value.id}`,
+            { forceFormData: true, onSuccess: () => closeForm() },
+        );
+    } else {
+        form.post(`/sahodaya-admin/${props.sahodaya.id}/question-bank`, {
+            forceFormData: true,
+            onSuccess: () => closeForm(),
+        });
+    }
 }
 
 async function remove(d) {

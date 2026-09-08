@@ -24,20 +24,17 @@ class QuestionBankController extends Controller
             ->get(['id', 'name'])
             ->keyBy('id');
 
-        $grouped = $documents
-            ->groupBy('master_class_id')
-            ->map(fn ($docs, $classId) => [
-                'class_name' => $masterClasses->get($classId)?->name ?? 'Other',
-                'documents'  => $docs->values(),
-            ])
-            ->sortBy(fn ($group) => $group['class_name'])
-            ->values();
+        $documents = $documents->map(function ($document) use ($masterClasses) {
+            $document->setAttribute('class_name', $masterClasses->get($document->master_class_id)?->name);
+
+            return $document;
+        })->values();
 
         return $this->renderPublic('public.question-bank.index', $tenant, [
-            'groups' => $grouped,
+            'documents' => $documents,
             'pageSeo' => [
                 'title'       => 'Question Bank — '.$tenant->name,
-                'description' => 'Class-wise question bank downloads from '.$tenant->name,
+                'description' => 'Question bank downloads from '.$tenant->name,
                 'og_type'     => 'website',
             ],
         ]);

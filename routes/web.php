@@ -868,6 +868,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         // public site disabled must still be able to manage it.
         Route::get('/question-bank',                  [\App\Http\Controllers\SahodayaAdmin\QuestionBankController::class, 'index'])->name('question-bank.index');
         Route::post('/question-bank',                 [\App\Http\Controllers\SahodayaAdmin\QuestionBankController::class, 'store'])->name('question-bank.store');
+        Route::put('/question-bank/{questionBankDocument}', [\App\Http\Controllers\SahodayaAdmin\QuestionBankController::class, 'update'])->name('question-bank.update');
         Route::delete('/question-bank/{questionBankDocument}', [\App\Http\Controllers\SahodayaAdmin\QuestionBankController::class, 'destroy'])->name('question-bank.destroy');
 
         // Portal & website content (portal always available; full website tabs when enabled)
