@@ -375,10 +375,10 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
     });
 
     // ── Website (conditional) ─────────────────────────────────────────
-    if (publicWebsiteEnabled && canNav('website') && menuOn('website')) {
-        groups.push({
-            section: 'Website',
-            items: [
+    if (canNav('website') && menuOn('website')) {
+        const websiteItems = [];
+        if (publicWebsiteEnabled) {
+            websiteItems.push(
                 { label: 'Site Builder', href: `${base}/site-builder`, icon: 'layers' },
                 { label: 'Domains', href: `${base}/website/domains`, icon: 'globe' },
                 { label: 'Microsites', href: `${base}/website/sites`, icon: 'grid' },
@@ -386,9 +386,13 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
                 { label: 'Content', href: `${base}/public-content`, icon: 'edit' },
                 { label: 'Office Bearers', href: `${base}/office-bearers`, icon: 'users' },
                 { label: 'Circulars', href: `${base}/circulars`, icon: 'file-text' },
-                { label: 'Question Bank', href: `${base}/question-bank`, icon: 'book-open' },
-            ],
-        });
+            );
+        }
+        // Question bank is shared via a direct link, not part of the full public-website
+        // CMS, so it stays available even when the Sahodaya has the public website disabled.
+        websiteItems.push({ label: 'Question Bank', href: `${base}/question-bank`, icon: 'book-open' });
+
+        groups.push({ section: 'Website', items: websiteItems });
     }
 
     // ── Schools & Membership ──────────────────────────────────────────

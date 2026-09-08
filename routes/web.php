@@ -860,11 +860,15 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/circulars',              [\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'index'])->name('circulars.index');
         Route::post('/circulars',             [\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'store'])->name('circulars.store');
         Route::delete('/circulars/{circular}',[\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'destroy'])->name('circulars.destroy');
+        }); // public.website.admin.cms
 
+        // Question bank — deliberately outside the public.website.admin.cms gate above:
+        // it's shared via a direct link (see the public tenant.php routes, also always
+        // available), not part of the full public-website CMS, so a Sahodaya that has the
+        // public site disabled must still be able to manage it.
         Route::get('/question-bank',                  [\App\Http\Controllers\SahodayaAdmin\QuestionBankController::class, 'index'])->name('question-bank.index');
         Route::post('/question-bank',                 [\App\Http\Controllers\SahodayaAdmin\QuestionBankController::class, 'store'])->name('question-bank.store');
         Route::delete('/question-bank/{questionBankDocument}', [\App\Http\Controllers\SahodayaAdmin\QuestionBankController::class, 'destroy'])->name('question-bank.destroy');
-        }); // public.website.admin.cms
 
         // Portal & website content (portal always available; full website tabs when enabled)
         Route::get('/public-content',  [\App\Http\Controllers\SahodayaAdmin\PublicContentController::class, 'index'])->name('public-content.index');
