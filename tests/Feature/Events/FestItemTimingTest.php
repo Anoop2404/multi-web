@@ -7,11 +7,9 @@ use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestEventPhase;
-use App\Models\FestPhaseRegion;
 use App\Models\FestSchedule;
 use App\Models\FestStage;
 use App\Models\FestVenue;
-use App\Models\Region;
 use App\Models\SahodayaProfile;
 use App\Models\SchoolClass;
 use App\Models\Student;
@@ -162,13 +160,18 @@ class FestItemTimingTest extends TestCase
         $this->assertNull($schedule->stage_id);
     }
 
-    public function test_item_schedule_page_exposes_phases_with_their_allowed_regions(): void
+    /**
+     * A regional phase (e.g. "Sargadhara" split by region) gets its own separate child
+     * FestEvent per region (FestPhaseTopologyService::syncLeaf() + FestItemSyncService)
+     * rather than one shared item list filtered by region — so this page exposes a plain
+     * Phase filter (for phases that stay on this one event, e.g. Prelims/Finals) plus the
+     * standard scopedChildEventOptions() switcher for jumping to a region's own page.
+     */
+    public function test_item_schedule_page_exposes_a_phase_filter_and_defers_regions_to_the_child_event_switcher(): void
     {
         ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->fixture();
 
-        $region = Region::create(['tenant_id' => $sahodaya->id, 'name' => 'North Zone', 'code' => 'NZ', 'is_active' => true]);
-        $phase = FestEventPhase::create(['event_id' => $event->id, 'name' => 'Sargadhara', 'is_regional' => true, 'sort_order' => 1]);
-        FestPhaseRegion::create(['phase_id' => $phase->id, 'region_id' => $region->id, 'enabled' => true]);
+        $phase = FestEventPhase::create(['event_id' => $event->id, 'name' => 'Finals', 'sort_order' => 1]);
 
         FestEventItem::create([
             'event_id' => $event->id, 'title' => 'Recitation', 'participant_type' => 'individual',
@@ -181,9 +184,10 @@ class FestItemTimingTest extends TestCase
 
         $response->assertOk();
         $props = $response->viewData('page')['props'];
-        $this->assertSame('Sargadhara', $props['phases'][0]['name']);
-        $this->assertSame('North Zone', $props['phases'][0]['allowed_regions'][0]['region']['name']);
+        $this->assertSame('Finals', $props['phases'][0]['name']);
+        $this->assertArrayNotHasKey('allowed_regions', $props['phases'][0]);
         $this->assertSame($phase->id, $props['rows'][0]['phase_id']);
+        $this->assertArrayHasKey('childEvents', $props);
     }
 
     public function test_auto_sequence_cascades_start_times_across_items_on_a_stage(): void

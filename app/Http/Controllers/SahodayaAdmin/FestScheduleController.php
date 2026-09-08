@@ -322,10 +322,16 @@ class FestScheduleController extends SahodayaAdminController
                 ->get(),
             'venues'    => FestVenue::where('event_id', $event->id)->orderBy('name')->get(['id', 'name', 'location']),
             'ageGroups' => $event->items->pluck('age_group')->filter()->unique()->values(),
-            'phases'    => \App\Models\FestEventPhase::where('event_id', $event->id)
-                ->with(['allowedRegions' => fn ($q) => $q->where('enabled', true)->with('region:id,name')])
+            // Non-regional phases (e.g. "Prelims"/"Finals") can legitimately coexist as items
+            // on this one event, so a plain Phase filter is meaningful here. A *regional*
+            // phase instead gets its own separate child FestEvent per region (see
+            // FestPhaseTopologyService::syncLeaf() + FestItemSyncService::copyItemToPartition())
+            // — that per-region scheduling happens on the region's own Item Schedule page,
+            // reached via the childEvents switcher below, not by filtering this event's items.
+            'phases'      => \App\Models\FestEventPhase::where('event_id', $event->id)
                 ->orderBy('sort_order')
-                ->get(['id', 'event_id', 'name', 'is_regional', 'sort_order']),
+                ->get(['id', 'event_id', 'name', 'sort_order']),
+            'childEvents' => $this->scopedChildEventOptions($event),
         ]));
     }
 

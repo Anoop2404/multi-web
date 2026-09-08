@@ -24,6 +24,13 @@
             </div>
         </div>
 
+        <div v-if="childEvents.length" class="flex flex-wrap items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Phase / Region:</label>
+            <SearchableSelect :model-value="String(event.id)" @update:model-value="switchEvent"
+                              :options="childEventOptions" :all-option="false" placeholder="Select region"
+                              class="w-64" />
+        </div>
+
         <div v-if="!venues.length && !stages.length" class="notice-banner notice-banner--info mb-4 text-sm">
             Add venues and stages under
             <a :href="settingsUrl" class="link-brand font-semibold">Event settings → Venues</a>
@@ -39,8 +46,6 @@
                               :all-label="event.event_type === 'sports' ? 'All Event Heads' : 'All item heads'" />
             <SearchableSelect v-if="ageGroups.length" v-model="ageFilter" class="max-w-[10rem]"
                               :options="ageGroupOptions" :all-option="true" all-label="All age groups" />
-            <SearchableSelect v-if="regionOptions.length" v-model="regionFilter" class="max-w-[10rem]"
-                              :options="regionOptions" :all-option="true" all-label="All regions" />
             <SearchableSelect v-if="phases.length" v-model="phaseFilter" class="max-w-[12rem]"
                               :options="phaseOptions" :all-option="true" all-label="All phases" />
             <SearchableSelect v-model="statusFilter" class="max-w-[10rem]"
@@ -181,7 +186,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
@@ -197,13 +202,13 @@ const props = defineProps({
     venues: Array,
     ageGroups: Array,
     phases: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
 });
 
 const search = ref('');
 const headFilter = ref('');
 const ageFilter = ref('');
-const regionFilter = ref('');
 const phaseFilter = ref('');
 const statusFilter = ref('');
 const importFile = ref(null);
@@ -287,10 +292,6 @@ const filteredRows = computed(() => {
         if (headFilter.value && headFilter.value !== 'other' && String(row.head_id ?? '') !== String(headFilter.value)) return false;
         if (ageFilter.value && row.age_group !== ageFilter.value) return false;
         if (phaseFilter.value && String(row.phase_id ?? '') !== String(phaseFilter.value)) return false;
-        if (regionFilter.value && !phaseFilter.value) {
-            const allowedPhaseIds = phaseIdsForRegion(regionFilter.value);
-            if (!allowedPhaseIds.includes(row.phase_id)) return false;
-        }
         const hasSchedule = Boolean(row.scheduled_date || row.scheduled_time || row.stage_id || row.stage);
         if (statusFilter.value === 'scheduled' && !hasSchedule) return false;
         if (statusFilter.value === 'unscheduled' && hasSchedule) return false;
@@ -316,28 +317,19 @@ const headFilterOptions = computed(() => [
 
 const ageGroupOptions = computed(() => (props.ageGroups ?? []).map((g) => ({ value: g, label: String(g).toUpperCase() })));
 
-const regionOptions = computed(() => {
-    const map = new Map();
-    for (const phase of props.phases ?? []) {
-        for (const link of phase.allowed_regions ?? []) {
-            if (link.region) map.set(String(link.region.id), link.region.name);
-        }
-    }
-    return [...map.entries()].map(([value, label]) => ({ value, label }));
-});
+const phaseOptions = computed(() => (props.phases ?? []).map((phase) => ({ value: String(phase.id), label: phase.name })));
 
-function phaseIdsForRegion(regionId) {
-    return (props.phases ?? [])
-        .filter((phase) => (phase.allowed_regions ?? []).some((link) => String(link.region_id ?? link.region?.id) === String(regionId)))
-        .map((phase) => phase.id);
+// childEvents lists the per-region sibling FestEvents for a regional phase (see
+// SahodayaAdminController::scopedChildEventOptions) — picking one navigates to that
+// region's own separate Item Schedule page, matching MarkEntry.vue/Attendance.vue's switcher.
+const childEventOptions = computed(() => (props.childEvents ?? []).map((ev) => ({
+    value: String(ev.id),
+    label: ev.short_title || ev.title,
+})));
+
+function switchEvent(eventId) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${eventId}/schedule/items`);
 }
-
-const phaseOptions = computed(() => {
-    const list = regionFilter.value
-        ? (props.phases ?? []).filter((phase) => phaseIdsForRegion(regionFilter.value).includes(phase.id))
-        : (props.phases ?? []);
-    return list.map((phase) => ({ value: String(phase.id), label: phase.name }));
-});
 
 const stageOptions = computed(() => (props.stages ?? []).map((s) => ({ value: String(s.id), label: stageLabel(s) })));
 const venueOptions = computed(() => (props.venues ?? []).map((v) => ({ value: String(v.id), label: v.name })));
