@@ -19,8 +19,15 @@
                     </span>
                 </div>
 
+                <div v-if="form.hasErrors" class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+                    <p class="font-semibold">Couldn't save — please fix the following:</p>
+                    <ul class="mt-1 list-disc list-inside space-y-0.5">
+                        <li v-for="(message, field) in form.errors" :key="field">{{ message }}</li>
+                    </ul>
+                </div>
+
                 <FormGrid>
-                    <FormField label="Event type" required>
+                    <FormField label="Event type" :error="form.errors.event_type" required>
                         <template #default="{ id }">
                             <SearchableSelect
                                 :id="id"
@@ -33,7 +40,7 @@
                         </template>
                     </FormField>
 
-                    <FormField label="Certificate type" hint="e.g. participation, congratulations, winner" required>
+                    <FormField label="Certificate type" hint="e.g. participation, congratulations, winner" :error="form.errors.certificate_type" required>
                         <template #default="{ id }">
                             <SearchableSelect v-if="form.event_type === 'training'" :id="id" v-model="form.certificate_type"
                                 :options="trainingCertificateTypeOptions" :all-option="false" :required="true"
@@ -49,7 +56,7 @@
                     </FormField>
 
                     <template v-if="form.event_type === 'fest'">
-                        <FormField label="Event" hint="Leave blank to make this the Sahodaya-wide default for this certificate type.">
+                        <FormField label="Event" hint="Leave blank to make this the Sahodaya-wide default for this certificate type." :error="form.errors.event_id">
                             <template #default="{ id }">
                                 <SearchableSelect :id="id" v-model="form.event_id" :options="festEventOptions"
                                         all-label="All events (default)" placeholder="All events (default)"
@@ -57,7 +64,7 @@
                                         @change="form.item_id = null; form.also_apply_to_event_ids = form.also_apply_to_event_ids.filter(id => id !== form.event_id)" />
                             </template>
                         </FormField>
-                        <FormField label="Item" hint="Leave blank to cover every item in the selected event.">
+                        <FormField label="Item" hint="Leave blank to cover every item in the selected event." :error="form.errors.item_id">
                             <template #default>
                                 <SearchableSelect
                                     v-model="form.item_id"
@@ -88,7 +95,7 @@
                     </template>
 
                     <template v-if="form.event_type === 'training' || form.event_type === 'topper' || form.event_type === 'fest'">
-                        <FormField label="Certificate title" class-extra="sm:col-span-2">
+                        <FormField label="Certificate title" class-extra="sm:col-span-2" :error="form.errors.title">
                             <template #default="{ id }">
                                 <input :id="id" v-model="form.title" class="field font-medium"
                                        :placeholder="form.event_type === 'topper' ? 'Certificate of Congratulations' : 'Certificate of Participation'">
@@ -99,6 +106,7 @@
                             v-if="form.event_type === 'training' || form.event_type === 'fest'"
                             label="Background backdrop (PDF or image)"
                             class-extra="sm:col-span-2"
+                            :error="form.errors.template_file"
                             :hint="editingId
                                 ? 'PDF or image background. Leave blank to keep current background.'
                                 : 'PDF or image used as the backdrop design.'"
@@ -112,6 +120,9 @@
                                 <input :id="id" type="file" accept=".pdf,.png,.jpg,.jpeg"
                                        class="field"
                                        @change="onFileChange">
+                                <p v-if="backgroundPreviewError" class="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1" role="alert">
+                                    {{ backgroundPreviewError }}
+                                </p>
                             </template>
                         </FormField>
 
@@ -153,17 +164,17 @@
                                 <p class="sm:col-span-2 md:col-span-4 font-bold text-slate-800 text-xs uppercase tracking-wider">Recipient Name Position &amp; Alignment</p>
                                 <FormField label="Top %">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.recipient_name.top" type="number" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                        <input :id="id" v-model.number="form.layout_json.recipient_name.top" type="number" step="any" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
                                     </template>
                                 </FormField>
                                 <FormField label="Left %">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.recipient_name.left" type="number" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                        <input :id="id" v-model.number="form.layout_json.recipient_name.left" type="number" step="any" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
                                     </template>
                                 </FormField>
                                 <FormField label="Width %">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.recipient_name.width" type="number" min="10" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                        <input :id="id" v-model.number="form.layout_json.recipient_name.width" type="number" step="any" min="10" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
                                     </template>
                                 </FormField>
                                 <FormField label="Text Align">
@@ -176,7 +187,7 @@
                                 </FormField>
                                 <FormField label="Font size (px)">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.recipient_name.font_size" type="number" min="6" max="96" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                        <input :id="id" v-model.number="form.layout_json.recipient_name.font_size" type="number" step="any" min="6" max="96" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
                                     </template>
                                 </FormField>
                                 <FormField label="Font family">
@@ -204,17 +215,17 @@
                                 <p class="sm:col-span-2 md:col-span-4 font-bold text-slate-800 text-xs uppercase tracking-wider">Body Text Position &amp; Alignment</p>
                                 <FormField label="Top %">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.body.top" type="number" min="0" max="100" class="field">
+                                        <input :id="id" v-model.number="form.layout_json.body.top" type="number" step="any" min="0" max="100" class="field">
                                     </template>
                                 </FormField>
                                 <FormField label="Left %">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.body.left" type="number" min="0" max="100" class="field">
+                                        <input :id="id" v-model.number="form.layout_json.body.left" type="number" step="any" min="0" max="100" class="field">
                                     </template>
                                 </FormField>
                                 <FormField label="Width %">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.body.width" type="number" min="10" max="100" class="field">
+                                        <input :id="id" v-model.number="form.layout_json.body.width" type="number" step="any" min="10" max="100" class="field">
                                     </template>
                                 </FormField>
                                 <FormField label="Text Align">
@@ -226,7 +237,7 @@
                                 </FormField>
                                 <FormField label="Font size (px)">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.body.font_size" type="number" min="6" max="96" class="field">
+                                        <input :id="id" v-model.number="form.layout_json.body.font_size" type="number" step="any" min="6" max="96" class="field">
                                     </template>
                                 </FormField>
                                 <FormField label="Font family">
@@ -253,17 +264,17 @@
                                 <p class="sm:col-span-2 md:col-span-4 font-bold text-slate-800 text-xs uppercase tracking-wider">Date Position &amp; Alignment</p>
                                 <FormField label="Top %">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.certificate_date.top" type="number" min="0" max="100" class="field">
+                                        <input :id="id" v-model.number="form.layout_json.certificate_date.top" type="number" step="any" min="0" max="100" class="field">
                                     </template>
                                 </FormField>
                                 <FormField label="Left %">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.certificate_date.left" type="number" min="0" max="100" class="field">
+                                        <input :id="id" v-model.number="form.layout_json.certificate_date.left" type="number" step="any" min="0" max="100" class="field">
                                     </template>
                                 </FormField>
                                 <FormField label="Width %">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.certificate_date.width" type="number" min="10" max="100" class="field">
+                                        <input :id="id" v-model.number="form.layout_json.certificate_date.width" type="number" step="any" min="10" max="100" class="field">
                                     </template>
                                 </FormField>
                                 <FormField label="Text Align">
@@ -279,17 +290,17 @@
                                 <p class="sm:col-span-2 md:col-span-4 font-bold text-slate-800 text-xs uppercase tracking-wider">Photo Position &amp; Size</p>
                                 <FormField label="Top %" hint="Distance from the top of the canvas.">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.photo.top" type="number" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_photo)">
+                                        <input :id="id" v-model.number="form.layout_json.photo.top" type="number" step="any" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_photo)">
                                     </template>
                                 </FormField>
                                 <FormField label="Left %" hint="50 = horizontally centered.">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.photo.left" type="number" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_photo)">
+                                        <input :id="id" v-model.number="form.layout_json.photo.left" type="number" step="any" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_photo)">
                                     </template>
                                 </FormField>
                                 <FormField label="Size (px)" hint="Circle diameter.">
                                     <template #default="{ id }">
-                                        <input :id="id" v-model.number="form.layout_json.photo.size" type="number" min="24" max="400" class="field" :disabled="!isTruthy(form.layout_json.show_photo)">
+                                        <input :id="id" v-model.number="form.layout_json.photo.size" type="number" step="any" min="24" max="400" class="field" :disabled="!isTruthy(form.layout_json.show_photo)">
                                     </template>
                                 </FormField>
                             </div>
@@ -319,22 +330,22 @@
                                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                         <FormField label="Top %">
                                             <template #default="{ id }">
-                                                <input :id="id" v-model.number="cf.top" type="number" min="0" max="100" class="field">
+                                                <input :id="id" v-model.number="cf.top" type="number" step="any" min="0" max="100" class="field">
                                             </template>
                                         </FormField>
                                         <FormField label="Left %">
                                             <template #default="{ id }">
-                                                <input :id="id" v-model.number="cf.left" type="number" min="0" max="100" class="field">
+                                                <input :id="id" v-model.number="cf.left" type="number" step="any" min="0" max="100" class="field">
                                             </template>
                                         </FormField>
                                         <FormField label="Width %">
                                             <template #default="{ id }">
-                                                <input :id="id" v-model.number="cf.width" type="number" min="1" max="100" class="field">
+                                                <input :id="id" v-model.number="cf.width" type="number" step="any" min="1" max="100" class="field">
                                             </template>
                                         </FormField>
                                         <FormField label="Font size (px)">
                                             <template #default="{ id }">
-                                                <input :id="id" v-model.number="cf.font_size" type="number" min="6" max="96" class="field">
+                                                <input :id="id" v-model.number="cf.font_size" type="number" step="any" min="6" max="96" class="field">
                                             </template>
                                         </FormField>
                                     </div>
@@ -364,7 +375,7 @@
                             </div>
                         </template>
 
-                        <FormField label="Body text" class-extra="sm:col-span-2">
+                        <FormField label="Body text" class-extra="sm:col-span-2" :error="form.errors.body">
                             <template #default="{ id }">
                                 <div class="space-y-2">
                                     <div class="flex items-center justify-between text-xs text-slate-500">
@@ -564,6 +575,7 @@ const fontFamilies = props.fontFamilyOptions;
 const activeCategoryTab = ref('all');
 const localFilePreviewUrl = ref(null);
 const backgroundPreviewLoading = ref(false);
+const backgroundPreviewError = ref('');
 
 const filteredTemplates = computed(() => {
     if (activeCategoryTab.value === 'all') return props.templates;
@@ -616,6 +628,7 @@ function onFileChange(e) {
     // server-side (same rasterization Save uses) just for this live-editor preview,
     // so positions can be lined up against the real artwork before ever saving.
     localFilePreviewUrl.value = null;
+    backgroundPreviewError.value = '';
     backgroundPreviewLoading.value = true;
     const formData = new FormData();
     formData.append('file', file);
@@ -629,9 +642,17 @@ function onFileChange(e) {
         body: formData,
         credentials: 'same-origin',
     })
-        .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+        .then((res) => (res.ok ? res.json() : res.json().then((body) => Promise.reject(body)).catch(() => Promise.reject({}))))
         .then((data) => { localFilePreviewUrl.value = data.data_uri ?? null; })
-        .catch(() => { localFilePreviewUrl.value = null; })
+        .catch((body) => {
+            localFilePreviewUrl.value = null;
+            // Live preview failing (e.g. no PDF rasterizer on this server) doesn't block
+            // Save itself — the same conversion runs again there and its own error, if any,
+            // surfaces through form.errors.template_file. This is just an early heads-up.
+            backgroundPreviewError.value = body?.message
+                || body?.errors?.template_file?.[0]
+                || 'Could not generate a preview for this file. You can still try saving — upload a PNG/JPG if it fails.';
+        })
         .finally(() => { backgroundPreviewLoading.value = false; });
 }
 
@@ -805,11 +826,25 @@ function editTemplate(template) {
     form.item_id = template.item_id ?? null;
     form.also_apply_to_event_ids = [];
     form.title = template.title || 'Certificate of Participation';
-    form.body = template.body || props.defaultBody;
+    // A template whose body is intentionally null because its custom_fields already
+    // cover every blank (see certificate-body.blade.php's matching fallback rule) must
+    // stay empty here too -- backfilling a default sentence looked harmless in the
+    // editor but silently duplicated text across the certificate the moment the form
+    // was saved with it still in place.
+    {
+        const hasCustomFields = Array.isArray(template.layout_json?.custom_fields) && template.layout_json.custom_fields.length > 0;
+        const defaultForType = form.event_type === 'fest' ? (props.defaultFestBody || '')
+            : form.event_type === 'topper' ? (props.defaultTopperBody || '')
+            : props.defaultBody;
+        form.body = template.body ?? (hasCustomFields ? '' : defaultForType);
+    }
     form.is_active = template.is_active ?? true;
     form.template_file = null;
     form.logo = null;
     form.seal = null;
+    form.clearErrors();
+    backgroundPreviewError.value = '';
+    localFilePreviewUrl.value = null;
     form.layout_json = layoutDefaults(template.layout_json || {});
     const sigs = Array.isArray(template.signatories) && template.signatories.length
         ? template.signatories
@@ -827,6 +862,7 @@ function cancelEdit() {
     editingId.value = null;
     editingTemplate.value = null;
     localFilePreviewUrl.value = null;
+    backgroundPreviewError.value = '';
     form.event_type = 'fest';
     form.certificate_type = 'participation';
     form.event_id = null;
@@ -859,6 +895,10 @@ function upload() {
                 cancelEdit();
             }
         },
+        // The error banner renders at the top of a form that can run to 10+ custom
+        // fields — without this, a validation failure while scrolled down looks like
+        // nothing happened at all.
+        onError: () => { window.scrollTo({ top: 0, behavior: 'smooth' }); },
     };
 
     if (editingId.value) {
