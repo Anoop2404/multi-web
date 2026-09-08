@@ -323,6 +323,14 @@ class FestEventController extends SahodayaAdminController
         $stats['zero_marks_items'] = collect($itemSummaries)->filter(fn (array $row) => ($row['performers'] ?? 0) > 0 && ($row['marks_entered'] ?? 0) === 0)->count();
         $stats['marked_unpublished_items'] = collect($itemSummaries)->filter(fn (array $row) => ($row['marks_ready'] ?? false) && ! ($row['results_published'] ?? false))->count();
 
+        // Same automatic time-overlap detection already inline on the Schedule page and
+        // the dedicated Schedule Clashes report — surfaced here too so an admin sees it
+        // immediately on the event's landing page, not only after navigating into Schedule
+        // or Reports. Cheap: same O(schedules^2) pass the Schedule page already runs on
+        // every load, and this page reloads far less often than that one.
+        $conflictService = new \App\Services\Events\FestScheduleConflictService($event);
+        $stats['schedule_clashes'] = count($conflictService->detectAll()) + count($conflictService->detectStageConflicts());
+
         return $this->inertia('Sahodaya/Events/Overview', $ctx + [
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::OVERVIEW),
             'stats'        => $stats,

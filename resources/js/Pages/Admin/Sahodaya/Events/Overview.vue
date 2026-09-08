@@ -148,7 +148,7 @@
         <!-- Actionable KPI row — previously none of this was visible without digging into
              the checklist hints or a separate report page. See
              Documents/Fest_Improvements_Proposal.md §7.6. -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <Link :href="`${base}/registrations?status=submitted`"
                   class="card !py-3.5 text-center transition hover:border-amber-300"
                   :class="stats.pending_approvals > 0 ? 'border-amber-200 bg-amber-50/60' : 'card--muted'">
@@ -166,6 +166,12 @@
                   :class="stats.marked_unpublished_items > 0 ? 'border-indigo-200 bg-indigo-50/60' : 'card--muted'">
                 <p class="text-2xl font-black" :class="stats.marked_unpublished_items > 0 ? 'text-indigo-600' : 'text-slate-400'">{{ stats.marked_unpublished_items ?? 0 }}</p>
                 <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Marked but Not Published</p>
+            </Link>
+            <Link :href="`${base}/reports/schedule-clashes`"
+                  class="card !py-3.5 text-center transition hover:border-rose-300"
+                  :class="stats.schedule_clashes > 0 ? 'border-rose-200 bg-rose-50/60' : 'card--muted'">
+                <p class="text-2xl font-black" :class="stats.schedule_clashes > 0 ? 'text-rose-600' : 'text-slate-400'">{{ stats.schedule_clashes ?? 0 }}</p>
+                <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Schedule Clashes</p>
             </Link>
         </div>
 
