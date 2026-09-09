@@ -147,6 +147,15 @@
 <body>
     @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
+    {{-- Only set when this PDF was requested from a School Admin's own scoped report
+         (FestSchoolReportController::exportStudentLimitsPdf) — the branding header above
+         always shows the Sahodaya's own name/logo (brandingData() resolves the event's
+         tenant, never the individual school), so without this a school printing their own
+         report saw no heading identifying it as theirs. --}}
+    @if(!empty($school))
+        <p style="text-align:center;font-size:14px;font-weight:bold;color:#0f172a;margin:0 0 2px;">{{ $school['name'] ?? $school->name }}</p>
+    @endif
+
     <h2>{{ $event->title }} — Student Item Limits Report</h2>
     <p class="meta">Per-student on-stage, off-stage, individual and group item usage vs limits · Generated on {{ date('d M Y, h:i A') }}</p>
 
@@ -175,6 +184,9 @@
                         {{ $idx + 1 }}. {{ $st['name'] }}
                         @if(!empty($st['reg_no']))
                             <span style="font-size: 11px; font-weight: normal; color: #64748b;">({{ $st['reg_no'] }})</span>
+                        @endif
+                        @if(!empty($st['school_name']))
+                            <span style="font-size: 11px; font-weight: normal; color: #94a3b8;">&middot; {{ $st['school_name'] }}</span>
                         @endif
                         @if($st['exceeds_any'] ?? false)
                             <span class="badge-flag">Exceeds limit</span>

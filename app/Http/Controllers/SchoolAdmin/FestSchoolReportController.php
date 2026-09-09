@@ -252,6 +252,7 @@ class FestSchoolReportController extends SchoolAdminController
             'event'   => $event,
             'rows'    => $rows,
             'summary' => $summary,
+            'school'  => $this->school->only('id', 'name'),
             ...$reportService->brandingData(),
         ], \Illuminate\Support\Str::slug($event->title).'-student-limits-report.pdf');
     }
