@@ -131,6 +131,53 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return $this->getSetting('widgets', []) ?? [];
     }
 
+    /**
+     * A school's own bank/UPI details — the same shape as SahodayaProfile's payment_*
+     * columns, but stored via the generic settings store rather than a dedicated table,
+     * since school-side settings never got a SahodayaProfile-style profile model. Used
+     * when this school is designated the "host school" for an event's food payments
+     * (FestEvent::food_payee_type === 'host_school') — see FestFoodOrderController::show().
+     *
+     * @return array{bank_name: ?string, account_no: ?string, ifsc: ?string, upi: ?string, qr_code: ?string}
+     */
+    public function paymentDetails(): array
+    {
+        return array_merge(
+            ['bank_name' => null, 'account_no' => null, 'ifsc' => null, 'upi' => null, 'qr_code' => null],
+            $this->getSetting('payment', []) ?? [],
+        );
+    }
+
+    /** Formatted payment details for a school ordering food from this host — mirrors SahodayaProfile::paymentDetailsText(). */
+    public function paymentDetailsText(): string
+    {
+        $d = $this->paymentDetails();
+
+        return implode("\n", array_filter([
+            $d['bank_name'] ? "Bank: {$d['bank_name']}" : null,
+            $d['account_no'] ? "Account: {$d['account_no']}" : null,
+            $d['ifsc'] ? "IFSC: {$d['ifsc']}" : null,
+            $d['upi'] ? "UPI: {$d['upi']}" : null,
+        ]));
+    }
+
+    /** Mirrors SahodayaProfile::paymentQrCodeUrl(). */
+    public function paymentQrCodeUrl(): ?string
+    {
+        $path = $this->paymentDetails()['qr_code'];
+        if (blank($path)) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
+            return $path;
+        }
+
+        return \App\Support\TenantStorage::assetUrl(null, $path)
+            ?? \App\Support\TenantStorage::logoUrl(null, $path)
+            ?? ('/storage/'.ltrim($path, '/'));
+    }
+
     public function invalidateCache(): void
     {
         TenantCache::flushTenant($this->id);

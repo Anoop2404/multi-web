@@ -81,6 +81,45 @@
                     </div>
                 </div>
 
+                <!-- Payment details -->
+                <div class="card space-y-4">
+                    <h3 class="font-bold text-gray-800">Payment Details</h3>
+                    <p class="text-xs text-gray-400 -mt-1">Shown to schools ordering food when a Sahodaya event designates your school as the "host school" that food payments are payable to.</p>
+
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label mb-1.5">Bank name</label>
+                            <input v-model="form.payment_bank_name" type="text" placeholder="State Bank of India" class="field">
+                        </div>
+                        <div>
+                            <label class="form-label mb-1.5">Account number</label>
+                            <input v-model="form.payment_account_no" type="text" class="field font-mono">
+                        </div>
+                        <div>
+                            <label class="form-label mb-1.5">IFSC code</label>
+                            <input v-model="form.payment_ifsc" type="text" placeholder="SBIN0001234" class="field font-mono uppercase">
+                        </div>
+                        <div>
+                            <label class="form-label mb-1.5">UPI ID</label>
+                            <input v-model="form.payment_upi" type="text" placeholder="school@upi" class="field font-mono">
+                        </div>
+                    </div>
+
+                    <div v-if="paymentQrCodeUrl && !removeQrCode">
+                        <p class="text-xs font-semibold text-gray-600 mb-2">Current QR code</p>
+                        <img :src="paymentQrCodeUrl" class="h-32 object-contain rounded border border-gray-100 bg-gray-50 p-2">
+                        <label class="flex items-center gap-2 mt-2 cursor-pointer">
+                            <input v-model="removeQrCode" type="checkbox" class="w-4 h-4 rounded text-indigo-600">
+                            <span class="text-xs text-gray-600">Remove QR code</span>
+                        </label>
+                    </div>
+                    <div v-else>
+                        <label class="form-label mb-1.5">UPI QR code (optional)</label>
+                        <input type="file" accept="image/*" @change="form.payment_qr_code = $event.target.files[0]"
+                               class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                    </div>
+                </div>
+
                 <!-- Social Media -->
                 <div class="card space-y-4">
                     <h3 class="font-bold text-gray-800">Social Media Links</h3>
@@ -194,9 +233,12 @@ const props = defineProps({
     school:   Object,
     settings: { type: Object, default: () => ({}) },
     publicWebsiteEnabled: { type: Boolean, default: true },
+    paymentDetails: { type: Object, default: () => ({}) },
+    paymentQrCodeUrl: { type: String, default: null },
 });
 
 const publicSiteEnabled = ref(props.publicWebsiteEnabled ?? true);
+const removeQrCode = ref(false);
 
 const contact = props.settings.contact ?? {};
 
@@ -219,12 +261,18 @@ const form = useForm({
     seo_tagline:     seo.tagline ?? '',
     seo_keywords:    seo.keywords ?? '',
     locale:          props.settings.locale ?? 'en',
+    payment_bank_name:  props.paymentDetails.bank_name ?? '',
+    payment_account_no: props.paymentDetails.account_no ?? '',
+    payment_ifsc:        props.paymentDetails.ifsc ?? '',
+    payment_upi:         props.paymentDetails.upi ?? '',
+    payment_qr_code:     null,
 });
 
 function submit() {
     form.transform((data) => ({
         ...data,
         public_website_enabled: publicSiteEnabled.value,
+        remove_payment_qr_code: removeQrCode.value,
     })).post(`/school-admin/${props.school.id}/settings`, { forceFormData: true });
 }
 </script>

@@ -43,6 +43,18 @@
                 <FoodBillSummary v-if="bill" :total="Number(bill.amount_total)" :paid="Number(bill.amount_paid)"
                                   :balance="Number(bill.balance_due)" :status="bill.status" />
 
+                <div v-if="payeeDetails" class="card space-y-2">
+                    <p class="font-bold text-sm">Where to pay</p>
+                    <p class="text-xs text-slate-500">{{ payeeLabel }}</p>
+                    <div class="text-xs text-slate-700 space-y-0.5">
+                        <p v-if="payeeDetails.bank_name"><span class="text-slate-400">Bank:</span> {{ payeeDetails.bank_name }}</p>
+                        <p v-if="payeeDetails.account_no"><span class="text-slate-400">Account:</span> <span class="font-mono">{{ payeeDetails.account_no }}</span></p>
+                        <p v-if="payeeDetails.ifsc"><span class="text-slate-400">IFSC:</span> <span class="font-mono">{{ payeeDetails.ifsc }}</span></p>
+                        <p v-if="payeeDetails.upi"><span class="text-slate-400">UPI:</span> <span class="font-mono">{{ payeeDetails.upi }}</span></p>
+                    </div>
+                    <img v-if="payeeDetails.qr_code_url" :src="payeeDetails.qr_code_url" alt="Payment QR code" class="h-28 object-contain rounded border border-gray-100 bg-gray-50 p-2 mt-1">
+                </div>
+
                 <div class="card-list">
                     <div class="p-3 border-b bg-gray-50 font-bold text-sm">Your order</div>
                     <div v-if="!orderItems.length" class="p-4 text-center text-sm text-slate-400">Nothing ordered yet.</div>
@@ -148,6 +160,7 @@ const props = defineProps({
     orderItems: { type: Array, default: () => [] },
     payments: { type: Array, default: () => [] },
     payeeLabel: { type: String, default: '' },
+    payeeDetails: { type: Object, default: null },
 });
 
 const school = computed(() => usePage().props.school);

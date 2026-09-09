@@ -47,9 +47,42 @@ class FestFoodOrderController extends SchoolAdminController
         $bill = FestFoodBill::where('event_id', $event->id)->where('school_id', $this->school->id)->first();
         $bill?->load(['orderItems', 'payments']);
 
-        $hostSchoolName = $event->food_payee_type === 'host_school' && $event->food_host_school_id
-            ? Tenant::where('id', $event->food_host_school_id)->value('name')
+        // Prefer the bill's OWN snapshotted payee (set once at FestFoodBill::
+        // firstOrCreateForSchool() and never rewritten by a later event-setting change —
+        // see that method's docblock) so this matches exactly who the bill is actually
+        // payable to. Before the school has ordered anything (no bill yet), there's
+        // nothing snapshotted, so fall back to the event's current setting.
+        $payeeType = $bill?->payee_type ?? $event->food_payee_type;
+        $hostSchoolId = $bill?->host_school_id ?? $event->food_host_school_id;
+
+        $hostSchool = $payeeType === 'host_school' && $hostSchoolId
+            ? Tenant::find($hostSchoolId)
             : null;
+
+        $payeeDetails = null;
+        if ($payeeType === 'host_school' && $hostSchool) {
+            $payeeDetails = [
+                'name' => $hostSchool->name,
+                ...$hostSchool->paymentDetails(),
+                'qr_code_url' => $hostSchool->paymentQrCodeUrl(),
+            ];
+        } elseif ($payeeType !== 'host_school') {
+            $sahodayaProfile = \App\Models\SahodayaProfile::where('tenant_id', $event->tenant_id)->first();
+            if ($sahodayaProfile) {
+                $payeeDetails = [
+                    'name' => Tenant::where('id', $event->tenant_id)->value('name'),
+                    'bank_name' => $sahodayaProfile->payment_bank_name,
+                    'account_no' => $sahodayaProfile->payment_account_no,
+                    'ifsc' => $sahodayaProfile->payment_ifsc,
+                    'upi' => $sahodayaProfile->payment_upi,
+                    'qr_code_url' => $sahodayaProfile->paymentQrCodeUrl(),
+                ];
+            }
+        }
+        // No bank/UPI/QR field is worth showing an empty "Where to pay" card for.
+        if ($payeeDetails && ! array_filter(array_intersect_key($payeeDetails, array_flip(['bank_name', 'account_no', 'ifsc', 'upi', 'qr_code_url'])))) {
+            $payeeDetails = null;
+        }
 
         return $this->inertia('School/Fest/FoodOrder', [
             'event' => $event->only('id', 'title', 'event_start', 'event_end'),
@@ -65,9 +98,10 @@ class FestFoodOrderController extends SchoolAdminController
                 ...$p->only(['id', 'amount', 'payment_mode', 'receipt_number', 'status', 'transaction_ref', 'bank_name', 'received_at', 'submitted_at', 'rejection_reason']),
                 'has_proof' => (bool) $p->proof_path,
             ]) ?? [],
-            'payeeLabel' => $event->food_payee_type === 'host_school'
-                ? ($hostSchoolName ? "Payable to {$hostSchoolName} (host school)" : 'Payable to the host school')
+            'payeeLabel' => $payeeType === 'host_school'
+                ? ($hostSchool ? "Payable to {$hostSchool->name} (host school)" : 'Payable to the host school')
                 : 'Payable to Sahodaya',
+            'payeeDetails' => $payeeDetails,
         ]);
     }
 
