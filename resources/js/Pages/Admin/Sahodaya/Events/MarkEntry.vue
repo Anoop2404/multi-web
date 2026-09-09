@@ -205,7 +205,7 @@
                                 <th class="p-3.5 w-10 text-center sticky left-0 z-20 bg-slate-50 border-r border-slate-200">#</th>
                                 <th class="p-3.5 w-24">Chest No.</th>
                                 <th class="p-3.5 w-28">Order</th>
-                                <th class="p-3.5 w-28">Reg No.</th>
+                                <th class="p-3.5 w-28">Fest ID</th>
                                 <th class="p-3.5 w-32">Attendance</th>
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
                                 <th class="p-3.5 w-32">Rank</th>
@@ -249,7 +249,9 @@
                                             @update:model-value="(value) => saveOrderNo(participant, value)" />
                                 </td>
 
-                                <!-- Reg No. -->
+                                <!-- Fest ID — the participant's per-event registration number
+                                     (FestParticipant.level_registration_number), same field
+                                     shown as "Fest ID" on the Chest Number report. -->
                                 <td class="p-3.5 font-mono text-slate-700 text-xs">
                                     <span v-if="participantRegNo(participant)" class="bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
                                         {{ participantRegNo(participant) }}
@@ -749,8 +751,12 @@ function deleteUpload(upload) {
     router.delete(upload.downloadUrl, { preserveScroll: true });
 }
 
+// level_registration_number ("Fest ID") is set once a student's Step-1 event
+// registration is approved — student.fest_registration_id/participant.event_reg_id
+// never existed as real fields, so this always fell through to showing the raw
+// internal participant.id instead of any real registration number.
 function participantRegNo(participant) {
-    return participant.student?.fest_registration_id ?? participant.event_reg_id ?? null;
+    return participant.level_registration_number ?? null;
 }
 
 function markAttendance(participant, item, status) {
