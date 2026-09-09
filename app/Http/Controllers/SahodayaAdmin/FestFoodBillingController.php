@@ -13,6 +13,7 @@ use App\Services\Events\FestPartitionService;
 use App\Services\Exports\CsvExportDispatcher;
 use App\Support\FestPageActivity;
 use App\Support\TenantBranding;
+use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -176,7 +177,11 @@ class FestFoodBillingController extends SahodayaAdminController
                 'host_school_name' => $hostSchool?->name,
             ],
             'orderItems' => $bill->orderItems,
-            'payments' => $bill->payments,
+            'payments' => $bill->payments->map(fn (FestFoodPayment $p) => [
+                ...$p->only(['id', 'amount', 'payment_mode', 'receipt_number', 'status', 'transaction_ref', 'bank_name', 'notes', 'received_at', 'submitted_at', 'reviewed_at', 'rejection_reason']),
+                'has_proof' => (bool) $p->proof_path,
+                'submitted_by_name' => $p->submitted_by_user_id ? \App\Models\User::find($p->submitted_by_user_id)?->name : null,
+            ]),
             'menuItems' => $menuItems,
         ]));
     }
@@ -271,6 +276,50 @@ class FestFoodBillingController extends SahodayaAdminController
         ]);
 
         return back()->with('success', "Payment {$receiptNumber} voided.");
+    }
+
+    public function approvePayment(Request $request, string $tenantId, FestEvent $event, FestFoodBill $bill, FestFoodPayment $payment, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($bill->event_id !== $event->id, 404);
+        abort_if($payment->bill_id !== $bill->id, 404);
+
+        $payment->approve($request->user()->id);
+
+        $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.payment_approved', "Payment of ₹{$payment->amount} approved", [
+            'bill_id' => $bill->id,
+            'payment_id' => $payment->id,
+        ]);
+
+        return back()->with('success', 'Payment approved.');
+    }
+
+    public function rejectPayment(Request $request, string $tenantId, FestEvent $event, FestFoodBill $bill, FestFoodPayment $payment, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($bill->event_id !== $event->id, 404);
+        abort_if($payment->bill_id !== $bill->id, 404);
+
+        $data = $request->validate(['reason' => 'nullable|string|max:500']);
+
+        $payment->reject($request->user()->id, $data['reason'] ?? null);
+
+        $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.payment_rejected', "Payment of ₹{$payment->amount} rejected", [
+            'bill_id' => $bill->id,
+            'payment_id' => $payment->id,
+        ]);
+
+        return back()->with('success', 'Payment rejected.');
+    }
+
+    public function paymentProof(string $tenantId, FestEvent $event, FestFoodBill $bill, FestFoodPayment $payment)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($bill->event_id !== $event->id, 404);
+        abort_if($payment->bill_id !== $bill->id, 404);
+        abort_unless($payment->proof_path, 404);
+
+        return TenantStorage::downloadResponse($this->sahodaya, $payment->proof_path);
     }
 
     public function settle(Request $request, string $tenantId, FestEvent $event, FestFoodBill $bill, PlatformAuditLogger $audit)

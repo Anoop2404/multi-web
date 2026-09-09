@@ -13,14 +13,25 @@ use Illuminate\Support\Facades\DB;
  */
 class FestFoodPayment extends Model
 {
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_APPROVED = 'approved';
+
+    public const STATUS_REJECTED = 'rejected';
+
     protected $fillable = [
         'bill_id', 'amount', 'payment_mode', 'receipt_number',
-        'received_by_user_id', 'received_at', 'notes',
+        'received_by_user_id', 'received_at', 'notes', 'status',
+        'transaction_ref', 'bank_name', 'proof_path',
+        'submitted_by_user_id', 'submitted_at',
+        'reviewed_by_user_id', 'reviewed_at', 'rejection_reason',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'received_at' => 'datetime',
+        'submitted_at' => 'datetime',
+        'reviewed_at' => 'datetime',
     ];
 
     public function bill(): BelongsTo
@@ -91,6 +102,12 @@ class FestFoodPayment extends Model
                 'receipt_number' => $receiptNumber,
                 'received_by_user_id' => $receivedByUserId,
                 'received_at' => now(),
+                // Staff directly entering this IS the review — a front-desk/bank-transfer
+                // entry a staff member typed in themselves needs no separate approval step,
+                // unlike a school's own submitPayment()-based claim below.
+                'status' => self::STATUS_APPROVED,
+                'reviewed_by_user_id' => $receivedByUserId,
+                'reviewed_at' => now(),
             ]);
 
             $locked->recalculate();
@@ -100,6 +117,88 @@ class FestFoodPayment extends Model
 
             return $payment;
         });
+    }
+
+    /**
+     * A school submitting its own payment claim (proof upload + transaction ref) — unlike
+     * recordForBill(), this starts as STATUS_PENDING and does NOT touch the bill's
+     * amount_paid at all (recalculate() only ever sums approved rows), so a claim sitting
+     * unreviewed can never make a bill look more paid-off than it actually is. No
+     * overpayment-vs-balance check here on purpose: the balance a school sees already
+     * excludes every pending claim, so blocking on it would only get in the way of a
+     * school resubmitting proof for a payment still awaiting review.
+     */
+    public static function submitForBill(
+        FestFoodBill $bill,
+        float $amount,
+        string $paymentMode,
+        ?string $transactionRef,
+        ?string $bankName,
+        ?string $proofPath,
+        ?string $notes,
+        int $submittedByUserId,
+    ): self {
+        return DB::transaction(function () use ($bill, $amount, $paymentMode, $transactionRef, $bankName, $proofPath, $notes, $submittedByUserId) {
+            $locked = FestFoodBill::whereKey($bill->id)->lockForUpdate()->firstOrFail();
+
+            abort_if(
+                $locked->status !== FestFoodBill::STATUS_OPEN,
+                422,
+                'This bill is settled/cancelled — no further payments can be submitted.'
+            );
+
+            return static::create([
+                'bill_id' => $locked->id,
+                'amount' => $amount,
+                'payment_mode' => $paymentMode,
+                'transaction_ref' => $transactionRef,
+                'bank_name' => $bankName,
+                'proof_path' => $proofPath,
+                'notes' => $notes,
+                'status' => self::STATUS_PENDING,
+                'submitted_by_user_id' => $submittedByUserId,
+                'submitted_at' => now(),
+            ]);
+        });
+    }
+
+    /**
+     * Approve a pending payment claim — only now does it count toward the bill's
+     * amount_paid, via the recalculate() call below.
+     */
+    public function approve(int $reviewerId): void
+    {
+        DB::transaction(function () use ($reviewerId) {
+            $locked = FestFoodBill::whereKey($this->bill_id)->lockForUpdate()->firstOrFail();
+
+            abort_if($this->status !== self::STATUS_PENDING, 422, 'Only a pending payment can be approved.');
+
+            $n = static::where('bill_id', $locked->id)->where('status', self::STATUS_APPROVED)->count() + 1;
+
+            $this->update([
+                'status' => self::STATUS_APPROVED,
+                'receipt_number' => $this->receipt_number ?: 'FB'.$locked->id.'-'.str_pad((string) $n, 3, '0', STR_PAD_LEFT),
+                'received_by_user_id' => $reviewerId,
+                'received_at' => now(),
+                'reviewed_by_user_id' => $reviewerId,
+                'reviewed_at' => now(),
+            ]);
+
+            $locked->recalculate();
+        });
+    }
+
+    /** Reject a pending payment claim — never counted toward amount_paid, so no recalculate needed. */
+    public function reject(int $reviewerId, ?string $reason): void
+    {
+        abort_if($this->status !== self::STATUS_PENDING, 422, 'Only a pending payment can be rejected.');
+
+        $this->update([
+            'status' => self::STATUS_REJECTED,
+            'reviewed_by_user_id' => $reviewerId,
+            'reviewed_at' => now(),
+            'rejection_reason' => $reason,
+        ]);
     }
 
     /**

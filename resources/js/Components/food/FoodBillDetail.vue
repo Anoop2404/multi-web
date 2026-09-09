@@ -62,22 +62,36 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Receipt</th><th>Amount</th><th>Mode</th><th>Received</th><th>Notes</th><th class="text-right"></th>
+                        <th>Receipt</th><th>Amount</th><th>Mode</th><th>Status</th><th>Received</th><th>Notes</th><th class="text-right"></th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="p in payments" :key="p.id">
-                        <td class="font-mono text-xs">{{ p.receipt_number }}</td>
+                        <td class="font-mono text-xs">{{ p.receipt_number || '—' }}</td>
                         <td>₹{{ Number(p.amount).toFixed(2) }}</td>
                         <td class="capitalize">{{ p.payment_mode.replace('_', ' ') }}</td>
-                        <td>{{ formatCalendarDate(p.received_at) }}</td>
+                        <td>
+                            <span :class="statusBadgeClass(p.status)">{{ statusLabel(p.status) }}</span>
+                            <p v-if="p.status === 'pending'" class="text-[11px] text-gray-500 mt-0.5">
+                                {{ p.submitted_by_name ? `Submitted by ${p.submitted_by_name}` : 'School-submitted' }}
+                                <span v-if="p.transaction_ref"> · Ref {{ p.transaction_ref }}</span>
+                                <span v-if="p.bank_name"> · {{ p.bank_name }}</span>
+                            </p>
+                            <p v-if="p.status === 'rejected' && p.rejection_reason" class="text-[11px] text-red-600 mt-0.5">{{ p.rejection_reason }}</p>
+                            <a v-if="p.has_proof" :href="`${basePath}/payments/${p.id}/proof`" target="_blank" class="text-[11px] text-blue-600 underline block mt-0.5">View proof</a>
+                        </td>
+                        <td>{{ formatCalendarDate(p.received_at || p.submitted_at) }}</td>
                         <td class="text-gray-500">{{ p.notes }}</td>
-                        <td class="text-right">
-                            <button class="text-xs font-semibold text-red-500" @click="voidPayment(p)">Void</button>
+                        <td class="text-right whitespace-nowrap">
+                            <template v-if="p.status === 'pending'">
+                                <button class="text-xs font-semibold text-emerald-600 mr-2" @click="approvePayment(p)">Approve</button>
+                                <button class="text-xs font-semibold text-red-500" @click="rejectPayment(p)">Reject</button>
+                            </template>
+                            <button v-else class="text-xs font-semibold text-red-500" @click="voidPayment(p)">Void</button>
                         </td>
                     </tr>
                     <tr v-if="!payments.length">
-                        <td colspan="6" class="p-6 text-center text-gray-400">No payments recorded yet.</td>
+                        <td colspan="7" class="p-6 text-center text-gray-400">No payments recorded yet.</td>
                     </tr>
                 </tbody>
             </table>
@@ -120,7 +134,7 @@ const props = defineProps({
     canCancel: { type: Boolean, default: false },
 });
 
-const { confirm } = useConfirm();
+const { confirm, prompt } = useConfirm();
 
 const itemForm = useForm({ menu_item_id: '', quantity: 1 });
 
@@ -166,5 +180,34 @@ async function cancelBill() {
 async function voidPayment(p) {
     if (!(await confirm({ message: `Void payment ${p.receipt_number} (₹${Number(p.amount).toFixed(2)})? This cannot be undone.`, destructive: true }))) return;
     router.delete(`${props.basePath}/payments/${p.id}`, { preserveScroll: true });
+}
+
+async function approvePayment(p) {
+    if (!(await confirm({ message: `Approve this ₹${Number(p.amount).toFixed(2)} payment? It will count toward the bill's paid total.` }))) return;
+    router.post(`${props.basePath}/payments/${p.id}/approve`, {}, { preserveScroll: true });
+}
+async function rejectPayment(p) {
+    const reason = await prompt({
+        title: 'Reject payment',
+        message: `Reject this ₹${Number(p.amount).toFixed(2)} payment claim?`,
+        inputLabel: 'Reason (optional)',
+        inputPlaceholder: 'e.g. UTR does not match our bank statement',
+        inputRequired: false,
+        confirmLabel: 'Reject',
+        destructive: true,
+    });
+    if (reason === null) return;
+    router.post(`${props.basePath}/payments/${p.id}/reject`, { reason }, { preserveScroll: true });
+}
+
+const STATUS_LABELS = { pending: 'Awaiting review', approved: 'Approved', rejected: 'Rejected' };
+function statusLabel(status) {
+    return STATUS_LABELS[status] ?? status;
+}
+function statusBadgeClass(status) {
+    const base = 'inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full';
+    if (status === 'approved') return `${base} bg-emerald-50 text-emerald-700`;
+    if (status === 'rejected') return `${base} bg-red-50 text-red-700`;
+    return `${base} bg-amber-50 text-amber-700`;
 }
 </script>

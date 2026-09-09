@@ -62,7 +62,10 @@ th{background:#1d3557;color:#fff}
         </tr>
     </thead>
     <tbody>
-        @forelse($bill->payments as $p)
+        {{-- Only approved payments — a pending or rejected school-submitted claim isn't a
+             real payment yet (see FestFoodPayment::submitForBill()/approve()) and must
+             never appear on a printed receipt as if it were confirmed. --}}
+        @forelse($bill->payments->where('status', \App\Models\FestFoodPayment::STATUS_APPROVED) as $p)
             <tr>
                 <td>{{ $p->receipt_number }}</td>
                 <td style="text-align:right">{{ number_format((float) $p->amount, 2) }}</td>

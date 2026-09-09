@@ -55,16 +55,58 @@
                     </div>
                 </div>
 
-                <details v-if="payments.length" class="card card--flush">
-                    <summary class="p-3 cursor-pointer select-none font-bold text-sm">Payments received ({{ payments.length }})</summary>
+                <div v-if="bill && Number(bill.balance_due) > 0 && canOrder" class="card space-y-3">
+                    <p class="font-bold text-sm">Submit a payment</p>
+                    <p class="text-xs text-slate-500">Paid by bank transfer or UPI? Upload proof here — it'll show as "Awaiting review" until the Sahodaya checks it against their statement.</p>
+                    <form class="space-y-2" @submit.prevent="submitPayment">
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="text-xs font-medium text-slate-600">Amount (₹)
+                                <input v-model="paymentForm.amount" type="number" min="0.01" step="0.01" class="field mt-1" required>
+                            </label>
+                            <label class="text-xs font-medium text-slate-600">Mode
+                                <select v-model="paymentForm.payment_mode" class="field mt-1" required>
+                                    <option value="upi">UPI</option>
+                                    <option value="bank_transfer">Bank transfer</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </label>
+                        </div>
+                        <label class="block text-xs font-medium text-slate-600">Transaction ref / UTR (optional)
+                            <input v-model="paymentForm.transaction_ref" type="text" class="field mt-1">
+                        </label>
+                        <label class="block text-xs font-medium text-slate-600">Paid from bank (optional)
+                            <input v-model="paymentForm.bank_name" type="text" class="field mt-1">
+                        </label>
+                        <label class="block text-xs font-medium text-slate-600">Proof (screenshot/PDF)
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="field mt-1" required @change="onProofSelected">
+                        </label>
+                        <label class="block text-xs font-medium text-slate-600">Notes (optional)
+                            <textarea v-model="paymentForm.notes" rows="2" class="field mt-1"></textarea>
+                        </label>
+                        <p v-if="paymentForm.errors.amount" class="text-xs text-red-600">{{ paymentForm.errors.amount }}</p>
+                        <p v-if="paymentForm.errors.proof" class="text-xs text-red-600">{{ paymentForm.errors.proof }}</p>
+                        <button type="submit" class="btn-primary w-full text-xs" :disabled="paymentForm.processing">
+                            {{ paymentForm.processing ? 'Submitting…' : 'Submit for review' }}
+                        </button>
+                    </form>
+                </div>
+
+                <details v-if="payments.length" class="card card--flush" open>
+                    <summary class="p-3 cursor-pointer select-none font-bold text-sm">Payments ({{ payments.length }})</summary>
                     <table class="data-table">
-                        <thead><tr><th>Receipt</th><th>Amount</th><th>Mode</th><th>Date</th></tr></thead>
+                        <thead><tr><th>Receipt</th><th>Amount</th><th>Mode</th><th>Status</th><th>Date</th></tr></thead>
                         <tbody>
                             <tr v-for="p in payments" :key="p.id">
-                                <td class="font-mono text-xs">{{ p.receipt_number }}</td>
+                                <td class="font-mono text-xs">{{ p.receipt_number || '—' }}</td>
                                 <td>₹{{ Number(p.amount).toFixed(2) }}</td>
                                 <td class="capitalize">{{ p.payment_mode.replace('_', ' ') }}</td>
-                                <td>{{ formatCalendarDate(p.received_at) }}</td>
+                                <td>
+                                    <span :class="statusBadgeClass(p.status)">{{ statusLabel(p.status) }}</span>
+                                    <p v-if="p.status === 'rejected' && p.rejection_reason" class="text-[11px] text-red-600 mt-0.5">{{ p.rejection_reason }}</p>
+                                    <a v-if="p.has_proof" :href="`${base}/payments/${p.id}/proof`" target="_blank" class="text-[11px] text-blue-600 underline block mt-0.5">View proof</a>
+                                </td>
+                                <td>{{ formatCalendarDate(p.received_at || p.submitted_at) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -115,6 +157,32 @@ const canOrder = computed(() => !props.bill || props.bill.status === 'open');
 
 const qty = reactive({});
 const itemForm = useForm({ menu_item_id: '', quantity: 1 });
+
+const paymentForm = useForm({
+    amount: '', payment_mode: 'upi', transaction_ref: '', bank_name: '', proof: null, notes: '',
+});
+
+function onProofSelected(event) {
+    paymentForm.proof = event.target.files[0] ?? null;
+}
+
+function submitPayment() {
+    paymentForm.post(`${base}/payments`, {
+        preserveScroll: true,
+        onSuccess: () => paymentForm.reset(),
+    });
+}
+
+const STATUS_LABELS = { pending: 'Awaiting review', approved: 'Approved', rejected: 'Rejected' };
+function statusLabel(status) {
+    return STATUS_LABELS[status] ?? status;
+}
+function statusBadgeClass(status) {
+    const base = 'inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full';
+    if (status === 'approved') return `${base} bg-emerald-50 text-emerald-700`;
+    if (status === 'rejected') return `${base} bg-red-50 text-red-700`;
+    return `${base} bg-amber-50 text-amber-700`;
+}
 
 function orderedQty(menuItemId) {
     return props.orderItems.filter((oi) => oi.menu_item_id === menuItemId).reduce((sum, oi) => sum + oi.quantity, 0);

@@ -73,11 +73,17 @@ class FestFoodBill extends Model
         return round((float) $this->amount_total - (float) $this->amount_paid, 2);
     }
 
-    /** Re-derive amount_total from order items and amount_paid from payments. Call after any mutation. */
+    /**
+     * Re-derive amount_total from order items and amount_paid from payments. Call after
+     * any mutation. Only 'approved' payments count toward amount_paid — a school-submitted
+     * payment sits as 'pending' until a staff member on the receiving side reviews it, so a
+     * claim that hasn't been checked against the bank statement never quietly settles a
+     * bill on its own.
+     */
     public function recalculate(): void
     {
         $this->amount_total = $this->orderItems()->sum('line_total');
-        $this->amount_paid = $this->payments()->sum('amount');
+        $this->amount_paid = $this->payments()->where('status', FestFoodPayment::STATUS_APPROVED)->sum('amount');
         $this->save();
     }
 

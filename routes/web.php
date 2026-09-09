@@ -487,6 +487,8 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/fest/{event}/food-order', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'show'])->name('food-order.show');
     Route::post('/fest/{event}/food-order/items', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'addItem'])->name('food-order.items.store');
     Route::delete('/fest/{event}/food-order/items/{orderItem}', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'removeItem'])->name('food-order.items.destroy');
+    Route::post('/fest/{event}/food-order/payments', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'submitPayment'])->name('food-order.payments.store');
+    Route::get('/fest/{event}/food-order/payments/{payment}/proof', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'paymentProof'])->name('food-order.payments.proof');
     Route::get('/fest/{event}/food-host-billing', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'index'])->name('food-host-billing.index');
     Route::get('/fest/{event}/food-host-billing/export', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'exportCsv'])->name('food-host-billing.export');
     Route::get('/fest/{event}/food-host-billing/report', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'report'])->name('food-host-billing.report');
@@ -497,6 +499,9 @@ Route::prefix('school-admin/{tenantId}')
     Route::delete('/fest/{event}/food-host-billing/{bill}/items/{orderItem}', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'removeItem'])->name('food-host-billing.items.destroy');
     Route::post('/fest/{event}/food-host-billing/{bill}/payments', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'recordPayment'])->name('food-host-billing.payments.store');
     Route::delete('/fest/{event}/food-host-billing/{bill}/payments/{payment}', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'voidPayment'])->name('food-host-billing.payments.void');
+    Route::post('/fest/{event}/food-host-billing/{bill}/payments/{payment}/approve', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'approvePayment'])->name('food-host-billing.payments.approve');
+    Route::post('/fest/{event}/food-host-billing/{bill}/payments/{payment}/reject', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'rejectPayment'])->name('food-host-billing.payments.reject');
+    Route::get('/fest/{event}/food-host-billing/{bill}/payments/{payment}/proof', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'paymentProof'])->name('food-host-billing.payments.proof');
     Route::post('/fest/{event}/food-host-billing/{bill}/settle', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'settle'])->name('food-host-billing.settle');
     Route::post('/fest/{event}/food-host-billing/{bill}/reopen', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'reopen'])->name('food-host-billing.reopen');
 
@@ -1315,6 +1320,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/food-billing/{bill}/items/{orderItem}', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'removeItem'])->name('food-billing.items.destroy');
             Route::post('/{event}/food-billing/{bill}/payments', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'recordPayment'])->name('food-billing.payments.store');
             Route::delete('/{event}/food-billing/{bill}/payments/{payment}', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'voidPayment'])->name('food-billing.payments.void');
+            Route::post('/{event}/food-billing/{bill}/payments/{payment}/approve', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'approvePayment'])->name('food-billing.payments.approve');
+            Route::post('/{event}/food-billing/{bill}/payments/{payment}/reject', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'rejectPayment'])->name('food-billing.payments.reject');
+            Route::get('/{event}/food-billing/{bill}/payments/{payment}/proof', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'paymentProof'])->name('food-billing.payments.proof');
             Route::post('/{event}/food-billing/{bill}/settle', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'settle'])->name('food-billing.settle');
             Route::post('/{event}/food-billing/{bill}/reopen', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'reopen'])->name('food-billing.reopen');
             Route::post('/{event}/food-billing/{bill}/cancel', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'cancel'])->name('food-billing.cancel');
