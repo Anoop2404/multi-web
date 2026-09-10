@@ -18,7 +18,7 @@
 
         @if(!empty($content['quick_links']))
         <div>
-            <h3 class="text-white font-semibold mb-3">Quick Links</h3>
+            <h3 class="site-footer-heading text-white font-semibold mb-3">{{ $content['quick_links_heading'] ?? 'Quick Links' }}</h3>
             <ul class="space-y-1 text-sm">
                 @foreach($content['quick_links'] as $link)
                     <li><a href="{{ $link['url'] }}" class="hover:text-white transition-colors">{{ $link['label'] }}</a></li>
@@ -29,7 +29,7 @@
 
         @if(!empty($content['address']) || !empty($content['phone']) || !empty($content['email']))
         <div>
-            <h3 class="text-white font-semibold mb-3">Contact</h3>
+            <h3 class="site-footer-heading text-white font-semibold mb-3">{{ $content['contact_heading'] ?? 'Contact' }}</h3>
             <address class="text-sm not-italic space-y-1">
                 @if(!empty($content['address']))<p>{{ $content['address'] }}</p>@endif
                 @if(!empty($content['phone']))<p>{{ $content['phone'] }}</p>@endif

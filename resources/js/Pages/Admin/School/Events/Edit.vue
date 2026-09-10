@@ -44,7 +44,7 @@
                     </div>
 
                     <div v-if="event.image" class="flex items-center gap-3 text-sm text-gray-500">
-                        <img :src="event.image" class="h-16 w-24 object-cover rounded-lg border border-gray-100">
+                        <img :src="event.image_url || event.image" class="h-16 w-24 object-cover rounded-lg border border-gray-100">
                         <span>Current image</span>
                     </div>
 

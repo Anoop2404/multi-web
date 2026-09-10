@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\GalleryAlbum;
-use App\Support\TenantStorage;
 use App\Models\GalleryItem;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -14,7 +14,7 @@ class GalleryController extends SchoolAdminController
     {
         $albums = GalleryAlbum::where('tenant_id', $this->school->id)
             ->withCount('items')
-            ->with(['items' => fn($q) => $q->orderBy('display_order')->limit(16)])
+            ->with(['items' => fn ($q) => $q->orderBy('display_order')->limit(16)])
             ->orderBy('display_order')
             ->get();
 
@@ -24,16 +24,16 @@ class GalleryController extends SchoolAdminController
     public function storeAlbum(Request $request)
     {
         $data = $request->validate([
-            'title'       => 'required|string|max:255',
+            'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'cover_image' => 'nullable|image|max:4096',
         ]);
 
         $data['tenant_id'] = $this->school->id;
-        $data['slug']      = Str::slug($data['title']) . '-' . Str::random(4);
+        $data['slug'] = Str::slug($data['title']).'-'.Str::random(4);
 
         if ($request->hasFile('cover_image')) {
-            $data['cover_image'] = $request->file('cover_image')->store('gallery/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
+            $data['cover_image'] = TenantStorage::storeSiteMedia($request->file('cover_image'), $this->school->id);
         }
 
         $album = GalleryAlbum::create($data);
@@ -41,34 +41,69 @@ class GalleryController extends SchoolAdminController
         return back()->with('success', "Album \"{$album->title}\" created.");
     }
 
+    public function updateAlbum(Request $request, string $tenantId, GalleryAlbum $album)
+    {
+        abort_if($album->tenant_id !== $this->school->id, 403);
+
+        $data = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string|max:2000',
+            'display_order' => 'nullable|integer|min:0|max:10000',
+            'cover_image' => 'nullable|image|max:4096',
+        ]);
+
+        if ($request->hasFile('cover_image')) {
+            $data['cover_image'] = TenantStorage::storeSiteMedia($request->file('cover_image'), $this->school->id);
+        }
+
+        $album->update($data);
+
+        return back()->with('success', "Album \"{$album->title}\" updated.");
+    }
+
     public function uploadPhotos(Request $request, string $tenantId, GalleryAlbum $album)
     {
         abort_if($album->tenant_id !== $this->school->id, 403);
 
         $request->validate([
-            'photos'   => 'required|array',
+            'photos' => 'required|array',
             'photos.*' => 'image|max:8192',
         ]);
 
         $order = $album->items()->max('display_order') + 1;
 
         foreach ($request->file('photos') as $photo) {
-            $path = $photo->store('gallery/' . $this->school->id . '/' . $album->id, \App\Support\TenantStorage::uploadDisk());
+            $path = TenantStorage::storeSiteMedia($photo, $this->school->id);
             GalleryItem::create([
-                'album_id'      => $album->id,
-                'tenant_id'     => $this->school->id,
-                'image_path'    => $path,
+                'album_id' => $album->id,
+                'tenant_id' => $this->school->id,
+                'image_path' => $path,
                 'display_order' => $order++,
             ]);
         }
 
-        return back()->with('success', count($request->file('photos')) . ' photos uploaded.');
+        return back()->with('success', count($request->file('photos')).' photos uploaded.');
+    }
+
+    public function updatePhoto(Request $request, string $tenantId, GalleryItem $photo)
+    {
+        abort_if($photo->tenant_id !== $this->school->id, 403);
+
+        $data = $request->validate([
+            'caption' => 'nullable|string|max:500',
+            'display_order' => 'nullable|integer|min:0|max:10000',
+        ]);
+
+        $photo->update($data);
+
+        return back()->with('success', 'Photo details updated.');
     }
 
     public function destroyAlbum(string $tenantId, GalleryAlbum $album)
     {
         abort_if($album->tenant_id !== $this->school->id, 403);
         $album->delete();
+
         return back()->with('success', 'Album deleted.');
     }
 
@@ -76,6 +111,7 @@ class GalleryController extends SchoolAdminController
     {
         abort_if($photo->tenant_id !== $this->school->id, 403);
         $photo->delete();
+
         return back()->with('success', 'Photo removed.');
     }
 }

@@ -1,15 +1,18 @@
 @extends('layouts.public')
 
 @section('content')
+@php
+    $pageContent = data_get($siteContent ?? [], 'pages.results', []);
+@endphp
 <section class="py-12 px-4">
     <div class="max-w-5xl mx-auto">
         <a href="/" class="inline-flex items-center gap-1 text-sm font-semibold mb-8 hover:underline" style="color: var(--color-primary)">
-            &larr; Back to home
+            &larr; {{ data_get($siteContent ?? [], 'common.back_to_home', 'Back to home') }}
         </a>
 
         <div class="mb-10">
-            <h1 class="text-3xl md:text-4xl font-bold font-heading text-gray-900">Board Examination Results</h1>
-            <p class="text-gray-500 mt-2">Academic year {{ $year }} — Class X (AISSE) &amp; Class XII (AISSCE)</p>
+            <h1 class="text-3xl md:text-4xl font-bold font-heading text-gray-900">{{ $pageContent['title'] ?? 'Board Examination Results' }}</h1>
+            <p class="text-gray-500 mt-2">{{ $pageContent['intro_prefix'] ?? 'Academic year' }} {{ $year }} — {{ $pageContent['intro_suffix'] ?? 'Class X (AISSE) & Class XII (AISSCE)' }}</p>
         </div>
 
         @forelse($results as $result)
@@ -29,17 +32,17 @@
                    class="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full border transition hover:opacity-90"
                    style="border-color: var(--color-primary); color: var(--color-primary)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-                    Download Full Result (PDF)
+                    {{ $pageContent['download_label'] ?? 'Download Full Result (PDF)' }}
                 </a>
                 @endif
             </div>
 
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                 @foreach([
-                    ['label' => 'Appeared', 'value' => $result->total_appeared],
-                    ['label' => 'Pass %', 'value' => $result->pass_percent !== null ? $result->pass_percent.'%' : '—'],
-                    ['label' => 'Distinctions', 'value' => $result->distinctions],
-                    ['label' => 'First Class', 'value' => $result->first_class],
+                    ['label' => $pageContent['appeared_label'] ?? 'Appeared', 'value' => $result->total_appeared],
+                    ['label' => $pageContent['pass_label'] ?? 'Pass %', 'value' => $result->pass_percent !== null ? $result->pass_percent.'%' : '—'],
+                    ['label' => $pageContent['distinctions_label'] ?? 'Distinctions', 'value' => $result->distinctions],
+                    ['label' => $pageContent['first_class_label'] ?? 'First Class', 'value' => $result->first_class],
                 ] as $stat)
                 <div class="text-center bg-gray-50 rounded-2xl p-5">
                     <div class="text-3xl font-bold font-heading" style="color: var(--color-primary)">{{ $stat['value'] ?? '—' }}</div>
@@ -53,7 +56,7 @@
             <div class="space-y-8">
                 @foreach($streamGroups as $streamLabel => $streamToppers)
                 <div>
-                    <h3 class="font-semibold text-gray-700 mb-4">{{ $streamLabel ?: 'Top Scorers' }}</h3>
+                    <h3 class="font-semibold text-gray-700 mb-4">{{ $streamLabel ?: ($pageContent['top_scorers_label'] ?? 'Top Scorers') }}</h3>
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                         @foreach($streamToppers as $topper)
                         <div class="text-center bg-gray-50 rounded-xl p-4">
@@ -77,7 +80,7 @@
             @endif
         </div>
         @empty
-        <p class="text-gray-500 text-center py-12">Results have not been published yet.</p>
+        <p class="text-gray-500 text-center py-12">{{ $pageContent['empty_message'] ?? 'Results have not been published yet.' }}</p>
         @endforelse
     </div>
 </section>

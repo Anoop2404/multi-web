@@ -4,7 +4,7 @@
 <article class="py-12 px-4">
     <div class="max-w-3xl mx-auto">
         <a href="/" class="inline-flex items-center gap-1 text-sm font-semibold mb-8 hover:underline" style="color: var(--color-primary)">
-            &larr; Back to home
+            &larr; {{ data_get($siteContent ?? [], 'common.back_to_home', 'Back to home') }}
         </a>
 
         <h1 class="text-3xl md:text-4xl font-bold font-heading text-gray-900 mb-4">{{ $event->title }}</h1>
@@ -32,9 +32,9 @@
             @endif
         </div>
 
-        @if($event->image)
+        @if($event->image_url)
         <div class="rounded-2xl overflow-hidden mb-8 shadow-sm">
-            <img src="{{ $event->image }}" alt="{{ $event->title }}" class="w-full h-auto object-cover">
+            <img src="{{ $event->image_url }}" alt="{{ $event->title }}" class="w-full h-auto object-cover">
         </div>
         @endif
 

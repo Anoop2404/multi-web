@@ -1,20 +1,23 @@
 @extends('layouts.public')
 
 @section('content')
+@php
+    $pageContent = data_get($siteContent ?? [], 'pages.events', []);
+@endphp
 <section class="py-12 px-4">
     <div class="max-w-5xl mx-auto">
         <a href="/" class="inline-flex items-center gap-1 text-sm font-semibold mb-8 hover:underline" style="color: var(--color-primary)">
-            &larr; Back to home
+            &larr; {{ data_get($siteContent ?? [], 'common.back_to_home', 'Back to home') }}
         </a>
 
-        <h1 class="text-3xl md:text-4xl font-bold font-heading text-gray-900 mb-10">Events</h1>
+        <h1 class="text-3xl md:text-4xl font-bold font-heading text-gray-900 mb-10">{{ $pageContent['title'] ?? 'Events' }}</h1>
 
         <div class="grid sm:grid-cols-2 gap-6">
             @forelse($events as $event)
             <a href="/events/{{ $event->slug }}" class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group block">
-                @if($event->image)
+                @if($event->image_url)
                 <div class="aspect-video overflow-hidden">
-                    <img loading="lazy" src="{{ $event->image }}" alt="{{ $event->title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    <img loading="lazy" src="{{ $event->image_url }}" alt="{{ $event->title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
                 </div>
                 @endif
                 <div class="p-5">
@@ -30,7 +33,7 @@
                 </div>
             </a>
             @empty
-            <p class="text-gray-500 col-span-full text-center py-12">No events listed yet.</p>
+            <p class="text-gray-500 col-span-full text-center py-12">{{ $pageContent['empty_message'] ?? 'No events listed yet.' }}</p>
             @endforelse
         </div>
 

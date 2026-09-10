@@ -3,7 +3,12 @@
 namespace App\Http\Controllers\Public\Concerns;
 
 use App\Models\Tenant;
+use App\Models\WebsiteSite;
+use App\Services\Website\SahodayaHomepageModeResolver;
+use App\Support\SahodayaWebsiteTemplateCatalog;
 use App\Support\SchoolPortalNavLinks;
+use App\Support\SchoolPublicPageContent;
+use App\Support\SchoolWebsiteTemplateCatalog;
 use App\Support\TenantBranding;
 use App\Support\TenantCache;
 use Illuminate\Http\Response;
@@ -33,6 +38,7 @@ trait RendersPublicPages
                 'seo' => $tenant->settings()->where('key', 'seo')->first()?->value ?? [],
                 'locale' => $tenant->settings()->where('key', 'locale')->first()?->value ?? 'en',
                 'logo' => TenantBranding::logoUrl($tenant),
+                'siteContent' => $tenant->type === 'school' ? SchoolPublicPageContent::resolve($tenant) : [],
             ]
         );
     }
@@ -42,7 +48,7 @@ trait RendersPublicPages
      * screen from the main Settings page where a school actually enters its phone/email/
      * address — most schools only ever fill in Settings, leaving footer_config's contact
      * fields (and quick links) permanently empty. Fall back to the Settings-page `contact`
-     * setting, and to the standard Admissions/Admin-Login quick links, whenever the footer
+     * setting, and to the standard Admissions quick link, whenever the footer
      * editor hasn't been used to override them explicitly.
      *
      * @return array<string, mixed>
@@ -78,7 +84,7 @@ trait RendersPublicPages
     {
         $layout = $this->layoutData($tenant);
         $widgets = $layout['widgets'] ?? [];
-        $experience = $extra['experience'] ?? [];
+        $experience = $extra['experience'] ?? $this->primaryExperienceFor($tenant);
         $policy = $experience['widget_policy'] ?? [];
         $design = $experience['design'] ?? [];
 
@@ -96,7 +102,7 @@ trait RendersPublicPages
             $site = $extra['site'] ?? null;
             if ($site && ! $site->is_primary) {
                 $micrositePath = route('tenant.site.microsite', ['slug' => $site->slug], false);
-                
+
                 // Complete list of dedicated sub-page menu items
                 $items = [
                     ['label' => 'Home', 'url' => $micrositePath, 'external' => false, 'children' => []],
@@ -135,7 +141,35 @@ trait RendersPublicPages
 
         return response()->view($view, array_merge($layout, $extra, [
             'tenant' => $tenant,
+            'experience' => $experience,
             'tenantTheme' => array_merge($layout['theme'] ?? [], $experience['design'] ?? []),
         ]));
+    }
+
+    /** Give standalone public pages the same theme and widget policy as the homepage. */
+    private function primaryExperienceFor(Tenant $tenant): array
+    {
+        $site = WebsiteSite::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('is_primary', true)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $site || ! $site->template_key) {
+            return [];
+        }
+
+        $catalog = $tenant->type === 'school'
+            ? SchoolWebsiteTemplateCatalog::class
+            : SahodayaWebsiteTemplateCatalog::class;
+
+        return [
+            'key' => $site->template_key,
+            'version' => $site->template_version,
+            'experience_version' => 'v2',
+            'homepage_mode' => app(SahodayaHomepageModeResolver::class)->resolve($site),
+            'design' => $site->design_json ?? [],
+            'widget_policy' => $catalog::widgetPolicy($site->template_key),
+        ];
     }
 }

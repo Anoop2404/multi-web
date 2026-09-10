@@ -37,7 +37,7 @@
                     </div>
 
                     <div v-if="news.image" class="flex items-center gap-3 text-sm text-gray-500">
-                        <img :src="news.image" class="h-16 w-24 object-cover rounded-lg border border-gray-100">
+                        <img :src="news.image_url || news.image" class="h-16 w-24 object-cover rounded-lg border border-gray-100">
                         <span>Current image</span>
                     </div>
 

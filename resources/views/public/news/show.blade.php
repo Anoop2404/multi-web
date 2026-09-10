@@ -4,7 +4,7 @@
 <article class="py-12 px-4">
     <div class="max-w-3xl mx-auto">
         <a href="/" class="inline-flex items-center gap-1 text-sm font-semibold mb-8 hover:underline" style="color: var(--color-primary)">
-            &larr; Back to home
+            &larr; {{ data_get($siteContent ?? [], 'common.back_to_home', 'Back to home') }}
         </a>
 
         @if($article->category)
@@ -22,9 +22,9 @@
         </time>
         @endif
 
-        @if($article->image)
+        @if($article->image_url)
         <div class="rounded-2xl overflow-hidden mb-8 shadow-sm">
-            <img src="{{ $article->image }}" alt="{{ $article->title }}" class="w-full h-auto object-cover">
+            <img src="{{ $article->image_url }}" alt="{{ $article->title }}" class="w-full h-auto object-cover">
         </div>
         @endif
 

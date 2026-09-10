@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Public\Concerns\RendersPublicPages;
 use App\Models\Event;
+use App\Support\SchoolPublicPageContent;
+use App\Support\TenantStorage;
 use Illuminate\Support\Str;
 
 class EventController extends Controller
@@ -20,12 +22,12 @@ class EventController extends Controller
             ->paginate(12);
 
         return $this->renderPublic('public.events.index', $tenant, [
-            'events'  => $events,
-            'pageSeo' => [
-                'title'       => 'Events — '.$tenant->name,
+            'events' => $events,
+            'pageSeo' => SchoolPublicPageContent::seo($tenant, 'events', [
+                'title' => 'Events — '.$tenant->name,
                 'description' => 'Upcoming and past events at '.$tenant->name,
-                'og_type'     => 'website',
-            ],
+                'og_type' => 'website',
+            ]),
         ]);
     }
 
@@ -40,11 +42,20 @@ class EventController extends Controller
         return $this->renderPublic('public.events.show', $tenant, [
             'event' => $event,
             'pageSeo' => [
-                'title'       => $event->title.' — '.$tenant->name,
+                'title' => $event->title.' — '.$tenant->name,
                 'description' => Str::limit(strip_tags($event->description ?? ''), 160),
-                'og_image'    => $event->image,
-                'og_type'     => 'event',
+                'og_image' => $event->image_url,
+                'og_type' => 'event',
             ],
         ]);
+    }
+
+    public function image(Event $event)
+    {
+        $tenant = $this->resolveTenant();
+
+        abort_unless($event->tenant_id === $tenant->id && $event->image, 404);
+
+        return TenantStorage::downloadResponse($tenant, $event->image);
     }
 }

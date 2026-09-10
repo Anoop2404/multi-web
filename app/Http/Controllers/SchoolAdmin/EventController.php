@@ -26,19 +26,19 @@ class EventController extends SchoolAdminController
     public function store(Request $request)
     {
         $data = $request->validate([
-            'title'       => 'required|string|max:255',
+            'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'start_date'  => 'required|date',
-            'end_date'    => 'nullable|date|after_or_equal:start_date',
-            'venue'       => 'nullable|string|max:255',
-            'image'       => 'nullable|image|max:4096',
+            'start_date' => 'required|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'venue' => 'nullable|string|max:255',
+            'image' => 'nullable|image|max:4096',
         ]);
 
         $data['tenant_id'] = $this->school->id;
-        $data['slug']      = Str::slug($data['title']) . '-' . Str::random(5);
+        $data['slug'] = Str::slug($data['title']).'-'.Str::random(5);
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('events/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
+            $data['image'] = TenantStorage::storeSiteMedia($request->file('image'), $this->school->id);
         }
 
         Event::create($data);
@@ -49,6 +49,7 @@ class EventController extends SchoolAdminController
     public function edit(string $tenantId, Event $event)
     {
         abort_if($event->tenant_id !== $this->school->id, 403);
+
         return $this->inertia('School/Events/Edit', compact('event'));
     }
 
@@ -57,16 +58,16 @@ class EventController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->id, 403);
 
         $data = $request->validate([
-            'title'       => 'required|string|max:255',
+            'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'start_date'  => 'required|date',
-            'end_date'    => 'nullable|date|after_or_equal:start_date',
-            'venue'       => 'nullable|string|max:255',
-            'image'       => 'nullable|image|max:4096',
+            'start_date' => 'required|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'venue' => 'nullable|string|max:255',
+            'image' => 'nullable|image|max:4096',
         ]);
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('events/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
+            $data['image'] = TenantStorage::storeSiteMedia($request->file('image'), $this->school->id);
         }
 
         $event->update($data);
@@ -78,6 +79,7 @@ class EventController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->id, 403);
         $event->delete();
+
         return back()->with('success', 'Event deleted.');
     }
 }

@@ -28,7 +28,18 @@
     </div>
 @endif
 
-<nav class="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-slate-200" x-data="{ open: false, activeSubmenu: null }">
+@php
+    $schoolCta = $navConfig['portal_cta'] ?? [];
+    if (($tenant->type ?? null) === 'school' && ($schoolCta['contact_btn'] ?? true)) {
+        $contactUrl = $schoolCta['contact_url'] ?? '/contact';
+        $items = collect($items)->reject(function ($item) use ($contactUrl) {
+            $label = strtolower(trim($item['label'] ?? ''));
+            return ($item['url'] ?? '') === $contactUrl || in_array($label, ['contact', 'contact us'], true);
+        })->values()->all();
+    }
+@endphp
+
+<nav class="site-main-navigation bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-slate-200" x-data="{ open: false, activeSubmenu: null }">
     <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16 sm:h-20">
         <a href="{{ $homeUrl ?? '/' }}" class="flex items-center gap-3 min-w-0 group">
             @if(!empty($logo))
@@ -43,12 +54,12 @@
             <div class="min-w-0">
                 <p class="font-heading font-extrabold text-base sm:text-lg text-slate-900 leading-tight tracking-tight truncate group-hover:text-primary transition-colors">{{ $tenant->name ?? 'Sahodaya' }}</p>
                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none hidden sm:block mt-0.5">
-                    {{ ($tenant->type ?? null) === 'school' ? 'CBSE Affiliated School' : 'CBSE Sahodaya Network' }}
+                    {{ ($tenant->type ?? null) === 'school' ? data_get($siteContent ?? [], 'branding.subtitle', 'CBSE Affiliated School') : 'CBSE Sahodaya Network' }}
                 </p>
             </div>
         </a>
 
-        <div class="hidden lg:flex items-center gap-3 2xl:gap-4 min-w-0 ml-4">
+        <div class="site-desktop-navigation hidden xl:flex items-center gap-3 2xl:gap-4 min-w-0 ml-4">
             {{-- No overflow-x here on purpose: any overflow-x value forces the browser to
                  also clip overflow-y (a CSS overflow spec quirk), which was silently
                  hiding every dropdown's flyout panel — hover/click worked, the menu was
@@ -117,7 +128,7 @@
             @include('partials.navbars.portal-cta', ['navConfig' => $navConfig ?? []])
         </div>
 
-        <button @click="open = !open" class="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition">
+        <button @click="open = !open" class="site-mobile-toggle xl:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition" aria-label="Toggle navigation menu" :aria-expanded="open">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       :d="open ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16'"/>
@@ -125,7 +136,7 @@
         </button>
     </div>
 
-    <div x-show="open" x-cloak class="lg:hidden border-t border-slate-200 px-4 py-4 space-y-1.5 bg-white shadow-lg">
+    <div x-show="open" x-cloak class="site-mobile-navigation xl:hidden border-t border-slate-200 px-4 py-4 space-y-1.5 bg-white shadow-lg max-h-[calc(100vh-64px)] overflow-y-auto overscroll-contain">
         @foreach($items as $item)
             @php
                 $label = $item['label'] ?? '';
@@ -142,7 +153,7 @@
                     </button>
                     <div x-show="subOpen" x-cloak class="pl-4 space-y-1 mt-1 border-l-2 border-slate-100">
                         @foreach($item['children'] as $child)
-                            <a href="{{ $child['url'] }}" class="block px-3 py-2 text-xs font-semibold text-slate-600 rounded-lg hover:bg-slate-50">{{ $child['label'] }}</a>
+                            <a href="{{ $child['url'] }}" class="block px-3 py-2 text-xs font-semibold text-slate-600 rounded-lg hover:bg-slate-50" @if($child['external'] ?? false) target="_blank" rel="noopener" @endif>{{ $child['label'] }}</a>
                         @endforeach
                     </div>
                 </div>

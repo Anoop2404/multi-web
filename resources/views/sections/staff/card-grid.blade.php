@@ -1,4 +1,5 @@
 @php
+    use App\Support\TenantStorage;
     $type  = $config['staff_type'] ?? null;
     $limit = $config['limit'] ?? 12;
     $query = \App\Models\StaffMember::where('tenant_id', $tenant->id)->where('is_active', true);
@@ -21,8 +22,8 @@
             @foreach($staff as $member)
             <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
                 <div class="aspect-[4/3] bg-gray-100 flex items-center justify-center overflow-hidden">
-                    @if($member->photo)
-                    <img loading="lazy" src="{{ $member->photo }}" alt="{{ $member->name }}" class="w-full h-full object-cover">
+                    @if($photoUrl = TenantStorage::siteMediaUrl($tenant, $member->photo))
+                    <img loading="lazy" src="{{ $photoUrl }}" alt="{{ $member->name }}" class="w-full h-full object-cover">
                     @else
                     <span class="text-gray-400 text-sm">No photo</span>
                     @endif

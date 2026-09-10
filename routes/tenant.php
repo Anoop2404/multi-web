@@ -109,10 +109,12 @@ Route::middleware([
     // Public website pages (require the tenant's own public-site setting)
     Route::middleware(['public.website.enabled'])->group(function () {
         Route::get('/news', [NewsArticleController::class, 'index'])->name('tenant.news.index');
+        Route::get('/news/{article}/image', [NewsArticleController::class, 'image'])->name('tenant.news.image');
         Route::get('/news/{slug}', [NewsArticleController::class, 'show'])->name('tenant.news.show');
         Route::get('/circulars', [\App\Http\Controllers\Public\CircularController::class, 'index'])->name('tenant.circulars.index');
         Route::get('/circulars/{circular}/download', [\App\Http\Controllers\Public\CircularController::class, 'download'])->name('tenant.circulars.download');
         Route::get('/events', [EventController::class, 'index'])->name('tenant.events.index');
+        Route::get('/events/{event}/image', [EventController::class, 'image'])->name('tenant.events.image');
         Route::get('/events/{slug}', [EventController::class, 'show'])->name('tenant.events.show');
         Route::get('/member-schools', [\App\Http\Controllers\Public\MemberSchoolsController::class, 'index'])->name('tenant.member-schools.index');
         Route::get('/office-bearers', [\App\Http\Controllers\Public\OfficeBearersController::class, 'index'])->name('tenant.office-bearers.index');
@@ -143,6 +145,8 @@ Route::middleware([
         Route::get('/moa/activities', fn () => app(SahodayaCmsPageController::class)->show('moa/activities'))->name('tenant.sahodaya.moa.activities');
         Route::get('/moa/election', fn () => app(SahodayaCmsPageController::class)->show('moa/election'))->name('tenant.sahodaya.moa.election');
 
+        Route::get('/gallery/albums/{album}/cover', [GalleryAlbumController::class, 'cover'])->name('tenant.gallery.cover');
+        Route::get('/gallery/photos/{photo}', [GalleryAlbumController::class, 'photo'])->name('tenant.gallery.photo');
         Route::get('/gallery', [GalleryAlbumController::class, 'index'])->name('tenant.gallery.index');
         Route::get('/gallery/{slug}', [GalleryAlbumController::class, 'show'])->name('tenant.gallery.show');
 

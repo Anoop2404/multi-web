@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Public\Concerns\RendersPublicPages;
 use App\Models\BoardResult;
 use App\Support\AcademicYear;
+use App\Support\SchoolPublicPageContent;
 use App\Support\TenantStorage;
 
 class SchoolResultsController extends Controller
@@ -32,12 +33,12 @@ class SchoolResultsController extends Controller
 
         return $this->renderPublic('public.results.index', $tenant, [
             'results' => $results,
-            'year'    => $year,
-            'pageSeo' => [
-                'title'       => 'Board Results — '.$tenant->name,
+            'year' => $year,
+            'pageSeo' => SchoolPublicPageContent::seo($tenant, 'results', [
+                'title' => 'Board Results — '.$tenant->name,
                 'description' => 'CBSE Class X and Class XII board examination results and toppers from '.$tenant->name,
-                'og_type'     => 'website',
-            ],
+                'og_type' => 'website',
+            ]),
         ]);
     }
 

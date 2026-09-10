@@ -6,15 +6,17 @@
     $isSchool = isset($tenant) && $tenant->type === 'school';
     $showCbse = $cta['cbse_btn'] ?? $isSchool;
     $cbseUrl = $cta['cbse_url'] ?? '/disclosure';
+    $cbseLabel = $cta['cbse_label'] ?? 'CBSE';
     $showContact = $cta['contact_btn'] ?? $isSchool;
     $contactUrl = $cta['contact_url'] ?? '/contact';
+    $contactLabel = $cta['contact_label'] ?? 'Contact Us';
 @endphp
-<div class="hidden lg:flex items-center gap-2.5 shrink-0 ml-3">
+<div class="hidden xl:flex items-center gap-2.5 shrink-0 ml-3">
     @if($showCbse)
     <a href="{{ $cbseUrl }}"
        class="inline-flex items-center justify-center px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider text-white hover:brightness-110 shadow-sm transition-all"
        style="background-color: var(--color-accent)">
-        CBSE
+        {{ $cbseLabel }}
     </a>
     @endif
 
@@ -22,7 +24,7 @@
     <a href="{{ $contactUrl }}"
        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white hover:brightness-110 shadow-sm transition-all"
        style="background-color: var(--color-primary)">
-        <span>Contact Us</span>
+        <span>{{ $contactLabel }}</span>
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
     </a>
     @endif

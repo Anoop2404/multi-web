@@ -3,23 +3,26 @@
 return [
     'al-farooque' => [
         'name' => 'Al Farooque',
-        'version' => '1.0.0',
-        'purpose' => 'A warm, photo-forward school site with admissions, achievements and CBSE disclosure front and center.',
+        'version' => '1.2.0',
+        'purpose' => 'A clean, contemporary school site with admissions, achievements and CBSE disclosure front and center.',
         'audience' => 'Prospective and current parents, students and staff',
-        'character' => 'Warm, generous whitespace, rounded imagery',
-        'accent' => 'School green with a restrained red accent, emblem-led',
+        'character' => 'Crisp white navigation, charcoal hero, mint surfaces and generous whitespace',
+        'accent' => 'Emerald green with a restrained CBSE red accent, emblem-led',
         'design' => [
-            'primary' => '#166534', 'secondary' => '#14532D', 'accent_color' => '#C00000',
+            'primary' => '#04906D', 'secondary' => '#037559', 'accent_color' => '#DC3545',
+            'text_color' => '#333333', 'page_background' => '#FFFFFF', 'muted_surface' => '#F8FFFE',
+            'hero_background' => '#212529', 'navbar_background' => '#FFFFFF', 'footer_background' => '#FFFFFF',
+            'footer_text_color' => '#6B7280',
             'display_font' => 'Inter', 'body_font' => 'Inter', 'type_scale' => 'balanced',
-            'density' => 'comfortable', 'surface' => 'elevated', 'corners' => 'soft',
+            'density' => 'comfortable', 'surface' => 'soft', 'corners' => 'soft',
             'buttons' => 'solid', 'images' => 'documentary', 'motion' => 'restrained',
             'navigation' => 'logo-left', 'footer' => 'three-column',
         ],
-        'widgets' => ['news_ticker' => false, 'admission_banner' => false, 'social_strip' => true],
+        'widgets' => ['topbar' => false, 'news_ticker' => false, 'admission_banner' => false, 'social_strip' => false],
         'sections' => [
             ['section_type' => 'hero', 'variant' => 'full-slider', 'config' => [
                 'slides' => [
-                    ['title' => '{{name}}', 'subtitle' => 'CBSE Affiliated', 'description' => 'Building knowledge, values and confidence.', 'cta_label' => 'Admissions Open', 'cta_url' => '#admission'],
+                    ['title' => '{{name}}', 'subtitle' => 'CBSE Affiliated', 'description' => 'Building knowledge, values and confidence.', 'cta_label' => 'Admissions Open', 'cta_url' => '#admissions'],
                 ],
             ], 'layout' => ['width' => 'full', 'spacing' => 'compact', 'surface' => 'dark', 'heading_alignment' => 'left']],
             ['section_type' => 'about', 'variant' => 'overlap-stats', 'config' => [

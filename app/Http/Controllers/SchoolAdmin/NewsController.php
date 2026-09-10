@@ -27,19 +27,19 @@ class NewsController extends SchoolAdminController
     public function store(Request $request)
     {
         $data = $request->validate([
-            'title'        => 'required|string|max:255',
-            'body'         => 'required|string',
-            'category'     => 'nullable|string|max:100',
-            'is_featured'  => 'boolean',
+            'title' => 'required|string|max:255',
+            'body' => 'required|string',
+            'category' => 'nullable|string|max:100',
+            'is_featured' => 'boolean',
             'published_at' => 'nullable|date',
-            'image'        => 'nullable|image|max:4096',
+            'image' => 'nullable|image|max:4096',
         ]);
 
         $data['tenant_id'] = $this->school->id;
-        $data['slug']      = Str::slug($data['title']) . '-' . Str::random(5);
+        $data['slug'] = Str::slug($data['title']).'-'.Str::random(5);
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('news/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
+            $data['image'] = TenantStorage::storeSiteMedia($request->file('image'), $this->school->id);
         }
 
         NewsArticle::create($data);
@@ -51,6 +51,7 @@ class NewsController extends SchoolAdminController
     public function edit(string $tenantId, NewsArticle $news)
     {
         abort_if($news->tenant_id !== $this->school->id, 403);
+
         return $this->inertia('School/News/Edit', compact('news'));
     }
 
@@ -59,16 +60,16 @@ class NewsController extends SchoolAdminController
         abort_if($news->tenant_id !== $this->school->id, 403);
 
         $data = $request->validate([
-            'title'        => 'required|string|max:255',
-            'body'         => 'required|string',
-            'category'     => 'nullable|string|max:100',
-            'is_featured'  => 'boolean',
+            'title' => 'required|string|max:255',
+            'body' => 'required|string',
+            'category' => 'nullable|string|max:100',
+            'is_featured' => 'boolean',
             'published_at' => 'nullable|date',
-            'image'        => 'nullable|image|max:4096',
+            'image' => 'nullable|image|max:4096',
         ]);
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('news/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
+            $data['image'] = TenantStorage::storeSiteMedia($request->file('image'), $this->school->id);
         }
 
         $news->update($data);
@@ -81,6 +82,7 @@ class NewsController extends SchoolAdminController
     {
         abort_if($news->tenant_id !== $this->school->id, 403);
         $news->delete();
+
         return back()->with('success', 'Article deleted.');
     }
 }

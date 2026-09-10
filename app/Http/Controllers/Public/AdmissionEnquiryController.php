@@ -8,6 +8,7 @@ use App\Models\AdmissionEnquiry;
 use App\Models\Tenant;
 use App\Services\Mail\SchoolSiteMailer;
 use App\Support\Mail\EmailBranding;
+use App\Support\SchoolPublicPageContent;
 use Illuminate\Http\Request;
 
 class AdmissionEnquiryController extends Controller
@@ -19,11 +20,11 @@ class AdmissionEnquiryController extends Controller
         $tenant = $this->resolveTenant();
 
         return $this->renderPublic('public.admission-enquiry', $tenant, [
-            'pageSeo' => [
-                'title'       => 'Admission Enquiry — '.$tenant->name,
+            'pageSeo' => SchoolPublicPageContent::seo($tenant, 'admission_enquiry', [
+                'title' => 'Admission Enquiry — '.$tenant->name,
                 'description' => 'Submit an admission enquiry for '.$tenant->name.'.',
-                'og_type'     => 'website',
-            ],
+                'og_type' => 'website',
+            ]),
         ]);
     }
 
@@ -31,22 +32,22 @@ class AdmissionEnquiryController extends Controller
     {
         $tenant = tenancy()->tenant;
 
-        abort_if(!$tenant, 404);
+        abort_if(! $tenant, 404);
 
         $data = $request->validate([
-            'student_name'  => 'required|string|max:255',
-            'dob'           => 'required|date',
-            'class_applying'=> 'required|string|max:20',
-            'parent_name'   => 'required|string|max:255',
-            'phone'         => 'required|string|max:30',
-            'email'         => 'nullable|email|max:255',
-            'address'       => 'nullable|string|max:1000',
-            'message'       => 'nullable|string|max:2000',
+            'student_name' => 'required|string|max:255',
+            'dob' => 'required|date',
+            'class_applying' => 'required|string|max:20',
+            'parent_name' => 'required|string|max:255',
+            'phone' => 'required|string|max:30',
+            'email' => 'nullable|email|max:255',
+            'address' => 'nullable|string|max:1000',
+            'message' => 'nullable|string|max:2000',
         ]);
 
-        $data['tenant_id']     = $tenant->id;
-        $data['status']        = 'new';
-        $data['academic_year'] = now()->year . '-' . (now()->year + 1);
+        $data['tenant_id'] = $tenant->id;
+        $data['status'] = 'new';
+        $data['academic_year'] = now()->year.'-'.(now()->year + 1);
 
         $enquiry = AdmissionEnquiry::create($data);
 
@@ -58,17 +59,19 @@ class AdmissionEnquiryController extends Controller
             array_merge(
                 EmailBranding::forTenant($sahodaya ?? $tenant),
                 [
-                    'enquiry'        => $enquiry,
-                    'school'         => $tenant,
-                    'headerTitle'    => 'New Admission Enquiry',
+                    'enquiry' => $enquiry,
+                    'school' => $tenant,
+                    'headerTitle' => 'New Admission Enquiry',
                     'headerSubtitle' => $tenant->name,
-                    'headerEyebrow'  => 'Admissions',
-                    'footerNote'     => 'Submitted via '.$tenant->name.' Admission Portal',
+                    'headerEyebrow' => 'Admissions',
+                    'footerNote' => 'Submitted via '.$tenant->name.' Admission Portal',
                 ],
             ),
         );
 
-        return back()->with('admission_success',
-            'Thank you! Your enquiry has been received. We will contact you shortly.');
+        return back()->with(
+            'admission_success',
+            SchoolPublicPageContent::page($tenant, 'admission_enquiry')['success_message']
+        );
     }
 }

@@ -3,7 +3,10 @@
 @section('title', $tenant->name)
 
 @section('content')
-@php $portalCta = $portalCta ?? []; @endphp
+@php
+    $portalCta = $portalCta ?? [];
+    $landingContent = $landingContent ?? [];
+@endphp
 <div class="portal-wrap">
     <div class="portal-page">
         <div class="portal-shell">
@@ -17,15 +20,17 @@
                     'motto'     => $motto ?? null,
                     'phone'     => $phone ?? null,
                     'email'     => $email ?? null,
-                    'defaultTagline' => 'Membership registration portal for CBSE-affiliated member schools.',
+                    'defaultTagline' => $isSahodaya
+                        ? 'Membership registration portal for CBSE-affiliated member schools.'
+                        : 'Official school website administration portal.',
                 ])
             </div>
 
             <div class="portal-panel">
                 <div class="portal-panel-intro">
-                    <p class="portal-panel-heading">Get Started</p>
-                    <h2 class="portal-panel-title">Welcome</h2>
-                    <p class="portal-panel-sub">Register your school as a new member, or sign in to register students for events.</p>
+                    <p class="portal-panel-heading">{{ $isSahodaya ? 'Get Started' : ($landingContent['eyebrow'] ?? 'School Website') }}</p>
+                    <h2 class="portal-panel-title">{{ $isSahodaya ? 'Welcome' : ($landingContent['title'] ?? 'Administration Access') }}</h2>
+                    <p class="portal-panel-sub">{{ $isSahodaya ? 'Register your school as a new member, or sign in to register students for events.' : ($landingContent['intro'] ?? 'Sign in to manage this school website and its published information.') }}</p>
                 </div>
 
                 <div class="portal-actions">
@@ -48,11 +53,16 @@
                         </div>
                         <span class="portal-action-body">
                             <span class="portal-action-title">{{ $portalCta['login_label'] ?? 'School Login' }}</span>
-                            <span class="portal-action-desc">Register students for Kalotsav, sports &amp; more</span>
+                            <span class="portal-action-desc">
+                                {{ $isSahodaya
+                                    ? 'Register students for Kalotsav, sports & more'
+                                    : ($landingContent['action_description'] ?? 'Manage website content, enquiries, staff, news, events, gallery, and results') }}
+                            </span>
                         </span>
                         <span class="portal-action-arrow">→</span>
                     </a>
 
+                    @if($isSahodaya)
                     <a href="{{ $portalCta['portal_login_url'] ?? '/portal/login' }}" class="portal-action portal-action-secondary">
                         <div class="portal-action-icon">
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -63,6 +73,7 @@
                         </span>
                         <span class="portal-action-arrow">→</span>
                     </a>
+                    @endif
 
                     @if($isSahodaya)
                     <a href="{{ $portalCta['admin_login_url'] ?? '/login' }}" class="portal-action portal-action-ghost">
@@ -77,7 +88,11 @@
 
         </div>
 
-        <p class="portal-footer-note">CBSE Sahodaya School Complex · Membership Portal</p>
+        <p class="portal-footer-note">
+            {{ $isSahodaya
+                ? 'CBSE Sahodaya School Complex · Membership Portal'
+                : $tenant->name.' · '.($landingContent['footer_note'] ?? 'School website administration portal') }}
+        </p>
     </div>
 </div>
 @endsection

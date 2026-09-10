@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\PlatformUser;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\WebsiteSite;
 use App\Services\Mail\SahodayaMailer;
 use App\Support\SahodayaHomepageContent;
+use App\Support\SchoolPublicPageContent;
+use App\Support\TenancyDatabase;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
 use App\Support\TenantUserCatalog;
@@ -22,7 +25,7 @@ use Inertia\Response;
 
 class AuthController extends Controller
 {
-    public function showLogin(): Response
+    public function showLogin(): Response|RedirectResponse
     {
         if (TenantDomainSync::isCentralHost(request()->getHost())) {
             return inertia('Auth/SuperadminLogin', [
@@ -32,6 +35,10 @@ class AuthController extends Controller
         }
 
         $tenant = TenantBranding::resolveTenant();
+        if ($tenant?->type === 'school') {
+            return redirect('/school-login');
+        }
+
         $branding = ($tenant && $tenant->type === 'sahodaya')
             ? SahodayaHomepageContent::get($tenant)
             : [];
@@ -55,11 +62,14 @@ class AuthController extends Controller
         }
 
         $tenant = TenantBranding::resolveTenant();
-        if (! $tenant || $tenant->type !== 'sahodaya') {
+        if (! $tenant || ! in_array($tenant->type, ['sahodaya', 'school'], true)) {
             return redirect()->route('login');
         }
 
-        $branding = SahodayaHomepageContent::get($tenant);
+        $isSchoolWebsite = $tenant->type === 'school';
+        $branding = $isSchoolWebsite
+            ? self::schoolWebsiteBranding($tenant)
+            : SahodayaHomepageContent::get($tenant);
 
         return inertia('Auth/SchoolLogin', [
             'logoUrl'    => TenantBranding::logoUrl($tenant),
@@ -67,9 +77,57 @@ class AuthController extends Controller
             'motto'      => $branding['motto'] ?? null,
             'phone'      => $branding['phone'] ?? null,
             'email'      => $branding['email'] ?? null,
-            'showRegisterLink' => true,
+            'standalone' => $isSchoolWebsite,
+            'content' => $branding['login_content'] ?? [],
+            'primaryColor' => $branding['primary'] ?? '#0F3D7A',
+            'secondaryColor' => $branding['secondary'] ?? '#1E5AA8',
+            'accentColor' => $branding['accent'] ?? '#FBBF24',
+            'showRegisterLink' => ! $isSchoolWebsite,
             'sessionExpired' => request()->query('session') === 'expired',
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private static function schoolWebsiteBranding(Tenant $school): array
+    {
+        $defaults = SchoolPublicPageContent::defaults();
+
+        return TenancyDatabase::whenDatabaseReady($school, function () use ($school, $defaults) {
+            $contact = $school->getSetting('contact', []) ?? [];
+            $seo = $school->getSetting('seo', []) ?? [];
+            $siteContent = SchoolPublicPageContent::resolve($school);
+            $site = WebsiteSite::query()
+                ->where('tenant_id', $school->id)
+                ->where('is_primary', true)
+                ->where('is_active', true)
+                ->first();
+            $theme = array_merge($school->getTheme(), $site?->design_json ?? []);
+
+            return [
+                'motto' => $seo['tagline'] ?? $siteContent['branding']['subtitle'] ?? null,
+                'phone' => $contact['phone'] ?? null,
+                'email' => $contact['email'] ?? null,
+                'login_content' => $siteContent['pages']['admin_login'] ?? $defaults['pages']['admin_login'],
+                'primary' => self::themeColor($theme['primary'] ?? $theme['primary_color'] ?? null, '#04906D'),
+                'secondary' => self::themeColor($theme['secondary'] ?? $theme['secondary_color'] ?? null, '#037559'),
+                'accent' => self::themeColor($theme['accent_color'] ?? $theme['accent'] ?? null, '#DC3545'),
+            ];
+        }, [
+            'motto' => $defaults['branding']['subtitle'],
+            'phone' => null,
+            'email' => null,
+            'login_content' => $defaults['pages']['admin_login'],
+            'primary' => '#04906D',
+            'secondary' => '#037559',
+            'accent' => '#DC3545',
+        ]) ?? [];
+    }
+
+    private static function themeColor(mixed $value, string $fallback): string
+    {
+        $colour = trim((string) $value);
+
+        return preg_match('/^#[0-9A-Fa-f]{6}$/', $colour) ? $colour : $fallback;
     }
 
     public function showPortalLogin(): Response|RedirectResponse

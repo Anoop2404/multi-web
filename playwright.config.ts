@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const SAHODAYA_BASE = process.env.E2E_SAHODAYA_URL ?? 'http://malappuramsahodaya.test:8000';
 const SUPERADMIN_BASE = process.env.E2E_SUPERADMIN_URL ?? 'http://superadmin.test:8000';
+const LOCAL_CHROME_EXECUTABLE = process.env.E2E_CHROME_EXECUTABLE;
 
 export default defineConfig({
     testDir: './tests/e2e',
@@ -73,6 +74,16 @@ export default defineConfig({
             name: 'fest-features',
             testMatch: /10-fest-features/,
             use: { ...devices['Desktop Chrome'], baseURL: SAHODAYA_BASE },
+        },
+        {
+            name: 'standalone-school',
+            testMatch: /11-standalone-school-login/,
+            use: {
+                ...devices['Desktop Chrome'],
+                launchOptions: LOCAL_CHROME_EXECUTABLE
+                    ? { executablePath: LOCAL_CHROME_EXECUTABLE }
+                    : undefined,
+            },
         },
     ],
 });

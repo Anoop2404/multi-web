@@ -27,7 +27,7 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             @foreach($items as $item)
             <figure class="aspect-square rounded-lg overflow-hidden shadow-sm">
-                <img loading="lazy" src="{{ $item->image_path }}" alt="{{ $item->caption ?? '' }}"
+                <img loading="lazy" src="{{ $item->image_url }}" alt="{{ $item->caption ?? '' }}"
                      class="w-full h-full object-cover">
             </figure>
             @endforeach

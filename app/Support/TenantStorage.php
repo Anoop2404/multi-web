@@ -271,6 +271,10 @@ class TenantStorage
                     }
                 }
 
+                if ($disk === self::SHARED_DISK && $localServeUrl) {
+                    return $localServeUrl;
+                }
+
                 if ($disk === 'public') {
                     $centralPath = self::storageRoot('app/public/'.$relativePath);
                     if ($localServeUrl && ! is_file($centralPath) && $tenant && self::publicFilePath($tenant, $relativePath)) {

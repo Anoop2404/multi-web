@@ -44,6 +44,73 @@
                 </a>
             </div>
 
+            <!-- ── Design ────────────────────────────────────────────────── -->
+            <div v-if="activeTab === 'design'" class="space-y-5">
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
+                    <div>
+                        <h2 class="font-bold text-gray-900">Website Design</h2>
+                        <p class="text-sm text-gray-500 mt-1">Control the colour balance, typography, spacing and component style used across every public page.</p>
+                    </div>
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <label v-for="field in designColorFields" :key="field.key" class="text-xs font-bold text-gray-600">
+                            {{ field.label }}
+                            <div class="mt-1.5 flex items-center gap-2">
+                                <input v-model="designConfig[field.key]" type="color" class="w-11 h-10 rounded-lg border border-gray-200 cursor-pointer">
+                                <input v-model="designConfig[field.key]" class="field font-mono uppercase">
+                            </div>
+                        </label>
+                    </div>
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <label v-for="field in designSelectFields" :key="field.key" class="text-xs font-bold text-gray-600">
+                            {{ field.label }}
+                            <select v-model="designConfig[field.key]" class="field mt-1.5 bg-white font-normal">
+                                <option v-for="option in field.options" :key="option" :value="option">{{ titleCase(option) }}</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="rounded-2xl overflow-hidden border border-gray-200" :style="{ backgroundColor: designConfig.page_background, color: designConfig.text_color }">
+                        <div class="px-5 py-3 font-bold" :style="{ backgroundColor: designConfig.navbar_background, color: designConfig.primary }">Live colour preview</div>
+                        <div class="p-6" :style="{ backgroundColor: designConfig.muted_surface }">
+                            <h3 class="text-2xl font-bold" :style="{ color: designConfig.primary, fontFamily: designConfig.display_font }">Knowledge, values and confidence</h3>
+                            <p class="text-sm mt-2" :style="{ fontFamily: designConfig.body_font }">Green leads the school identity while red is reserved for important highlights.</p>
+                            <span class="inline-block mt-4 px-4 py-2 rounded-lg text-white font-semibold" :style="{ backgroundColor: designConfig.accent_color }">Important action</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
+                        <button @click="saveDesign" :disabled="designSaving" class="btn-primary disabled:opacity-50">{{ designSaving ? 'Saving…' : 'Save Design' }}</button>
+                        <span v-if="designSaved" class="text-sm text-green-600 font-medium">Saved!</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Public page text ──────────────────────────────────────── -->
+            <div v-if="activeTab === 'content'" class="space-y-5">
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+                    <div>
+                        <h2 class="font-bold text-gray-900">Public Page Text</h2>
+                        <p class="text-sm text-gray-500 mt-1">Edit headings, empty states, form labels and search preview text without changing code.</p>
+                    </div>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <label class="text-xs font-bold text-gray-600">School subtitle<input v-model="siteContent.branding.subtitle" class="field mt-1.5 font-normal"></label>
+                        <label class="text-xs font-bold text-gray-600">Back-to-home label<input v-model="siteContent.common.back_to_home" class="field mt-1.5 font-normal"></label>
+                    </div>
+                </div>
+                <div v-for="group in contentPageFields" :key="group.key" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <h3 class="font-bold text-gray-900">{{ group.label }}</h3>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <label v-for="field in group.fields" :key="field.key" class="text-xs font-bold text-gray-600" :class="field.wide ? 'sm:col-span-2' : ''">
+                            {{ field.label }}
+                            <textarea v-if="field.textarea" v-model="siteContent.pages[group.key][field.key]" rows="2" class="field mt-1.5 font-normal"></textarea>
+                            <input v-else v-model="siteContent.pages[group.key][field.key]" class="field mt-1.5 font-normal">
+                        </label>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-3">
+                    <button @click="saveSiteContent" :disabled="contentSaving" class="btn-primary disabled:opacity-50">{{ contentSaving ? 'Saving…' : 'Save Public Page Text' }}</button>
+                    <span v-if="contentSaved" class="text-sm text-green-600 font-medium">Saved!</span>
+                </div>
+            </div>
+
             <!-- ── Navigation & Admissions ─────────────────────────────────── -->
             <div v-if="activeTab === 'navigation'" class="space-y-5">
                 <div v-if="!navConfig.items?.length"
@@ -92,6 +159,22 @@
                         </label>
                     </div>
 
+                    <div class="grid sm:grid-cols-2 gap-4 p-4 rounded-xl border border-gray-100">
+                        <div class="sm:col-span-2 font-bold text-sm text-gray-800">School navigation actions</div>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" v-model="navConfig.portal_cta.cbse_btn" class="w-4 h-4 rounded text-red-600">
+                            <span class="text-sm font-medium text-gray-700">Show CBSE button</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" v-model="navConfig.portal_cta.contact_btn" class="w-4 h-4 rounded text-green-700">
+                            <span class="text-sm font-medium text-gray-700">Show Contact button</span>
+                        </label>
+                        <label class="text-xs font-bold text-gray-600">CBSE label<input v-model="navConfig.portal_cta.cbse_label" class="field mt-1.5 font-normal"></label>
+                        <label class="text-xs font-bold text-gray-600">CBSE URL<input v-model="navConfig.portal_cta.cbse_url" class="field mt-1.5 font-mono font-normal"></label>
+                        <label class="text-xs font-bold text-gray-600">Contact label<input v-model="navConfig.portal_cta.contact_label" class="field mt-1.5 font-normal"></label>
+                        <label class="text-xs font-bold text-gray-600">Contact URL<input v-model="navConfig.portal_cta.contact_url" class="field mt-1.5 font-mono font-normal"></label>
+                    </div>
+
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-gray-600 mb-1.5">Admissions button label</label>
@@ -125,13 +208,22 @@
                         </button>
                     </div>
                     <div class="space-y-2">
-                        <div v-for="(item, idx) in navConfig.items" :key="idx"
-                             class="flex flex-wrap items-center gap-3 bg-gray-50 rounded-xl p-3">
-                            <input v-model="item.label" placeholder="Label"
-                                   class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200">
-                            <input v-model="item.url" placeholder="/url"
-                                   class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sky-200">
-                            <button @click="removeNavItem(idx)" class="text-red-400 hover:text-red-600 text-lg px-1">&times;</button>
+                        <div v-for="(item, idx) in navConfig.items" :key="idx" class="bg-gray-50 rounded-xl p-3 space-y-3">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <input v-model="item.label" placeholder="Label" class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200">
+                                <input v-model="item.url" placeholder="/url" class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sky-200">
+                                <label class="inline-flex items-center gap-1.5 text-xs text-gray-500"><input type="checkbox" v-model="item.external" class="rounded"> New tab</label>
+                                <button @click="removeNavItem(idx)" class="text-red-400 hover:text-red-600 text-lg px-1" aria-label="Remove navigation item">&times;</button>
+                            </div>
+                            <div v-if="item.children?.length" class="pl-4 border-l-2 border-sky-100 space-y-2">
+                                <div v-for="(child, childIdx) in item.children" :key="childIdx" class="flex flex-wrap items-center gap-2">
+                                    <input v-model="child.label" placeholder="Dropdown label" class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-xs">
+                                    <input v-model="child.url" placeholder="/url" class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono">
+                                    <label class="inline-flex items-center gap-1 text-[11px] text-gray-500"><input type="checkbox" v-model="child.external" class="rounded"> New tab</label>
+                                    <button @click="removeNavChild(item, childIdx)" class="text-red-400 hover:text-red-600 px-1" aria-label="Remove dropdown link">&times;</button>
+                                </div>
+                            </div>
+                            <button type="button" @click="addNavChild(item)" class="text-xs font-semibold text-sky-700 hover:text-sky-900">+ Add dropdown link</button>
                         </div>
                         <p v-if="!navConfig.items?.length" class="text-sm text-gray-400 text-center py-4">No menu items yet.</p>
                     </div>
@@ -150,12 +242,21 @@
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
                     <div>
                         <h2 class="font-bold text-gray-900">Footer Quick Links</h2>
-                        <p class="text-sm text-gray-500 mt-1">Admissions and admin login links appear here for visitors scrolling to the footer.</p>
+                        <p class="text-sm text-gray-500 mt-1">Admissions links appear here for visitors scrolling to the footer.</p>
                     </div>
                     <label class="flex items-center gap-3 cursor-pointer">
                         <input type="checkbox" v-model="footerIncludePortal" class="w-4 h-4 rounded text-sky-700">
-                        <span class="text-sm font-medium text-gray-700">Include admissions & admin login links when saving</span>
+                        <span class="text-sm font-medium text-gray-700">Include the admissions link when saving</span>
                     </label>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <label class="text-xs font-bold text-gray-600">Footer tagline<textarea v-model="footerConfig.tagline" rows="2" class="field mt-1.5 font-normal"></textarea></label>
+                        <label class="text-xs font-bold text-gray-600">Copyright text<textarea v-model="footerConfig.copyright" rows="2" class="field mt-1.5 font-normal"></textarea></label>
+                        <label class="text-xs font-bold text-gray-600">Quick links heading<input v-model="footerConfig.quick_links_heading" class="field mt-1.5 font-normal"></label>
+                        <label class="text-xs font-bold text-gray-600">Contact heading<input v-model="footerConfig.contact_heading" class="field mt-1.5 font-normal"></label>
+                        <label class="text-xs font-bold text-gray-600">Phone<input v-model="footerConfig.phone" class="field mt-1.5 font-normal"></label>
+                        <label class="text-xs font-bold text-gray-600">Email<input v-model="footerConfig.email" type="email" class="field mt-1.5 font-normal"></label>
+                        <label class="text-xs font-bold text-gray-600 sm:col-span-2">Address<textarea v-model="footerConfig.address" rows="2" class="field mt-1.5 font-normal"></textarea></label>
+                    </div>
                     <div class="space-y-2">
                         <div v-for="(link, idx) in footerConfig.quick_links" :key="idx"
                              class="flex flex-wrap items-center gap-3 bg-gray-50 rounded-xl p-3">
@@ -448,6 +549,7 @@ const props = defineProps({
     fieldDefs:               { type: Object, default: () => ({}) },
     navConfig:               { type: Object, default: () => ({}) },
     footerConfig:            { type: Object, default: () => ({}) },
+    siteContent:             { type: Object, default: () => ({}) },
     portalDefaults:          { type: Object, default: () => ({}) },
     publicWebsiteEnabled:    { type: Boolean, default: true },
     defaultNavConfig:        { type: Object, default: () => ({}) },
@@ -457,7 +559,9 @@ const props = defineProps({
 
 const tabs = [
     { id: 'template', label: 'Template' },
+    { id: 'design', label: 'Design' },
     { id: 'sections', label: 'Page Sections' },
+    { id: 'content', label: 'Public Page Text' },
     { id: 'navigation', label: 'Navigation & Admissions' },
     { id: 'footer', label: 'Footer Links' },
 ];
@@ -482,8 +586,108 @@ const footerConfig = reactive({
     copyright: props.footerConfig?.copyright ?? '',
     phone: props.footerConfig?.phone ?? '',
     email: props.footerConfig?.email ?? '',
+    address: props.footerConfig?.address ?? '',
+    quick_links_heading: props.footerConfig?.quick_links_heading ?? 'Quick Links',
+    contact_heading: props.footerConfig?.contact_heading ?? 'Contact Us',
     layout_variant: props.footerConfig?.layout_variant ?? 'three-column',
 });
+const designConfig = reactive({
+    primary: '#04906D', secondary: '#037559', accent_color: '#DC3545',
+    text_color: '#333333', page_background: '#FFFFFF', muted_surface: '#F8FFFE',
+    hero_background: '#212529', navbar_background: '#FFFFFF', footer_background: '#FFFFFF', footer_text_color: '#6B7280',
+    display_font: 'Inter', body_font: 'Inter', type_scale: 'balanced', density: 'comfortable',
+    surface: 'soft', corners: 'soft', buttons: 'solid', images: 'documentary', motion: 'restrained',
+    navigation: 'logo-left', footer: 'three-column',
+    ...(props.currentSite?.design_json ?? {}),
+});
+const designColorFields = [
+    { key: 'primary', label: 'Primary green' },
+    { key: 'secondary', label: 'Secondary green' },
+    { key: 'accent_color', label: 'Accent red' },
+    { key: 'text_color', label: 'Body text' },
+    { key: 'page_background', label: 'Page background' },
+    { key: 'muted_surface', label: 'Soft section background' },
+    { key: 'hero_background', label: 'Hero background' },
+    { key: 'navbar_background', label: 'Navbar background' },
+    { key: 'footer_background', label: 'Footer background' },
+    { key: 'footer_text_color', label: 'Footer text' },
+];
+const designSelectFields = [
+    { key: 'display_font', label: 'Heading font', options: ['Inter', 'Manrope', 'Merriweather', 'Roboto'] },
+    { key: 'body_font', label: 'Body font', options: ['Inter', 'Manrope', 'Roboto'] },
+    { key: 'type_scale', label: 'Type scale', options: ['compact', 'balanced', 'editorial'] },
+    { key: 'density', label: 'Section spacing', options: ['compact', 'comfortable', 'spacious'] },
+    { key: 'surface', label: 'Card surface', options: ['flat', 'bordered', 'soft', 'elevated'] },
+    { key: 'corners', label: 'Corner style', options: ['square', 'soft', 'rounded'] },
+    { key: 'buttons', label: 'Button style', options: ['solid', 'bordered', 'understated'] },
+    { key: 'images', label: 'Image treatment', options: ['documentary', 'vibrant', 'formal', 'monochrome'] },
+    { key: 'motion', label: 'Motion', options: ['none', 'restrained', 'expressive'] },
+];
+const siteContent = reactive(JSON.parse(JSON.stringify(props.siteContent ?? {})));
+const contentPageFields = [
+    { key: 'about', label: 'About page', fields: publicSectionPageFields() },
+    { key: 'academics', label: 'Academics page', fields: publicSectionPageFields() },
+    { key: 'admissions', label: 'Admissions page', fields: publicSectionPageFields() },
+    { key: 'disclosure', label: 'CBSE disclosure page', fields: publicSectionPageFields() },
+    { key: 'contact', label: 'Contact page', fields: publicSectionPageFields() },
+    { key: 'news', label: 'News page', fields: [
+        { key: 'title', label: 'Page title' }, { key: 'empty_message', label: 'Empty message', wide: true },
+        { key: 'seo_title', label: 'Search title' }, { key: 'seo_description', label: 'Search description', textarea: true },
+    ] },
+    { key: 'events', label: 'Events page', fields: [
+        { key: 'title', label: 'Page title' }, { key: 'empty_message', label: 'Empty message', wide: true },
+        { key: 'seo_title', label: 'Search title' }, { key: 'seo_description', label: 'Search description', textarea: true },
+    ] },
+    { key: 'gallery', label: 'Gallery page', fields: [
+        { key: 'title', label: 'Page title' }, { key: 'empty_title', label: 'Empty-state title' },
+        { key: 'empty_description', label: 'Empty-state description', textarea: true, wide: true },
+        { key: 'empty_album_message', label: 'Empty album message', wide: true },
+        { key: 'photo_singular', label: 'Singular photo label' }, { key: 'photo_plural', label: 'Plural photo label' },
+        { key: 'seo_title', label: 'Search title' }, { key: 'seo_description', label: 'Search description', textarea: true },
+    ] },
+    { key: 'results', label: 'Board results page', fields: [
+        { key: 'title', label: 'Page title' }, { key: 'download_label', label: 'Download button label' },
+        { key: 'intro_prefix', label: 'Academic year prefix' }, { key: 'intro_suffix', label: 'Intro suffix' },
+        { key: 'empty_message', label: 'Empty message', wide: true }, { key: 'appeared_label', label: 'Appeared label' },
+        { key: 'pass_label', label: 'Pass label' }, { key: 'distinctions_label', label: 'Distinctions label' },
+        { key: 'first_class_label', label: 'First class label' }, { key: 'top_scorers_label', label: 'Top scorers label' },
+        { key: 'seo_title', label: 'Search title' }, { key: 'seo_description', label: 'Search description', textarea: true },
+    ] },
+    { key: 'admission_enquiry', label: 'Admission enquiry page', fields: [
+        { key: 'eyebrow', label: 'Eyebrow' }, { key: 'title', label: 'Page title' },
+        { key: 'intro', label: 'Introduction', textarea: true, wide: true },
+        { key: 'student_name_label', label: 'Student name label' }, { key: 'date_of_birth_label', label: 'Date of birth label' },
+        { key: 'class_label', label: 'Class label' }, { key: 'parent_name_label', label: 'Parent/guardian label' },
+        { key: 'phone_label', label: 'Phone label' }, { key: 'email_label', label: 'Email label' },
+        { key: 'address_label', label: 'Address label' }, { key: 'message_label', label: 'Message label' },
+        { key: 'select_placeholder', label: 'Select placeholder' }, { key: 'submit_label', label: 'Submit button label' },
+        { key: 'success_message', label: 'Success message', textarea: true, wide: true },
+        { key: 'seo_title', label: 'Search title' }, { key: 'seo_description', label: 'Search description', textarea: true },
+    ] },
+    { key: 'admin_login', label: 'School administration login', fields: [
+        { key: 'badge', label: 'Badge' }, { key: 'intro', label: 'Introduction', textarea: true, wide: true },
+        { key: 'step_one', label: 'First capability', wide: true }, { key: 'step_two', label: 'Second capability', wide: true },
+        { key: 'step_three', label: 'Third capability', wide: true }, { key: 'form_eyebrow', label: 'Form eyebrow' },
+        { key: 'form_title', label: 'Form title' }, { key: 'form_description', label: 'Form description', textarea: true, wide: true },
+        { key: 'submit_label', label: 'Sign-in button label' }, { key: 'footer_note', label: 'Footer note' },
+    ] },
+    { key: 'portal_landing', label: 'Administration access landing page', fields: [
+        { key: 'eyebrow', label: 'Eyebrow' }, { key: 'title', label: 'Page title' },
+        { key: 'intro', label: 'Introduction', textarea: true, wide: true }, { key: 'action_label', label: 'Login action label' },
+        { key: 'action_description', label: 'Login action description', textarea: true, wide: true },
+        { key: 'footer_note', label: 'Footer note' },
+    ] },
+];
+
+function publicSectionPageFields() {
+    return [
+        { key: 'title', label: 'Page title' },
+        { key: 'eyebrow', label: 'Eyebrow' },
+        { key: 'subheading', label: 'Introduction', textarea: true, wide: true },
+        { key: 'seo_title', label: 'Search title' },
+        { key: 'seo_description', label: 'Search description', textarea: true },
+    ];
+}
 const footerIncludePortal = ref(true);
 const navSaving = ref(false);
 const navSaved = ref(false);
@@ -493,6 +697,10 @@ const portalSaving = ref(false);
 const publicWebsiteEnabled = ref(props.publicWebsiteEnabled ?? true);
 const publicWebsiteSaving = ref(false);
 const defaultNavSaving = ref(false);
+const designSaving = ref(false);
+const designSaved = ref(false);
+const contentSaving = ref(false);
+const contentSaved = ref(false);
 
 const addModal = reactive({
     open: false, selectedType: null, selectedVariant: null, saving: false,
@@ -639,6 +847,13 @@ function addNavItem() {
 function removeNavItem(idx) {
     navConfig.items.splice(idx, 1);
 }
+function addNavChild(item) {
+    if (!Array.isArray(item.children)) item.children = [];
+    item.children.push({ label: '', url: '/', external: false });
+}
+function removeNavChild(item, idx) {
+    item.children.splice(idx, 1);
+}
 async function saveNav() {
     navSaving.value = true;
     navSaved.value = false;
@@ -676,6 +891,35 @@ async function saveFooter() {
         setTimeout(() => { footerSaved.value = false; }, 2500);
     } finally {
         footerSaving.value = false;
+    }
+}
+
+async function saveDesign() {
+    designSaving.value = true;
+    designSaved.value = false;
+    try {
+        const response = await apiPost('/design', { site_id: currentSiteData.id, ...designConfig });
+        if (response.design) {
+            Object.assign(designConfig, response.design);
+            currentSiteData.design_json = response.design;
+        }
+        designSaved.value = true;
+        setTimeout(() => { designSaved.value = false; }, 2500);
+    } finally {
+        designSaving.value = false;
+    }
+}
+
+async function saveSiteContent() {
+    contentSaving.value = true;
+    contentSaved.value = false;
+    try {
+        const response = await apiPost('/site-content', { site_id: currentSiteData.id, ...siteContent });
+        if (response.content) Object.assign(siteContent, response.content);
+        contentSaved.value = true;
+        setTimeout(() => { contentSaved.value = false; }, 2500);
+    } finally {
+        contentSaving.value = false;
     }
 }
 

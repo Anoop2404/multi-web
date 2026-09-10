@@ -8,6 +8,7 @@ use App\Models\WebsiteSiteVersion;
 use App\Services\Website\SahodayaTemplateApplier;
 use App\Support\NavConfigDefaults;
 use App\Support\SchoolPortalNavLinks;
+use App\Support\SchoolPublicPageContent;
 use App\Support\SchoolSiteBuilderCatalog;
 use App\Support\SchoolWebsiteTemplateCatalog;
 use App\Support\TenantPublicSite;
@@ -91,6 +92,13 @@ class SiteBuilderApiController extends SchoolAdminController
             'primary' => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'secondary' => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'accent_color' => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'text_color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'page_background' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'muted_surface' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'hero_background' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'navbar_background' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'footer_background' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'footer_text_color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'display_font' => 'required|in:Inter,Manrope,Merriweather,Roboto',
             'body_font' => 'required|in:Inter,Manrope,Roboto',
             'type_scale' => 'required|in:compact,balanced,editorial',
@@ -194,19 +202,29 @@ class SiteBuilderApiController extends SchoolAdminController
     public function saveNav(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'style'          => 'nullable|string|max:50',
+            'style' => 'nullable|string|max:50',
             'layout_variant' => 'nullable|string|max:50',
-            'items'          => 'nullable|array',
-            'items.*.label'  => 'required_with:items|string|max:100',
-            'items.*.url'    => 'required_with:items|string|max:500',
+            'items' => 'nullable|array',
+            'items.*.label' => 'required_with:items|string|max:100',
+            'items.*.url' => 'required_with:items|string|max:500',
             'items.*.children' => 'nullable|array',
-            'portal_cta'     => 'nullable|array',
+            'portal_cta' => 'nullable|array',
             'portal_cta.show_in_navbar' => 'nullable|boolean',
-            'portal_cta.show_in_menu'   => 'nullable|boolean',
+            'portal_cta.show_in_menu' => 'nullable|boolean',
             'portal_cta.register_label' => 'nullable|string|max:100',
-            'portal_cta.register_url'   => 'nullable|string|max:500',
-            'portal_cta.login_label'    => 'nullable|string|max:100',
-            'portal_cta.login_url'      => 'nullable|string|max:500',
+            'portal_cta.register_url' => 'nullable|string|max:500',
+            'portal_cta.login_label' => 'nullable|string|max:100',
+            'portal_cta.login_url' => 'nullable|string|max:500',
+            'portal_cta.cbse_btn' => 'nullable|boolean',
+            'portal_cta.cbse_label' => 'nullable|string|max:100',
+            'portal_cta.cbse_url' => 'nullable|string|max:500',
+            'portal_cta.contact_btn' => 'nullable|boolean',
+            'portal_cta.contact_label' => 'nullable|string|max:100',
+            'portal_cta.contact_url' => 'nullable|string|max:500',
+            'items.*.external' => 'nullable|boolean',
+            'items.*.children.*.label' => 'required_with:items.*.children|string|max:100',
+            'items.*.children.*.url' => 'required_with:items.*.children|string|max:500',
+            'items.*.children.*.external' => 'nullable|boolean',
         ]);
 
         $data = SchoolPortalNavLinks::mergePortalCta($data);
@@ -216,6 +234,7 @@ class SiteBuilderApiController extends SchoolAdminController
         $data['layout_variant'] = $variant;
 
         $this->school->setSetting('nav_config', $data);
+        $this->school->invalidateCache();
 
         return response()->json(['saved' => true, 'nav' => $data]);
     }
@@ -228,15 +247,18 @@ class SiteBuilderApiController extends SchoolAdminController
     public function saveFooter(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'layout_variant'        => 'nullable|string|max:50',
-            'tagline'               => 'nullable|string|max:500',
-            'copyright'             => 'nullable|string|max:500',
-            'phone'                 => 'nullable|string|max:50',
-            'email'                 => 'nullable|email|max:255',
-            'quick_links'           => 'nullable|array',
-            'quick_links.*.label'   => 'required_with:quick_links|string|max:100',
-            'quick_links.*.url'     => 'required_with:quick_links|string|max:500',
-            'include_portal_links'  => 'nullable|boolean',
+            'layout_variant' => 'nullable|string|max:50',
+            'tagline' => 'nullable|string|max:500',
+            'copyright' => 'nullable|string|max:500',
+            'phone' => 'nullable|string|max:50',
+            'email' => 'nullable|email|max:255',
+            'address' => 'nullable|string|max:500',
+            'quick_links_heading' => 'nullable|string|max:100',
+            'contact_heading' => 'nullable|string|max:100',
+            'quick_links' => 'nullable|array',
+            'quick_links.*.label' => 'required_with:quick_links|string|max:100',
+            'quick_links.*.url' => 'required_with:quick_links|string|max:500',
+            'include_portal_links' => 'nullable|boolean',
         ]);
 
         if ($request->boolean('include_portal_links', true)) {
@@ -244,8 +266,30 @@ class SiteBuilderApiController extends SchoolAdminController
         }
 
         $this->school->setSetting('footer_config', $data);
+        $this->school->invalidateCache();
 
         return response()->json(['saved' => true, 'footer' => $data]);
+    }
+
+    public function saveSiteContent(Request $request): JsonResponse
+    {
+        $this->requestSite($request);
+
+        $rules = ['site_id' => 'required|integer'];
+        foreach ($this->siteContentStringPaths() as $path => $max) {
+            $rules[$path] = "nullable|string|max:{$max}";
+        }
+
+        $data = $request->validate($rules);
+        unset($data['site_id']);
+
+        $this->school->setSetting('site_content', $data);
+        $this->school->invalidateCache();
+
+        return response()->json([
+            'saved' => true,
+            'content' => SchoolPublicPageContent::resolve($this->school),
+        ]);
     }
 
     public function ensurePortalLinks(): JsonResponse
@@ -257,10 +301,11 @@ class SiteBuilderApiController extends SchoolAdminController
 
         $footer = SchoolPortalNavLinks::ensureFooterLinks($this->school->getSetting('footer_config', []));
         $this->school->setSetting('footer_config', $footer);
+        $this->school->invalidateCache();
 
         return response()->json([
-            'saved'  => true,
-            'nav'    => $nav,
+            'saved' => true,
+            'nav' => $nav,
             'footer' => $footer,
         ]);
     }
@@ -272,10 +317,11 @@ class SiteBuilderApiController extends SchoolAdminController
 
         $footer = SchoolPortalNavLinks::ensureFooterLinks($this->school->getSetting('footer_config', []));
         $this->school->setSetting('footer_config', $footer);
+        $this->school->invalidateCache();
 
         return response()->json([
-            'saved'  => true,
-            'nav'    => $nav,
+            'saved' => true,
+            'nav' => $nav,
             'footer' => $footer,
         ]);
     }
@@ -296,7 +342,7 @@ class SiteBuilderApiController extends SchoolAdminController
         TenantPublicSite::setEnabled($this->school, $data['enabled']);
 
         return response()->json([
-            'saved'   => true,
+            'saved' => true,
             'enabled' => $data['enabled'],
         ]);
     }
@@ -308,5 +354,24 @@ class SiteBuilderApiController extends SchoolAdminController
                 'section_type' => 'This section type is not available in the school site builder.',
             ]);
         }
+    }
+
+    /** @return array<string, int> */
+    private function siteContentStringPaths(): array
+    {
+        $paths = [
+            'branding.subtitle' => 150,
+            'common.back_to_home' => 100,
+        ];
+
+        foreach (SchoolPublicPageContent::defaults()['pages'] as $page => $values) {
+            foreach ($values as $field => $value) {
+                $paths["pages.{$page}.{$field}"] = str_contains($field, 'description') || in_array($field, ['intro', 'success_message'], true)
+                    ? 500
+                    : 200;
+            }
+        }
+
+        return $paths;
     }
 }

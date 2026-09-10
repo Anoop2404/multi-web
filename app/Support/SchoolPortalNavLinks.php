@@ -6,7 +6,7 @@ class SchoolPortalNavLinks
 {
     public const ADMISSIONS_URL = '/admissions';
 
-    public const LOGIN_URL = '/login';
+    public const LOGIN_URL = '/school-login';
 
     public const PORTAL_LOGIN_URL = '/portal/login';
 
@@ -18,12 +18,18 @@ class SchoolPortalNavLinks
             // real school sites keep staff/admin access out of the main nav. The
             // student/parent/teacher self-service portal is genuinely useful to
             // visitors though, so that's what the default CTA button points to.
-            'show_in_navbar'    => false,
-            'show_in_menu'      => false,
-            'register_label'    => 'Admissions',
-            'register_url'      => self::ADMISSIONS_URL,
-            'login_label'       => 'Student / Parent Portal',
-            'login_url'         => self::PORTAL_LOGIN_URL,
+            'show_in_navbar' => false,
+            'show_in_menu' => false,
+            'register_label' => 'Admissions',
+            'register_url' => self::ADMISSIONS_URL,
+            'login_label' => 'Student / Parent Portal',
+            'login_url' => self::PORTAL_LOGIN_URL,
+            'cbse_btn' => true,
+            'cbse_label' => 'CBSE',
+            'cbse_url' => '/disclosure',
+            'contact_btn' => true,
+            'contact_label' => 'Contact Us',
+            'contact_url' => '/contact',
         ];
     }
 
@@ -55,7 +61,7 @@ class SchoolPortalNavLinks
         // The prominent CTA button (desktop + mobile) already surfaces login when
         // show_in_navbar is on, so a plain menu item alongside it would be a duplicate.
         if ($includeLogin) {
-            $links[] = ['label' => 'Admin Login', 'url' => self::LOGIN_URL, 'external' => false, 'children' => []];
+            $links[] = ['label' => 'School Login', 'url' => self::LOGIN_URL, 'external' => false, 'children' => []];
         }
 
         foreach ($links as $link) {

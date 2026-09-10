@@ -918,6 +918,11 @@ return [
                 ['key' => 'cta_label',   'type' => 'text',     'label' => 'Button Label'],
                 ['key' => 'cta_url',     'type' => 'url',      'label' => 'Button URL (defaults to the admission enquiry form)'],
                 ['key' => 'notice_text', 'type' => 'text',     'label' => 'Optional Notice (e.g. admissions closed)'],
+                ['key' => 'key_dates',   'type' => 'repeater', 'label' => 'Admission Dates',
+                 'fields' => [
+                     ['key' => 'date',  'type' => 'text', 'label' => 'Date / Month'],
+                     ['key' => 'label', 'type' => 'text', 'label' => 'Milestone'],
+                 ]],
             ],
         ],
         'fee-structure' => [
@@ -1062,6 +1067,13 @@ return [
             'description' => 'Static grid of testimonials',
             'fields' => [
                 ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'testimonials', 'type' => 'repeater', 'label' => 'Testimonials',
+                 'fields' => [
+                     ['key' => 'name',        'type' => 'text',   'label' => 'Name'],
+                     ['key' => 'designation', 'type' => 'text',   'label' => 'Role / Class'],
+                     ['key' => 'quote',       'type' => 'textarea','label' => 'Quote'],
+                     ['key' => 'rating',      'type' => 'number', 'label' => 'Rating (1–5)'],
+                 ]],
             ],
         ],
     ],

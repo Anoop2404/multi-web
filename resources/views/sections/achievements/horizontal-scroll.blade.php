@@ -1,4 +1,5 @@
 @php
+    use App\Support\TenantStorage;
     $limit = $config['limit'] ?? 8;
     $achievements = \App\Models\Achievement::where('tenant_id', $tenant->id)
         ->orderBy('display_order')->limit($limit)->get();
@@ -18,8 +19,8 @@
         <div class="flex gap-4 overflow-x-auto pb-2" style="scrollbar-width: thin;">
             @foreach($achievements as $ach)
             <div class="shrink-0 w-[250px]">
-                @if($ach->image)
-                <img loading="lazy" src="{{ $ach->image }}" alt="{{ $ach->title }}"
+                @if($imageUrl = TenantStorage::siteMediaUrl($tenant, $ach->image))
+                <img loading="lazy" src="{{ $imageUrl }}" alt="{{ $ach->title }}"
                      class="w-[250px] h-[350px] object-cover rounded-xl shadow-sm">
                 @else
                 <div class="w-[250px] h-[350px] rounded-xl flex items-center justify-center text-white text-center p-6"
@@ -27,7 +28,7 @@
                     {{ $ach->title }}
                 </div>
                 @endif
-                @if($ach->image)
+                @if($imageUrl)
                 <p class="mt-3 text-sm font-semibold text-gray-800 line-clamp-2">{{ $ach->title }}</p>
                 @endif
             </div>

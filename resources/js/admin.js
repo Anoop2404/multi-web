@@ -20,6 +20,8 @@ import PageHeader from '@/Components/ui/PageHeader.vue';
 import PageShell from '@/Components/ui/PageShell.vue';
 import Modal from '@/Components/ui/Modal.vue';
 
+const adminTitleSuffix = document.querySelector('meta[name="admin-title-suffix"]')?.content || 'Administration';
+
 router.on('httpException', (event) => {
     const status = event.detail.response?.status;
 
@@ -37,7 +39,7 @@ router.on('navigate', () => runAccessibilityPass());
 router.on('success', () => runAccessibilityPass());
 
 createInertiaApp({
-    title: (title) => (title ? `${title} — Sahodaya Admin` : 'Sahodaya Admin'),
+    title: (title) => (title ? `${title} — ${adminTitleSuffix}` : adminTitleSuffix),
     resolve: (name) =>
         resolvePageComponent(
             `./Pages/Admin/${name}.vue`,

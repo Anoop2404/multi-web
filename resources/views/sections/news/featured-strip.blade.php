@@ -17,9 +17,9 @@
             {{-- Featured article --}}
             @if($featured)
             <a href="/news/{{ $featured->slug }}" class="lg:col-span-3 bg-white rounded-2xl overflow-hidden shadow-sm group block hover:shadow-md transition">
-                @if($featured->image)
+                @if($featured->image_url)
                 <div class="aspect-video overflow-hidden">
-                    <img loading="lazy" src="{{ $featured->image }}" alt="{{ $featured->title }}"
+                    <img loading="lazy" src="{{ $featured->image_url }}" alt="{{ $featured->title }}"
                          class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
                 </div>
                 @endif
@@ -39,9 +39,9 @@
             <div class="lg:col-span-2 flex flex-col gap-4">
                 @foreach($recents->take(4) as $article)
                 <a href="/news/{{ $article->slug }}" class="bg-white rounded-xl p-4 shadow-sm flex gap-4 hover:shadow-md transition group">
-                    @if($article->image)
+                    @if($article->image_url)
                     <div class="w-20 h-16 rounded-lg overflow-hidden shrink-0">
-                        <img loading="lazy" src="{{ $article->image }}" alt="{{ $article->title }}"
+                        <img loading="lazy" src="{{ $article->image_url }}" alt="{{ $article->title }}"
                              class="w-full h-full object-cover group-hover:scale-105 transition">
                     </div>
                     @endif

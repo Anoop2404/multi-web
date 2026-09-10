@@ -20,6 +20,13 @@
         --color-primary: {{ $theme['primary'] ?? $theme['primary_color'] ?? '#0F2942' }};
         --color-secondary: {{ $theme['secondary'] ?? $theme['secondary_color'] ?? '#163B60' }};
         --color-accent: {{ $theme['accent_color'] ?? $theme['accent'] ?? '#D97706' }};
+        --site-text: {{ $theme['text_color'] ?? '#333333' }};
+        --site-page-bg: {{ $theme['page_background'] ?? '#ffffff' }};
+        --site-muted-bg: {{ $theme['muted_surface'] ?? '#f8fafc' }};
+        --site-hero-bg: {{ $theme['hero_background'] ?? '#111827' }};
+        --site-navbar-bg: {{ $theme['navbar_background'] ?? '#ffffff' }};
+        --site-footer-bg: {{ $theme['footer_background'] ?? 'var(--color-primary)' }};
+        --site-footer-text: {{ $theme['footer_text_color'] ?? '#d1d5db' }};
         --color-primary-light: color-mix(in srgb, var(--color-primary) 10%, #ffffff);
         --color-primary-border: color-mix(in srgb, var(--color-primary) 25%, #cbd5e1);
         --color-primary-text: color-mix(in srgb, var(--color-primary) 85%, #000000);
@@ -175,6 +182,60 @@
     [data-experience="confederation-governance"] h1,
     [data-experience="confederation-governance"] h2 { letter-spacing: -.025em; }
     [data-experience="network-directory"] .site-section-frame [class*="rounded"] { border-radius: var(--site-corner); }
+
+    {{-- Al Farooque keeps green as the main identity colour and reserves red for
+         high-value actions. All colours below come from the admin Design tab. --}}
+    body[data-experience="al-farooque"] {
+        color: var(--site-text);
+        background-color: var(--site-page-bg);
+    }
+    [data-experience="al-farooque"] .site-main-navigation {
+        background-color: color-mix(in srgb, var(--site-navbar-bg) 96%, transparent) !important;
+        border-color: color-mix(in srgb, var(--color-primary) 14%, #e2e8f0) !important;
+    }
+    [data-experience="al-farooque"] main,
+    [data-experience="al-farooque"] main > section,
+    [data-experience="al-farooque"] .site-section-frame,
+    [data-experience="al-farooque"] .site-section-surface-canvas {
+        background-color: var(--site-page-bg);
+    }
+    [data-experience="al-farooque"] .site-section-surface-muted,
+    [data-experience="al-farooque"] .site-section-frame:nth-child(odd) {
+        background-color: var(--site-muted-bg);
+        border-color: color-mix(in srgb, var(--color-primary) 12%, #e2e8f0);
+    }
+    [data-experience="al-farooque"] .site-section-surface-dark,
+    [data-experience="al-farooque"] .site-section-surface-dark > section,
+    [data-experience="al-farooque"] #hero,
+    [data-experience="al-farooque"] #hero > section {
+        background-color: var(--site-hero-bg) !important;
+    }
+    [data-experience="al-farooque"] .v2-card,
+    [data-experience="al-farooque"] section [class*="shadow"] {
+        border-color: color-mix(in srgb, var(--color-primary) 10%, #e5e7eb);
+    }
+    [data-experience="al-farooque"] footer {
+        background-color: var(--site-footer-bg) !important;
+        color: var(--site-footer-text) !important;
+        border-top: 1px solid color-mix(in srgb, var(--color-primary) 18%, #e5e7eb);
+    }
+    [data-experience="al-farooque"] footer .site-footer-heading,
+    [data-experience="al-farooque"] footer h3 {
+        color: var(--color-primary) !important;
+    }
+    [data-experience="al-farooque"] footer a:hover {
+        color: var(--color-accent) !important;
+    }
+    [data-experience="al-farooque"] footer > div:last-child {
+        color: var(--site-footer-text) !important;
+        border-color: color-mix(in srgb, var(--color-primary) 12%, transparent) !important;
+    }
+
+    @media (max-width: 1279px) {
+        [data-experience="al-farooque"] .site-main-navigation > div:first-child { min-height: 64px; height: auto; }
+        [data-experience="al-farooque"] .site-mobile-navigation a,
+        [data-experience="al-farooque"] .site-mobile-navigation button { min-height: 42px; }
+    }
 
     {{-- Motion character: none/restrained turn off decorative looping animation and reduce hover travel --}}
     @if($motion === 'none')

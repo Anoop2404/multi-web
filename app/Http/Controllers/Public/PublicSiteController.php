@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Public\Concerns\RendersPublicPages;
 use App\Models\WebsiteSite;
-use Illuminate\Http\Request;
+use App\Services\Website\SahodayaHomepageModeResolver;
 use App\Services\Website\SahodayaTemplateApplier;
 use App\Support\SahodayaWebsiteTemplateCatalog;
-use App\Services\Website\SahodayaHomepageModeResolver;
+use App\Support\SchoolPublicPageContent;
+use App\Support\SchoolWebsiteTemplateCatalog;
+use Illuminate\Http\Request;
 
 class PublicSiteController extends Controller
 {
@@ -115,10 +117,28 @@ class PublicSiteController extends Controller
                 $pageConfig = [
                     'title' => ucfirst(str_replace('-', ' ', $page)),
                     'eyebrow' => $tenant->name ?? 'Portal',
-                    'subheading' => 'Official page for ' . ($tenant->name ?? 'School') . '.',
+                    'subheading' => 'Official page for '.($tenant->name ?? 'School').'.',
                     'section_types' => [str_replace('-', '_', $pageLower)],
                 ];
                 break;
+        }
+
+        $contentPage = match ($pageLower) {
+            'about', 'about-us' => 'about',
+            'academics', 'academic', 'courses' => 'academics',
+            'admissions', 'admission' => 'admissions',
+            'disclosure', 'mandatory-disclosure', 'cbse-disclosure' => 'disclosure',
+            'contact', 'contact-us' => 'contact',
+            default => null,
+        };
+
+        if ($tenant->type === 'school' && $contentPage) {
+            $content = SchoolPublicPageContent::page($tenant, $contentPage);
+            foreach (['title', 'eyebrow', 'subheading'] as $field) {
+                if (! empty($content[$field])) {
+                    $pageConfig[$field] = $content[$field];
+                }
+            }
         }
 
         $filteredSections = $allSections->filter(function ($section) use ($pageConfig) {
@@ -136,7 +156,9 @@ class PublicSiteController extends Controller
             'site' => $site,
             'pageConfig' => $pageConfig,
             'activePage' => $page,
-            'pageSeo' => array_merge($site->seo_json ?? [], ['title' => $pageConfig['title'] . ' | ' . ($tenant->name ?? 'School')]),
+            'pageSeo' => $tenant->type === 'school' && $contentPage
+                ? SchoolPublicPageContent::seo($tenant, $contentPage, array_merge($site->seo_json ?? [], ['title' => $pageConfig['title'].' | '.($tenant->name ?? 'School')]))
+                : array_merge($site->seo_json ?? [], ['title' => $pageConfig['title'].' | '.($tenant->name ?? 'School')]),
             'experience' => $this->experienceData($site),
         ]);
     }
@@ -182,7 +204,7 @@ class PublicSiteController extends Controller
                 $pageConfig = [
                     'title' => 'Member Schools Directory',
                     'eyebrow' => 'Affiliated Network',
-                    'subheading' => 'Explore 80+ CBSE affiliated member schools across districts in ' . ($tenant->name ?? 'the region') . '.',
+                    'subheading' => 'Explore 80+ CBSE affiliated member schools across districts in '.($tenant->name ?? 'the region').'.',
                     'section_types' => ['member_schools'],
                 ];
                 break;
@@ -248,7 +270,7 @@ class PublicSiteController extends Controller
                 $pageConfig = [
                     'title' => ucfirst(str_replace('-', ' ', $page)),
                     'eyebrow' => 'Sahodaya Portal',
-                    'subheading' => 'Official page for ' . ($tenant->name ?? 'Sahodaya') . '.',
+                    'subheading' => 'Official page for '.($tenant->name ?? 'Sahodaya').'.',
                     'section_types' => [],
                 ];
                 break;
@@ -259,7 +281,7 @@ class PublicSiteController extends Controller
         });
 
         // Fallback: if no matching section is assigned to site, show all sections except hero
-        if ($filteredSections->isEmpty() && !empty($pageConfig['section_types'])) {
+        if ($filteredSections->isEmpty() && ! empty($pageConfig['section_types'])) {
             $filteredSections = $allSections->reject(fn ($s) => $s->section_type === 'hero');
         }
 
@@ -270,7 +292,7 @@ class PublicSiteController extends Controller
             'site' => $site,
             'pageConfig' => $pageConfig,
             'activePage' => $page,
-            'pageSeo' => array_merge($site->seo_json ?? [], ['title' => $pageConfig['title'] . ' | ' . ($tenant->name ?? 'Sahodaya')]),
+            'pageSeo' => array_merge($site->seo_json ?? [], ['title' => $pageConfig['title'].' | '.($tenant->name ?? 'Sahodaya')]),
             'experience' => $this->experienceData($site),
         ]);
     }
@@ -281,13 +303,17 @@ class PublicSiteController extends Controller
         $draft = $preview ? ($site->draft_template_json ?? []) : [];
         $key = $draft['template_key'] ?? $site->template_key;
 
+        $catalog = (tenancy()->tenant?->type ?? null) === 'school'
+            ? SchoolWebsiteTemplateCatalog::class
+            : SahodayaWebsiteTemplateCatalog::class;
+
         return [
             'key' => $key,
             'version' => $draft['template_version'] ?? $site->template_version,
             'experience_version' => $key ? 'v2' : ($site->experience_version ?? 'v1'),
             'homepage_mode' => app(SahodayaHomepageModeResolver::class)->resolve($site),
             'design' => $draft['design'] ?? $site->design_json ?? [],
-            'widget_policy' => $draft['widgets'] ?? SahodayaWebsiteTemplateCatalog::widgetPolicy($key),
+            'widget_policy' => $draft['widgets'] ?? $catalog::widgetPolicy($key),
         ];
     }
 }

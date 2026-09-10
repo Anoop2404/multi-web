@@ -1,21 +1,24 @@
 @extends('layouts.public')
 
 @section('content')
+@php
+    $pageContent = data_get($siteContent ?? [], 'pages.news', []);
+@endphp
 <section class="py-12 px-4">
     <div class="max-w-5xl mx-auto">
         <a href="/" class="inline-flex items-center gap-1 text-sm font-semibold mb-8 hover:underline" style="color: var(--color-primary)">
-            &larr; Back to home
+            &larr; {{ data_get($siteContent ?? [], 'common.back_to_home', 'Back to home') }}
         </a>
 
-        <h1 class="text-3xl md:text-4xl font-bold font-heading text-gray-900 mb-10">News & Announcements</h1>
+        <h1 class="text-3xl md:text-4xl font-bold font-heading text-gray-900 mb-10">{{ $pageContent['title'] ?? 'News & Announcements' }}</h1>
 
         <div class="space-y-6">
             @forelse($articles as $article)
             <article class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition">
                 <a href="/news/{{ $article->slug }}" class="flex flex-col sm:flex-row gap-0 sm:gap-6">
-                    @if($article->image)
+                    @if($article->image_url)
                     <div class="sm:w-48 md:w-56 shrink-0 aspect-video sm:aspect-square overflow-hidden">
-                        <img loading="lazy" src="{{ $article->image }}" alt="{{ $article->title }}" class="w-full h-full object-cover">
+                        <img loading="lazy" src="{{ $article->image_url }}" alt="{{ $article->title }}" class="w-full h-full object-cover">
                     </div>
                     @endif
                     <div class="p-6 flex-1">
@@ -32,7 +35,7 @@
                 </a>
             </article>
             @empty
-            <p class="text-gray-500 text-center py-12">No news articles published yet.</p>
+            <p class="text-gray-500 text-center py-12">{{ $pageContent['empty_message'] ?? 'No news articles published yet.' }}</p>
             @endforelse
         </div>
 
