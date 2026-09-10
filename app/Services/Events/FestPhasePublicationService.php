@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\DB;
 
 class FestPhasePublicationService
 {
-    public function __construct(private FestCumulativeChampionshipService $cumulative) {}
+    public function __construct(
+        private FestCumulativeChampionshipService $cumulative,
+        private FestItemResultsService $itemResults,
+    ) {}
 
     public function publishSchedule(FestEvent $leaf): void
     {
@@ -78,6 +81,10 @@ class FestPhasePublicationService
                 'published_at' => null,
                 'published_by' => null,
             ]);
+            // See FestItemResultsService::unpublishItemsForEvents() docblock: an item
+            // individually published within this phase/region otherwise stays visible on
+            // the public portal after the phase-level unpublish.
+            $this->itemResults->unpublishItemsForEvents([$leaf->id]);
             $this->cumulative->invalidateFrom($root, $source, $actorId);
         });
     }

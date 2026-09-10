@@ -289,6 +289,26 @@ class FestItemResultsService
         FestEventItem::whereIn('id', $itemIds)->update(['results_published_at' => null, 'results_hidden' => true]);
     }
 
+    /**
+     * Counterpart to unpublishItem() for a whole event: an event-level "Unpublish
+     * Results" only flips FestEvent::results_published, which isItemVisible() treats
+     * as a fallback that any individually-published item already overrides via its own
+     * results_published_at/results_hidden. Without this, an item published on its own
+     * (bulk-publish or per-item) stayed publicly visible forever after the event-wide
+     * unpublish, since nothing ever reset its item-level flags.
+     */
+    public function unpublishItemsForEvents(array $eventIds): int
+    {
+        if (empty($eventIds)) {
+            return 0;
+        }
+
+        return FestEventItem::whereIn('event_id', $eventIds)->update([
+            'results_published_at' => null,
+            'results_hidden' => true,
+        ]);
+    }
+
     public function isItemVisible(FestEventItem $item, FestEvent $event): bool
     {
         if ($item->results_hidden) {

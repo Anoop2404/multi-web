@@ -358,6 +358,13 @@ class FestResultsController extends SahodayaAdminController
                 'published_by' => null,
             ]);
 
+        // See FestItemResultsService::unpublishItemsForEvents() docblock: an item
+        // individually published (per-item or bulk-publish) otherwise stays visible on
+        // the public portal indefinitely, since its own results_published_at/
+        // results_hidden flags override this event-wide toggle.
+        app(FestItemResultsService::class)->unpublishItemsForEvents($publicationEventIds);
+        EventContext::for($event)->recalculateSchoolPoints();
+
         app(FestCmsAutoPush::class)->pushScoreboard($event);
         app(FestEventNotifier::class)->resultsUnpublished($event);
 
