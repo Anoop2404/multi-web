@@ -88,7 +88,7 @@
          far this header could stick to that wrapper's total height, and it would
          detach and scroll away with it instead of staying pinned. --}}
     <header class="event-chrome-header sticky top-0 z-40">
-        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div class="max-w-[100rem] mx-auto px-4 py-3 flex items-center justify-between gap-3">
             <a href="{{ route('tenant.fest.index') }}" class="flex items-center gap-2.5 min-w-0 group">
                 @if($logo ?? null)
                 <img src="{{ $logo }}" alt="" class="event-chrome-logo w-8 h-8 rounded-full object-contain bg-white/10 p-1 shrink-0">
@@ -107,7 +107,7 @@
     </header>
     @if($insideEventSubpage)
     <div class="border-b border-white/10 bg-black/20">
-        <div class="max-w-6xl mx-auto px-4 py-2">
+        <div class="max-w-[100rem] mx-auto px-4 py-2">
             <a href="{{ route('tenant.fest.show', $event->id) }}" class="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors max-w-full">
                 <span aria-hidden="true">←</span>
                 <span class="truncate">{{ $event->title }}</span>
@@ -117,7 +117,7 @@
     @endif
     @if($isAdminPreview ?? false)
     <div class="bg-indigo-900/90 border-b border-indigo-500/40 text-white">
-        <div class="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
+        <div class="max-w-[100rem] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
             <div class="flex items-center gap-2">
                 <span class="bg-indigo-500/40 text-indigo-100 border border-indigo-400/40 px-2 py-0.5 rounded text-[10px] uppercase font-extrabold tracking-wider">👁️ Admin Preview Mode</span>
                 <span>Public results visibility is currently <strong>locked / disabled</strong> for regular visitors. You are viewing live standings because you are logged in as an Admin.</span>
@@ -132,7 +132,7 @@
     </main>
 
     <footer class="border-t border-white/10 bg-slate-950 mt-16">
-        <div class="max-w-6xl mx-auto px-4 py-6 flex flex-wrap items-center justify-between gap-3 text-xs text-white/40">
+        <div class="max-w-[100rem] mx-auto px-4 py-6 flex flex-wrap items-center justify-between gap-3 text-xs text-white/40">
             <span>© {{ date('Y') }} {{ $tenant->name ?? 'Sahodaya' }}</span>
             <a href="{{ url('/') }}" class="hover:text-white/70 transition-colors">Visit main site →</a>
         </div>
