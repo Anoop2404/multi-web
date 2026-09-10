@@ -133,7 +133,6 @@
                             <th class="p-3 text-right w-20">Rank Pts</th>
                             <th class="p-3 text-center w-20">Grade</th>
                             <th class="p-3 text-right w-20">Grade Pts</th>
-                            <th class="p-3 text-right w-24">Score</th>
                             <th class="p-3 text-right w-24">Total</th>
                         </tr>
                     </thead>
@@ -149,7 +148,6 @@
                             <td class="p-3 text-right font-mono text-white/70">{{ $row['rank_points'] ?? '—' }}</td>
                             <td class="p-3 text-center font-bold text-amber-300">{{ $row['grade'] ?? '—' }}</td>
                             <td class="p-3 text-right font-mono text-white/70">{{ $row['grade_points'] ?? '—' }}</td>
-                            <td class="p-3 text-right font-mono text-white/70">{{ $row['score'] !== null ? number_format((float) $row['score'], 2) : '—' }}</td>
                             <td class="p-3 text-right font-mono font-bold text-white">{{ $row['points'] ?? 0 }}</td>
                         </tr>
                         @endforeach
