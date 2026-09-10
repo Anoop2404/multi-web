@@ -4,6 +4,7 @@ namespace Tests\Feature\Public;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
@@ -141,6 +142,32 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $response->assertOk();
         $response->assertSee('Girls Solo Dance');
         $response->assertSee('Girls');
+    }
+
+    public function test_championship_tab_shows_humanized_category_and_a_link_to_the_students_page(): void
+    {
+        $student = Student::where('name', 'Anu Krishna')->firstOrFail();
+        FestParticipant::whereHas('student', fn ($q) => $q->where('name', 'Anu Krishna'))
+            ->update(['level_registration_number' => 'CHAMP-REF-1']);
+
+        FestIndividualChampionshipPoint::create([
+            'event_id' => $this->event->id,
+            'student_id' => $student->id,
+            'category' => 'hs',
+            'gender' => 'female',
+            'points' => 42,
+            'group_points' => 0,
+        ]);
+
+        $response = $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=championship");
+
+        $response->assertOk();
+        // Humanized label, not the raw enum key stored on the row.
+        $response->assertDontSee('>hs<', false);
+        $response->assertSee('Classes 8, 9 &amp; 10', false);
+        $response->assertSee('Girls');
+        // Eye icon links to this student's own public participant page.
+        $response->assertSee("/fest/{$this->event->id}/participant/CHAMP-REF-1", false);
     }
 
     public function test_item_results_page_shows_full_roster_not_just_one_member(): void

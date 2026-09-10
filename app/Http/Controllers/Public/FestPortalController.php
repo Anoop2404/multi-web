@@ -209,18 +209,33 @@ class FestPortalController extends Controller
             : collect();
         $championshipSchools = Tenant::whereIn('id', $championshipRows->pluck('student.tenant_id')->filter()->unique())
             ->pluck('name', 'id');
+        // Lets each Championship row link to that student's own public participant page
+        // (participant() below, resolved via findParticipantByRef()'s level_registration_number
+        // match) — one Fest ID resolves to any of that student's item-level FestParticipant
+        // rows, and publicParticipantItems() then lists every item they took, not just one.
+        $championshipRefs = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $championshipEventId))
+            ->whereIn('student_id', $championshipRows->pluck('student_id')->filter()->unique())
+            ->whereNotNull('level_registration_number')
+            ->pluck('level_registration_number', 'student_id');
+        // FestIndividualChampionshipPoint.category is always one of the fixed lp/up/hs/
+        // hss/open keys (App\Http\Controllers\SahodayaAdmin\FestChampionshipController::
+        // INDIVIDUAL_CATEGORY_KEYS), regardless of event_type — the same keys
+        // FestClassGroupScheme::labels() resolves for Kalolsavam class categories, so it
+        // doubles as the label source here too instead of showing the raw "lp"/"hs" slug.
+        $championshipCategoryLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $championship = $championshipRows
-            ->map(function (FestIndividualChampionshipPoint $row, int $index) use ($championshipSchools) {
+            ->map(function (FestIndividualChampionshipPoint $row, int $index) use ($championshipSchools, $championshipCategoryLabels, $championshipRefs) {
 
                 return [
                     'rank' => $index + 1,
                     'points' => $row->points,
-                    'category' => $row->category,
-                    'gender' => $row->gender,
+                    'category' => $championshipCategoryLabels[$row->category] ?? $row->category,
+                    'gender' => \App\Support\FestSportsAgeGroup::genderLabel($row->gender) ?? $row->gender,
                     'student' => $row->student?->name,
                     'photo' => $row->student?->photoDataUri(),
                     'reg_no' => $row->student?->reg_no,
                     'school' => $championshipSchools[$row->student?->tenant_id] ?? null,
+                    'ref' => $championshipRefs[$row->student_id] ?? null,
                 ];
             })
             ->values()

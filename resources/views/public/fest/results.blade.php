@@ -476,7 +476,7 @@
                 </div>
                 <table class="w-full text-sm">
                     <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
-                        <tr><th class="p-3">Rank</th><th class="p-3">Student</th><th class="p-3">School</th><th class="p-3">Category</th><th class="p-3">Gender</th><th class="p-3 text-right">Points</th></tr>
+                        <tr><th class="p-3">Rank</th><th class="p-3">Student</th><th class="p-3">School</th><th class="p-3">Category</th><th class="p-3">Gender</th><th class="p-3 text-right">Points</th><th class="p-3 w-10"></th></tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
                         @forelse($championship as $row)
@@ -487,9 +487,21 @@
                                 <td class="p-3 text-white/70">{{ $row['category'] }}</td>
                                 <td class="p-3 text-white/70">{{ $row['gender'] }}</td>
                                 <td class="p-3 text-right font-mono text-white">{{ $row['points'] }}</td>
+                                <td class="p-3 text-right">
+                                    @if($row['ref'])
+                                    <a href="{{ route('tenant.fest.participant', [$event->id, $row['ref']]) }}"
+                                       class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-700 text-white/50 hover:text-white hover:border-slate-500 transition"
+                                       title="View this student's full results">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                        </svg>
+                                    </a>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="p-8 text-center text-white/30">No championship points published yet.</td></tr>
+                            <tr><td colspan="7" class="p-8 text-center text-white/30">No championship points published yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
