@@ -291,7 +291,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'school_id'        => 'required|exists:tenants,id',
+            'school_id'        => 'required|exists:central.tenants,id',
             'item_id'          => 'required|exists:fest_event_items,id',
             'team_name'        => 'nullable|string|max:255',
             'coach_name'       => 'nullable|string|max:255',
@@ -662,7 +662,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $data = $request->validate([
             'registration_ids'   => 'nullable|array',
             'registration_ids.*' => 'integer|exists:fest_registrations,id',
-            'school_id'          => 'nullable|exists:tenants,id',
+            'school_id'          => 'nullable|exists:central.tenants,id',
             'item_id'            => 'nullable|integer|exists:fest_event_items,id',
             'override_lifecycle' => 'nullable|boolean',
         ]);
@@ -697,7 +697,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $data = $request->validate([
             'registration_ids'   => 'nullable|array',
             'registration_ids.*' => 'integer|exists:fest_registrations,id',
-            'school_id'          => 'nullable|exists:tenants,id',
+            'school_id'          => 'nullable|exists:central.tenants,id',
             'item_id'            => 'nullable|integer|exists:fest_event_items,id',
             'override_lifecycle' => 'nullable|boolean',
             'rejection_reason'   => 'nullable|string|max:500',

@@ -361,7 +361,7 @@ class SchoolApplicationForm
         }
 
         $rules['requested_subdomain'] = [
-            'nullable', 'string', 'max:50', 'alpha_dash', 'unique:tenants,subdomain',
+            'nullable', 'string', 'max:50', 'alpha_dash', 'unique:central.tenants,subdomain',
             function (string $attribute, mixed $value, \Closure $fail): void {
                 if ($value && TenantDomainSync::isReservedSubdomain((string) $value)) {
                     $fail('This subdomain is reserved.');

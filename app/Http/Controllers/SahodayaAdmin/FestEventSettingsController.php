@@ -1096,7 +1096,10 @@ class FestEventSettingsController extends SahodayaAdminController
             'school_id'          => [
                 'nullable',
                 'string',
-                Rule::exists('tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
+                // 'central.tenants', not 'tenants' -- runs after tenancy has switched the
+                // default DB connection to the current Sahodaya's own database, which has
+                // no tenants table (central-only). Same fix as FestRegistrationReviewController.
+                Rule::exists('central.tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
             ],
             'class_group'        => 'nullable|in:lp,up,hs,hss,open',
             'max_arts_events'    => 'nullable|integer|min:0',

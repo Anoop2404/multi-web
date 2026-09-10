@@ -79,7 +79,7 @@ class StateRemittanceController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'sahodaya_id'    => 'required|exists:tenants,id',
+            'sahodaya_id'    => 'required|exists:central.tenants,id',
             'title'          => 'required|string|max:255',
             'description'    => 'nullable|string',
             'amount'         => 'required|numeric|min:0.01',

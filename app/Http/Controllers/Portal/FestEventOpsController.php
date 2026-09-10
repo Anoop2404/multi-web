@@ -218,7 +218,7 @@ class FestEventOpsController extends Controller
         $data = $request->validate([
             'registration_ids'   => 'nullable|array',
             'registration_ids.*' => 'integer|exists:fest_registrations,id',
-            'school_id'          => 'nullable|exists:tenants,id',
+            'school_id'          => 'nullable|exists:central.tenants,id',
             'override_lifecycle' => 'nullable|boolean',
         ]);
 
@@ -240,7 +240,7 @@ class FestEventOpsController extends Controller
         $data = $request->validate([
             'registration_ids'   => 'nullable|array',
             'registration_ids.*' => 'integer|exists:fest_registrations,id',
-            'school_id'          => 'nullable|exists:tenants,id',
+            'school_id'          => 'nullable|exists:central.tenants,id',
             'override_lifecycle' => 'nullable|boolean',
         ]);
 

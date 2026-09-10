@@ -215,7 +215,12 @@ class FestEventController extends SahodayaAdminController
             'food_host_school_id'      => [
                 Rule::requiredIf(($request->input('food_payee_type') ?? 'sahodaya') === 'host_school'),
                 'nullable',
-                Rule::exists('tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
+                // 'central.tenants', not 'tenants' -- this controller runs after tenancy
+                // has switched the default DB connection to the current Sahodaya's own
+                // database, which has no tenants table at all (that's central-only).
+                // Unqualified, this 500s exactly like the school_id lookups in
+                // FestRegistrationReviewController did before the same fix there.
+                Rule::exists('central.tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
             ],
         ]);
 

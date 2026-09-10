@@ -786,7 +786,7 @@ class TenantController extends Controller
             ],
             // A school with no parent_id is a standalone tenant (App\Support\TenancyDatabase::isStandalone) —
             // its data lives on the central connection instead of a Sahodaya's dedicated database.
-            'parent_id' => ['nullable', 'exists:tenants,id'],
+            'parent_id' => ['nullable', 'exists:central.tenants,id'],
             'plan'      => 'nullable|string',
             'is_active' => $tenant ? 'boolean' : 'sometimes',
         ];

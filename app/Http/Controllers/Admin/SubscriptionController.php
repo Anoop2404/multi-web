@@ -113,7 +113,7 @@ class SubscriptionController extends Controller
     public function storeTenantSubscription(Request $request, PlatformAuditLogger $audit)
     {
         $data = $request->validate([
-            'tenant_id'    => 'required|exists:tenants,id',
+            'tenant_id'    => 'required|exists:central.tenants,id',
             'plan_id'      => 'nullable|exists:subscription_plans,id',
             'period_start' => 'required|date',
             'period_end'   => 'required|date|after:period_start',
@@ -134,7 +134,7 @@ class SubscriptionController extends Controller
     public function storeInvoice(Request $request, PlatformAuditLogger $audit)
     {
         $data = $request->validate([
-            'tenant_id' => 'required|exists:tenants,id',
+            'tenant_id' => 'required|exists:central.tenants,id',
             'plan_id'   => 'nullable|exists:subscription_plans,id',
             'amount'    => 'required|numeric|min:0',
             'due_date'  => 'required|date',

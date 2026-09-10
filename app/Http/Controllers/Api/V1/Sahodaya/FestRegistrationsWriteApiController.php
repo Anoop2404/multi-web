@@ -68,7 +68,7 @@ class FestRegistrationsWriteApiController extends SahodayaApiController
 
         $data = $request->validate([
             'registration_ids'   => 'nullable|array',
-            'school_id'          => 'nullable|exists:tenants,id',
+            'school_id'          => 'nullable|exists:central.tenants,id',
             'override_lifecycle' => 'nullable|boolean',
         ]);
 

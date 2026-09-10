@@ -32,7 +32,7 @@ class StorageMigrationController extends Controller
     public function migrate(Request $request, LegacyStorageMigrationService $migration)
     {
         $data = $request->validate([
-            'tenant'            => 'nullable|string|exists:tenants,id',
+            'tenant'            => 'nullable|string|exists:central.tenants,id',
             'delete_local'      => 'boolean',
             'include_filesystem'=> 'boolean',
             'sync'              => 'boolean',
