@@ -109,8 +109,8 @@
                             <th class="w-16 text-center">Reg.</th>
                             <th class="min-w-[190px]">Timing</th>
                             <th class="w-20 text-center">Est.</th>
-                            <th class="w-36">Date</th>
-                            <th class="w-28">Time</th>
+                            <th class="w-40">Date</th>
+                            <th class="w-36">Time</th>
                             <th class="min-w-[130px]">Stage</th>
                             <th class="min-w-[130px]">Venue</th>
                         </tr>
@@ -137,24 +137,28 @@
                                 <td class="text-xs uppercase text-slate-500">{{ row.age_group || '—' }}</td>
                                 <td class="text-center text-xs text-slate-600 tabular-nums">{{ row.registrations_count ?? '—' }}</td>
                                 <td>
-                                    <div class="flex items-center gap-1">
-                                        <SearchableSelect v-model="draft[row.item_id].timing_mode" class="w-28"
+                                    <div class="flex flex-col gap-1">
+                                        <SearchableSelect v-model="draft[row.item_id].timing_mode" class="w-full"
                                                           :options="timingModeOptions" />
-                                        <input v-model.number="draft[row.item_id].duration_minutes" type="number" min="1" max="600"
-                                               class="field !py-1 !text-xs w-14" :placeholder="draft[row.item_id].timing_mode === 'fixed' ? 'Total' : 'Per'">
-                                        <span class="text-[10px] text-slate-400">min</span>
-                                        <input v-model.number="draft[row.item_id].calling_buffer_minutes" type="number" min="0" max="120"
-                                               class="field !py-1 !text-xs w-12" placeholder="Buf" title="Calling / setup buffer, minutes">
+                                        <div class="flex items-center gap-1.5">
+                                            <input v-model.number="draft[row.item_id].duration_minutes" type="number" min="1" max="600"
+                                                   class="field !py-1 !px-1.5 !text-xs !w-16 shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                   :placeholder="draft[row.item_id].timing_mode === 'fixed' ? 'Total' : 'Per'">
+                                            <span class="text-[10px] text-slate-400 shrink-0">min</span>
+                                            <input v-model.number="draft[row.item_id].calling_buffer_minutes" type="number" min="0" max="120"
+                                                   class="field !py-1 !px-1.5 !text-xs !w-14 shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                   placeholder="Buf" title="Calling / setup buffer, minutes">
+                                        </div>
                                     </div>
                                 </td>
                                 <td class="text-center text-xs font-semibold text-slate-700 tabular-nums">
                                     {{ formatMinutes(estimatedMinutesFor(row)) }}
                                 </td>
-                                <td>
-                                    <input v-model="draft[row.item_id].scheduled_date" type="date" class="field !py-1 !text-xs">
+                                <td class="!px-2">
+                                    <input v-model="draft[row.item_id].scheduled_date" type="date" class="field !py-1 !px-2 !text-xs">
                                 </td>
-                                <td>
-                                    <input v-model="draft[row.item_id].scheduled_time" type="time" class="field !py-1 !text-xs">
+                                <td class="!px-2">
+                                    <input v-model="draft[row.item_id].scheduled_time" type="time" class="field !py-1 !px-2 !text-xs">
                                 </td>
                                 <td>
                                     <SearchableSelect v-if="stages.length" v-model="draft[row.item_id].stage_id"
