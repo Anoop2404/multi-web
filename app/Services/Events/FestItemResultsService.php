@@ -44,14 +44,21 @@ class FestItemResultsService
             $query->where(fn ($q) => $q->whereNull('sport_discipline')->orWhere('sport_discipline', $event->sport_discipline));
         }
 
-        $items = $query->with('head:id,name,reg_start,reg_end,competition_start,competition_end')
+        $items = $query->with(['head:id,name,reg_start,reg_end,competition_start,competition_end', 'phase:id,source_phase_id'])
             ->orderBy('display_order')
             ->orderBy('title')
             ->get([
                 'id', 'title', 'item_code', 'head_id', 'age_group', 'class_group', 'category', 'gender',
                 'sport_discipline', 'stage_type', 'reg_start', 'reg_end', 'competition_start',
-                'competition_end', 'results_published_at', 'inherited_from_item_id', 'event_id',
+                'competition_end', 'results_published_at', 'inherited_from_item_id', 'event_id', 'phase_id',
             ]);
+
+        // A phase leaf's own fest_event_items table can hold a handful of items copied
+        // under the wrong phase (see FestHeadItemNavigationService::filterToOwnPhase()'s
+        // docblock) — without this, this method's stat-card counts (141 items) diverged
+        // from the item listing below them (correctly phase-scoped via the same helper),
+        // which only ever showed this phase's true ~74.
+        $items = FestHeadItemNavigationService::filterToOwnPhase($items, $event);
 
         $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
