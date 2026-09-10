@@ -847,7 +847,7 @@ class FestSchoolEventFeeService
         }
 
         foreach ($composite['lines'] ?? [] as $line) {
-            if (in_array($line['line_type'] ?? null, ['item_fee', 'extra_item'], true)
+            if (in_array($line['line_type'] ?? null, ['item_fee', 'extra_item', 'team_fee'], true)
                 && ($line['meta']['phase_id'] ?? null) === $phase->id) {
                 $lines[] = $line;
             }

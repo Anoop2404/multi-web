@@ -582,11 +582,15 @@ class FestSportsCompositeFeeService
         // for at least one item — an event-level-only (Step 1) registration with no
         // items must not be billed. (This previously counted every active event-level
         // registration outright, whether or not the student ever registered an item.)
+        // Team/group items (e.g. Band Display) are excluded here too: they're billed on
+        // their own below and never draw from the individual per-student quota, so a
+        // student registered ONLY for a team item must not be charged this fee either.
         $studentIds = FestRegistration::whereIn('event_id', $eventIds)
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
-            ->with('participants')
+            ->with(['item', 'participants'])
             ->get()
+            ->reject(fn (FestRegistration $r) => $r->item?->isTeamItem())
             ->flatMap(fn (FestRegistration $r) => $r->participants
                 ->where('participant_role', '!=', 'standby')
                 ->pluck('student_id'))
@@ -639,6 +643,17 @@ class FestSportsCompositeFeeService
 
         $chargedRegistrations = [];
         foreach ($registrations as $registration) {
+            // Team/group items (e.g. Band Display) never draw from the individual
+            // per-student free quota and are never counted as "extra" items against it —
+            // they're billed on their own, always, in the loop below. Previously these
+            // fell into this same position walk: landing within a student's first
+            // $includedQuota registrations silently waived the item (billing ₹0 instead
+            // of its own fee/override), while still consuming a free slot an ordinary
+            // item should have used.
+            if ($registration->item?->isTeamItem()) {
+                continue;
+            }
+
             foreach ($registration->participants as $participant) {
                 if ($participant->participant_role === 'standby' || ! $participant->student_id) {
                     continue;
@@ -692,6 +707,48 @@ class FestSportsCompositeFeeService
                 } else {
                     $extraNoPhase += $amount;
                 }
+            }
+        }
+
+        // Team/group items (e.g. Band Display) are billed on their own, always — see the
+        // skip above. Uses the item's own fee_amount override (or group_item_flat_fee/
+        // group_item_per_participant_rate) via amountForItem(), the same resolver the
+        // per-student loop above uses, so both agree on where an override wins.
+        foreach ($registrations as $registration) {
+            if (! $registration->item?->isTeamItem()) {
+                continue;
+            }
+
+            $performersCount = $registration->participants
+                ->filter(fn ($p) => $p->participant_role !== 'standby' && $p->student_id)
+                ->count();
+
+            if ($performersCount === 0) {
+                continue;
+            }
+
+            $amount = $this->itemFeeResolver->amountForItem($registration->item, $schedule, $event, registration: $registration);
+            $itemTitle = $registration->item?->formattedTitle() ?? str_replace('_', ' ', $registration->item->title ?? 'Team item');
+            $itemPhaseId = $registration->item?->phase_id;
+
+            $extraLines[] = [
+                'line_type' => 'team_fee',
+                'label' => $itemTitle.' — team fee',
+                'quantity' => 1,
+                'unit_amount' => $amount,
+                'amount' => $amount,
+                'meta' => [
+                    'item_id' => $registration->item_id,
+                    'registration_id' => $registration->id,
+                    'phase_id' => $itemPhaseId,
+                ],
+            ];
+            $extraTotal += $amount;
+
+            if ($itemPhaseId !== null) {
+                $extraByPhase[$itemPhaseId] = ($extraByPhase[$itemPhaseId] ?? 0.0) + $amount;
+            } else {
+                $extraNoPhase += $amount;
             }
         }
 

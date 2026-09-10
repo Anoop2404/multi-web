@@ -232,6 +232,125 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(7200.0, (float) $secondaryFee->total_due);
     }
 
+    /**
+     * Bug fix: FestSportsCompositeFeeService::calculate() (the kalolsavam_composite path)
+     * previously ran every registration — including team/group items like Band Display —
+     * through the same per-student free-quota "position" walk as ordinary individual items.
+     * Whether a team item silently consumed one of the student's free slots (billing it ₹0
+     * instead of its own fee_amount override) depended purely on registration id order.
+     * Registering the team item FIRST here reproduces exactly that failure mode.
+     */
+    public function test_kalolsavam_composite_team_item_never_consumes_the_individual_free_quota(): void
+    {
+        ['school' => $school, 'event' => $event] = $this->festContext();
+
+        $event->update([
+            'fee_settings' => [
+                'fee_model' => 'kalolsavam_composite',
+                'per_student_amount' => 500,
+                'included_items_per_student' => 3,
+                'extra_item_fee' => 100,
+                'school_registration_flat' => 0,
+            ],
+        ]);
+
+        $bandDisplay = FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => 'Band Display',
+            'participant_type' => 'group',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+            'fee_amount' => 2500,
+        ]);
+
+        $individualItems = collect(range(1, 4))->map(fn ($n) => FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => "Solo Item {$n}",
+            'participant_type' => 'individual',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+        ]));
+
+        $schoolClass = SchoolClass::create([
+            'tenant_id' => $school->id,
+            'name' => '10',
+            'class_category_id' => 1,
+            'is_active' => true,
+        ]);
+        $student = Student::create([
+            'tenant_id' => $school->id,
+            'school_class_id' => $schoolClass->id,
+            'name' => 'Quota Test Student',
+            'gender' => 'male',
+            'dob' => '2012-01-01',
+            'status' => 'active',
+        ]);
+
+        // Band Display registered FIRST (lowest id) — the ordering that triggered the bug.
+        $this->approvedRegistration($event->fresh(), $bandDisplay, $school, $student);
+        foreach ($individualItems as $item) {
+            $this->approvedRegistration($event->fresh(), $item, $school, $student);
+        }
+
+        $fee = app(FestSchoolEventFeeService::class)->recalculate($event->fresh(), $school->id);
+
+        // 1 student × ₹500 covers 3 of the 4 individual items; the 4th is a ₹100 extra
+        // item; Band Display bills its own ₹2500 override, untouched by the quota.
+        // extra_item_fee is the single "beyond the flat per-student fee" bucket — there's
+        // no separate team-fee column — so it carries both: 100 + 2500 = 2600.
+        $this->assertSame(500.0, (float) $fee->student_registration_fee);
+        $this->assertSame(2600.0, (float) $fee->extra_item_fee);
+        $this->assertSame(3100.0, (float) $fee->total_due);
+    }
+
+    public function test_kalolsavam_composite_team_only_student_is_not_charged_the_per_student_fee(): void
+    {
+        ['school' => $school, 'event' => $event] = $this->festContext();
+
+        $event->update([
+            'fee_settings' => [
+                'fee_model' => 'kalolsavam_composite',
+                'per_student_amount' => 500,
+                'included_items_per_student' => 3,
+                'extra_item_fee' => 100,
+                'school_registration_flat' => 0,
+            ],
+        ]);
+
+        $bandDisplay = FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => 'Band Display',
+            'participant_type' => 'group',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+            'fee_amount' => 2500,
+        ]);
+
+        $schoolClass = SchoolClass::create([
+            'tenant_id' => $school->id,
+            'name' => '10',
+            'class_category_id' => 1,
+            'is_active' => true,
+        ]);
+        $student = Student::create([
+            'tenant_id' => $school->id,
+            'school_class_id' => $schoolClass->id,
+            'name' => 'Band Only Student',
+            'gender' => 'male',
+            'dob' => '2012-01-01',
+            'status' => 'active',
+        ]);
+
+        $this->approvedRegistration($event->fresh(), $bandDisplay, $school, $student);
+
+        $fee = app(FestSchoolEventFeeService::class)->recalculate($event->fresh(), $school->id);
+
+        // A student registered only for a team item owes no per-student registration
+        // fee — only the item's own fixed fee.
+        $this->assertSame(0.0, (float) $fee->student_registration_fee);
+        $this->assertSame(2500.0, (float) $fee->total_due);
+    }
+
     public function test_cksc_tiered_counts_registrations_only_by_default(): void
     {
         ['school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();
