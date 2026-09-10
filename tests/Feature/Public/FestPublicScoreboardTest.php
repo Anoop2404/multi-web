@@ -403,6 +403,7 @@ class FestPublicScoreboardTest extends TestCase
         $item = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'North Poetry', 'category' => 'literary',
             'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
         ]);
         $registration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
         $participant = FestParticipant::create([
@@ -441,6 +442,7 @@ class FestPublicScoreboardTest extends TestCase
         $lpItem = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'North LP Item', 'category' => 'literary',
             'class_group' => 'lp', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
         ]);
         $registration = FestRegistration::create([
             'event_id' => $this->north->id, 'item_id' => $lpItem->id,
@@ -506,6 +508,7 @@ class FestPublicScoreboardTest extends TestCase
         $laterCategoryItem = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'Zzz Late Item', 'category' => 'literary',
             'class_group' => 'zzz_category', 'participant_type' => 'group', 'is_enabled' => true,
+            'results_published_at' => now(),
         ]);
         $reg1 = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $laterCategoryItem->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
         $p1 = FestParticipant::create(['registration_id' => $reg1->id, 'event_id' => $this->north->id, 'participant_type' => 'student']);
@@ -515,6 +518,7 @@ class FestPublicScoreboardTest extends TestCase
         $earlierCategoryItem = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'Aaa Early Item', 'category' => 'literary',
             'class_group' => 'aaa_category', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
         ]);
         $reg2 = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $earlierCategoryItem->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
         $p2 = FestParticipant::create(['registration_id' => $reg2->id, 'event_id' => $this->north->id, 'participant_type' => 'student']);
@@ -546,6 +550,7 @@ class FestPublicScoreboardTest extends TestCase
         $item = FestEventItem::create([
             'event_id' => $confedEvent->id, 'title' => 'Confed Poetry', 'category' => 'literary',
             'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
         ]);
         $registration = FestRegistration::create(['event_id' => $confedEvent->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
         $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $confedEvent->id, 'participant_type' => 'student']);
@@ -580,6 +585,7 @@ class FestPublicScoreboardTest extends TestCase
         $item = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'North Group Song', 'category' => 'music',
             'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
         ]);
         $registration = FestRegistration::create([
             'event_id' => $this->north->id, 'item_id' => $item->id,
@@ -620,6 +626,7 @@ class FestPublicScoreboardTest extends TestCase
         $item = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'North Poetry', 'category' => 'literary',
             'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
         ]);
         $registration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
         $schoolClass = SchoolClass::create(['tenant_id' => $this->northSchool->id, 'name' => '8']);
@@ -647,6 +654,7 @@ class FestPublicScoreboardTest extends TestCase
         $nonWinningItem = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'North Elocution', 'category' => 'literary',
             'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
         ]);
         $registration = FestRegistration::create([
             'event_id' => $this->north->id, 'item_id' => $nonWinningItem->id,

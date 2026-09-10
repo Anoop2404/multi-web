@@ -194,7 +194,7 @@ class FestCertificateZipExportTest extends TestCase
 
         $event = FestEvent::create([
             'tenant_id' => $sahodaya->id, 'title' => 'Published Only Zip Event', 'event_type' => 'kalolsavam',
-            'results_published' => false,
+            'results_published' => true,
         ]);
         $publishedItem = FestEventItem::create([
             'event_id' => $event->id, 'title' => 'Published Item', 'item_code' => 'PZ1',

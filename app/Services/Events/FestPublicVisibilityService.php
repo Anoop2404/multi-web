@@ -65,24 +65,26 @@ class FestPublicVisibilityService
             return true;
         }
 
-        // Under strict anonymity, a name only reveals once results are actually
-        // out — for the specific item when known, via that item's own publish
-        // timestamp, not just the event's catch-all flag. That flag flips once
-        // for the whole festival and would otherwise reveal every participant
-        // the moment any part of the event finalizes, including items that
-        // haven't run or been judged yet. An item explicitly unpublished/hidden
-        // via results_hidden always wins here too — same rule showIndividualMarks()
-        // already applies, previously missing here meant a name could still show
-        // (with marks correctly hidden) for an item an admin had explicitly hidden.
-        if ($item) {
-            if ($item->results_hidden) {
-                return false;
-            }
-
-            return (bool) $item->results_published_at;
+        // Under strict anonymity, a name only reveals once the event overall has been
+        // published AND — when the specific item is known — that item has also been
+        // individually published. An item's own early-publish workflow only ever
+        // reveals something once the event-wide toggle also allows public visibility;
+        // it is never a bypass of it (an admin turning the event-wide toggle off must
+        // hide everything, full stop, regardless of any item's own state). An item
+        // explicitly unpublished/hidden via results_hidden always wins regardless.
+        if (! $event->results_published) {
+            return false;
         }
 
-        return (bool) $event->results_published;
+        if (! $item) {
+            return true;
+        }
+
+        if ($item->results_hidden) {
+            return false;
+        }
+
+        return (bool) $item->results_published_at;
     }
 
     public function showSchoolName(FestEvent $event, bool $isAdminPreview = false): bool
@@ -95,12 +97,10 @@ class FestPublicVisibilityService
     }
 
     /**
-     * $item lets this line up with showParticipantName()/isItemVisible(): an item's own
-     * publish state (including an explicit unpublish/hide) always wins over the event-wide
-     * flag when known, instead of this checking $event->results_published alone — which
-     * previously meant a mark's position/grade/score could still print here even for an
-     * item that was never individually published, or one an admin had explicitly hidden
-     * after the event overall went public.
+     * $item lines this up with showParticipantName()/isItemVisible(): the event-wide
+     * flag is a hard requirement, not a fallback — an item can only reveal a mark once
+     * the event overall is published AND (when the item is known) that item has also
+     * been individually published, never independently of the event-wide toggle.
      */
     public function showIndividualMarks(FestEvent $event, bool $isAdminPreview = false, ?FestEventItem $item = null): bool
     {
@@ -108,19 +108,23 @@ class FestPublicVisibilityService
             return true;
         }
 
-        if ($item?->results_hidden) {
+        if ($this->isSportsEvent($event)) {
+            return true;
+        }
+
+        if (! $event->results_published) {
             return false;
         }
 
-        if ($item?->results_published_at) {
+        if (! $item) {
             return true;
         }
 
-        if ($event->results_published) {
-            return true;
+        if ($item->results_hidden) {
+            return false;
         }
 
-        return $this->isSportsEvent($event);
+        return (bool) $item->results_published_at;
     }
 
     public function allowNameSearch(FestEvent $event, bool $isAdminPreview = false): bool

@@ -535,12 +535,17 @@ class FestPortalController extends Controller
         // Deliberately a separate query from results()'s own $marks (which stays
         // top-3-only — it also feeds the item/individual/medal-tally tabs, where
         // "winners only" is the correct scope), not a reuse of it.
-        $scopePublished = (bool) ($selectedScope['results_published'] ?? false);
 
         $allSchoolMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
-            ->when(! $scopePublished, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')))
-            // Unconditional regardless of $scopePublished — an explicitly unpublished
-            // item must never resurface just because the event overall got published.
+            // Unconditional, regardless of whether the event overall is published — an
+            // item that was never individually published (still "Pending" in admin) must
+            // never resurface here just because the event-wide toggle went on. Previously
+            // only enforced while the event was unpublished, so once an admin published
+            // the event, every item not explicitly hidden leaked onto this roster
+            // (including grade/points) even if that specific item was still Pending.
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at'))
+            // Unconditional too — an explicitly unpublished item must never resurface
+            // just because the event overall got published.
             ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
             // Only set when schoolResults() was reached from a category-filtered
             // scoreboard — narrows the roster to that one category instead of the
@@ -1214,21 +1219,6 @@ public function tv(Request $request, int $eventId)
     }
 
     /**
-     * Whether any item in this scope has been individually published (and not since
-     * hidden again) — the gate for "is there anything at all to show here" on a page
-     * that isn't behind the whole-event results_published flag yet. A school shouldn't
-     * get a blanket 403 on /results or /tv just because the official "Publish Results"
-     * action hasn't run, as long as at least one item has already published on its own.
-     */
-    private function hasPublishedItems(array $eventIds): bool
-    {
-        return FestEventItem::whereIn('event_id', $eventIds)
-            ->whereNotNull('results_published_at')
-            ->where('results_hidden', false)
-            ->exists();
-    }
-
-    /**
      * tv_show_overall_standings also gates the Scoreboard page's "All Categories" tab
      * (matching tv()'s own use of the same flag) — when it's off and the visitor didn't
      * ask for a specific category, default to the first one instead of the fest-wide
@@ -1407,7 +1397,10 @@ public function tv(Request $request, int $eventId)
         // an event with public results fully disabled (and no item individually
         // published yet) still served this page and, via chest-number/level-reg-number
         // lookup, could surface a participant's item/category/school even though every
-        // other public surface correctly shows "disabled" for the same event.
+        // other public surface correctly shows "disabled" for the same event. Content
+        // within the page is separately, unconditionally gated by showParticipantName()/
+        // isItemVisible() (both now require the event-wide flag too), so allowing page
+        // access here as soon as one item has published doesn't leak anything on its own.
         abort_unless($isPublished || $this->hasPublishedItems($selectedScope['event_ids']), 403, 'Public results are disabled for this event.');
 
         // Cast: $request->query() returns whatever the client sends for this key, including an
@@ -1472,7 +1465,8 @@ public function tv(Request $request, int $eventId)
         // Same gate as search()/results()/itemResults()/scoreboard()/tv(): a direct link
         // to a participant page must not bypass the event's public-disable lock, even
         // though formatPublicParticipant()/publicParticipantItems() already hide the
-        // name/marks for any item that isn't individually published.
+        // name/marks for any item that isn't individually published (and, now, also
+        // require the event-wide flag itself — see showParticipantName()/isItemVisible()).
         abort_unless($isPublished || $this->hasPublishedItems($selectedScope['event_ids']), 403, 'Public results are disabled for this event.');
 
         $participant = $this->visibility->findParticipantByRef($event, $ref);
@@ -1552,6 +1546,24 @@ public function tv(Request $request, int $eventId)
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * Whether any item in this scope has been individually published (and not since
+     * hidden again) — the gate for "is there anything at all to show here" on a page
+     * that isn't behind the whole-event results_published flag yet. A school shouldn't
+     * get a blanket 403 on /results, /tv, /search, or /participant just because the
+     * official "Publish Results" action hasn't run, as long as at least one item has
+     * already published on its own — page ACCESS only; actual content is separately,
+     * unconditionally gated by showParticipantName()/showIndividualMarks()/
+     * isItemVisible() (all of which also require the event-wide flag itself).
+     */
+    private function hasPublishedItems(array $eventIds): bool
+    {
+        return FestEventItem::whereIn('event_id', $eventIds)
+            ->whereNotNull('results_published_at')
+            ->where('results_hidden', false)
+            ->exists();
     }
 
     private function findEvent(string $tenantId, int $eventId): FestEvent

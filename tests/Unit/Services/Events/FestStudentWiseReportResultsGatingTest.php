@@ -86,7 +86,11 @@ class FestStudentWiseReportResultsGatingTest extends TestCase
             'event_type'        => 'kalolsavam',
             'level_round'       => 'sahodaya',
             'status'            => 'registration_open',
-            'results_published' => false,
+            // The event-wide flag is a hard requirement, not something an item's own
+            // early publish can bypass (see FestItemResultsService::isItemVisible()) —
+            // this test's per-item gating (published item visible, unpublished item
+            // hidden) only exercises anything once the event overall is published too.
+            'results_published' => true,
             'fee_settings'      => ['fee_model' => 'none'],
         ]);
 
@@ -138,11 +142,15 @@ class FestStudentWiseReportResultsGatingTest extends TestCase
         $this->assertNull($rows[0]['photo_data_uri']);
     }
 
-    public function test_event_wide_publish_flag_also_makes_results_visible(): void
+    public function test_event_wide_publish_flag_alone_does_not_make_results_visible(): void
     {
         ['sahodaya' => $sahodaya, 'school' => $school] = $this->makeSahodayaAndSchool();
         $student = $this->makeStudent($school);
 
+        // The event-wide flag is a hard requirement, never a substitute for an item's
+        // own publish state — an item that was never individually published must stay
+        // hidden even once the event overall is published (see
+        // FestItemResultsService::isItemVisible()).
         $event = FestEvent::create([
             'tenant_id'         => $sahodaya->id,
             'title'             => 'Event-Wide Publish Kalolsav',
@@ -173,8 +181,8 @@ class FestStudentWiseReportResultsGatingTest extends TestCase
         $analytics = app(FestEventReportAnalyticsService::class, ['event' => $event]);
         $rows = $analytics->studentWiseBrowserRows($school->id);
 
-        $this->assertTrue($rows[0]['items'][0]['results_published']);
-        $this->assertSame('B', $rows[0]['items'][0]['grade']);
+        $this->assertFalse($rows[0]['items'][0]['results_published']);
+        $this->assertNull($rows[0]['items'][0]['grade']);
     }
 
     public function test_stage_type_and_participant_type_are_carried_through_for_the_report(): void

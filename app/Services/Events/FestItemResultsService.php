@@ -311,15 +311,18 @@ class FestItemResultsService
 
     public function isItemVisible(FestEventItem $item, FestEvent $event): bool
     {
+        // The event-wide flag is a hard requirement, not a fallback — an item can
+        // never be publicly visible independently of the event overall being
+        // published, even if that item was individually published on its own.
+        if (! $event->results_published) {
+            return false;
+        }
+
         if ($item->results_hidden) {
             return false;
         }
 
-        if ($item->results_published_at) {
-            return true;
-        }
-
-        return (bool) $event->results_published;
+        return (bool) $item->results_published_at;
     }
 
 }

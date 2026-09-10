@@ -140,7 +140,7 @@ class FestCertificateBatchSupersedeTest extends TestCase
         $f = $this->fixture();
         $f['event']->update(['results_published' => true]);
 
-        $item = FestEventItem::create(['event_id' => $f['event']->id, 'title' => 'Solo Song', 'item_code' => 'SP5']);
+        $item = FestEventItem::create(['event_id' => $f['event']->id, 'title' => 'Solo Song', 'item_code' => 'SP5', 'results_published_at' => now()]);
         $registration = FestRegistration::create([
             'event_id' => $f['event']->id, 'item_id' => $item->id, 'school_id' => $f['school']->id, 'status' => 'approved',
         ]);
