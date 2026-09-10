@@ -199,6 +199,36 @@ class FestPublicScoreboardTest extends TestCase
     }
 
     /**
+     * tv_show_overall_standings (Sahodaya admin > Event Settings > Locks & Gates) also
+     * gates the Scoreboard page's "All Categories" tab, matching what it already does
+     * for the TV screen's Overall Standings slide — category tabs still always show,
+     * and a bare /scoreboard request (no ?category=) falls back to the first category
+     * instead of the fest-wide combined view.
+     */
+    public function test_scoreboard_hides_all_categories_tab_and_defaults_to_first_category_when_toggled_off(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North HS Winner');
+        $this->north->update(['tv_show_overall_standings' => false]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
+
+        $response->assertOk();
+        $response->assertDontSee('All Categories');
+        $response->assertSee('Classes 8, 9 &amp; 10', false);
+        $response->assertSee('North Star School');
+    }
+
+    public function test_scoreboard_shows_all_categories_tab_by_default(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North HS Winner');
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
+
+        $response->assertOk();
+        $response->assertSee('All Categories');
+    }
+
+    /**
      * Regression test for a real production gap: PublicFestScoreboardService::
      * scoreboard()'s category branch (used by the scoreboard's category filter, and
      * by the Category-wise/Toppers tabs on the results page) summed every FestMark in

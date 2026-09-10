@@ -764,6 +764,7 @@ public function scoreboard(Request $request, int $eventId)
     if ($category !== null) {
         abort_unless(in_array($category, $categories, true), 404);
     }
+    $category = $this->resolveScoreboardCategory($event, $category, $categories);
 
     $categoryLabels = collect($categories)
         ->mapWithKeys(fn (string $key) => [$key => $this->scoreboards->categoryLabel($event, $key)])
@@ -799,6 +800,7 @@ public function scoreboardData(Request $request, int $eventId)
     if ($category !== null) {
         abort_unless(in_array($category, $categories, true), 404);
     }
+    $category = $this->resolveScoreboardCategory($event, $category, $categories);
 
     $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
     $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
@@ -1193,6 +1195,24 @@ public function tv(Request $request, int $eventId)
             ->whereNotNull('results_published_at')
             ->where('results_hidden', false)
             ->exists();
+    }
+
+    /**
+     * tv_show_overall_standings also gates the Scoreboard page's "All Categories" tab
+     * (matching tv()'s own use of the same flag) — when it's off and the visitor didn't
+     * ask for a specific category, default to the first one instead of the fest-wide
+     * combined view, the same way tv() drops the Overall Standings slide from rotation
+     * while still cycling through each category's own board.
+     *
+     * @param  list<string>  $categories
+     */
+    private function resolveScoreboardCategory(FestEvent $event, ?string $category, array $categories): ?string
+    {
+        if ($category === null && ! ($event->tv_show_overall_standings ?? true) && $categories !== []) {
+            return $categories[0];
+        }
+
+        return $category;
     }
 
     /**

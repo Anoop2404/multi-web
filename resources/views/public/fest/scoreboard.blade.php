@@ -44,7 +44,11 @@
 
         @if(count($categories ?? []))
         <nav class="flex gap-2 overflow-x-auto rounded-2xl p-3 border border-slate-800 bg-slate-900/70" aria-label="Event category">
+            {{-- tv_show_overall_standings also gates this tab (matching the TV screen's
+                 own Overall Standings slide) — category tabs still always show. --}}
+            @if($event->tv_show_overall_standings ?? true)
             <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id]) }}" class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border {{ !$category ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500' }}">All Categories</a>
+            @endif
             @foreach($categories as $cat)
             <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id, 'category' => $cat]) }}" class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border {{ ($category ?? '') === $cat ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500' }}">{{ $categoryLabels[$cat] ?? strtoupper($cat) }}</a>
             @endforeach
