@@ -2,7 +2,7 @@
 
 @section('content')
 <section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-[100rem] mx-auto">
 
         <header class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-amber-500/20 p-6 sm:p-9 shadow-2xl">
             <div aria-hidden="true" class="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-amber-500/15 blur-3xl"></div>

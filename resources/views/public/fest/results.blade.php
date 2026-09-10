@@ -13,7 +13,7 @@
 @endphp
 
 <section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-[100rem] mx-auto">
         @php
             $heroBadges = array_values(array_filter([$eventContext['phase'], $eventContext['region'], $event->resolvedVenueName()]));
         @endphp

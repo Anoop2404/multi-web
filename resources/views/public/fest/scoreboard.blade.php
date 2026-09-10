@@ -3,7 +3,7 @@
 @section('content')
 <section id="scoreboard-live-root" class="py-6 sm:py-8 px-4 bg-slate-950 text-white min-h-screen"
          data-refresh-url="{{ route('tenant.fest.scoreboard.data', array_filter(['event' => $event->id, 'category' => $category])) }}">
-    <div class="max-w-7xl mx-auto space-y-6">
+    <div class="max-w-[100rem] mx-auto space-y-6">
         <header class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-amber-500/20 p-6 md:p-8 shadow-2xl">
             <div aria-hidden="true" class="absolute -top-32 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
             <div aria-hidden="true" class="absolute -bottom-32 left-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl"></div>

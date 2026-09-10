@@ -2,7 +2,7 @@
 
 @section('content')
 <section class="py-10 sm:py-14 px-4 bg-slate-950 text-white min-h-[70vh]">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-[100rem] mx-auto">
         <div class="mb-8">
             @include('public.fest.partials.page-hero', [
                 'eyebrow' => 'Public event directory',
