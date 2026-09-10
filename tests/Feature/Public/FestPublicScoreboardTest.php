@@ -229,6 +229,42 @@ class FestPublicScoreboardTest extends TestCase
     }
 
     /**
+     * Client-side auto-rotation (every 3s until a visitor clicks a category tab —
+     * see scoreboard.blade.php's script) reads these data-* attributes off
+     * #scoreboard-live-root; this locks down the backend half of that contract, the
+     * same caveat as FestSchoolItemScheduleReportTest about what a PHPUnit response
+     * assertion can and can't prove for client-side behavior.
+     */
+    public function test_scoreboard_root_carries_the_rotation_data_attributes(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North HS Winner');
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
+        $html = $response->getContent();
+
+        $response->assertOk();
+        $this->assertMatchesRegularExpression('/data-categories="\[&quot;&quot;,&quot;hs&quot;\]"/', $html);
+        // json_encode() escapes the em dash as — by default (no JSON_UNESCAPED_UNICODE) —
+        // that's the literal text in the rendered attribute, not an actual em dash character.
+        $this->assertStringContainsString('data-category-labels="{&quot;hs&quot;:&quot;Category 3 \u2014 Classes 8, 9 &amp; 10&quot;}"', $html);
+        $this->assertStringContainsString('data-base-label="Regional Arts Fest — North Region"', $html);
+        $this->assertStringContainsString('data-initial-category=""', $html);
+    }
+
+    public function test_scoreboard_root_omits_all_categories_from_rotation_data_when_toggled_off(): void
+    {
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North HS Winner');
+        $this->north->update(['tv_show_overall_standings' => false]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
+        $html = $response->getContent();
+
+        $response->assertOk();
+        $this->assertMatchesRegularExpression('/data-categories="\[&quot;hs&quot;\]"/', $html);
+        $this->assertStringContainsString('data-initial-category="hs"', $html);
+    }
+
+    /**
      * Regression test for a real production gap: PublicFestScoreboardService::
      * scoreboard()'s category branch (used by the scoreboard's category filter, and
      * by the Category-wise/Toppers tabs on the results page) summed every FestMark in

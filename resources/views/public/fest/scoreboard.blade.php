@@ -2,7 +2,11 @@
 
 @section('content')
 <section id="scoreboard-live-root" class="py-6 sm:py-8 px-4 bg-slate-950 text-white min-h-screen"
-         data-refresh-url="{{ route('tenant.fest.scoreboard.data', array_filter(['event' => $event->id, 'category' => $category])) }}">
+         data-base-url="{{ route('tenant.fest.scoreboard.data', ['event' => $event->id]) }}"
+         data-categories="{{ json_encode(($event->tv_show_overall_standings ?? true) ? array_merge([''], $categories) : $categories) }}"
+         data-category-labels="{{ json_encode($categoryLabels) }}"
+         data-base-label="{{ $selectedScope['label'] }}"
+         data-initial-category="{{ $category ?? '' }}">
     <div class="max-w-[100rem] mx-auto space-y-6">
         <header class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-amber-500/20 p-6 md:p-8 shadow-2xl">
             <div aria-hidden="true" class="absolute -top-32 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
@@ -20,7 +24,7 @@
                     <div>
                         <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight font-heading text-white">{{ $event->title }}</h1>
                         <div class="text-xs md:text-sm text-slate-400 flex items-center gap-2 flex-wrap mt-3">
-                            <span class="text-amber-300 font-semibold">{{ $scoreboardTitle }}</span>
+                            <span id="scoreboard-title-category" class="text-amber-300 font-semibold">{{ $scoreboardTitle }}</span>
                             @if($eventContext['phase'])<span class="rounded-full border border-white/10 px-2.5 py-1">{{ $eventContext['phase'] }}</span>@endif
                             @if($eventContext['region'])<span class="rounded-full border border-white/10 px-2.5 py-1">{{ $eventContext['region'] }}</span>@endif
                             @if($event->resolvedVenueName())<span class="rounded-full border border-white/10 px-2.5 py-1">{{ $event->resolvedVenueName() }}</span>@endif
@@ -43,14 +47,20 @@
         </header>
 
         @if(count($categories ?? []))
-        <nav class="flex gap-2 overflow-x-auto rounded-2xl p-3 border border-slate-800 bg-slate-900/70" aria-label="Event category">
-            {{-- tv_show_overall_standings also gates this tab (matching the TV screen's
-                 own Overall Standings slide) — category tabs still always show. --}}
+        <nav id="scoreboard-category-nav" class="flex gap-2 overflow-x-auto rounded-2xl p-3 border border-slate-800 bg-slate-900/70" aria-label="Event category">
+            {{-- Auto-rotates through these every 3s until a visitor clicks one (see the
+                 script below) — tv_show_overall_standings also gates the "All Categories"
+                 tab and drops it from the rotation, matching the TV screen's own Overall
+                 Standings slide. Category tabs (and merged-category labels, since
+                 $categories/$categoryLabels already fold through FestCategoryMerge) always
+                 show and rotate regardless. --}}
             @if($event->tv_show_overall_standings ?? true)
-            <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id]) }}" class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border {{ !$category ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500' }}">All Categories</a>
+            <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id]) }}" data-category=""
+               class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border {{ !$category ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500' }}">All Categories</a>
             @endif
             @foreach($categories as $cat)
-            <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id, 'category' => $cat]) }}" class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border {{ ($category ?? '') === $cat ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500' }}">{{ $categoryLabels[$cat] ?? strtoupper($cat) }}</a>
+            <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id, 'category' => $cat]) }}" data-category="{{ $cat }}"
+               class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border {{ ($category ?? '') === $cat ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500' }}">{{ $categoryLabels[$cat] ?? strtoupper($cat) }}</a>
             @endforeach
         </nav>
         @endif
@@ -72,20 +82,62 @@
     const clock = document.getElementById('scoreboard-live-clock');
     const status = document.getElementById('scoreboard-refresh-status');
     const content = document.getElementById('scoreboard-dynamic-content');
+    const titleEl = document.getElementById('scoreboard-title-category');
+    const nav = document.getElementById('scoreboard-category-nav');
+
+    const categories = JSON.parse(root.dataset.categories || '[]'); // '' entry means the fest-wide combined view
+    const categoryLabels = JSON.parse(root.dataset.categoryLabels || '{}');
+    const baseLabel = root.dataset.baseLabel || '';
+
     let refreshing = false;
     let lastUpdated = Date.now();
+    let interacted = false; // a visitor picking a category by hand stops the rotation for good
+    let rotateTimer = null;
+    let current = root.dataset.initialCategory || '';
+    let currentIndex = Math.max(categories.indexOf(current), 0);
 
     const updateClock = () => { clock.textContent = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true}); };
-    const refresh = async () => {
-        if (refreshing || document.hidden) return;
+
+    const urlFor = (cat) => {
+        const url = new URL(root.dataset.baseUrl, window.location.origin);
+        if (cat) url.searchParams.set('category', cat);
+        return url.toString();
+    };
+
+    const setActiveTab = (cat) => {
+        if (!nav) return;
+        nav.querySelectorAll('[data-category]').forEach((a) => {
+            const active = a.dataset.category === cat;
+            a.classList.toggle('bg-amber-500', active);
+            a.classList.toggle('text-slate-950', active);
+            a.classList.toggle('border-amber-500', active);
+            a.classList.toggle('bg-slate-800', !active);
+            a.classList.toggle('text-slate-300', !active);
+            a.classList.toggle('border-slate-700', !active);
+        });
+    };
+
+    const setTitle = (cat) => {
+        if (!titleEl) return;
+        titleEl.textContent = cat ? `${baseLabel} · ${categoryLabels[cat] ?? cat.toUpperCase()}` : baseLabel;
+    };
+
+    // silent = a rotation/background tick (no "Loading…" flicker); a manual tab click
+    // still shows it, since that's an intentional, immediate action a visitor is watching.
+    const loadCategory = async (cat, {silent = false} = {}) => {
+        if (refreshing) return;
         refreshing = true;
         root.setAttribute('aria-busy', 'true');
-        status.textContent = 'Checking for updated results…';
+        if (!silent) status.textContent = 'Loading…';
         try {
-            const response = await fetch(root.dataset.refreshUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+            const response = await fetch(urlFor(cat), {headers: {'Accept': 'application/json'}, cache: 'no-store'});
             if (!response.ok) throw new Error('Refresh failed');
             const data = await response.json();
             content.innerHTML = data.contentHtml;
+            current = cat;
+            currentIndex = Math.max(categories.indexOf(cat), 0);
+            setActiveTab(cat);
+            setTitle(cat);
             lastUpdated = Date.now();
             status.textContent = 'Updated ' + new Date(data.refreshedAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
         } catch (error) {
@@ -96,11 +148,43 @@
         }
     };
 
+    const stopRotation = () => {
+        if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; }
+    };
+
+    const startRotation = () => {
+        stopRotation();
+        if (interacted || categories.length < 2) return;
+        rotateTimer = setInterval(() => {
+            if (document.hidden) return;
+            currentIndex = (currentIndex + 1) % categories.length;
+            loadCategory(categories[currentIndex], {silent: true});
+        }, 3000);
+    };
+
+    if (nav) {
+        nav.addEventListener('click', (e) => {
+            const link = e.target.closest('[data-category]');
+            if (!link || e.ctrlKey || e.metaKey || e.shiftKey) return; // let modified clicks (open in new tab, etc.) behave normally
+            e.preventDefault();
+            interacted = true;
+            stopRotation();
+            loadCategory(link.dataset.category);
+        });
+    }
+
     updateClock();
     setInterval(updateClock, 1000);
-    setInterval(refresh, 30000);
+    startRotation();
+
+    // Once a visitor has taken control (or there's nothing to rotate through), fall back
+    // to periodically refreshing whichever single category is on screen — the rotation
+    // itself already keeps every category fresh on its own 3s-per-category cycle.
+    setInterval(() => {
+        if (!rotateTimer && !document.hidden) loadCategory(current, {silent: true});
+    }, 30000);
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && Date.now() - lastUpdated > 30000) refresh();
+        if (!document.hidden && !rotateTimer && Date.now() - lastUpdated > 30000) loadCategory(current, {silent: true});
     });
 })();
 </script>
