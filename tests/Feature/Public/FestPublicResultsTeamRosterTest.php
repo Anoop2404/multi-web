@@ -123,6 +123,26 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $response->assertSee('Group');
     }
 
+    public function test_results_item_tab_shows_the_items_gender_badge(): void
+    {
+        $item = FestEventItem::create([
+            'event_id' => $this->event->id,
+            'title' => 'Girls Solo Dance',
+            'participant_type' => 'individual',
+            'class_group' => 'hs',
+            'gender' => 'female',
+            'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $this->markSolo($item, $this->schoolA, 'Divya Menon', 1);
+
+        $response = $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=item");
+
+        $response->assertOk();
+        $response->assertSee('Girls Solo Dance');
+        $response->assertSee('Girls');
+    }
+
     public function test_item_results_page_shows_full_roster_not_just_one_member(): void
     {
         $groupItem = FestEventItem::where('title', 'Group Dance')->firstOrFail();

@@ -296,6 +296,7 @@ class FestPortalController extends Controller
                     'item' => $first->item?->title,
                     'head' => $first->item?->head?->name,
                     'category' => $first->item?->{$categoryColumn},
+                    'gender_label' => \App\Support\FestSportsAgeGroup::genderLabel($first->item?->gender),
                     'participant_type' => $first->item?->participant_type,
                     'stage_type' => $first->item?->stage_type,
                     // Pair/group items save one FestMark per teammate (all with the same

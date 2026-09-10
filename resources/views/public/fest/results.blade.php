@@ -375,6 +375,9 @@
                                             <h3 class="font-bold text-white uppercase">{{ $item['item'] }}</h3>
                                             @if($item['head'])<p class="text-xs text-white/40">{{ $item['head'] }}</p>@endif
                                         </div>
+                                        @if(!empty($item['gender_label']))
+                                        <span class="shrink-0 text-[11px] font-semibold text-white/60 bg-white/5 border border-slate-700 px-2 py-0.5 rounded-full">{{ $item['gender_label'] }}</span>
+                                        @endif
                                         @if($typeLabel = $participantTypeLabels[$item['participant_type'] ?? ''] ?? null)
                                         <span class="shrink-0 text-[11px] font-semibold text-white/60 bg-white/5 border border-slate-700 px-2 py-0.5 rounded-full">{{ $typeLabel }}</span>
                                         @endif
