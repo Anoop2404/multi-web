@@ -1122,6 +1122,10 @@ public function tv(Request $request, int $eventId)
             'standingsPublished' => $isPublished,
             'standingsProvisional' => $isAdminPreview,
             'isAdminPreview' => $isAdminPreview,
+            // Same toggle as the TV screen's Overall Standings slide and the Scoreboard
+            // page's "All Categories" tab — when off, only the per-category links below
+            // stand in for standings here.
+            'showOverallStandings' => $event->tv_show_overall_standings ?? true,
             'categoryLinks' => $categoryLinks,
             'houseScoreboard' => $isPublished
                 ? $ctx->scoreboardByHouse()

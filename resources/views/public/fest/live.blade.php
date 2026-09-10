@@ -6,8 +6,8 @@
         ? '<img src="'.asset('images/fest/medals/rank-'.$rank.'.webp').'" alt="Rank '.$rank.'" class="inline-block w-5 h-5 align-middle">'
         : '<span class="font-mono">#'.$rank.'</span>';
 @endphp
-<section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen" id="fest-live-root" data-live-url="{{ route('tenant.fest.live.data', ['event' => $event->id]) }}" data-event-status="{{ $event->status }}">
-    <div class="max-w-2xl mx-auto">
+<section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen" id="fest-live-root" data-live-url="{{ route('tenant.fest.live.data', ['event' => $event->id]) }}" data-event-status="{{ $event->status }}" data-show-overall="{{ ($showOverallStandings ?? true) ? '1' : '0' }}">
+    <div class="max-w-[100rem] mx-auto">
 
         <header class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border {{ $event->status === 'completed' ? 'border-slate-700' : 'border-red-500/20' }} p-6 sm:p-8 text-center shadow-2xl">
             <div aria-hidden="true" class="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-red-500/10 blur-3xl"></div>
@@ -42,79 +42,85 @@
             @endif
         </div>
 
-        <div class="flex items-center justify-between gap-3 mt-10 mb-3">
-            <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400">Event School Standings</h2>
-            <span id="school-scoreboard-provisional-badge" class="text-[10px] font-bold uppercase tracking-wider text-amber-300 border border-amber-500/30 bg-amber-500/10 rounded-full px-2 py-0.5 @unless($standingsProvisional ?? false) hidden @endunless">Provisional</span>
-        </div>
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
-            <div class="grid grid-cols-[2rem_1fr_repeat(3,2.25rem)_3.5rem] gap-1.5 px-3 py-2 bg-white/5 border-b border-slate-800 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                <span>#</span>
-                <span>School</span>
-                <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold" class="w-4 h-4"></span>
-                <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Silver" class="w-4 h-4"></span>
-                <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Bronze" class="w-4 h-4"></span>
-                <span class="text-right">Pts</span>
+        <div class="grid lg:grid-cols-[1.2fr_.8fr] gap-x-8 mt-10">
+            <div id="school-scoreboard-section" @if(!($showOverallStandings ?? true)) hidden @endif>
+            <div class="flex items-center justify-between gap-3 mb-3">
+                <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400">Event School Standings</h2>
+                <span id="school-scoreboard-provisional-badge" class="text-[10px] font-bold uppercase tracking-wider text-amber-300 border border-amber-500/30 bg-amber-500/10 rounded-full px-2 py-0.5 @unless($standingsProvisional ?? false) hidden @endunless">Provisional</span>
             </div>
-            <ol id="school-scoreboard" class="divide-y divide-slate-800">
-                @forelse($scoreboard as $row)
-                <li class="grid grid-cols-[2rem_1fr_repeat(3,2.25rem)_3.5rem] gap-1.5 items-center px-3 py-2.5">
-                    <span class="flex items-center">{!! $medalImg($row['rank']) !!}</span>
-                    <span class="text-white font-semibold text-sm uppercase">{{ $row['school_name'] }}</span>
-                    <span class="text-center font-mono font-bold text-amber-300 text-sm">{{ $row['gold'] ?? 0 }}</span>
-                    <span class="text-center font-mono font-bold text-slate-300 text-sm">{{ $row['silver'] ?? 0 }}</span>
-                    <span class="text-center font-mono font-bold text-amber-600 text-sm">{{ $row['bronze'] ?? 0 }}</span>
-                    <span class="text-right font-mono font-extrabold text-white text-sm">{{ $row['total_points'] }}</span>
-                </li>
-                @empty
-                <li class="text-white/40 text-center py-6 font-semibold">{{ $standingsPublished ? 'No scores published yet' : '🔒 Public scoreboard & standings are disabled for this event.' }}</li>
-                @endforelse
-            </ol>
-        </div>
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+                <div class="grid grid-cols-[2rem_1fr_repeat(3,2.25rem)_3.5rem] gap-1.5 px-3 py-2 bg-white/5 border-b border-slate-800 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                    <span>#</span>
+                    <span>School</span>
+                    <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold" class="w-4 h-4"></span>
+                    <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Silver" class="w-4 h-4"></span>
+                    <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Bronze" class="w-4 h-4"></span>
+                    <span class="text-right">Pts</span>
+                </div>
+                <ol id="school-scoreboard" class="divide-y divide-slate-800">
+                    @forelse($scoreboard as $row)
+                    <li class="grid grid-cols-[2rem_1fr_repeat(3,2.25rem)_3.5rem] gap-1.5 items-center px-3 py-2.5">
+                        <span class="flex items-center">{!! $medalImg($row['rank']) !!}</span>
+                        <span class="text-white font-semibold text-sm uppercase">{{ $row['school_name'] }}</span>
+                        <span class="text-center font-mono font-bold text-amber-300 text-sm">{{ $row['gold'] ?? 0 }}</span>
+                        <span class="text-center font-mono font-bold text-slate-300 text-sm">{{ $row['silver'] ?? 0 }}</span>
+                        <span class="text-center font-mono font-bold text-amber-600 text-sm">{{ $row['bronze'] ?? 0 }}</span>
+                        <span class="text-right font-mono font-extrabold text-white text-sm">{{ $row['total_points'] }}</span>
+                    </li>
+                    @empty
+                    <li class="text-white/40 text-center py-6 font-semibold">{{ $standingsPublished ? 'No scores published yet' : '🔒 Public scoreboard & standings are disabled for this event.' }}</li>
+                    @endforelse
+                </ol>
+            </div>
+            </div>
 
-        <div id="house-scoreboard-section" @if(!count($houseScoreboard)) hidden @endif>
-        <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">House Standings</h2>
-        <ol id="house-scoreboard" class="space-y-2">
-            @foreach($houseScoreboard as $row)
-            <li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
-                <span class="text-white flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-full" style="background:{{ $row['color'] ?? '#fbbf24' }}"></span>{!! $medalImg($row['rank']) !!} {{ $row['house_name'] }}</span>
-                <span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span>
-            </li>
-            @endforeach
-        </ol>
-        </div>
+            <div class="space-y-10 mt-10 lg:mt-0">
+                <div id="category-links-section" @if(!count($categoryLinks ?? [])) hidden @endif>
+                <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mb-3">Category Scoreboards</h2>
+                <div id="category-links" class="flex flex-wrap gap-2">
+                    @foreach($categoryLinks ?? [] as $link)
+                    <a href="{{ $link['url'] }}" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-900/60 border border-slate-800 text-white/70 hover:border-amber-500/50 hover:text-white transition">{{ $link['label'] }}</a>
+                    @endforeach
+                </div>
+                </div>
 
-        <div id="athletic-records-section" @if(!count($athleticRecords ?? [])) hidden @endif>
-        <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Athletic Records</h2>
-        <ol id="athletic-records" class="space-y-2 text-sm">
-            @foreach($athleticRecords ?? [] as $r)
-            <li class="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3 text-white/80">
-                <span class="font-medium text-white">{{ $r['item'] }}</span>
-                <span class="text-white/40"> · {{ $r['class_group'] }} {{ $r['gender'] }}</span>
-                <span class="float-right font-mono text-amber-300">{{ $r['value'] }} {{ $r['unit'] }}</span>
-            </li>
-            @endforeach
-        </ol>
-        </div>
+                <div id="house-scoreboard-section" @if(!count($houseScoreboard)) hidden @endif>
+                <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mb-3">House Standings</h2>
+                <ol id="house-scoreboard" class="space-y-2">
+                    @foreach($houseScoreboard as $row)
+                    <li class="flex justify-between items-center bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
+                        <span class="text-white flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-full" style="background:{{ $row['color'] ?? '#fbbf24' }}"></span>{!! $medalImg($row['rank']) !!} {{ $row['house_name'] }}</span>
+                        <span class="font-mono font-bold text-white">{{ $row['total_points'] }}</span>
+                    </li>
+                    @endforeach
+                </ol>
+                </div>
 
-        <div id="recent-breaks-section" @if(!count($recentBreaks ?? [])) hidden @endif>
-        <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Recent Record Breaks</h2>
-        <ul id="recent-breaks" class="space-y-2 text-sm">
-            @foreach($recentBreaks ?? [] as $b)
-            <li class="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
-                <strong class="text-white">{{ $b['name'] ?? 'Participant' }}</strong> <span class="text-white/60">— {{ $b['item'] }}</span>
-                <span class="block text-amber-300 font-mono mt-1">{{ $b['new_value'] }} {{ $b['unit'] }} · {{ $b['prize_label'] }}</span>
-            </li>
-            @endforeach
-        </ul>
-        </div>
+                <div id="athletic-records-section" @if(!count($athleticRecords ?? [])) hidden @endif>
+                <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mb-3">Athletic Records</h2>
+                <ol id="athletic-records" class="space-y-2 text-sm">
+                    @foreach($athleticRecords ?? [] as $r)
+                    <li class="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3 text-white/80">
+                        <span class="font-medium text-white">{{ $r['item'] }}</span>
+                        <span class="text-white/40"> · {{ $r['class_group'] }} {{ $r['gender'] }}</span>
+                        <span class="float-right font-mono text-amber-300">{{ $r['value'] }} {{ $r['unit'] }}</span>
+                    </li>
+                    @endforeach
+                </ol>
+                </div>
 
-        <div id="category-links-section" @if(!count($categoryLinks ?? [])) hidden @endif>
-        <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mt-10 mb-3">Category Scoreboards</h2>
-        <div id="category-links" class="flex flex-wrap gap-2">
-            @foreach($categoryLinks ?? [] as $link)
-            <a href="{{ $link['url'] }}" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-900/60 border border-slate-800 text-white/70 hover:border-amber-500/50 hover:text-white transition">{{ $link['label'] }}</a>
-            @endforeach
-        </div>
+                <div id="recent-breaks-section" @if(!count($recentBreaks ?? [])) hidden @endif>
+                <h2 class="text-xs font-bold uppercase tracking-widest text-amber-400 mb-3">Recent Record Breaks</h2>
+                <ul id="recent-breaks" class="space-y-2 text-sm">
+                    @foreach($recentBreaks ?? [] as $b)
+                    <li class="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+                        <strong class="text-white">{{ $b['name'] ?? 'Participant' }}</strong> <span class="text-white/60">— {{ $b['item'] }}</span>
+                        <span class="block text-amber-300 font-mono mt-1">{{ $b['new_value'] }} {{ $b['unit'] }} · {{ $b['prize_label'] }}</span>
+                    </li>
+                    @endforeach
+                </ul>
+                </div>
+            </div>
         </div>
 
         <p class="mt-10 pt-6 border-t border-slate-800 text-center flex flex-wrap justify-center gap-5 text-xs">
@@ -129,12 +135,14 @@
     if (!root) return;
     const url = root.dataset.liveUrl;
     const isCompleted = root.dataset.eventStatus === 'completed';
+    const showOverall = root.dataset.showOverall === '1';
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const medalFor = (rank) => (rank >= 1 && rank <= 3)
         ? `<img src="/images/fest/medals/rank-${rank}.webp" alt="Rank ${rank}" class="inline-block w-5 h-5 align-middle">`
         : `<span class="font-mono">#${rank}</span>`;
 
     function renderSchool(rows, published, provisional) {
+        if (!showOverall) return;
         const el = document.getElementById('school-scoreboard');
         const badge = document.getElementById('school-scoreboard-provisional-badge');
         if (badge) badge.classList.toggle('hidden', !provisional);
