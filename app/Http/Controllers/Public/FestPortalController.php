@@ -830,12 +830,17 @@ public function tv(Request $request, int $eventId)
         ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
     $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
+    // Points earned FROM rank-1/2/3 finishes specifically, not raw medal counts — reuses
+    // the same per-mark point computation the standings' own Points column sums
+    // (FestGradePointService::pointsForMark(), position+grade rule tables for
+    // kalolsavam, FestRankPointService for sports), so a gold/silver/bronze here always
+    // matches what that position actually contributed to the school's total.
     $medalTallyFor = fn ($scopedMarks) => $scopedMarks
         ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
         ->map(fn ($group) => [
-            'gold' => $group->where('position', 1)->count(),
-            'silver' => $group->where('position', 2)->count(),
-            'bronze' => $group->where('position', 3)->count(),
+            'gold' => $group->where('position', 1)->sum(fn (FestMark $m) => $this->gradePoints->pointsForMark($event, $m)),
+            'silver' => $group->where('position', 2)->sum(fn (FestMark $m) => $this->gradePoints->pointsForMark($event, $m)),
+            'bronze' => $group->where('position', 3)->sum(fn (FestMark $m) => $this->gradePoints->pointsForMark($event, $m)),
         ]);
 
     $withMedals = fn (array $rows, $tally) => collect($rows)
@@ -888,14 +893,19 @@ public function tv(Request $request, int $eventId)
     // detail underneath it.
     $provisionalSuffix = $isPublished ? '' : ' · Provisional';
 
-    $overallPages = array_chunk($overallBoard, $boardsPerPage);
-    foreach ($overallPages as $i => $page) {
-        $slides[] = [
-            'type' => 'board',
-            'title' => 'Overall Standings',
-            'subtitle' => (count($overallPages) > 1 ? 'Page '.($i + 1).' of '.count($overallPages) : 'All Categories').$provisionalSuffix,
-            'rows' => $page,
-        ];
+    // tv_show_overall_standings only hides the fest-wide slide — category-wise boards
+    // below always rotate regardless, and $overallBoard itself still feeds the
+    // "nothing published yet" fallback check further down.
+    if ($event->tv_show_overall_standings ?? true) {
+        $overallPages = array_chunk($overallBoard, $boardsPerPage);
+        foreach ($overallPages as $i => $page) {
+            $slides[] = [
+                'type' => 'board',
+                'title' => 'Overall Standings',
+                'subtitle' => (count($overallPages) > 1 ? 'Page '.($i + 1).' of '.count($overallPages) : 'All Categories').$provisionalSuffix,
+                'rows' => $page,
+            ];
+        }
     }
 
     foreach ($categoryBoards as $board) {

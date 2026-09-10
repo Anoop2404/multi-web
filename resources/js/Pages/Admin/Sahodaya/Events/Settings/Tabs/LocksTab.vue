@@ -55,6 +55,11 @@
                         </label>
                     </div>
                 </FormField>
+                <FormField label="Public TV screen" hint="Category-wise standings always rotate on the TV screen regardless of this toggle.">
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" v-model="settingsForm.tv_show_overall_standings"> Show fest-wide Overall Standings slide
+                    </label>
+                </FormField>
                 <FormField label="Chest reveal mode">
                     <template #default="{ id }">
                         <SearchableSelect :id="id" v-model="settingsForm.chest_reveal_mode" :options="[{ value: 'immediate', label: 'Immediate' }, { value: 'stage_entry', label: 'At stage entry' }]" :all-option="false" />

@@ -81,6 +81,7 @@ export function useEventSettingsForms(props) {
         approval_policy: props.event.approval_policy ?? 'auto',
         max_participants: props.event.max_participants ?? '',
         max_teams: props.event.max_teams ?? '',
+        tv_show_overall_standings: props.event.tv_show_overall_standings ?? true,
     });
 
     // Event-level notification gating — mirrors the per-head form in

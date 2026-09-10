@@ -2,10 +2,12 @@
     <div class="grid grid-cols-[3.5rem_1fr_repeat(3,4rem)_6rem] gap-2 px-5 py-3 bg-white/5 border-b border-slate-800 text-xs font-extrabold uppercase tracking-wider text-slate-400">
         <span>Rank</span>
         <span>School</span>
-        <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Gold count" class="w-5 h-5"></span>
-        <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Silver count" class="w-5 h-5"></span>
-        <span class="flex items-center justify-center"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Bronze count" class="w-5 h-5"></span>
-        <span class="text-right">Points</span>
+        {{-- Points earned from that rank specifically (see FestPortalController::tv()'s
+             $medalTallyFor), not a count of how many times the school placed there. --}}
+        <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Points from 1st place" class="w-5 h-5"><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
+        <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Points from 2nd place" class="w-5 h-5"><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
+        <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Points from 3rd place" class="w-5 h-5"><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
+        <span class="text-right">Total Points</span>
     </div>
     <div class="divide-y divide-slate-800/80">
         @php $showMedalRank = $showMedalRank ?? true; @endphp

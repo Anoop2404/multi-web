@@ -387,6 +387,10 @@ class FestEventSettingsController extends SahodayaAdminController
             'approval_policy'                     => 'nullable|in:auto,manual',
             'max_participants'                    => 'nullable|integer|min:0',
             'max_teams'                            => 'nullable|integer|min:0',
+            // Controls whether the public TV screen (FestPortalController::tv()) rotates
+            // through the fest-wide Overall Standings slide. Category-wise standings
+            // always show regardless of this toggle.
+            'tv_show_overall_standings'           => 'nullable|boolean',
         ]);
 
         $data = FestEventSettingsPayload::applyDefaults($data);

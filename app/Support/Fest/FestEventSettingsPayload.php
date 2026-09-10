@@ -19,6 +19,7 @@ class FestEventSettingsPayload
             'registration_locked',
             'record_tracking_enabled',
             'strict_item_payment_gating',
+            'tv_show_overall_standings',
         ], [
             'scoring_locked'                      => false,
             'appeals_open'                        => false,
@@ -29,6 +30,7 @@ class FestEventSettingsPayload
             'registration_locked'                 => false,
             'record_tracking_enabled'             => false,
             'strict_item_payment_gating'           => false,
+            'tv_show_overall_standings'            => true,
         ]);
     }
 }
