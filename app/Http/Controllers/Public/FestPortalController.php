@@ -122,17 +122,20 @@ class FestPortalController extends Controller
                 ->limit(200)
                 ->get();
             $recentRoster = $this->rosterForMarks($recentMarks);
+            $recentClassGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
             $recentResults = $recentMarks
                 ->unique(fn (FestMark $mark) => $mark->deduplicationKey())
                 ->groupBy('item_id')
                 ->sortByDesc(fn ($marksForItem) => $marksForItem->max('updated_at'))
-                ->map(function ($marksForItem) use ($event, $recentRoster) {
+                ->map(function ($marksForItem) use ($event, $recentRoster, $recentClassGroupLabels) {
                     $first = $marksForItem->first();
 
                     return [
                         'item_id' => $first->item_id,
                         'item' => $first->item?->title,
                         'participant_type' => $first->item?->participant_type,
+                        'category_label' => FestItemCategoryLabel::resolve($first->item, $recentClassGroupLabels, config('fest_item_taxonomy.arts_category', [])),
+                        'gender_label' => \App\Support\FestSportsAgeGroup::genderLabel($first->item?->gender),
                         'winners' => $marksForItem->sortBy('position')
                             ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $recentRoster))
                             ->values()
@@ -584,6 +587,7 @@ class FestPortalController extends Controller
                         'category' => $m->item?->{$categoryColumn}
                             ? $this->scoreboards->categoryLabel($event, $m->item->{$categoryColumn})
                             : 'Uncategorized',
+                        'gender' => \App\Support\FestSportsAgeGroup::genderLabel($m->item?->gender),
                         'participant_type' => $participantTypeLabels[$m->item?->participant_type] ?? 'Individual',
                         'rank_points' => $breakdown['rank_points'],
                         'grade_points' => $breakdown['grade_points'],
@@ -629,8 +633,9 @@ class FestPortalController extends Controller
         $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
         $schedules = $this->mapScheduleRows($event, $item->id, [$event->id], $isAdminPreview);
         $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event->rootEvent()), config('fest_item_taxonomy.arts_category', []));
+        $genderLabel = \App\Support\FestSportsAgeGroup::genderLabel($item->gender);
 
-        return $this->renderPublic('public.fest.item-schedule', $tenant, compact('event', 'item', 'schedules', 'categoryLabel') + ['isAdminPreview' => $isAdminPreview]);
+        return $this->renderPublic('public.fest.item-schedule', $tenant, compact('event', 'item', 'schedules', 'categoryLabel', 'genderLabel') + ['isAdminPreview' => $isAdminPreview]);
     }
 
     public function itemResults(Request $request, int $eventId, FestEventItem $item)
@@ -687,7 +692,14 @@ class FestPortalController extends Controller
 
         $marks = $allMarks->filter(fn (array $row) => in_array((int) ($row['position'] ?? 0), [1, 2, 3], true))->values();
 
-        return $this->renderPublic('public.fest.item-results', $tenant, compact('event', 'item', 'marks', 'allMarks'));
+        $categoryLabel = FestItemCategoryLabel::resolve(
+            $item,
+            FestClassGroupScheme::labels(null, $event->rootEvent()),
+            config('fest_item_taxonomy.arts_category', [])
+        );
+        $genderLabel = \App\Support\FestSportsAgeGroup::genderLabel($item->gender);
+
+        return $this->renderPublic('public.fest.item-results', $tenant, compact('event', 'item', 'marks', 'allMarks', 'categoryLabel', 'genderLabel'));
     }
 
     public function winnerPoster(Request $request, int $eventId, FestEventItem $item, FestMark $mark, FestWinnerPosterService $posters)
@@ -735,6 +747,7 @@ class FestPortalController extends Controller
             ->get();
 
         $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event->rootEvent()));
+        $genderLabel = \App\Support\FestSportsAgeGroup::genderLabel($item->gender);
 
         $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($item->title)) ?: 'item';
 
@@ -742,6 +755,7 @@ class FestPortalController extends Controller
             'event'         => $event,
             'item'          => $item,
             'categoryLabel' => $categoryLabel,
+            'genderLabel'   => $genderLabel,
             'marks'         => $marks,
             'topN'          => $topN,
             'orgName'       => $tenant->name ?? 'Sahodaya',
@@ -1109,6 +1123,7 @@ public function tv(Request $request, int $eventId)
                 FestClassGroupScheme::labels(null, $event->rootEvent()),
                 config('fest_item_taxonomy.arts_category', [])
             );
+            $nowPerforming['gender_label'] = \App\Support\FestSportsAgeGroup::genderLabel($nowSlot->item?->gender);
         }
 
         $scoreboard = [];
@@ -1310,6 +1325,10 @@ public function tv(Request $request, int $eventId)
             ->when($category, fn ($query) => $query->whereHas('item', fn ($q) => $q->where($categoryColumn, $category)))
             ->get();
         $roster = $this->rosterForMarks($winnerMarks);
+        // Item titles repeat across different categories/genders (e.g. "Extempore -
+        // English" run separately for Category 1 Boys and Category 3 Girls), so a card
+        // with just the title is ambiguous about which specific item it is.
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $latestWinners = $winnerMarks
             ->unique(fn (FestMark $mark) => $mark->deduplicationKey())
             ->groupBy('item_id')
@@ -1319,7 +1338,7 @@ public function tv(Request $request, int $eventId)
             // stitch together which cards belonged to the same item; a single item card
             // with its winners listed inside it doesn't require that at all.
             ->sortByDesc(fn ($marksForItem) => $marksForItem->max('updated_at'))
-            ->map(function ($marksForItem) use ($event, $roster) {
+            ->map(function ($marksForItem) use ($event, $roster, $classGroupLabels) {
                 $first = $marksForItem->first();
 
                 return [
@@ -1327,6 +1346,8 @@ public function tv(Request $request, int $eventId)
                     'item' => $first->item?->title,
                     'head' => $first->item?->head?->name,
                     'participant_type' => $first->item?->participant_type,
+                    'category_label' => FestItemCategoryLabel::resolve($first->item, $classGroupLabels, config('fest_item_taxonomy.arts_category', [])),
+                    'gender_label' => \App\Support\FestSportsAgeGroup::genderLabel($first->item?->gender),
                     'winners' => $marksForItem->sortBy('position')
                         ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $roster))
                         ->values()
@@ -1500,6 +1521,7 @@ public function tv(Request $request, int $eventId)
                     'item_id' => $first->item_id,
                     'item_title' => $first->item?->title,
                     'category_label' => FestItemCategoryLabel::resolve($first->item, $classGroupLabels, config('fest_item_taxonomy.arts_category', [])),
+                    'gender_label' => \App\Support\FestSportsAgeGroup::genderLabel($first->item?->gender),
                     'results_published_at' => $first->item?->results_published_at,
                     'results_hidden' => (bool) $first->item?->results_hidden,
                     'stage' => $first->stage,

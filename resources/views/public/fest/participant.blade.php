@@ -52,8 +52,8 @@
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <h2 class="font-bold text-white leading-snug uppercase">{{ $row['item_title'] }}</h2>
-                            @if($row['category_label'] ?? null)
-                            <p class="text-xs text-white/40 mt-0.5">{{ $row['category_label'] }}</p>
+                            @if(($row['category_label'] ?? null) || ($row['gender_label'] ?? null))
+                            <p class="text-xs text-white/40 mt-0.5">{{ collect([$row['category_label'] ?? null, $row['gender_label'] ?? null])->filter()->implode(' · ') }}</p>
                             @endif
                         </div>
                         <span class="shrink-0 text-[11px] font-bold uppercase tracking-wide px-2 py-1 rounded-full {{ $row['is_team_item'] ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30' : 'bg-white/5 text-white/50 border border-slate-700' }}">

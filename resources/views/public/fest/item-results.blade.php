@@ -18,7 +18,7 @@
             'eyebrow' => 'Results',
             'title' => Str::upper($item->title),
             'subtitle' => $event->title,
-            'badges' => [$typeLabels[$item->participant_type] ?? ucfirst($item->participant_type ?: 'individual')],
+            'badges' => collect([$categoryLabel ?? null, $genderLabel ?? null, $typeLabels[$item->participant_type] ?? ucfirst($item->participant_type ?: 'individual')])->filter()->all(),
         ])
 
         @if($allMarks->isEmpty())

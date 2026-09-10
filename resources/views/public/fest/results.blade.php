@@ -271,7 +271,7 @@
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm text-white">{{ $winner['item'] }}</p>
-                                    <p class="text-[11px] text-white/40 mt-0.5">{{ $winner['category'] }} · {{ $winner['participant_type'] }}</p>
+                                    <p class="text-[11px] text-white/40 mt-0.5">{{ collect([$winner['category'] ?? null, $winner['gender'] ?? null, $winner['participant_type'] ?? null])->filter()->implode(' · ') }}</p>
                                     @if($rosterNames->isNotEmpty())
                                         <p class="text-[11px] text-white/60 mt-0.5 uppercase">{{ $rosterNames->take(3)->implode(', ') }}{{ $rosterNames->count() > 3 ? ' +'.($rosterNames->count() - 3) : '' }}</p>
                                     @endif

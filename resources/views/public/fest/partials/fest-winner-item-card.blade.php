@@ -1,6 +1,12 @@
 <article class="rounded-2xl bg-slate-900 border border-slate-800 shadow-md overflow-hidden">
     <div class="px-4 py-2.5 bg-white/5 border-b border-slate-800">
         <p class="font-bold text-white text-sm uppercase">{{ $itemGroup['item'] }}</p>
+        {{-- Category + gender disambiguate items that share the same title across
+             different categories/genders (e.g. "Extempore - English" run separately for
+             Category 1 Boys and Category 3 Girls). --}}
+        @if(($itemGroup['category_label'] ?? null) || ($itemGroup['gender_label'] ?? null))
+        <p class="text-[11px] text-amber-300/80 font-semibold">{{ collect([$itemGroup['category_label'] ?? null, $itemGroup['gender_label'] ?? null])->filter()->implode(' · ') }}</p>
+        @endif
         @if($itemGroup['head'])<p class="text-[11px] text-white/40">{{ $itemGroup['head'] }}</p>@endif
     </div>
     {{-- flex-wrap, not divide-y: multiple awarded positions for the same item sit side by

@@ -81,6 +81,9 @@
                 <a href="{{ route('tenant.fest.item-results', [$event->id, $itemGroup['item_id']]) }}" class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden hover:border-amber-500/50 hover:bg-slate-900 transition">
                     <div class="px-4 py-3 border-b border-slate-800/60">
                         <h3 class="font-bold text-white uppercase">{{ $itemGroup['item'] }}</h3>
+                        @if(($itemGroup['category_label'] ?? null) || ($itemGroup['gender_label'] ?? null))
+                        <p class="text-[11px] text-amber-400/80 font-semibold mt-0.5">{{ collect([$itemGroup['category_label'] ?? null, $itemGroup['gender_label'] ?? null])->filter()->implode(' · ') }}</p>
+                        @endif
                     </div>
                     <div class="flex flex-wrap">
                         @foreach($itemGroup['winners'] as $winner)
@@ -146,6 +149,7 @@
                     @if($item->head)<p class="text-xs text-white/40 mt-1">{{ $item->head->name }}</p>@endif
                     <div class="flex flex-wrap gap-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-white/40">
                         @if($itemCategory)<span class="rounded-full border border-slate-700 px-2 py-1">{{ $categoryLabels[$itemCategory] ?? strtoupper($itemCategory) }}</span>@endif
+                        @if($genderLabel = \App\Support\FestSportsAgeGroup::genderLabel($item->gender))<span class="rounded-full border border-slate-700 px-2 py-1">{{ $genderLabel }}</span>@endif
                         <span class="rounded-full border border-slate-700 px-2 py-1">{{ $item->stage_type === 'on_stage' ? '🎤 On stage' : ($item->stage_type === 'off_stage' ? '📝 Off stage' : 'Stage') }}</span>
                     </div>
                     <div class="mt-auto pt-4 flex gap-2">

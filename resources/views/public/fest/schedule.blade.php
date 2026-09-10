@@ -31,8 +31,8 @@
                     @if(($row['results_published_at'] ?? null) || ($isAdminPreview ?? false))
                     <a href="{{ route('tenant.fest.item-results', [$event->id, $row['item_id']]) }}" class="ml-2 text-xs text-amber-300/70 hover:underline">Results →</a>
                     @endif
-                    @if($row['category_label'] ?? null)
-                    <span class="block text-xs text-white/40">{{ $row['category_label'] }}</span>
+                    @if(($row['category_label'] ?? null) || ($row['gender_label'] ?? null))
+                    <span class="block text-xs text-white/40">{{ collect([$row['category_label'] ?? null, $row['gender_label'] ?? null])->filter()->implode(' · ') }}</span>
                     @endif
                     @else <span class="text-white/30">—</span> @endif
                 </td>

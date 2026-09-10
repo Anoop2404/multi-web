@@ -47,7 +47,7 @@
                         <div class="flex items-center justify-between gap-3 px-4 py-3 bg-white/5 border-b border-slate-800">
                             <div class="min-w-0">
                                 <p class="font-bold text-white">{{ $winner['item'] }}</p>
-                                <p class="text-xs text-white/40">{{ $winner['participant_type'] }}</p>
+                                <p class="text-xs text-white/40">{{ collect([$winner['gender'] ?? null, $winner['participant_type'] ?? null])->filter()->implode(' · ') }}</p>
                             </div>
                             @if($winner['position'] && $winner['position'] <= 3)
                                 <img src="{{ asset('images/fest/medals/rank-'.$winner['position'].'.webp') }}" alt="Rank {{ $winner['position'] }}" class="w-10 h-10 shrink-0">
