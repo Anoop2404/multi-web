@@ -134,6 +134,17 @@ class FestRegistrationItemLockTest extends TestCase
         $this->assertSame('performer', $f['standby']->fresh()->participant_role);
     }
 
+    public function test_substitute_performer_succeeds_when_the_event_is_published_but_this_item_is_not(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['results_published' => true]);
+
+        app(FestRegistrationService::class)->substitutePerformer($f['performer']->fresh(), $f['standby']->fresh());
+
+        $this->assertSame('standby', $f['performer']->fresh()->participant_role);
+        $this->assertSame('performer', $f['standby']->fresh()->participant_role);
+    }
+
     public function test_add_participant_aborts_once_the_items_results_are_published(): void
     {
         $f = $this->fixture();

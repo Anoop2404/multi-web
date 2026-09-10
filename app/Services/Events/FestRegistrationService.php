@@ -338,13 +338,14 @@ class FestRegistrationService
      * Previously had no lifecycle check at all — every other roster-write action in this
      * file blocks once the event or item is published, but a substitution could still
      * silently change who the recorded winner/participant actually was after the fact.
+     * Gated on this item's own results_published_at only, not the event-wide flag — same
+     * reasoning as addParticipant()/removeParticipant() above.
      */
     public function substitutePerformer(FestParticipant $performer, FestParticipant $standby): void
     {
         abort_if($performer->registration_id !== $standby->registration_id, 422, 'Participants must belong to the same registration.');
         abort_if($standby->participant_role !== 'standby', 422, 'Target must be a standby.');
         abort_if($performer->participant_role === 'standby', 422, 'Cannot substitute a standby performer.');
-        abort_if($performer->registration?->event?->results_published, 422, 'Results have already been published for this event.');
         abort_if($performer->registration?->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to substitute participants.');
 
         // Chest number/order number belong to whoever is actually performing — leaving
