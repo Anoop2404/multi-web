@@ -113,6 +113,34 @@ class FestItemScheduleService
     /** @param list<array<string, mixed>> $rows */
     public function bulkSave(FestEvent $event, array $rows): int
     {
+        // Was previously 4-6+ individual queries per row (item lookup, stage lookup,
+        // venue lookup, updateOrCreate's own select + write, and a sort_order max()
+        // re-run on every single row) — for the 100-140 item events this page is built
+        // for, that's 500-800+ synchronous round-trips in one request, which is exactly
+        // why saving took "too much time" for a full list. Batch-fetch everything these
+        // rows could reference once, up front, then do a single read-or-write per row
+        // instead of several.
+        $itemIds = collect($rows)->pluck('item_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        $items = FestEventItem::where('event_id', $event->id)->whereIn('id', $itemIds)->get()->keyBy('id');
+
+        $stageIds = collect($rows)->pluck('stage_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        $stages = $stageIds->isEmpty()
+            ? collect()
+            : FestStage::where('event_id', $event->id)->whereIn('id', $stageIds)->get()->keyBy('id');
+
+        $venueIds = collect($rows)->pluck('venue_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        $validVenueIds = $venueIds->isEmpty()
+            ? collect()
+            : FestVenue::where('event_id', $event->id)->whereIn('id', $venueIds)->pluck('id')->flip();
+
+        $existingSchedules = FestSchedule::where('event_id', $event->id)
+            ->whereIn('item_id', $itemIds)
+            ->whereNull('participant_id')
+            ->get()
+            ->keyBy('item_id');
+
+        $nextSortOrder = (FestSchedule::where('event_id', $event->id)->max('sort_order') ?? 0) + 1;
+
         $saved = 0;
 
         foreach ($rows as $row) {
@@ -121,7 +149,7 @@ class FestItemScheduleService
                 continue;
             }
 
-            $item = FestEventItem::where('event_id', $event->id)->where('id', $itemId)->first();
+            $item = $items->get($itemId);
             abort_unless($item, 422, "Item {$itemId} does not belong to this event.");
 
             $this->applyTimingFields($item, $row);
@@ -132,39 +160,38 @@ class FestItemScheduleService
             $venueId = ! empty($row['venue_id']) ? (int) $row['venue_id'] : null;
 
             if ($stageId) {
-                $stage = FestStage::where('event_id', $event->id)->findOrFail($stageId);
+                $stage = $stages->get($stageId);
+                abort_unless($stage, 404, "Stage {$stageId} does not belong to this event.");
                 $stageName = $stage->name;
             }
 
             if ($venueId) {
-                FestVenue::where('event_id', $event->id)->findOrFail($venueId);
+                abort_unless($validVenueIds->has($venueId), 404, "Venue {$venueId} does not belong to this event.");
             }
 
             $hasData = $scheduledAt !== null || $stageId || $stageName !== '' || $venueId;
+            $existing = $existingSchedules->get($itemId);
 
             if (! $hasData) {
-                FestSchedule::where('event_id', $event->id)
-                    ->where('item_id', $itemId)
-                    ->whereNull('participant_id')
-                    ->delete();
+                $existing?->delete();
 
                 continue;
             }
 
-            FestSchedule::updateOrCreate(
-                [
-                    'item_id'        => $itemId,
-                    'participant_id' => null,
-                ],
-                [
-                    'event_id'     => $event->id,
-                    'scheduled_at' => $scheduledAt,
-                    'stage_id'     => $stageId,
-                    'stage'        => $stageName !== '' ? $stageName : null,
-                    'venue_id'     => $venueId,
-                    'sort_order'   => isset($row['sort_order']) ? (int) $row['sort_order'] : (FestSchedule::where('event_id', $event->id)->max('sort_order') ?? 0) + 1,
-                ]
-            );
+            $attributes = [
+                'event_id'     => $event->id,
+                'scheduled_at' => $scheduledAt,
+                'stage_id'     => $stageId,
+                'stage'        => $stageName !== '' ? $stageName : null,
+                'venue_id'     => $venueId,
+                'sort_order'   => isset($row['sort_order']) ? (int) $row['sort_order'] : $nextSortOrder++,
+            ];
+
+            if ($existing) {
+                $existing->update($attributes);
+            } else {
+                FestSchedule::create($attributes + ['item_id' => $itemId, 'participant_id' => null]);
+            }
 
             $saved++;
         }
