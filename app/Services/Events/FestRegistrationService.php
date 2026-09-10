@@ -347,7 +347,14 @@ class FestRegistrationService
         abort_if($performer->registration?->event?->results_published, 422, 'Results have already been published for this event.');
         abort_if($performer->registration?->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to substitute participants.');
 
-        $performer->update(['participant_role' => 'standby']);
+        // Chest number/order number belong to whoever is actually performing — leaving
+        // them on the demoted participant left a standby still holding a live chest
+        // number (and showing up on the Chest Numbers page as if performing; see
+        // FestChestNumberController's participant_role filter added alongside this).
+        // The promoted standby doesn't inherit it automatically — re-assign via the
+        // Chest Numbers page (Generate/Assign Missing or manual entry), same as any
+        // other participant who needs one.
+        $performer->update(['participant_role' => 'standby', 'chest_no' => null, 'order_no' => null, 'chest_revealed_at' => null]);
         $standby->update(['participant_role' => 'performer']);
     }
 

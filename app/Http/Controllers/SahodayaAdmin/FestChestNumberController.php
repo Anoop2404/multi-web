@@ -281,6 +281,7 @@ class FestChestNumberController extends SahodayaAdminController
             ->whereIn('event_id', $event->reportableEventIds())
             ->whereIn('item_id', $itemIds)
             ->whereNotIn('status', ['rejected', 'withdrawn']))
+            ->where('participant_role', '!=', 'standby')
             ->with(['registration.school', 'registration', 'student', 'teacher', 'group'])
             ->get();
 
@@ -354,6 +355,7 @@ class FestChestNumberController extends SahodayaAdminController
             ->whereIn('item_id', $itemIds)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->whereHas('item', fn ($i) => $i->where('stage_type', 'on_stage')))
+            ->where('participant_role', '!=', 'standby')
             ->with(['registration.school', 'student', 'teacher', 'group'])
             ->get();
 
@@ -401,6 +403,7 @@ class FestChestNumberController extends SahodayaAdminController
             ->whereIn('event_id', $event->reportableEventIds())
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($itemIds, fn ($q2) => $q2->whereIn('item_id', $itemIds)))
+            ->where('participant_role', '!=', 'standby')
             ->with(['registration.item', 'registration.school', 'student', 'teacher', 'group'])
             ->get();
 
