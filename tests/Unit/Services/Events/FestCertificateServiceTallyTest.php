@@ -105,6 +105,90 @@ class FestCertificateServiceTallyTest extends TestCase
         $this->assertSame(3, $tally['totals']['winner_certs']);
         $this->assertSame(5, $tally['totals']['participation_certs']);
         $this->assertSame(8, $tally['totals']['grand_total']);
+        $this->assertSame(3, $row['projected_winner_certs'], '5 real entrants -> capped at top 3, same as the actual winner count here.');
+    }
+
+    /**
+     * Before any marks are entered, winner_certs is genuinely 0 everywhere — this is the
+     * planning projection: "how many certificates would the top 3 need, if decided today."
+     */
+    public function test_projected_winner_certs_assumes_top_three_before_any_marks_exist(): void
+    {
+        $event = $this->makeEvent();
+        $school = $this->makeSchool($event->tenant_id);
+        $item = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Solo Song', 'participant_type' => 'individual',
+            'category' => 'music', 'is_enabled' => true,
+        ]);
+
+        // No position on any of these -- nobody has been marked yet.
+        $this->individualParticipant($event, $item, $school->id);
+        $this->individualParticipant($event, $item, $school->id);
+        $this->individualParticipant($event, $item, $school->id);
+        $this->individualParticipant($event, $item, $school->id);
+        $this->individualParticipant($event, $item, $school->id);
+
+        $tally = app(FestCertificateService::class)->certificateTally($event);
+        $row = collect($tally['rows'])->firstWhere('item_id', $item->id);
+
+        $this->assertSame(0, $row['winner_certs'], 'No marks entered yet -> the real count is still 0.');
+        $this->assertSame(3, $row['projected_winner_certs'], '5 entrants, capped at 3 places.');
+        $this->assertSame(3, $tally['totals']['projected_winner_certs']);
+    }
+
+    /**
+     * projected_winner_certs sums per item (winning 2 items legitimately needs 2
+     * certificates), but projected_winner_unique_students answers a different question —
+     * "how many distinct students" — so a student who's a top-3 entrant in two different
+     * items must only be counted once here, not twice.
+     */
+    public function test_projected_winner_unique_students_dedupes_a_student_entered_in_two_items(): void
+    {
+        $event = $this->makeEvent();
+        $school = $this->makeSchool($event->tenant_id);
+        $itemA = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Elocution', 'participant_type' => 'individual',
+            'category' => 'literary', 'is_enabled' => true,
+        ]);
+        $itemB = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Quiz', 'participant_type' => 'individual',
+            'category' => 'literary', 'is_enabled' => true,
+        ]);
+
+        // Same student enters both items -> two FestParticipant rows, one real person,
+        // both within the top 3 of their (tiny) item.
+        $multiA = $this->individualParticipant($event, $itemA, $school->id);
+        $registrationB = FestRegistration::create([
+            'event_id' => $event->id, 'item_id' => $itemB->id, 'school_id' => $school->id,
+            'status' => 'approved', 'submitted_at' => now(),
+        ]);
+        FestParticipant::create([
+            'registration_id' => $registrationB->id, 'event_id' => $event->id,
+            'student_id' => $multiA->student_id, 'participant_type' => 'student', 'participant_role' => 'performer',
+        ]);
+
+        $tally = app(FestCertificateService::class)->certificateTally($event);
+
+        $this->assertSame(2, $tally['totals']['projected_winner_certs'], 'Two items -> two certificates (per-item basis, like the real winner_certs total).');
+        $this->assertSame(1, $tally['totals']['projected_winner_unique_students'], 'One real student, counted once.');
+    }
+
+    public function test_projected_winner_certs_is_capped_at_entry_count_when_fewer_than_three_entered(): void
+    {
+        $event = $this->makeEvent();
+        $school = $this->makeSchool($event->tenant_id);
+        $item = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Solo Song', 'participant_type' => 'individual',
+            'category' => 'music', 'is_enabled' => true,
+        ]);
+
+        $this->individualParticipant($event, $item, $school->id);
+        $this->individualParticipant($event, $item, $school->id);
+
+        $tally = app(FestCertificateService::class)->certificateTally($event);
+        $row = collect($tally['rows'])->firstWhere('item_id', $item->id);
+
+        $this->assertSame(2, $row['projected_winner_certs'], 'Only 2 entrants -- cannot project 3 winners that don\'t exist.');
     }
 
     public function test_team_item_counts_certificates_per_member_not_per_team(): void

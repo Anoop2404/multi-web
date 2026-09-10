@@ -2,7 +2,7 @@
     <SahodayaEventsLayout :title="`${event.title} — Certificate tally`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Certificate tally`" eyebrow="Operations"
-                    description="Winner certificates to print, by item — team items are counted by member, not by team. Participation certificates are issued once per person for the whole event, not per item; the per-item column below shows entries, not certificate counts." />
+                    description="Winner certificates to print, by item — team items are counted by member, not by team. Participation certificates are issued once per person for the whole event, not per item; the per-item column below shows entries, not certificate counts. 'Projected' assumes 1st/2nd/3rd are awarded for every item, using each item's own registered entries (and, for team items, its 3 largest teams' real rosters) — a planning estimate for before marks are entered, not an actual count." />
 
         <div class="mb-4 flex flex-wrap gap-2">
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates`" class="btn-secondary">
@@ -17,7 +17,7 @@
                                class="w-64" />
         </div>
 
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ totals.items }}</p>
                 <p class="text-xs text-slate-500 mt-1">Items with entries</p>
@@ -25,6 +25,11 @@
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold text-amber-700">{{ totals.winner_certs }}</p>
                 <p class="text-xs text-slate-500 mt-1">Winner certificates</p>
+            </div>
+            <div class="card card--muted !py-4 text-center">
+                <p class="text-xl font-bold text-orange-600">{{ totals.projected_winner_certs }}</p>
+                <p class="text-xs text-slate-500 mt-1">Projected (top 3)</p>
+                <p class="text-[10px] text-slate-400">{{ totals.projected_winner_unique_students }} unique students · before marks</p>
             </div>
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold text-sky-700">{{ totals.participation_certs }}</p>
@@ -59,6 +64,7 @@
                     <template v-else>{{ row.entry_count }}</template>
                 </td>
                 <td class="px-4 py-3 text-right font-semibold text-amber-700">{{ row.winner_certs }}</td>
+                <td class="px-4 py-3 text-right font-semibold text-orange-600">{{ row.projected_winner_certs }}</td>
                 <td class="px-4 py-3 text-right font-semibold text-sky-700">{{ row.participation_certs }}
                     <span class="block text-[10px] font-normal text-slate-400">entries</span>
                 </td>
@@ -82,7 +88,7 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object,
     rows: { type: Array, default: () => [] },
-    totals: { type: Object, default: () => ({ items: 0, winner_certs: 0, participation_certs: 0, grand_total: 0 }) },
+    totals: { type: Object, default: () => ({ items: 0, winner_certs: 0, projected_winner_certs: 0, projected_winner_unique_students: 0, participation_certs: 0, grand_total: 0 }) },
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
 });
@@ -102,6 +108,7 @@ const columns = [
     { key: 'type', label: 'Type' },
     { key: 'entries', label: 'Entries' },
     { key: 'winner_certs', label: 'Winner certs', align: 'right' },
+    { key: 'projected_winner_certs', label: 'Projected (top 3)', align: 'right' },
     { key: 'participation_certs', label: 'Entries', align: 'right' },
 ];
 </script>

@@ -367,6 +367,12 @@ class FestCertificateService
             $byItem[$item->id]['standbys'][] = $standby;
         }
 
+        // Certificate counts above are already per-item (a student winning 2 items
+        // legitimately gets 2 winner certificates), so the totals sum is not "how many
+        // students" — tracked separately here as the projection's own answer to that,
+        // deduped by student_id across every item's projected top 3.
+        $projectedWinnerStudentIds = [];
+
         $rows = [];
         foreach ($byItem as $itemId => $data) {
             $item = $data['item'];
@@ -374,30 +380,60 @@ class FestCertificateService
             $entrants = $data['participants'] ?? [];
             $isTeam = $item->isTeamItem();
 
+            // Before marks exist, winner_certs above is genuinely 0 for every item — this
+            // is a same-basis projection for print-quantity planning: "if the top 3 places
+            // were decided today, how many winner certificates would this item need?".
+            // Individual items: at most 3 people. Team items: certificates are per member
+            // (see the class docblock), and different teams on the same item can have
+            // different head counts, so it's the 3 *largest* registered teams' member
+            // counts summed — not just 3× an assumed team size — using each team's own
+            // real, already-registered roster rather than a guess. Which specific 3
+            // entrants/teams is arbitrary (nothing ranks them pre-marks) but the resulting
+            // *count*, and the student_ids folded into the unique-students total below,
+            // are what matter for print-quantity planning.
+            if ($isTeam) {
+                $topGroups = collect($entrants)->groupBy('group_id')->sortByDesc(fn ($g) => $g->count())->take(3);
+                $projectedWinnerCerts = $topGroups->sum(fn ($g) => $g->count());
+                foreach ($topGroups as $group) {
+                    foreach ($group as $member) {
+                        $projectedWinnerStudentIds[$member->student_id] = true;
+                    }
+                }
+            } else {
+                $topEntrants = collect($entrants)->take(3);
+                $projectedWinnerCerts = $topEntrants->count();
+                foreach ($topEntrants as $entrant) {
+                    $projectedWinnerStudentIds[$entrant->student_id] = true;
+                }
+            }
+
             $rows[] = [
-                'item_id'             => $itemId,
-                'title'               => $item->title,
-                'head_name'           => $item->head?->name,
-                'category'            => $item->age_group ?: $item->class_group,
-                'is_team'             => $isTeam,
-                'entry_count'         => $isTeam
+                'item_id'                => $itemId,
+                'title'                  => $item->title,
+                'head_name'              => $item->head?->name,
+                'category'               => $item->age_group ?: $item->class_group,
+                'is_team'                => $isTeam,
+                'entry_count'            => $isTeam
                     ? collect($entrants)->pluck('group_id')->unique()->count()
                     : count($entrants),
-                'member_count'        => count($entrants),
-                'standby_count'       => $isTeam ? count($data['standbys'] ?? []) : 0,
-                'winner_certs'        => count($winners),
+                'member_count'           => count($entrants),
+                'standby_count'          => $isTeam ? count($data['standbys'] ?? []) : 0,
+                'winner_certs'           => count($winners),
+                'projected_winner_certs' => $projectedWinnerCerts,
                 // Entries for this item, not certificates — one person's participation
                 // certificate can cover several items, see totals.participation_certs.
-                'participation_certs' => count($entrants),
+                'participation_certs'    => count($entrants),
             ];
         }
 
         usort($rows, fn ($a, $b) => strcmp($a['title'], $b['title']));
 
         $totals = [
-            'items'               => count($rows),
-            'winner_certs'        => array_sum(array_column($rows, 'winner_certs')),
-            'participation_certs' => $participationCertificateCount,
+            'items'                          => count($rows),
+            'winner_certs'                   => array_sum(array_column($rows, 'winner_certs')),
+            'projected_winner_certs'         => array_sum(array_column($rows, 'projected_winner_certs')),
+            'projected_winner_unique_students' => count($projectedWinnerStudentIds),
+            'participation_certs'            => $participationCertificateCount,
         ];
         $totals['grand_total'] = $totals['winner_certs'] + $totals['participation_certs'];
 
