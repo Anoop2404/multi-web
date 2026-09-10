@@ -10,12 +10,19 @@
                     <a :href="publicFestUrl" target="_blank" rel="noopener" class="btn-secondary text-xs">
                         Public portal ↗
                     </a>
+                    <button type="button" class="btn-secondary text-xs" @click="showShareModal = true">
+                        🔗 Share &amp; QR
+                    </button>
                     <button type="button" class="btn-primary text-xs flex items-center gap-1.5 shadow-sm" :disabled="form.processing" @click="saveEvent">
                         <span>{{ form.processing ? 'Saving...' : 'Save event' }}</span>
                     </button>
                 </div>
             </template>
         </PageHeader>
+
+        <EventShareModal :show="showShareModal" :public-url="publicFestUrl"
+                          :qr-image-url="`${base}/share/qr-image`" :qr-pdf-url="`${base}/share/qr-pdf`"
+                          @close="showShareModal = false" />
 
         <EventSubNav v-if="event.event_type !== 'sports'"
                      :sahodaya-id="sahodaya.id" :event-id="event.id" active="overview" />
@@ -396,6 +403,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventLifecyclePanel from '@/Components/sahodaya/EventLifecyclePanel.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import EventShareModal from '@/Components/sahodaya/EventShareModal.vue';
 import FormGrid from '@/Components/ui/FormGrid.vue';
 import FormField from '@/Components/ui/FormField.vue';
 import CheckboxField from '@/Components/ui/CheckboxField.vue';
@@ -441,6 +449,7 @@ function venueForRegion(regionId) {
     return props.venues?.find(v => v.region_id === regionId);
 }
 
+const showShareModal = ref(false);
 const fixingSeason = ref(false);
 function fixMistakenSeason() {
     fixingSeason.value = true;

@@ -174,7 +174,8 @@ class TrainingQrService
             }
 
             $tagSize = $width * 0.018;
-            imagettftext($img, $tagSize, 0, $textX, $orgY + (int) round($tagSize * 0.4), imagecolorallocate($img, 186, 210, 235), $font, 'Teacher Training');
+            $orgTag = (string) ($branding['org_tag'] ?? 'Teacher Training');
+            imagettftext($img, $tagSize, 0, $textX, $orgY + (int) round($tagSize * 0.4), imagecolorallocate($img, 186, 210, 235), $font, $orgTag);
         }
 
         $contentTop = (int) round($height * 0.22);
@@ -287,6 +288,7 @@ class TrainingQrService
         $qrData = 'data:image/png;base64,'.base64_encode($this->png($url, $qrSize));
         $logo = $branding['logo_src'] ?? null;
         $org = htmlspecialchars((string) ($branding['org_name'] ?? 'Sahodaya'), ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        $orgTag = htmlspecialchars((string) ($branding['org_tag'] ?? 'Teacher Training'), ENT_XML1 | ENT_QUOTES, 'UTF-8');
         $title = htmlspecialchars((string) ($branding['program_title'] ?? ''), ENT_XML1 | ENT_QUOTES, 'UTF-8');
         $label = htmlspecialchars(strtoupper((string) ($branding['label'] ?? 'QR Code')), ENT_XML1 | ENT_QUOTES, 'UTF-8');
         $instruction = htmlspecialchars((string) ($branding['instruction'] ?? 'Scan with your phone camera'), ENT_XML1 | ENT_QUOTES, 'UTF-8');
@@ -368,7 +370,7 @@ class TrainingQrService
   <rect y="{$headerH}" width="100%" height="{$accentH}" fill="#1e5a9e"/>
   {$logoMarkup}
   <text x="{$textX}" y="{$orgY}" fill="#ffffff" font-size="{$orgSize}" font-weight="700" font-family="DejaVu Sans, Arial, sans-serif">{$org}</text>
-  <text x="{$textX}" y="{$tagY}" fill="#bad2eb" font-size="{$tagSize}" font-family="DejaVu Sans, Arial, sans-serif">Teacher Training</text>
+  <text x="{$textX}" y="{$tagY}" fill="#bad2eb" font-size="{$tagSize}" font-family="DejaVu Sans, Arial, sans-serif">{$orgTag}</text>
   <rect x="{$badgeX}" y="{$badgeY}" width="{$badgeW}" height="{$badgeH}" rx="4" fill="#1e5a9e"/>
   <text x="{$cx}" y="{$labelY}" text-anchor="middle" fill="#ffffff" font-size="{$labelSize}" font-weight="700" font-family="DejaVu Sans, Arial, sans-serif">{$label}</text>
   <text x="{$cx}" y="{$titleY}" text-anchor="middle" fill="#0f2744" font-size="{$titleSize}" font-weight="700" font-family="DejaVu Sans, Arial, sans-serif">{$title}</text>
