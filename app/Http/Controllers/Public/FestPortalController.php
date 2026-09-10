@@ -1399,7 +1399,16 @@ public function tv(Request $request, int $eventId)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
+        $selectedScope = $this->operationalEvents->directScope($event);
+        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+        $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
+
+        // Matches results()/itemResults()/scoreboard()/tv()'s own gate — without this,
+        // an event with public results fully disabled (and no item individually
+        // published yet) still served this page and, via chest-number/level-reg-number
+        // lookup, could surface a participant's item/category/school even though every
+        // other public surface correctly shows "disabled" for the same event.
+        abort_unless($isPublished || $this->hasPublishedItems($selectedScope['event_ids']), 403, 'Public results are disabled for this event.');
 
         // Cast: $request->query() returns whatever the client sends for this key, including an
         // array (e.g. ?q[]=x), which would fatally TypeError trim(). This is a public,
@@ -1456,7 +1465,15 @@ public function tv(Request $request, int $eventId)
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
+        $selectedScope = $this->operationalEvents->directScope($event);
+        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+        $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
+
+        // Same gate as search()/results()/itemResults()/scoreboard()/tv(): a direct link
+        // to a participant page must not bypass the event's public-disable lock, even
+        // though formatPublicParticipant()/publicParticipantItems() already hide the
+        // name/marks for any item that isn't individually published.
+        abort_unless($isPublished || $this->hasPublishedItems($selectedScope['event_ids']), 403, 'Public results are disabled for this event.');
 
         $participant = $this->visibility->findParticipantByRef($event, $ref);
         abort_unless($participant, 404);
