@@ -34,7 +34,7 @@ class FestRegistrationCreateService
         array $performerIds,
         array $standbyIds = [],
         ?string $teamName = null,
-        bool $skipSchoolClosedCheck = false,
+        bool $adminOverride = false,
         ?array $teamContacts = null,
     ): FestRegistration {
         abort_if($school->parent_id !== $event->tenant_id, 403);
@@ -76,18 +76,22 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['registration' => 'This item is not open for registration.']);
         }
 
-        app(FestItemRegistrationGate::class)->assertOpen($item);
+        app(FestItemRegistrationGate::class)->assertOpen($item, $adminOverride);
         app(FestRegistrationFeeGate::class)->assertCanRegister($event, $school);
         app(FestRegistrationFeeGate::class)->assertPriorBatchesPaid($event, $item, $school);
 
-        if (! $skipSchoolClosedCheck && $school->fest_registration_closed) {
+        if (! $adminOverride && $school->fest_registration_closed) {
             throw ValidationException::withMessages(['registration' => 'Fest registration is closed for this school.']);
         }
 
-        try {
-            EventLifecycleGate::allowRegistrationForItem($event, $item);
-        } catch (HttpException $e) {
-            throw ValidationException::withMessages(['registration' => $e->getMessage()]);
+        if ($adminOverride) {
+            EventLifecycleGate::assertItemRosterNotFrozen($item);
+        } else {
+            try {
+                EventLifecycleGate::allowRegistrationForItem($event, $item);
+            } catch (HttpException $e) {
+                throw ValidationException::withMessages(['registration' => $e->getMessage()]);
+            }
         }
 
         if ($event->event_type === 'teacher_fest') {
@@ -132,6 +136,7 @@ class FestRegistrationCreateService
                     $standbyIds,
                     $teamName,
                     $teamContacts,
+                    $adminOverride,
                 );
             }
         }
@@ -139,7 +144,7 @@ class FestRegistrationCreateService
         $item->loadMissing('head');
 
         try {
-            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts) {
+            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $adminOverride) {
                 // Quota and eligibility checks are inside the transaction with lockForUpdate
                 // to prevent race conditions where concurrent requests overflow per-school quotas.
                 \App\Models\FestEvent::query()->whereKey($event->id)->lockForUpdate()->first();
@@ -185,7 +190,7 @@ class FestRegistrationCreateService
                     } else {
                         $student = Student::find($studentId);
                         if ($student) {
-                            $eventRegService->registerStudent($event, $student, $school);
+                            $eventRegService->registerStudent($event, $student, $school, $adminOverride);
                         }
                     }
                 }
@@ -310,6 +315,7 @@ class FestRegistrationCreateService
         array $standbyIds = [],
         ?string $teamName = null,
         ?array $teamContacts = null,
+        bool $adminOverride = false,
     ): FestRegistration {
         // Defense-in-depth, same reasoning as FestRegistrationService::cancel(): a
         // partitioned hub's registrations live on the school's region child, not the hub.
@@ -318,7 +324,18 @@ class FestRegistrationCreateService
         abort_if($registration->school_id !== $school->id, 403);
         abort_if($school->parent_id !== $event->tenant_id, 403);
 
-        if (! app(FestRegistrationService::class)->canSchoolEditRoster($registration, $event)) {
+        // Same admin-override principle as assertOpen() above -- an admin editing a
+        // registration on a school's behalf (Register on behalf routed here because a
+        // registration for this item already existed) is blocked only by this item's
+        // own results already being published, not by canSchoolEditRoster()'s broader
+        // event-wide status/lock/window checks.
+        if ($adminOverride) {
+            if ($registration->item?->results_published_at) {
+                throw ValidationException::withMessages([
+                    'registration' => "This item's results are already published.",
+                ]);
+            }
+        } elseif (! app(FestRegistrationService::class)->canSchoolEditRoster($registration, $event)) {
             throw ValidationException::withMessages([
                 'registration' => 'This registration can no longer be edited — it may be past results-publish, or the event has closed.',
             ]);
@@ -336,7 +353,7 @@ class FestRegistrationCreateService
         if ($item->is_enabled === false) {
             throw ValidationException::withMessages(['registration' => 'This item is not open for registration.']);
         }
-        app(FestItemRegistrationGate::class)->assertOpen($item);
+        app(FestItemRegistrationGate::class)->assertOpen($item, $adminOverride);
         if ($event->schedule_published) {
             throw ValidationException::withMessages([
                 'registration' => 'The squad cannot be changed once the fest-day schedule has been published.',
@@ -393,7 +410,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['student_ids' => implode(' ', $eligibilityErrors)]);
         }
 
-        $updated = DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $feeService, $dueBefore, $isPaid) {
+        $updated = DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $feeService, $dueBefore, $isPaid, $adminOverride) {
             $eventRegService = app(FestEventRegistrationService::class);
             foreach (array_merge($performerIds, $standbyIds) as $studentId) {
                 if ($eventRegService->requireEventRegistration($event) && $event->event_type !== 'sports') {
@@ -401,7 +418,7 @@ class FestRegistrationCreateService
                 } else {
                     $student = Student::find($studentId);
                     if ($student) {
-                        $eventRegService->registerStudent($event, $student, $school);
+                        $eventRegService->registerStudent($event, $student, $school, $adminOverride);
                     }
                 }
             }

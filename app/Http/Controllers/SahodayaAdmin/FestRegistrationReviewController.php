@@ -320,7 +320,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 $data['student_ids'],
                 $data['standby_ids'] ?? [],
                 $data['team_name'] ?? null,
-                skipSchoolClosedCheck: true,
+                adminOverride: true,
                 teamContacts: [
                     'coach_name' => $data['coach_name'] ?? null,
                     'coach_phone' => $data['coach_phone'] ?? null,

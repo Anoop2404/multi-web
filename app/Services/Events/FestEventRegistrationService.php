@@ -55,17 +55,25 @@ class FestEventRegistrationService
             ->all();
     }
 
-    public function registerStudent(FestEvent $event, Student $student, Tenant $school): FestLevelRegistration
+    public function registerStudent(FestEvent $event, Student $student, Tenant $school, bool $adminOverride = false): FestLevelRegistration
     {
         abort_if($student->tenant_id !== $school->id, 403);
         abort_if($school->parent_id !== $event->tenant_id, 403);
         $this->assertSchoolMembershipApproved($school);
-        
-        if ($school->fest_registration_closed) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['registration' => 'Fest registration is closed for your school.']);
-        }
-        if (! $this->isEventRegistrationOpen($event)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['registration' => 'Event registration is closed.']);
+
+        // $adminOverride mirrors the same flag on FestRegistrationCreateService::
+        // createForSchool()/updateForSchool(), which call this internally to auto-create
+        // the event-level registration row alongside an item registration -- an admin
+        // registering a school here (Register on behalf) must not get blocked by the
+        // school's own fest_registration_closed flag or the event's top-level
+        // registration window, both already bypassed one level up for this same reason.
+        if (! $adminOverride) {
+            if ($school->fest_registration_closed) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['registration' => 'Fest registration is closed for your school.']);
+            }
+            if (! $this->isEventRegistrationOpen($event)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['registration' => 'Event registration is closed.']);
+            }
         }
 
         if ($event->event_type === 'sports') {
