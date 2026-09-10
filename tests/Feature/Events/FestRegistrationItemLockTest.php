@@ -181,6 +181,36 @@ class FestRegistrationItemLockTest extends TestCase
         $this->assertDatabaseHas('fest_participants', ['id' => $f['performer']->id]);
     }
 
+    /**
+     * Regression test: add/removeParticipant() used to also abort on the event-wide
+     * results_published flag, on top of the item-level check above — so once results were
+     * published for *any* item in the event, admins could no longer add or remove
+     * participants for a *different* item whose own results weren't published yet. Fixed to
+     * gate purely on this item's own results_published_at, matching every other per-item
+     * lock in this file.
+     */
+    public function test_add_participant_succeeds_when_the_event_is_published_but_this_item_is_not(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['results_published' => true]);
+        $schoolClass = SchoolClass::create(['tenant_id' => $f['school']->id, 'name' => 'Class 9']);
+        $student = Student::create(['name' => 'New Standby', 'tenant_id' => $f['school']->id, 'school_class_id' => $schoolClass->id]);
+
+        $participant = app(FestRegistrationService::class)->addParticipant($f['registration']->fresh(), $f['event']->fresh(), $student, 'standby');
+
+        $this->assertSame($student->id, $participant->student_id);
+    }
+
+    public function test_remove_participant_succeeds_when_the_event_is_published_but_this_item_is_not(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['results_published' => true]);
+
+        app(FestRegistrationService::class)->removeParticipant($f['standby']->fresh(), $f['event']->fresh());
+
+        $this->assertDatabaseMissing('fest_participants', ['id' => $f['standby']->id]);
+    }
+
     public function test_allow_registration_for_item_aborts_once_item_results_are_published(): void
     {
         $f = $this->fixture();

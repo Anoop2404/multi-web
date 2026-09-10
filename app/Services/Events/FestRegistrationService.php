@@ -363,14 +363,14 @@ class FestRegistrationService
      * (unlike substitutePerformer(), which only swaps between two rows that already exist).
      * Deliberately does NOT check canSchoolEditRoster()/schedule_published — this is an
      * admin-only override for the exact case that lock exists to prevent schools from doing
-     * themselves (day-of emergencies: sick student, no-show right before their item). Still
-     * blocked once results are published, same as every other admin override in this file —
-     * reversing a published result is out of scope everywhere else too.
+     * themselves (day-of emergencies: sick student, no-show right before their item). Gated
+     * on this item's own results_published_at only, not the event-wide results_published flag
+     * — an event can have results published for other items while this one's are still open,
+     * and admins need to keep managing this item's roster until its own results go out.
      */
     public function addParticipant(FestRegistration $registration, FestEvent $event, Student $student, string $role): FestParticipant
     {
         abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 422);
-        abort_if($event->results_published, 422, 'Results have already been published for this event.');
         abort_if($registration->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to add a participant.');
         abort_unless(in_array($role, ['performer', 'standby'], true), 422, 'Invalid role.');
         abort_if((string) $student->tenant_id !== (string) $registration->school_id, 422, "The student's school does not match this registration.");
@@ -437,13 +437,13 @@ class FestRegistrationService
      * codebase has no soft-delete convention for participants (disqualified_at is a distinct
      * misconduct concept, not roster removal); FestRegistrationCreateService::updateForSchool()
      * already hard-deletes as part of a full roster replace. Same admin-override posture as
-     * addParticipant() above re: schedule_published vs results_published.
+     * addParticipant() above re: schedule_published vs results_published — gated on this
+     * item's own results_published_at only, not the event-wide flag.
      */
     public function removeParticipant(FestParticipant $participant, FestEvent $event): void
     {
         $registration = $participant->registration;
         abort_unless($registration && in_array($registration->event_id, $event->reportableEventIds(), true), 422);
-        abort_if($event->results_published, 422, 'Results have already been published for this event.');
         abort_if($registration->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to remove a participant.');
 
         $registration->loadMissing('participants');
