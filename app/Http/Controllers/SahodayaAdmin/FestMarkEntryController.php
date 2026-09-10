@@ -1350,10 +1350,9 @@ class FestMarkEntryController extends SahodayaAdminController
     }
 
     /**
-     * Wipes every mark-entry-page scoring field for one item — judge scores,
-     * grand total/score, rank, grade, and attendance — back to blank/unmarked
-     * for every participant (or team) registered in it. Leaves order number
-     * untouched (that's a separate per-item sequence, not part of "marks").
+     * Wipes every mark-entry-page field for one item — judge scores, grand
+     * total/score, rank, grade, attendance, and order number — back to
+     * blank/unmarked for every participant (or team) registered in it.
      * Same lock/publish gate as store()/bulkStore() so a published item
      * can't be reset without unpublishing first.
      */
@@ -1364,10 +1363,19 @@ class FestMarkEntryController extends SahodayaAdminController
 
         EventLifecycleGate::allowMarkEntryForItem($event, $item);
 
-        DB::transaction(function () use ($item) {
+        DB::transaction(function () use ($event, $item) {
             FestMark::where('item_id', $item->id)->delete();
             FestMarkJudgeScore::where('item_id', $item->id)->delete();
             FestAttendance::where('item_id', $item->id)->delete();
+
+            FestParticipant::whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $event->id)
+                    ->where('item_id', $item->id))
+                ->update(['order_no' => null]);
+
+            FestGroup::whereHas('registration', fn ($q) => $q->where('item_id', $item->id))
+                ->where('event_id', $event->id)
+                ->update(['order_no' => null]);
         });
 
         $markSave->recalculate($event);

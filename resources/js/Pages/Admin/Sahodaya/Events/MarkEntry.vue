@@ -976,7 +976,7 @@ function clearAllMarks(section) {
     const item = section.item;
     if (!item?.id) return;
 
-    if (!confirm(`Clear ALL marks for "${item.title}"?\n\nThis wipes judge scores, grand total, rank, grade, and attendance for every participant in this item. Order numbers are kept. This cannot be undone.`)) {
+    if (!confirm(`Clear ALL marks for "${item.title}"?\n\nThis wipes judge scores, grand total, rank, grade, attendance, and order number for every participant in this item. This cannot be undone.`)) {
         return;
     }
 
