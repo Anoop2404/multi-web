@@ -188,6 +188,9 @@
                         <button v-if="section.item?.id && showGradeColumn" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoGrade(section)">
                             Auto-grade
                         </button>
+                        <button v-if="section.item?.id" type="button" class="text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 font-medium" :disabled="itemLocked" @click="clearAllMarks(section)">
+                            Clear All Marks
+                        </button>
                     </div>
                 </div>
 
@@ -967,5 +970,27 @@ function autoRankAll() {
 
 function autoRank(item) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${item.id}/auto-rank`, {}, { preserveScroll: true });
+}
+
+function clearAllMarks(section) {
+    const item = section.item;
+    if (!item?.id) return;
+
+    if (!confirm(`Clear ALL marks for "${item.title}"?\n\nThis wipes judge scores, grand total, rank, grade, and attendance for every participant in this item. Order numbers are kept. This cannot be undone.`)) {
+        return;
+    }
+
+    // preserveState: false — this reset touches every field markForms/judgeForms
+    // hold locally, and (unlike the other router.post calls here, e.g. autoRank
+    // above) there's no reactivity tying those forms back to fresh props, so a
+    // normal preserveScroll POST would leave stale values on screen even though
+    // the server-side data is gone. Forcing a fresh component instance re-runs
+    // the setup-time build of markForms/judgeForms from the reloaded props,
+    // matching onItemSelect()'s same rationale.
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${item.id}/marks/clear-all`,
+        {},
+        { preserveScroll: true, preserveState: false }
+    );
 }
 </script>

@@ -9,6 +9,7 @@ use App\Models\FestEventItem;
 use App\Models\FestGroup;
 use App\Models\FestMark;
 use App\Models\FestMarkCriterion;
+use App\Models\FestMarkJudgeScore;
 use App\Models\FestMarkSheetUpload;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
@@ -1346,6 +1347,36 @@ class FestMarkEntryController extends SahodayaAdminController
         $result = $ranker->rankItem($event, $item);
 
         return back()->with('success', "Auto-ranked {$result['ranked']} athlete(s) for {$result['item_title']}.");
+    }
+
+    /**
+     * Wipes every mark-entry-page scoring field for one item — judge scores,
+     * grand total/score, rank, grade, and attendance — back to blank/unmarked
+     * for every participant (or team) registered in it. Leaves order number
+     * untouched (that's a separate per-item sequence, not part of "marks").
+     * Same lock/publish gate as store()/bulkStore() so a published item
+     * can't be reset without unpublishing first.
+     */
+    public function clearAllMarks(string $tenantId, FestEvent $event, FestEventItem $item, FestMarkSaveService $markSave, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($item->event_id !== $event->id, 404);
+
+        EventLifecycleGate::allowMarkEntryForItem($event, $item);
+
+        DB::transaction(function () use ($item) {
+            FestMark::where('item_id', $item->id)->delete();
+            FestMarkJudgeScore::where('item_id', $item->id)->delete();
+            FestAttendance::where('item_id', $item->id)->delete();
+        });
+
+        $markSave->recalculate($event);
+
+        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.marks.cleared_all', "All marks cleared for {$item->title}", [
+            'item_id' => $item->id,
+        ]);
+
+        return back()->with('success', "All marks cleared for {$item->title}.");
     }
 
     /**
