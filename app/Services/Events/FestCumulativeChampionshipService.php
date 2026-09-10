@@ -259,14 +259,12 @@ class FestCumulativeChampionshipService
     private function applyRanks(Collection $rows): Collection
     {
         return $rows->groupBy('championship_category_key')->flatMap(function (Collection $categoryRows) {
-            $position = 0;
             $rank = 0;
             $previous = null;
 
-            return $categoryRows->sortByDesc('closing_points')->values()->map(function (array $row) use (&$position, &$rank, &$previous) {
-                $position++;
+            return $categoryRows->sortByDesc('closing_points')->values()->map(function (array $row) use (&$rank, &$previous) {
                 if ($previous === null || $row['closing_points'] < $previous) {
-                    $rank = $position;
+                    $rank++;
                 }
                 $previous = $row['closing_points'];
                 $row['rank'] = $rank;

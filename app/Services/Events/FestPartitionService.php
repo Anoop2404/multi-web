@@ -611,15 +611,13 @@ class FestPartitionService
             ->get(['id', 'name'])
             ->keyBy('id');
 
-        $rank = 1;
+        $rank = 0;
         $previousTotal = null;
-        $position = 0;
         $rows = [];
 
         foreach (collect($totals)->sortDesc() as $schoolId => $total) {
-            $position++;
-            if ($previousTotal !== null && (int) $total < (int) $previousTotal) {
-                $rank = $position;
+            if ($previousTotal === null || (int) $total < (int) $previousTotal) {
+                $rank++;
             }
             $previousTotal = (int) $total;
 

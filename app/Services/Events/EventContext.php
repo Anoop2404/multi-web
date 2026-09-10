@@ -237,15 +237,13 @@ class EventContext
             ->get(['id', 'name'])
             ->keyBy('id');
 
-        $rank = 1;
+        $rank = 0;
         $previousTotal = null;
-        $position = 0;
         $rows = [];
 
         foreach (collect($pointsBySchool)->sortDesc() as $schoolId => $total) {
-            $position++;
-            if ($previousTotal !== null && (int) $total < (int) $previousTotal) {
-                $rank = $position;
+            if ($previousTotal === null || (int) $total < (int) $previousTotal) {
+                $rank++;
             }
             $previousTotal = (int) $total;
 
@@ -375,17 +373,15 @@ class EventContext
             return;
         }
 
-        $rank = 1;
+        $rank = 0;
         $previousTotal = null;
-        $position = 0;
 
         $existingSchoolIds = FestResult::where('event_id', $this->event->id)->whereNull('item_id')->pluck('school_id')->all();
         $updatedSchoolIds = [];
 
         foreach (collect($pointsBySchool)->sortDesc() as $schoolId => $total) {
-            $position++;
-            if ($previousTotal !== null && (int) $total < (int) $previousTotal) {
-                $rank = $position;
+            if ($previousTotal === null || (int) $total < (int) $previousTotal) {
+                $rank++;
             }
             $previousTotal = (int) $total;
             $updatedSchoolIds[] = $schoolId;

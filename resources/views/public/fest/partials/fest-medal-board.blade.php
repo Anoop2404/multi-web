@@ -1,5 +1,5 @@
 <div class="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
-    <div class="grid grid-cols-[3.5rem_1fr_repeat(3,4rem)_6rem] gap-2 px-5 py-3 bg-white/5 border-b border-slate-800 text-xs font-extrabold uppercase tracking-wider text-slate-400">
+    <div class="grid grid-cols-[3.5rem_1fr_repeat(4,4rem)_6rem] gap-2 px-5 py-3 bg-white/5 border-b border-slate-800 text-xs font-extrabold uppercase tracking-wider text-slate-400">
         <span>Rank</span>
         <span>School</span>
         {{-- Points earned from that rank specifically (see FestPortalController::tv()'s
@@ -7,6 +7,10 @@
         <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Points from 1st place" class="w-5 h-5"><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
         <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Points from 2nd place" class="w-5 h-5"><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
         <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Points from 3rd place" class="w-5 h-5"><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
+        {{-- Grade points earned off the podium (e.g. Grade A with no 1st/2nd/3rd finish) —
+             without this column Total Points had no visible source when gold/silver/bronze
+             were all zero. --}}
+        <span class="flex flex-col items-center justify-center gap-0.5"><span>Grade</span><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
         <span class="text-right">Total Points</span>
     </div>
     <div class="divide-y divide-slate-800/80">
@@ -20,7 +24,7 @@
                 default => '',
             } : '';
         @endphp
-        <div class="grid grid-cols-[3.5rem_1fr_repeat(3,4rem)_6rem] gap-2 items-center px-5 py-3 {{ $rankClass }}">
+        <div class="grid grid-cols-[3.5rem_1fr_repeat(4,4rem)_6rem] gap-2 items-center px-5 py-3 {{ $rankClass }}">
             <span class="flex items-center">
                 {{-- Medal icons imply an actual result — only show them once there's a real
                      ranking. A pre-results roster (everyone at 0) uses plain numbers even
@@ -35,6 +39,7 @@
             <span class="text-center font-mono font-bold tabular-nums text-amber-300 text-base">{{ $row['gold'] }}</span>
             <span class="text-center font-mono font-bold tabular-nums text-slate-300 text-base">{{ $row['silver'] }}</span>
             <span class="text-center font-mono font-bold tabular-nums text-amber-600 text-base">{{ $row['bronze'] }}</span>
+            <span class="text-center font-mono font-bold tabular-nums text-sky-300 text-base">{{ $row['grade_points'] ?? 0 }}</span>
             <span class="text-right font-mono font-extrabold tabular-nums text-amber-400 text-lg">{{ $row['total_points'] }}</span>
         </div>
         @empty

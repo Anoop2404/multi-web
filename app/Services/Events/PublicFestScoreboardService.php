@@ -441,9 +441,9 @@ class PublicFestScoreboardService
         $previousPoints = null;
         $rank = 0;
 
-        return $rows->map(function (array $row, int $index) use (&$previousPoints, &$rank) {
+        return $rows->map(function (array $row) use (&$previousPoints, &$rank) {
             if ($previousPoints === null || $row['total_points'] < $previousPoints) {
-                $rank = $index + 1;
+                $rank++;
             }
 
             $previousPoints = $row['total_points'];

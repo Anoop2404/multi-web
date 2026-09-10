@@ -861,12 +861,24 @@ public function tv(Request $request, int $eventId)
             'bronze' => $group->where('position', 3)->sum(fn (FestMark $m) => $this->gradePoints->pointsForMark($event, $m)),
         ]);
 
+    // Total Points includes every scored mark (grade points awarded regardless of
+    // podium finish, e.g. Grade A off the podium), while gold/silver/bronze above only
+    // tally points earned FROM a 1st/2nd/3rd place finish specifically. Without this,
+    // a school whose points are entirely grade-only (no podium item) rendered as
+    // 0/0/0 next to a nonzero Total with no visible source for the difference.
     $withMedals = fn (array $rows, $tally) => collect($rows)
-        ->map(fn (array $row) => $row + [
-            'gold' => $tally[$row['school_id']]['gold'] ?? 0,
-            'silver' => $tally[$row['school_id']]['silver'] ?? 0,
-            'bronze' => $tally[$row['school_id']]['bronze'] ?? 0,
-        ])
+        ->map(function (array $row) use ($tally) {
+            $gold = $tally[$row['school_id']]['gold'] ?? 0;
+            $silver = $tally[$row['school_id']]['silver'] ?? 0;
+            $bronze = $tally[$row['school_id']]['bronze'] ?? 0;
+
+            return $row + [
+                'gold' => $gold,
+                'silver' => $silver,
+                'bronze' => $bronze,
+                'grade_points' => max(0, ($row['total_points'] ?? 0) - $gold - $silver - $bronze),
+            ];
+        })
         ->values()
         ->all();
 
