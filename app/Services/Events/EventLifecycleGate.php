@@ -370,5 +370,17 @@ class EventLifecycleGate
         if ($participantCount > 0 && $markedCount < $participantCount) {
             throw new HttpException(422, "Mark entry incomplete ({$markedCount}/{$participantCount}). Complete all marks before publishing.");
         }
+
+        // A grade/score can be entered without a position (rank) ever being set — same gap
+        // FestItemResultsService::assertCanPublish() closes for a single item's own publish
+        // button; this closes it for the whole-event publish too, under the same
+        // require_all_marks_before_publish toggle rather than a separate one.
+        $rankedCount = FestMark::whereIn('event_id', $eventIds)
+            ->whereNotNull('position')
+            ->count();
+
+        if ($participantCount > 0 && $rankedCount < $participantCount) {
+            throw new HttpException(422, "Rank assignment incomplete ({$rankedCount}/{$participantCount}). Assign ranks for all participants before publishing.");
+        }
     }
 }

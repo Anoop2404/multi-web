@@ -74,6 +74,7 @@ class FestItemResultsService
             $performers = 0;
             $registrationCount = 0;
             $marksEntered = 0;
+            $ranksAssigned = 0;
             $judgesAssigned = 0;
             $anyPublished = false;
 
@@ -83,6 +84,7 @@ class FestItemResultsService
                     $performers += (int) ($row['performers'] ?? 0);
                     $registrationCount += (int) ($row['registration_count'] ?? 0);
                     $marksEntered += (int) ($row['marks_entered'] ?? 0);
+                    $ranksAssigned += (int) ($row['ranks_assigned'] ?? 0);
                     $judgesAssigned = max($judgesAssigned, (int) ($row['judges_assigned'] ?? 0));
                 }
             }
@@ -115,6 +117,8 @@ class FestItemResultsService
                 'marks_entered'         => $marksEntered,
                 'marks_pending'         => max(0, $performers - $marksEntered),
                 'marks_ready'           => $marksReady,
+                'ranks_assigned'        => $ranksAssigned,
+                'ranks_pending'         => max(0, $performers - $ranksAssigned),
                 'judges_assigned'       => $judgesAssigned,
                 'results_published'     => $anyPublished,
                 'results_published_at'  => $primary->results_published_at?->toIso8601String(),
@@ -251,6 +255,19 @@ class FestItemResultsService
             $marksEntered < $performers,
             422,
             "Enter marks for all participants before publishing ({$marksEntered}/{$performers} marked).",
+        );
+
+        // A grade/score can be entered without a position (rank) ever being set — they're
+        // independent nullable fields on the same mark-entry form — so marksEntered alone
+        // isn't enough to guarantee winners can actually be determined. Absent participants
+        // are already excluded from $performers (see FestEventReportAnalyticsService::
+        // assignmentCompletenessRows()'s own denominator), so this only ever demands a rank
+        // from someone who was actually marked.
+        $ranksAssigned = (int) ($summary['ranks_assigned'] ?? 0);
+        abort_if(
+            $ranksAssigned < $performers,
+            422,
+            "Assign ranks for all participants before publishing ({$ranksAssigned}/{$performers} ranked).",
         );
     }
 

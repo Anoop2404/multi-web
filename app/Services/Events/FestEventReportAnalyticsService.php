@@ -911,6 +911,23 @@ class FestEventReportAnalyticsService
             ->groupBy('item_id')
             ->pluck('cnt', 'item_id');
 
+        // Distinct from marksEntered above: a grade/score can be entered without a
+        // position (rank) ever being set, since they're independent nullable fields on
+        // the same mark-entry form — see FestItemResultsService::assertCanPublish(),
+        // which requires this to reach performers before a publish is allowed, so an
+        // item can't go out with marks entered but nobody actually ranked.
+        $ranksQuery = FestMark::query()
+            ->whereIn('event_id', $eventIds)
+            ->whereIn('item_id', $itemIds)
+            ->whereNotNull('position');
+        if ($schoolId) {
+            $ranksQuery->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId));
+        }
+        $ranksMap = $ranksQuery
+            ->selectRaw('item_id, count(distinct participant_id) as cnt')
+            ->groupBy('item_id')
+            ->pluck('cnt', 'item_id');
+
         $judgesMap = FestJudgeAssignment::whereIn('event_id', $eventIds)
             ->whereIn('item_id', $itemIds)
             ->selectRaw('item_id, count(*) as cnt')
@@ -931,6 +948,7 @@ class FestEventReportAnalyticsService
 
             $scheduledParticipants = (int) ($scheduledMap[$item->id] ?? 0);
             $marksEntered = (int) ($marksMap[$item->id] ?? 0);
+            $ranksAssigned = (int) ($ranksMap[$item->id] ?? 0);
             $judges = (int) ($judgesMap[$item->id] ?? 0);
 
             $rows[] = [
@@ -953,6 +971,8 @@ class FestEventReportAnalyticsService
                 'participants_scheduled' => $scheduledParticipants,
                 'marks_entered'          => $marksEntered,
                 'marks_pending'          => max(0, $performers - $marksEntered),
+                'ranks_assigned'         => $ranksAssigned,
+                'ranks_pending'          => max(0, $performers - $ranksAssigned),
                 'judges_assigned'        => $judges,
                 'ready_for_event'      => $performers > 0
                     && $chestAssigned >= $performers
