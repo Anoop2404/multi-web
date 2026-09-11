@@ -6,11 +6,12 @@
             <div class="absolute top-0 left-0 origin-top-left bg-white transition-all overflow-hidden"
                  :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px`, transform: `scale(${scaleFactor})` }">
 
-                <!-- Background Image Backdrop — background-size:100% 100% (stretch), matching the
-                     blade's own background-size exactly rather than bg-cover's crop-to-fill, so
+                <!-- Background Image Backdrop — mirrors the blade's own background-size exactly
+                     (full-canvas stretch by default, or the artwork's true physical size when
+                     background.width_mm/height_mm are set — see backgroundSizeStyle above), so
                      what you see here matches the real print output pixel-for-pixel. -->
                 <div v-if="bgUrl" class="w-full h-full bg-no-repeat"
-                     :style="{ backgroundImage: `url('${bgUrl}')`, backgroundSize: '100% 100%', backgroundPosition: 'center' }">
+                     :style="{ backgroundImage: `url('${bgUrl}')`, ...backgroundSizeStyle }">
                 </div>
 
                 <div v-else class="w-full h-full flex flex-col items-center justify-center p-12 text-center bg-slate-100 text-slate-400 border-8 border-double border-indigo-900">
@@ -158,6 +159,22 @@ const showLogoOverlay = computed(() => props.layout?.show_logo_overlay !== false
 
 const showPhoto = computed(() => props.layout?.show_photo === true);
 const photoLayout = computed(() => props.layout?.photo ?? {});
+
+// Mirrors CertificateTemplate::backgroundSizePercentages() — null (both dimensions
+// unset) keeps the historical full-canvas stretch; set width_mm/height_mm to render
+// the artwork at its true physical size, centered and letterboxed/cropped by the
+// canvas's own overflow:hidden, matching the real print output exactly.
+const backgroundSizeStyle = computed(() => {
+    const widthMm = Number(props.layout?.background?.width_mm);
+    const heightMm = Number(props.layout?.background?.height_mm);
+    if (!widthMm || !heightMm || widthMm <= 0 || heightMm <= 0) {
+        return { backgroundSize: '100% 100%', backgroundPosition: 'center' };
+    }
+    const [pageWidthMm, pageHeightMm] = isPortrait.value ? [210, 297] : [297, 210];
+    const widthPct = (widthMm / pageWidthMm) * 100;
+    const heightPct = (heightMm / pageHeightMm) * 100;
+    return { backgroundSize: `${widthPct}% ${heightPct}%`, backgroundPosition: 'center' };
+});
 
 const participationLabelCover = computed(() => props.layout?.participation_label_cover);
 const recipientNameLayout = computed(() => props.layout?.recipient_name);

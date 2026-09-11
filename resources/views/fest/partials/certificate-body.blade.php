@@ -33,6 +33,12 @@
         $body = \App\Models\CertificateTemplate::substituteTokens($rawBody ?? '', $fieldValues ?? [], $boldVariables);
         $paragraphs = array_filter(array_map('trim', preg_split('/\n\s*\n/', $body)));
         $hasBackground = ! empty($backgroundUrl) || ! empty($template);
+        // Null unless the admin declared the artwork's true physical size — see
+        // CertificateTemplate::backgroundSizePercentages(). Falls back to the
+        // .page.has-background stylesheet rule's own `background-size: 100% 100%`
+        // (full-canvas stretch) when not set, so every template configured before this
+        // option existed keeps rendering exactly as before.
+        $__bgSize = \App\Models\CertificateTemplate::backgroundSizePercentages($layout, $__orientation);
     @endphp
 
     @if(empty($isSample))
@@ -42,7 +48,7 @@
     @endif
 
     @if($hasBackground)
-        <div class="page {{ !empty($plainMode) ? 'hide-background ' : '' }}has-background{{ $__orientation === 'portrait' ? ' portrait' : '' }}" style="{{ empty($plainMode) && !empty($backgroundUrl) ? "background-image:url('{$backgroundUrl}');" : 'background-image:none !important;' }}">
+        <div class="page {{ !empty($plainMode) ? 'hide-background ' : '' }}has-background{{ $__orientation === 'portrait' ? ' portrait' : '' }}" style="{{ empty($plainMode) && !empty($backgroundUrl) ? "background-image:url('{$backgroundUrl}');" : 'background-image:none !important;' }}{{ $__bgSize ? "background-size:{$__bgSize['width']}% {$__bgSize['height']}%;background-position:center;background-repeat:no-repeat;" : '' }}">
             @if(($layout['show_photo'] ?? false) && !empty($photoUrl))
                 @php $ph = $layout['photo'] ?? []; @endphp
                 <img class="overlay-photo" src="{{ $photoUrl }}" alt=""
