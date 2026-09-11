@@ -74,9 +74,14 @@
                 </thead>
                 <tbody>
                     <template v-for="(row, idx) in displayRows" :key="row.item_id">
-                        <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                            <td colspan="7" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                {{ row.head_name ?? 'Other items' }}
+                        <tr v-if="shouldShowDateDivider(row, displayRows[idx - 1])" class="bg-slate-100">
+                            <td colspan="7" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                                {{ row.scheduled_date ? formatCalendarDate(row.scheduled_date) : 'Not scheduled' }}
+                            </td>
+                        </tr>
+                        <tr v-if="shouldShowStageDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
+                            <td colspan="7" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                {{ row.stage || 'No stage assigned' }}
                             </td>
                         </tr>
                         <tr>
@@ -138,8 +143,17 @@ const {
     headsForFilter,
     hasItemHeads,
     displayRows,
-    shouldShowHeadDivider,
 } = useReportHeadFilters(base, () => props.rows);
+
+// Rows arrive pre-sorted by date → stage → time (FestItemScheduleService::reportRows),
+// so a group boundary is just "this row's date/stage differs from the previous row's".
+function shouldShowDateDivider(row, prevRow) {
+    return (row.scheduled_date ?? null) !== (prevRow?.scheduled_date ?? null);
+}
+
+function shouldShowStageDivider(row, prevRow) {
+    return shouldShowDateDivider(row, prevRow) || (row.stage ?? null) !== (prevRow?.stage ?? null);
+}
 
 const filteredSummary = computed(() => {
     const list = displayRows.value;

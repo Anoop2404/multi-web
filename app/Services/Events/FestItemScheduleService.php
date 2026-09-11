@@ -75,6 +75,7 @@ class FestItemScheduleService
             'scheduled_time' => $at?->format('H:i'),
             'stage_id'       => $schedule?->stage_id,
             'stage'          => $schedule?->stage,
+            'stage_sort_order' => $schedule?->festStage?->sort_order,
             'venue_id'       => $schedule?->venue_id,
             'venue'          => $schedule?->venue?->name ?? $schedule?->festStage?->venue?->name,
             'sort_order'     => $schedule?->sort_order,
@@ -94,9 +95,14 @@ class FestItemScheduleService
             $rows = $rows->filter(fn ($r) => (int) ($r['stage_id'] ?? 0) === $stageId);
         }
 
+        // Grouped for display as date → stage → time, per report requirements:
+        // unscheduled items (no date/stage) sort last within their group.
         return $rows
             ->sortBy([
-                fn ($r) => $r['scheduled_at'] ?? '9999',
+                fn ($r) => $r['scheduled_date'] ?? '9999-99-99',
+                fn ($r) => $r['stage_sort_order'] ?? 9999,
+                fn ($r) => $r['stage'] ?? 'zzzz',
+                fn ($r) => $r['scheduled_time'] ?? '99:99',
                 fn ($r) => $r['sort_order'] ?? 9999,
                 fn ($r) => $r['title'],
             ])
