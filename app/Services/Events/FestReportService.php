@@ -1387,9 +1387,13 @@ class FestReportService
     {
         $clashes = $this->scheduleClashRows($request->input('school_id'))['participant'];
 
-        $csv = "Student,School,Item 1,Item 2,Clash Time\n";
+        $esc = fn ($v) => str_replace('"', '""', (string) ($v ?? ''));
+
+        $csv = "Student,School,Item 1,Item 1 Category,Item 1 Gender,Item 1 Type,Item 1 Time,Item 2,Item 2 Category,Item 2 Gender,Item 2 Type,Item 2 Time\n";
         foreach ($clashes as $c) {
-            $csv .= '"'.$c['student_name'].'","'.$c['school_name'].'","'.$c['event1'].'","'.$c['event2'].'","'.$c['time']."\"\n";
+            $csv .= '"'.$esc($c['student_name']).'","'.$esc($c['school_name']).'",';
+            $csv .= '"'.$esc($c['event1']).'","'.$esc($c['item1_category']).'","'.$esc($c['item1_gender']).'","'.$esc($c['item1_type']).'","'.$esc($c['item1_time']).'",';
+            $csv .= '"'.$esc($c['event2']).'","'.$esc($c['item2_category']).'","'.$esc($c['item2_gender']).'","'.$esc($c['item2_type']).'","'.$esc($c['item2_time'])."\"\n";
         }
 
         return response()->streamDownload(

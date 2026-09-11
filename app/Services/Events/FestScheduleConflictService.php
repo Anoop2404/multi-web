@@ -3,17 +3,48 @@
 namespace App\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchedule;
 use App\Models\Student;
 use App\Models\Tenant;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
+use App\Support\FestTeamSquadRules;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class FestScheduleConflictService
 {
-    public function __construct(public FestEvent $event) {}
+    /** @var array<string, string> */
+    private array $classGroupLabels;
+
+    public function __construct(public FestEvent $event)
+    {
+        $this->classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+    }
+
+    /** @return array{title: string, category: ?string, gender: ?string, type: string} */
+    private function itemMeta(?FestEventItem $item, ?int $itemId): array
+    {
+        return [
+            'title'    => $item?->title ?? "Item #{$itemId}",
+            'category' => FestItemCategoryLabel::resolve($item, $this->classGroupLabels),
+            'gender'   => $this->genderLabel($item?->gender),
+            'type'     => FestTeamSquadRules::isMultiPerson($item?->participant_type) ? 'Group' : 'Individual',
+        ];
+    }
+
+    private function genderLabel(?string $gender): ?string
+    {
+        return match (strtolower((string) $gender)) {
+            'male', 'm', 'boy', 'boys' => 'Boys',
+            'female', 'f', 'girl', 'girls' => 'Girls',
+            'mixed', 'common' => 'Mixed',
+            default => null,
+        };
+    }
 
     /** @return list<array<string, mixed>> */
     public function detectAll(?string $schoolId = null): array
@@ -21,7 +52,7 @@ class FestScheduleConflictService
         $schedules = FestSchedule::where('event_id', $this->event->id)
             ->whereNotNull('scheduled_at')
             ->with([
-                'item' => fn ($q) => $q->with('head')->withCount(['registrations' => fn ($r) => $r->whereIn('status', FestRegistration::ACTIVE_STATUSES)]),
+                'item' => fn ($q) => $q->withCount(['registrations' => fn ($r) => $r->whereIn('status', FestRegistration::ACTIVE_STATUSES)]),
                 'participant.student', 'participant.registration',
             ])
             ->get();
@@ -68,20 +99,28 @@ class FestScheduleConflictService
                     }
 
                     $schoolName = Tenant::where('id', $entrySchoolId)->value('name') ?? '—';
+                    $item1 = $this->itemMeta($s1->item, $s1->item_id);
+                    $item2 = $this->itemMeta($s2->item, $s2->item_id);
 
                     $clashes[] = [
-                        'student_id'   => $studentId,
-                        'student_name' => $student?->name ?? "Student #{$studentId}",
-                        'school_name'  => $schoolName,
-                        'school_id'    => $entrySchoolId,
-                        'event1'       => $s1->item?->title ?? "Item #{$s1->item_id}",
-                        'event2'       => $s2->item?->title ?? "Item #{$s2->item_id}",
-                        'item1_id'     => $s1->item_id,
-                        'item2_id'     => $s2->item_id,
-                        'head1_id'     => $s1->item?->head_id,
-                        'head2_id'     => $s2->item?->head_id,
-                        'time'         => $start1->format('d M H:i').' – '.$start2->format('d M H:i'),
-                        'start_time1'  => $start1->timestamp,
+                        'student_id'      => $studentId,
+                        'student_name'    => $student?->name ?? "Student #{$studentId}",
+                        'school_name'     => $schoolName,
+                        'school_id'       => $entrySchoolId,
+                        'event1'          => $item1['title'],
+                        'event2'          => $item2['title'],
+                        'item1_id'        => $s1->item_id,
+                        'item2_id'        => $s2->item_id,
+                        'item1_category'  => $item1['category'],
+                        'item2_category'  => $item2['category'],
+                        'item1_gender'    => $item1['gender'],
+                        'item2_gender'    => $item2['gender'],
+                        'item1_type'      => $item1['type'],
+                        'item2_type'      => $item2['type'],
+                        'item1_time'      => $start1->format('d M H:i'),
+                        'item2_time'      => $start2->format('d M H:i'),
+                        'time'            => $start1->format('d M H:i').' – '.$start2->format('d M H:i'),
+                        'start_time1'     => $start1->timestamp,
                     ];
                 }
             }
@@ -96,7 +135,7 @@ class FestScheduleConflictService
         $schedules = FestSchedule::where('event_id', $this->event->id)
             ->whereNotNull('scheduled_at')
             ->with([
-                'item' => fn ($q) => $q->with('head')->withCount(['registrations' => fn ($r) => $r->whereIn('status', FestRegistration::ACTIVE_STATUSES)]),
+                'item' => fn ($q) => $q->withCount(['registrations' => fn ($r) => $r->whereIn('status', FestRegistration::ACTIVE_STATUSES)]),
                 'festStage.venue',
             ])
             ->get()
@@ -136,16 +175,25 @@ class FestScheduleConflictService
                 }
                 $seen[$pairKey] = true;
 
+                $item1 = $this->itemMeta($s1->item, $s1->item_id);
+                $item2 = $this->itemMeta($s2->item, $s2->item_id);
+
                 $conflicts[] = [
-                    'stage'    => $s1->festStage?->name ?? $s1->stage ?? 'Stage',
-                    'venue'    => $s1->festStage?->venue?->name,
-                    'item1'    => $s1->item?->title ?? "Item #{$s1->item_id}",
-                    'item2'    => $s2->item?->title ?? "Item #{$s2->item_id}",
-                    'item1_id' => $s1->item_id,
-                    'item2_id' => $s2->item_id,
-                    'head1_id' => $s1->item?->head_id,
-                    'head2_id' => $s2->item?->head_id,
-                    'time'     => $start1->format('d M H:i').' – '.$start2->format('d M H:i'),
+                    'stage'          => $s1->festStage?->name ?? $s1->stage ?? 'Stage',
+                    'venue'          => $s1->festStage?->venue?->name,
+                    'item1'          => $item1['title'],
+                    'item2'          => $item2['title'],
+                    'item1_id'       => $s1->item_id,
+                    'item2_id'       => $s2->item_id,
+                    'item1_category' => $item1['category'],
+                    'item2_category' => $item2['category'],
+                    'item1_gender'   => $item1['gender'],
+                    'item2_gender'   => $item2['gender'],
+                    'item1_type'     => $item1['type'],
+                    'item2_type'     => $item2['type'],
+                    'item1_time'     => $start1->format('d M H:i'),
+                    'item2_time'     => $start2->format('d M H:i'),
+                    'time'           => $start1->format('d M H:i').' – '.$start2->format('d M H:i'),
                 ];
             }
         }

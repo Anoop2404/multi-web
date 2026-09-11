@@ -6,11 +6,15 @@
 
 <h2 style="text-align:center">{{ $event->title }} — Schedule Clashes — {{ $school->name }}</h2>
 <p style="text-align:center;font-size:10px;color:#64748b;margin-top:2px">Generated on {{ now()->format('d M Y, h:i A') }}</p>
-<table><thead><tr><th>Student</th><th>Item 1</th><th>Item 2</th><th>Time</th></tr></thead>
+<table><thead><tr><th>Student</th><th>Item 1</th><th>Item 2</th></tr></thead>
 <tbody>
 @forelse($conflicts as $c)
-<tr><td>{{ $c['student_name'] }}</td><td>{{ $c['event1'] }}</td><td>{{ $c['event2'] }}</td><td>{{ $c['time'] }}</td></tr>
+<tr>
+    <td>{{ $c['student_name'] }}</td>
+    <td>{{ $c['event1'] }}<br><small>{{ implode(' · ', array_filter([$c['item1_category'] ?? null, $c['item1_gender'] ?? null, $c['item1_type'] ?? null, $c['item1_time'] ?? null])) }}</small></td>
+    <td>{{ $c['event2'] }}<br><small>{{ implode(' · ', array_filter([$c['item2_category'] ?? null, $c['item2_gender'] ?? null, $c['item2_type'] ?? null, $c['item2_time'] ?? null])) }}</small></td>
+</tr>
 @empty
-<tr><td colspan="4" style="text-align:center">No clashes detected.</td></tr>
+<tr><td colspan="3" style="text-align:center">No clashes detected.</td></tr>
 @endforelse
 </tbody></table></body></html>

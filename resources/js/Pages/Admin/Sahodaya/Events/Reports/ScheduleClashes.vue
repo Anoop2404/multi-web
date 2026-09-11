@@ -48,7 +48,6 @@
                             <th>School</th>
                             <th>Item 1</th>
                             <th>Item 2</th>
-                            <th>Time</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -56,9 +55,14 @@
                             <td>{{ i + 1 }}</td>
                             <td>{{ c.student_name }}</td>
                             <td>{{ (c.school_name || '').toUpperCase() }}</td>
-                            <td>{{ c.event1 }}</td>
-                            <td>{{ c.event2 }}</td>
-                            <td class="text-xs">{{ c.time }}</td>
+                            <td>
+                                <p class="font-medium">{{ c.event1 }}</p>
+                                <p class="text-xs text-slate-500">{{ itemMetaLine(c, 1) }}</p>
+                            </td>
+                            <td>
+                                <p class="font-medium">{{ c.event2 }}</p>
+                                <p class="text-xs text-slate-500">{{ itemMetaLine(c, 2) }}</p>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -77,16 +81,20 @@
                             <th>Stage</th>
                             <th>Item 1</th>
                             <th>Item 2</th>
-                            <th>Time</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="(c, i) in filteredStage" :key="'s-'+i">
                             <td>{{ i + 1 }}</td>
                             <td>{{ c.stage }}<span v-if="c.venue" class="text-slate-400"> · {{ c.venue }}</span></td>
-                            <td>{{ c.item1 }}</td>
-                            <td>{{ c.item2 }}</td>
-                            <td class="text-xs">{{ c.time }}</td>
+                            <td>
+                                <p class="font-medium">{{ c.item1 }}</p>
+                                <p class="text-xs text-slate-500">{{ itemMetaLine(c, 1) }}</p>
+                            </td>
+                            <td>
+                                <p class="font-medium">{{ c.item2 }}</p>
+                                <p class="text-xs text-slate-500">{{ itemMetaLine(c, 2) }}</p>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -146,5 +154,13 @@ const totalClashes = computed(() => filteredParticipant.value.length + filteredS
 
 function applyFilter() {
     applyHeadFilter({ school_id: schoolFilter.value || undefined });
+}
+
+// Both clash row shapes carry item1_category/item1_gender/item1_type/item1_time
+// (and the item2_* equivalents) from FestScheduleConflictService.
+function itemMetaLine(clash, n) {
+    return [clash[`item${n}_category`], clash[`item${n}_gender`], clash[`item${n}_type`], clash[`item${n}_time`]]
+        .filter(Boolean)
+        .join(' · ');
 }
 </script>
