@@ -33,7 +33,16 @@ class FestParticipationPolicyController extends SahodayaAdminController
             'require_fee_before_approval' => 'nullable|boolean',
         ]);
 
-        if (! empty($data['preset_key'])) {
+        $existing = FestParticipationPolicy::where('event_id', $event->id)
+            ->where('class_group', $data['class_group'] ?? null)
+            ->first();
+
+        // Only treat this as "apply a preset" (which resets every limit to that preset's
+        // defaults) when the admin actually just switched the dropdown to a different preset.
+        // Re-saving the form while the same preset is still shown — e.g. just toggling a
+        // checkbox or tweaking one number field — must not silently discard those edits and
+        // reset everything back to the preset's raw defaults.
+        if (! empty($data['preset_key']) && $data['preset_key'] !== $existing?->preset_key) {
             $service->applyPresetToEvent($event, $data['preset_key'], $data['class_group'] ?? null);
 
             $audit->festEvent($event, FestPageActivity::settingsTab('participation'), 'fest.participation.preset', "Participation preset applied: {$data['preset_key']}");
