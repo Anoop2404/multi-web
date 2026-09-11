@@ -158,6 +158,7 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         { label: 'Student-wise report', href: `${base}/reports/student-wise`, icon: 'users', permissions: FEST_VIEW },
         { label: 'Item-wise report', href: `${base}/reports/item-wise`, icon: 'list', permissions: FEST_VIEW },
         { label: 'Item counts', href: `${base}/reports/item-counts`, icon: 'bar-chart', permissions: FEST_VIEW },
+        { label: 'Schedule clashes', href: `${base}/reports/schedule-clashes`, icon: 'alert-circle', permissions: FEST_VIEW },
         { label: 'School participation', href: `${base}/reports/school-participation`, icon: 'bar-chart', permissions: FEST_VIEW },
         { label: 'Student item limits', href: `${base}/reports/student-limits`, icon: 'bar-chart', permissions: FEST_VIEW },
         { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permissions: FEST_CERTIFICATES },

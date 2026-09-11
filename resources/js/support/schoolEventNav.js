@@ -121,7 +121,8 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
         { label: 'Student report', href: `${reportsBase}/student-report`, icon: 'users' },
         { label: 'Item-wise report', href: `${reportsBase}/item-wise`, icon: 'list' },
         { label: 'Registration list', href: `${reportsBase}/registration-register`, icon: 'list' },
-        { label: 'Item counts', href: `${reportsBase}/item-counts`, icon: 'bar-chart' }
+        { label: 'Item counts', href: `${reportsBase}/item-counts`, icon: 'bar-chart' },
+        { label: 'Schedule clashes', href: `${reportsBase}/schedule-clashes`, icon: 'alert-circle' }
     );
     if (isSports) {
         workflowItems.push({ label: 'Entry Form', href: `${eventBase}/games-entry-form`, icon: 'file-text' });
