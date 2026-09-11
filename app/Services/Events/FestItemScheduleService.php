@@ -72,7 +72,7 @@ class FestItemScheduleService
             'schedule_id'    => $schedule?->id,
             'scheduled_at'   => $at?->format('Y-m-d\TH:i'),
             'scheduled_date' => $at?->format('Y-m-d'),
-            'scheduled_time' => $at?->format('H:i'),
+            'scheduled_time' => $at?->format('h:i A'),
             'stage_id'       => $schedule?->stage_id,
             'stage'          => $schedule?->stage,
             'stage_sort_order' => $schedule?->festStage?->sort_order,
@@ -96,16 +96,23 @@ class FestItemScheduleService
         }
 
         // Grouped for display as date → stage → time, per report requirements:
-        // unscheduled items (no date/stage) sort last within their group.
+        // unscheduled items (no date/stage) sort last within their group. Collection::sortBy()
+        // with an ARRAY of closures only treats them as true multi-key criteria when each is a
+        // two-arg comparator (see Collection::sortByMany()) — a one-arg "value retriever" closure
+        // like these gets called as $closure($a, $b), silently ignores $b, and returns a raw value
+        // instead of a comparison result, which breaks the sort instead of combining the keys. So
+        // this chains single-key sortBy() calls least-significant-first instead: each call's
+        // asort() is stable (PHP 8+), so ties from an earlier (less significant) pass keep their
+        // relative order once the later (more significant) pass runs, giving a real multi-key sort.
+        // Sorts on scheduled_at/scheduled_date (raw, chronological) rather than the 12-hour
+        // scheduled_time display string, since "02:00 PM" sorts before "09:00 AM" as plain text.
         return $rows
-            ->sortBy([
-                fn ($r) => $r['scheduled_date'] ?? '9999-99-99',
-                fn ($r) => $r['stage_sort_order'] ?? 9999,
-                fn ($r) => $r['stage'] ?? 'zzzz',
-                fn ($r) => $r['scheduled_time'] ?? '99:99',
-                fn ($r) => $r['sort_order'] ?? 9999,
-                fn ($r) => $r['title'],
-            ])
+            ->sortBy(fn ($r) => $r['title'])
+            ->sortBy(fn ($r) => $r['sort_order'] ?? 9999)
+            ->sortBy(fn ($r) => $r['scheduled_at'] ?? '9999-99-99T99:99')
+            ->sortBy(fn ($r) => $r['stage'] ?? 'zzzz')
+            ->sortBy(fn ($r) => $r['stage_sort_order'] ?? 9999)
+            ->sortBy(fn ($r) => $r['scheduled_date'] ?? '9999-99-99')
             ->values()
             ->all();
     }
