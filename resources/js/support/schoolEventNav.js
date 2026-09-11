@@ -122,6 +122,7 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
         { label: 'Item-wise report', href: `${reportsBase}/item-wise`, icon: 'list' },
         { label: 'Registration list', href: `${reportsBase}/registration-register`, icon: 'list' },
         { label: 'Item counts', href: `${reportsBase}/item-counts`, icon: 'bar-chart' },
+        { label: 'Item schedule', href: `${reportsBase}/item-schedule`, icon: 'calendar' },
         { label: 'Schedule clashes', href: `${reportsBase}/schedule-clashes`, icon: 'alert-circle' }
     );
     if (isSports) {
