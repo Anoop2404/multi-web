@@ -56,6 +56,7 @@
                 <table class="data-table w-full text-sm">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Head</th>
                             <th>Item</th>
                             <th>Category</th>
@@ -69,16 +70,17 @@
                     <tbody>
                         <template v-for="(row, idx) in displayRows" :key="row.item_id">
                             <tr v-if="shouldShowDateDivider(row, displayRows[idx - 1])" class="bg-slate-100">
-                                <td colspan="8" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                                <td colspan="9" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
                                     {{ row.scheduled_date ? formatCalendarDate(row.scheduled_date) : 'Not scheduled' }}
                                 </td>
                             </tr>
                             <tr v-if="shouldShowStageDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                                <td colspan="8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <td colspan="9" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     {{ row.stage || 'No stage assigned' }}
                                 </td>
                             </tr>
                             <tr class="border-t">
+                                <td class="text-xs text-slate-500">{{ idx + 1 }}</td>
                                 <td class="text-xs text-slate-500">{{ row.head_name ?? '—' }}</td>
                                 <td class="font-medium">{{ row.title }}</td>
                                 <td class="text-xs">{{ categoryLabel(row) }}</td>
@@ -90,7 +92,7 @@
                             </tr>
                         </template>
                         <tr v-if="!displayRows.length">
-                            <td colspan="8" class="p-8 text-center text-slate-400">No schedule rows match filters.</td>
+                            <td colspan="9" class="p-8 text-center text-slate-400">No schedule rows match filters.</td>
                         </tr>
                     </tbody>
                 </table>

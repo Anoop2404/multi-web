@@ -11,21 +11,22 @@
     · Generated on {{ now()->format('d M Y, h:i A') }}
 </p>
 <table>
-<thead><tr><th>Item</th><th>Category</th><th>Gender</th><th>Date</th><th>Time</th><th>Venue</th><th>Stage</th></tr></thead>
+<thead><tr><th>Sl No</th><th>Item</th><th>Category</th><th>Gender</th><th>Date</th><th>Time</th><th>Venue</th><th>Stage</th></tr></thead>
 <tbody>
 @php($prevDate = '__none__')
 @php($prevStage = '__none__')
 @foreach($rows as $row)
 @if(($row['scheduled_date'] ?? null) !== $prevDate)
-<tr><td colspan="7" style="background:#e2e8f0;font-weight:bold;padding:6px;">{{ $row['scheduled_date'] ?? 'Not scheduled' }}</td></tr>
+<tr><td colspan="8" style="background:#e2e8f0;font-weight:bold;padding:6px;">{{ $row['scheduled_date'] ?? 'Not scheduled' }}</td></tr>
 @php($prevDate = $row['scheduled_date'] ?? null)
 @php($prevStage = '__none__')
 @endif
 @if(($row['stage'] ?? null) !== $prevStage)
-<tr><td colspan="7" style="background:#f3f4f6;font-weight:600;padding:5px;">{{ $row['stage'] ?? 'No stage assigned' }}</td></tr>
+<tr><td colspan="8" style="background:#f3f4f6;font-weight:600;padding:5px;">{{ $row['stage'] ?? 'No stage assigned' }}</td></tr>
 @php($prevStage = $row['stage'] ?? null)
 @endif
 <tr>
+    <td>{{ $loop->iteration }}</td>
     <td>{{ $row['title'] }}</td>
     <td>{{ $row['category_label'] ?? '—' }}</td>
     <td>{{ $row['gender_label'] ?? '—' }}</td>

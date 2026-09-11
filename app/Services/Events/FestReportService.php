@@ -1410,8 +1410,9 @@ class FestReportService
         $stageId = $request->integer('stage_id') ?: null;
         $rows = $this->itemScheduleRows($date, $stageId);
 
-        $csv = "Item,Category,Gender,Date,Time,Venue,Stage\n";
-        foreach ($rows as $row) {
+        $csv = "Sl No,Item,Category,Gender,Date,Time,Venue,Stage\n";
+        foreach ($rows as $i => $row) {
+            $csv .= '"'.($i + 1).'",';
             $csv .= '"'.str_replace('"', '""', (string) $row['title']).'",';
             $csv .= '"'.str_replace('"', '""', (string) ($row['category_label'] ?? '')).'",';
             $csv .= '"'.str_replace('"', '""', (string) ($row['gender_label'] ?? '')).'",';
