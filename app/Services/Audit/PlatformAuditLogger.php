@@ -50,7 +50,16 @@ class PlatformAuditLogger
         // apart from the log alone without this. Resolved once here from the acting
         // user's roles rather than per call site, so it's correct everywhere without
         // relying on ~40 call sites remembering to pass it.
-        $resolvedUserId = $userId ?? auth()->id();
+        //
+        // auth()->id() only checks the default guard ('web'). A school cancelling via the
+        // mobile app hits api/v1/school/... routes guarded by auth:sanctum instead — a
+        // perfectly real, authenticated request, but invisible to plain auth()->id(), which
+        // silently wrote user_id=null (shown as "System" in the activity log, alongside a
+        // real ip_address, since that's still a genuine HTTP request — just authenticated
+        // under a guard nothing here was checking). Falling back to the sanctum guard
+        // recovers the actual actor for every API-originated action logged through this
+        // class, not just registration withdrawals.
+        $resolvedUserId = $userId ?? auth()->id() ?? auth('sanctum')->id();
         if (! isset($properties['actor_type']) && $resolvedUserId) {
             $properties['actor_type'] = $this->actorType($resolvedUserId);
         }
