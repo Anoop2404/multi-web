@@ -66,6 +66,7 @@
                         <th>Head</th>
                         <th>Item</th>
                         <th>Category</th>
+                        <th>Gender</th>
                         <th>Date</th>
                         <th>Time</th>
                         <th>Venue</th>
@@ -75,12 +76,12 @@
                 <tbody>
                     <template v-for="(row, idx) in displayRows" :key="row.item_id">
                         <tr v-if="shouldShowDateDivider(row, displayRows[idx - 1])" class="bg-slate-100">
-                            <td colspan="7" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                            <td colspan="8" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
                                 {{ row.scheduled_date ? formatCalendarDate(row.scheduled_date) : 'Not scheduled' }}
                             </td>
                         </tr>
                         <tr v-if="shouldShowStageDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                            <td colspan="7" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <td colspan="8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 {{ row.stage || 'No stage assigned' }}
                             </td>
                         </tr>
@@ -88,14 +89,15 @@
                             <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
                             <td class="font-medium">{{ row.title }}</td>
                             <td class="text-xs uppercase">{{ categoryLabel(row) }}</td>
+                            <td class="text-xs">{{ genderLabel(row) }}</td>
                             <td>{{ formatCalendarDate(row.scheduled_date) }}</td>
-                            <td>{{ row.scheduled_time || '—' }}</td>
+                            <td>{{ row.scheduled_time_12h || '—' }}</td>
                             <td>{{ row.venue || '—' }}</td>
                             <td>{{ row.stage || '—' }}</td>
                         </tr>
                     </template>
                     <tr v-if="!displayRows.length">
-                        <td colspan="7" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
+                        <td colspan="8" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
                     </tr>
                 </tbody>
             </table>
@@ -178,6 +180,10 @@ function categoryLabel(row) {
     if (row.age_group) return humanize(row.age_group);
     if (row.class_group && row.class_group !== 'open') return humanize(row.class_group);
     return '—';
+}
+
+function genderLabel(row) {
+    return row.gender_label ?? '—';
 }
 
 function stageLabel(stage) {

@@ -62,6 +62,7 @@ class FestItemScheduleService
             'age_group'       => $item->age_group,
             'category_label'  => FestItemCategoryLabel::resolve($item, $classGroupLabels),
             'gender'          => $item->gender,
+            'gender_label'    => $this->genderLabel($item->gender),
             'participant_type' => $item->participant_type,
             'phase_id'        => $item->phase_id,
             'timing_mode'            => $item->timing_mode ?? 'per_participant',
@@ -72,7 +73,12 @@ class FestItemScheduleService
             'schedule_id'    => $schedule?->id,
             'scheduled_at'   => $at?->format('Y-m-d\TH:i'),
             'scheduled_date' => $at?->format('Y-m-d'),
-            'scheduled_time' => $at?->format('h:i A'),
+            // Kept as 24-hour HH:MM — this is the same row shape the editable schedule form
+            // (FestScheduleController::itemsIndex) binds straight into <input type="time">,
+            // which silently rejects a 12-hour "04:00 PM" string and renders blank. The 12-hour
+            // AM/PM display for reports/PDF/CSV uses scheduled_time_12h instead.
+            'scheduled_time' => $at?->format('H:i'),
+            'scheduled_time_12h' => $at?->format('h:i A'),
             'stage_id'       => $schedule?->stage_id,
             'stage'          => $schedule?->stage,
             'stage_sort_order' => $schedule?->festStage?->sort_order,
@@ -80,6 +86,18 @@ class FestItemScheduleService
             'venue'          => $schedule?->venue?->name ?? $schedule?->festStage?->venue?->name,
             'sort_order'     => $schedule?->sort_order,
         ];
+    }
+
+    // Same mapping as FestScheduleConflictService::genderLabel() — kept separate since these
+    // two services don't share a base class and the logic is a one-line match expression.
+    private function genderLabel(?string $gender): ?string
+    {
+        return match (strtolower((string) $gender)) {
+            'male', 'm', 'boy', 'boys' => 'Boys',
+            'female', 'f', 'girl', 'girls' => 'Girls',
+            'mixed', 'common' => 'Mixed',
+            default => null,
+        };
     }
 
     /** @return list<array<string, mixed>> */
