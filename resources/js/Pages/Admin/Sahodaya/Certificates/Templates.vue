@@ -125,20 +125,6 @@
                                 <p v-if="backgroundPreviewError" class="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1" role="alert">
                                     {{ backgroundPreviewError }}
                                 </p>
-                                <div class="mt-2 grid grid-cols-2 gap-2 max-w-xs">
-                                    <label class="text-xs text-slate-600">
-                                        Width (mm)
-                                        <input v-model.number="form.layout_json.background.width_mm" type="number" min="1" step="0.1" class="field mt-0.5" placeholder="e.g. 210">
-                                    </label>
-                                    <label class="text-xs text-slate-600">
-                                        Height (mm)
-                                        <input v-model.number="form.layout_json.background.height_mm" type="number" min="1" step="0.1" class="field mt-0.5" placeholder="e.g. 297">
-                                    </label>
-                                </div>
-                                <p class="mt-1 text-xs text-slate-500">
-                                    Leave both blank to stretch the artwork to fill the page (default). If your background isn't cut to exact A4 size, enter its real
-                                    dimensions here so it renders true-to-scale — centered on the A4 page — instead of being distorted. Check the live preview after setting this.
-                                </p>
                             </template>
                         </FormField>
 
@@ -806,13 +792,6 @@ function layoutDefaults(from = null) {
             top: src.photo?.top ?? d.photo?.top ?? 31,
             left: src.photo?.left ?? d.photo?.left ?? 50,
             size: src.photo?.size ?? d.photo?.size ?? 118,
-        },
-        // Null (both) means the historical default: stretch the artwork to fill the
-        // whole A4 canvas. Set both to render it at its true physical size instead —
-        // see CertificateTemplate::backgroundSizePercentages() server-side.
-        background: {
-            width_mm: src.background?.width_mm ?? d.background?.width_mm ?? null,
-            height_mm: src.background?.height_mm ?? d.background?.height_mm ?? null,
         },
         recipient_name: textFieldDefaults(src.recipient_name, d.recipient_name, {
             top: 38, left: 10, width: 80, font_size: 24, font_family: 'Montserrat', font_weight: 'bold', align: 'center',

@@ -76,17 +76,6 @@ class CertificateTemplate extends Model
             // a real position has actually been set (e.g. a future UI, or a direct
             // layout_json edit) — see the `!empty($c)` guard there.
             'participation_label_cover' => [],
-            // Null (both) means the historical default: stretch the artwork to fill the
-            // whole A4 canvas (`background-size: 100% 100%` in certificate-print.blade.php),
-            // which is exact for a background already cut to true A4 proportions but
-            // distorts anything else. Setting both lets the admin declare the artwork's
-            // real physical size so it renders true-to-scale, centered on the A4 page
-            // (letterboxed if smaller, cropped if larger) — see
-            // CertificateTemplate::backgroundSizePercentages().
-            'background' => [
-                'width_mm' => null,
-                'height_mm' => null,
-            ],
             'recipient_name' => [
                 'top' => 38,
                 'left' => 10,
@@ -263,14 +252,13 @@ class CertificateTemplate extends Model
 
         $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style', 'align'];
 
-        foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover', 'photo', 'background'] as $key) {
+        foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover', 'photo'] as $key) {
             if (! isset($custom[$key]) || ! is_array($custom[$key])) {
                 continue;
             }
             $allowed = match ($key) {
                 'participation_label_cover' => ['top', 'left', 'width', 'height'],
                 'photo' => ['top', 'left', 'size'],
-                'background' => ['width_mm', 'height_mm'],
                 // Only `body` grows with variable content (achievement text, the
                 // participation items box) — `bottom` marks the artwork's fillable-zone
                 // edge for that field alone (see overlayFieldStyle()).
@@ -293,33 +281,6 @@ class CertificateTemplate extends Model
         }
 
         return $defaults;
-    }
-
-    /**
-     * CSS `background-size` width/height percentages for artwork declared at its true
-     * physical size (see `background.width_mm`/`height_mm` in overlayLayout()), rather
-     * than the historical `100% 100%` full-canvas stretch. A percentage — not a fixed
-     * px/mm value — because it renders identically whether the container is the admin
-     * preview's pixel canvas or the print page's real mm dimensions, both of which are
-     * already true A4 proportions. Returns null (caller keeps the 100% 100% stretch
-     * default) unless both dimensions are actually set.
-     *
-     * @return array{width: float, height: float}|null
-     */
-    public static function backgroundSizePercentages(array $layout, string $orientation): ?array
-    {
-        $widthMm = $layout['background']['width_mm'] ?? null;
-        $heightMm = $layout['background']['height_mm'] ?? null;
-        if (! is_numeric($widthMm) || ! is_numeric($heightMm) || $widthMm <= 0 || $heightMm <= 0) {
-            return null;
-        }
-
-        [$pageWidthMm, $pageHeightMm] = $orientation === 'portrait' ? [210, 297] : [297, 210];
-
-        return [
-            'width' => round(($widthMm / $pageWidthMm) * 100, 2),
-            'height' => round(($heightMm / $pageHeightMm) * 100, 2),
-        ];
     }
 
     /** Default body text with placeholders for training certificates. */
