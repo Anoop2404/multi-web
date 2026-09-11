@@ -76,20 +76,32 @@ class CertificateTemplateController extends SahodayaAdminController
         abort_if($template->tenant_id !== $this->sahodaya->id, 403);
 
         if ($template->event_type === 'fest') {
+            $sampleRecipientName = 'Sample Student Name';
+            $sampleSchoolName = 'Sample Model School';
+            // 8 -> "VIII", matching FestCertificateService::toRomanIfNumeric()'s real
+            // conversion of a numeric class value, so {class}/{class_roman} agree here
+            // the same way they would for a real student in class 8.
+            $sampleClassRoman = self::sampleRomanNumeral(8);
+            $sampleCategoryRoman = self::sampleRomanNumeral(1);
+
             $render = [
                 'template'      => $template,
                 'title'         => $template->title ?: 'Certificate of Participation',
                 'fieldValues'   => [
                     'salutation'       => 'Master/Miss',
-                    'recipient_name'   => 'Sample Student Name',
-                    'class'            => 'VIII',
-                    'school_name'      => 'Sample Model School',
+                    'recipient_name'   => $sampleRecipientName,
+                    'recipient_name_upper' => strtoupper($sampleRecipientName),
+                    'class'            => $sampleClassRoman,
+                    'class_roman'      => $sampleClassRoman,
+                    'school_name'      => $sampleSchoolName,
+                    'school_name_upper' => strtoupper($sampleSchoolName),
                     'event_title'      => 'Annual Kalotsav 2026',
                     'event_name'       => 'Annual Kalotsav 2026',
                     'item_title'       => 'Classical Music (Solo)',
                     'item_details'     => 'Classical Music (Solo)',
-                    'category_name'    => 'Category I',
-                    'category_short'   => 'I',
+                    'category_name'    => 'Category '.$sampleCategoryRoman,
+                    'category_short'   => $sampleCategoryRoman,
+                    'category_roman'   => $sampleCategoryRoman,
                     'participation_type' => 'Individual',
                     'event_dates'      => '12th - 14th October 2026',
                     'venue'            => 'Sample Model School',
@@ -140,6 +152,31 @@ class CertificateTemplateController extends SahodayaAdminController
             'isSample'      => true,
             'pdfPreviewUrl' => $pdfPreviewUrl,
         ]));
+    }
+
+    /**
+     * Roman numeral for this preview's fixed sample numbers only — mirrors
+     * FestCertificateService::toRomanIfNumeric()'s conversion, kept as its own small
+     * copy here (rather than a shared call) since that method is private to the real
+     * certificate-generation service and this is authoring-preview sample data, not a
+     * real student's record.
+     */
+    private static function sampleRomanNumeral(int $number): string
+    {
+        $map = [
+            1000 => 'M', 900 => 'CM', 500 => 'D', 400 => 'CD',
+            100 => 'C', 90 => 'XC', 50 => 'L', 40 => 'XL',
+            10 => 'X', 9 => 'IX', 5 => 'V', 4 => 'IV', 1 => 'I',
+        ];
+        $roman = '';
+        foreach ($map as $threshold => $numeral) {
+            while ($number >= $threshold) {
+                $roman .= $numeral;
+                $number -= $threshold;
+            }
+        }
+
+        return $roman;
     }
 
     public function previewPdf(string $tenantId, CertificateTemplate $template)
