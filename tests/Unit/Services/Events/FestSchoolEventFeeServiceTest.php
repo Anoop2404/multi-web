@@ -420,6 +420,79 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(1250.0, (float) $fee->total_due);
     }
 
+    /**
+     * Regression test for a real production incident: an earlier version of the fix above
+     * also excluded any team/group item from the per-student quota purely by
+     * participant_type (isTeamItem()) — but most group items in a real Kalotsavam (Group
+     * Dance, Group Song, Oppana, ...) have participant_type=group/team simply because
+     * that's the performance format, with NO fee_amount override set at all. Each
+     * PARTICIPATING STUDENT still draws on their own 3-item quota for those — team/group
+     * is not, on its own, a billing signal. Only an item with an explicit fee_amount
+     * override should bypass the quota (see hasOwnFee()).
+     */
+    public function test_kalolsavam_composite_group_item_without_override_still_uses_the_individual_quota(): void
+    {
+        ['school' => $school, 'event' => $event] = $this->festContext();
+
+        $event->update([
+            'fee_settings' => [
+                'fee_model' => 'kalolsavam_composite',
+                'per_student_amount' => 500,
+                'included_items_per_student' => 3,
+                'extra_item_fee' => 100,
+                'school_registration_flat' => 0,
+            ],
+        ]);
+
+        // A plain group item — no fee_amount override — exactly like "Group Dance" or
+        // "Group Song" in a real event: it must bill per participating student, drawing
+        // on that student's own quota, not bypass it.
+        $groupDance = FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => 'Group Dance',
+            'participant_type' => 'group',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+        ]);
+
+        $individualItems = collect(range(1, 3))->map(fn ($n) => FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => "Solo Item {$n}",
+            'participant_type' => 'individual',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+        ]));
+
+        $schoolClass = SchoolClass::create([
+            'tenant_id' => $school->id,
+            'name' => '10',
+            'class_category_id' => 1,
+            'is_active' => true,
+        ]);
+        $student = Student::create([
+            'tenant_id' => $school->id,
+            'school_class_id' => $schoolClass->id,
+            'name' => 'Group Item Student',
+            'gender' => 'male',
+            'dob' => '2012-01-01',
+            'status' => 'active',
+        ]);
+
+        // 3 individual items (fills the free quota) + the group item as the 4th
+        // registration — it should be billed as the ₹100 "extra" item, same as any
+        // ordinary item beyond quota, not as a standalone flat fee.
+        foreach ($individualItems as $item) {
+            $this->approvedRegistration($event->fresh(), $item, $school, $student);
+        }
+        $this->approvedRegistration($event->fresh(), $groupDance, $school, $student);
+
+        $fee = app(FestSchoolEventFeeService::class)->recalculate($event->fresh(), $school->id);
+
+        $this->assertSame(500.0, (float) $fee->student_registration_fee);
+        $this->assertSame(100.0, (float) $fee->extra_item_fee);
+        $this->assertSame(600.0, (float) $fee->total_due);
+    }
+
     public function test_cksc_tiered_counts_registrations_only_by_default(): void
     {
         ['school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();

@@ -846,15 +846,23 @@ class FestSportsCompositeFeeService
 
     /**
      * Whether an item is billed entirely on its own — via amountForItem() — rather than
-     * through the per-student free-quota/extra-item system used by calculate(): true for
-     * team/group/pair/trio items (isTeamItem()), and true for ANY item (individual
-     * included) that has its own per-item fee_amount override set on the event's Fees
-     * page. A student registered only for such items owes no per-student registration
-     * fee either — see the two call sites in calculate().
+     * through the per-student free-quota/extra-item system used by calculate(): true only
+     * for an item that has its own explicit per-item fee_amount override set on the
+     * event's Fees page (e.g. Band Display). A student registered only for such items
+     * owes no per-student registration fee either — see the two call sites in calculate().
+     *
+     * Deliberately NOT based on isTeamItem()/participant_type: most group/team items in a
+     * Kalotsavam (Group Dance, Group Song, Oppana, ...) are billed per PARTICIPATING
+     * STUDENT exactly like an individual item — each performer still draws on their own
+     * 3-item quota — team/group is a performance-format detail, not a billing signal.
+     * Only an item an admin has explicitly given its own fixed fee should bypass that.
+     * (An earlier version of this method also checked isTeamItem(), which wrongly pulled
+     * every group item in a Kalotsavam out of the per-student system — see fix commit
+     * that removed it.)
      */
     private function hasOwnFee(?FestEventItem $item): bool
     {
-        return (bool) ($item?->isTeamItem() || $item?->fee_amount !== null);
+        return $item?->fee_amount !== null;
     }
 
     public function schoolRegistrationAmount(Tenant $school, array $schedule, FestEvent $event): float
