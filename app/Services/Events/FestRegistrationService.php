@@ -29,19 +29,16 @@ class FestRegistrationService
             422,
             'This registration\'s fee has already been paid and approved — it can no longer be cancelled.',
         );
-        // LIFE-04 fix (functional audit, 2026-08-11/12): this guard previously
-        // only existed in canAdminCancel() — a caller (like the direct reject/
-        // cancel controller actions) that didn't check that method first could
-        // cancel a registration after its event's results were already
-        // published. Moved into the method that actually performs the
-        // mutation so it can't be bypassed by a caller forgetting the
-        // separate check.
-        abort_if($event->results_published, 422, 'Results have already been published for this event — this registration can no longer be cancelled.');
-        // Same reasoning as the check above — moved into the mutating method itself
-        // rather than left solely in canSchoolCancel()/canAdminCancel(), so it can't be
-        // bypassed by a caller that forgets the separate check. See
-        // EventLifecycleGate::assertItemRosterNotFrozen()'s own docblock for why an
-        // item can be published independently of the whole event.
+        // Deliberately checks the ITEM's own results_published_at, not the event-wide
+        // results_published flag (that flag only gates public-portal visibility of
+        // results/scores/rankings — see Overview.vue's "Publish results, scores &
+        // rankings on public portal" toggle — and an event can have that on for
+        // already-finished items while a different item registered under it was never
+        // actually held). Moved into the method that actually performs the mutation
+        // (not left solely in canAdminCancel()) so it can't be bypassed by a caller
+        // forgetting the separate check. See EventLifecycleGate::
+        // assertItemRosterNotFrozen()'s own docblock for why an item can be published
+        // independently of the whole event.
         abort_if($registration->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to cancel this registration.');
 
         $registration->loadMissing('item', 'participants');
@@ -105,10 +102,8 @@ class FestRegistrationService
             return false;
         }
 
-        if ($event->results_published) {
-            return false;
-        }
-
+        // See cancel()'s matching check above for why this is the item's own
+        // results_published_at, not the event-wide (public-portal) results_published flag.
         if ($registration->item?->results_published_at) {
             return false;
         }
@@ -133,8 +128,8 @@ class FestRegistrationService
      * participants — cancel() (the pre-payment path) never had to worry about either because
      * a registration that's never been paid/approved essentially never has marks or a revealed
      * chest number yet; this path can be reached later in the lifecycle, so both are handled
-     * explicitly. Still blocked once results are published — reversing a *published* result is
-     * a bigger integrity question than this fix is scoped to answer.
+     * explicitly. Still blocked once the item's own results are published — reversing a
+     * *published* result is a bigger integrity question than this fix is scoped to answer.
      */
     public function cancelWithRefund(FestRegistration $registration, FestEvent $event, string $reason, bool $notify = true): void
     {
@@ -322,10 +317,8 @@ class FestRegistrationService
             return false;
         }
 
-        if ($event->results_published) {
-            return false;
-        }
-
+        // See cancel()'s matching check for why this is the item's own
+        // results_published_at, not the event-wide (public-portal) results_published flag.
         if ($registration->item?->results_published_at) {
             return false;
         }

@@ -522,7 +522,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         abort_unless(
             app(FestRegistrationService::class)->canAdminCancel($registration, $event),
             422,
-            'Cannot cancel — results are published or the fee for this registration has already been paid and approved.'
+            'Cannot cancel — this item\'s results are already published, or the fee for this registration has already been paid and approved.'
         );
 
         app(FestRegistrationService::class)->cancel($registration, $event);
@@ -556,7 +556,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         abort_unless(
             app(FestRegistrationService::class)->canAdminCancelWithRefund($registration, $event),
             422,
-            'Cannot cancel — results are published, the registration is already closed, or it was never paid (use the regular cancel action instead).'
+            'Cannot cancel — this item\'s results are already published, the registration is already closed, or it was never paid (use the regular cancel action instead).'
         );
 
         app(FestRegistrationService::class)->cancelWithRefund($registration, $event, $data['reason']);
