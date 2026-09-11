@@ -4,7 +4,7 @@
         <PageHeader :title="`${event.title} — Schedule clashes`" eyebrow="Reports"
                     description="Participant and stage scheduling conflicts to resolve before publishing.">
             <template #actions>
-                <a :href="csvUrl" class="btn-secondary text-sm">Export CSV ↓</a>
+                <ReportDownloadButtons :pdf-url="pdfUrl" :csv-url="csvUrl" />
             </template>
         </PageHeader>
 
@@ -51,19 +51,26 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(c, i) in filteredParticipant" :key="'p-'+i">
-                            <td>{{ i + 1 }}</td>
-                            <td>{{ c.student_name }}</td>
-                            <td>{{ (c.school_name || '').toUpperCase() }}</td>
-                            <td>
-                                <p class="font-medium">{{ c.event1 }}</p>
-                                <p class="text-xs text-slate-500">{{ itemMetaLine(c, 1) }}</p>
-                            </td>
-                            <td>
-                                <p class="font-medium">{{ c.event2 }}</p>
-                                <p class="text-xs text-slate-500">{{ itemMetaLine(c, 2) }}</p>
-                            </td>
-                        </tr>
+                        <template v-for="(c, i) in filteredParticipant" :key="'p-'+i">
+                            <tr v-if="shouldShowDateDivider(c, filteredParticipant[i - 1])" class="bg-slate-100">
+                                <td colspan="5" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                                    {{ c.date || 'Unscheduled' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>{{ i + 1 }}</td>
+                                <td>{{ c.student_name }}</td>
+                                <td>{{ (c.school_name || '').toUpperCase() }}</td>
+                                <td>
+                                    <p class="font-medium">{{ c.event1 }}</p>
+                                    <p class="text-xs text-slate-500">{{ itemMetaLine(c, 1) }}</p>
+                                </td>
+                                <td>
+                                    <p class="font-medium">{{ c.event2 }}</p>
+                                    <p class="text-xs text-slate-500">{{ itemMetaLine(c, 2) }}</p>
+                                </td>
+                            </tr>
+                        </template>
                     </tbody>
                 </table>
                 </div>
@@ -86,7 +93,10 @@
                     <tbody>
                         <tr v-for="(c, i) in filteredStage" :key="'s-'+i">
                             <td>{{ i + 1 }}</td>
-                            <td>{{ c.stage }}<span v-if="c.venue" class="text-slate-400"> · {{ c.venue }}</span></td>
+                            <td>
+                                {{ c.stage }}<span v-if="c.venue" class="text-slate-400"> · {{ c.venue }}</span>
+                                <span v-if="c.date" class="block text-xs text-slate-400">{{ c.date }}</span>
+                            </td>
                             <td>
                                 <p class="font-medium">{{ c.item1 }}</p>
                                 <p class="text-xs text-slate-500">{{ itemMetaLine(c, 1) }}</p>
@@ -112,6 +122,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadFilter from '@/Components/reports/ReportHeadFilter.vue';
+import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { filterClashRows, useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
 
@@ -125,6 +136,7 @@ const props = defineProps({
     participant: { type: Array, default: () => [] },
     stage: { type: Array, default: () => [] },
     csvUrl: String,
+    pdfUrl: String,
     activityLogs: { type: Array, default: () => [] },
 });
 
@@ -157,10 +169,21 @@ function applyFilter() {
 }
 
 // Both clash row shapes carry item1_category/item1_gender/item1_type/item1_time
-// (and the item2_* equivalents) from FestScheduleConflictService.
+// (and the item2_* equivalents) from FestScheduleConflictService. item1_stage/item2_stage
+// only exist on participant-clash rows — stage conflicts already show a shared stage column.
 function itemMetaLine(clash, n) {
-    return [clash[`item${n}_category`], clash[`item${n}_gender`], clash[`item${n}_type`], clash[`item${n}_time`]]
-        .filter(Boolean)
-        .join(' · ');
+    return [
+        clash[`item${n}_category`],
+        clash[`item${n}_gender`],
+        clash[`item${n}_type`],
+        clash[`item${n}_stage`],
+        clash[`item${n}_time`],
+    ].filter(Boolean).join(' · ');
+}
+
+// Rows arrive pre-sorted chronologically (FestScheduleConflictService sorts by start_time1),
+// so a date-group boundary is just "this row's date differs from the previous row's".
+function shouldShowDateDivider(row, prevRow) {
+    return (row.date ?? null) !== (prevRow?.date ?? null);
 }
 </script>

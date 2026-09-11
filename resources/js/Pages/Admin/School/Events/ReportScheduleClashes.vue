@@ -36,17 +36,24 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(c, i) in filteredParticipant" :key="'p-'+i">
-                                <td>{{ c.student_name }}</td>
-                                <td>
-                                    <p class="font-medium">{{ c.event1 }}</p>
-                                    <p class="text-xs text-slate-500">{{ itemMetaLine(c, 1) }}</p>
-                                </td>
-                                <td>
-                                    <p class="font-medium">{{ c.event2 }}</p>
-                                    <p class="text-xs text-slate-500">{{ itemMetaLine(c, 2) }}</p>
-                                </td>
-                            </tr>
+                            <template v-for="(c, i) in filteredParticipant" :key="'p-'+i">
+                                <tr v-if="shouldShowDateDivider(c, filteredParticipant[i - 1])" class="bg-slate-100">
+                                    <td colspan="3" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                                        {{ c.date || 'Unscheduled' }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>{{ c.student_name }}</td>
+                                    <td>
+                                        <p class="font-medium">{{ c.event1 }}</p>
+                                        <p class="text-xs text-slate-500">{{ itemMetaLine(c, 1) }}</p>
+                                    </td>
+                                    <td>
+                                        <p class="font-medium">{{ c.event2 }}</p>
+                                        <p class="text-xs text-slate-500">{{ itemMetaLine(c, 2) }}</p>
+                                    </td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
                 </div>
@@ -67,7 +74,10 @@
                         </thead>
                         <tbody>
                             <tr v-for="(c, i) in filteredStage" :key="'s-'+i">
-                                <td>{{ c.stage }}<span v-if="c.venue" class="text-slate-400"> · {{ c.venue }}</span></td>
+                                <td>
+                                    {{ c.stage }}<span v-if="c.venue" class="text-slate-400"> · {{ c.venue }}</span>
+                                    <span v-if="c.date" class="block text-xs text-slate-400">{{ c.date }}</span>
+                                </td>
                                 <td>
                                     <p class="font-medium">{{ c.item1 }}</p>
                                     <p class="text-xs text-slate-500">{{ itemMetaLine(c, 1) }}</p>
@@ -137,10 +147,21 @@ const filteredStage = computed(() => filterClashRows(props.stage, {
 const totalClashes = computed(() => filteredParticipant.value.length + filteredStage.value.length);
 
 // Both clash row shapes carry item1_category/item1_gender/item1_type/item1_time
-// (and the item2_* equivalents) from FestScheduleConflictService.
+// (and the item2_* equivalents) from FestScheduleConflictService. item1_stage/item2_stage
+// only exist on participant-clash rows — stage conflicts already show a shared stage column.
 function itemMetaLine(clash, n) {
-    return [clash[`item${n}_category`], clash[`item${n}_gender`], clash[`item${n}_type`], clash[`item${n}_time`]]
-        .filter(Boolean)
-        .join(' · ');
+    return [
+        clash[`item${n}_category`],
+        clash[`item${n}_gender`],
+        clash[`item${n}_type`],
+        clash[`item${n}_stage`],
+        clash[`item${n}_time`],
+    ].filter(Boolean).join(' · ');
+}
+
+// Rows arrive pre-sorted chronologically (FestScheduleConflictService sorts by start_time1),
+// so a date-group boundary is just "this row's date differs from the previous row's".
+function shouldShowDateDivider(row, prevRow) {
+    return (row.date ?? null) !== (prevRow?.date ?? null);
 }
 </script>

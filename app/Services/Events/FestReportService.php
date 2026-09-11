@@ -581,6 +581,7 @@ class FestReportService
             'green-room-list' => $this->greenRoomListPdf($request),
             'clashes' => $this->clashesCsv($request),
             'clashes-school' => $this->clashesSchoolPdf($request),
+            'schedule-clashes-pdf' => $this->scheduleClashesPdf($request),
             'promotions' => $this->promotionsCsv(),
             'promotions-pdf' => $this->promotionsPdf(),
             'certificate-counts' => $this->certificateCountsCsv($request->input('school_id')),
@@ -1389,11 +1390,11 @@ class FestReportService
 
         $esc = fn ($v) => str_replace('"', '""', (string) ($v ?? ''));
 
-        $csv = "Student,School,Item 1,Item 1 Category,Item 1 Gender,Item 1 Type,Item 1 Time,Item 2,Item 2 Category,Item 2 Gender,Item 2 Type,Item 2 Time\n";
+        $csv = "Student,School,Item 1,Item 1 Category,Item 1 Gender,Item 1 Type,Item 1 Stage,Item 1 Time,Item 2,Item 2 Category,Item 2 Gender,Item 2 Type,Item 2 Stage,Item 2 Time\n";
         foreach ($clashes as $c) {
             $csv .= '"'.$esc($c['student_name']).'","'.$esc($c['school_name']).'",';
-            $csv .= '"'.$esc($c['event1']).'","'.$esc($c['item1_category']).'","'.$esc($c['item1_gender']).'","'.$esc($c['item1_type']).'","'.$esc($c['item1_time']).'",';
-            $csv .= '"'.$esc($c['event2']).'","'.$esc($c['item2_category']).'","'.$esc($c['item2_gender']).'","'.$esc($c['item2_type']).'","'.$esc($c['item2_time'])."\"\n";
+            $csv .= '"'.$esc($c['event1']).'","'.$esc($c['item1_category']).'","'.$esc($c['item1_gender']).'","'.$esc($c['item1_type']).'","'.$esc($c['item1_stage']).'","'.$esc($c['item1_time']).'",';
+            $csv .= '"'.$esc($c['event2']).'","'.$esc($c['item2_category']).'","'.$esc($c['item2_gender']).'","'.$esc($c['item2_type']).'","'.$esc($c['item2_stage']).'","'.$esc($c['item2_time'])."\"\n";
         }
 
         return response()->streamDownload(
@@ -1409,12 +1410,13 @@ class FestReportService
         $stageId = $request->integer('stage_id') ?: null;
         $rows = $this->itemScheduleRows($date, $stageId);
 
-        $csv = "Item,Category,Date,Time,Venue,Stage\n";
+        $csv = "Item,Category,Gender,Date,Time,Venue,Stage\n";
         foreach ($rows as $row) {
             $csv .= '"'.str_replace('"', '""', (string) $row['title']).'",';
             $csv .= '"'.str_replace('"', '""', (string) ($row['category_label'] ?? '')).'",';
+            $csv .= '"'.str_replace('"', '""', (string) ($row['gender_label'] ?? '')).'",';
             $csv .= '"'.($row['scheduled_date'] ?? '').'",';
-            $csv .= '"'.($row['scheduled_time'] ?? '').'",';
+            $csv .= '"'.($row['scheduled_time_12h'] ?? '').'",';
             $csv .= '"'.str_replace('"', '""', (string) ($row['venue'] ?? '')).'",';
             $csv .= '"'.str_replace('"', '""', (string) ($row['stage'] ?? ''))."\"\n";
         }
@@ -1452,6 +1454,23 @@ class FestReportService
             'conflicts' => $conflicts,
             ...$this->brandingData(),
         ], $this->slug()."-clash-{$school->id}.pdf");
+    }
+
+    // Event-wide clashes PDF for the Sahodaya-admin schedule-clashes report — both tables
+    // (participant + stage), optionally narrowed to one school, unlike clashesSchoolPdf()
+    // above which is the school-admin single-school/participant-only variant.
+    private function scheduleClashesPdf(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $schoolId = $request->input('school_id');
+        $rows = $this->scheduleClashRows($schoolId);
+
+        return $this->renderPdf('fest.reports.schedule-clashes', [
+            'event'      => $this->event,
+            'school'     => $schoolId ? Tenant::find($schoolId) : null,
+            'participant' => $rows['participant'],
+            'stage'      => $rows['stage'],
+            ...$this->brandingData(),
+        ], $this->slug().'-schedule-clashes.pdf', true);
     }
 
     private function promotionsCsv(): StreamedResponse

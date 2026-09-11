@@ -46,6 +46,14 @@ class FestScheduleConflictService
         };
     }
 
+    private function scheduleStageLabel(FestSchedule $schedule): ?string
+    {
+        $name = $schedule->festStage?->name ?? $schedule->stage;
+        $venue = $schedule->festStage?->venue?->name;
+
+        return $venue ? "{$name} · {$venue}" : $name;
+    }
+
     /** @return list<array<string, mixed>> */
     public function detectAll(?string $schoolId = null): array
     {
@@ -53,7 +61,7 @@ class FestScheduleConflictService
             ->whereNotNull('scheduled_at')
             ->with([
                 'item' => fn ($q) => $q->withCount(['registrations' => fn ($r) => $r->whereIn('status', FestRegistration::ACTIVE_STATUSES)]),
-                'participant.student', 'participant.registration',
+                'participant.student', 'participant.registration', 'festStage.venue',
             ])
             ->get();
 
@@ -107,6 +115,7 @@ class FestScheduleConflictService
                         'student_name'    => $student?->name ?? "Student #{$studentId}",
                         'school_name'     => $schoolName,
                         'school_id'       => $entrySchoolId,
+                        'date'            => $start1->format('d M Y'),
                         'event1'          => $item1['title'],
                         'event2'          => $item2['title'],
                         'item1_id'        => $s1->item_id,
@@ -117,6 +126,8 @@ class FestScheduleConflictService
                         'item2_gender'    => $item2['gender'],
                         'item1_type'      => $item1['type'],
                         'item2_type'      => $item2['type'],
+                        'item1_stage'     => $this->scheduleStageLabel($s1),
+                        'item2_stage'     => $this->scheduleStageLabel($s2),
                         'item1_time'      => $start1->format('d M h:i A').' – '.$end1->format('h:i A'),
                         'item2_time'      => $start2->format('d M h:i A').' – '.$end2->format('h:i A'),
                         'time'            => $start1->format('d M h:i A').' – '.$start2->format('d M h:i A'),
@@ -126,7 +137,10 @@ class FestScheduleConflictService
             }
         }
 
-        return $clashes;
+        // Sorted chronologically so same-date clashes group together in the UI. A single-key
+        // sortBy() closure is safe here — see FestItemScheduleService::reportRows() for why an
+        // ARRAY of closures is not (Collection::sortByMany() expects two-arg comparators).
+        return collect($clashes)->sortBy(fn ($c) => $c['start_time1'])->values()->all();
     }
 
     /** @return list<array<string, mixed>> */
@@ -181,6 +195,7 @@ class FestScheduleConflictService
                 $conflicts[] = [
                     'stage'          => $s1->festStage?->name ?? $s1->stage ?? 'Stage',
                     'venue'          => $s1->festStage?->venue?->name,
+                    'date'           => $start1->format('d M Y'),
                     'item1'          => $item1['title'],
                     'item2'          => $item2['title'],
                     'item1_id'       => $s1->item_id,
@@ -194,11 +209,12 @@ class FestScheduleConflictService
                     'item1_time'     => $start1->format('d M h:i A').' – '.$end1->format('h:i A'),
                     'item2_time'     => $start2->format('d M h:i A').' – '.$end2->format('h:i A'),
                     'time'           => $start1->format('d M h:i A').' – '.$start2->format('d M h:i A'),
+                    'start_time1'    => $start1->timestamp,
                 ];
             }
         }
 
-        return $conflicts;
+        return collect($conflicts)->sortBy(fn ($c) => $c['start_time1'])->values()->all();
     }
 
     /** @return list<array<string, mixed>> */

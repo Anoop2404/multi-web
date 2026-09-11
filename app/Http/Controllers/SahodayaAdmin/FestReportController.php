@@ -477,6 +477,9 @@ class FestReportController extends SahodayaAdminController
             'csvUrl'      => $schoolId
                 ? "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/clashes?".http_build_query(['school_id' => $schoolId])
                 : "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/clashes",
+            'pdfUrl'      => $schoolId
+                ? "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/schedule-clashes-pdf?".http_build_query(['school_id' => $schoolId])
+                : "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/schedule-clashes-pdf",
         ])));
     }
 

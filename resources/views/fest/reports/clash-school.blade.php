@@ -11,8 +11,8 @@
 @forelse($conflicts as $c)
 <tr>
     <td>{{ $c['student_name'] }}</td>
-    <td>{{ $c['event1'] }}<br><small>{{ implode(' · ', array_filter([$c['item1_category'] ?? null, $c['item1_gender'] ?? null, $c['item1_type'] ?? null, $c['item1_time'] ?? null])) }}</small></td>
-    <td>{{ $c['event2'] }}<br><small>{{ implode(' · ', array_filter([$c['item2_category'] ?? null, $c['item2_gender'] ?? null, $c['item2_type'] ?? null, $c['item2_time'] ?? null])) }}</small></td>
+    <td>{{ $c['event1'] }}<br><small>{{ implode(' · ', array_filter([$c['item1_category'] ?? null, $c['item1_gender'] ?? null, $c['item1_type'] ?? null, $c['item1_stage'] ?? null, $c['item1_time'] ?? null])) }}</small></td>
+    <td>{{ $c['event2'] }}<br><small>{{ implode(' · ', array_filter([$c['item2_category'] ?? null, $c['item2_gender'] ?? null, $c['item2_type'] ?? null, $c['item2_stage'] ?? null, $c['item2_time'] ?? null])) }}</small></td>
 </tr>
 @empty
 <tr><td colspan="3" style="text-align:center">No clashes detected.</td></tr>
