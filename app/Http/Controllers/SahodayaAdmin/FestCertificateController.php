@@ -123,14 +123,45 @@ class FestCertificateController extends SahodayaAdminController
         return FestEventItem::whereIn('event_id', $event->reportableEventIds())
             ->whereNotNull('results_published_at')
             ->orderBy('title')
-            ->get(['id', 'title', 'item_code', 'class_group', 'category'])
+            ->get(['id', 'title', 'item_code', 'class_group', 'category', 'gender', 'participant_type'])
             ->map(fn ($item) => [
                 'id' => $item->id,
                 'title' => $item->title,
                 'item_code' => $item->item_code,
                 'category_label' => FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
+                'gender_label' => $this->itemGenderLabel($item),
+                'type_label' => $this->itemTypeLabel($item),
             ])
             ->values();
+    }
+
+    /**
+     * "Boys"/"Girls"/"Mixed" for an item's own gender restriction, null for 'open' (no
+     * restriction — not worth stating). Mirrors FestEventItem::formattedTitle()'s inline
+     * mapping; kept as its own copy here since that method bakes the label into a single
+     * title string, while callers here (the item picker, grouped-by-item views) need the
+     * label as a separate value to combine with category/type differently per UI.
+     */
+    private function itemGenderLabel(FestEventItem $item): ?string
+    {
+        return match (strtolower((string) $item->gender)) {
+            'male', 'm', 'boy', 'boys' => 'Boys',
+            'female', 'f', 'girl', 'girls' => 'Girls',
+            'mixed', 'common' => 'Mixed',
+            default => null,
+        };
+    }
+
+    /** Same 5-value mapping as FestCertificateService::itemTaxonomyLabels()'s $type. */
+    private function itemTypeLabel(FestEventItem $item): string
+    {
+        return match (strtolower((string) $item->participant_type)) {
+            'group' => 'Group',
+            'team' => 'Team',
+            'pair' => 'Pair',
+            'trio' => 'Trio',
+            default => 'Individual',
+        };
     }
 
     /** @param  Collection<int, array<string, mixed>>  $certificates */
@@ -208,6 +239,8 @@ class FestCertificateController extends SahodayaAdminController
                     'item_title' => $first['item']->title,
                     'item_code' => $first['item']->item_code,
                     'category_label' => FestItemCategoryLabel::shortLabel($first['item'], $classGroupLabels, $artsCategoryLabels),
+                    'gender_label' => $this->itemGenderLabel($first['item']),
+                    'type_label' => $this->itemTypeLabel($first['item']),
                     'winners' => $group->sortBy(fn ($c) => $c['mark']?->position ?? $c['position'] ?? 99)
                         ->map(fn ($c) => [
                             'id' => $c['id'],
@@ -221,6 +254,11 @@ class FestCertificateController extends SahodayaAdminController
                 ];
             })
             ->sortBy('item_title')
+            ->values()
+            // Sl No against each ITEM row in this grouped-by-item listing (not the
+            // students inside it) — added after the sort above so numbering matches the
+            // on-screen order.
+            ->map(fn ($group, $index) => array_merge($group, ['sl_no' => $index + 1]))
             ->values();
     }
 

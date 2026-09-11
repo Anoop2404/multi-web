@@ -174,8 +174,9 @@
                 <div v-for="group in winnersByItem" :key="group.item_id" class="py-3 first:pt-0 last:pb-0">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="min-w-0 flex items-center gap-3">
+                            <span class="shrink-0 text-xs font-semibold text-gray-400 tabular-nums">{{ group.sl_no }}.</span>
                             <p class="font-semibold text-sm text-gray-900">
-                                {{ group.item_title }}<span v-if="group.category_label" class="font-normal text-gray-500"> ({{ group.category_label }})</span>
+                                {{ group.item_title }}<span v-if="[group.category_label, group.type_label, group.gender_label].some(Boolean)" class="font-normal text-gray-500"> ({{ [group.category_label, group.type_label, group.gender_label].filter(Boolean).join(' · ') }})</span>
                             </p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
                                 {{ group.winners.length }} merit winner{{ group.winners.length === 1 ? '' : 's' }}
@@ -301,8 +302,9 @@
                 <div v-for="group in participationByItem" :key="group.item_id" class="py-3 first:pt-0 last:pb-0">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="min-w-0 flex items-center gap-3">
+                            <span class="shrink-0 text-xs font-semibold text-gray-400 tabular-nums">{{ group.sl_no }}.</span>
                             <p class="font-semibold text-sm text-gray-900">
-                                {{ group.item_title }}<span v-if="group.category_label" class="font-normal text-gray-500"> ({{ group.category_label }})</span>
+                                {{ group.item_title }}<span v-if="[group.category_label, group.type_label, group.gender_label].some(Boolean)" class="font-normal text-gray-500"> ({{ [group.category_label, group.type_label, group.gender_label].filter(Boolean).join(' · ') }})</span>
                             </p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-medium">
                                 {{ group.winners.length }} participant{{ group.winners.length === 1 ? '' : 's' }}
@@ -618,15 +620,18 @@ function clearCertificateDate() {
     saveCertificateDate();
 }
 
-const publishedItemOptions = computed(() => props.publishedItems.map(item => ({
-    value: item.id,
-    // Same-titled items with no item_code (e.g. three separate "Book Review" items, one
-    // per class-group category) are otherwise indistinguishable in this dropdown —
-    // category_label (Category 1/LP/UP/...) is the fallback disambiguator.
-    label: item.item_code
-        ? `[${item.item_code}] ${item.title}`
-        : (item.category_label ? `${item.title} (${item.category_label})` : item.title),
-})));
+const publishedItemOptions = computed(() => props.publishedItems.map(item => {
+    // Same-titled items (e.g. three separate "Book Review" items, one per class-group
+    // category, or split further by gender) are otherwise indistinguishable in this
+    // dropdown — category/type/gender always shown alongside the item_code, not just
+    // as a fallback when item_code is missing.
+    const meta = [item.category_label, item.type_label, item.gender_label].filter(Boolean).join(' · ');
+    const codePrefix = item.item_code ? `[${item.item_code}] ` : '';
+    return {
+        value: item.id,
+        label: meta ? `${codePrefix}${item.title} (${meta})` : `${codePrefix}${item.title}`,
+    };
+}));
 
 // Render/cache batch progress — same dispatch -> flash key -> poll /progress pattern as
 // Settings/StorageMigration.vue's async job UX.
