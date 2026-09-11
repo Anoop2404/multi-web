@@ -85,7 +85,7 @@ class FestParticipationLimitService
         if ($item?->age_group && $item->age_group !== 'open') {
             return [
                 'key' => 'age:'.$item->age_group,
-                'label' => $ageGroupLabels[$item->age_group] ?? strtoupper($item->age_group),
+                'label' => self::ageGroupDisplayLabel($ageGroupLabels[$item->age_group] ?? strtoupper($item->age_group)),
             ];
         }
 
@@ -111,12 +111,23 @@ class FestParticipationLimitService
         if ($rootEvent->event_type === 'sports') {
             foreach (config('fest_item_taxonomy.age_group', []) as $key => $label) {
                 if ($key !== 'open') {
-                    $options['age:'.$key] = $label;
+                    $options['age:'.$key] = self::ageGroupDisplayLabel($label);
                 }
             }
         }
 
         return $options;
+    }
+
+    /**
+     * config('fest_item_taxonomy.age_group') labels carry a class-range hint meant for the
+     * item edit form ("Under 14 (Classes VI–VIII)") — every report-facing display of an
+     * age group (a row's own category and this filter dropdown) just wants the age bracket
+     * itself, not the classes it maps to.
+     */
+    private static function ageGroupDisplayLabel(string $label): string
+    {
+        return trim(preg_replace('/\s*\([^)]*\)\s*$/', '', $label));
     }
 
     /**

@@ -359,13 +359,14 @@ class FestParticipationLimitServiceTest extends TestCase
         $rows = $service->studentLimitReportRows($schoolId);
 
         $this->assertSame('age:u14', $rows[0]['items'][0]['category_key']);
-        $this->assertSame('Under 14 (Classes VI–VIII)', $rows[0]['items'][0]['category_label']);
+        $this->assertSame('Under 14', $rows[0]['items'][0]['category_label'], 'the class-range hint is for the item edit form, not this report');
 
         $filterOptions = $service->itemFilterOptions();
         $this->assertSame('age:u14', $filterOptions[0]['category_key']);
-        $this->assertSame('Under 14 (Classes VI–VIII)', $filterOptions[0]['category_label']);
+        $this->assertSame('Under 14', $filterOptions[0]['category_label']);
 
         $categoryOptions = FestParticipationLimitService::categoryFilterOptions($event);
         $this->assertArrayHasKey('age:u14', $categoryOptions, 'the category filter dropdown must offer the age-group option too');
+        $this->assertSame('Under 14', $categoryOptions['age:u14']);
     }
 }
