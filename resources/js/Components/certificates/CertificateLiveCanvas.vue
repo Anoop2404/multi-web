@@ -203,6 +203,26 @@ function overlayStyle(field = {}, fallback = {}) {
     return style;
 }
 
+// Mirrors FestCertificateService::toRomanIfNumeric() — used to derive the *_roman
+// preview samples from the same base number the plain sample text already displays,
+// rather than typing the roman form as its own separate literal.
+function toRomanNumeral(number) {
+    const table = [
+        [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+        [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+        [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+    ];
+    let remaining = number;
+    let roman = '';
+    for (const [value, numeral] of table) {
+        while (remaining >= value) {
+            roman += numeral;
+            remaining -= value;
+        }
+    }
+    return roman;
+}
+
 const sampleRecipientName = computed(() => {
     if (props.eventType === 'fest') return 'MADHAV AJITH';
     if (props.eventType === 'topper') return 'ARJUNKRISHNAN NAMBIAR';
@@ -211,20 +231,23 @@ const sampleRecipientName = computed(() => {
 
 const sampleData = computed(() => {
     const pageSahodaya = page.props.sahodaya?.name || page.props.tenant?.name || 'Sahodaya Complex';
+    const sampleSchoolName = 'Sample Model School';
+    const sampleClassNumber = 10;
+    const sampleCategoryNumber = 1;
     return {
         recipient_name: sampleRecipientName.value,
         recipient_name_upper: sampleRecipientName.value.toUpperCase(),
-        school_name: 'Sample Model School',
-        school_name_upper: 'SAMPLE MODEL SCHOOL',
+        school_name: sampleSchoolName,
+        school_name_upper: sampleSchoolName.toUpperCase(),
         sahodaya_name: pageSahodaya,
         program_title: props.title || 'Sahodaya Teacher Leadership Training',
         event_title: props.title || 'Annual Sports Meet 2026',
         item_title: '100m Sprint Boys (U17)',
         item_details: '100m Sprint Boys (U17)',
         event_name: props.title || 'Annual Sports Meet 2026',
-        category_name: 'Category I',
-        category_short: 'I',
-        category_roman: 'I',
+        category_name: `Category ${toRomanNumeral(sampleCategoryNumber)}`,
+        category_short: toRomanNumeral(sampleCategoryNumber),
+        category_roman: toRomanNumeral(sampleCategoryNumber),
         participation_type: 'Individual',
         event_dates: '21st - 23rd July 2026',
         conducted_on: '22nd July 2026',
@@ -236,8 +259,8 @@ const sampleData = computed(() => {
         // real gender-based token); training/topper keep the Mr./Mrs.-style honorific.
         salutation: props.eventType === 'fest' ? 'Master' : 'Mr.',
         designation: 'Senior PGT Teacher',
-        class: 'Class X',
-        class_roman: 'X',
+        class: `Class ${toRomanNumeral(sampleClassNumber)}`,
+        class_roman: toRomanNumeral(sampleClassNumber),
         academic_year: '2026-27',
         percentage: '98.4%',
         rank: 'First Rank',
