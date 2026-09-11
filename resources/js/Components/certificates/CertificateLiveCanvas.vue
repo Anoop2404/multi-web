@@ -213,7 +213,9 @@ const sampleData = computed(() => {
     const pageSahodaya = page.props.sahodaya?.name || page.props.tenant?.name || 'Sahodaya Complex';
     return {
         recipient_name: sampleRecipientName.value,
+        recipient_name_upper: sampleRecipientName.value.toUpperCase(),
         school_name: 'Sample Model School',
+        school_name_upper: 'SAMPLE MODEL SCHOOL',
         sahodaya_name: pageSahodaya,
         program_title: props.title || 'Sahodaya Teacher Leadership Training',
         event_title: props.title || 'Annual Sports Meet 2026',
@@ -222,6 +224,7 @@ const sampleData = computed(() => {
         event_name: props.title || 'Annual Sports Meet 2026',
         category_name: 'Category I',
         category_short: 'I',
+        category_roman: 'I',
         participation_type: 'Individual',
         event_dates: '21st - 23rd July 2026',
         conducted_on: '22nd July 2026',
@@ -234,6 +237,7 @@ const sampleData = computed(() => {
         salutation: props.eventType === 'fest' ? 'Master' : 'Mr.',
         designation: 'Senior PGT Teacher',
         class: 'Class X',
+        class_roman: 'X',
         academic_year: '2026-27',
         percentage: '98.4%',
         rank: 'First Rank',
