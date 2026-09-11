@@ -219,7 +219,7 @@ class FestSchoolReportController extends SchoolAdminController
             'event'   => $event->only('id', 'title'),
             'rows'    => $rows,
             'summary' => $summary,
-            'categories'     => \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()),
+            'categories'     => \App\Services\Events\FestParticipationLimitService::categoryFilterOptions($event->rootEvent()),
             'items'          => $service->itemFilterOptions(),
             'filterCategory' => $category,
             'filterItemId'   => $itemId,

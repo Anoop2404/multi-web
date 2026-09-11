@@ -338,4 +338,34 @@ class FestParticipationLimitServiceTest extends TestCase
 
         $this->assertSame([], $errors, 'items with no exclusive_group_key must never be treated as mutually exclusive');
     }
+
+    public function test_a_sports_items_category_comes_from_its_age_group_not_the_generic_class_group_bucket(): void
+    {
+        // Sports items are categorized by age_group, not class_group (which they never
+        // set) — the report's category resolution previously ignored age_group entirely
+        // and fell through to class_group's catch-all, showing every sports item as
+        // "Open / All Categories" regardless of its real age bracket.
+        [$event, $schoolId] = $this->fixture();
+        $event->update(['event_type' => 'sports']);
+        $studentId = 1;
+
+        $chess = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Chess', 'item_code' => 'CHESS1',
+            'participant_type' => 'individual', 'age_group' => 'u14', 'is_enabled' => true,
+        ]);
+        $this->registerStudentFor($event, $schoolId, $studentId, $chess);
+
+        $service = new FestParticipationLimitService($event);
+        $rows = $service->studentLimitReportRows($schoolId);
+
+        $this->assertSame('age:u14', $rows[0]['items'][0]['category_key']);
+        $this->assertSame('Under 14 (Classes VI–VIII)', $rows[0]['items'][0]['category_label']);
+
+        $filterOptions = $service->itemFilterOptions();
+        $this->assertSame('age:u14', $filterOptions[0]['category_key']);
+        $this->assertSame('Under 14 (Classes VI–VIII)', $filterOptions[0]['category_label']);
+
+        $categoryOptions = FestParticipationLimitService::categoryFilterOptions($event);
+        $this->assertArrayHasKey('age:u14', $categoryOptions, 'the category filter dropdown must offer the age-group option too');
+    }
 }

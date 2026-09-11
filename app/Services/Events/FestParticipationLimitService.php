@@ -67,6 +67,59 @@ class FestParticipationLimitService
     }
 
     /**
+     * An item's display category (key + label) for this report — age_group first when set
+     * and not 'open', else the class_group scheme, else the arts category, matching
+     * FestSchoolReportController::itemCategoryLabel()'s precedence exactly (sports items
+     * are categorized by age_group, not class_group, which was previously ignored here:
+     * every sports item fell through to class_group's generic "Open / All Categories"
+     * bucket since sports items don't set class_group at all). $key stays distinct from
+     * FestClassGroupScheme's keyset for an age-group match — 'age:u14' rather than 'u14' —
+     * so an age-group category can never collide with a same-spelled class-group one.
+     *
+     * @param  array<string, string>  $classGroupLabels
+     * @param  array<string, string>  $ageGroupLabels
+     * @return array{key: string, label: string}
+     */
+    private function itemCategory(?FestEventItem $item, array $classGroupLabels, array $ageGroupLabels): array
+    {
+        if ($item?->age_group && $item->age_group !== 'open') {
+            return [
+                'key' => 'age:'.$item->age_group,
+                'label' => $ageGroupLabels[$item->age_group] ?? strtoupper($item->age_group),
+            ];
+        }
+
+        return [
+            'key' => \App\Support\FestClassGroupScheme::resolveItemKey($classGroupLabels, $item?->class_group),
+            'label' => \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item?->class_group),
+        ];
+    }
+
+    /**
+     * Category filter dropdown options for the student-limits report — the class_group
+     * scheme's own labels, plus (for a sports event) every non-'open' age_group label, keyed
+     * the same way itemCategory() keys a row so a selected filter value actually matches
+     * rows. Merged rather than swapped outright so a sports event that also has some
+     * class_group-categorized items (unusual, but not impossible) keeps both filterable.
+     *
+     * @return array<string, string>
+     */
+    public static function categoryFilterOptions(FestEvent $rootEvent): array
+    {
+        $options = \App\Support\FestClassGroupScheme::labels(null, $rootEvent);
+
+        if ($rootEvent->event_type === 'sports') {
+            foreach (config('fest_item_taxonomy.age_group', []) as $key => $label) {
+                if ($key !== 'open') {
+                    $options['age:'.$key] = $label;
+                }
+            }
+        }
+
+        return $options;
+    }
+
+    /**
      * Per-student limit-usage rows for the whole school — one row per student with at
      * least one active registration, each showing on-stage, off-stage, their combined
      * "individual" total, and the group count against the resolved policy limits.
@@ -88,6 +141,7 @@ class FestParticipationLimitService
         // with $event->rootEvent()) — the scheme itself is configured on the root's
         // fee_settings, so this is safe to resolve once here rather than per item.
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event);
+        $ageGroupLabels = config('fest_item_taxonomy.age_group', []);
 
         $registrations = FestRegistration::whereIn('event_id', $this->scopeEventIds())
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
@@ -154,11 +208,13 @@ class FestParticipationLimitService
                     }
                 }
 
+                $itemCategory = $this->itemCategory($reg->item, $classGroupLabels, $ageGroupLabels);
+
                 $items[] = [
                     'item_id'    => $reg->item_id,
                     'item_title' => $reg->item?->title,
-                    'category_key'   => \App\Support\FestClassGroupScheme::resolveItemKey($classGroupLabels, $reg->item?->class_group),
-                    'category_label' => \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $reg->item?->class_group),
+                    'category_key'   => $itemCategory['key'],
+                    'category_label' => $itemCategory['label'],
                     'dimension'  => $dims['group'] ? 'group' : ($dims['on_stage'] ? 'on_stage' : ($dims['off_stage'] ? 'off_stage' : null)),
                     'status'     => $reg->status,
                     'countable'  => $isCountable,
@@ -250,16 +306,21 @@ class FestParticipationLimitService
     public function itemFilterOptions(): array
     {
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event);
+        $ageGroupLabels = config('fest_item_taxonomy.age_group', []);
 
         return FestEventItem::whereIn('event_id', $this->scopeEventIds())
             ->orderBy('title')
-            ->get(['id', 'title', 'class_group'])
-            ->map(fn (FestEventItem $item) => [
-                'id'    => $item->id,
-                'title' => $item->title,
-                'category_key'   => \App\Support\FestClassGroupScheme::resolveItemKey($classGroupLabels, $item->class_group),
-                'category_label' => \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group),
-            ])
+            ->get(['id', 'title', 'class_group', 'age_group'])
+            ->map(function (FestEventItem $item) use ($classGroupLabels, $ageGroupLabels) {
+                $category = $this->itemCategory($item, $classGroupLabels, $ageGroupLabels);
+
+                return [
+                    'id'    => $item->id,
+                    'title' => $item->title,
+                    'category_key'   => $category['key'],
+                    'category_label' => $category['label'],
+                ];
+            })
             ->values()
             ->all();
     }

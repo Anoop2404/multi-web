@@ -891,7 +891,7 @@ class FestReportController extends SahodayaAdminController
             'rows'           => $rows,
             'summary'        => $summary,
             'schools'        => $this->scopedReportService($request, $rootEvent)->schools(),
-            'categories'     => \App\Support\FestClassGroupScheme::labels(null, $rootEvent),
+            'categories'     => FestParticipationLimitService::categoryFilterOptions($rootEvent),
             'items'          => $service->itemFilterOptions(),
             'filterSchoolId' => $schoolId,
             'filterCategory' => $category,
