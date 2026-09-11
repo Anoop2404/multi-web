@@ -238,7 +238,7 @@ class FestRegistrationService
         // LIFE-06 fix — see cancel() above.
         app(FestQualificationService::class)->revokeQualificationsForRegistration($registration);
 
-        app(PlatformAuditLogger::class)->festRegistrationCancelled($registration);
+        app(PlatformAuditLogger::class)->festRegistrationCancelled($registration, reason: $reason);
 
         // Distinct from cancel()'s notification: this one carries the required reason (and the
         // credit amount, if one was issued) so the school knows why an approved, paid entry was

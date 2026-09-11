@@ -82,9 +82,21 @@
                                         🟢 PRESENT
                                     </span>
                                 </div>
+                                <div v-if="log.reason" class="mt-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 inline-block">
+                                    <span class="font-semibold">Reason:</span> {{ log.reason }}
+                                </div>
                             </td>
                             <td class="text-xs text-slate-600 font-medium whitespace-nowrap">
-                                <div>{{ log.user?.name ?? 'System' }}</div>
+                                <div class="flex items-center gap-1.5">
+                                    <span>{{ log.user?.name ?? 'System' }}</span>
+                                    <span v-if="log.actor_type"
+                                          class="rounded px-1.5 py-0.5 text-[10px] font-bold border"
+                                          :class="log.actor_type === 'School'
+                                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                              : 'bg-indigo-50 text-indigo-700 border-indigo-200'">
+                                        {{ log.actor_type === 'School' ? 'SCHOOL' : 'SAHODAYA' }}
+                                    </span>
+                                </div>
                                 <div v-if="log.ip_address" class="text-[10px] text-slate-400 font-mono">🌐 {{ log.ip_address }}</div>
                             </td>
                             <td class="text-right whitespace-nowrap">
@@ -230,7 +242,9 @@ const displayedLogs = computed(() => {
                 log.item_category,
                 log.page_label,
                 log.user?.name,
+                log.actor_type,
                 log.ip_address,
+                log.reason,
             ].filter(Boolean).join(' ').toLowerCase();
 
             return terms.every(term => text.includes(term));

@@ -34,8 +34,29 @@ class PlatformAuditLogger
         ?string $category = null,
         ?string $tenantId = null,
     ): AuditLog {
+        // Device context (user agent) is folded into every write here, rather than left
+        // to each of the ~40 call sites across the app, so the activity log can show
+        // "what device did this" for anything logged through this class — not just the
+        // handful of callers that happened to think to pass it.
+        if ($this->request && ! isset($properties['user_agent'])) {
+            $properties['user_agent'] = $this->request->userAgent();
+        }
+
+        // Same reasoning as user_agent above, for a different question: a school can
+        // cancel/withdraw its own registration through the school portal (see
+        // SchoolAdmin\FestRegistrationController::withdraw()), which calls the exact same
+        // festRegistrationCancelled() as a Sahodaya/event admin cancelling it from the
+        // review queue — same action name, same description shape, no way to tell them
+        // apart from the log alone without this. Resolved once here from the acting
+        // user's roles rather than per call site, so it's correct everywhere without
+        // relying on ~40 call sites remembering to pass it.
+        $resolvedUserId = $userId ?? auth()->id();
+        if (! isset($properties['actor_type']) && $resolvedUserId) {
+            $properties['actor_type'] = $this->actorType($resolvedUserId);
+        }
+
         $data = [
-            'user_id'      => $userId ?? auth()->id(),
+            'user_id'      => $resolvedUserId,
             'tenant_id'    => $this->resolveTenantId($tenantId, $subject, $properties),
             'category'     => $category ?? AuditLogCatalog::categoryForAction($action),
             'action'       => $action,
@@ -58,6 +79,31 @@ class PlatformAuditLogger
                 return new AuditLog($data);
             }
         }
+    }
+
+    /**
+     * Coarse school-vs-admin bucket, not the user's specific role — that's what the
+     * activity log actually needs to answer "who cancelled this, the school or us."
+     * Every role prefixed `school_` (school_admin, school_principal, school_event_coordinator,
+     * ...) buckets as School; every other role (sahodaya_admin, event_admin,
+     * registration_coordinator, mark_entry_admin, ...) buckets as Sahodaya/Event Admin,
+     * since a registration can only be reviewed/cancelled by someone on that side.
+     */
+    private function actorType(int $userId): ?string
+    {
+        $user = auth()->id() === $userId ? auth()->user() : User::find($userId);
+        if (! $user || ! method_exists($user, 'getRoleNames')) {
+            return null;
+        }
+
+        $roles = $user->getRoleNames();
+        if ($roles->isEmpty()) {
+            return null;
+        }
+
+        return $roles->contains(fn ($role) => str_starts_with($role, 'school_'))
+            ? 'School'
+            : 'Sahodaya/Event Admin';
     }
 
     // RPT-01 fix (functional audit, 2026-08-11/12): audit_logs is a shared,
@@ -216,44 +262,98 @@ class PlatformAuditLogger
 
     public function festRegistrationApproved(FestRegistration $registration, ?string $page = null): AuditLog
     {
+        $ctx = $this->registrationContext($registration);
+
         return $this->log(
             'fest.registration.approved',
-            "Fest registration #{$registration->id} approved",
+            "Fest registration #{$registration->id} approved{$ctx['suffix']}",
             $registration,
             [
-                'event_id' => $registration->event_id,
-                'school_id' => $registration->school_id,
-                'page' => $page ?? \App\Support\FestPageActivity::REGISTRATIONS,
+                'event_id'    => $registration->event_id,
+                'school_id'   => $registration->school_id,
+                'school'      => $ctx['school'],
+                'item_id'     => $registration->item_id,
+                'item_title'  => $ctx['item_title'],
+                'participant' => $ctx['participant'],
+                'page'        => $page ?? \App\Support\FestPageActivity::REGISTRATIONS,
             ],
         );
     }
 
-    public function festRegistrationRejected(FestRegistration $registration, ?string $page = null): AuditLog
+    public function festRegistrationRejected(FestRegistration $registration, ?string $page = null, ?string $reason = null): AuditLog
     {
+        $ctx = $this->registrationContext($registration);
+
         return $this->log(
             'fest.registration.rejected',
-            "Fest registration #{$registration->id} rejected",
+            "Fest registration #{$registration->id} rejected{$ctx['suffix']}",
             $registration,
             [
-                'event_id' => $registration->event_id,
-                'school_id' => $registration->school_id,
-                'page' => $page ?? \App\Support\FestPageActivity::REGISTRATIONS,
+                'event_id'    => $registration->event_id,
+                'school_id'   => $registration->school_id,
+                'school'      => $ctx['school'],
+                'item_id'     => $registration->item_id,
+                'item_title'  => $ctx['item_title'],
+                'participant' => $ctx['participant'],
+                'reason'      => $reason ?: $registration->rejection_reason,
+                'page'        => $page ?? \App\Support\FestPageActivity::REGISTRATIONS,
             ],
         );
     }
 
-    public function festRegistrationCancelled(FestRegistration $registration, ?string $page = null): AuditLog
+    public function festRegistrationCancelled(FestRegistration $registration, ?string $page = null, ?string $reason = null): AuditLog
     {
+        $ctx = $this->registrationContext($registration);
+
         return $this->log(
             'fest.registration.cancelled',
-            "Fest registration #{$registration->id} cancelled",
+            "Fest registration #{$registration->id} cancelled{$ctx['suffix']}",
             $registration,
             [
-                'event_id' => $registration->event_id,
-                'school_id' => $registration->school_id,
-                'page' => $page ?? \App\Support\FestPageActivity::REGISTRATIONS,
+                'event_id'    => $registration->event_id,
+                'school_id'   => $registration->school_id,
+                'school'      => $ctx['school'],
+                'item_id'     => $registration->item_id,
+                'item_title'  => $ctx['item_title'],
+                'participant' => $ctx['participant'],
+                'reason'      => $reason,
+                'page'        => $page ?? \App\Support\FestPageActivity::REGISTRATIONS,
             ],
         );
+    }
+
+    /**
+     * Shared enrichment for registration-level audit entries — item/school/participant
+     * names so the activity log shows who/what was actually affected instead of a bare
+     * registration id. FestEventActivityService::query() already surfaces
+     * properties['school']/['item_title']/['participant'] for any log that carries
+     * them; this is what populates those keys for approve/reject/cancel (previously
+     * only event_id/school_id were recorded).
+     *
+     * @return array{item_title: ?string, school: ?string, participant: ?string, suffix: string}
+     */
+    private function registrationContext(FestRegistration $registration): array
+    {
+        $registration->loadMissing('item', 'school', 'participants.student', 'participants.teacher', 'participants.group');
+
+        $names = $registration->participants
+            ->map(fn ($p) => $p->student?->name ?? $p->teacher?->name ?? $p->group?->team_name)
+            ->filter()
+            ->unique()
+            ->implode(', ');
+
+        $itemTitle = $registration->item?->title;
+        $schoolName = $registration->school?->name;
+
+        $suffixParts = array_filter([$itemTitle, $schoolName]);
+        $suffix = $suffixParts ? ' ('.implode(' — ', $suffixParts).')' : '';
+
+        return [
+            'item_title'  => $itemTitle,
+            'school'      => $schoolName,
+            'participant' => $names ?: null,
+            'suffix'      => $suffix,
+        ];
     }
 
     public function festRegistrationSubmitted(FestRegistration $registration): AuditLog

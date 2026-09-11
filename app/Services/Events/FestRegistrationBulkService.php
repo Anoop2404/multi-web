@@ -185,7 +185,7 @@ class FestRegistrationBulkService
             app(FestQualificationService::class)->revokeQualificationsForRegistration($registration);
 
             $notifier->registrationRejected($registration, $reason);
-            $audit->festRegistrationRejected($registration);
+            $audit->festRegistrationRejected($registration, reason: $reason);
             $rejected++;
         }
 

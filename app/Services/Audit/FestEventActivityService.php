@@ -78,6 +78,14 @@ class FestEventActivityService
     {
         $morph = (new FestEvent)->getMorphClass();
         $eventId = (string) $event->id;
+        // A hub event's own activity log needs to include what happened under its region
+        // children too — registrations, marks, attendance, and chest-number actions are all
+        // logged against the CHILD region's event id (that's the event the action actually
+        // ran against), never the hub's. Every other hub-aware admin page (chest numbers,
+        // marks, reports) already scopes this way; this query previously matched only the
+        // exact hub id, so a hub's Activity Log page could never show any region activity —
+        // "no logged actions" even when the region logs plainly existed.
+        $reportableEventIds = $event->reportableEventIds();
 
         $searchParticipantIds = [];
         if ($search !== null && $search !== '') {
@@ -95,10 +103,10 @@ class FestEventActivityService
 
         $logs = AuditLog::query()
             ->with('user:id,name,email')
-            ->where(function ($q) use ($morph, $eventId, $event) {
+            ->where(function ($q) use ($morph, $eventId, $reportableEventIds) {
                 $q->where(function ($q2) use ($morph, $eventId) {
                     $q2->where('subject_type', $morph)->where('subject_id', $eventId);
-                })->orWhere('properties->event_id', $event->id);
+                })->orWhereIn('properties->event_id', $reportableEventIds);
             })
             ->when($page !== null && $page !== '', fn ($q) => $q->where('properties->page', $page))
             ->when($itemId !== null, function ($q) use ($itemId) {
@@ -264,7 +272,10 @@ class FestEventActivityService
                 'participant'   => $personName,
                 'school'        => $schoolName,
                 'reg_no'        => $regNo,
+                'reason'        => $props['reason'] ?? null,
                 'ip_address'    => $log->ip_address,
+                'user_agent'    => $props['user_agent'] ?? null,
+                'actor_type'    => $props['actor_type'] ?? null,
                 'user'          => $log->user?->only('id', 'name', 'email'),
                 'properties'    => $props,
                 'created_at'    => $log->created_at?->toIso8601String(),
@@ -286,6 +297,8 @@ class FestEventActivityService
                     $row['item_code'] ?? '',
                     $row['user']['name'] ?? '',
                     $row['ip_address'] ?? '',
+                    $row['reason'] ?? '',
+                    $row['actor_type'] ?? '',
                 ])));
 
                 foreach ($rawTerms as $term) {

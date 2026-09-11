@@ -502,7 +502,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         app(\App\Services\Events\FestQualificationService::class)->revokeQualificationsForRegistration($registration);
 
         app(FestEventNotifier::class)->registrationRejected($registration, $reason);
-        $audit->festRegistrationRejected($registration);
+        $audit->festRegistrationRejected($registration, reason: $reason);
 
         return back()->with('success', 'Registration rejected.');
     }
