@@ -133,6 +133,32 @@ class FestParticipationLimitServiceTest extends TestCase
         $this->assertStringContainsString('group items', implode(' ', $errors));
     }
 
+    public function test_group_item_is_not_blocked_by_an_already_full_total_cap(): void
+    {
+        // Reported by a Sahodaya admin: total=5, on-stage=5, off-stage=5, group=2. A school
+        // registered 5 individual items (hitting the total=5 cap on its own), then tried to
+        // register a group item within the still-untouched group=2 cap and got "exceeds max
+        // 5 total items" — even though group items are never supposed to count toward total
+        // at all (itemDimensions()'s documented rule). excludedFromTotalCount() decides
+        // whether a NEW item's registration even gets checked against max_total_per_student,
+        // and it only excluded relay/march_past sports items, not group — so a group item's
+        // own registration attempt got +1'd onto the already-full total count.
+        [$event, $schoolId] = $this->fixture(['max_total_per_student' => 5]);
+        $studentId = 1;
+
+        for ($i = 1; $i <= 5; $i++) {
+            $item = FestEventItem::create(['event_id' => $event->id, 'title' => "Individual {$i}", 'item_code' => "IND{$i}", 'stage_type' => $i % 2 === 0 ? 'off_stage' : 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+            $this->registerStudentFor($event, $schoolId, $studentId, $item);
+        }
+
+        $groupItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Group Dance', 'item_code' => 'GRPX', 'stage_type' => 'on_stage', 'participant_type' => 'group', 'min_group_size' => 1, 'max_group_size' => 10, 'is_enabled' => true]);
+
+        $service = new FestParticipationLimitService($event);
+        $errors = $service->validateRegistration($groupItem, $schoolId, [$studentId]);
+
+        $this->assertSame([], $errors, 'a group item must never be blocked by the total cap: '.implode(' | ', $errors));
+    }
+
     public function test_usage_badges_count_group_items_only_under_group(): void
     {
         [$event, $schoolId] = $this->fixture();

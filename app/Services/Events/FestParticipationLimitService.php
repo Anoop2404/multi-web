@@ -880,19 +880,25 @@ class FestParticipationLimitService
         return ['approved'];
     }
 
+    /**
+     * A group/team item never counts toward "total items" — same rule itemDimensions()
+     * documents and countableTotalForStudent() below already applied to a student's
+     * EXISTING registrations, but this method (which gates whether a NEW registration even
+     * gets checked against max_total_per_student at all, see validateStudent()) only
+     * excluded relay/march_past, not group. That let a school sitting exactly at their
+     * individual (on-stage+off-stage) total limit get blocked from registering a group item
+     * — "exceeds max N total items" — even though group has its own separate
+     * max_group_per_student cap and was never meant to compete with total for the same slots.
+     */
     private function excludedFromTotalCount(FestEventItem $item): bool
     {
-        return in_array($item->sport_discipline, ['relay', 'march_past'], true);
+        return $this->itemDimensions($item)['group']
+            || in_array($item->sport_discipline, ['relay', 'march_past'], true);
     }
 
     /** @param Collection<int, FestRegistration> $regs */
     private function countableTotalForStudent($regs): int
     {
-        return $regs->filter(function (FestRegistration $r) {
-            $discipline = $r->item?->sport_discipline;
-            $dims = $this->itemDimensions($r->item);
-
-            return ! $dims['group'] && ! in_array($discipline, ['relay', 'march_past'], true);
-        })->count();
+        return $regs->filter(fn (FestRegistration $r) => $r->item && ! $this->excludedFromTotalCount($r->item))->count();
     }
 }
