@@ -25,14 +25,21 @@ class FestItemScheduleService
 
         $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
 
-        return FestEventItem::query()
+        $items = FestEventItem::query()
             ->where('event_id', $event->id)
             ->where('is_enabled', true)
-            ->with('head:id,name')
+            ->with(['head:id,name', 'phase:id,source_phase_id'])
             ->withCount(['registrations' => fn ($q) => $q->whereIn('status', FestRegistration::ACTIVE_STATUSES)])
             ->orderBy('display_order')
             ->orderBy('title')
-            ->get()
+            ->get();
+
+        // Same fix as FestHeadItemNavigationService::navigationForEvent() (Mark Entry,
+        // Chest Numbers, Reports) — a phase leaf's own item table can still hold a
+        // handful of items copied under the wrong phase, so this must be narrowed down
+        // the same way, not just filtered by event_id. See filterToOwnPhase()'s own
+        // docblock for the production incident this was first found from.
+        return FestHeadItemNavigationService::filterToOwnPhase($items, $event)
             ->map(fn (FestEventItem $item) => $this->rowFromItem($item, $schedules->get($item->id), $classGroupLabels))
             ->values()
             ->all();

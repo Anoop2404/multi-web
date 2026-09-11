@@ -64,6 +64,51 @@ class FestItemScheduleServiceTest extends TestCase
         ]);
     }
 
+    // ── rowsForEvent(): phase leaf scoping ───────────────────────────────
+
+    /**
+     * Same bug/fix as FestHeadItemNavigationService::filterToOwnPhase() (Mark Entry,
+     * Chest Numbers, Reports) — first found live on Wayanad Sahodaya: a phase leaf's own
+     * item table can hold items copied under the wrong phase (e.g. an update-time sync
+     * that doesn't re-verify phase_id on an already-existing child row), and the Item
+     * Schedule page was listing every one of them instead of just this leaf's own.
+     */
+    public function test_rows_for_event_excludes_items_belonging_to_a_different_phase_on_the_same_leaf(): void
+    {
+        [$sahodaya] = $this->actingAdmin();
+
+        $hub = $this->makeEvent($sahodaya->id);
+        $phaseA = \App\Models\FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase A', 'code' => 'PA']);
+        $phaseB = \App\Models\FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase B', 'code' => 'PB']);
+
+        $leaf = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Phase A Leaf',
+            'event_type' => 'kalolsavam',
+            'parent_event_id' => $hub->id,
+            'source_phase_id' => $phaseA->id,
+            'partition_key' => 'pa',
+            'partition_role' => 'phase',
+            'level_round' => 'sahodaya',
+            'status' => 'registration_open',
+        ]);
+
+        // The leaf's own local mirror of each hub phase, same shape
+        // FestPhaseTopologyService::syncChildPhase() creates.
+        $leafPhaseA = \App\Models\FestEventPhase::create(['event_id' => $leaf->id, 'source_phase_id' => $phaseA->id, 'name' => 'Phase A']);
+        $leafPhaseB = \App\Models\FestEventPhase::create(['event_id' => $leaf->id, 'source_phase_id' => $phaseB->id, 'name' => 'Phase B']);
+
+        $correct = FestEventItem::create(['event_id' => $leaf->id, 'title' => 'Own Phase Item', 'is_enabled' => true, 'phase_id' => $leafPhaseA->id]);
+        $misplaced = FestEventItem::create(['event_id' => $leaf->id, 'title' => 'Wrong Phase Item', 'is_enabled' => true, 'phase_id' => $leafPhaseB->id]);
+        $unassigned = FestEventItem::create(['event_id' => $leaf->id, 'title' => 'Unassigned Item', 'is_enabled' => true, 'phase_id' => null]);
+
+        $itemIds = collect(app(FestItemScheduleService::class)->rowsForEvent($leaf))->pluck('item_id')->all();
+
+        $this->assertContains($correct->id, $itemIds);
+        $this->assertContains($unassigned->id, $itemIds);
+        $this->assertNotContains($misplaced->id, $itemIds);
+    }
+
     // ── bulkSave(): empty submission clears an existing row ─────────────
 
     public function test_bulk_save_deletes_the_existing_item_level_row_when_submitted_with_no_date_stage_or_time(): void
