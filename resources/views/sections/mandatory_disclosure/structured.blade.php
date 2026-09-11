@@ -4,8 +4,8 @@
 <section class="py-16 px-4 bg-white">
     <div class="max-w-4xl mx-auto">
         <div class="text-center mb-10">
-            <h2 class="text-3xl font-bold font-heading text-gray-900">Mandatory Public Disclosure</h2>
-            <p class="text-gray-500 mt-2 text-sm">As per CBSE Affiliation Bye-Laws</p>
+            <h2 class="text-3xl font-bold font-heading text-gray-900">{{ $disc['heading'] ?? 'Mandatory Public Disclosure' }}</h2>
+            <p class="text-gray-500 mt-2 text-sm">{{ $disc['subheading'] ?? 'As per CBSE Affiliation Bye-Laws' }}</p>
         </div>
 
         @php
@@ -75,7 +75,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                             </svg>
-                            Download / View
+                            {{ $disc['download_label'] ?? 'Download / View' }}
                         </a>
                         @elseif($value)
                         {{ $value }}

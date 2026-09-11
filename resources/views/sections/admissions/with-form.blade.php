@@ -1,3 +1,6 @@
+@php
+    $pageContent = data_get($siteContent ?? [], 'pages.admission_enquiry', []);
+@endphp
 <section class="py-16 px-4 bg-gray-50">
     <div class="max-w-3xl mx-auto">
         <div class="text-center mb-10">
@@ -23,13 +26,13 @@
 
             <div class="grid sm:grid-cols-2 gap-5">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Student Name *</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ $pageContent['student_name_label'] ?? 'Student Name' }} *</label>
                     <input type="text" name="student_name" required value="{{ old('student_name') }}"
                            class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 @error('student_name') border-red-400 @enderror">
                     @error('student_name')<p class="text-xs text-red-500 mt-1">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Date of Birth *</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ $pageContent['date_of_birth_label'] ?? 'Date of Birth' }} *</label>
                     <input type="date" name="dob" required value="{{ old('dob') }}"
                            class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
                 </div>
@@ -37,10 +40,10 @@
 
             <div class="grid sm:grid-cols-2 gap-5">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Class Applying For *</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ $pageContent['class_label'] ?? 'Class Applying For' }} *</label>
                     <select name="class_applying" required
                             class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white">
-                        <option value="">-- Select --</option>
+                        <option value="">-- {{ $pageContent['select_placeholder'] ?? 'Select' }} --</option>
                         {{-- array_merge, not `+` — see admission-enquiry.blade.php for why
                              `+` silently drops Class 1-3 here. --}}
                         @foreach(array_merge(['Nursery','LKG','UKG'], range(1,12)) as $cls)
@@ -51,7 +54,7 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Parent / Guardian Name *</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ $pageContent['parent_name_label'] ?? 'Parent / Guardian Name' }} *</label>
                     <input type="text" name="parent_name" required value="{{ old('parent_name') }}"
                            class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
                 </div>
@@ -59,25 +62,25 @@
 
             <div class="grid sm:grid-cols-2 gap-5">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Phone *</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ $pageContent['phone_label'] ?? 'Phone' }} *</label>
                     <input type="tel" name="phone" required value="{{ old('phone') }}"
                            class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ $pageContent['email_label'] ?? 'Email' }}</label>
                     <input type="email" name="email" value="{{ old('email') }}"
                            class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
                 </div>
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Address</label>
+                <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ $pageContent['address_label'] ?? 'Address' }}</label>
                 <textarea name="address" rows="2"
                           class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 resize-none">{{ old('address') }}</textarea>
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Message / Additional Info</label>
+                <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ $pageContent['message_label'] ?? 'Message / Additional Info' }}</label>
                 <textarea name="message" rows="3"
                           class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 resize-none">{{ old('message') }}</textarea>
             </div>
@@ -85,7 +88,7 @@
             <button type="submit"
                     class="w-full font-semibold py-3 rounded-xl text-white transition hover:opacity-90"
                     style="background-color: var(--color-primary)">
-                Submit Enquiry
+                {{ $pageContent['submit_label'] ?? 'Submit Enquiry' }}
             </button>
         </form>
     </div>

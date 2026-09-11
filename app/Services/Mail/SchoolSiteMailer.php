@@ -10,7 +10,14 @@ class SchoolSiteMailer
     public function sendToSchoolContact(Tenant $school, string $subject, string $view, array $data): void
     {
         $contactEmail = $school->settings()->where('key', 'contact')->first()?->value['email'] ?? null;
-        if (! $contactEmail) {
+
+        $this->sendToAddress($school, $contactEmail, $subject, $view, $data);
+    }
+
+    public function sendToAddress(Tenant $school, ?string $recipient, string $subject, string $view, array $data): void
+    {
+        $recipient = $recipient ?: ($school->settings()->where('key', 'contact')->first()?->value['email'] ?? null);
+        if (! $recipient) {
             return;
         }
 
@@ -18,14 +25,14 @@ class SchoolSiteMailer
         if ($sahodayaId) {
             $mailer = SahodayaMailer::for($sahodayaId);
             if ($mailer->isConfigured()) {
-                $mailer->sendView($contactEmail, $subject, $view, $data);
+                $mailer->sendView($recipient, $subject, $view, $data);
 
                 return;
             }
         }
 
-        Mail::send($view, $data, function ($message) use ($contactEmail, $subject) {
-            $message->to($contactEmail)->subject($subject);
+        Mail::send($view, $data, function ($message) use ($recipient, $subject) {
+            $message->to($recipient)->subject($subject);
         });
     }
 }

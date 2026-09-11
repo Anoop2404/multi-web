@@ -25,6 +25,12 @@
                             <input v-model="form.display_order" type="number" min="0" placeholder="0"
                                    class="field">
                         </div>
+                        <div>
+                            <label class="form-label mb-1.5">Rating</label>
+                            <select v-model="form.rating" class="field">
+                                <option v-for="value in 5" :key="value" :value="value">{{ value }} star{{ value === 1 ? '' : 's' }}</option>
+                            </select>
+                        </div>
                         <div class="sm:col-span-2">
                             <label class="form-label mb-1.5">Testimonial Quote *</label>
                             <textarea v-model="form.quote" rows="4" required
@@ -61,6 +67,7 @@
                             <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th>
                             <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Designation</th>
                             <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Order</th>
+                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Rating</th>
                             <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Active</th>
                             <th class="px-5 py-3"></th>
                         </tr>
@@ -78,6 +85,7 @@
                             </td>
                             <td class="px-5 py-3 text-gray-500 text-xs">{{ t.designation || '—' }}</td>
                             <td class="px-5 py-3 text-gray-400 text-xs">{{ t.display_order ?? '—' }}</td>
+                            <td class="px-5 py-3 text-amber-500 text-xs">{{ '★'.repeat(t.rating || 0) }}</td>
                             <td class="px-5 py-3">
                                 <span :class="t.is_active ? 'bg-green-50 text-green-700' : 'text-gray-300'"
                                       class="text-xs font-medium">
@@ -90,7 +98,7 @@
                             </td>
                         </tr>
                         <tr v-if="!testimonials.length">
-                            <td colspan="5" class="px-5 py-10 text-center text-gray-400">No testimonials yet.</td>
+                            <td colspan="6" class="px-5 py-10 text-center text-gray-400">No testimonials yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -118,6 +126,7 @@ const form = useForm({
     name:          '',
     designation:   '',
     quote:         '',
+    rating:        5,
     display_order: '',
     is_active:     true,
     photo:         null,
@@ -128,6 +137,7 @@ function startEdit(t) {
     form.name            = t.name;
     form.designation     = t.designation ?? '';
     form.quote           = t.quote;
+    form.rating          = t.rating ?? 5;
     form.display_order   = t.display_order ?? '';
     form.is_active       = t.is_active ?? true;
     form.photo           = null;
@@ -137,6 +147,7 @@ function cancelEdit() {
     editing.value = null;
     form.reset();
     form.is_active = true;
+    form.rating = 5;
 }
 
 function save() {
@@ -144,12 +155,12 @@ function save() {
         form.transform(d => ({ ...d, _method: 'PUT' }))
             .post(`/school-admin/${props.school.id}/testimonials/${editing.value}`, {
                 forceFormData: true,
-                onSuccess: () => { editing.value = null; form.reset(); form.is_active = true; },
+                onSuccess: () => { editing.value = null; form.reset(); form.is_active = true; form.rating = 5; },
             });
     } else {
         form.post(`/school-admin/${props.school.id}/testimonials`, {
             forceFormData: true,
-            onSuccess: () => { form.reset(); form.is_active = true; },
+            onSuccess: () => { form.reset(); form.is_active = true; form.rating = 5; },
         });
     }
 }

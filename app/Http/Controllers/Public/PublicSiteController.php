@@ -72,7 +72,7 @@ class PublicSiteController extends Controller
                     'title' => $tenant->type === 'school' ? 'About Our School' : 'About Sahodaya',
                     'eyebrow' => $tenant->type === 'school' ? 'Vision & Values' : 'Network Vision & Leadership',
                     'subheading' => 'Fostering academic excellence, character building, and holistic education.',
-                    'section_types' => ['about', 'about_sahodaya', 'facilities', 'statistics'],
+                    'section_types' => ['about', 'about_sahodaya', 'principal_message', 'facilities', 'statistics'],
                 ];
                 break;
             case 'academics':
@@ -113,6 +113,50 @@ class PublicSiteController extends Controller
                     'section_types' => ['contact'],
                 ];
                 break;
+            case 'faculty':
+            case 'staff':
+                $pageConfig = [
+                    'title' => 'Faculty',
+                    'eyebrow' => 'Our Team',
+                    'subheading' => 'Meet the teachers and school leaders who guide our students.',
+                    'section_types' => ['staff', 'management'],
+                ];
+                break;
+            case 'downloads':
+            case 'resources':
+                $pageConfig = [
+                    'title' => 'Downloads',
+                    'eyebrow' => 'School Resources',
+                    'subheading' => 'Access school forms, calendars, circulars, and documents.',
+                    'section_types' => ['downloads'],
+                ];
+                break;
+            case 'careers':
+            case 'jobs':
+            case 'job-vacancies':
+                $pageConfig = [
+                    'title' => 'Careers',
+                    'eyebrow' => 'Join Our Team',
+                    'subheading' => 'View current teaching and non-teaching opportunities.',
+                    'section_types' => ['job_vacancies'],
+                ];
+                break;
+            case 'alumni':
+                $pageConfig = [
+                    'title' => 'Alumni',
+                    'eyebrow' => 'Our Community',
+                    'subheading' => 'Reconnect with the school and share your journey.',
+                    'section_types' => ['alumni'],
+                ];
+                break;
+            case 'achievements':
+                $pageConfig = [
+                    'title' => 'Achievements',
+                    'eyebrow' => 'Celebrating Success',
+                    'subheading' => 'Academic, cultural, and sporting milestones from our school community.',
+                    'section_types' => ['achievements'],
+                ];
+                break;
             default:
                 $pageConfig = [
                     'title' => ucfirst(str_replace('-', ' ', $page)),
@@ -129,6 +173,11 @@ class PublicSiteController extends Controller
             'admissions', 'admission' => 'admissions',
             'disclosure', 'mandatory-disclosure', 'cbse-disclosure' => 'disclosure',
             'contact', 'contact-us' => 'contact',
+            'faculty', 'staff' => 'faculty',
+            'downloads', 'resources' => 'downloads',
+            'careers', 'jobs', 'job-vacancies' => 'careers',
+            'alumni' => 'alumni',
+            'achievements' => 'achievements',
             default => null,
         };
 
@@ -145,7 +194,7 @@ class PublicSiteController extends Controller
             return in_array($section->section_type, $pageConfig['section_types'], true);
         });
 
-        if ($filteredSections->isEmpty()) {
+        if ($filteredSections->isEmpty() && $tenant->type === 'sahodaya') {
             $filteredSections = $allSections->reject(fn ($s) => $s->section_type === 'hero');
         }
 

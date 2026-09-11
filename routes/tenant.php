@@ -133,8 +133,22 @@ Route::middleware([
         Route::post('/enquire', [\App\Http\Controllers\Public\AdmissionEnquiryController::class, 'store'])->name('tenant.enquiry.submit');
         Route::post('/alumni-register', [\App\Http\Controllers\Public\AlumniPublicController::class, 'store'])->name('alumni.register');
         Route::get('/contactus', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'contact'));
-        Route::get('/downloads', fn () => app(SahodayaCmsPageController::class)->show('downloads'))->name('tenant.sahodaya.downloads');
-        Route::get('/download', fn () => app(SahodayaCmsPageController::class)->show('downloads'));
+        Route::get('/downloads', function (\Illuminate\Http\Request $request) {
+            return tenancy()->tenant?->type === 'school'
+                ? app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'downloads')
+                : app(SahodayaCmsPageController::class)->show('downloads');
+        })->name('tenant.sahodaya.downloads');
+        Route::get('/download', function (\Illuminate\Http\Request $request) {
+            return tenancy()->tenant?->type === 'school'
+                ? app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'downloads')
+                : app(SahodayaCmsPageController::class)->show('downloads');
+        });
+        Route::get('/downloads/{download}/file', [\App\Http\Controllers\Public\SchoolDownloadController::class, 'show'])->name('tenant.school-downloads.show');
+        Route::get('/faculty', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'faculty'))->name('tenant.site.faculty');
+        Route::get('/staff', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'faculty'));
+        Route::get('/careers', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'careers'))->name('tenant.site.careers');
+        Route::get('/alumni', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'alumni'))->name('tenant.site.alumni');
+        Route::get('/achievements', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'achievements'))->name('tenant.site.achievements');
         Route::get('/gallery/function', fn () => app(SahodayaCmsPageController::class)->show('gallery/function'))->name('tenant.sahodaya.gallery.function');
         Route::get('/gallery/programme', fn () => app(SahodayaCmsPageController::class)->show('gallery/programme'))->name('tenant.sahodaya.gallery.programme');
         Route::get('/gallery/sahodya', fn () => app(SahodayaCmsPageController::class)->show('gallery/sahodya'))->name('tenant.sahodaya.gallery.sahodya');

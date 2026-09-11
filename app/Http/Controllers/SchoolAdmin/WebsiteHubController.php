@@ -20,6 +20,7 @@ class WebsiteHubController extends SchoolAdminController
                 'job_vacancies' => "{$base}/job-vacancies",
                 'alumni' => "{$base}/alumni",
                 'testimonials' => "{$base}/testimonials",
+                'forms' => "{$base}/website/forms",
                 'contact' => "{$base}/contact",
                 'enquiries' => "{$base}/enquiries",
             ],

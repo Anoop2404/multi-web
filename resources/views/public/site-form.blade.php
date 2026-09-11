@@ -8,19 +8,24 @@
     @endif
     <form method="post" action="{{ url('/forms/'.$form->slug) }}" class="space-y-4 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
         @csrf
+        @if($form->honeypot_enabled)
         {{-- Honeypot --}}
         <div class="hidden" aria-hidden="true">
             <label>Website <input type="text" name="website_url" tabindex="-1" autocomplete="off"></label>
         </div>
+        @endif
         @foreach(($form->fields_json ?? []) as $field)
             @php $key = $field['key'] ?? null; @endphp
             @continue(!$key)
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">{{ $field['label'] ?? $key }}</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">
+                    {{ $field['label'] ?? $key }}@if(!empty($field['required'])) * @endif
+                </label>
                 @if(($field['type'] ?? 'text') === 'textarea')
-                    <textarea name="{{ $key }}" rows="4" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" @if(!empty($field['required'])) required @endif>{{ old($key) }}</textarea>
+                    <textarea name="{{ $key }}" rows="4" placeholder="{{ $field['placeholder'] ?? '' }}" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" @if(!empty($field['required'])) required @endif>{{ old($key) }}</textarea>
                 @else
                     <input name="{{ $key }}" type="{{ $field['type'] ?? 'text' }}" value="{{ old($key) }}"
+                           placeholder="{{ $field['placeholder'] ?? '' }}"
                            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
                            @if(!empty($field['required'])) required @endif>
                 @endif

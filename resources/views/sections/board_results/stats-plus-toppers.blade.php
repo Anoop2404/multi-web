@@ -10,6 +10,7 @@
     $results = $query->with(['toppers' => fn($q) => $q->orderByDesc('percentage')->limit(6)])
                      ->orderByDesc('academic_year')
                      ->get();
+    $resultContent = data_get($siteContent ?? [], 'pages.results', []);
 @endphp
 @if($results->isNotEmpty())
 <section class="py-16 px-4 bg-white">
@@ -36,10 +37,10 @@
             {{-- Stats --}}
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                 @foreach([
-                    ['label' => 'Appeared',    'value' => $result->total_appeared],
-                    ['label' => 'Pass %',       'value' => $result->pass_percent . '%'],
-                    ['label' => 'Distinctions','value' => $result->distinctions],
-                    ['label' => 'First Class', 'value' => $result->first_class],
+                    ['label' => $resultContent['appeared_label'] ?? 'Appeared', 'value' => $result->total_appeared],
+                    ['label' => $resultContent['pass_label'] ?? 'Pass %', 'value' => $result->pass_percent . '%'],
+                    ['label' => $resultContent['distinctions_label'] ?? 'Distinctions', 'value' => $result->distinctions],
+                    ['label' => $resultContent['first_class_label'] ?? 'First Class', 'value' => $result->first_class],
                 ] as $stat)
                 <div class="text-center bg-gray-50 rounded-2xl p-5">
                     <div class="text-3xl font-bold font-heading" style="color: var(--color-primary)">{{ $stat['value'] }}</div>
@@ -51,7 +52,7 @@
             {{-- Toppers --}}
             @if($result->toppers->isNotEmpty())
             <div>
-                <h4 class="font-semibold text-gray-700 mb-4">Top Scorers</h4>
+                <h4 class="font-semibold text-gray-700 mb-4">{{ $resultContent['top_scorers_label'] ?? 'Top Scorers' }}</h4>
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                     @foreach($result->toppers as $i => $topper)
                     <div class="text-center bg-gray-50 rounded-xl p-4">

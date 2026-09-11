@@ -26,7 +26,7 @@
                         @if($dl->academic_year) &bull; {{ $dl->academic_year }} @endif
                     </p>
                 </div>
-                <a href="{{ \Storage::url($dl->file_path) }}" target="_blank"
+                <a href="{{ route('tenant.school-downloads.show', ['download' => $dl->id], false) }}" target="_blank"
                    class="shrink-0 p-2 rounded-lg hover:bg-gray-100 transition"
                    style="color: var(--color-primary)" title="Download">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -12,7 +12,7 @@
             {{ $config['heading'] ?? 'Stay Updated' }}
         </h2>
         <p class="text-white/75 text-base max-w-lg mx-auto mb-8">
-            {{ $config['subtext'] ?? 'Get the latest circulars, events, and news from our Sahodaya delivered to your inbox.' }}
+            {{ $config['subtext'] ?? (($tenant->type ?? null) === 'school' ? 'Get the latest announcements, events, and school news delivered to your inbox.' : 'Get the latest circulars, events, and Sahodaya news delivered to your inbox.') }}
         </p>
 
         <form method="POST" action="{{ $config['form_action'] ?? '#' }}"

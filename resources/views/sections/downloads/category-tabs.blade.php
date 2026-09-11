@@ -63,7 +63,7 @@
                                 @endif
                             </div>
                         </div>
-                        <a href="{{ \Storage::url($dl->file_path) }}" target="_blank"
+                        <a href="{{ route('tenant.school-downloads.show', ['download' => $dl->id], false) }}" target="_blank"
                            class="shrink-0 ml-4 text-sm font-semibold flex items-center gap-1 hover:underline"
                            style="color: var(--color-primary)">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

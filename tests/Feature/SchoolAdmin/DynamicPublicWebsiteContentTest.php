@@ -2,13 +2,20 @@
 
 namespace Tests\Feature\SchoolAdmin;
 
+use App\Models\Alumni;
+use App\Models\Download;
 use App\Models\GalleryAlbum;
+use App\Models\SiteForm;
+use App\Models\SiteFormSubmission;
+use App\Models\SiteSection;
 use App\Models\Tenant;
+use App\Models\Testimonial;
 use App\Models\User;
 use App\Models\WebsiteSite;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -282,5 +289,325 @@ class DynamicPublicWebsiteContentTest extends TestCase
                 ->where('settings.widgets.whatsapp_number', null)
                 ->where('settings.widgets.cbse_affiliation_number', '930222')
                 ->where('settings.seo.description', null));
+    }
+
+    public function test_content_added_in_school_admin_reaches_the_published_website(): void
+    {
+        $this->publishAlFarooqueTemplate();
+
+        $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/news", [
+            'title' => 'Science Fair Winners',
+            'body' => 'Our students presented award-winning projects.',
+            'category' => 'Campus',
+            'is_featured' => true,
+            'published_at' => now()->subMinute()->toDateTimeString(),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/events", [
+            'title' => 'Annual Sports Day',
+            'description' => 'Athletics and team events.',
+            'start_date' => now()->addWeek()->toDateString(),
+            'venue' => 'School Ground',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/staff", [
+            'name' => 'Anitha Teacher',
+            'designation' => 'Science Teacher',
+            'department' => 'Science',
+            'qualification' => 'MSc, BEd',
+            'type' => 'teaching',
+            'display_order' => 1,
+            'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/achievements", [
+            'title' => 'District Quiz Champions',
+            'description' => 'First place in the district quiz.',
+            'category' => 'academic',
+            'level' => 'district',
+            'academic_year' => '2026-27',
+            'achieved_at' => now()->toDateString(),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/testimonials", [
+            'name' => 'Amina Parent',
+            'designation' => 'Class VII Parent',
+            'quote' => 'The teachers communicate clearly and care for every child.',
+            'rating' => 4,
+            'display_order' => 1,
+            'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->get('http://dynamic-school.sahodaya.test/')
+            ->assertOk()
+            ->assertSee('Science Fair Winners')
+            ->assertSee('Anitha Teacher')
+            ->assertSee('District Quiz Champions')
+            ->assertSee('Amina Parent')
+            ->assertSee('The teachers communicate clearly and care for every child.')
+            ->assertDontSee('Our child has grown so much in confidence');
+
+        $this->get('http://dynamic-school.sahodaya.test/events')
+            ->assertOk()
+            ->assertSee('Annual Sports Day')
+            ->assertSee('School Ground');
+
+        $this->get('http://dynamic-school.sahodaya.test/faculty')
+            ->assertOk()
+            ->assertSee('Anitha Teacher')
+            ->assertSee('Science Teacher')
+            ->assertSee('href="/faculty"', false);
+
+        $this->get('http://dynamic-school.sahodaya.test/about')
+            ->assertOk()
+            ->assertSee('id="principal-message"', false)
+            ->assertSee('id="facilities"', false);
+
+        $testimonial = Testimonial::where('tenant_id', $this->school->id)->firstOrFail();
+        $this->actingAs($this->admin)->put("/school-admin/{$this->school->id}/testimonials/{$testimonial->id}", [
+            'name' => 'Amina Parent',
+            'designation' => 'Class VII Parent',
+            'quote' => 'This hidden message must not appear.',
+            'rating' => 4,
+            'display_order' => 1,
+            'is_active' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->get('http://dynamic-school.sahodaya.test/')
+            ->assertOk()
+            ->assertDontSee('This hidden message must not appear.')
+            ->assertDontSee('Our child has grown so much in confidence');
+    }
+
+    public function test_school_admin_can_manage_contact_form_fields_and_read_public_submissions(): void
+    {
+        Mail::fake();
+        $this->publishAlFarooqueTemplate();
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/website/forms")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('School/Website/Forms', false)
+                ->where('forms.0.slug', 'contact'));
+
+        $form = SiteForm::where('tenant_id', $this->school->id)->where('slug', 'contact')->firstOrFail();
+
+        $this->actingAs($this->admin)->put("/school-admin/{$this->school->id}/website/forms/{$form->id}", [
+            'name' => 'Contact our school',
+            'notify_email' => 'office@dynamic-school.test',
+            'success_message' => 'Your message has reached our school office.',
+            'is_active' => true,
+            'honeypot_enabled' => true,
+            'fields_json' => [
+                ['key' => 'name', 'label' => 'Your full name', 'type' => 'text', 'placeholder' => 'Enter your name', 'required' => true],
+                ['key' => 'email', 'label' => 'Reply email', 'type' => 'email', 'placeholder' => 'you@example.com', 'required' => true],
+                ['key' => 'message', 'label' => 'How can we help?', 'type' => 'textarea', 'placeholder' => 'Write your message', 'required' => true],
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->get('http://dynamic-school.sahodaya.test/contact')
+            ->assertOk()
+            ->assertSee('Your full name')
+            ->assertSee('Reply email')
+            ->assertSee('How can we help?')
+            ->assertSee('Enter your name')
+            ->assertDontSee('Secretariat');
+
+        $this->from('http://dynamic-school.sahodaya.test/contact')
+            ->post('http://dynamic-school.sahodaya.test/forms/contact', [
+                'name' => 'Fathima Parent',
+                'email' => 'fathima@example.com',
+                'message' => 'Please share the admission visit timings.',
+            ])
+            ->assertRedirect('http://dynamic-school.sahodaya.test/contact')
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Your message has reached our school office.');
+
+        $submission = SiteFormSubmission::where('site_form_id', $form->id)->firstOrFail();
+        $this->assertSame('Fathima Parent', $submission->payload_json['name']);
+        $this->assertSame('Please share the admission visit timings.', $submission->payload_json['message']);
+        $this->assertFalse($submission->is_spam);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/website/forms/{$form->id}/submissions")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('School/Website/FormSubmissions', false)
+                ->where('submissions.0.payload_json.name', 'Fathima Parent')
+                ->where('submissions.0.payload_json.message', 'Please share the admission visit timings.'));
+
+    }
+
+    public function test_section_editor_changes_publish_and_sahodaya_only_variants_are_rejected(): void
+    {
+        $this->publishAlFarooqueTemplate();
+        $api = "/school-admin/{$this->school->id}/site-builder/api";
+
+        $academic = SiteSection::query()
+            ->where('tenant_id', $this->school->id)
+            ->where('section_type', 'academic_programmes')
+            ->firstOrFail();
+
+        $config = $academic->config;
+        $config['heading'] = 'Learning Pathways 2026';
+
+        $this->actingAs($this->admin)->patchJson("{$api}/sections/{$academic->id}", [
+            'site_id' => $this->site->id,
+            'config' => $config,
+        ])->assertOk()->assertJsonPath('status', 'draft');
+
+        $this->get('http://dynamic-school.sahodaya.test/')
+            ->assertOk()
+            ->assertDontSee('Learning Pathways 2026');
+
+        $this->actingAs($this->admin)->postJson("{$api}/sections/{$academic->id}/publish", [
+            'site_id' => $this->site->id,
+        ])->assertOk()->assertJsonPath('status', 'published');
+
+        $this->get('http://dynamic-school.sahodaya.test/')
+            ->assertOk()
+            ->assertSee('Learning Pathways 2026');
+
+        $this->actingAs($this->admin)->postJson("{$api}/sections", [
+            'site_id' => $this->site->id,
+            'section_type' => 'hero',
+            'variant' => 'gradient-split',
+            'config' => [],
+        ])->assertUnprocessable()->assertJsonValidationErrors('section_type');
+
+        $this->actingAs($this->admin)->postJson("{$api}/sections", [
+            'site_id' => $this->site->id,
+            'section_type' => 'contact',
+            'variant' => 'side-by-side',
+            'config' => [],
+        ])->assertUnprocessable()->assertJsonValidationErrors('section_type');
+    }
+
+    public function test_downloads_vacancies_alumni_and_admission_enquiries_work_end_to_end(): void
+    {
+        Storage::fake('shared');
+        config()->set('filesystems.upload_disk', 'shared');
+        $api = "/school-admin/{$this->school->id}/site-builder/api";
+
+        $this->addPublishedSection('downloads', 'card-grid', ['heading' => 'Parent Downloads']);
+        $this->addPublishedSection('job_vacancies', 'listing', ['heading' => 'Work With Us']);
+        $this->addPublishedSection('alumni', 'featured-grid', ['heading' => 'Alumni Stories']);
+
+        $this->actingAs($this->admin)->postJson("{$api}/site-content", [
+            'site_id' => $this->site->id,
+            'pages' => [
+                'downloads' => ['title' => 'School Documents', 'eyebrow' => 'Useful Files', 'subheading' => 'Download current school resources.'],
+                'careers' => ['title' => 'Current Openings', 'eyebrow' => 'Careers', 'subheading' => 'Join our teaching team.'],
+                'alumni' => ['title' => 'Our Alumni Network', 'eyebrow' => 'Stay Connected', 'subheading' => 'Reconnect with classmates and teachers.'],
+            ],
+        ])->assertOk()->assertJsonPath('saved', true);
+
+        $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/downloads", [
+            'title' => 'Academic Calendar 2026',
+            'category' => 'calendar',
+            'academic_year' => '2026-27',
+            'is_active' => true,
+            'file' => UploadedFile::fake()->create('calendar.pdf', 80, 'application/pdf'),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $download = Download::where('tenant_id', $this->school->id)->firstOrFail();
+        Storage::disk('shared')->assertExists($download->file_path);
+
+        $this->get('http://dynamic-school.sahodaya.test/downloads')
+            ->assertOk()
+            ->assertSee('School Documents')
+            ->assertSee('Useful Files')
+            ->assertSee('Academic Calendar 2026')
+            ->assertSee("/downloads/{$download->id}/file", false);
+
+        $this->get("http://dynamic-school.sahodaya.test/downloads/{$download->id}/file")
+            ->assertOk();
+
+        $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/job-vacancies", [
+            'title' => 'Primary English Teacher',
+            'description' => 'Lead engaging English lessons.',
+            'qualification' => 'BA English, BEd',
+            'experience' => 'Two years preferred',
+            'last_date' => now()->addMonth()->toDateString(),
+            'apply_email' => 'careers@dynamic-school.test',
+            'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->get('http://dynamic-school.sahodaya.test/careers')
+            ->assertOk()
+            ->assertSee('Current Openings')
+            ->assertSee('Primary English Teacher')
+            ->assertSee('careers@dynamic-school.test');
+
+        $this->from('http://dynamic-school.sahodaya.test/alumni')
+            ->post('http://dynamic-school.sahodaya.test/alumni-register', [
+                'name' => 'Nihal Alumnus',
+                'batch_year' => 2018,
+                'email' => 'nihal@example.com',
+                'phone' => '9876543210',
+                'current_role' => 'Engineer',
+                'message' => 'Happy to reconnect.',
+            ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $alumnus = Alumni::where('tenant_id', $this->school->id)->firstOrFail();
+        $this->actingAs($this->admin)->patch("/school-admin/{$this->school->id}/alumni/{$alumnus->id}/approve")
+            ->assertRedirect();
+        $this->actingAs($this->admin)->patch("/school-admin/{$this->school->id}/alumni/{$alumnus->id}/feature")
+            ->assertRedirect();
+
+        $this->get('http://dynamic-school.sahodaya.test/alumni')
+            ->assertOk()
+            ->assertSee('Our Alumni Network')
+            ->assertSee('Nihal Alumnus')
+            ->assertSee('Engineer');
+
+        $this->from('http://dynamic-school.sahodaya.test/admission-enquiry')
+            ->post('http://dynamic-school.sahodaya.test/admission-enquiry', [
+                'student_name' => 'Sara Student',
+                'dob' => '2018-05-12',
+                'class_applying' => '3',
+                'parent_name' => 'Fathima Parent',
+                'phone' => '9876543210',
+                'email' => 'fathima@example.com',
+                'address' => 'School Road',
+                'message' => 'Please share the next steps.',
+            ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/enquiries")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('School/Enquiries/Index', false)
+                ->where('enquiries.data.0.student_name', 'Sara Student')
+                ->where('enquiries.data.0.parent_name', 'Fathima Parent'));
+    }
+
+    private function publishAlFarooqueTemplate(): void
+    {
+        $api = "/school-admin/{$this->school->id}/site-builder/api";
+
+        $this->actingAs($this->admin)->postJson("{$api}/experience/draft", [
+            'site_id' => $this->site->id,
+            'template_key' => 'al-farooque',
+            'mode' => 'full',
+        ])->assertOk();
+
+        $this->actingAs($this->admin)->postJson("{$api}/experience/publish", [
+            'site_id' => $this->site->id,
+        ])->assertOk()->assertJsonPath('published', true);
+    }
+
+    /** @param array<string, mixed> $config */
+    private function addPublishedSection(string $type, string $variant, array $config): void
+    {
+        $this->actingAs($this->admin)->postJson("/school-admin/{$this->school->id}/site-builder/api/sections", [
+            'site_id' => $this->site->id,
+            'section_type' => $type,
+            'variant' => $variant,
+            'config' => $config,
+            'is_active' => true,
+            'status' => 'published',
+        ])->assertCreated()->assertJsonPath('status', 'published');
     }
 }

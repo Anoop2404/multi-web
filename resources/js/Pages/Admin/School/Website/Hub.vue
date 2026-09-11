@@ -15,6 +15,7 @@
             <HubCard :href="links.job_vacancies" icon="💼" label="Job vacancies" hint="Staff recruitment listings" />
             <HubCard :href="links.alumni" icon="🎓" label="Alumni" hint="Alumni directory" />
             <HubCard :href="links.testimonials" icon="⭐" label="Testimonials" hint="Parent & student testimonials" />
+            <HubCard :href="links.forms" icon="📨" label="Website forms" hint="Contact forms and received messages" />
             <HubCard :href="links.contact" icon="✉️" label="Contact page" hint="Contact details shown publicly" />
             <HubCard :href="links.enquiries" icon="📥" label="Enquiries" hint="Admission enquiries received" />
         </div>

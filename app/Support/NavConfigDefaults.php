@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Tenant;
+use Illuminate\Support\Collection;
 
 class NavConfigDefaults
 {
@@ -42,6 +43,8 @@ class NavConfigDefaults
             return PortalNavLinks::mergePortalCta($stored);
         }
 
+        $stored['items'] = self::replaceLegacySchoolLinks($stored['items'] ?? []);
+
         return SchoolPortalNavLinks::mergePortalCta($stored);
     }
 
@@ -53,10 +56,10 @@ class NavConfigDefaults
      * doesn't keep dead sub-links either.
      *
      * @param  array<string, mixed>  $navConfig
-     * @param  \Illuminate\Support\Collection<int, mixed>  $sections
+     * @param  Collection<int, mixed>  $sections
      * @return array<string, mixed>
      */
-    public static function pruneDeadAnchors(array $navConfig, \Illuminate\Support\Collection $sections): array
+    public static function pruneDeadAnchors(array $navConfig, Collection $sections): array
     {
         $liveAnchors = $sections
             ->pluck('section_type')
@@ -71,10 +74,10 @@ class NavConfigDefaults
 
     /**
      * @param  array<int, array<string, mixed>>  $items
-     * @param  \Illuminate\Support\Collection<int, string>  $liveAnchors
+     * @param  Collection<int, string>  $liveAnchors
      * @return array<int, array<string, mixed>>
      */
-    private static function filterDeadAnchorItems(array $items, \Illuminate\Support\Collection $liveAnchors): array
+    private static function filterDeadAnchorItems(array $items, Collection $liveAnchors): array
     {
         return collect($items)
             ->filter(function (array $item) use ($liveAnchors) {
@@ -99,9 +102,9 @@ class NavConfigDefaults
     public static function forSahodaya(): array
     {
         return [
-            'style'          => 'sahodaya-modern',
+            'style' => 'sahodaya-modern',
             'layout_variant' => 'sahodaya-modern',
-            'items'          => [
+            'items' => [
                 ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
                 ['label' => 'About', 'url' => '/#about-sahodaya', 'external' => false, 'children' => []],
                 ['label' => 'Programmes', 'url' => '/#events-programs', 'external' => false, 'children' => []],
@@ -128,16 +131,16 @@ class NavConfigDefaults
     public static function forSchool(Tenant $school): array
     {
         return [
-            'style'          => 'logo-left',
+            'style' => 'logo-left',
             'layout_variant' => 'logo-left',
-            'items'          => [
+            'items' => [
                 ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
                 [
                     'label' => 'About Us', 'url' => '/about', 'external' => false,
                     'children' => [
                         ['label' => 'Our Profile', 'url' => '/about', 'external' => false],
-                        ['label' => "Principal's Desk", 'url' => '/about#principals-desk', 'external' => false],
-                        ['label' => 'Why Choose Us', 'url' => '/about#why-choose', 'external' => false],
+                        ['label' => "Principal's Desk", 'url' => '/about#principal-message', 'external' => false],
+                        ['label' => 'Why Choose Us', 'url' => '/about#facilities', 'external' => false],
                     ],
                 ],
                 [
@@ -155,7 +158,7 @@ class NavConfigDefaults
                         ['label' => 'Admission Enquiry', 'url' => '/admission-enquiry', 'external' => false],
                     ],
                 ],
-                ['label' => 'Faculty', 'url' => '/about#faculty', 'external' => false, 'children' => []],
+                ['label' => 'Faculty', 'url' => '/faculty', 'external' => false, 'children' => []],
                 ['label' => 'Gallery', 'url' => '/gallery', 'external' => false, 'children' => []],
                 ['label' => 'Contact Us', 'url' => '/contact', 'external' => false, 'children' => []],
             ],
@@ -184,5 +187,24 @@ class NavConfigDefaults
             ['value' => 'sticky-transparent', 'label' => 'Sticky Transparent'],
             ['value' => 'dark', 'label' => 'Dark'],
         ];
+    }
+
+    /** @param array<int, array<string, mixed>> $items */
+    private static function replaceLegacySchoolLinks(array $items): array
+    {
+        $replacements = [
+            '/about#principals-desk' => '/about#principal-message',
+            '/about#why-choose' => '/about#facilities',
+            '/about#faculty' => '/faculty',
+        ];
+
+        return collect($items)->map(function (array $item) use ($replacements) {
+            $item['url'] = $replacements[$item['url'] ?? ''] ?? ($item['url'] ?? '');
+            if (! empty($item['children'])) {
+                $item['children'] = self::replaceLegacySchoolLinks($item['children']);
+            }
+
+            return $item;
+        })->all();
     }
 }

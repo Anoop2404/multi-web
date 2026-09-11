@@ -66,3 +66,44 @@ test.describe('Standalone school administration login', () => {
         await expect(page.locator('a[href="/portal/login"]')).toHaveCount(0);
     });
 });
+
+test.describe('Standalone school public website', () => {
+    for (const viewport of viewports) {
+        test(`navbar and public pages are responsive on ${viewport.name}`, async ({ page }) => {
+            await page.setViewportSize(viewport);
+
+            for (const path of ['/', '/about', '/faculty', '/contact', '/gallery']) {
+                const response = await page.goto(`${SCHOOL_BASE}${path}`);
+                expect(response?.status(), `${path} should load`).toBe(200);
+
+                const layout = await page.evaluate(() => ({
+                    horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+                    navWithinViewport: (() => {
+                        const nav = document.querySelector('.site-main-navigation')?.getBoundingClientRect();
+                        return Boolean(nav && nav.left >= 0 && nav.right <= window.innerWidth);
+                    })(),
+                }));
+
+                expect(layout.horizontalOverflow, `${path} should not overflow horizontally`).toBe(false);
+                expect(layout.navWithinViewport, `${path} navbar should stay inside the viewport`).toBe(true);
+                await expect(page.getByText('Secretariat')).toHaveCount(0);
+            }
+
+            await page.goto(`${SCHOOL_BASE}/`);
+            const desktopNav = page.locator('.site-desktop-navigation');
+            const mobileToggle = page.locator('.site-mobile-toggle');
+
+            if (viewport.width < 1280) {
+                await expect(desktopNav).toBeHidden();
+                await expect(mobileToggle).toBeVisible();
+                await mobileToggle.click();
+                await expect(page.locator('.site-mobile-navigation')).toBeVisible();
+                await expect(page.locator('.site-mobile-navigation a[href="/faculty"]')).toHaveCount(1);
+            } else {
+                await expect(desktopNav).toBeVisible();
+                await expect(mobileToggle).toBeHidden();
+                await expect(page.locator('.site-desktop-navigation a[href="/faculty"]')).toHaveCount(1);
+            }
+        });
+    }
+});

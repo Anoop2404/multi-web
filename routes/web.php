@@ -677,6 +677,13 @@ Route::prefix('school-admin/{tenantId}')
     Route::put('/testimonials/{testimonial}',                [\App\Http\Controllers\SchoolAdmin\TestimonialController::class, 'update'])->name('testimonials.update');
     Route::delete('/testimonials/{testimonial}',             [\App\Http\Controllers\SchoolAdmin\TestimonialController::class, 'destroy'])->name('testimonials.destroy');
 
+    // Public website forms and their submissions
+    Route::get('/website/forms', [\App\Http\Controllers\SchoolAdmin\SiteFormController::class, 'index'])->name('website.forms');
+    Route::post('/website/forms', [\App\Http\Controllers\SchoolAdmin\SiteFormController::class, 'store'])->name('website.forms.store');
+    Route::put('/website/forms/{form}', [\App\Http\Controllers\SchoolAdmin\SiteFormController::class, 'update'])->name('website.forms.update');
+    Route::delete('/website/forms/{form}', [\App\Http\Controllers\SchoolAdmin\SiteFormController::class, 'destroy'])->name('website.forms.destroy');
+    Route::get('/website/forms/{form}/submissions', [\App\Http\Controllers\SchoolAdmin\SiteFormController::class, 'submissions'])->name('website.forms.submissions');
+
     // Contact
     Route::get('/contact', function (\App\Models\Tenant $tenantId) {
         $settings = $tenantId->settings()->get()->pluck('value', 'key')->toArray();

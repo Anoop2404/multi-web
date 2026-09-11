@@ -1,5 +1,12 @@
 @php
     $contact = $tenant->getSetting('contact', []);
+    $formSlug = $config['form_slug'] ?? 'contact';
+    $siteForm = \App\Models\SiteForm::query()
+        ->where('tenant_id', $tenant->id)
+        ->where('slug', $formSlug)
+        ->first();
+    $formFields = $siteForm?->fields_json ?: \App\Models\SiteForm::defaultContactFields();
+    $formEnabled = ! $siteForm || $siteForm->is_active;
 @endphp
 <section class="py-16 px-4 bg-gray-50">
     <div class="max-w-3xl mx-auto">
@@ -18,19 +25,19 @@
             <div class="grid sm:grid-cols-3 gap-4 mb-8 text-center text-sm">
                 @if(!empty($contact['phone']))
                 <a href="tel:{{ preg_replace('/\s+/', '', $contact['phone']) }}" class="rounded-xl bg-gray-50 px-3 py-3 hover:bg-gray-100 transition">
-                    <span class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Phone</span>
+                    <span class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ $config['phone_label'] ?? 'Phone' }}</span>
                     <span class="font-semibold text-gray-800">{{ $contact['phone'] }}</span>
                 </a>
                 @endif
                 @if(!empty($contact['email']))
                 <a href="mailto:{{ $contact['email'] }}" class="rounded-xl bg-gray-50 px-3 py-3 hover:bg-gray-100 transition">
-                    <span class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Email</span>
+                    <span class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ $config['email_label'] ?? 'Email' }}</span>
                     <span class="font-semibold text-gray-800 break-all">{{ $contact['email'] }}</span>
                 </a>
                 @endif
                 @if(!empty($contact['address']))
                 <div class="rounded-xl bg-gray-50 px-3 py-3">
-                    <span class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Address</span>
+                    <span class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ $config['address_label'] ?? 'Address' }}</span>
                     <span class="font-semibold text-gray-800">{{ $contact['address'] }}</span>
                 </div>
                 @endif
@@ -43,22 +50,40 @@
             </div>
             @endif
 
-            <form method="POST" action="{{ url('/forms/'.($config['form_slug'] ?? 'contact')) }}" class="space-y-4">
+            @if($formEnabled)
+            <form method="POST" action="{{ url('/forms/'.$formSlug) }}" class="space-y-4">
                 @csrf
-                <div class="grid md:grid-cols-2 gap-4">
-                    <input type="text" name="name" placeholder="Name" required
-                           class="w-full bg-gray-100 border-0 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2"
-                           style="--tw-ring-color: var(--color-primary)">
-                    <input type="email" name="email" placeholder="Email" required
-                           class="w-full bg-gray-100 border-0 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2"
-                           style="--tw-ring-color: var(--color-primary)">
+                @if(! $siteForm || $siteForm->honeypot_enabled)
+                <div class="hidden" aria-hidden="true">
+                    <label>Website <input type="text" name="website_url" tabindex="-1" autocomplete="off"></label>
                 </div>
-                <input type="text" name="subject" placeholder="Subject"
-                       class="w-full bg-gray-100 border-0 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2"
-                       style="--tw-ring-color: var(--color-primary)">
-                <textarea name="message" placeholder="Message" rows="5" required
-                          class="w-full bg-gray-100 border-0 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2"
-                          style="--tw-ring-color: var(--color-primary)"></textarea>
+                @endif
+                <div class="grid md:grid-cols-2 gap-4">
+                    @foreach($formFields as $field)
+                    @php
+                        $key = $field['key'] ?? null;
+                        $type = $field['type'] ?? 'text';
+                        $label = $field['label'] ?? $key;
+                        $placeholder = $field['placeholder'] ?? $label;
+                    @endphp
+                    @continue(!$key)
+                    <div class="{{ $type === 'textarea' ? 'md:col-span-2' : '' }}">
+                        <label for="contact-{{ $key }}" class="block text-xs font-semibold text-gray-600 mb-1.5">
+                            {{ $label }}@if(!empty($field['required'])) * @endif
+                        </label>
+                        @if($type === 'textarea')
+                        <textarea id="contact-{{ $key }}" name="{{ $key }}" placeholder="{{ $placeholder }}" rows="5"
+                                  class="w-full bg-gray-100 border-0 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2"
+                                  style="--tw-ring-color: var(--color-primary)" @required(!empty($field['required']))>{{ old($key) }}</textarea>
+                        @else
+                        <input id="contact-{{ $key }}" type="{{ $type }}" name="{{ $key }}" value="{{ old($key) }}" placeholder="{{ $placeholder }}"
+                               class="w-full bg-gray-100 border-0 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2"
+                               style="--tw-ring-color: var(--color-primary)" @required(!empty($field['required']))>
+                        @endif
+                        @error($key)<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
+                    </div>
+                    @endforeach
+                </div>
                 <div class="text-center pt-2">
                     <button type="submit"
                             class="font-semibold px-8 py-3 rounded-full text-white hover:opacity-90 transition"
@@ -67,6 +92,7 @@
                     </button>
                 </div>
             </form>
+            @endif
         </div>
     </div>
 </section>

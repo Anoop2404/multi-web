@@ -630,6 +630,11 @@ const contentPageFields = [
     { key: 'admissions', label: 'Admissions page', fields: publicSectionPageFields() },
     { key: 'disclosure', label: 'CBSE disclosure page', fields: publicSectionPageFields() },
     { key: 'contact', label: 'Contact page', fields: publicSectionPageFields() },
+    { key: 'faculty', label: 'Faculty page', fields: publicSectionPageFields() },
+    { key: 'downloads', label: 'Downloads page', fields: publicSectionPageFields() },
+    { key: 'careers', label: 'Careers page', fields: publicSectionPageFields() },
+    { key: 'alumni', label: 'Alumni page', fields: publicSectionPageFields() },
+    { key: 'achievements', label: 'Achievements page', fields: publicSectionPageFields() },
     { key: 'news', label: 'News page', fields: [
         { key: 'title', label: 'Page title' }, { key: 'empty_message', label: 'Empty message', wide: true },
         { key: 'seo_title', label: 'Search title' }, { key: 'seo_description', label: 'Search description', textarea: true },

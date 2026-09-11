@@ -69,7 +69,9 @@
         <div class="max-w-7xl mx-auto py-16 px-4 text-center space-y-4">
             <div class="w-16 h-16 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center mx-auto text-2xl font-bold">ℹ</div>
             <h2 class="text-2xl font-bold text-slate-900 font-heading">Content Coming Soon</h2>
-            <p class="text-slate-600 max-w-md mx-auto">This page is being prepared by the secretariat desk.</p>
+            <p class="text-slate-600 max-w-md mx-auto">
+                {{ ($tenant->type ?? null) === 'school' ? 'This page is being prepared by the school office.' : 'This page is being prepared by the secretariat desk.' }}
+            </p>
             <a href="{{ $micrositeHome ?: '/' }}" class="inline-block v2-btn-accent font-bold px-6 py-2.5 rounded-xl text-sm shadow-md">
                 Back to Homepage
             </a>
@@ -104,6 +106,7 @@
                 <a href="/about" class="hover:text-primary transition-colors">About</a>
                 <a href="/academics" class="hover:text-primary transition-colors">Academics</a>
                 <a href="/admissions" class="hover:text-primary transition-colors">Admissions</a>
+                <a href="/faculty" class="hover:text-primary transition-colors">Faculty</a>
                 <a href="/gallery" class="hover:text-primary transition-colors">Gallery</a>
                 <a href="/results" class="hover:text-primary transition-colors">Results</a>
                 <a href="/contact" class="hover:text-primary transition-colors">Contact</a>

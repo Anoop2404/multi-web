@@ -1,11 +1,26 @@
+@php
+    $managedTestimonials = \App\Models\Testimonial::query()
+        ->where('tenant_id', $tenant->id)
+        ->orderBy('display_order')
+        ->get();
+    $testimonials = $managedTestimonials->isNotEmpty()
+        ? $managedTestimonials->where('is_active', true)->map(fn ($item) => [
+            'name' => $item->name,
+            'designation' => $item->designation,
+            'quote' => $item->quote,
+            'rating' => $item->rating,
+            'photo' => \App\Support\TenantStorage::siteMediaUrl($tenant, $item->photo),
+        ])->all()
+        : ($config['testimonials'] ?? []);
+@endphp
+@if(!empty($testimonials))
 <section class="py-16 px-4">
     <div class="max-w-7xl mx-auto">
         @if(!empty($config['heading']))
         <h2 class="text-3xl md:text-4xl font-bold font-heading text-center mb-10" style="color: var(--color-primary)">{{ $config['heading'] }}</h2>
         @endif
-        @if(!empty($config['testimonials']) && is_array($config['testimonials']))
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            @foreach($config['testimonials'] as $testimonial)
+            @foreach($testimonials as $testimonial)
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition">
                 <div class="flex items-center gap-3 mb-4">
                     @if(!empty($testimonial['photo']))
@@ -27,6 +42,6 @@
             </div>
             @endforeach
         </div>
-        @endif
     </div>
 </section>
+@endif

@@ -42,8 +42,8 @@
         </div>
         @else
         <x-section-empty-state
-            title="Gallery Coming Soon"
-            subtitle="Event photos and highlights will appear here once added."
+            :title="data_get($siteContent ?? [], 'pages.gallery.empty_title', 'Gallery Coming Soon')"
+            :subtitle="data_get($siteContent ?? [], 'pages.gallery.empty_description', 'Event photos and highlights will appear here once added.')"
             icon="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 3h18v18H3V3z"
         />
         @endif
