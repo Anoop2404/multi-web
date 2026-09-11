@@ -117,9 +117,9 @@ class FestScheduleConflictService
                         'item2_gender'    => $item2['gender'],
                         'item1_type'      => $item1['type'],
                         'item2_type'      => $item2['type'],
-                        'item1_time'      => $start1->format('d M H:i'),
-                        'item2_time'      => $start2->format('d M H:i'),
-                        'time'            => $start1->format('d M H:i').' – '.$start2->format('d M H:i'),
+                        'item1_time'      => $start1->format('d M h:i A').' – '.$end1->format('h:i A'),
+                        'item2_time'      => $start2->format('d M h:i A').' – '.$end2->format('h:i A'),
+                        'time'            => $start1->format('d M h:i A').' – '.$start2->format('d M h:i A'),
                         'start_time1'     => $start1->timestamp,
                     ];
                 }
@@ -191,9 +191,9 @@ class FestScheduleConflictService
                     'item2_gender'   => $item2['gender'],
                     'item1_type'     => $item1['type'],
                     'item2_type'     => $item2['type'],
-                    'item1_time'     => $start1->format('d M H:i'),
-                    'item2_time'     => $start2->format('d M H:i'),
-                    'time'           => $start1->format('d M H:i').' – '.$start2->format('d M H:i'),
+                    'item1_time'     => $start1->format('d M h:i A').' – '.$end1->format('h:i A'),
+                    'item2_time'     => $start2->format('d M h:i A').' – '.$end2->format('h:i A'),
+                    'time'           => $start1->format('d M h:i A').' – '.$start2->format('d M h:i A'),
                 ];
             }
         }
