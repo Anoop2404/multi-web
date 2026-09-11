@@ -435,7 +435,7 @@ class FestCertificateController extends SahodayaAdminController
 
         abort_if($certificates->isEmpty(), 404, $publishedOnly ? 'No published winner certificates to download.' : 'No certificates to download.');
 
-        $this->deleteSupersededBatches($event, 'zip_export', $certType, $itemId, $schoolId, $certIds, $publishedOnly, $groupBy);
+        $this->deleteSupersededBatches($event, 'zip_export', $certType, $itemId, $schoolId, $certIds, $publishedOnly, $groupBy, $plain);
 
         $batchRow = CertificateBatch::create([
             'tenant_id' => $this->sahodaya->id,
@@ -444,6 +444,7 @@ class FestCertificateController extends SahodayaAdminController
             'cert_type' => $certType,
             'published_only' => $publishedOnly,
             'group_by' => $groupBy,
+            'plain' => $plain,
             'item_id' => $itemId,
             'school_id' => $schoolId,
             'certificate_ids_json' => $certIds,
@@ -670,12 +671,14 @@ class FestCertificateController extends SahodayaAdminController
         ?array $certIds,
         bool $publishedOnly = false,
         ?string $groupBy = null,
+        bool $plain = false,
     ): void {
         $candidates = CertificateBatch::where('event_id', $event->id)
             ->where('batch_type', $batchType)
             ->where('cert_type', $certType)
             ->where('published_only', $publishedOnly)
             ->where('group_by', $groupBy)
+            ->where('plain', $plain)
             ->where('item_id', $itemId)
             ->where('school_id', $schoolId)
             ->whereIn('status', CertificateBatch::TERMINAL_STATUSES)

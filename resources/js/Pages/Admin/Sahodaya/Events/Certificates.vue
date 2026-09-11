@@ -93,6 +93,14 @@
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Merit winners only — no background (ZIP)
                                 </button>
+                                <button v-if="winnersByItem.length" @click="queueZipDownload({ published_only: '1', group_by: 'item', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 Merit winners — grouped by item — no background (ZIP)
+                                </button>
+                                <button v-if="winnersByItem.length" @click="queueZipDownload({ published_only: '1', group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 Merit winners — grouped by school — no background (ZIP)
+                                </button>
                                 <button v-if="participationByItem.length" @click="queueZipDownload({ cert_type: 'participation' }, $event)" :disabled="isBatchRunning"
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Participation only (ZIP)
