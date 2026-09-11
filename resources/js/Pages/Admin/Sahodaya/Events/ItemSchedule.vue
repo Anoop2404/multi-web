@@ -122,7 +122,13 @@
                                     {{ group.label }} · {{ group.rows.length }} item{{ group.rows.length === 1 ? '' : 's' }}
                                 </td>
                             </tr>
-                            <tr v-for="row in group.rows" :key="row.item_id" class="hover:bg-slate-50/60">
+                            <template v-for="(row, idx) in group.rows" :key="row.item_id">
+                                <tr v-if="shouldShowStageDivider(row, group.rows[idx - 1])" class="bg-slate-50">
+                                    <td colspan="9" class="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                        {{ row.stage || 'No stage assigned' }}
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-slate-50/60">
                                 <td class="font-medium text-slate-900">
                                     <div>{{ row.title }}</div>
                                     <div class="mt-0.5 flex flex-wrap gap-1">
@@ -170,7 +176,8 @@
                                     <SearchableSelect v-model="draft[row.item_id].venue_id"
                                                       :options="venueOptions" :all-option="true" all-label="— Optional —" />
                                 </td>
-                            </tr>
+                                </tr>
+                            </template>
                         </template>
                         <tr v-if="!filteredRows.length">
                             <td colspan="9" class="p-6 text-center text-slate-400">No items match your filters.</td>
@@ -194,6 +201,7 @@ import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object,
@@ -338,15 +346,40 @@ function switchEvent(eventId) {
 const stageOptions = computed(() => (props.stages ?? []).map((s) => ({ value: String(s.id), label: stageLabel(s) })));
 const venueOptions = computed(() => (props.venues ?? []).map((v) => ({ value: String(v.id), label: v.name })));
 
+// Sorted date → stage → time so the grouped view below reads as an actual runsheet, not
+// display_order (the raw props.rows order). Sorts on the pre-load row values (not `draft`,
+// which holds in-progress edits) so the list doesn't reshuffle under the user while they type.
+const sortedFilteredRows = computed(() => {
+    return [...filteredRows.value].sort((a, b) => {
+        const da = a.scheduled_date || '9999-99-99';
+        const db = b.scheduled_date || '9999-99-99';
+        if (da !== db) return da < db ? -1 : 1;
+
+        const sa = a.stage_sort_order ?? 9999;
+        const sb = b.stage_sort_order ?? 9999;
+        if (sa !== sb) return sa - sb;
+
+        const stgA = a.stage || 'zzzz';
+        const stgB = b.stage || 'zzzz';
+        if (stgA !== stgB) return stgA < stgB ? -1 : 1;
+
+        const ta = a.scheduled_time || '99:99';
+        const tb = b.scheduled_time || '99:99';
+        if (ta !== tb) return ta < tb ? -1 : 1;
+
+        return (a.title || '').localeCompare(b.title || '');
+    });
+});
+
 const groupedFilteredRows = computed(() => {
     const groups = [];
     const byKey = new Map();
-    for (const row of filteredRows.value) {
-        const key = row.head_id ? String(row.head_id) : 'other';
+    for (const row of sortedFilteredRows.value) {
+        const key = row.scheduled_date || 'unscheduled';
         if (!byKey.has(key)) {
             const group = {
                 key,
-                label: row.head_name || 'Unassigned items',
+                label: row.scheduled_date ? formatCalendarDate(row.scheduled_date) : 'Not scheduled',
                 rows: [],
             };
             byKey.set(key, group);
@@ -356,6 +389,13 @@ const groupedFilteredRows = computed(() => {
     }
     return groups;
 });
+
+// Stage sub-header within a date group — rows arrive pre-sorted by date → stage → time
+// (see sortedFilteredRows), so a boundary is just "this row's stage differs from the
+// previous row's".
+function shouldShowStageDivider(row, prevRow) {
+    return (row.stage ?? null) !== (prevRow?.stage ?? null);
+}
 
 function stageLabel(stage) {
     return stage.venue?.name ? `${stage.name} · ${stage.venue.name}` : stage.name;
@@ -399,7 +439,7 @@ const canAutoSequence = computed(() => Boolean(autoSeq.date && autoSeq.time && f
 const autoSeqPreviewEnd = computed(() => {
     if (!canAutoSequence.value) return null;
     let cursor = new Date(`${autoSeq.date}T${autoSeq.time}`);
-    for (const row of filteredRows.value) {
+    for (const row of sortedFilteredRows.value) {
         cursor = new Date(cursor.getTime() + estimatedMinutesFor(row) * 60000);
     }
     return cursor.toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -407,7 +447,10 @@ const autoSeqPreviewEnd = computed(() => {
 
 function runAutoSequence() {
     if (!canAutoSequence.value) return;
-    autoSeqForm.item_ids = filteredRows.value.map((row) => row.item_id);
+    // Matches the grouped table's display order (date → stage → time) rather than raw
+    // display_order, so "the items currently shown below" in the helper text above is
+    // literally true instead of quietly using a different order than what's on screen.
+    autoSeqForm.item_ids = sortedFilteredRows.value.map((row) => row.item_id);
     autoSeqForm.start_at = `${autoSeq.date} ${autoSeq.time}:00`;
     autoSeqForm.stage_id = autoSeq.stage_id ? Number(autoSeq.stage_id) : null;
     autoSeqForm.stage = autoSeq.stage || null;
