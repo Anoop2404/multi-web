@@ -10,22 +10,31 @@
     · Generated on {{ now()->format('d M Y, h:i A') }}
 </p>
 
+@php($participantByDate = collect($participant)->groupBy(fn ($c) => $c['date'] ?? 'Unscheduled'))
+@if($participantByDate->isEmpty())
 <h3>Participant clashes</h3>
+<table><tbody><tr><td style="text-align:center">No participant clashes detected.</td></tr></tbody></table>
+@else
+@foreach($participantByDate as $date => $rows)
+<div @if(!$loop->first) style="page-break-before:always" @endif>
+<h3>Participant clashes — {{ $date }}</h3>
 <table>
 <thead><tr><th>Student</th><th>School</th><th>Item 1</th><th>Item 2</th></tr></thead>
 <tbody>
-@forelse($participant as $c)
+@foreach($rows as $c)
 <tr>
     <td>{{ $c['student_name'] }}</td>
     <td>{{ $c['school_name'] }}</td>
     <td>{{ $c['event1'] }}<br><small>{{ implode(' · ', array_filter([$c['item1_category'] ?? null, $c['item1_gender'] ?? null, $c['item1_type'] ?? null, $c['item1_stage'] ?? null, $c['item1_time'] ?? null])) }}</small></td>
     <td>{{ $c['event2'] }}<br><small>{{ implode(' · ', array_filter([$c['item2_category'] ?? null, $c['item2_gender'] ?? null, $c['item2_type'] ?? null, $c['item2_stage'] ?? null, $c['item2_time'] ?? null])) }}</small></td>
 </tr>
-@empty
-<tr><td colspan="4" style="text-align:center">No participant clashes detected.</td></tr>
-@endforelse
+@endforeach
 </tbody></table>
+</div>
+@endforeach
+@endif
 
+<div @if($participantByDate->isNotEmpty()) style="page-break-before:always" @endif>
 <h3>Stage conflicts</h3>
 <table>
 <thead><tr><th>Stage</th><th>Item 1</th><th>Item 2</th></tr></thead>
@@ -40,4 +49,5 @@
 <tr><td colspan="3" style="text-align:center">No stage conflicts detected.</td></tr>
 @endforelse
 </tbody></table>
+</div>
 </body></html>
