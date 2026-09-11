@@ -8,7 +8,7 @@
     .badge{display:inline-block;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:9px;padding:2px 9px;margin:0 3px;font-size:9px;font-weight:700;letter-spacing:.2px}
     .badge-dark{background:#0f172a;color:#ffffff;border-color:#0f172a}
     .badge-warn{background:#fffbeb;color:#92400e;border-color:#fde68a}
-    .day-page{page-break-inside:auto}
+    .day-page{page-break-inside:auto;padding:26px 30px 24px}
     .day-band{background:#0f172a;color:#ffffff;padding:9px 14px;font-size:13px;font-weight:800;border-radius:5px;margin:18px 0 9px;letter-spacing:.2px}
     .day-band .count{font-weight:400;color:#cbd5e1;font-size:10px}
     .stage-band td{background:#eef2ff;color:#3730a3;font-weight:700;font-size:9.5px;padding:5px 10px;border-left:3px solid #4f46e5;border-top:1px solid #e0e7ff;border-bottom:1px solid #e0e7ff}
