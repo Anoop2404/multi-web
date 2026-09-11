@@ -351,6 +351,75 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(2500.0, (float) $fee->total_due);
     }
 
+    /**
+     * The exclusion isn't limited to team/group items — any item (INDIVIDUAL included)
+     * that has its own per-item fee_amount override is billed on its own, always, and
+     * never draws from or counts against the per-student free quota. Reuses the exact
+     * same ordering trick as the team-item test above: the overridden item is registered
+     * FIRST so it would have wrongly consumed a free slot before this fix.
+     */
+    public function test_kalolsavam_composite_individual_item_with_fee_override_bypasses_the_quota(): void
+    {
+        ['school' => $school, 'event' => $event] = $this->festContext();
+
+        $event->update([
+            'fee_settings' => [
+                'fee_model' => 'kalolsavam_composite',
+                'per_student_amount' => 500,
+                'included_items_per_student' => 3,
+                'extra_item_fee' => 100,
+                'school_registration_flat' => 0,
+            ],
+        ]);
+
+        $premiumItem = FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => 'Premium Workshop',
+            'participant_type' => 'individual',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+            'fee_amount' => 750,
+        ]);
+
+        $individualItems = collect(range(1, 3))->map(fn ($n) => FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => "Solo Item {$n}",
+            'participant_type' => 'individual',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+        ]));
+
+        $schoolClass = SchoolClass::create([
+            'tenant_id' => $school->id,
+            'name' => '10',
+            'class_category_id' => 1,
+            'is_active' => true,
+        ]);
+        $student = Student::create([
+            'tenant_id' => $school->id,
+            'school_class_id' => $schoolClass->id,
+            'name' => 'Override Item Student',
+            'gender' => 'male',
+            'dob' => '2012-01-01',
+            'status' => 'active',
+        ]);
+
+        // Overridden item registered FIRST — the ordering that would have consumed a
+        // free-quota slot (billing it ₹0 instead of its ₹750 override) before this fix.
+        $this->approvedRegistration($event->fresh(), $premiumItem, $school, $student);
+        foreach ($individualItems as $item) {
+            $this->approvedRegistration($event->fresh(), $item, $school, $student);
+        }
+
+        $fee = app(FestSchoolEventFeeService::class)->recalculate($event->fresh(), $school->id);
+
+        // 1 student × ₹500 covers all 3 plain individual items (none beyond quota); the
+        // overridden item bills its own ₹750, untouched by the quota either way.
+        $this->assertSame(500.0, (float) $fee->student_registration_fee);
+        $this->assertSame(750.0, (float) $fee->extra_item_fee);
+        $this->assertSame(1250.0, (float) $fee->total_due);
+    }
+
     public function test_cksc_tiered_counts_registrations_only_by_default(): void
     {
         ['school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();

@@ -3,6 +3,7 @@
 namespace App\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestItemHead;
 use App\Models\FestLevelRegistration;
 use App\Models\FestRegistration;
@@ -582,15 +583,15 @@ class FestSportsCompositeFeeService
         // for at least one item — an event-level-only (Step 1) registration with no
         // items must not be billed. (This previously counted every active event-level
         // registration outright, whether or not the student ever registered an item.)
-        // Team/group items (e.g. Band Display) are excluded here too: they're billed on
+        // Self-priced items (see hasOwnFee()) are excluded here too: they're billed on
         // their own below and never draw from the individual per-student quota, so a
-        // student registered ONLY for a team item must not be charged this fee either.
+        // student registered ONLY for such items must not be charged this fee either.
         $studentIds = FestRegistration::whereIn('event_id', $eventIds)
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             ->with(['item', 'participants'])
             ->get()
-            ->reject(fn (FestRegistration $r) => $r->item?->isTeamItem())
+            ->reject(fn (FestRegistration $r) => $this->hasOwnFee($r->item))
             ->flatMap(fn (FestRegistration $r) => $r->participants
                 ->where('participant_role', '!=', 'standby')
                 ->pluck('student_id'))
@@ -643,14 +644,15 @@ class FestSportsCompositeFeeService
 
         $chargedRegistrations = [];
         foreach ($registrations as $registration) {
-            // Team/group items (e.g. Band Display) never draw from the individual
+            // Self-priced items (team/group items like Band Display, or any item with its
+            // own per-item fee override — see hasOwnFee()) never draw from the individual
             // per-student free quota and are never counted as "extra" items against it —
             // they're billed on their own, always, in the loop below. Previously these
             // fell into this same position walk: landing within a student's first
             // $includedQuota registrations silently waived the item (billing ₹0 instead
             // of its own fee/override), while still consuming a free slot an ordinary
             // item should have used.
-            if ($registration->item?->isTeamItem()) {
+            if ($this->hasOwnFee($registration->item)) {
                 continue;
             }
 
@@ -710,12 +712,13 @@ class FestSportsCompositeFeeService
             }
         }
 
-        // Team/group items (e.g. Band Display) are billed on their own, always — see the
-        // skip above. Uses the item's own fee_amount override (or group_item_flat_fee/
-        // group_item_per_participant_rate) via amountForItem(), the same resolver the
-        // per-student loop above uses, so both agree on where an override wins.
+        // Self-priced items (team/group items, or any item with its own per-item fee
+        // override) are billed on their own, always — see the skip above. Uses
+        // amountForItem(), the same resolver the per-student loop above uses, so both
+        // agree on where an override wins.
         foreach ($registrations as $registration) {
-            if (! $registration->item?->isTeamItem()) {
+            $item = $registration->item;
+            if (! $this->hasOwnFee($item)) {
                 continue;
             }
 
@@ -727,13 +730,14 @@ class FestSportsCompositeFeeService
                 continue;
             }
 
-            $amount = $this->itemFeeResolver->amountForItem($registration->item, $schedule, $event, registration: $registration);
-            $itemTitle = $registration->item?->formattedTitle() ?? str_replace('_', ' ', $registration->item->title ?? 'Team item');
-            $itemPhaseId = $registration->item?->phase_id;
+            $amount = $this->itemFeeResolver->amountForItem($item, $schedule, $event, registration: $registration);
+            $itemTitle = $item->formattedTitle() ?? str_replace('_', ' ', $item->title ?? 'Item');
+            $itemPhaseId = $item->phase_id;
+            $label = $item->isTeamItem() ? $itemTitle.' — team fee' : $itemTitle.' (fixed fee)';
 
             $extraLines[] = [
                 'line_type' => 'team_fee',
-                'label' => $itemTitle.' — team fee',
+                'label' => $label,
                 'quantity' => 1,
                 'unit_amount' => $amount,
                 'amount' => $amount,
@@ -838,6 +842,19 @@ class FestSportsCompositeFeeService
                 ],
             ],
         ];
+    }
+
+    /**
+     * Whether an item is billed entirely on its own — via amountForItem() — rather than
+     * through the per-student free-quota/extra-item system used by calculate(): true for
+     * team/group/pair/trio items (isTeamItem()), and true for ANY item (individual
+     * included) that has its own per-item fee_amount override set on the event's Fees
+     * page. A student registered only for such items owes no per-student registration
+     * fee either — see the two call sites in calculate().
+     */
+    private function hasOwnFee(?FestEventItem $item): bool
+    {
+        return (bool) ($item?->isTeamItem() || $item?->fee_amount !== null);
     }
 
     public function schoolRegistrationAmount(Tenant $school, array $schedule, FestEvent $event): float
