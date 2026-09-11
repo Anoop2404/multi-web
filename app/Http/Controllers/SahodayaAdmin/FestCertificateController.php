@@ -135,33 +135,14 @@ class FestCertificateController extends SahodayaAdminController
             ->values();
     }
 
-    /**
-     * "Boys"/"Girls"/"Mixed" for an item's own gender restriction, null for 'open' (no
-     * restriction — not worth stating). Mirrors FestEventItem::formattedTitle()'s inline
-     * mapping; kept as its own copy here since that method bakes the label into a single
-     * title string, while callers here (the item picker, grouped-by-item views) need the
-     * label as a separate value to combine with category/type differently per UI.
-     */
     private function itemGenderLabel(FestEventItem $item): ?string
     {
-        return match (strtolower((string) $item->gender)) {
-            'male', 'm', 'boy', 'boys' => 'Boys',
-            'female', 'f', 'girl', 'girls' => 'Girls',
-            'mixed', 'common' => 'Mixed',
-            default => null,
-        };
+        return FestItemCategoryLabel::genderLabel($item->gender);
     }
 
-    /** Same 5-value mapping as FestCertificateService::itemTaxonomyLabels()'s $type. */
     private function itemTypeLabel(FestEventItem $item): string
     {
-        return match (strtolower((string) $item->participant_type)) {
-            'group' => 'Group',
-            'team' => 'Team',
-            'pair' => 'Pair',
-            'trio' => 'Trio',
-            default => 'Individual',
-        };
+        return FestItemCategoryLabel::typeLabel($item->participant_type);
     }
 
     /** @param  Collection<int, array<string, mixed>>  $certificates */
@@ -364,6 +345,7 @@ class FestCertificateController extends SahodayaAdminController
         $certIds = $request->query('certificate_ids')
             ? array_filter(array_map('intval', explode(',', (string) $request->query('certificate_ids'))))
             : null;
+        $groupBy = in_array($request->query('group_by'), ['item', 'school'], true) ? $request->query('group_by') : null;
 
         $service = app(FestCertificateService::class);
         $payloads = $service->exportPayloadsForEvent(
@@ -387,6 +369,11 @@ class FestCertificateController extends SahodayaAdminController
 
         $plain = $request->boolean('plain');
 
+        // Only needed for group_by=item — resolved once for the whole export rather than
+        // per certificate, matching groupCertificatesByItem()'s own cost-avoidance.
+        $classGroupLabels = $groupBy === 'item' ? FestClassGroupScheme::labels(null, $event->rootEvent()) : [];
+        $artsCategoryLabels = $groupBy === 'item' ? config('fest_item_taxonomy.arts_category', []) : [];
+
         foreach ($payloads as $payload) {
             $certificate = $payload['certificate'];
 
@@ -397,6 +384,10 @@ class FestCertificateController extends SahodayaAdminController
             $pdf = $service->cachedOrFreshPdf($certificate, fn () => $payload, $plain);
 
             $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.pdf';
+            if ($groupBy) {
+                $folder = $service->archiveGroupFolder($payload, $groupBy, $classGroupLabels, $artsCategoryLabels) ?? 'Other';
+                $name = FestCertificateService::sanitizeArchiveSegment($folder).'/'.$name;
+            }
             $zip->addFromString($name, $pdf);
         }
 
@@ -404,6 +395,7 @@ class FestCertificateController extends SahodayaAdminController
 
         $filename = str($event->title)->slug()
             .($publishedOnly ? '-published-winners' : ($certType ? '-'.$certType : '-certificates'))
+            .($groupBy ? '-by-'.$groupBy : '')
             .($request->boolean('plain') ? '-plain' : '').'.zip';
 
         return response()->download($zipPath, $filename)->deleteFileAfterSend();
@@ -428,6 +420,7 @@ class FestCertificateController extends SahodayaAdminController
             ? array_values(array_filter(array_map('intval', explode(',', (string) $request->input('certificate_ids')))))
             : null;
         $plain = $request->boolean('plain');
+        $groupBy = in_array($request->input('group_by'), ['item', 'school'], true) ? $request->input('group_by') : null;
 
         $service = app(FestCertificateService::class);
         $certificates = $service->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
@@ -442,7 +435,7 @@ class FestCertificateController extends SahodayaAdminController
 
         abort_if($certificates->isEmpty(), 404, $publishedOnly ? 'No published winner certificates to download.' : 'No certificates to download.');
 
-        $this->deleteSupersededBatches($event, 'zip_export', $certType, $itemId, $schoolId, $certIds, $publishedOnly);
+        $this->deleteSupersededBatches($event, 'zip_export', $certType, $itemId, $schoolId, $certIds, $publishedOnly, $groupBy);
 
         $batchRow = CertificateBatch::create([
             'tenant_id' => $this->sahodaya->id,
@@ -450,10 +443,11 @@ class FestCertificateController extends SahodayaAdminController
             'batch_type' => 'zip_export',
             'cert_type' => $certType,
             'published_only' => $publishedOnly,
+            'group_by' => $groupBy,
             'item_id' => $itemId,
             'school_id' => $schoolId,
             'certificate_ids_json' => $certIds,
-            'scope_description' => $this->describeScope($event, $itemId, $schoolId, $certType, $certIds, $publishedOnly),
+            'scope_description' => $this->describeScope($event, $itemId, $schoolId, $certType, $certIds, $publishedOnly).($groupBy ? ' (grouped by '.$groupBy.')' : ''),
             'total_count' => $certificates->count(),
             'status' => CertificateBatch::STATUS_PROCESSING,
             'created_by_user_id' => $request->user()?->id,
@@ -462,6 +456,7 @@ class FestCertificateController extends SahodayaAdminController
 
         $resultFilename = str($event->title)->slug()
             .($publishedOnly ? '-published-winners' : ($certType ? '-'.$certType : '-certificates'))
+            .($groupBy ? '-by-'.$groupBy : '')
             .($plain ? '-plain' : '').'.zip';
 
         // Bus::chain(), not Bus::batch() — chunks must append to the same on-disk ZIP
@@ -477,6 +472,7 @@ class FestCertificateController extends SahodayaAdminController
             $index === $chunks->count() - 1,
             $plain,
             $resultFilename,
+            $groupBy,
         ))->all();
 
         Bus::chain($jobs)
@@ -673,11 +669,13 @@ class FestCertificateController extends SahodayaAdminController
         ?string $schoolId,
         ?array $certIds,
         bool $publishedOnly = false,
+        ?string $groupBy = null,
     ): void {
         $candidates = CertificateBatch::where('event_id', $event->id)
             ->where('batch_type', $batchType)
             ->where('cert_type', $certType)
             ->where('published_only', $publishedOnly)
+            ->where('group_by', $groupBy)
             ->where('item_id', $itemId)
             ->where('school_id', $schoolId)
             ->whereIn('status', CertificateBatch::TERMINAL_STATUSES)

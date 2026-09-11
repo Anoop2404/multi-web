@@ -14,6 +14,7 @@ use App\Models\FestVolunteer;
 use App\Models\FestRecordBreak;
 use App\Models\Tenant;
 use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
@@ -1470,5 +1471,50 @@ class FestCertificateService
 
             return $payload;
         });
+    }
+
+    /**
+     * Folder name for a grouped ZIP export ('item' or 'school') — same category/type/
+     * gender combo already shown in the admin's grouped-by-item views (see
+     * FestCertificateController::groupCertificatesByItem()), so a downloaded ZIP's
+     * folder structure matches what the admin already sees on screen. Returns null for
+     * 'item' mode when the payload has no item (shouldn't happen for winner/participation
+     * certs, which are always item-anchored, but callers fall back to an "Other" folder
+     * rather than erroring on it).
+     *
+     * @param  array<string, mixed>  $payload  A renderContext()-shaped payload.
+     * @param  array<string, string>  $classGroupLabels
+     * @param  array<string, string>  $artsCategoryLabels
+     */
+    public function archiveGroupFolder(array $payload, string $groupBy, array $classGroupLabels, array $artsCategoryLabels): ?string
+    {
+        if ($groupBy === 'school') {
+            $school = $payload['registration']?->school ?? $payload['participant']?->registration?->school;
+
+            return $school?->name;
+        }
+
+        if ($groupBy === 'item') {
+            $item = $payload['item'] ?? null;
+            if (! $item) {
+                return null;
+            }
+
+            $meta = array_filter([
+                FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
+                FestItemCategoryLabel::typeLabel($item->participant_type),
+                FestItemCategoryLabel::genderLabel($item->gender),
+            ]);
+
+            return $meta ? $item->title.' ('.implode(' · ', $meta).')' : $item->title;
+        }
+
+        return null;
+    }
+
+    /** Strips characters invalid in a Windows/Mac zip entry path, so a group folder built from admin-entered item/school names always produces a valid archive path. */
+    public static function sanitizeArchiveSegment(string $value): string
+    {
+        return trim(preg_replace('/[\/\\\\:*?"<>|]+/', ' ', $value) ?? $value);
     }
 }

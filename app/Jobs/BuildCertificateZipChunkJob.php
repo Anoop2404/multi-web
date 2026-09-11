@@ -6,6 +6,7 @@ use App\Models\CertificateBatch;
 use App\Models\FestEvent;
 use App\Models\Tenant;
 use App\Services\Events\FestCertificateService;
+use App\Support\FestClassGroupScheme;
 use App\Support\TenancyDatabase;
 use App\Support\TenantStorage;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -45,6 +46,7 @@ class BuildCertificateZipChunkJob implements ShouldQueue
         public bool $isFinalChunk,
         public bool $plain,
         public string $resultFilename,
+        public ?string $groupBy = null,
     ) {}
 
     public function handle(FestCertificateService $service): void
@@ -105,12 +107,22 @@ class BuildCertificateZipChunkJob implements ShouldQueue
         $succeeded = 0;
         $failed = 0;
 
+        // Only needed for groupBy='item' — resolved once for the whole chunk rather than
+        // per certificate, matching FestCertificateController::groupCertificatesByItem()'s
+        // own cost-avoidance.
+        $classGroupLabels = $this->groupBy === 'item' ? FestClassGroupScheme::labels(null, $event->rootEvent()) : [];
+        $artsCategoryLabels = $this->groupBy === 'item' ? config('fest_item_taxonomy.arts_category', []) : [];
+
         foreach ($payloads as $payload) {
             $certificate = $payload['certificate'];
 
             try {
                 $pdf = $service->cachedOrFreshPdf($certificate, fn () => $payload, $this->plain);
                 $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.pdf';
+                if ($this->groupBy) {
+                    $folder = $service->archiveGroupFolder($payload, $this->groupBy, $classGroupLabels, $artsCategoryLabels) ?? 'Other';
+                    $name = FestCertificateService::sanitizeArchiveSegment($folder).'/'.$name;
+                }
                 $zip->addFromString($name, $pdf);
                 $succeeded++;
             } catch (\Throwable) {

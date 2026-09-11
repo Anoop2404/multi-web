@@ -76,13 +76,30 @@
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 All certificates (ZIP)
                                 </button>
+                                <button @click="queueZipDownload({ group_by: 'item' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 All certificates — grouped by item (ZIP)
+                                </button>
+                                <button @click="queueZipDownload({ group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 All certificates — grouped by school (ZIP)
+                                </button>
+                                <div class="border-t border-gray-100 my-1"></div>
                                 <button v-if="winnersByItem.length" @click="queueZipDownload({ published_only: '1' }, $event)" :disabled="isBatchRunning"
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Merit winners only (ZIP)
                                 </button>
+                                <button v-if="winnersByItem.length" @click="queueZipDownload({ published_only: '1', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 Merit winners only — no background (ZIP)
+                                </button>
                                 <button v-if="participationByItem.length" @click="queueZipDownload({ cert_type: 'participation' }, $event)" :disabled="isBatchRunning"
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Participation only (ZIP)
+                                </button>
+                                <button v-if="participationByItem.length" @click="queueZipDownload({ cert_type: 'participation', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 Participation only — no background (ZIP)
                                 </button>
                                 <div class="border-t border-gray-100 my-1"></div>
                                 <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (with background) ↗</a>

@@ -50,4 +50,32 @@ class FestItemCategoryLabel
 
         return $label ? trim(explode(' — ', $label)[0]) : null;
     }
+
+    /**
+     * "Boys"/"Girls"/"Mixed" for an item's own gender restriction, null for 'open' (no
+     * restriction — not worth stating). Shared by the certificate item picker, the
+     * grouped-by-item admin views, and grouped ZIP exports so all three describe the
+     * same item the same way.
+     */
+    public static function genderLabel(?string $gender): ?string
+    {
+        return match (strtolower((string) $gender)) {
+            'male', 'm', 'boy', 'boys' => 'Boys',
+            'female', 'f', 'girl', 'girls' => 'Girls',
+            'mixed', 'common' => 'Mixed',
+            default => null,
+        };
+    }
+
+    /** Same 5-value mapping as FestCertificateService::itemTaxonomyLabels()'s $type. */
+    public static function typeLabel(?string $participantType): string
+    {
+        return match (strtolower((string) $participantType)) {
+            'group' => 'Group',
+            'team' => 'Team',
+            'pair' => 'Pair',
+            'trio' => 'Trio',
+            default => 'Individual',
+        };
+    }
 }
