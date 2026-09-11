@@ -915,10 +915,16 @@ class FestCertificateService
         return [
             'salutation'          => $salutation,
             'recipient_name'      => $recipientName,
+            'recipient_name_upper' => Str::upper($recipientName),
             // Matches the {class} token name the training/topper certificate templates
             // already use, rather than inventing a differently-named fest equivalent.
             'class'               => $className,
+            // Roman numeral form for numeric class values ("10" -> "X"); non-numeric
+            // classes (e.g. "LKG"/"UKG") pass through unchanged since roman numerals
+            // don't apply to them.
+            'class_roman'         => self::toRomanIfNumeric($className),
             'school_name'         => $schoolName,
+            'school_name_upper'   => Str::upper($schoolName),
             'event_title'         => $event?->title ?? '',
             // Alias of event_title — some templates reference {event_name} instead.
             'event_name'          => $event?->title ?? '',
@@ -938,6 +944,10 @@ class FestCertificateService
             'item_titles'         => $items->pluck('title')->all(),
             'category_name'       => $categoryName,
             'category_short'      => $categoryShort,
+            // Roman numeral form of the short category code ("1" -> "I"); non-numeric
+            // categories (e.g. "Sub Junior") pass through unchanged, same rule as
+            // {class_roman} above.
+            'category_roman'      => self::toRomanIfNumeric($categoryShort),
             'participation_type'  => $participationType,
             'event_dates'         => $eventDates,
             'achievement_line'    => $achievementLine,
@@ -1044,6 +1054,40 @@ class FestCertificateService
         }
 
         return $mark->grade;
+    }
+
+    /**
+     * Roman numeral form of a purely-numeric token value ("10" -> "X"), for certificate
+     * backgrounds that print class/category numbers in roman numerals. Values that aren't
+     * plain digits (e.g. "LKG", "Sub Junior") pass through unchanged — roman numerals have
+     * no meaning for them, and guessing would be worse than leaving the original text.
+     */
+    private static function toRomanIfNumeric(?string $value): string
+    {
+        $trimmed = trim((string) $value);
+        if ($trimmed === '' || ! ctype_digit($trimmed)) {
+            return (string) $value;
+        }
+
+        $number = (int) $trimmed;
+        if ($number <= 0 || $number > 3999) {
+            return (string) $value;
+        }
+
+        $map = [
+            1000 => 'M', 900 => 'CM', 500 => 'D', 400 => 'CD',
+            100 => 'C', 90 => 'XC', 50 => 'L', 40 => 'XL',
+            10 => 'X', 9 => 'IX', 5 => 'V', 4 => 'IV', 1 => 'I',
+        ];
+        $roman = '';
+        foreach ($map as $threshold => $numeral) {
+            while ($number >= $threshold) {
+                $roman .= $numeral;
+                $number -= $threshold;
+            }
+        }
+
+        return $roman;
     }
 
     /**

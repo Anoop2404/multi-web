@@ -595,7 +595,7 @@ const placeholderTokens = computed(() => {
         // resolveFieldValues()) but missing from this button list — worked if typed by hand,
         // just undiscoverable. {class} (student's class, empty for teacher-fest recipients)
         // reuses the same token name the topper template list already uses above.
-        return ['{salutation}', '{recipient_name}', '{class}', '{school_name}', '{event_title}', '{event_name}', '{item_title}', '{item_details}', '{category_name}', '{category_short}', '{participation_type}', '{event_dates}', '{venue}', '{achievement_line}', '{position}', '{grade}', '{sahodaya_name}', '{certificate_date}'];
+        return ['{salutation}', '{recipient_name}', '{recipient_name_upper}', '{class}', '{class_roman}', '{school_name}', '{school_name_upper}', '{event_title}', '{event_name}', '{item_title}', '{item_details}', '{category_name}', '{category_short}', '{category_roman}', '{participation_type}', '{event_dates}', '{venue}', '{achievement_line}', '{position}', '{grade}', '{sahodaya_name}', '{certificate_date}'];
     }
     return ['{salutation}', '{recipient_name}', '{designation}', '{school_name}', '{program_title}', '{sahodaya_name}', '{venue}', '{conducted_on}', '{certificate_date}'];
 });
