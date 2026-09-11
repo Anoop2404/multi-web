@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
+use App\Models\FestRegistration;
 use App\Services\Events\PublicFestScoreboardService;
 use Illuminate\Support\Collection;
 
@@ -174,12 +175,66 @@ class FestEventActivityService
                 ->keyBy('id');
         }
 
+        // Registration-level actions (approve/reject/cancel/submit) log the registration
+        // itself as the audit subject — subject_id is always the registration id, even for
+        // entries written before item_title/participant/school were captured into
+        // properties (see PlatformAuditLogger::registrationContext()). Falling back to the
+        // registration's CURRENT item/participants/school here means old entries display
+        // this too, not just ones logged after that enrichment shipped — no backfill
+        // migration needed, just a live lookup by the id the log already carried.
+        $registrationMorph = (new FestRegistration)->getMorphClass();
+        $missingRegistrationIds = $logs
+            ->filter(function (AuditLog $log) use ($registrationMorph) {
+                $props = $log->properties ?? [];
+
+                return $log->subject_type === $registrationMorph
+                    && $log->subject_id !== null
+                    && (empty($props['item_title']) || empty($props['participant']) || empty($props['school']));
+            })
+            ->pluck('subject_id')
+            ->filter()
+            ->unique()
+            ->all();
+
+        $registrationsMap = collect();
+        if (! empty($missingRegistrationIds)) {
+            $registrationsMap = FestRegistration::whereIn('id', $missingRegistrationIds)
+                ->with(['item', 'school', 'participants.student', 'participants.teacher', 'participants.group'])
+                ->get()
+                ->keyBy('id');
+        }
+
         $scoreboards = app(PublicFestScoreboardService::class);
         $gradePointService = app(\App\Services\Events\FestGradePointService::class);
         $itemResultsService = app(\App\Services\Events\FestItemResultsService::class);
 
-        $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $marksMap, $itemsMap, $event, $scoreboards, $gradePointService, $itemResultsService) {
+        $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $marksMap, $itemsMap, $registrationsMap, $registrationMorph, $event, $scoreboards, $gradePointService, $itemResultsService) {
             $props = $log->properties ?? [];
+
+            if ($log->subject_type === $registrationMorph && $log->subject_id !== null) {
+                $registration = $registrationsMap->get((int) $log->subject_id);
+                if ($registration) {
+                    if (empty($props['item_title'])) {
+                        $props['item_title'] = $registration->item?->title;
+                    }
+                    if (empty($props['item_id'])) {
+                        $props['item_id'] = $registration->item_id;
+                    }
+                    if (empty($props['school'])) {
+                        $props['school'] = $registration->school?->name;
+                    }
+                    if (empty($props['participant'])) {
+                        $names = $registration->participants
+                            ->map(fn ($p) => $p->student?->name ?? $p->teacher?->name ?? $p->group?->team_name)
+                            ->filter()
+                            ->unique()
+                            ->implode(', ');
+                        if ($names !== '') {
+                            $props['participant'] = $names;
+                        }
+                    }
+                }
+            }
             $pid = $props['participant_id'] ?? null;
             if (! $pid && preg_match('/participant\s+#(\d+)/i', $log->description, $matches)) {
                 $pid = (int) $matches[1];
