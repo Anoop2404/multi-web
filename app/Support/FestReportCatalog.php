@@ -131,6 +131,7 @@ class FestReportCatalog
             ['id' => 'absent-report', 'label' => 'Absent Participants', 'format' => 'csv', 'params' => ['school_id'], 'phase' => 'during', 'audience' => 'staff'],
             ['id' => 'clashes', 'label' => 'Schedule Clash Report', 'format' => 'csv', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'clashes-school', 'label' => 'School Clash Report (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'schedule-clashes-pdf', 'label' => 'Schedule Clashes Report (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'promotions', 'label' => 'Promoted Qualifiers', 'format' => 'csv', 'params' => [], 'phase' => 'after', 'audience' => 'staff'],
             ['id' => 'promotions-pdf', 'label' => 'Promotion Sheet', 'format' => 'pdf', 'params' => [], 'phase' => 'after', 'audience' => 'staff'],
             ['id' => 'fees', 'label' => 'Fee / Payment Report', 'format' => 'xls', 'params' => [], 'phase' => 'before', 'audience' => 'staff'],
@@ -226,6 +227,7 @@ class FestReportCatalog
         'absent-report'                 => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'clashes'                        => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
         'clashes-school'                => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => false],
+        'schedule-clashes-pdf'          => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
         'promotions'                    => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'promotions-pdf'                => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'fees'                           => ['dataset' => 'finance', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
@@ -332,7 +334,7 @@ class FestReportCatalog
         'discipline-registration',
         'mark-entry-status',
         'results-pending', 'absent-report',
-        'schedule-clashes', 'clashes', 'clashes-school',
+        'schedule-clashes', 'clashes', 'clashes-school', 'schedule-clashes-pdf',
         'assignment-completeness',
         // Payment/fee report — same reportableEventIds() resolution issue, found when
         // auditing the six above.
@@ -432,7 +434,7 @@ class FestReportCatalog
             'mark-entry-status' => 'mark-entry-status',
             'results-pending' => 'results-pending',
             'absent-report' => 'absent-report',
-            'clashes', 'clashes-school' => 'schedule-clashes',
+            'clashes', 'clashes-school', 'schedule-clashes-pdf' => 'schedule-clashes',
             'item-schedule', 'item-schedule-pdf' => 'item-schedule',
             'student-participation' => 'participation-counts',
             'discipline-registration' => 'discipline-registration',
