@@ -54,7 +54,7 @@
                          just scaled up at sm+. No separate mobile/desktop markup to drift apart. --}}
                     <div class="flex items-center gap-3 sm:gap-4 p-4 sm:p-5">
                         <div class="shrink-0">
-                            @if($pos && $pos <= 6)
+                            @if($pos && $pos <= 3)
                                 <span class="sm:hidden">@include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 56])</span>
                                 <span class="hidden sm:inline-block">@include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 80])</span>
                             @else
@@ -85,7 +85,7 @@
                          sized down just enough that 11+ members still wrap cleanly. --}}
                     <div class="p-4 sm:p-5">
                         <div class="flex items-center gap-3">
-                            @if($pos && $pos <= 6)
+                            @if($pos && $pos <= 3)
                                 @include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 64])
                             @else
                                 <div class="shrink-0 w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-sm text-white font-black">{{ $pos ? '#' . $pos : '—' }}</div>
