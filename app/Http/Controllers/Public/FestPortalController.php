@@ -1206,7 +1206,17 @@ public function tv(Request $request, int $eventId)
 
         // Pair/group items: every co-performer on the same registration, not just
         // whichever one the mark happens to be attached to (see note where this is built).
-        if ($rosterByRegistration && $participant?->registration_id) {
+        // Gated on the item actually being a team/pair/group/trio item, not just on a
+        // roster having been passed in — several callers (results()'s item tab,
+        // schoolResultsRoster(), the landing page's recent-results section) build their
+        // $rosterByRegistration unconditionally across every item in view, individual and
+        // team alike. An individual item with max_per_school > 1 lets one school register
+        // several distinct students under one FestRegistration row
+        // (FestRegistrationCreateService::createForSchool()) — without this guard, every
+        // one of those students' own placements rendered ALL of them under EVERY
+        // placement card for that item, as if they'd competed as a team.
+        if ($rosterByRegistration && $participant?->registration_id
+            && ($mark->item ?? $participant->registration?->item)?->isTeamItem()) {
             $row['team'] = $rosterByRegistration->get($participant->registration_id, collect())
                 ->map(function (FestParticipant $member) {
                     $memberPerson = $member->student ?? $member->teacher;
