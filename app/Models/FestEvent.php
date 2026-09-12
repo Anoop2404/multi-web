@@ -710,13 +710,33 @@ class FestEvent extends Model
      * Prefers the indexed root_event_id column (Phase 7, §7.1) when it's set, falling
      * back to walking parent_event_id — root_event_id may be null for rows created
      * before that backfill ran, or in test fixtures that don't set it explicitly.
+     *
+     * Cached per event id for the life of the request — public fest pages call this
+     * once per item/mark in a loop (e.g. FestPublicVisibilityService::formatPublicParticipant(),
+     * PublicFestScoreboardService::categoryLabel()), and without memoization each call
+     * re-queries fest_events from scratch even though the root never changes mid-request.
+     *
+     * @var array<int, self>
      */
+    private static array $rootEventCache = [];
+
     public function rootEvent(): self
     {
+        // RefreshDatabase recycles auto-increment ids between tests, so a static cache
+        // keyed by id (see FestEligibilityRuleEngine::flushCache() for the same issue)
+        // must not survive past the test that populated it.
+        if (app()->environment('testing')) {
+            self::$rootEventCache = [];
+        }
+
+        if (isset(self::$rootEventCache[$this->id])) {
+            return self::$rootEventCache[$this->id];
+        }
+
         if ($this->root_event_id && (int) $this->root_event_id !== (int) $this->id) {
             $root = self::find($this->root_event_id);
             if ($root) {
-                return $root;
+                return self::$rootEventCache[$this->id] = $root;
             }
         }
 
@@ -732,7 +752,7 @@ class FestEvent extends Model
             $event = $parent;
         }
 
-        return $event;
+        return self::$rootEventCache[$this->id] = $event;
     }
 
     /** @return \Illuminate\Support\Collection<int, self> Root-first ancestry, excluding $this. */

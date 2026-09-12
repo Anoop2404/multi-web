@@ -194,8 +194,29 @@ class FestClassGroupScheme
         return str_ends_with($row->label, $suffix) ? $row->label : $row->label.$suffix;
     }
 
+    /**
+     * Cached per scheme id for the life of the request — public fest pages call this
+     * once per item/mark in a loop (e.g. FestPublicVisibilityService, categoryLabel()
+     * callers), and without memoization each call re-queries the same handful of
+     * scheme groups from scratch.
+     *
+     * @var array<int, array<string, string>>
+     */
+    private static array $labelsForSchemeIdCache = [];
+
     public static function labelsForSchemeId(int $schemeId): array
     {
+        // RefreshDatabase recycles auto-increment ids between tests, so a static cache
+        // keyed by id (see FestEligibilityRuleEngine::flushCache() for the same issue)
+        // must not survive past the test that populated it.
+        if (app()->environment('testing')) {
+            self::$labelsForSchemeIdCache = [];
+        }
+
+        if (isset(self::$labelsForSchemeIdCache[$schemeId])) {
+            return self::$labelsForSchemeIdCache[$schemeId];
+        }
+
         $labels = ['open' => 'Open / All Categories'];
 
         $rows = \App\Models\FestClassCategorySchemeGroup::where('scheme_id', $schemeId)
@@ -207,7 +228,7 @@ class FestClassGroupScheme
             $labels[$row->key] = self::appendClassesSuffixOnce($row);
         }
 
-        return $labels;
+        return self::$labelsForSchemeIdCache[$schemeId] = $labels;
     }
 
     /** @return array<string, float> */

@@ -28,8 +28,22 @@ class PublicFestScoreboardService
         private FestGradePointService $gradePoints,
     ) {}
 
+    /**
+     * Cached per event id — categoryLabel(), scopes(), scoreboard(), and
+     * provisionalScoreboard() all call this once per item/mark/category in a loop,
+     * and without memoization each call re-queries the parent event from scratch
+     * even though it never changes mid-request.
+     *
+     * @var array<int, FestEvent>
+     */
+    private array $rootEventCache = [];
+
     public function rootEvent(FestEvent $event): FestEvent
     {
+        if (isset($this->rootEventCache[$event->id])) {
+            return $this->rootEventCache[$event->id];
+        }
+
         $isPartitionChild = $event->parent_event_id
             && (
                 $event->partition_key
@@ -38,10 +52,10 @@ class PublicFestScoreboardService
             );
 
         if (! $isPartitionChild) {
-            return $event;
+            return $this->rootEventCache[$event->id] = $event;
         }
 
-        return FestEvent::where('tenant_id', $event->tenant_id)
+        return $this->rootEventCache[$event->id] = FestEvent::where('tenant_id', $event->tenant_id)
             ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])
             ->findOrFail($event->parent_event_id);
     }

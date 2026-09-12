@@ -719,7 +719,7 @@ class FestPortalController extends Controller
 
         $allMarks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
-            ->with(['participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('position')
             ->orderByDesc('score')
             ->get()
