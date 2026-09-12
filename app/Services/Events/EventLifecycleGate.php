@@ -193,14 +193,18 @@ class EventLifecycleGate
             throw new HttpException(422, 'Scoring is locked for this event.');
         }
 
-        // Explicit check, not just a side effect of publish() also flipping status to
-        // 'completed' (which the status check below would otherwise catch indirectly) —
-        // a future publish path that sets results_published without transitioning status
-        // must not leave mark entry silently open.
-        if ($event->results_published) {
-            throw new HttpException(422, 'Results have already been published for this event.');
-        }
-
+        // results_published no longer implies "the event is over, freeze everything" —
+        // it's also the Settings page's standalone "Publish results, scores & rankings on
+        // public portal" toggle (FestEventController::update()), which an admin can flip
+        // on mid-event without touching status, precisely so items can go public
+        // incrementally as they're judged. FestResultsController::publish() (the actual
+        // hub-level "finalize the whole fest" action) sets status to 'completed' in the
+        // same call, so the status check below already catches a genuinely finalized
+        // event — a bare results_published check here was blocking mark entry for every
+        // item, published or not, the moment that portal-visibility toggle went on while
+        // the event was still 'ongoing'. Per-item freezing after an individual item is
+        // published is handled separately by allowMarkEntryForItem()'s
+        // results_published_at check below, which fires first regardless of this method.
         if (! in_array($event->status, ['ongoing', 'registration_open', 'published'], true)) {
             throw new HttpException(422, 'Mark entry is not allowed in the current event phase.');
         }
