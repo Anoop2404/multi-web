@@ -96,6 +96,26 @@
             </div>
         </div>
 
+        <!-- Overall exclusions -->
+        <div class="card mb-6 space-y-3">
+            <div>
+                <h3 class="section-title !mb-0">Exclude from overall school total</h3>
+                <p class="section-desc mt-0.5">
+                    Leave a category's points out of the combined "All Categories" school scoreboard total on the public portal.
+                    The category's own scoreboard tab still works as normal — only the combined total skips it.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <label v-for="opt in categoryOptions" :key="opt.value"
+                       class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border cursor-pointer"
+                       :class="excludedCategories.includes(opt.value) ? 'bg-rose-50 border-rose-300 text-rose-800' : 'bg-white border-slate-200 text-slate-600'">
+                    <input type="checkbox" class="rounded" :value="opt.value" v-model="excludedCategories" @change="saveExcludedCategories">
+                    {{ opt.label }}
+                </label>
+                <p v-if="!categoryOptions.length" class="text-xs text-slate-400">No categories found for this event yet.</p>
+            </div>
+        </div>
+
         <div class="card card--flush overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -139,6 +159,7 @@ const props = defineProps({
     activityLogs: { type: Array, default: () => [] },
     categoryOptions: { type: Array, default: () => [] },
     categoryMergeGroups: { type: Array, default: () => [] },
+    excludedOverallCategories: { type: Array, default: () => [] },
 });
 
 const filterCategory = ref('');
@@ -179,6 +200,14 @@ function saveMergeGroup() {
 function saveMergeGroups() {
     router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/category-merge`, {
         groups: mergeGroups.value,
+    }, { preserveScroll: true });
+}
+
+const excludedCategories = ref([...props.excludedOverallCategories]);
+
+function saveExcludedCategories() {
+    router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/excluded-overall-categories`, {
+        categories: excludedCategories.value,
     }, { preserveScroll: true });
 }
 

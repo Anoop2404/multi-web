@@ -8,6 +8,7 @@ use App\Models\FestMark;
 use App\Models\Tenant;
 use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
+use App\Support\FestOverallCategoryExclusion;
 use App\Support\FestSportsAgeGroup;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -376,12 +377,19 @@ class PublicFestScoreboardService
         $root = $this->rootEvent($event);
         $categoryColumn = $root->event_type === 'sports' ? 'age_group' : 'class_group';
         $sourceCategoryKeys = $category ? FestCategoryMerge::sourceKeysFor($root, $category) : null;
+        // Only the combined "All Categories" total (no specific $category requested)
+        // honors excluded_overall_categories — viewing an excluded category on its own
+        // tab still works, only the combined total leaves it out.
+        $excludedCategories = $category ? [] : FestOverallCategoryExclusion::excluded($root);
 
         $marks = FestMark::whereIn('event_id', $scope['event_ids'])
-            ->whereHas('item', function ($query) use ($sourceCategoryKeys, $categoryColumn) {
+            ->whereHas('item', function ($query) use ($sourceCategoryKeys, $categoryColumn, $excludedCategories) {
                 $query->whereNotNull('results_published_at');
                 if ($sourceCategoryKeys) {
                     $query->whereIn($categoryColumn, $sourceCategoryKeys);
+                }
+                if ($excludedCategories) {
+                    $query->whereNotIn($categoryColumn, $excludedCategories);
                 }
             })
             ->with(['participant.registration.item', 'item'])

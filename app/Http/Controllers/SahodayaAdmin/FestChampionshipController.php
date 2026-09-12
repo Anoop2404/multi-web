@@ -9,6 +9,7 @@ use App\Models\FestEvent;
 use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestMark;
 use App\Models\Tenant;
+use App\Services\Events\EventContext;
 use App\Services\Events\FestGradePointService;
 use Illuminate\Http\Request;
 
@@ -71,6 +72,7 @@ class FestChampionshipController extends SahodayaAdminController
             'leaderboard' => $rows,
             'categoryOptions' => collect($categoryLabels)->map(fn ($label, $key) => ['value' => $key, 'label' => $label])->values(),
             'categoryMergeGroups' => $this->mergeGroupsForDisplay($categoryMap),
+            'excludedOverallCategories' => \App\Support\FestOverallCategoryExclusion::excluded($root),
         ]));
     }
 
@@ -117,6 +119,37 @@ class FestChampionshipController extends SahodayaAdminController
         $root->update(['aggregation_config' => $config]);
 
         return back()->with('success', 'Category merge rules saved.');
+    }
+
+    /**
+     * Leaves one or more categories' points out of the combined "All Categories"
+     * school scoreboard total (EventContext::recalculateSchoolPoints(),
+     * PublicFestScoreboardService::provisionalScoreboard()) — that category's own
+     * scoreboard tab is unaffected, only the combined total. Recalculates immediately
+     * so the change is visible without waiting on the next mark save.
+     */
+    public function updateExcludedOverallCategories(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'categories' => 'nullable|array',
+            'categories.*' => 'string',
+        ]);
+
+        $root = $event->rootEvent();
+        $config = $root->aggregation_config ?? [];
+        $categories = array_values(array_unique($data['categories'] ?? []));
+        if ($categories === []) {
+            unset($config['excluded_overall_categories']);
+        } else {
+            $config['excluded_overall_categories'] = $categories;
+        }
+        $root->update(['aggregation_config' => $config]);
+
+        EventContext::for($event)->recalculateSchoolPoints();
+
+        return back()->with('success', 'Overall scoreboard exclusions saved.');
     }
 
     /** @return array<string, string> */

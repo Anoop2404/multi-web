@@ -317,6 +317,7 @@ class FestPortalController extends Controller
                     'gender_label' => \App\Support\FestSportsAgeGroup::genderLabel($first->item?->gender),
                     'participant_type' => $first->item?->participant_type,
                     'stage_type' => $first->item?->stage_type,
+                    'results_published_at' => $first->item?->results_published_at,
                     // Pair/group items save one FestMark per teammate (all with the same
                     // position/score — see the roster batch-fetch above), so without this
                     // the same team would render as N identical winner cards.
@@ -327,6 +328,10 @@ class FestPortalController extends Controller
                         ->all(),
                 ];
             })
+            // Most recently published item first — items were previously left in
+            // item_id order (registration order), which reads as arbitrary once results
+            // start trickling in; visitors want to see what just got published.
+            ->sortByDesc('results_published_at')
             ->values();
 
         // Group item-wise results under the same category labels/order already used by

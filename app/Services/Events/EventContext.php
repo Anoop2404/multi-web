@@ -11,6 +11,7 @@ use App\Models\FestRegistration;
 use App\Models\FestResult;
 use App\Models\Tenant;
 use App\Support\FestClassGroupScheme;
+use App\Support\FestOverallCategoryExclusion;
 use App\Support\FestSportsAgeGroup;
 use Illuminate\Support\Collection;
 
@@ -345,6 +346,7 @@ class EventContext
 
         $pointsBySchool = [];
         $appealPoolIds = Tenant::appealPoolSchoolIds();
+        $excludedCategories = FestOverallCategoryExclusion::excluded($this->event->rootEvent());
 
         foreach ($marks as $mark) {
             $participant = $mark->participant;
@@ -354,6 +356,13 @@ class EventContext
 
             $schoolId = $participant->registration?->school_id;
             if (! $schoolId || isset($appealPoolIds[$schoolId])) {
+                continue;
+            }
+
+            // Admin-configured "leave this category out of the combined overall total"
+            // (aggregation_config.excluded_overall_categories) — the category's own
+            // scoreboard tab (scoreboardByCategory()) is unaffected, only this flat total.
+            if ($excludedCategories && in_array(FestOverallCategoryExclusion::categoryKeyForItem($this->event, $mark->item), $excludedCategories, true)) {
                 continue;
             }
 
