@@ -743,9 +743,15 @@ class FestPortalController extends Controller
                 ->groupBy('registration_id')
             : null;
 
-        // Winner Roster (photo podium) stays capped to the top 3; the Full Results table
-        // below it lists everyone, including non-placing participants — one query/roster
-        // resolution feeds both instead of running this twice.
+        // Winner Roster (photo podium) shows every participant with a mark for this item —
+        // FestMarkSaveService refuses to save a mark for anyone flagged absent
+        // (FestAttendance status), so a FestMark row here already implies "present and
+        // scored"; no separate absence filter is needed. The view already has medal/tint
+        // treatment through rank 6 and a numbered fallback badge beyond that. The Full
+        // Results table below repeats everyone in plain tabular form for the exact points
+        // breakdown; one query/roster resolution feeds both instead of running this
+        // twice. The poster (downloadable certificate-style image) stays top-3 only —
+        // it's not meaningful for every rank.
         $allMarks = $allMarks->map(fn (FestMark $m) => $this->publicWinnerRow($m, $event, $rosterByRegistration) + [
             'mark_id' => $m->id,
             'poster_url' => in_array((int) $m->position, [1, 2, 3], true)
@@ -753,7 +759,7 @@ class FestPortalController extends Controller
                 : null,
         ])->values();
 
-        $marks = $allMarks->filter(fn (array $row) => in_array((int) ($row['position'] ?? 0), [1, 2, 3], true))->values();
+        $marks = $allMarks;
 
         $categoryLabel = FestItemCategoryLabel::resolve(
             $item,
