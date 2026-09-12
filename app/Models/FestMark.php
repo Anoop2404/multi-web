@@ -40,7 +40,12 @@ class FestMark extends Model
         $participantType = strtolower((string) ($item?->participant_type ?? 'individual'));
         $isNonIndividual = $participantType !== 'individual';
 
-        if ($p?->group_id) {
+        // group_id merging only makes sense for an actual team/group/pair/trio item —
+        // an individual item's winners must never collapse into one row just because a
+        // stray group_id (e.g. left over from an unrelated batch/family registration
+        // flow) happens to be set on their participant row, or two different students
+        // from the same school silently vanish into a single result.
+        if ($isNonIndividual && $p?->group_id) {
             return 'grp:' . $p->group_id;
         }
 
@@ -50,8 +55,17 @@ class FestMark extends Model
             return 'team:' . $this->item_id . ':' . $schoolId . ($chest !== '' ? (':' . $chest) : '');
         }
 
-        if ($p?->registration_id) {
-            return 'reg:' . $p->registration_id;
+        // NOT keyed by registration_id here: an individual item with max_per_school > 1
+        // lets one school register several distinct students under a single
+        // FestRegistration row (FestRegistrationCreateService::createForSchool()), each
+        // with their own FestParticipant and FestMark. Keying by registration_id
+        // collapsed every one of those students but the first (by position/score order)
+        // into a single row — a same-school pair or trio in an individual item silently
+        // lost all but their top scorer everywhere this key drives deduping (school
+        // points, the public item-results page, etc). A participant is the correct
+        // atomic unit for an individual entrant; registration is not.
+        if ($p?->id) {
+            return 'participant:' . $p->id;
         }
 
         return 'mark:' . $this->id;
