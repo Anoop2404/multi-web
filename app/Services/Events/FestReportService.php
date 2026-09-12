@@ -121,7 +121,7 @@ class FestReportService
                     'school_name'          => $first->school?->name ?? $first->school_id,
                     'phase_id'             => $usesPhases ? $first->event->source_phase_id : null,
                     'phase_name'           => $usesPhases ? ($first->event->sourcePhase?->name ?? 'Unassigned') : null,
-                    'active_count'         => $group->count(),
+                    'active_count'         => $group->sum(fn ($r) => $this->registrationAtomicCount($r)),
                     'item_count'           => $enabled->pluck('item_id')->unique()->count(),
                     'unique_student_count' => $enabled->flatMap(fn ($r) => $r->participants)->pluck('student_id')->filter()->unique()->count(),
                 ];
@@ -140,10 +140,29 @@ class FestReportService
             'usesPhases' => $usesPhases,
             'totals'     => [
                 'schools'              => $regs->pluck('school_id')->unique()->count(),
-                'active_registrations' => $regs->count(),
+                'active_registrations' => $regs->sum(fn ($r) => $this->registrationAtomicCount($r)),
                 'unique_students'      => $regs->flatMap(fn ($r) => $r->participants)->pluck('student_id')->filter()->unique()->count(),
             ],
         ];
+    }
+
+    /**
+     * How many "registrations" one FestRegistration row represents for reporting.
+     * A team/group/pair/trio row is one entry no matter its roster size. But for an
+     * individual item, FestRegistrationCreateService::createForSchool() can bundle
+     * several distinct students from the same school under a single row when
+     * max_per_school > 1 — so each of their FestParticipant rows is its own
+     * registration, mirroring the atomic-unit convention FestMark::deduplicationKey()
+     * already uses for the same reason (a participant, not a registration, is the
+     * correct unit for an individual entrant).
+     */
+    private function registrationAtomicCount(FestRegistration $registration): int
+    {
+        $participantType = strtolower((string) ($registration->item?->participant_type ?? 'individual'));
+
+        return $participantType === 'individual'
+            ? max($registration->participants->count(), 1)
+            : 1;
     }
 
     private function schoolParticipationPdf(): \Symfony\Component\HttpFoundation\Response
