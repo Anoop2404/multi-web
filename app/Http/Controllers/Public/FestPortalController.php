@@ -174,6 +174,59 @@ class FestPortalController extends Controller
         ]);
     }
 
+    /**
+     * Standalone version of show()'s "Event item finder" section (search/filter grid of
+     * every item, Schedule/Results buttons per item) — previously only reachable by
+     * scrolling to the bottom of the long event landing page. Reuses the exact same
+     * item/category/schedule data-building as show() (kept as its own small query here
+     * rather than extracted into a shared helper, so this page can't regress show()'s
+     * already-working landing page if this one changes later).
+     */
+    public function itemFinder(Request $request, int $eventId)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        $selectedScope = $this->operationalEvents->directScope($event);
+
+        $targetEvent = FestEventItem::where('event_id', $event->id)->where('is_enabled', true)->exists()
+            ? $event
+            : ($event->parent_event_id ? $event->rootEvent() : $event);
+
+        $rawItems = FestEventItem::where('event_id', $targetEvent->id)
+            ->where('is_enabled', true)
+            ->with(['head:id,name', 'phase:id,source_phase_id'])
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->get(['id', 'title', 'stage_type', 'category', 'class_group', 'age_group', 'participant_type', 'head_id', 'event_id', 'results_published_at', 'results_hidden', 'phase_id']);
+
+        $allItems = \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($rawItems, $event);
+
+        $scheduledItemIds = FestSchedule::where('event_id', $event->id)
+            ->whereNotNull('item_id')
+            ->distinct()
+            ->pluck('item_id');
+
+        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+
+        $itemCategoryKeys = $allItems
+            ->map(fn ($item) => $item->class_group ?: $item->age_group ?: $item->category)
+            ->filter()->unique()->values();
+        $categoryLabels = $itemCategoryKeys->mapWithKeys(
+            fn (string $key) => [$key => $this->scoreboards->categoryLabel($event, $key)]
+        );
+
+        return $this->renderPublic('public.fest.item-finder', $tenant, [
+            'event' => $event,
+            'eventContext' => $this->operationalEvents->publicContext($event),
+            'allItems' => $allItems,
+            'categoryLabels' => $categoryLabels,
+            'isAdminPreview' => $isAdminPreview,
+            'scopeSchedulePublished' => (bool) $selectedScope['schedule_published'],
+            'scheduledItemIds' => $scheduledItemIds,
+            'pageSeo' => ['title' => 'Item Finder — '.$event->title.' — '.$tenant->name],
+        ]);
+    }
+
     public function results(Request $request, int $eventId)
     {
         $tenant = $this->resolveTenant();
