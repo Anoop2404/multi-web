@@ -146,4 +146,45 @@ class FestEventUpdateRespectsTransitionGuardTest extends TestCase
         $response->assertSessionDoesntHaveErrors('status');
         $this->assertSame('ongoing', $event->fresh()->status);
     }
+
+    public function test_update_allows_reopening_registration_from_ongoing(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'Guard Test Sahodaya 4',
+            'domain'    => 'guard-test-4.test',
+            'is_active' => true,
+        ]);
+
+        SahodayaProfile::create([
+            'tenant_id'         => $sahodaya->id,
+            'prefix'            => 'GT4',
+            'student_data_mode' => 'counts_only',
+        ]);
+
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create([
+            'tenant_id'   => $sahodaya->id,
+            'title'       => 'Ongoing Event',
+            'event_type'  => 'kalotsavam',
+            'level_round' => 'sahodaya',
+            'status'      => 'ongoing',
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('sahodaya.events.update', [
+            'tenantId' => $sahodaya->id,
+            'event'    => $event->id,
+        ]), [
+            'title'  => 'Ongoing Event',
+            'status' => 'registration_open',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors('status');
+        $this->assertSame('registration_open', $event->fresh()->status);
+    }
 }

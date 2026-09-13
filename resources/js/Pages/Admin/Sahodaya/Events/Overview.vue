@@ -508,7 +508,7 @@ const FEST_EVENT_TRANSITIONS = {
     draft: ['published', 'cancelled'],
     published: ['registration_open', 'draft', 'cancelled'],
     registration_open: ['ongoing', 'published', 'cancelled'],
-    ongoing: ['completed', 'cancelled'],
+    ongoing: ['completed', 'cancelled', 'registration_open'],
     completed: ['ongoing'],
     cancelled: ['draft'],
 };

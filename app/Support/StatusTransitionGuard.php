@@ -12,7 +12,7 @@ class StatusTransitionGuard
         'draft'             => ['published', 'cancelled'],
         'published'         => ['registration_open', 'draft', 'cancelled'],
         'registration_open' => ['ongoing', 'published', 'cancelled'],
-        'ongoing'           => ['completed', 'cancelled'],
+        'ongoing'           => ['completed', 'cancelled', 'registration_open'], // Admin re-opening registration (e.g. advanced to ongoing by mistake, or needs to accept late entries)
         'completed'         => ['ongoing'], // Admin re-opening to ongoing
         'cancelled'         => ['draft'], // Admin re-opening
     ];
