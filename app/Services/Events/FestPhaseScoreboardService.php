@@ -62,7 +62,7 @@ class FestPhaseScoreboardService
      *
      * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
      */
-    public function phaseScoreboard(FestEventPhase $phase): array
+    public function phaseScoreboard(FestEventPhase $phase, ?string $category = null): array
     {
         $sourcePhase = $phase->sourcePhase ?: $phase;
         $hub = ($sourcePhase->event ?: FestEvent::find($sourcePhase->event_id))?->rootEvent();
@@ -84,23 +84,23 @@ class FestPhaseScoreboardService
         if ($phaseLeaves->isNotEmpty()) {
             return $this->partitions->aggregateScoreboardAcrossPartitions(
                 $phaseLeaves,
-                function (FestEvent $leaf) use ($sourcePhase) {
+                function (FestEvent $leaf) use ($sourcePhase, $category) {
                     $childPhaseId = FestEventPhase::where('event_id', $leaf->id)
                         ->where('source_phase_id', $sourcePhase->id)
                         ->value('id');
 
                     return $childPhaseId
-                        ? EventContext::for($leaf)->scoreboardByPhase((int) $childPhaseId)
+                        ? EventContext::for($leaf)->scoreboardByPhase((int) $childPhaseId, $category)
                         : [];
                 }
             );
         }
 
-        return EventContext::for($hub)->scoreboardByPhase($sourcePhase->id);
+        return EventContext::for($hub)->scoreboardByPhase($sourcePhase->id, $category);
     }
 
     /** @return list<array{school_id: string, school_name: string, total_points: int, rank: int}> */
-    public function phaseScoreboardForRegion(FestEventPhase $phase, int $regionId): array
+    public function phaseScoreboardForRegion(FestEventPhase $phase, int $regionId, ?string $category = null): array
     {
         $source = $phase->sourcePhase ?: $phase;
         $hub = $source->event?->rootEvent();
@@ -120,7 +120,7 @@ class FestPhaseScoreboardService
             ->where('source_phase_id', $source->id)
             ->value('id');
 
-        return $childPhaseId ? EventContext::for($leaf)->scoreboardByPhase((int) $childPhaseId) : [];
+        return $childPhaseId ? EventContext::for($leaf)->scoreboardByPhase((int) $childPhaseId, $category) : [];
     }
 
     /**
@@ -140,7 +140,7 @@ class FestPhaseScoreboardService
      *
      * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
      */
-    public function cumulativeOverall(FestEvent $hub): array
+    public function cumulativeOverall(FestEvent $hub, ?string $category = null): array
     {
         $publishedPhases = FestEventPhase::where('event_id', $hub->id)
             ->where('results_published', true)
@@ -153,7 +153,7 @@ class FestPhaseScoreboardService
 
         $totals = [];
         foreach ($publishedPhases as $phase) {
-            foreach ($this->phaseScoreboard($phase) as $row) {
+            foreach ($this->phaseScoreboard($phase, $category) as $row) {
                 $sid = $row['school_id'];
                 $totals[$sid] = ($totals[$sid] ?? 0) + (int) $row['total_points'];
             }
@@ -163,11 +163,13 @@ class FestPhaseScoreboardService
     }
 
     /**
-     * Running overall with auditable per-phase contribution columns.
+     * Running overall with auditable per-phase contribution columns. $category filters
+     * to one class/age-group category (same values as EventContext::scoreboardByCategory())
+     * — null means the whole-event "Overall" total, matching every other call site's default.
      *
      * @return list<array{school_id: string, school_name: string, phase_points: array<int, int>, total_points: int, rank: int}>
      */
-    public function cumulativeOverallWithContributions(FestEvent $hub): array
+    public function cumulativeOverallWithContributions(FestEvent $hub, ?string $category = null): array
     {
         $published = FestEventPhase::where('event_id', $hub->rootEvent()->id)
             ->where('results_published', true)
@@ -176,7 +178,7 @@ class FestPhaseScoreboardService
         $rows = [];
 
         foreach ($published as $phase) {
-            foreach ($this->phaseScoreboard($phase) as $score) {
+            foreach ($this->phaseScoreboard($phase, $category) as $score) {
                 $schoolId = $score['school_id'];
                 $rows[$schoolId] ??= [
                     'school_id' => $schoolId,
@@ -215,7 +217,7 @@ class FestPhaseScoreboardService
      *
      * @return list<array{phase_id: int, name: string, code: ?string, results_published: bool, board: list<array{school_id: string, school_name: string, total_points: int, rank: int}>}>
      */
-    public function phaseBreakdown(FestEvent $hub): array
+    public function phaseBreakdown(FestEvent $hub, ?string $category = null): array
     {
         return FestEventPhase::where('event_id', $hub->id)
             ->orderBy('sort_order')
@@ -225,13 +227,13 @@ class FestPhaseScoreboardService
                 'name' => $phase->name,
                 'code' => $phase->code,
                 'results_published' => (bool) $phase->results_published,
-                'board' => $phase->results_published ? $this->phaseScoreboard($phase) : [],
+                'board' => $phase->results_published ? $this->phaseScoreboard($phase, $category) : [],
                 'regions' => $phase->isRegional()
                     ? $phase->allowedRegions()->where('enabled', true)->with('region')->get()->map(fn ($allowed) => [
                         'region_id' => $allowed->region_id,
                         'region_name' => $allowed->region?->name,
                         'board' => $phase->results_published
-                            ? $this->phaseScoreboardForRegion($phase, $allowed->region_id)
+                            ? $this->phaseScoreboardForRegion($phase, $allowed->region_id, $category)
                             : [],
                     ])->values()->all()
                     : [],

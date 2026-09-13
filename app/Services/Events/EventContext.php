@@ -182,7 +182,9 @@ class EventContext
      * §7.3a (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15) — a school's points
      * for items where item.phase_id = $phaseId, computed live from this event's own
      * FestMark rows (mirrors scoreboardByCategory()'s live class_group/age_group
-     * filter, applied to phase_id instead). Used directly by
+     * filter, applied to phase_id instead — and combinable with it via $category, so
+     * the same phase-cumulative view FestPhaseScoreboardService builds for "Overall"
+     * can be built per class/age category too). Used directly by
      * FestPhaseScoreboardService::phaseScoreboard() for a non-regional phase (called
      * on the hub event), and once per region-partition child for a regional phase
      * (called on each child, then summed via
@@ -190,14 +192,19 @@ class EventContext
      *
      * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
      */
-    public function scoreboardByPhase(int $phaseId): array
+    public function scoreboardByPhase(int $phaseId, ?string $category = null): array
     {
         $gradePointService = app(FestGradePointService::class);
 
         // Same dedupe as scoreboardByCategory() above — one FestMark per teammate on
         // pair/group items must not multiply a team's points by its squad size.
         $marks = FestMark::where('event_id', $this->event->id)
-            ->whereHas('item', fn ($q) => $q->where('phase_id', $phaseId))
+            ->whereHas('item', function ($q) use ($phaseId, $category) {
+                $q->where('phase_id', $phaseId);
+                if ($category) {
+                    $q->where($this->event->event_type === 'sports' ? 'age_group' : 'class_group', $category);
+                }
+            })
             ->with(['participant.registration', 'item'])
             ->get()
             ->unique(fn (FestMark $m) => $m->deduplicationKey());

@@ -299,18 +299,22 @@ class PublicFestScoreboardService
     {
         $root = $this->rootEvent($event);
 
-        if (! $category) {
-            if ($root->usesPhasedRegionalBilling()) {
-                if (($scope['role'] ?? null) === 'phase' && ! empty($scope['source_phase_id'])) {
-                    $phase = $root->phases()->findOrFail($scope['source_phase_id']);
+        // Phase-cumulative routing applies regardless of $category (a class/age-group
+        // board needs the same phase-carry-forward the overall board gets — see
+        // FestPhaseScoreboardService::phaseScoreboard()'s $category param) — only the
+        // plain single-event fallback below is overall-only.
+        if ($root->usesPhasedRegionalBilling()) {
+            if (($scope['role'] ?? null) === 'phase' && ! empty($scope['source_phase_id'])) {
+                $phase = $root->phases()->findOrFail($scope['source_phase_id']);
 
-                    return app(FestPhaseScoreboardService::class)->phaseScoreboard($phase);
-                }
-                if (($scope['role'] ?? null) === 'overall') {
-                    return app(FestPhaseScoreboardService::class)->cumulativeOverall($root);
-                }
+                return app(FestPhaseScoreboardService::class)->phaseScoreboard($phase, $category);
             }
+            if (($scope['role'] ?? null) === 'overall') {
+                return app(FestPhaseScoreboardService::class)->cumulativeOverall($root, $category);
+            }
+        }
 
+        if (! $category) {
             if ($scope['event_id']) {
                 $partition = FestEvent::where('tenant_id', $root->tenant_id)
                     ->findOrFail($scope['event_id']);

@@ -139,10 +139,32 @@ class PublicOperationalEventService
      */
     public function directScope(FestEvent $event): array
     {
+        // 'role' here does NOT change event_ids (still just this one event — see the
+        // class docblock) — it only labels the scope so PublicFestScoreboardService::
+        // scoreboard() and FestPortalController::results() know to layer in the phased-
+        // event cumulative board (FestPhaseScoreboardService) on top of this event's own
+        // data. Was hardcoded to 'event' unconditionally, which meant that already-built
+        // routing (role === 'phase' / 'overall') was never reachable from any public
+        // page — every public controller method resolves its scope through this method.
+        $role = 'event';
+        if ($event->usesPhasedRegionalBilling()) {
+            // region_id set means this leaf is ONE region among possibly several sharing
+            // the same source_phase_id — role stays 'event' so its own page keeps showing
+            // just its own results (per the docblock above), not silently combined with
+            // sibling regions. A leaf with no region_id is either a non-regional phase's
+            // sole leaf, or a combined finale — aggregating "every leaf of this phase" is
+            // a no-op for the former and exactly correct for the latter.
+            if ($event->source_phase_id && ! $event->region_id) {
+                $role = 'phase';
+            } elseif (! $event->parent_event_id) {
+                $role = 'overall';
+            }
+        }
+
         return [
             'key' => 'event:'.$event->id,
             'label' => $event->title,
-            'role' => 'event',
+            'role' => $role,
             'event_id' => (int) $event->id,
             'event_ids' => [(int) $event->id],
             'results_published' => (bool) $event->results_published,
