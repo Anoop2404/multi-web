@@ -74,8 +74,7 @@
                                     <SearchableSelect :model-value="attendanceStatus(participant, item)"
                                             class="min-w-[6.5rem] w-full"
                                             :options="[{ value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' }]"
-                                            :all-option="true"
-                                            all-label="—"
+                                            :all-option="false" placeholder="Not marked" :searchable="false" escape-overflow
                                             @update:model-value="(status) => markAttendance(participant, item, status)" />
                                 </td>
                                 <td v-if="showMeasurement(section.item)" class="p-2 align-middle">

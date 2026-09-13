@@ -119,10 +119,13 @@
                     <Link :href="markEntryStatusReportUrl" class="text-[11px] text-indigo-600 hover:underline shrink-0 whitespace-nowrap">
                         View full status report →
                     </Link>
-                    <button v-if="sections.length" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankAll">
+                    <!-- Only shown with 2+ items in view — with exactly one, this would sit right
+                         above that section's own identical "Auto-rank"/"Auto-grade" buttons
+                         (below), duplicating them for the everyday single-item workflow. -->
+                    <button v-if="sections.length > 1" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankAll">
                         Auto-rank All
                     </button>
-                    <button v-if="sections.length && showGradeColumn" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoGradeAll">
+                    <button v-if="sections.length > 1 && showGradeColumn" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoGradeAll">
                         Auto-grade All
                     </button>
                     <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4 shrink-0 whitespace-nowrap"
@@ -270,7 +273,7 @@
                                             :class="isAbsent(participant, item) ? '!border-rose-300 !bg-rose-50 !text-rose-700' : ''"
                                             :disabled="itemLocked"
                                             :options="[{ value: 'present', label: 'Present ✓' }, { value: 'absent', label: 'Absent ✕' }]"
-                                            :all-option="true" all-label="Present ✓"
+                                            :all-option="false" placeholder="Not marked" :searchable="false" escape-overflow
                                             @update:model-value="(value) => markAttendance(participant, item, value)" />
                                 </td>
 

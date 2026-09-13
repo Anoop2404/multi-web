@@ -31,54 +31,62 @@
             <option v-for="opt in normalizedOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </select>
 
-        <!-- Dropdown panel -->
-        <div
-            v-if="isOpen && !disabled"
-            class="absolute left-0 top-full mt-1 min-w-full w-max max-w-sm bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col max-h-64"
-        >
-            <!-- Search input inside dropdown -->
-            <div v-if="searchable" class="p-2 border-b border-slate-100 bg-slate-50/50">
-                <input
-                    ref="searchInputRef"
-                    v-model="searchQuery"
-                    type="text"
-                    class="w-full text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                    :placeholder="searchPlaceholder"
-                    @click.stop
-                />
-            </div>
-
-            <!-- Options list -->
-            <div class="overflow-y-auto flex-1 p-1">
-                <button
-                    v-if="allOption"
-                    type="button"
-                    class="w-full text-left text-xs px-2.5 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition flex items-center justify-between"
-                    :class="!modelValue ? 'bg-indigo-50/80 text-indigo-700 font-bold' : 'text-slate-700'"
-                    @click="selectOption('')"
-                >
-                    <span>{{ allLabel }}</span>
-                    <span v-if="!modelValue" class="text-indigo-600">✓</span>
-                </button>
-
-                <div v-if="filteredOptions.length === 0" class="p-3 text-center text-xs text-slate-400">
-                    No results match "{{ searchQuery }}"
+        <!-- Dropdown panel. Teleported to <body> only when escape-overflow is set (e.g. a
+             cell inside a horizontally-scrollable table, whose overflow-x-auto wrapper
+             also clips vertically per the CSS overflow spec) so the menu can overlap
+             ancestors that would otherwise cut it off; Teleport's `disabled` keeps every
+             other caller's DOM exactly as before. -->
+        <Teleport to="body" :disabled="!escapeOverflow">
+            <div
+                v-if="isOpen && !disabled"
+                ref="menuRef"
+                class="absolute left-0 top-full mt-1 min-w-full w-max max-w-sm bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col max-h-64"
+                :style="escapeOverflow ? menuStyle : undefined"
+            >
+                <!-- Search input inside dropdown -->
+                <div v-if="searchable" class="p-2 border-b border-slate-100 bg-slate-50/50">
+                    <input
+                        ref="searchInputRef"
+                        v-model="searchQuery"
+                        type="text"
+                        class="w-full text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        :placeholder="searchPlaceholder"
+                        @click.stop
+                    />
                 </div>
 
-                <button
-                    v-for="opt in filteredOptions"
-                    :key="opt.value"
-                    type="button"
-                    class="w-full text-left text-xs px-2.5 py-2 rounded-md transition flex items-center justify-between"
-                    :class="opt.disabled ? 'text-slate-300 cursor-not-allowed' : (isOptionSelected(opt) ? 'bg-indigo-50/80 text-indigo-700 font-bold hover:bg-indigo-50 hover:text-indigo-700' : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700')"
-                    :disabled="opt.disabled"
-                    @click="!opt.disabled && selectOption(opt.value)"
-                >
-                    <span class="truncate">{{ opt.label }}</span>
-                    <span v-if="isOptionSelected(opt)" class="text-indigo-600">✓</span>
-                </button>
+                <!-- Options list -->
+                <div class="overflow-y-auto flex-1 p-1">
+                    <button
+                        v-if="allOption"
+                        type="button"
+                        class="w-full text-left text-xs px-2.5 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition flex items-center justify-between"
+                        :class="!modelValue ? 'bg-indigo-50/80 text-indigo-700 font-bold' : 'text-slate-700'"
+                        @click="selectOption('')"
+                    >
+                        <span>{{ allLabel }}</span>
+                        <span v-if="!modelValue" class="text-indigo-600">✓</span>
+                    </button>
+
+                    <div v-if="filteredOptions.length === 0" class="p-3 text-center text-xs text-slate-400">
+                        No results match "{{ searchQuery }}"
+                    </div>
+
+                    <button
+                        v-for="opt in filteredOptions"
+                        :key="opt.value"
+                        type="button"
+                        class="w-full text-left text-xs px-2.5 py-2 rounded-md transition flex items-center justify-between"
+                        :class="opt.disabled ? 'text-slate-300 cursor-not-allowed' : (isOptionSelected(opt) ? 'bg-indigo-50/80 text-indigo-700 font-bold hover:bg-indigo-50 hover:text-indigo-700' : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700')"
+                        :disabled="opt.disabled"
+                        @click="!opt.disabled && selectOption(opt.value)"
+                    >
+                        <span class="truncate">{{ opt.label }}</span>
+                        <span v-if="isOptionSelected(opt)" class="text-indigo-600">✓</span>
+                    </button>
+                </div>
             </div>
-        </div>
+        </Teleport>
     </div>
 </template>
 
@@ -129,6 +137,15 @@ const props = defineProps({
         type: String,
         default: undefined,
     },
+    // Teleports the menu to <body> and positions it with `position: fixed`, computed
+    // from the trigger's own bounding rect, instead of `absolute` inside this component's
+    // own DOM position. Needed inside a scrollable/overflow-clipped ancestor (e.g. a
+    // horizontally-scrolling table) where a plain in-flow menu gets cut off for rows near
+    // the clipping edge. Off by default — everywhere else keeps its exact current DOM.
+    escapeOverflow: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const emit = defineEmits(['update:modelValue', 'change']);
@@ -137,6 +154,8 @@ const isOpen = ref(false);
 const searchQuery = ref('');
 const containerRef = ref(null);
 const searchInputRef = ref(null);
+const menuRef = ref(null);
+const menuStyle = ref({});
 
 function normalizeOption(opt) {
     if (opt !== null && typeof opt === 'object') {
@@ -196,9 +215,35 @@ function selectOption(val) {
 }
 
 function handleClickOutside(event) {
-    if (containerRef.value && !containerRef.value.contains(event.target)) {
+    const inContainer = containerRef.value?.contains(event.target);
+    const inMenu = menuRef.value?.contains(event.target);
+    if (!inContainer && !inMenu) {
         isOpen.value = false;
     }
+}
+
+// Positions the (teleported) menu from the trigger's own rect, flipping above it when
+// there isn't room below — otherwise a menu opened near the bottom of the viewport (e.g.
+// the last row of a tall table) would render off-screen instead of overlapping content.
+function updateMenuPosition() {
+    if (!props.escapeOverflow || !containerRef.value) return;
+
+    const rect = containerRef.value.getBoundingClientRect();
+    const estimatedHeight = menuRef.value?.offsetHeight || 256;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < estimatedHeight + 8 && rect.top > spaceBelow;
+
+    menuStyle.value = {
+        position: 'fixed',
+        left: `${rect.left}px`,
+        width: `${rect.width}px`,
+        top: openUpward ? 'auto' : `${rect.bottom + 4}px`,
+        bottom: openUpward ? `${window.innerHeight - rect.top + 4}px` : 'auto',
+    };
+}
+
+function handleReposition() {
+    if (isOpen.value) updateMenuPosition();
 }
 
 watch(() => props.disabled, (isDisabled) => {
@@ -211,13 +256,24 @@ watch(isOpen, (newVal) => {
     } else {
         searchQuery.value = '';
     }
+    if (newVal && props.escapeOverflow) {
+        nextTick(updateMenuPosition);
+    }
 });
 
 onMounted(() => {
     document.addEventListener('click', handleClickOutside);
+    if (props.escapeOverflow) {
+        // capture: true so this also fires for scrolling inside an ancestor container
+        // (e.g. the table's own overflow-x-auto wrapper), which doesn't bubble to window.
+        window.addEventListener('scroll', handleReposition, true);
+        window.addEventListener('resize', handleReposition);
+    }
 });
 
 onBeforeUnmount(() => {
     document.removeEventListener('click', handleClickOutside);
+    window.removeEventListener('scroll', handleReposition, true);
+    window.removeEventListener('resize', handleReposition);
 });
 </script>
