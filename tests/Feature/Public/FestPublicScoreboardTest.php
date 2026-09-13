@@ -229,13 +229,11 @@ class FestPublicScoreboardTest extends TestCase
     }
 
     /**
-     * Client-side auto-rotation (every 3s until a visitor clicks a category tab —
-     * see scoreboard.blade.php's script) reads these data-* attributes off
-     * #scoreboard-live-root; this locks down the backend half of that contract, the
-     * same caveat as FestSchoolItemScheduleReportTest about what a PHPUnit response
-     * assertion can and can't prove for client-side behavior.
+     * Client-side category navigation and in-place refresh read these data attributes
+     * from #scoreboard-live-root. Browsing stays on the selected category; automatic
+     * category rotation is reserved for the dedicated TV page.
      */
-    public function test_scoreboard_root_carries_the_rotation_data_attributes(): void
+    public function test_scoreboard_root_carries_category_navigation_data_attributes(): void
     {
         $this->markCategoryWinner($this->north, $this->northSchool, 'North HS Winner');
 
@@ -421,6 +419,8 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertSee('North Poetry');
         $response->assertSee('Anjali Menon');
         $response->assertSee('← Back to all schools', false);
+        $response->assertSee('id="school-roster-search"', false);
+        $response->assertSee('id="school-roster-load"', false);
     }
 
     public function test_school_detail_page_404s_for_a_school_with_no_results(): void
@@ -813,8 +813,10 @@ class FestPublicScoreboardTest extends TestCase
         $scoreboard->assertSee('Official Standings Not Published Yet');
         $scoreboard->assertDontSee('North Star School');
 
+        // The event itself remains a valid public catalogue entry; only its results are
+        // disabled, so the results endpoint denies access without exposing any rows.
         $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results")
-            ->assertNotFound();
+            ->assertForbidden();
 
         $this->getJson("http://public-scoreboard.test/fest/{$this->north->id}/live/data")
             ->assertOk()
@@ -966,6 +968,33 @@ class FestPublicScoreboardTest extends TestCase
             ->assertJsonStructure(['contentHtml', 'refreshedAt']);
         $this->assertStringContainsString('North Star School', $data->json('contentHtml'));
         $this->assertStringContainsString('no-store', $data->headers->get('Cache-Control'));
+    }
+
+    public function test_tv_paginates_nine_school_rows_and_exposes_display_controls(): void
+    {
+        foreach (range(2, 10) as $rank) {
+            $school = $this->school("TV School {$rank}");
+            FestResult::create([
+                'event_id' => $this->north->id,
+                'school_id' => $school->id,
+                'total_points' => 70 - $rank,
+                'rank' => $rank,
+                'published_at' => now(),
+            ]);
+        }
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
+        $html = $response->getContent();
+
+        $response->assertOk()
+            ->assertSee('Results Display')
+            ->assertSee('Page 1 of 2')
+            ->assertSee('Page 2 of 2')
+            ->assertSee('data-tv-pause', false)
+            ->assertSee('data-tv-fullscreen', false)
+            ->assertSee('data-tv-prev', false)
+            ->assertSee('data-tv-next', false);
+        $this->assertSame(2, substr_count($html, '<section data-tv-slide'));
     }
 
     private function school(string $name): Tenant

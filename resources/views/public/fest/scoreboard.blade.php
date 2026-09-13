@@ -70,7 +70,7 @@
         </div>
 
         <footer class="pt-6 border-t border-slate-800 text-center flex flex-wrap justify-center gap-5 text-xs">
-            <a href="{{ route('tenant.fest.live', ['event' => $event->id]) }}" class="text-amber-400 font-semibold hover:underline">Live event view →</a>
+            <a href="{{ route('tenant.fest.live', ['event' => $event->id]) }}" class="text-amber-400 font-semibold hover:underline">{{ $event->status === 'completed' ? 'Results hub' : 'Live event view' }} →</a>
             <a href="{{ route('tenant.fest.show', ['event' => $event->id]) }}" class="text-slate-400 hover:text-white">← Event page</a>
         </footer>
     </div>
@@ -91,10 +91,7 @@
 
     let refreshing = false;
     let lastUpdated = Date.now();
-    let interacted = false; // a visitor picking a category by hand stops the rotation for good
-    let rotateTimer = null;
     let current = root.dataset.initialCategory || '';
-    let currentIndex = Math.max(categories.indexOf(current), 0);
 
     const updateClock = () => { clock.textContent = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true}); };
 
@@ -122,8 +119,8 @@
         titleEl.textContent = cat ? `${baseLabel} · ${categoryLabels[cat] ?? cat.toUpperCase()}` : baseLabel;
     };
 
-    // silent = a rotation/background tick (no "Loading…" flicker); a manual tab click
-    // still shows it, since that's an intentional, immediate action a visitor is watching.
+    // Background refreshes avoid a "Loading…" flicker; a manual tab click still shows
+    // it because that is an immediate action the visitor is watching.
     const loadCategory = async (cat, {silent = false} = {}) => {
         if (refreshing) return;
         refreshing = true;
@@ -135,7 +132,6 @@
             const data = await response.json();
             content.innerHTML = data.contentHtml;
             current = cat;
-            currentIndex = Math.max(categories.indexOf(cat), 0);
             setActiveTab(cat);
             setTitle(cat);
             lastUpdated = Date.now();
@@ -148,43 +144,25 @@
         }
     };
 
-    const stopRotation = () => {
-        if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; }
-    };
-
-    const startRotation = () => {
-        stopRotation();
-        if (interacted || categories.length < 2) return;
-        rotateTimer = setInterval(() => {
-            if (document.hidden) return;
-            currentIndex = (currentIndex + 1) % categories.length;
-            loadCategory(categories[currentIndex], {silent: true});
-        }, 3000);
-    };
-
     if (nav) {
         nav.addEventListener('click', (e) => {
             const link = e.target.closest('[data-category]');
             if (!link || e.ctrlKey || e.metaKey || e.shiftKey) return; // let modified clicks (open in new tab, etc.) behave normally
             e.preventDefault();
-            interacted = true;
-            stopRotation();
             loadCategory(link.dataset.category);
         });
     }
 
     updateClock();
     setInterval(updateClock, 1000);
-    startRotation();
 
-    // Once a visitor has taken control (or there's nothing to rotate through), fall back
-    // to periodically refreshing whichever single category is on screen — the rotation
-    // itself already keeps every category fresh on its own 3s-per-category cycle.
+    // Browsing pages preserve the visitor's chosen category. Rotation belongs only on
+    // the dedicated TV display; this page refreshes the current category in place.
     setInterval(() => {
-        if (!rotateTimer && !document.hidden) loadCategory(current, {silent: true});
+        if (!document.hidden) loadCategory(current, {silent: true});
     }, 30000);
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && !rotateTimer && Date.now() - lastUpdated > 30000) loadCategory(current, {silent: true});
+        if (!document.hidden && Date.now() - lastUpdated > 30000) loadCategory(current, {silent: true});
     });
 })();
 </script>

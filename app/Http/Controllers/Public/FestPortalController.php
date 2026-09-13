@@ -142,6 +142,7 @@ class FestPortalController extends Controller
                             ->all(),
                     ];
                 })
+                ->take(6)
                 ->values();
 
             $publishedItemCount = $items->filter(fn ($i) => $i->results_published_at !== null && ! $i->results_hidden)->count();
@@ -265,14 +266,16 @@ class FestPortalController extends Controller
             : collect();
         $championshipSchools = Tenant::whereIn('id', $championshipRows->pluck('student.tenant_id')->filter()->unique())
             ->pluck('name', 'id');
-        // Lets each Championship row link to that student's own public participant page
-        // (participant() below, resolved via findParticipantByRef()'s level_registration_number
-        // match) — one Fest ID resolves to any of that student's item-level FestParticipant
-        // rows, and publicParticipantItems() then lists every item they took, not just one.
+        // Link each championship row through the same typed participant reference used
+        // by search, avoiding collisions between numeric chest and registration numbers.
         $championshipRefs = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $championshipEventId))
             ->whereIn('student_id', $championshipRows->pluck('student_id')->filter()->unique())
-            ->whereNotNull('level_registration_number')
-            ->pluck('level_registration_number', 'student_id');
+            ->orderBy('id')
+            ->get()
+            ->unique('student_id')
+            ->mapWithKeys(fn (FestParticipant $participant) => [
+                $participant->student_id => $this->visibility->participantLinkRef($participant),
+            ]);
         // FestIndividualChampionshipPoint.category is always one of the fixed lp/up/hs/
         // hss/open keys (App\Http\Controllers\SahodayaAdmin\FestChampionshipController::
         // INDIVIDUAL_CATEGORY_KEYS), regardless of event_type — the same keys
@@ -408,10 +411,16 @@ class FestPortalController extends Controller
         }
         $itemResultsByCategory = $itemResultsByCategory->all();
 
+        $individualClassGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $individualResults = $marks
             ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event) + [
                 'item' => $mark->item?->title,
                 'head' => $mark->item?->head?->name,
+                'category' => FestItemCategoryLabel::resolve(
+                    $mark->item,
+                    $individualClassGroupLabels,
+                    config('fest_item_taxonomy.arts_category', [])
+                ),
             ])
             ->sortBy(fn (array $row) => [$row['participant'] ?? '', $row['item'] ?? ''])
             ->values()
@@ -743,15 +752,9 @@ class FestPortalController extends Controller
                 ->groupBy('registration_id')
             : null;
 
-        // Winner Roster (photo podium) shows every participant with a mark for this item —
-        // FestMarkSaveService refuses to save a mark for anyone flagged absent
-        // (FestAttendance status), so a FestMark row here already implies "present and
-        // scored"; no separate absence filter is needed. The view already has medal/tint
-        // treatment through rank 6 and a numbered fallback badge beyond that. The Full
-        // Results table below repeats everyone in plain tabular form for the exact points
-        // breakdown; one query/roster resolution feeds both instead of running this
-        // twice. The poster (downloadable certificate-style image) stays top-3 only —
-        // it's not meaningful for every rank.
+        // One query/roster resolution feeds both sections. The visual Winner Roster is
+        // reserved for the podium (including ties), while Full Results remains the clear
+        // source for every ranked participant and the exact points breakdown.
         $allMarks = $allMarks->map(fn (FestMark $m) => $this->publicWinnerRow($m, $event, $rosterByRegistration) + [
             'mark_id' => $m->id,
             'poster_url' => in_array((int) $m->position, [1, 2, 3], true)
@@ -759,7 +762,9 @@ class FestPortalController extends Controller
                 : null,
         ])->values();
 
-        $marks = $allMarks;
+        $marks = $allMarks
+            ->filter(fn (array $row) => in_array((int) $row['position'], [1, 2, 3], true))
+            ->values();
 
         $categoryLabel = FestItemCategoryLabel::resolve(
             $item,
@@ -997,7 +1002,9 @@ public function tv(Request $request, int $eventId)
     // own item's height. A single item with 3+ awarded positions and a large roster
     // can still exceed one screen on its own; left as a rare residual case rather
     // than building full dynamic height-measured pagination for it.
-    $boardsPerPage = 12;
+    // Nine rows reliably fit a 720p venue display with the header, slide title and
+    // controls visible. Twelve rows clipped the bottom schools at common TV sizes.
+    $boardsPerPage = 9;
     $winnersPerPage = 1;
     $slides = [];
 
@@ -1119,7 +1126,7 @@ public function tv(Request $request, int $eventId)
             'isPublished' => $isPublished,
             'isAdminPreview' => $isAdminPreview,
             'slides' => $slides,
-            'pageSeo' => ['title' => $event->title.' — Live Screen'],
+            'pageSeo' => ['title' => $event->title.' — Results Display'],
         ]);
     }
 
@@ -1490,8 +1497,15 @@ public function tv(Request $request, int $eventId)
                 ->with(['student', 'teacher', 'registration.item', 'registration.event', 'registration.school']);
 
             if (ctype_digit($q)) {
-                // Fast path: chest number officially revealed and persisted to the column.
-                $matches = (clone $base)->where('chest_no', (int) $q)->limit(30)->get();
+                // A numeric query can legitimately be either a chest number or a level
+                // registration number. Return both instead of letting one namespace hide
+                // the other when the same number exists in each.
+                $matches = (clone $base)
+                    ->where(fn ($query) => $query
+                        ->where('chest_no', (int) $q)
+                        ->orWhere('level_registration_number', $q))
+                    ->limit(30)
+                    ->get();
                 if ($matches->isEmpty()) {
                     // Before reveal, the chest number shown/linked publicly is a *computed*
                     // preview (FestNumberingService::effectiveChestNumber()) that isn't a
@@ -1513,9 +1527,40 @@ public function tv(Request $request, int $eventId)
             }
 
             $showSchool = $this->visibility->showSchoolName($event, $isAdminPreview);
-            $results = $matches->map(fn (FestParticipant $p) => $this->visibility->formatPublicParticipant($event, $p, null, null, $isAdminPreview) + [
-                'school' => $showSchool ? $p->registration?->school?->name : null,
-            ]);
+            $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+            $results = $matches
+                // A student has one FestParticipant row per registration. Showing each
+                // row separately made one person appear several times and amplified the
+                // ambiguous-reference bug fixed in participantLinkRef().
+                ->groupBy(fn (FestParticipant $p) => $p->student_id
+                    ? 'student-'.$p->student_id
+                    : ($p->teacher_id ? 'teacher-'.$p->teacher_id : 'participant-'.$p->id))
+                ->map(function (Collection $entries) use ($event, $isAdminPreview, $showSchool, $classGroupLabels) {
+                    /** @var FestParticipant $participant */
+                    $participant = $entries->sortBy('id')->first();
+                    $public = $this->visibility->formatPublicParticipant($event, $participant, null, null, $isAdminPreview);
+                    $matchedItems = $entries
+                        ->map(fn (FestParticipant $entry) => [
+                            'title' => $entry->registration?->item?->title,
+                            'category' => FestItemCategoryLabel::resolve(
+                                $entry->registration?->item,
+                                $classGroupLabels,
+                                config('fest_item_taxonomy.arts_category', [])
+                            ),
+                        ])
+                        ->filter(fn (array $item) => filled($item['title']))
+                        ->unique('title')
+                        ->values()
+                        ->all();
+
+                    return $public + [
+                        'school' => $showSchool ? $participant->registration?->school?->name : null,
+                        'matched_items' => $matchedItems,
+                        'item_count' => count($matchedItems),
+                    ];
+                })
+                ->take(30)
+                ->values();
         }
 
         return $this->renderPublic('public.fest.search', $tenant, [

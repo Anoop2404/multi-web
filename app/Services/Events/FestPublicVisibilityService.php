@@ -170,11 +170,11 @@ class FestPublicVisibilityService
 
     public function participantLinkRef(FestParticipant $participant): ?string
     {
-        if ($participant->chest_no) {
-            return (string) $participant->chest_no;
-        }
-
-        return $participant->level_registration_number;
+        // Keep the URL lookup unambiguous. A bare numeric level-registration number can
+        // also be a different participant's chest number; the legacy resolver checks
+        // chest numbers first, so links generated from that bare value could open the
+        // wrong student's page. New links carry the participant row's explicit type.
+        return $participant->exists ? 'p-'.$participant->getKey() : null;
     }
 
     /** @return array<string, mixed> */
@@ -356,6 +356,13 @@ class FestPublicVisibilityService
             ->where('event_id', $event->id)
             ->where('status', 'approved'))
             ->with(['student', 'teacher', 'registration.item', 'registration.event', 'group']);
+
+        // All newly generated links use this explicit participant-row reference. Keep
+        // the older chest/level-registration formats below so bookmarks and printed QR
+        // codes created before this change continue to resolve.
+        if (preg_match('/^p-(\d+)$/i', $ref, $match)) {
+            return (clone $candidates)->whereKey((int) $match[1])->first();
+        }
 
         if (! ctype_digit($ref)) {
             return $candidates->where('level_registration_number', $ref)->first();

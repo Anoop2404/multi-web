@@ -49,7 +49,9 @@ class FestPublicVisibilityServiceTest extends TestCase
 
     public function test_off_stage_uses_level_registration_reference(): void
     {
-        $participant = $this->makeParticipant('district', 'off_stage', false);
+        // Public references are intentionally hidden until the event publishes; turn
+        // publication on here so this test isolates the off-stage identifier choice.
+        $participant = $this->makeParticipant('district', 'off_stage', true);
         $participant->level_registration_number = 'D-0042';
         $participant->chest_no = 7;
 

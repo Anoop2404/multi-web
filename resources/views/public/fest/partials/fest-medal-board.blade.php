@@ -1,5 +1,5 @@
 <div class="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
-    <div class="grid grid-cols-[3.5rem_1fr_repeat(4,4rem)_6rem] gap-2 px-5 py-3 bg-white/5 border-b border-slate-800 text-xs font-extrabold uppercase tracking-wider text-slate-400">
+    <div class="grid grid-cols-[3.25rem_1fr_repeat(4,3.75rem)_5.5rem] gap-2 px-4 py-2 bg-white/5 border-b border-slate-800 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
         <span>Rank</span>
         <span>School</span>
         {{-- Points earned from that rank specifically (see FestPortalController::tv()'s
@@ -24,23 +24,23 @@
                 default => '',
             } : '';
         @endphp
-        <div class="grid grid-cols-[3.5rem_1fr_repeat(4,4rem)_6rem] gap-2 items-center px-5 py-3 {{ $rankClass }}">
+        <div class="grid grid-cols-[3.25rem_1fr_repeat(4,3.75rem)_5.5rem] gap-2 items-center px-4 py-2 {{ $rankClass }}">
             <span class="flex items-center">
                 {{-- Medal icons imply an actual result — only show them once there's a real
                      ranking. A pre-results roster (everyone at 0) uses plain numbers even
                      for rows 1-3, so it can't be misread as "already won something." --}}
                 @if($showMedalRank && $row['rank'] <= 3)
-                <img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-8 h-8">
+                <img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-7 h-7">
                 @else
-                <span class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center text-sm font-extrabold">{{ $row['rank'] }}</span>
+                <span class="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span>
                 @endif
             </span>
-            <span class="font-bold text-white text-base uppercase">{{ $row['school_name'] }}</span>
-            <span class="text-center font-mono font-bold tabular-nums text-amber-300 text-base">{{ $row['gold'] }}</span>
-            <span class="text-center font-mono font-bold tabular-nums text-slate-300 text-base">{{ $row['silver'] }}</span>
-            <span class="text-center font-mono font-bold tabular-nums text-amber-600 text-base">{{ $row['bronze'] }}</span>
-            <span class="text-center font-mono font-bold tabular-nums text-sky-300 text-base">{{ $row['grade_points'] ?? 0 }}</span>
-            <span class="text-right font-mono font-extrabold tabular-nums text-amber-400 text-lg">{{ $row['total_points'] }}</span>
+            <span class="font-bold text-white text-sm uppercase truncate" title="{{ $row['school_name'] }}">{{ $row['school_name'] }}</span>
+            <span class="text-center font-mono font-bold tabular-nums text-amber-300 text-sm">{{ $row['gold'] }}</span>
+            <span class="text-center font-mono font-bold tabular-nums text-slate-300 text-sm">{{ $row['silver'] }}</span>
+            <span class="text-center font-mono font-bold tabular-nums text-amber-600 text-sm">{{ $row['bronze'] }}</span>
+            <span class="text-center font-mono font-bold tabular-nums text-sky-300 text-sm">{{ $row['grade_points'] ?? 0 }}</span>
+            <span class="text-right font-mono font-extrabold tabular-nums text-amber-400 text-base">{{ $row['total_points'] }}</span>
         </div>
         @empty
         <div class="text-slate-400 text-center py-12">No standings yet.</div>

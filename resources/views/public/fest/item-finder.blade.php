@@ -21,10 +21,11 @@
 
         <section class="mt-6" aria-labelledby="item-finder-title">
             <h2 id="item-finder-title" class="sr-only">Search schedules and results</h2>
-            <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-3 sm:p-4 grid md:grid-cols-[1fr_auto_auto] gap-3">
-                <label><span class="sr-only">Search event items</span><input id="event-item-search" type="search" placeholder="Search item name or head" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white placeholder:text-white/30 text-sm focus:border-amber-500 focus:ring-amber-500"></label>
-                <label><span class="sr-only">Filter by category</span><select id="event-item-category" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500"><option value="">All categories</option>@foreach($itemCategories as $category)<option value="{{ Str::lower($category) }}">{{ $categoryLabels[$category] ?? strtoupper($category) }}</option>@endforeach</select></label>
-                <label><span class="sr-only">Filter by participant type</span><select id="event-item-mode" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500"><option value="">Individual & group</option>@foreach($itemModes as $mode)<option value="{{ Str::lower($mode) }}">{{ ucfirst($mode) }}</option>@endforeach</select></label>
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-3 sm:p-4 grid md:grid-cols-[1fr_auto_auto_auto] gap-3 md:items-end">
+                <label><span class="block text-[10px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Item or head</span><input id="event-item-search" type="search" placeholder="Search item name or head" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white placeholder:text-white/30 text-sm focus:border-amber-500 focus:ring-amber-500"></label>
+                <label><span class="block text-[10px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Category</span><select id="event-item-category" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500"><option value="">All categories</option>@foreach($itemCategories as $category)<option value="{{ Str::lower($category) }}">{{ $categoryLabels[$category] ?? strtoupper($category) }}</option>@endforeach</select></label>
+                <label><span class="block text-[10px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Entry type</span><select id="event-item-mode" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500"><option value="">Individual & group</option>@foreach($itemModes as $mode)<option value="{{ Str::lower($mode) }}">{{ ucfirst($mode) }}</option>@endforeach</select></label>
+                <button id="event-item-reset" type="button" class="rounded-xl border border-slate-700 bg-white/5 px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/10 hover:text-white">Clear</button>
             </div>
             <p id="event-item-summary" class="text-xs text-white/40 mt-3" aria-live="polite">Showing {{ $allItems->count() }} items</p>
 
@@ -68,6 +69,11 @@
     const items = [...document.querySelectorAll('[data-event-item]')];
     const summary = document.getElementById('event-item-summary');
     const empty = document.getElementById('event-item-empty');
+    const reset = document.getElementById('event-item-reset');
+    const initialUrl = new URL(window.location.href);
+    search.value = initialUrl.searchParams.get('q') || '';
+    category.value = initialUrl.searchParams.get('category') || '';
+    mode.value = initialUrl.searchParams.get('mode') || '';
     const apply = () => {
         const query = search.value.trim().toLocaleLowerCase();
         let count = 0;
@@ -78,8 +84,15 @@
         });
         summary.textContent = `Showing ${count} ${count === 1 ? 'item' : 'items'}`;
         empty.classList.toggle('hidden', count !== 0);
+        const nextUrl = new URL(window.location.href);
+        search.value ? nextUrl.searchParams.set('q', search.value.trim()) : nextUrl.searchParams.delete('q');
+        category.value ? nextUrl.searchParams.set('category', category.value) : nextUrl.searchParams.delete('category');
+        mode.value ? nextUrl.searchParams.set('mode', mode.value) : nextUrl.searchParams.delete('mode');
+        history.replaceState(null, '', nextUrl);
     };
     [search, category, mode].forEach(control => control.addEventListener(control === search ? 'input' : 'change', apply));
+    reset.addEventListener('click', () => { search.value = ''; category.value = ''; mode.value = ''; apply(); search.focus(); });
+    apply();
 })();
 </script>
 @endsection

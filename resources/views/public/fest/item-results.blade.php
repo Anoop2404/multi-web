@@ -6,9 +6,6 @@
         1 => 'border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-slate-900/60',
         2 => 'border-slate-400/30 bg-gradient-to-b from-slate-400/10 to-slate-900/60',
         3 => 'border-orange-700/30 bg-gradient-to-b from-orange-700/10 to-slate-900/60',
-        4 => 'border-blue-600/30 bg-gradient-to-b from-blue-600/10 to-slate-900/60',
-        5 => 'border-emerald-600/30 bg-gradient-to-b from-emerald-600/10 to-slate-900/60',
-        6 => 'border-slate-500/30 bg-gradient-to-b from-slate-500/10 to-slate-900/60',
     ];
     $typeLabels = ['individual' => 'Individual', 'pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
 @endphp
@@ -25,93 +22,47 @@
         <div class="rounded-2xl border border-dashed border-slate-700 p-10 text-center text-white/30 mt-6">No published results for this item.</div>
         @else
         @if($marks->isNotEmpty())
-        <div class="mt-6 flex items-center gap-2 text-amber-300/90">
-            <span class="text-lg">🏆</span>
-            <h2 class="text-xs font-bold uppercase tracking-wider">Winner Roster</h2>
+        <div class="mt-6 flex flex-wrap items-end justify-between gap-2">
+            <div class="flex items-center gap-2 text-amber-300/90">
+                <span class="text-lg" aria-hidden="true">🏆</span>
+                <h2 class="text-xs font-bold uppercase tracking-wider">Winner Roster</h2>
+            </div>
+            <p class="text-xs text-white/40">Podium finishers · ties included</p>
         </div>
         <div class="mt-3 h-px bg-gradient-to-r from-amber-500/40 via-slate-700 to-transparent"></div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 mt-4">
             @foreach($marks as $row)
             @php
                 $roster = ($row['team'] ?? []) ?: [['name' => $row['participant'], 'photo' => $row['photo'] ?? null]];
                 $pos = $row['position'];
-                // Individual/pair keep a distinct row (mobile) / portrait-card (desktop) treatment.
-                // 3+ gets the header+grid team layout. Only large rosters (7+) get the full-width
-                // card — a small trio/group at full width left a big empty gap beside 3-4 tiles.
-                $compact = count($roster) <= 2;
-                $wide = count($roster) > 6;
+                $isLargeTeam = count($roster) > 4;
             @endphp
-            <div class="rounded-2xl border {{ $rankTint[$pos] ?? 'border-slate-800 bg-slate-900/60' }} {{ $compact ? '' : ($wide ? 'sm:col-span-2 lg:col-span-4' : 'sm:col-span-2') }} overflow-hidden">
-
-                {{-- One shared photo-tile language everywhere: rounded-xl (never a circle), the
-                     same border/shadow treatment, sized per tier but never smaller than feels
-                     like a "standard" size — individual/pair get the largest tier since there
-                     are only 1-2 of them; team tiles are smaller only because 11+ have to wrap. --}}
-                @if($compact)
-                    {{-- Individual/pair: ONE structure at every width — medal, photo(s) with the
-                         name captioned directly under each, school once under the whole group —
-                         just scaled up at sm+. No separate mobile/desktop markup to drift apart. --}}
-                    <div class="flex items-center gap-3 sm:gap-4 p-4 sm:p-5">
-                        <div class="shrink-0">
-                            @if($pos && $pos <= 3)
-                                <span class="sm:hidden">@include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 56])</span>
-                                <span class="hidden sm:inline-block">@include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 80])</span>
-                            @else
-                                <div class="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-slate-700 flex items-center justify-center text-white font-black">{{ $pos ? '#' . $pos : '—' }}</div>
-                            @endif
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <div class="flex gap-3 sm:gap-4">
-                                @foreach($roster as $member)
-                                <div class="flex flex-col items-center gap-1.5 flex-1 min-w-0 max-w-[7rem] sm:max-w-[9rem]">
-                                    @if($member['photo'] ?? null)
-                                    <img src="{{ $member['photo'] }}" alt="" class="w-full h-24 sm:h-32 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
-                                    @else
-                                    <span class="w-full h-24 sm:h-32 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-xl sm:text-2xl border-2 border-slate-700/60 shadow-md shadow-black/30">
-                                        {{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}
-                                    </span>
-                                    @endif
-                                    <span class="text-xs sm:text-sm font-bold leading-snug text-white text-center line-clamp-2 uppercase">{{ $member['name'] ?? '—' }}</span>
-                                </div>
-                                @endforeach
-                            </div>
-                            <p class="text-xs text-white/40 mt-3 uppercase">{{ $row['school'] }}</p>
-                        </div>
+            <article class="rounded-2xl border {{ $rankTint[$pos] ?? 'border-slate-800 bg-slate-900/60' }} {{ $isLargeTeam ? 'md:col-span-2 xl:col-span-3' : '' }} overflow-hidden">
+                <div class="flex items-center gap-3 p-4 border-b border-white/10">
+                    @include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 58])
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[10px] font-extrabold uppercase tracking-widest text-white/40">Rank {{ $pos }}</p>
+                        <p class="font-bold text-sm leading-snug text-white uppercase break-words">{{ $row['school'] ?? '—' }}</p>
+                        @if(count($roster) > 1)<p class="text-[11px] text-white/40 mt-0.5">{{ count($roster) }} members</p>@endif
                     </div>
-                @else
-                    {{-- Team/group (3+): header line (rank, school, member count) then a wrapping
-                         grid of standard photo tiles — same shape/border as individual/pair,
-                         sized down just enough that 11+ members still wrap cleanly. --}}
-                    <div class="p-4 sm:p-5">
-                        <div class="flex items-center gap-3">
-                            @if($pos && $pos <= 3)
-                                @include('public.fest.partials.rank-medal', ['position' => $pos, 'size' => 64])
-                            @else
-                                <div class="shrink-0 w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-sm text-white font-black">{{ $pos ? '#' . $pos : '—' }}</div>
-                            @endif
-                            <div class="flex-1 min-w-0">
-                                <p class="font-bold text-sm text-white uppercase">{{ $row['school'] }}</p>
-                                <p class="text-[11px] text-white/40">{{ count($roster) }} Team Members</p>
-                            </div>
-                        </div>
-                        <div class="mt-4 grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-3 justify-items-center">
-                            @foreach($roster as $member)
-                            <div class="flex flex-col items-center gap-1.5 w-20">
-                                @if($member['photo'] ?? null)
-                                <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
-                                @else
-                                <span class="w-20 h-20 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-lg border-2 border-slate-700/60 shadow-md shadow-black/30">
-                                    {{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}
-                                </span>
-                                @endif
-                                <span class="text-[11px] font-semibold leading-tight text-white/80 text-center line-clamp-2 uppercase">{{ $member['name'] ?? '—' }}</span>
-                            </div>
-                            @endforeach
-                        </div>
+                    @if($row['poster_url'] ?? null)
+                    <a href="{{ $row['poster_url'] }}" class="shrink-0 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-bold text-amber-300 hover:bg-white/10" target="_blank" rel="noopener">Poster</a>
+                    @endif
+                </div>
+                <div class="p-4 grid {{ $isLargeTeam ? 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1' }} gap-3">
+                    @foreach($roster as $member)
+                    <div class="flex items-center gap-3 min-w-0">
+                        @if($member['photo'] ?? null)
+                        <img src="{{ $member['photo'] }}" alt="" class="w-16 h-16 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30 shrink-0">
+                        @else
+                        <span class="w-16 h-16 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-lg border-2 border-slate-700/60 shrink-0" aria-hidden="true">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
+                        @endif
+                        <span class="text-sm font-bold leading-snug text-white uppercase break-words">{{ $member['name'] ?? '—' }}</span>
                     </div>
-                @endif
-            </div>
+                    @endforeach
+                </div>
+            </article>
             @endforeach
         </div>
         @endif
@@ -122,7 +73,28 @@
         </div>
         <div class="mt-3 h-px bg-gradient-to-r from-amber-500/40 via-slate-700 to-transparent"></div>
 
-        <div class="mt-4 rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+        <div class="mt-4 md:hidden space-y-3">
+            @foreach($allMarks as $row)
+            @php $names = !empty($row['team']) ? collect($row['team'])->pluck('name')->filter()->implode(', ') : $row['participant']; @endphp
+            <article class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                <div class="flex items-start gap-3">
+                    <span class="w-11 h-11 rounded-xl bg-white/5 border border-slate-700 flex items-center justify-center font-mono font-extrabold text-amber-300 shrink-0">#{{ $row['position'] ?? '—' }}</span>
+                    <div class="min-w-0 flex-1">
+                        <h3 class="font-bold text-white uppercase leading-snug break-words">{{ $names ?: '—' }}</h3>
+                        <p class="text-xs text-white/45 uppercase mt-1 break-words">{{ $row['school'] ?? '—' }}</p>
+                    </div>
+                    <span class="font-mono font-extrabold text-white shrink-0">{{ $row['points'] ?? 0 }} <small class="text-[10px] text-white/40">PTS</small></span>
+                </div>
+                <dl class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800 text-center">
+                    <div><dt class="text-[9px] uppercase tracking-wide text-white/35">Rank pts</dt><dd class="text-xs font-mono text-white/70 mt-1">{{ $row['rank_points'] ?? '—' }}</dd></div>
+                    <div><dt class="text-[9px] uppercase tracking-wide text-white/35">Grade</dt><dd class="text-xs font-bold text-amber-300 mt-1">{{ $row['grade'] ?? '—' }}</dd></div>
+                    <div><dt class="text-[9px] uppercase tracking-wide text-white/35">Grade pts</dt><dd class="text-xs font-mono text-white/70 mt-1">{{ $row['grade_points'] ?? '—' }}</dd></div>
+                </dl>
+            </article>
+            @endforeach
+        </div>
+
+        <div class="mt-4 hidden md:block rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
                     <thead class="bg-white/5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-800">

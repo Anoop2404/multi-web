@@ -25,7 +25,7 @@
                 @endif
                 <h1 class="text-2xl sm:text-3xl font-extrabold font-heading mt-3 text-white">{{ $event->title }}</h1>
                 @if($event->resolvedVenueName())<p class="text-sm text-white/50 mt-2">📍 {{ $event->resolvedVenueName() }}</p>@endif
-                <p id="live-refresh-badge" class="text-[11px] text-white/30 mt-3" aria-live="polite">{{ $event->status === 'completed' ? 'Final standings — this event has ended' : 'Auto-refreshing every 30 seconds' }}</p>
+                <p id="live-refresh-badge" class="text-[11px] text-white/30 mt-3" aria-live="polite">{{ $event->status === 'completed' ? 'Final results hub — this event has ended' : 'Auto-refreshing every 30 seconds' }}</p>
             </div>
         </header>
 
@@ -124,7 +124,9 @@
         </div>
 
         <p class="mt-10 pt-6 border-t border-slate-800 text-center flex flex-wrap justify-center gap-5 text-xs">
+            @if($event->event_type === 'sports' && $event->record_tracking_enabled)
             <a href="{{ route('tenant.fest.records', $event->id) }}" class="text-amber-400 font-semibold hover:underline">All records →</a>
+            @endif
             <a href="{{ route('tenant.fest.show', ['event' => $event->id]) }}" class="text-white/40 hover:text-white">← Event page</a>
         </p>
     </div>

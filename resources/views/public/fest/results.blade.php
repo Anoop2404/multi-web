@@ -415,7 +415,7 @@
                                                         @else
                                                         <span class="w-20 h-20 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center text-lg font-bold border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                                                         @endif
-                                                        <span class="text-[11px] font-semibold leading-tight text-white/90 text-center line-clamp-2 uppercase">{{ $member['name'] ?? '—' }}</span>
+                                                        <span class="text-[11px] font-semibold leading-tight text-white/90 text-center uppercase break-words">{{ $member['name'] ?? '—' }}</span>
                                                     </div>
                                                     @endforeach
                                                 </div>
@@ -434,10 +434,30 @@
             </div>
             <div id="result-item-empty" class="hidden rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">No published item results match those filters.</div>
         @elseif($tab === 'individual')
-            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/95 backdrop-blur p-3 sm:p-4 grid sm:grid-cols-[1fr_auto] gap-3 mb-3 sticky top-32 z-10 shadow-xl">
+                <label><span class="sr-only">Search individual results</span><input id="individual-result-search" type="search" placeholder="Search participant, school, or item" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white placeholder:text-white/30 text-sm focus:border-amber-500 focus:ring-amber-500"></label>
+                <label><span class="sr-only">Filter individual result category</span><select id="individual-result-category" class="w-full rounded-xl border-slate-700 bg-slate-950 text-white text-sm focus:border-amber-500 focus:ring-amber-500"><option value="">All categories</option>@foreach(collect($individualResults)->pluck('category')->filter()->unique()->sort()->values() as $category)<option value="{{ Str::slug($category) }}">{{ $category }}</option>@endforeach</select></label>
+            </div>
+            <p id="individual-result-summary" class="text-xs text-white/40 mb-4" aria-live="polite">Showing {{ count($individualResults) }} results</p>
+
+            <div class="md:hidden space-y-3" id="individual-result-cards">
+                @foreach($individualResults as $row)
+                <article data-individual-result data-category="{{ Str::slug($row['category'] ?? '') }}" data-search="{{ Str::lower(collect([$row['participant'], $row['school'], $row['item']])->filter()->implode(' ')) }}" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                    <div class="flex items-start gap-3">
+                        @if($row['photo'] ?? null)<img src="{{ $row['photo'] }}" alt="" class="w-12 h-12 rounded-xl object-cover object-top border border-slate-700 shrink-0">@else<span class="w-12 h-12 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold shrink-0" aria-hidden="true">{{ strtoupper(substr($row['participant'] ?? '?', 0, 1)) }}</span>@endif
+                        <div class="min-w-0 flex-1"><h3 class="font-bold text-white uppercase leading-snug break-words">{{ $row['participant'] }}</h3><p class="text-xs text-white/45 uppercase mt-1 break-words">{{ $row['school'] }}</p></div>
+                        <span class="font-mono font-extrabold text-amber-300 shrink-0">#{{ $row['position'] }}</span>
+                    </div>
+                    <p class="mt-3 pt-3 border-t border-slate-800 text-sm font-semibold text-white/80 uppercase">{{ $row['item'] }}</p>
+                    <div class="flex items-center justify-between gap-3 mt-2 text-xs"><span class="text-white/40">{{ $row['category'] }}</span><span class="font-mono font-bold text-white">{{ $row['points'] ?? '—' }} pts · {{ !empty($row['grade']) ? 'Grade '.$row['grade'] : 'No grade' }}</span></div>
+                </article>
+                @endforeach
+            </div>
+
+            <div class="hidden md:block bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
                 <div class="px-4 py-3 bg-white/5 border-b border-slate-800">
                     <h2 class="font-bold text-white">Individual Results</h2>
-                    <p class="text-xs text-white/40">Every published result, one row per participant — not the same as the Championship tab's cumulative points.</p>
+                    <p class="text-xs text-white/40">Published podium results, one row per participant. Championship shows cumulative points.</p>
                 </div>
                 <table class="w-full text-sm">
                     <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
@@ -445,7 +465,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-800">
                         @forelse($individualResults as $row)
-                            <tr>
+                            <tr data-individual-result data-category="{{ Str::slug($row['category'] ?? '') }}" data-search="{{ Str::lower(collect([$row['participant'], $row['school'], $row['item']])->filter()->implode(' ')) }}">
                                 <td class="p-3 font-semibold text-white">
                                     <div class="flex items-center gap-2">
                                         @if($row['photo'] ?? null)
@@ -468,7 +488,18 @@
                     </tbody>
                 </table>
             </div>
+            <p id="individual-result-empty" class="hidden rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">No individual results match those filters.</p>
         @else
+            @if(empty($championship))
+            <div class="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 sm:p-10 text-center">
+                <h2 class="font-bold text-white">No championship standing is published</h2>
+                <p class="text-sm text-white/45 mt-2 max-w-xl mx-auto">{{ $event->status === 'completed' ? 'This event has ended without a published individual championship table.' : 'The championship table will appear here if the event committee publishes cumulative individual points.' }}</p>
+                <div class="flex flex-wrap justify-center gap-3 mt-5">
+                    <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'item']) }}" class="rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-amber-400">Browse item results</a>
+                    <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'school']) }}" class="rounded-xl border border-slate-700 bg-white/5 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">School results</a>
+                </div>
+            </div>
+            @else
             <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
                 <div class="px-4 py-3 bg-white/5 border-b border-slate-800">
                     <h2 class="font-bold text-white">Championship Standings</h2>
@@ -479,7 +510,7 @@
                         <tr><th class="p-3">Rank</th><th class="p-3">Student</th><th class="p-3">School</th><th class="p-3">Category</th><th class="p-3">Gender</th><th class="p-3 text-right">Points</th><th class="p-3 w-10"></th></tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
-                        @forelse($championship as $row)
+                        @foreach($championship as $row)
                             <tr>
                                 <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
                                 <td class="p-3 font-semibold text-white uppercase">{{ $row['student'] }}</td>
@@ -500,12 +531,11 @@
                                     @endif
                                 </td>
                             </tr>
-                        @empty
-                            <tr><td colspan="7" class="p-8 text-center text-white/30">No championship points published yet.</td></tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
             </div>
+            @endif
         @endif
     </div>
 </section>
@@ -520,6 +550,11 @@
     const groups = [...document.querySelectorAll('[data-result-category]')];
     const summary = document.getElementById('result-item-summary');
     const empty = document.getElementById('result-item-empty');
+    const initialUrl = new URL(window.location.href);
+    search.value = initialUrl.searchParams.get('q') || '';
+    category.value = initialUrl.searchParams.get('category') || '';
+    mode.value = initialUrl.searchParams.get('mode') || '';
+    stage.value = initialUrl.searchParams.get('stage') || '';
     const apply = () => {
         const query = search.value.trim().toLocaleLowerCase();
         let count = 0;
@@ -532,8 +567,51 @@
         groups.forEach(group => group.hidden = !group.querySelector('[data-result-item]:not([hidden])'));
         summary.textContent = `Showing ${count} published ${count === 1 ? 'item result' : 'item results'}`;
         empty.classList.toggle('hidden', count !== 0);
+        const nextUrl = new URL(window.location.href);
+        search.value ? nextUrl.searchParams.set('q', search.value.trim()) : nextUrl.searchParams.delete('q');
+        category.value ? nextUrl.searchParams.set('category', category.value) : nextUrl.searchParams.delete('category');
+        mode.value ? nextUrl.searchParams.set('mode', mode.value) : nextUrl.searchParams.delete('mode');
+        stage.value ? nextUrl.searchParams.set('stage', stage.value) : nextUrl.searchParams.delete('stage');
+        history.replaceState(null, '', nextUrl);
     };
     [search, category, mode, stage].forEach(control => control.addEventListener(control === search ? 'input' : 'change', apply));
+    apply();
+})();
+</script>
+@elseif($tab === 'individual')
+<script>
+(() => {
+    const search = document.getElementById('individual-result-search');
+    const category = document.getElementById('individual-result-category');
+    const cards = [...document.querySelectorAll('#individual-result-cards [data-individual-result]')];
+    const tableRows = [...document.querySelectorAll('table [data-individual-result]')];
+    const summary = document.getElementById('individual-result-summary');
+    const empty = document.getElementById('individual-result-empty');
+    if (!search) return;
+    const initialUrl = new URL(window.location.href);
+    search.value = initialUrl.searchParams.get('q') || '';
+    category.value = initialUrl.searchParams.get('category') || '';
+
+    const apply = () => {
+        const query = search.value.trim().toLocaleLowerCase();
+        let visible = 0;
+        cards.forEach((card, index) => {
+            const matches = (!query || card.dataset.search.includes(query))
+                && (!category.value || card.dataset.category === category.value);
+            card.hidden = !matches;
+            if (tableRows[index]) tableRows[index].hidden = !matches;
+            if (matches) visible++;
+        });
+        summary.textContent = `Showing ${visible} ${visible === 1 ? 'result' : 'results'}`;
+        empty.classList.toggle('hidden', visible !== 0);
+        const nextUrl = new URL(window.location.href);
+        search.value ? nextUrl.searchParams.set('q', search.value.trim()) : nextUrl.searchParams.delete('q');
+        category.value ? nextUrl.searchParams.set('category', category.value) : nextUrl.searchParams.delete('category');
+        history.replaceState(null, '', nextUrl);
+    };
+
+    search.addEventListener('input', apply);
+    category.addEventListener('change', apply);
     apply();
 })();
 </script>

@@ -149,6 +149,7 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $student = Student::where('name', 'Anu Krishna')->firstOrFail();
         FestParticipant::whereHas('student', fn ($q) => $q->where('name', 'Anu Krishna'))
             ->update(['level_registration_number' => 'CHAMP-REF-1']);
+        $participant = FestParticipant::whereHas('student', fn ($q) => $q->where('name', 'Anu Krishna'))->firstOrFail();
 
         FestIndividualChampionshipPoint::create([
             'event_id' => $this->event->id,
@@ -167,7 +168,18 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $response->assertSee('Classes 8, 9 &amp; 10', false);
         $response->assertSee('Girls');
         // Eye icon links to this student's own public participant page.
-        $response->assertSee("/fest/{$this->event->id}/participant/CHAMP-REF-1", false);
+        $response->assertSee("/fest/{$this->event->id}/participant/p-{$participant->id}", false);
+    }
+
+    public function test_empty_championship_uses_an_explanatory_state_instead_of_an_empty_table(): void
+    {
+        $response = $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=championship");
+
+        $response->assertOk()
+            ->assertSee('No championship standing is published')
+            ->assertSee('Browse item results')
+            ->assertSee('School results')
+            ->assertDontSee('<table', false);
     }
 
     public function test_item_results_page_shows_full_roster_not_just_one_member(): void
@@ -180,6 +192,98 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $response->assertSee('Ravi Nair');
         $response->assertSee('Sita Menon');
         $response->assertSee('Meera Pillai');
+    }
+
+    public function test_item_results_winner_roster_only_shows_podium_while_full_results_keeps_every_rank(): void
+    {
+        $item = FestEventItem::where('title', 'Solo Song')->firstOrFail();
+        $this->markSolo($item, $this->schoolB, 'Fourth Place Child', 4);
+
+        $response = $this->get("http://roster-test.test/fest/{$this->event->id}/items/{$item->id}/results");
+
+        $response->assertOk()->assertSee('Fourth Place Child');
+        $winnerRosterHtml = Str::before($response->getContent(), 'Full Results');
+        $this->assertStringNotContainsString('Fourth Place Child', $winnerRosterHtml);
+        $this->assertStringContainsString('Podium finishers · ties included', $winnerRosterHtml);
+    }
+
+    public function test_search_consolidates_one_students_items_and_uses_an_unambiguous_link(): void
+    {
+        $firstItem = FestEventItem::where('title', 'Solo Song')->firstOrFail();
+        $secondItem = FestEventItem::create([
+            'event_id' => $this->event->id,
+            'title' => 'Water Colour',
+            'participant_type' => 'individual',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $student = $this->student($this->schoolA, 'Aashi P');
+
+        $participants = collect([$firstItem, $secondItem])->map(function (FestEventItem $item) use ($student) {
+            $registration = FestRegistration::create([
+                'event_id' => $this->event->id,
+                'item_id' => $item->id,
+                'school_id' => $this->schoolA->id,
+                'status' => 'approved',
+            ]);
+
+            return FestParticipant::create([
+                'registration_id' => $registration->id,
+                'event_id' => $this->event->id,
+                'student_id' => $student->id,
+                'participant_type' => 'student',
+                'level_registration_number' => '102',
+            ]);
+        });
+
+        // A different student owns chest 102. A legacy bare /participant/102 URL will
+        // still resolve that chest, but the search result must use p-{id} and therefore
+        // open Aashi's page rather than this decoy.
+        $decoyItem = FestEventItem::create([
+            'event_id' => $this->event->id,
+            'title' => 'Decoy Item',
+            'participant_type' => 'individual',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $decoyRegistration = FestRegistration::create([
+            'event_id' => $this->event->id,
+            'item_id' => $decoyItem->id,
+            'school_id' => $this->schoolB->id,
+            'status' => 'approved',
+        ]);
+        $decoy = FestParticipant::create([
+            'registration_id' => $decoyRegistration->id,
+            'event_id' => $this->event->id,
+            'student_id' => $this->student($this->schoolB, 'Aadhya Abhilash')->id,
+            'participant_type' => 'student',
+            'chest_no' => 102,
+        ]);
+
+        $canonicalRef = 'p-'.$participants->first()->id;
+        $search = $this->get("http://roster-test.test/fest/{$this->event->id}/search?q=Aashi");
+
+        $search->assertOk()
+            ->assertSee('1 participant found')
+            ->assertSee('Solo Song')
+            ->assertSee('Water Colour')
+            ->assertSee("/participant/{$canonicalRef}", false)
+            ->assertDontSee('/participant/102', false);
+
+        $this->get("http://roster-test.test/fest/{$this->event->id}/search?q=102")
+            ->assertOk()
+            ->assertSee('2 participants found')
+            ->assertSee('Aashi P')
+            ->assertSee('Aadhya Abhilash')
+            ->assertSee("/participant/{$canonicalRef}", false)
+            ->assertSee("/participant/p-{$decoy->id}", false);
+
+        $this->get("http://roster-test.test/fest/{$this->event->id}/participant/{$canonicalRef}")
+            ->assertOk()
+            ->assertSee('AASHI P')
+            ->assertDontSee('AADHYA ABHILASH');
     }
 
     /**
