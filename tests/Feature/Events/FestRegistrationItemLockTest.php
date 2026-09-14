@@ -222,6 +222,21 @@ class FestRegistrationItemLockTest extends TestCase
         $this->assertDatabaseMissing('fest_participants', ['id' => $f['standby']->id]);
     }
 
+    /**
+     * Same regression as above, for canSchoolEditRoster() specifically — it was the one
+     * guard in this class still checking the event-wide results_published flag on top of
+     * the item-level one, so a school could no longer edit its roster for ANY item once
+     * results were published for a completely different item in the same event, even
+     * with the registration window still open and this item's own results unpublished.
+     */
+    public function test_can_school_edit_roster_allows_when_the_event_is_published_but_this_item_is_not(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['results_published' => true]);
+
+        $this->assertTrue(app(FestRegistrationService::class)->canSchoolEditRoster($f['registration']->fresh(), $f['event']->fresh()));
+    }
+
     public function test_allow_registration_for_item_aborts_once_item_results_are_published(): void
     {
         $f = $this->fixture();

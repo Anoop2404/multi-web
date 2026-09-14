@@ -293,10 +293,13 @@ class FestRegistrationService
             return false;
         }
 
-        if ($event->results_published) {
-            return false;
-        }
-
+        // Gate purely on THIS item's own results_published_at, not the event-wide
+        // results_published flag — matching every sibling guard in this class
+        // (canSchoolCancel, canAdminCancel, substitutePerformer, addParticipant,
+        // removeParticipant, allowRegistrationForItem/Review — see
+        // FestRegistrationItemLockTest.php). The event-wide flag used to block this one
+        // too, so once ANY item in the event had its results published, a school could
+        // no longer edit its roster for a completely different, still-open item.
         if ($registration->item?->results_published_at) {
             return false;
         }
