@@ -24,11 +24,12 @@ class FeeReceiptAttachmentController extends SahodayaAdminController
         $schoolId = $receiptService->schoolIdForReceipt($receipt);
         abort_unless($schoolId && Tenant::find($schoolId)?->parent_id === $this->sahodaya->id, 403);
 
-        $disk = config('filesystems.upload_disk', 'shared');
-        if (in_array($disk, ['s3', 'private'], true)) {
-            return redirect(\Illuminate\Support\Facades\Storage::disk($disk)->temporaryUrl($attachment->file_path, now()->addMinutes(15)));
-        }
-
+        // No s3/private temporaryUrl() redirect branch here (unlike some sibling
+        // proof-serving actions) — that redirect was producing a broken/blank response for
+        // this endpoint. downloadResponse() streams the file directly and is what every
+        // other working proof/attachment endpoint already uses (SchoolAdmin's own version of
+        // this controller, UnifiedPaymentsController::proof(),
+        // PaymentHistoryController::programProof()) — kept consistent with those.
         return TenantStorage::downloadResponse($this->sahodaya, $attachment->file_path);
     }
 }

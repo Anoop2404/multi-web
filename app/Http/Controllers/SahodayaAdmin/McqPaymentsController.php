@@ -17,7 +17,7 @@ class McqPaymentsController extends SahodayaAdminController
 
         $base = McqSchoolFee::query()
             ->whereHas('exam', fn ($q) => $q->where('tenant_id', $this->sahodaya->id))
-            ->with(['exam:id,title,exam_level,scheduled_at', 'school:id,name', 'feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with('reviewedBy:id,name')]);
+            ->with(['exam:id,title,exam_level,scheduled_at', 'school:id,name', 'feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with(['reviewedBy:id,name', 'attachments'])]);
 
         if ($search !== '') {
             $base->where(function ($q) use ($search) {
@@ -63,7 +63,7 @@ class McqPaymentsController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         $schoolFees = McqSchoolFee::where('exam_id', $exam->id)
-            ->with(['school', 'feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with('reviewedBy:id,name')])
+            ->with(['school', 'feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with(['reviewedBy:id,name', 'attachments'])])
             ->orderBy('school_id')
             ->get()
             ->map(fn (McqSchoolFee $sf) => $this->mapFeeRow($sf));
@@ -193,7 +193,7 @@ class McqPaymentsController extends SahodayaAdminController
      */
     private function mapReceiptsHistory(McqSchoolFee $sf): array
     {
-        $receipts = $sf->relationLoaded('receipts') ? $sf->receipts : $sf->receipts()->latest('id')->with('reviewedBy:id,name')->get();
+        $receipts = $sf->relationLoaded('receipts') ? $sf->receipts : $sf->receipts()->latest('id')->with(['reviewedBy:id,name', 'attachments'])->get();
 
         return $receipts->map(fn ($r) => [
             'id'               => $r->id,
@@ -213,6 +213,14 @@ class McqPaymentsController extends SahodayaAdminController
             'receipt_url'      => in_array($r->status, ['approved', 'reversed'], true)
                 ? "/sahodaya-admin/{$this->sahodaya->id}/finance/payments/receipts/{$r->id}"
                 : null,
+            // Extra evidence images for this same payment (e.g. a bank statement page
+            // alongside a UTR screenshot) — uploadSchoolPayment() already saves these via
+            // FeeReceiptAttachmentService::attachExtra(), they just weren't exposed here, so
+            // admin only ever saw the first of several files a school submitted.
+            'attachments'      => $r->attachments->map(fn ($a) => [
+                'id'  => $a->id,
+                'url' => "/sahodaya-admin/{$this->sahodaya->id}/finance/payments/attachments/{$a->id}",
+            ])->values()->all(),
         ])->values()->all();
     }
 }

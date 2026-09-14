@@ -628,9 +628,13 @@
                                         <span v-else>—</span>
                                     </td>
                                     <td class="px-3 py-2">
-                                        <a v-if="receipt.proof_url" :href="receipt.proof_url" target="_blank" rel="noopener"
-                                           class="text-indigo-600 hover:text-indigo-800 font-semibold underline">View</a>
-                                        <span v-else class="text-slate-400">—</span>
+                                        <div class="flex flex-wrap gap-2">
+                                            <a v-if="receipt.proof_url" :href="receipt.proof_url" target="_blank" rel="noopener"
+                                               class="text-indigo-600 hover:text-indigo-800 font-semibold underline">View</a>
+                                            <a v-for="(att, idx) in receipt.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener"
+                                               class="text-indigo-600 hover:text-indigo-800 font-semibold underline">+{{ idx + 1 }}</a>
+                                            <span v-if="!receipt.proof_url" class="text-slate-400">—</span>
+                                        </div>
                                     </td>
                                 </tr>
                             </tbody>

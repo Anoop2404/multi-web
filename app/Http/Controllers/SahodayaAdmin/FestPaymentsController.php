@@ -27,7 +27,7 @@ class FestPaymentsController extends SahodayaAdminController
                 // than one receipt can be 'uploaded' and awaiting review at once — surfaced
                 // below as receipts_history/pending_total so the queue doesn't just show the
                 // latest one and silently hide the rest.
-                'receipts' => fn ($q) => $q->latest('id')->with('reviewedBy:id,name'),
+                'receipts' => fn ($q) => $q->latest('id')->with(['reviewedBy:id,name', 'attachments']),
             ]);
 
         $counts = [
@@ -136,6 +136,14 @@ class FestPaymentsController extends SahodayaAdminController
                 'proof_url'        => $r->file_path
                     ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$sf->event_id}/school-fees/{$sf->id}/proofs/{$r->id}"
                     : null,
+                // Extra evidence images for this same payment (e.g. a bank statement page
+                // alongside a UTR screenshot) — attachPayment() already saves these via
+                // FeeReceiptAttachmentService::attachExtra(), they just weren't exposed here,
+                // so admin only ever saw the first of several files a school submitted.
+                'attachments'      => $r->attachments->map(fn ($a) => [
+                    'id'  => $a->id,
+                    'url' => "/sahodaya-admin/{$this->sahodaya->id}/finance/payments/attachments/{$a->id}",
+                ])->values()->all(),
             ])->values()->all(),
             'event_fees_url' => $event
                 ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/fees"

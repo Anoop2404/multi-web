@@ -86,6 +86,7 @@
                                             <div v-if="r.rejection_reason" class="text-red-600 mt-0.5 font-medium">Rejected: {{ r.rejection_reason }}</div>
                                         </div>
                                         <a v-if="r.proof_url" :href="r.proof_url" target="_blank" rel="noopener" class="text-slate-600 font-semibold hover:underline">Proof ↗</a>
+                                        <a v-for="(att, idx) in r.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener" class="text-slate-600 font-semibold hover:underline ml-2">+{{ idx + 1 }}</a>
                                     </div>
                                 </div>
                             </td>

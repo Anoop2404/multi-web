@@ -132,7 +132,7 @@ class McqController extends SchoolAdminController
 
         $schoolFee = McqSchoolFee::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
-            ->with(['feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with('reviewedBy:id,name')])
+            ->with(['feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with(['reviewedBy:id,name', 'attachments'])])
             ->first();
 
         $feeService = app(McqSchoolFeeService::class);
@@ -345,6 +345,14 @@ class McqController extends SchoolAdminController
                     'proof_url'        => ($r->file_path && ! $r->isSystemCredit())
                         ? route('school.payments.program.proof', ['tenantId' => $this->school->id, 'feeReceipt' => $r->id])
                         : null,
+                    // Extra evidence images for this same payment (e.g. a bank statement page
+                    // alongside a UTR screenshot) — uploadSchoolPayment() already saves these
+                    // via FeeReceiptAttachmentService::attachExtra(), they just weren't
+                    // exposed here, so the school only ever saw the first of several files.
+                    'attachments'      => $r->attachments->map(fn ($a) => [
+                        'id'  => $a->id,
+                        'url' => route('school.payments.attachment', ['tenantId' => $this->school->id, 'attachment' => $a->id]),
+                    ])->values()->all(),
                 ])->values()->all(),
             ]) : null,
             'feeBreakdown'           => $feeBreakdown,
