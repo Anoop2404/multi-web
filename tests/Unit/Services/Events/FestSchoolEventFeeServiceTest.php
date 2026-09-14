@@ -1251,8 +1251,49 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame('proof_uploaded', $fee->status);
 
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
-        $this->expectExceptionMessage('already awaiting review');
+        $this->expectExceptionMessage('awaiting review');
 
         $service->attachPayment($ctx['event'], $ctx['school']->id, \Illuminate\Http\UploadedFile::fake()->create('proof2.pdf', 100, 'application/pdf'), 1);
+    }
+
+    /**
+     * A school genuinely paying in installments — e.g. ₹1000 now, the remaining ₹500 a few
+     * days later — must have both receipts survive as separate, independently reviewable
+     * records, each capped so their combined total can't exceed what's due
+     * (FestSchoolEventFee::claimableBalance()). Distinct from the sibling test above, which
+     * covers a true duplicate: a second submission once nothing is left unclaimed.
+     */
+    public function test_attach_payment_allows_a_second_installment_for_the_remaining_balance(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake(\App\Support\TenantStorage::SHARED_DISK);
+        $ctx = $this->festContext();
+        $this->approvedRegistration($ctx['event'], $ctx['item'], $ctx['school']);
+
+        $service = app(FestSchoolEventFeeService::class);
+        $fee = \App\Models\FestSchoolEventFee::where('event_id', $ctx['event']->id)->where('school_id', $ctx['school']->id)->first()
+            ?? $service->recalculate($ctx['event'], $ctx['school']->id);
+        $totalDue = $fee->fresh()->total_due;
+        $this->assertGreaterThan(0, $totalDue, 'Sanity check: the fixture must produce a real non-zero fee, or this test proves nothing.');
+
+        $firstAmount = round($totalDue / 2, 2);
+        $secondAmount = round($totalDue - $firstAmount, 2);
+
+        $service->attachPayment(
+            $ctx['event'], $ctx['school']->id,
+            \Illuminate\Http\UploadedFile::fake()->create('proof-1.pdf', 100, 'application/pdf'),
+            1, amount: $firstAmount,
+        );
+        $service->attachPayment(
+            $ctx['event'], $ctx['school']->id,
+            \Illuminate\Http\UploadedFile::fake()->create('proof-2.pdf', 100, 'application/pdf'),
+            1, amount: $secondAmount,
+        );
+
+        $fee = $fee->fresh();
+        $receipts = $fee->receipts()->orderBy('id')->get();
+        $this->assertCount(2, $receipts, 'Both installments must survive as separate receipts, not one superseding the other.');
+        $this->assertSame('uploaded', $receipts[0]->status, 'The first installment must not be silently superseded by the second.');
+        $this->assertSame('uploaded', $receipts[1]->status);
+        $this->assertSame(0.0, $fee->claimableBalance(), 'Nothing should remain claimable once pending proofs cover the full amount due.');
     }
 }

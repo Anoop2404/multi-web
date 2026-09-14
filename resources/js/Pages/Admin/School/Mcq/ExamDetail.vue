@@ -545,14 +545,14 @@
                     </template>
                     After verification, registrations are confirmed and hall tickets are issued.
                 </p>
-                <div v-if="examHasFee && schoolFee && Number(schoolFee.amount_paid) > 0" class="grid grid-cols-3 gap-3">
+                <div v-if="examHasFee && schoolFee" class="grid grid-cols-3 gap-3">
                     <div class="rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2 text-center">
                         <p class="text-sm font-bold text-emerald-700">{{ formatRupee(schoolFee.amount_paid) }}</p>
-                        <p class="text-[10px] uppercase tracking-wide text-emerald-600">Paid so far</p>
+                        <p class="text-[10px] uppercase tracking-wide text-emerald-600">Received</p>
                     </div>
                     <div class="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-center">
                         <p class="text-sm font-bold text-amber-700">{{ formatRupee(feeBalance) }}</p>
-                        <p class="text-[10px] uppercase tracking-wide text-amber-600">Balance due</p>
+                        <p class="text-[10px] uppercase tracking-wide text-amber-600">Due</p>
                     </div>
                     <div class="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-center">
                         <p class="text-sm font-bold capitalize">{{ (schoolFee.status || '').replace('_', ' ') }}</p>
@@ -563,28 +563,80 @@
                     Batch fee total will be calculated when Sahodaya sets the per-student exam fee.
                 </p>
                 <p v-else-if="!registrations.length" class="text-sm text-amber-700">Register students first, then upload payment here.</p>
-                <form v-else-if="examHasFee && schoolFee && feeBalance > 0"
-                      @submit.prevent="uploadBatchFee" class="flex flex-wrap gap-2 items-end border-t border-slate-100 pt-4">
-                    <div>
-                        <label class="text-xs font-semibold text-slate-600 block mb-1">Payment proof</label>
-                        <input ref="proofInput" type="file" accept=".pdf,.jpg,.jpeg,.png" multiple class="text-sm" required>
-                        <p class="text-[10px] text-slate-400 mt-0.5">Up to 5 images for this one payment.</p>
-                    </div>
-                    <div>
-                        <label class="text-xs font-semibold text-slate-600 block mb-1">Amount (₹)</label>
-                        <input v-model="feeAmount" type="number" min="1" :max="feeBalance" step="0.01"
-                               class="field max-w-[140px] text-sm" :placeholder="String(feeBalance)">
-                        <p class="text-[10px] text-slate-400 mt-0.5">Leave blank to pay full balance ({{ formatRupee(feeBalance) }})</p>
-                    </div>
-                    <div>
-                        <label class="text-xs font-semibold text-slate-600 block mb-1">Transaction ref (optional)</label>
-                        <input v-model="transactionRef" class="field max-w-xs text-sm" placeholder="UTR / ref no.">
-                    </div>
-                    <button type="submit" class="btn-primary text-sm">Upload proof</button>
-                </form>
-                <p v-else-if="schoolFee?.status === 'approved' || feeBalance <= 0 && Number(schoolFee?.amount_paid) > 0" class="text-sm font-semibold text-emerald-700">Fee fully paid — hall tickets can be issued by Sahodaya.</p>
-                <p v-else-if="schoolFee?.status === 'proof_uploaded'" class="text-sm text-amber-800">Proof uploaded — awaiting Sahodaya verification.</p>
+                <template v-else-if="examHasFee && schoolFee">
+                    <p v-if="schoolFee.status === 'proof_uploaded'" class="text-sm text-amber-800">
+                        A proof for {{ formatRupee(feeBalance - claimableBalance) }} is awaiting Sahodaya verification.
+                        <span v-if="claimableBalance > 0">You can still submit proof for the remaining {{ formatRupee(claimableBalance) }} below.</span>
+                    </p>
+                    <form v-if="claimableBalance > 0"
+                          @submit.prevent="uploadBatchFee" class="flex flex-wrap gap-2 items-end border-t border-slate-100 pt-4">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 block mb-1">Payment proof</label>
+                            <input ref="proofInput" type="file" accept=".pdf,.jpg,.jpeg,.png" multiple class="text-sm" required>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Up to 5 images for this one payment.</p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 block mb-1">Amount (₹)</label>
+                            <input v-model="feeAmount" type="number" min="1" :max="claimableBalance" step="0.01"
+                                   class="field max-w-[140px] text-sm" :placeholder="String(claimableBalance)">
+                            <p class="text-[10px] text-slate-400 mt-0.5">Leave blank to pay full remaining balance ({{ formatRupee(claimableBalance) }})</p>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 block mb-1">Transaction ref (optional)</label>
+                            <input v-model="transactionRef" class="field max-w-xs text-sm" placeholder="UTR / ref no.">
+                        </div>
+                        <button type="submit" class="btn-primary text-sm">Upload proof</button>
+                    </form>
+                    <p v-else-if="schoolFee.status === 'approved' || (feeBalance <= 0 && Number(schoolFee.amount_paid) > 0)" class="text-sm font-semibold text-emerald-700">Fee fully paid — hall tickets can be issued by Sahodaya.</p>
+                </template>
                 <p v-else class="text-sm font-semibold capitalize text-slate-600">Status: {{ schoolFee?.status?.replace('_', ' ') || 'Not calculated' }}</p>
+
+                <!-- Payment History — every proof already uploaded for this batch, and its review status -->
+                <div v-if="schoolFee?.receipt_history?.length" class="border-t border-slate-100 pt-4">
+                    <h5 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Payment History</h5>
+                    <div class="overflow-x-auto rounded-lg border border-slate-200">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th class="px-3 py-2">Uploaded</th>
+                                    <th class="px-3 py-2">Transaction Ref</th>
+                                    <th class="px-3 py-2 text-right">Amount (₹)</th>
+                                    <th class="px-3 py-2">Status</th>
+                                    <th class="px-3 py-2">Reviewed</th>
+                                    <th class="px-3 py-2">Proof</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                <tr v-for="receipt in schoolFee.receipt_history" :key="receipt.id" class="hover:bg-slate-50/50 align-top">
+                                    <td class="px-3 py-2 text-slate-700">{{ receipt.uploaded_at || '—' }}</td>
+                                    <td class="px-3 py-2 font-mono text-slate-700">{{ receipt.transaction_ref || '—' }}</td>
+                                    <td class="px-3 py-2 text-right font-mono font-semibold text-slate-900">{{ formatRupee(receipt.amount) }}</td>
+                                    <td class="px-3 py-2">
+                                        <span class="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border"
+                                              :class="receiptStatusBadgeClass(receipt.status)">
+                                            {{ (receipt.status || '').replace('_', ' ') }}
+                                        </span>
+                                        <p v-if="receipt.status === 'rejected' && receipt.rejection_reason" class="text-[10px] text-red-700 mt-1">
+                                            {{ receipt.rejection_reason }}
+                                        </p>
+                                        <p v-if="receipt.status === 'reversed' && receipt.reversal_reason" class="text-[10px] text-red-700 mt-1">
+                                            {{ receipt.reversal_reason }}
+                                        </p>
+                                    </td>
+                                    <td class="px-3 py-2 text-slate-500">
+                                        <span v-if="receipt.reviewed_at">{{ receipt.reviewed_at }}<span v-if="receipt.reviewed_by"> · {{ receipt.reviewed_by }}</span></span>
+                                        <span v-else>—</span>
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <a v-if="receipt.proof_url" :href="receipt.proof_url" target="_blank" rel="noopener"
+                                           class="text-indigo-600 hover:text-indigo-800 font-semibold underline">View</a>
+                                        <span v-else class="text-slate-400">—</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1629,6 +1681,17 @@ function formatRupee(amount) {
     return value % 1 === 0 ? `₹${value}` : `₹${value.toFixed(2)}`;
 }
 
+function receiptStatusBadgeClass(status) {
+    switch (status) {
+        case 'approved': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        case 'rejected':
+        case 'reversed': return 'bg-red-50 text-red-700 border-red-200';
+        case 'uploaded': return 'bg-amber-50 text-amber-700 border-amber-200';
+        case 'superseded': return 'bg-slate-50 text-slate-500 border-slate-200';
+        default: return 'bg-slate-50 text-slate-600 border-slate-200';
+    }
+}
+
 const studentFeeLabel = computed(() => props.exam?.student_fee_label ?? props.exam?.fee_label ?? formatRupee(props.feeBreakdown?.student_fee));
 const schoolDiscountLabel = computed(() => props.exam?.school_discount_label ?? formatRupee(props.feeBreakdown?.school_discount));
 const payablePerStudentLabel = computed(() => props.exam?.payable_per_student_label ?? formatRupee(props.feeBreakdown?.payable_per_student));
@@ -1649,6 +1712,13 @@ const feeBalance = computed(() => {
     const due = Number(props.schoolFee?.total_due ?? props.registerStats?.batch_due ?? 0);
     const paid = Number(props.schoolFee?.amount_paid ?? 0);
     return Math.max(0, Math.round((due - paid) * 100) / 100);
+});
+// Unclaimed by any approved OR already-pending receipt — a school may submit several
+// installments as separate receipts (e.g. ₹1000 now, ₹500 later), so this can be lower
+// than feeBalance once a proof is awaiting review for part of the balance.
+const claimableBalance = computed(() => {
+    const explicit = props.schoolFee?.claimable;
+    return explicit !== undefined && explicit !== null ? Number(explicit) : feeBalance.value;
 });
 
 const registrationBlockTitle = computed(() => 'Registration closed');

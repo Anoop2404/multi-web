@@ -248,4 +248,73 @@ class FestSchoolFeeReuploadAfterRejectionTest extends TestCase
             "Level 1 fee status is '{$freshLevel1Fee->status}' after rejection — PhasedRegionBillingPanel.vue's Upload Payment Proof button only shows for pending/partial/rejected, so this status leaves the school stuck with no way to resubmit for this level."
         );
     }
+
+    /**
+     * A school paying in installments (see claimableBalance()) can have TWO receipts
+     * 'uploaded' at once. FestSchoolEventFeeController::reject() used to unconditionally
+     * stamp the whole fee 'rejected' after rejecting one of them — even when the other
+     * installment was still genuinely awaiting review — which hid it from the admin
+     * queue's Pending filter (status === 'proof_uploaded' AND feeReceipt.status ===
+     * 'uploaded'). Confirms rejecting one installment leaves the other one's pending
+     * status, and the admin's ability to review it, intact.
+     */
+    public function test_rejecting_one_installment_does_not_hide_a_still_pending_sibling_installment(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Installment Reject Sahodaya',
+            'domain' => Str::uuid().'.test', 'is_active' => true,
+        ]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'IRS', 'student_data_mode' => 'counts_only']);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'parent_id' => $sahodaya->id,
+            'name' => 'Installment Reject School', 'domain' => Str::uuid().'.test',
+            'membership_status' => 'approved', 'is_active' => true,
+        ]);
+
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Installment Reject Kalotsav', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'registration_open',
+            'fee_settings' => ['fee_model' => 'per_item'],
+        ]);
+
+        $fee = FestSchoolEventFee::create([
+            'event_id' => $event->id, 'school_id' => $school->id,
+            'total_due' => 500, 'amount_paid' => 0, 'status' => 'proof_uploaded',
+        ]);
+        $olderReceipt = FeeReceipt::create([
+            'feeable_type' => FestSchoolEventFee::class, 'feeable_id' => $fee->id,
+            'file_path' => 'fest/receipts/installment-300.jpg', 'amount' => 300, 'status' => 'uploaded',
+        ]);
+        $newerReceipt = FeeReceipt::create([
+            'feeable_type' => FestSchoolEventFee::class, 'feeable_id' => $fee->id,
+            'file_path' => 'fest/receipts/installment-200.jpg', 'amount' => 200, 'status' => 'uploaded',
+        ]);
+        $fee->update(['fee_receipt_id' => $newerReceipt->id]);
+
+        // reject() targets "the latest uploaded receipt" when given no explicit receipt id
+        // — same as the admin queue's plain Reject button.
+        $response = $this->actingAs($admin)->post(route('sahodaya.events.school-fees.reject', [
+            'tenantId' => $sahodaya->id,
+            'event' => $event->id,
+            'schoolEventFee' => $fee->id,
+        ]), ['rejection_reason' => 'Amount mismatch']);
+        $response->assertSessionHasNoErrors();
+
+        $this->assertSame('rejected', $newerReceipt->fresh()->status);
+        $this->assertSame('uploaded', $olderReceipt->fresh()->status, 'The sibling installment must not be touched by rejecting the other one.');
+
+        $freshFee = $fee->fresh();
+        $this->assertSame(
+            'proof_uploaded',
+            $freshFee->status,
+            'The fee must stay proof_uploaded (not be force-stamped rejected) while another installment is still genuinely pending review.'
+        );
+        $this->assertSame($olderReceipt->id, $freshFee->fee_receipt_id, 'fee_receipt_id must re-point to the still-pending sibling, or the admin queue\'s Approve/Reject buttons stay hidden behind the rejected receipt.');
+    }
 }

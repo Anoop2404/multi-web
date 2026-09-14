@@ -140,6 +140,17 @@ class McqSchoolFeeService
                 'reviewed_at' => now(),
             ]);
 
+            // A different installment may still be 'uploaded' and awaiting review
+            // (claimableBalance() allows several simultaneous installments) — re-point
+            // fee_receipt_id to it so the admin queue's Approve/Reject buttons (keyed off
+            // feeReceipt->status) don't get hidden behind the receipt that was just approved.
+            if ($schoolFee->fee_receipt_id === $lockedReceipt->id) {
+                $nextReceipt = $schoolFee->receipts()->where('status', 'uploaded')->latest('id')->first();
+                if ($nextReceipt) {
+                    $schoolFee->update(['fee_receipt_id' => $nextReceipt->id]);
+                }
+            }
+
             // Accumulate this receipt into amount_paid and derive partial/approved status.
             $schoolFee->refresh();
             $schoolFee->refreshPaidState();
@@ -207,6 +218,15 @@ class McqSchoolFeeService
             'reviewed_by'       => $userId,
             'reviewed_at'       => now(),
         ]);
+
+        // A different installment may still be 'uploaded' and awaiting review
+        // (claimableBalance() allows several simultaneous installments) — re-point
+        // fee_receipt_id to it so the admin queue's Approve/Reject buttons (keyed off
+        // feeReceipt->status) don't get hidden behind the receipt that was just rejected.
+        if ($schoolFee->fee_receipt_id === $receipt->id) {
+            $nextReceipt = $schoolFee->receipts()->where('status', 'uploaded')->latest('id')->first();
+            $schoolFee->update(['fee_receipt_id' => $nextReceipt?->id]);
+        }
 
         // Fall back to whatever has already been paid (partial) or pending.
         $schoolFee->refresh();

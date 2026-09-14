@@ -168,6 +168,16 @@ class McqPaymentsController extends SahodayaAdminController
                     ? "/sahodaya-admin/{$this->sahodaya->id}/mcq/payments/{$sf->id}/proof"
                     : null,
             ] : null,
+            // How many receipts are currently 'uploaded' (pending review) and their combined
+            // amount — a school can submit several installments before any are reviewed
+            // (McqSchoolFee::claimableBalance()), so this can be several receipts even
+            // though only one is shown by fee_receipt above. 0/1 for most rows.
+            'pending_count'  => $sf->relationLoaded('receipts')
+                ? $sf->receipts->where('status', 'uploaded')->count()
+                : $sf->receipts()->where('status', 'uploaded')->count(),
+            'pending_total'  => $sf->relationLoaded('receipts')
+                ? (float) $sf->receipts->where('status', 'uploaded')->sum('amount')
+                : (float) $sf->receipts()->where('status', 'uploaded')->sum('amount'),
             'receipts_history' => $this->mapReceiptsHistory($sf),
             'exam_url'       => "/sahodaya-admin/{$this->sahodaya->id}/mcq-exams/{$sf->exam_id}",
             'payments_url'   => "/sahodaya-admin/{$this->sahodaya->id}/mcq-exams/{$sf->exam_id}/payments",

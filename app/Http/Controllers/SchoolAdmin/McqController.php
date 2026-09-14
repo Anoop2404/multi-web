@@ -132,7 +132,7 @@ class McqController extends SchoolAdminController
 
         $schoolFee = McqSchoolFee::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
-            ->with('feeReceipt')
+            ->with(['feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with('reviewedBy:id,name')])
             ->first();
 
         $feeService = app(McqSchoolFeeService::class);
@@ -318,7 +318,35 @@ class McqController extends SchoolAdminController
             ]),
             'tab'                    => $tab,
             'registrations'          => $registrations,
-            'schoolFee'              => $schoolFee,
+            'schoolFee'              => $schoolFee ? array_merge($schoolFee->toArray(), [
+                'outstanding'      => $schoolFee->outstandingBalance(),
+                // Unclaimed by any approved OR already-pending receipt — a school may submit
+                // several installments as separate receipts (e.g. ₹1000 now, ₹500 later), so
+                // this can be lower than 'outstanding' once a proof is awaiting review.
+                'claimable'        => $schoolFee->claimableBalance(),
+                'is_fully_paid'    => $schoolFee->isFullyPaid(),
+                // Every proof the school has uploaded for this batch fee, newest first — a
+                // batch fee can collect several receipts over time (a rejection followed by
+                // re-upload, or partial installments via TracksPartialPayments), and only the
+                // latest one was otherwise surfaced via feeReceipt. Same shape as the
+                // sahodaya-admin side's McqPaymentsController::mapReceiptsHistory().
+                'receipt_history'  => $schoolFee->receipts->map(fn ($r) => [
+                    'id'               => $r->id,
+                    'status'           => $r->status,
+                    'amount'           => (float) $r->amount,
+                    'receipt_number'   => $r->receipt_number,
+                    'transaction_ref'  => $r->transaction_ref,
+                    'payment_date'     => $r->payment_date?->format('Y-m-d'),
+                    'uploaded_at'      => $r->created_at?->format('j M Y, g:i A'),
+                    'reviewed_at'      => $r->reviewed_at?->format('j M Y, g:i A'),
+                    'reviewed_by'      => $r->reviewedBy?->name,
+                    'rejection_reason' => $r->rejection_reason,
+                    'reversal_reason'  => $r->reversal_reason,
+                    'proof_url'        => ($r->file_path && ! $r->isSystemCredit())
+                        ? route('school.payments.program.proof', ['tenantId' => $this->school->id, 'feeReceipt' => $r->id])
+                        : null,
+                ])->values()->all(),
+            ]) : null,
             'feeBreakdown'           => $feeBreakdown,
             'students'               => $students,
             'teachers'               => $teachers,

@@ -117,12 +117,21 @@ class FeeReceipt extends Model
     }
 
     /** Mark prior uploaded/rejected proofs inactive when a school re-uploads. */
+    /**
+     * Only supersedes a prior REJECTED receipt (the "resubmit after rejection" flow) — a
+     * still-'uploaded' (pending-review) receipt is deliberately left alone. Schools submit
+     * installments as separate receipts (e.g. ₹1000 now, ₹500 later); superseding an
+     * unreviewed receipt just because a new one arrived silently discarded the earlier
+     * payment's record. Each caller is responsible for capping the new receipt's amount to
+     * TracksPartialPayments::claimableBalance() so pending receipts can't collectively
+     * exceed what's actually due.
+     */
     public static function supersedePriorForFeeable(Model $feeable): void
     {
         static::query()
             ->where('feeable_type', $feeable->getMorphClass())
             ->where('feeable_id', $feeable->getKey())
-            ->whereIn('status', ['uploaded', 'rejected'])
+            ->where('status', 'rejected')
             ->update(['status' => 'superseded']);
     }
 }

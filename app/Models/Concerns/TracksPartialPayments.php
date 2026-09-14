@@ -36,6 +36,26 @@ trait TracksPartialPayments
         return round(max(0, $this->feeTotalDue() - (float) ($this->amount_paid ?? 0)), 2);
     }
 
+    /** Sum of receipts currently awaiting review — already "claimed" against the balance due, even though not yet approved. */
+    public function pendingUploadedTotal(): float
+    {
+        return (float) $this->receipts()
+            ->where('status', 'uploaded')
+            ->sum('amount');
+    }
+
+    /**
+     * How much of the outstanding balance is still unclaimed by any receipt (approved or
+     * pending review) and can be put toward a new proof upload — lets a school submit
+     * several installments as separate receipts (e.g. ₹1000 now, ₹500 later) without one
+     * upload silently superseding an earlier one still awaiting review, while still
+     * blocking a new upload once the full balance is already covered by pending proofs.
+     */
+    public function claimableBalance(): float
+    {
+        return round(max(0, $this->outstandingBalance() - $this->pendingUploadedTotal()), 2);
+    }
+
     public function isFullyPaid(): bool
     {
         return $this->feeTotalDue() <= 0 || $this->outstandingBalance() <= 0;

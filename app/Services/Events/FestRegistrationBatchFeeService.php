@@ -448,11 +448,11 @@ class FestRegistrationBatchFeeService
         $fee = $this->recalculateBatch($root, $schoolId, $batch);
         abort_if($fee->total_due <= 0, 422, 'No fee is due for this payment level.');
         abort_if($fee->isFullyPaid(), 422, 'This payment level is already fully paid.');
-        abort_if($fee->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this payment level. Wait for it to be reviewed before submitting another.');
 
-        $outstanding = $fee->outstandingBalance();
-        $payAmount = $amount !== null ? round($amount, 2) : $outstanding;
-        abort_if($payAmount <= 0 || $payAmount > $outstanding, 422, 'Payment amount must be within the outstanding balance.');
+        $claimable = $fee->claimableBalance();
+        abort_if($claimable <= 0, 422, 'The full remaining balance for this payment level already has a payment proof awaiting review. Wait for it to be reviewed before submitting another.');
+        $payAmount = $amount !== null ? round($amount, 2) : $claimable;
+        abort_if($payAmount <= 0 || $payAmount > $claimable, 422, 'Payment amount must be within the unclaimed balance.');
 
         $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
         FeeReceipt::supersedePriorForFeeable($fee);

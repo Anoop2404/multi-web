@@ -44,6 +44,9 @@
                                     ₹{{ sf.amount_paid }} <span class="text-slate-400 font-normal">of ₹{{ sf.total_due }}</span>
                                 </template>
                                 <template v-else>₹{{ sf.total_due }}</template>
+                                <p v-if="sf.pending_count > 1" class="text-[10px] font-semibold text-amber-700 mt-0.5">
+                                    {{ sf.pending_count }} proofs pending review (₹{{ sf.pending_total }})
+                                </p>
                             </td>
                             <td class="text-xs capitalize">{{ sf.status?.replace('_', ' ') }}</td>
                             <td class="text-xs">

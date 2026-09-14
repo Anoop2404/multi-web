@@ -188,7 +188,14 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             $schoolEventFee->refresh();
             $schoolEventFee->refreshPaidState();
             $fresh = $schoolEventFee->fresh();
-            if ($fresh->outstandingBalance() > 0 && ! $fresh->isPartiallyPaid()) {
+            // refreshPaidState() already derives 'proof_uploaded' when a DIFFERENT
+            // installment receipt is still 'uploaded' (awaiting review) — only stamp the
+            // whole fee 'rejected' when nothing else is pending, i.e. it landed on
+            // 'pending'. Overriding unconditionally used to be harmless (at most one
+            // receipt could ever be 'uploaded' at a time), but once claimableBalance()
+            // allows several simultaneous installments, doing so here wrongly hid a still-
+            // pending sibling receipt from the admin queue's status filter.
+            if ($fresh->status === 'pending') {
                 $schoolEventFee->update(['status' => 'rejected']);
             }
 

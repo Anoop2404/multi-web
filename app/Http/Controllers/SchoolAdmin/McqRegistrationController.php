@@ -719,16 +719,22 @@ class McqRegistrationController extends SchoolAdminController
         $outstanding = $schoolFee->outstandingBalance();
         abort_if($outstanding <= 0, 422, 'This batch fee is already fully paid.');
 
+        // A school may submit several installments as separate receipts (e.g. ₹1000 now,
+        // ₹500 later) — each is capped to what's still unclaimed by any approved OR
+        // already-pending receipt, so pending proofs can't collectively exceed what's due.
+        $claimable = $schoolFee->claimableBalance();
+        abort_if($claimable <= 0, 422, 'The full remaining balance already has a payment proof awaiting review. Wait for it to be reviewed before submitting another.');
+
         // payment_proof accepts up to 5 images for ONE payment — see
         // docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature.
         $data = $request->validate([
             'payment_proof'    => 'required|array|min:1|max:'.\App\Services\Fees\FeeReceiptAttachmentService::MAX_FILES,
             'payment_proof.*'  => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
             'transaction_ref'  => 'nullable|string|max:100',
-            'amount'           => 'nullable|numeric|min:1|max:'.$outstanding,
+            'amount'           => 'nullable|numeric|min:1|max:'.$claimable,
         ]);
 
-        $amount = round((float) ($data['amount'] ?? $outstanding), 2);
+        $amount = round((float) ($data['amount'] ?? $claimable), 2);
 
         $proofFiles = $request->file('payment_proof');
         $path = TenantStorage::storeUploadedFile(

@@ -52,10 +52,10 @@
                     <input :value="phasePaymentBank(phaseFee.phase_id)" required
                            @input="e => $emit('update-phase-bank', phaseFee.phase_id, e.target.value)"
                            class="field text-xs w-28" placeholder="Bank name *">
-                    <input type="number" step="0.01" min="0.01" :max="phaseFee.outstanding" required
+                    <input type="number" step="0.01" min="0.01" :max="phaseFee.claimable ?? phaseFee.outstanding" required
                            :value="phasePaymentAmount(phaseFee.phase_id)"
                            @input="e => $emit('update-phase-amount', phaseFee.phase_id, e.target.value)"
-                           class="field text-xs w-24" :placeholder="`Amount * (₹${formatMoney(phaseFee.outstanding)} due)`">
+                           class="field text-xs w-24" :placeholder="`Amount * (₹${formatMoney(phaseFee.claimable ?? phaseFee.outstanding)} due)`">
                     <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">
                         Upload proof
                     </button>
@@ -143,10 +143,10 @@ function phaseFeeStatusLabel(status) {
 }
 
 function canUploadPhaseFee(pf) {
-    // 'partial' must stay in this list — otherwise a school that already had one
-    // partial payment approved has no way to submit the remaining balance (matches
-    // EventBillingPanel.vue's plain-invoice whitelist).
-    return Number(pf.outstanding ?? 0) > 0 && ['pending', 'partial', 'rejected'].includes(pf.status);
+    // A school may submit several installments as separate receipts (e.g. ₹1000 now,
+    // ₹500 later) — claimable already accounts for any receipt still awaiting review, so
+    // once it hits 0 the button hides even while status stays 'proof_uploaded'.
+    return Number(pf.claimable ?? pf.outstanding ?? 0) > 0;
 }
 
 function phasePaymentRef(phaseId) {

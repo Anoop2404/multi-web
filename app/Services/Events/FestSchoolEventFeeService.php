@@ -737,25 +737,27 @@ class FestSchoolEventFeeService
         $fee = $this->recalculateForHead($event, $schoolId, $head);
         abort_if($fee->total_due <= 0, 422, 'No fee due for this Event Head.');
         abort_if($fee->isFullyPaid(), 422, 'Fee already fully paid.');
-        abort_if($fee->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this Event Head. Wait for it to be reviewed before submitting another.');
 
-        $outstanding = $fee->outstandingBalance();
-        $payAmount = $amount !== null ? round($amount, 2) : $outstanding;
+        // A school may submit several installments as separate receipts (e.g. ₹1000 now,
+        // ₹500 later) — cap each to what's still unclaimed by any approved OR
+        // already-pending receipt, so pending proofs can't collectively exceed what's due.
+        $claimable = $fee->claimableBalance();
+        abort_if($claimable <= 0, 422, 'The full remaining balance for this Event Head already has a payment proof awaiting review. Wait for it to be reviewed before submitting another.');
+        $payAmount = $amount !== null ? round($amount, 2) : $claimable;
         abort_if($payAmount <= 0, 422, 'Payment amount must be greater than zero.');
-        abort_if($payAmount > $outstanding, 422, 'Payment cannot exceed the outstanding balance of ₹'.number_format($outstanding, 2).'.');
+        abort_if($payAmount > $claimable, 422, 'Payment cannot exceed the unclaimed balance of ₹'.number_format($claimable, 2).'.');
 
         // File storage happens before the lock — it's slow and has no DB side effect to race.
         $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
 
         return DB::transaction(function () use ($fee, $schoolId, $path, $transactionRef, $bankName, $payAmount, $userId, $extraProofs) {
-            // Re-check "already awaiting review" against a LOCKED read of the same row — the
+            // Re-check the claimable balance against a LOCKED read of the same row — the
             // check above ran before the lock, so two near-simultaneous uploads (double-click,
             // two tabs) could both pass it and both reach here. Locking closes that window:
-            // whichever transaction commits first flips status to 'proof_uploaded', so the
-            // second one's re-check inside the lock correctly rejects it instead of also
-            // inserting a second 'uploaded' receipt for the same fee.
+            // whichever transaction commits first is reflected here, so the second one's
+            // re-check inside the lock correctly rejects it if it would now overclaim.
             $locked = FestSchoolEventFee::whereKey($fee->id)->lockForUpdate()->firstOrFail();
-            abort_if($locked->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this Event Head. Wait for it to be reviewed before submitting another.');
+            abort_if($payAmount > $locked->claimableBalance(), 422, 'A payment proof is already awaiting review for this Event Head. Wait for it to be reviewed before submitting another.');
 
             FeeReceipt::supersedePriorForFeeable($locked);
 
@@ -1062,19 +1064,19 @@ class FestSchoolEventFeeService
         $fee = $this->recalculateForPhase($event, $schoolId, $phase);
         abort_if($fee->total_due <= 0, 422, 'No fee due for this phase.');
         abort_if($fee->isFullyPaid(), 422, 'Fee already fully paid.');
-        abort_if($fee->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this phase. Wait for it to be reviewed before submitting another.');
 
-        $outstanding = $fee->outstandingBalance();
-        $payAmount = $amount !== null ? round($amount, 2) : $outstanding;
+        $claimable = $fee->claimableBalance();
+        abort_if($claimable <= 0, 422, 'The full remaining balance for this phase already has a payment proof awaiting review. Wait for it to be reviewed before submitting another.');
+        $payAmount = $amount !== null ? round($amount, 2) : $claimable;
         abort_if($payAmount <= 0, 422, 'Payment amount must be greater than zero.');
-        abort_if($payAmount > $outstanding, 422, 'Payment cannot exceed the outstanding balance of ₹'.number_format($outstanding, 2).'.');
+        abort_if($payAmount > $claimable, 422, 'Payment cannot exceed the unclaimed balance of ₹'.number_format($claimable, 2).'.');
 
         $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
 
         return DB::transaction(function () use ($fee, $schoolId, $path, $transactionRef, $bankName, $payAmount, $userId, $extraProofs) {
             // See attachPaymentForHead()'s identical lock for why this is needed.
             $locked = FestSchoolEventFee::whereKey($fee->id)->lockForUpdate()->firstOrFail();
-            abort_if($locked->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this phase. Wait for it to be reviewed before submitting another.');
+            abort_if($payAmount > $locked->claimableBalance(), 422, 'A payment proof is already awaiting review for this phase. Wait for it to be reviewed before submitting another.');
 
             FeeReceipt::supersedePriorForFeeable($locked);
 
@@ -1636,19 +1638,19 @@ class FestSchoolEventFeeService
         $fee = $this->recalculate($event, $schoolId);
         abort_if($fee->total_due <= 0, 422, 'No fee due for this event.');
         abort_if($fee->isFullyPaid(), 422, 'Fee already fully paid.');
-        abort_if($fee->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this event. Wait for it to be reviewed before submitting another.');
 
-        $outstanding = $fee->outstandingBalance();
-        $payAmount = $amount !== null ? round($amount, 2) : $outstanding;
+        $claimable = $fee->claimableBalance();
+        abort_if($claimable <= 0, 422, 'The full remaining balance for this event already has a payment proof awaiting review. Wait for it to be reviewed before submitting another.');
+        $payAmount = $amount !== null ? round($amount, 2) : $claimable;
         abort_if($payAmount <= 0, 422, 'Payment amount must be greater than zero.');
-        abort_if($payAmount > $outstanding, 422, 'Payment cannot exceed the outstanding balance of ₹'.number_format($outstanding, 2).'.');
+        abort_if($payAmount > $claimable, 422, 'Payment cannot exceed the unclaimed balance of ₹'.number_format($claimable, 2).'.');
 
         $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
 
         return DB::transaction(function () use ($fee, $schoolId, $path, $transactionRef, $bankName, $payAmount, $userId, $extraProofs) {
             // See attachPaymentForHead()'s identical lock for why this is needed.
             $locked = FestSchoolEventFee::whereKey($fee->id)->lockForUpdate()->firstOrFail();
-            abort_if($locked->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this event. Wait for it to be reviewed before submitting another.');
+            abort_if($payAmount > $locked->claimableBalance(), 422, 'A payment proof is already awaiting review for this event. Wait for it to be reviewed before submitting another.');
 
             FeeReceipt::supersedePriorForFeeable($locked);
 

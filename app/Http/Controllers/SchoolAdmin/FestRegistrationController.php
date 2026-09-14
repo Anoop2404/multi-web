@@ -722,6 +722,7 @@ class FestRegistrationController extends SchoolAdminController
                 // never had this, so EventBillingPanel.vue had no way to show what's actually
                 // still owed and fell back to a partial, item-only subtotal instead.
                 'outstanding' => (float) $schoolFee->outstandingBalance(),
+                'claimable' => (float) $schoolFee->claimableBalance(),
                 // Every receipt ever submitted against this fee record — uploaded, rejected,
                 // superseded, approved, reversed — via the existing receipts() morphMany
                 // (TracksPartialPayments trait), not just the single current one feeReceipt()
@@ -762,6 +763,7 @@ class FestRegistrationController extends SchoolAdminController
                     'total_due' => (float) $fee->total_due,
                     'amount_paid' => (float) $fee->amount_paid,
                     'outstanding' => (float) $fee->outstandingBalance(),
+                    'claimable' => (float) $fee->claimableBalance(),
                     'status' => $fee->status,
                     'breakdown' => $feeService->breakdown($event, $fee, $schedule),
                     'rejection_reason' => $fee->status === 'rejected'
@@ -801,6 +803,7 @@ class FestRegistrationController extends SchoolAdminController
                     'total_due' => (float) $fee->total_due,
                     'amount_paid' => (float) $fee->amount_paid,
                     'outstanding' => (float) $fee->outstandingBalance(),
+                    'claimable' => (float) $fee->claimableBalance(),
                     'status' => $fee->status,
                     'breakdown' => $feeService->breakdown($event, $fee, $schedule),
                     'rejection_reason' => $fee->status === 'rejected'
@@ -850,6 +853,7 @@ class FestRegistrationController extends SchoolAdminController
                     'total_due' => (float) $fee->total_due,
                     'amount_paid' => (float) $fee->amount_paid,
                     'outstanding' => (float) $fee->outstandingBalance(),
+                    'claimable' => (float) $fee->claimableBalance(),
                     'status' => $fee->status,
                     'fee_receipt_id' => $fee->fee_receipt_id,
                     'fee_receipt' => $fee->feeReceipt ? ['id' => $fee->feeReceipt->id, 'status' => $fee->feeReceipt->status] : null,

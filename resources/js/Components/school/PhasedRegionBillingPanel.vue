@@ -166,7 +166,7 @@
                    class="btn-secondary text-xs font-semibold inline-flex items-center gap-1 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100">
                     <span>🧾 Official Receipt</span>
                 </a>
-                <button v-if="Number(fee.outstanding) > 0 && ['pending', 'partial', 'rejected'].includes(fee.status) && paymentBatch?.registration_batch_id !== fee.registration_batch_id"
+                <button v-if="Number(fee.claimable ?? fee.outstanding) > 0 && paymentBatch?.registration_batch_id !== fee.registration_batch_id"
                         type="button"
                         class="btn-primary text-xs font-semibold inline-flex items-center gap-1 shadow-xs"
                         @click="openPayment(fee)">
@@ -306,7 +306,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Amount Paid (₹) *</label>
-                    <input v-model.number="paymentForm.amount" type="number" min="0.01" step="0.01" class="field text-xs w-full font-mono font-bold" placeholder="Amount" required>
+                    <input v-model.number="paymentForm.amount" type="number" min="0.01" :max="Number((paymentBatch?.claimable ?? paymentBatch?.outstanding) || 0)" step="0.01" class="field text-xs w-full font-mono font-bold" placeholder="Amount" required>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Proof File(s) (PDF / Image) *</label>
@@ -408,7 +408,9 @@ const activePaymentQrCodeUrl = computed(() => {
 
 function openPayment(fee) {
     paymentBatch.value = fee;
-    paymentForm.amount = Number(fee.outstanding || 0);
+    // Default to what's still unclaimed, not the full outstanding balance — a school may
+    // already have a receipt pending review for part of it (installments).
+    paymentForm.amount = Number((fee.claimable ?? fee.outstanding) || 0);
 }
 
 function submitPayment() {

@@ -47,6 +47,9 @@
                                     ₹{{ fee.amount_paid }} <span class="text-slate-400 font-normal">of ₹{{ fee.total_due }}</span>
                                 </template>
                                 <template v-else>₹{{ fee.total_due }}</template>
+                                <p v-if="fee.pending_count > 1" class="text-[10px] font-semibold text-amber-700 mt-0.5">
+                                    {{ fee.pending_count }} proofs pending review (₹{{ fee.pending_total }})
+                                </p>
                             </td>
                             <td class="text-xs whitespace-nowrap">{{ formatDateTime(fee.updated_at) }}</td>
                             <td class="text-xs whitespace-nowrap text-right space-x-2">

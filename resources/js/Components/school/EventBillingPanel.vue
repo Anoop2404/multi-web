@@ -157,7 +157,7 @@
                 <!-- Gated on the real outstanding balance (school + student + item + team fees
                      minus what's paid), not the old item-only subtotal — a school can owe money
                      purely from the school registration fee with zero item fees registered. -->
-                <form v-if="outstanding > 0 && ['pending', 'partial', 'rejected'].includes(event.school_fee?.status)"
+                <form v-if="claimable > 0"
                       @submit.prevent="$emit('upload-event-payment')" class="flex flex-wrap gap-2 items-center">
                     <!-- multiple: up to 5 images for the SAME payment (e.g. a UTR screenshot +
                          a bank statement page) — still one receipt, reviewed as one payment.
@@ -171,13 +171,13 @@
                     <input :value="eventPaymentBank" required
                            @input="e => $emit('update-event-bank', e.target.value)"
                            class="field text-xs w-28" placeholder="Bank name *">
-                    <input type="number" step="0.01" min="0.01" :max="outstanding" required
+                    <input type="number" step="0.01" min="0.01" :max="claimable" required
                            :value="eventPaymentAmount"
                            @input="e => $emit('update-event-amount', e.target.value)"
-                           class="field text-xs w-24" :placeholder="`Amount * (₹${formatMoney(outstanding)} due)`">
+                           class="field text-xs w-24" :placeholder="`Amount * (₹${formatMoney(claimable)} due)`">
                     <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">Upload payment proof</button>
                 </form>
-                <p v-if="outstanding > 0 && ['pending', 'partial', 'rejected'].includes(event.school_fee?.status)"
+                <p v-if="claimable > 0"
                    class="text-[10px] text-slate-400 -mt-1">Up to 5 images for this one payment.</p>
                 <a v-if="event.school_fee?.status === 'approved'"
                    :href="(event.school_fee?.fee_receipt_id || event.school_fee?.fee_receipt?.id) ? `/school-admin/${schoolId}/payments/receipts/${event.school_fee.fee_receipt_id || event.school_fee.fee_receipt?.id}` : `${programBase}/events/${event.id}/fee-receipt`"
@@ -271,6 +271,13 @@ const outstanding = computed(() => {
     const explicit = props.event.school_fee?.outstanding;
     if (explicit !== undefined && explicit !== null) return Number(explicit);
     return Math.max(totalDue.value - amountPaid.value, 0);
+});
+// Unclaimed by any approved OR already-pending receipt — a school may submit several
+// installments as separate receipts (e.g. ₹1000 now, ₹500 later), so this can be lower
+// than `outstanding` once a proof is awaiting review for part of the balance.
+const claimable = computed(() => {
+    const explicit = props.event.school_fee?.claimable;
+    return explicit !== undefined && explicit !== null ? Number(explicit) : outstanding.value;
 });
 
 function formatMoney(val) {

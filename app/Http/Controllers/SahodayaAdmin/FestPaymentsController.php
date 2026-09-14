@@ -21,7 +21,14 @@ class FestPaymentsController extends SahodayaAdminController
         $base = FestSchoolEventFee::query()
             ->whereIn('event_id', $eventIds)
             ->forAmountAggregation()
-            ->with(['event:id,title,event_type,level_round', 'school:id,name', 'feeReceipt', 'registrationBatch:id,name,code']);
+            ->with([
+                'event:id,title,event_type,level_round', 'school:id,name', 'feeReceipt', 'registrationBatch:id,name,code',
+                // Installments (see FestSchoolEventFeeService::claimableBalance()) mean more
+                // than one receipt can be 'uploaded' and awaiting review at once — surfaced
+                // below as receipts_history/pending_total so the queue doesn't just show the
+                // latest one and silently hide the rest.
+                'receipts' => fn ($q) => $q->latest('id')->with('reviewedBy:id,name'),
+            ]);
 
         $counts = [
             'pending'  => (clone $base)->where('status', 'proof_uploaded')
@@ -108,6 +115,28 @@ class FestPaymentsController extends SahodayaAdminController
                     ? "/sahodaya-admin/{$this->sahodaya->id}/fest/payments/{$sf->id}/proof"
                     : null,
             ] : null,
+            // How many receipts are currently 'uploaded' (pending review) and their combined
+            // amount — a school can submit several installments before any are reviewed
+            // (claimableBalance()), so this can be several receipts even though only one is
+            // shown by fee_receipt above. 0/1 for the overwhelming majority of rows.
+            'pending_count'  => $sf->receipts->where('status', 'uploaded')->count(),
+            'pending_total'  => (float) $sf->receipts->where('status', 'uploaded')->sum('amount'),
+            'receipts_history' => $sf->receipts->map(fn ($r) => [
+                'id'               => $r->id,
+                'status'           => $r->status,
+                'amount'           => (float) $r->amount,
+                'receipt_number'   => $r->receipt_number,
+                'transaction_ref'  => $r->transaction_ref,
+                'bank_name'        => $r->bank_name,
+                'payment_date'     => $r->payment_date?->format('Y-m-d'),
+                'uploaded_at'      => $r->created_at?->format('j M Y, g:i A'),
+                'reviewed_at'      => $r->reviewed_at?->format('j M Y, g:i A'),
+                'reviewed_by'      => $r->reviewedBy?->name,
+                'rejection_reason' => $r->rejection_reason,
+                'proof_url'        => $r->file_path
+                    ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$sf->event_id}/school-fees/{$sf->id}/proofs/{$r->id}"
+                    : null,
+            ])->values()->all(),
             'event_fees_url' => $event
                 ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/fees"
                 : null,
