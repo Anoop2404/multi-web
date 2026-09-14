@@ -448,6 +448,7 @@ class FestRegistrationBatchFeeService
         $fee = $this->recalculateBatch($root, $schoolId, $batch);
         abort_if($fee->total_due <= 0, 422, 'No fee is due for this payment level.');
         abort_if($fee->isFullyPaid(), 422, 'This payment level is already fully paid.');
+        abort_if($fee->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this payment level. Wait for it to be reviewed before submitting another.');
 
         $outstanding = $fee->outstandingBalance();
         $payAmount = $amount !== null ? round($amount, 2) : $outstanding;

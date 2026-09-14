@@ -398,19 +398,26 @@ class FestRegistrationCreateService
             }
         }
 
-        $limitErrors = (new FestParticipationLimitService($event))
-            ->validateRegistration($item, $school->id, $performerIds, $standbyIds, $registration->id);
-        if ($limitErrors) {
-            throw ValidationException::withMessages(['student_ids' => implode(' ', $limitErrors)]);
-        }
-
-        $eligibilityErrors = app(FestRegistrationEligibilityService::class)
-            ->validateStudents($event, $item, array_merge($performerIds, $standbyIds));
-        if ($eligibilityErrors) {
-            throw ValidationException::withMessages(['student_ids' => implode(' ', $eligibilityErrors)]);
-        }
-
         $updated = DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $feeService, $dueBefore, $isPaid, $adminOverride) {
+            // Quota checks locked inside the transaction, same as createForSchool() — this
+            // roster-edit path previously validated caps OUTSIDE any lock, so two concurrent
+            // edits to different registrations under the same school sharing a pooled cap
+            // (e.g. max_onstage_per_school) could both read the same pre-edit count, both
+            // pass, and jointly push the school over its cap with no error ever raised.
+            \App\Models\FestEvent::query()->whereKey($event->id)->lockForUpdate()->first();
+
+            $limitErrors = (new FestParticipationLimitService($event))
+                ->validateRegistration($item, $school->id, $performerIds, $standbyIds, $registration->id);
+            if ($limitErrors) {
+                throw ValidationException::withMessages(['student_ids' => implode(' ', $limitErrors)]);
+            }
+
+            $eligibilityErrors = app(FestRegistrationEligibilityService::class)
+                ->validateStudents($event, $item, array_merge($performerIds, $standbyIds));
+            if ($eligibilityErrors) {
+                throw ValidationException::withMessages(['student_ids' => implode(' ', $eligibilityErrors)]);
+            }
+
             $eventRegService = app(FestEventRegistrationService::class);
             foreach (array_merge($performerIds, $standbyIds) as $studentId) {
                 if ($eventRegService->requireEventRegistration($event) && $event->event_type !== 'sports') {

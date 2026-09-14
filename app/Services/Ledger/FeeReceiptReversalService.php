@@ -3,6 +3,7 @@
 namespace App\Services\Ledger;
 
 use App\Models\FeeReceipt;
+use App\Models\FestSchoolEventFee;
 use App\Models\MembershipPayment;
 use App\Models\Registration;
 use App\Models\TrainingRegistration;
@@ -166,6 +167,24 @@ class FeeReceiptReversalService
             $feeable->refresh();
             $feeable->refreshPaidState(
                 $feeable instanceof TrainingRegistration ? 'fee_status' : 'status'
+            );
+        }
+
+        // Settling a FestSchoolEventFee auto-approves the school's registrations for it
+        // (FestRegistrationApprovalService::approveSchoolEvent()) — reversing the payment
+        // that made that happen must undo it, or the school's students stay 'approved'
+        // (chest numbers and all) against a fee that's no longer paid. Reached whenever
+        // reverse() runs, regardless of which controller called it (fee-specific reject/
+        // rejectReceipt already call this too via demoteSiblingApprovals() directly, for the
+        // still-'uploaded'-receipt case this method never sees — the two are idempotent
+        // together, both only touching rows currently 'approved').
+        if ($feeable instanceof FestSchoolEventFee && ! $feeable->fresh()->isFullyPaid()) {
+            app(\App\Services\Events\FestSchoolEventFeeService::class)->demoteSiblingApprovals(
+                $feeable->event,
+                $feeable->school_id,
+                $feeable->fresh(),
+                $feeable->head_id,
+                'a payment was reversed'
             );
         }
 

@@ -36,6 +36,21 @@ class FestRegistrationApprovalService
             ->orderBy('id')
             ->get()
             ->each(function (FestRegistration $registration) use (&$count, $event, $feeService, $feeRequiredBeforeApproval) {
+                // Skip (not abort the whole batch) an item whose results are already
+                // published — its roster is frozen, same rule FestRegistrationReviewController
+                // ::approve() enforces for a single-registration approval via
+                // EventLifecycleGate::assertItemRosterNotFrozen(). Fee approval can auto-approve
+                // a school's registrations across many items at once (this whole method), so a
+                // per-item check here, not a single blanket check before the loop, is what's
+                // needed — one already-published item shouldn't block approving the school's
+                // still-open items. Previously this call path (fee approval → here) was the one
+                // place that skipped the roster-freeze check the single-registration path
+                // already enforces, letting a late fee approval silently re-approve/chest-number
+                // a registration for an item whose results were already published.
+                if ($registration->item?->results_published_at) {
+                    return;
+                }
+
                 // Event Head approval_policy=manual stays in the Sahodaya review queue.
                 // Falls back to the event-level policy when the item has no head (Kalotsav
                 // items assigned a plain category instead — see
@@ -71,10 +86,22 @@ class FestRegistrationApprovalService
      */
     public function promoteNextWaitlisted(FestEvent $event, ?int $headId): ?FestRegistration
     {
+        if ($event->registration_locked || $event->results_published || $event->status === 'completed') {
+            return null;
+        }
+
         $next = FestRegistration::query()
             ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'waitlisted')
             ->when($headId, fn ($q) => $q->whereHas('item', fn ($qi) => $qi->where('head_id', $headId)))
+            // A withdraw/reject can free a seat under one item while the waitlist's own
+            // oldest entry sits under a DIFFERENT item (any item under the same Event Head,
+            // or the whole event when $headId is null) whose results are already published
+            // — promoting into "submitted, awaiting review" for an item that's already been
+            // competed and published makes no sense and was previously done anyway, with no
+            // lifecycle check of any kind on this path. Excluding those items here means the
+            // next-oldest, still-open waitlisted entry gets promoted instead.
+            ->whereHas('item', fn ($qi) => $qi->whereNull('results_published_at'))
             ->with(['item.head', 'event'])
             ->orderBy('id')
             ->first();
@@ -109,6 +136,10 @@ class FestRegistrationApprovalService
     /** Promote all waitlisted registrations for an event whose quotas are now open. */
     public function promoteAllEligibleWaitlisted(FestEvent $event): int
     {
+        if ($event->registration_locked || $event->results_published || $event->status === 'completed') {
+            return 0;
+        }
+
         $waitlistedRegs = FestRegistration::query()
             ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'waitlisted')
@@ -119,6 +150,12 @@ class FestRegistrationApprovalService
         $promotedCount = 0;
         foreach ($waitlistedRegs as $reg) {
             if (! $reg->item) {
+                continue;
+            }
+
+            // See promoteNextWaitlisted()'s identical exclusion for why — don't promote into
+            // "submitted, awaiting review" for an item whose results are already published.
+            if ($reg->item->results_published_at) {
                 continue;
             }
 

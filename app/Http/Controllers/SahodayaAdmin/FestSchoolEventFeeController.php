@@ -8,6 +8,7 @@ use App\Models\FestSchoolEventFee;
 use App\Models\Tenant;
 use App\Models\FestEventInvoice;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestFeeLedgerService;
 use App\Services\Events\FestInvoiceService;
 use App\Services\Fees\OfflineProgramFeeOrchestrator;
@@ -32,6 +33,18 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             ?? $schoolEventFee->receipts()->latest('id')->first();
 
         abort_unless($receipt && in_array($receipt->status, ['uploaded', 'rejected', 'superseded'], true), 422, 'No proof available to approve.');
+
+        // Approving a fee here can auto-approve every registration it covers
+        // (FestRegistrationApprovalService::approveSchoolEvent(), called below once fully
+        // paid) — previously this endpoint never checked whether the event was locked or
+        // results already published, unlike FestRegistrationReviewController::approve(),
+        // which has always gated the equivalent single-registration action. A late fee
+        // approval could silently re-approve registrations for an already-published/locked
+        // event through this door. Event-wide checks only ($item omitted) since one fee
+        // approval can span many items; the per-item roster-freeze check now happens inside
+        // approveSchoolEvent()'s own loop, which skips any already-published item instead of
+        // blocking the whole approval.
+        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
 
         $fullyPaid = DB::transaction(function () use ($request, $receipt, $schoolEventFee, $event) {
             // Lock this fee record for the duration of the approval + overpayment-
@@ -138,11 +151,16 @@ class FestSchoolEventFeeController extends SahodayaAdminController
 
         $data = $request->validate(['rejection_reason' => 'nullable|string|max:500']);
 
+        // Same gate as approve() above, and the same one FestRegistrationReviewController
+        // ::reject() already enforces for a single registration — kept consistent rather
+        // than only gating the approve direction.
+        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
+
         $receipt = $schoolEventFee->receipts()->where('status', 'uploaded')->latest('id')->first()
             ?? $schoolEventFee->feeReceipt
             ?? $schoolEventFee->receipts()->latest('id')->first();
 
-        DB::transaction(function () use ($request, $data, $receipt, $schoolEventFee) {
+        DB::transaction(function () use ($request, $data, $receipt, $schoolEventFee, $event) {
             // Lock the fee record to prevent concurrent approve+reject from corrupting state.
             FestSchoolEventFee::whereKey($schoolEventFee->id)->lockForUpdate()->first();
 
@@ -169,8 +187,23 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             // Preserve any already-approved partial payments; fall back to partial/pending.
             $schoolEventFee->refresh();
             $schoolEventFee->refreshPaidState();
-            if ($schoolEventFee->fresh()->outstandingBalance() > 0 && ! $schoolEventFee->fresh()->isPartiallyPaid()) {
+            $fresh = $schoolEventFee->fresh();
+            if ($fresh->outstandingBalance() > 0 && ! $fresh->isPartiallyPaid()) {
                 $schoolEventFee->update(['status' => 'rejected']);
+            }
+
+            // Settling this fee previously auto-approved the school's registrations
+            // (FestRegistrationApprovalService::approveSchoolEvent()) — rejecting/reversing
+            // the payment that made that happen must undo it, or the school's students stay
+            // 'approved' (chest numbers and all) against a fee that's no longer paid.
+            if (! $fresh->isFullyPaid()) {
+                app(\App\Services\Events\FestSchoolEventFeeService::class)->demoteSiblingApprovals(
+                    $event,
+                    $schoolEventFee->school_id,
+                    $fresh,
+                    $schoolEventFee->head_id,
+                    'a payment proof was rejected'
+                );
             }
 
             // Invoice-status rollup for per-head fee records is handled by FestInvoiceService
@@ -224,6 +257,9 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         );
         abort_if($feeReceipt->isSystemCredit(), 422, 'System-applied fee credits must be managed from Credits & payouts.');
 
+        // Same gate as approve()/reject() above.
+        EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
+
         $data = $request->validate(['rejection_reason' => 'nullable|string|max:500']);
         $reason = filled($data['rejection_reason'] ?? null)
             ? $data['rejection_reason']
@@ -260,12 +296,26 @@ class FestSchoolEventFeeController extends SahodayaAdminController
 
             $lockedFee->refresh();
             $lockedFee->refreshPaidState();
+            $freshFee = $lockedFee->fresh();
 
-            if ($lockedFee->head_id === null && ! $lockedFee->fresh()->isFullyPaid()) {
+            if ($lockedFee->head_id === null && ! $freshFee->isFullyPaid()) {
                 FestEventInvoice::where('event_id', $lockedFee->event_id)
                     ->where('school_id', $lockedFee->school_id)
                     ->where('status', 'paid')
                     ->update(['status' => 'issued']);
+            }
+
+            // See reject()'s identical call for why this is needed — settling this fee may
+            // have auto-approved registrations; rejecting/reversing the payment that did
+            // that must undo it too.
+            if (! $freshFee->isFullyPaid()) {
+                app(\App\Services\Events\FestSchoolEventFeeService::class)->demoteSiblingApprovals(
+                    $lockedFee->event,
+                    $lockedFee->school_id,
+                    $freshFee,
+                    $lockedFee->head_id,
+                    'a payment proof was rejected'
+                );
             }
         });
 

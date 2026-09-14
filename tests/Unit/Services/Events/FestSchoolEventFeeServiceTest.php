@@ -1229,4 +1229,30 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(150, $plainChild->fresh()->fee_settings['per_item_amount']);
         $this->assertSame(75.0, (float) $plainChildItem->fresh()->fee_amount);
     }
+
+    /**
+     * A school reported being able to submit a second payment proof while the first was
+     * still awaiting admin review, on top of the sibling billing-mode UIs already blocking
+     * this (see PhasedRegionBillingPanel.vue, which was missing the same status check its
+     * three sibling panels already had). This proves the server-side guard now backs that
+     * up directly, so a duplicate submission is rejected even via a raw request that
+     * bypasses the UI entirely.
+     */
+    public function test_attach_payment_rejects_a_second_submission_while_the_first_awaits_review(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake(\App\Support\TenantStorage::SHARED_DISK);
+        $ctx = $this->festContext();
+        $this->approvedRegistration($ctx['event'], $ctx['item'], $ctx['school']);
+
+        $service = app(FestSchoolEventFeeService::class);
+        $proof = \Illuminate\Http\UploadedFile::fake()->create('proof.pdf', 100, 'application/pdf');
+
+        $fee = $service->attachPayment($ctx['event'], $ctx['school']->id, $proof, 1);
+        $this->assertSame('proof_uploaded', $fee->status);
+
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectExceptionMessage('already awaiting review');
+
+        $service->attachPayment($ctx['event'], $ctx['school']->id, \Illuminate\Http\UploadedFile::fake()->create('proof2.pdf', 100, 'application/pdf'), 1);
+    }
 }

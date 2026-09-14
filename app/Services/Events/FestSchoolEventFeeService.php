@@ -567,55 +567,61 @@ class FestSchoolEventFeeService
         $composite = $this->sportsCompositeFeeService->calculateForEvent($event, $schoolId);
         $total = $composite['school_reg'] + $composite['student_reg'] + $composite['item_fee'] + $composite['team_fee'];
 
-        $record = FestSchoolEventFee::firstOrNew([
-            'event_id' => $event->id,
-            'school_id' => $schoolId,
-            'head_id' => null,
-        ]);
+        return DB::transaction(function () use ($event, $schoolId, $composite, $total) {
+            // See recalculate()'s lockFeeRecalculation() call for why this is needed —
+            // same firstOrNew()-race risk, same fix.
+            $this->lockFeeRecalculation($event->id, $schoolId, headId: null);
 
-        // Prefer null-head row; if only head-scoped rows remain, reuse the first.
-        if (! $record->exists && Schema::hasColumn('fest_school_event_fees', 'head_id')) {
-            $legacy = FestSchoolEventFee::where('event_id', $event->id)
-                ->where('school_id', $schoolId)
-                ->orderByRaw('head_id is null desc')
-                ->first();
-            if ($legacy) {
-                $record = $legacy;
-                $record->head_id = null;
+            $record = FestSchoolEventFee::firstOrNew([
+                'event_id' => $event->id,
+                'school_id' => $schoolId,
+                'head_id' => null,
+            ]);
+
+            // Prefer null-head row; if only head-scoped rows remain, reuse the first.
+            if (! $record->exists && Schema::hasColumn('fest_school_event_fees', 'head_id')) {
+                $legacy = FestSchoolEventFee::where('event_id', $event->id)
+                    ->where('school_id', $schoolId)
+                    ->orderByRaw('head_id is null desc')
+                    ->first();
+                if ($legacy) {
+                    $record = $legacy;
+                    $record->head_id = null;
+                }
             }
-        }
 
-        // Snapshot before overwriting total_due — see demoteSiblingApprovals() for why.
-        $wasFullyPaidAndApproved = $record->exists && $record->status === 'approved' && $record->isFullyPaid();
+            // Snapshot before overwriting total_due — see demoteSiblingApprovals() for why.
+            $wasFullyPaidAndApproved = $record->exists && $record->status === 'approved' && $record->isFullyPaid();
 
-        $record->fill([
-            'head_id' => null,
-            'school_registration_fee' => $composite['school_reg'],
-            'student_registration_fee' => $composite['student_reg'],
-            'participation_item_count' => $composite['student_count'],
-            'participation_fee' => $composite['item_fee'] + $composite['team_fee'],
-            'extra_item_fee' => $composite['team_fee'],
-            'total_due' => round($total, 2),
-        ]);
-        $record->save();
+            $record->fill([
+                'head_id' => null,
+                'school_registration_fee' => $composite['school_reg'],
+                'student_registration_fee' => $composite['student_reg'],
+                'participation_item_count' => $composite['student_count'],
+                'participation_fee' => $composite['item_fee'] + $composite['team_fee'],
+                'extra_item_fee' => $composite['team_fee'],
+                'total_due' => round($total, 2),
+            ]);
+            $record->save();
 
-        // Derive status from the actual receipt state (approved/uploaded/none) rather
-        // than trusting whatever status happens to already be stored — previously a
-        // status of 'approved' set while total_due was (incorrectly) 0 would stick
-        // around forever afterward, even once the real amount was recalculated and
-        // even if the school's uploaded proof was never actually approved by an admin.
-        $record->refreshPaidState();
-        $this->applyAvailableCredit($record, $event);
+            // Derive status from the actual receipt state (approved/uploaded/none) rather
+            // than trusting whatever status happens to already be stored — previously a
+            // status of 'approved' set while total_due was (incorrectly) 0 would stick
+            // around forever afterward, even once the real amount was recalculated and
+            // even if the school's uploaded proof was never actually approved by an admin.
+            $record->refreshPaidState();
+            $this->applyAvailableCredit($record, $event);
 
-        if ($wasFullyPaidAndApproved && ! $record->isFullyPaid()) {
-            $this->demoteSiblingApprovals($event, $schoolId, $record);
-        }
+            if ($wasFullyPaidAndApproved && ! $record->isFullyPaid()) {
+                $this->demoteSiblingApprovals($event, $schoolId, $record);
+            }
 
-        if ($this->supportsFeeLines()) {
-            $this->syncFeeLines($record, $composite['lines']);
-        }
+            if ($this->supportsFeeLines()) {
+                $this->syncFeeLines($record, $composite['lines']);
+            }
 
-        return $record;
+            return $record;
+        });
     }
 
     /** Heads under this event that this school has (or previously had) billable activity for. */
@@ -649,30 +655,36 @@ class FestSchoolEventFeeService
         $composite = $this->sportsCompositeFeeService->calculateForHead($head, $schoolId);
         $total = $composite['school_reg'] + $composite['student_reg'] + $composite['item_fee'] + $composite['team_fee'];
 
-        $record = FestSchoolEventFee::firstOrNew([
-            'event_id' => $event->id,
-            'school_id' => $schoolId,
-            'head_id' => $head->id,
-        ]);
+        return DB::transaction(function () use ($event, $schoolId, $head, $composite, $total) {
+            // See recalculate()'s lockFeeRecalculation() call for why this is needed —
+            // same firstOrNew()-race risk, same fix.
+            $this->lockFeeRecalculation($event->id, $schoolId, headId: $head->id);
 
-        $record->fill([
-            'school_registration_fee' => $composite['school_reg'],
-            'student_registration_fee' => $composite['student_reg'],
-            'participation_item_count' => $composite['student_count'],
-            'participation_fee' => $composite['item_fee'] + $composite['team_fee'],
-            'extra_item_fee' => $composite['team_fee'],
-            'total_due' => round($total, 2),
-        ]);
-        $record->save();
+            $record = FestSchoolEventFee::firstOrNew([
+                'event_id' => $event->id,
+                'school_id' => $schoolId,
+                'head_id' => $head->id,
+            ]);
 
-        // See recalculateForSportsEvent() for why status is derived, not preserved.
-        $record->refreshPaidState();
+            $record->fill([
+                'school_registration_fee' => $composite['school_reg'],
+                'student_registration_fee' => $composite['student_reg'],
+                'participation_item_count' => $composite['student_count'],
+                'participation_fee' => $composite['item_fee'] + $composite['team_fee'],
+                'extra_item_fee' => $composite['team_fee'],
+                'total_due' => round($total, 2),
+            ]);
+            $record->save();
 
-        if ($this->supportsFeeLines()) {
-            $this->syncFeeLines($record, $composite['lines']);
-        }
+            // See recalculateForSportsEvent() for why status is derived, not preserved.
+            $record->refreshPaidState();
 
-        return $record;
+            if ($this->supportsFeeLines()) {
+                $this->syncFeeLines($record, $composite['lines']);
+            }
+
+            return $record;
+        });
     }
 
     /**
@@ -725,42 +737,55 @@ class FestSchoolEventFeeService
         $fee = $this->recalculateForHead($event, $schoolId, $head);
         abort_if($fee->total_due <= 0, 422, 'No fee due for this Event Head.');
         abort_if($fee->isFullyPaid(), 422, 'Fee already fully paid.');
+        abort_if($fee->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this Event Head. Wait for it to be reviewed before submitting another.');
 
         $outstanding = $fee->outstandingBalance();
         $payAmount = $amount !== null ? round($amount, 2) : $outstanding;
         abort_if($payAmount <= 0, 422, 'Payment amount must be greater than zero.');
         abort_if($payAmount > $outstanding, 422, 'Payment cannot exceed the outstanding balance of ₹'.number_format($outstanding, 2).'.');
 
+        // File storage happens before the lock — it's slow and has no DB side effect to race.
         $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
 
-        FeeReceipt::supersedePriorForFeeable($fee);
+        return DB::transaction(function () use ($fee, $schoolId, $path, $transactionRef, $bankName, $payAmount, $userId, $extraProofs) {
+            // Re-check "already awaiting review" against a LOCKED read of the same row — the
+            // check above ran before the lock, so two near-simultaneous uploads (double-click,
+            // two tabs) could both pass it and both reach here. Locking closes that window:
+            // whichever transaction commits first flips status to 'proof_uploaded', so the
+            // second one's re-check inside the lock correctly rejects it instead of also
+            // inserting a second 'uploaded' receipt for the same fee.
+            $locked = FestSchoolEventFee::whereKey($fee->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this Event Head. Wait for it to be reviewed before submitting another.');
 
-        $receipt = FeeReceipt::create([
-            'feeable_type' => FestSchoolEventFee::class,
-            'feeable_id' => $fee->id,
-            'file_path' => $path,
-            'transaction_ref' => $transactionRef,
-            'bank_name' => $bankName,
-            'payment_date' => now()->toDateString(),
-            'amount' => $payAmount,
-            'status' => 'uploaded',
-            'uploaded_by_user_id' => $userId,
-        ]);
+            FeeReceipt::supersedePriorForFeeable($locked);
 
-        // Extra evidence images for this same payment (e.g. a bank statement page alongside
-        // a UTR screenshot) — see docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature.
-        // Never creates additional receipts; $proof above remains the one reviewed record.
-        if (! empty($extraProofs)) {
-            app(FeeReceiptAttachmentService::class)
-                ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
-        }
+            $receipt = FeeReceipt::create([
+                'feeable_type' => FestSchoolEventFee::class,
+                'feeable_id' => $locked->id,
+                'file_path' => $path,
+                'transaction_ref' => $transactionRef,
+                'bank_name' => $bankName,
+                'payment_date' => now()->toDateString(),
+                'amount' => $payAmount,
+                'status' => 'uploaded',
+                'uploaded_by_user_id' => $userId,
+            ]);
 
-        $fee->update([
-            'fee_receipt_id' => $receipt->id,
-            'status' => 'proof_uploaded',
-        ]);
+            // Extra evidence images for this same payment (e.g. a bank statement page alongside
+            // a UTR screenshot) — see docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature.
+            // Never creates additional receipts; $proof above remains the one reviewed record.
+            if (! empty($extraProofs)) {
+                app(FeeReceiptAttachmentService::class)
+                    ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
+            }
 
-        return $fee->fresh(['feeReceipt']);
+            $locked->update([
+                'fee_receipt_id' => $receipt->id,
+                'status' => 'proof_uploaded',
+            ]);
+
+            return $locked->fresh(['feeReceipt']);
+        });
     }
 
     /**
@@ -937,32 +962,38 @@ class FestSchoolEventFeeService
 
         $total = round($schoolRegFee + $participationFee, 2);
 
-        $record = FestSchoolEventFee::firstOrNew([
-            'event_id' => $event->id,
-            'school_id' => $schoolId,
-            'phase_id' => $phase->id,
-        ]);
+        return DB::transaction(function () use ($event, $schoolId, $phase, $schoolRegFee, $studentRegFee, $participationCount, $participationFee, $extraItemFee, $total, $useComposite, $compositeLines) {
+            // See recalculate()'s lockFeeRecalculation() call for why this is needed —
+            // same firstOrNew()-race risk, same fix.
+            $this->lockFeeRecalculation($event->id, $schoolId, phaseId: $phase->id);
 
-        $record->fill(array_filter([
-            'school_registration_fee' => $schoolRegFee,
-            'student_registration_fee' => $this->supportsSportsCompositeSchema() ? $studentRegFee : null,
-            'participation_item_count' => $participationCount,
-            'participation_fee' => $participationFee,
-            'extra_item_fee' => $this->supportsSportsCompositeSchema() ? $extraItemFee : null,
-            'total_due' => $total,
-        ], fn ($value) => $value !== null));
-        $record->save();
+            $record = FestSchoolEventFee::firstOrNew([
+                'event_id' => $event->id,
+                'school_id' => $schoolId,
+                'phase_id' => $phase->id,
+            ]);
 
-        $record->refreshPaidState();
-        $this->applyAvailableCredit($record, $event);
+            $record->fill(array_filter([
+                'school_registration_fee' => $schoolRegFee,
+                'student_registration_fee' => $this->supportsSportsCompositeSchema() ? $studentRegFee : null,
+                'participation_item_count' => $participationCount,
+                'participation_fee' => $participationFee,
+                'extra_item_fee' => $this->supportsSportsCompositeSchema() ? $extraItemFee : null,
+                'total_due' => $total,
+            ], fn ($value) => $value !== null));
+            $record->save();
 
-        if ($useComposite && $this->supportsFeeLines()) {
-            $this->syncFeeLines($record, $compositeLines);
-        } elseif ($this->supportsFeeLines()) {
-            $record->lines()->delete();
-        }
+            $record->refreshPaidState();
+            $this->applyAvailableCredit($record, $event);
 
-        return $record;
+            if ($useComposite && $this->supportsFeeLines()) {
+                $this->syncFeeLines($record, $compositeLines);
+            } elseif ($this->supportsFeeLines()) {
+                $record->lines()->delete();
+            }
+
+            return $record;
+        });
     }
 
     /**
@@ -1031,6 +1062,7 @@ class FestSchoolEventFeeService
         $fee = $this->recalculateForPhase($event, $schoolId, $phase);
         abort_if($fee->total_due <= 0, 422, 'No fee due for this phase.');
         abort_if($fee->isFullyPaid(), 422, 'Fee already fully paid.');
+        abort_if($fee->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this phase. Wait for it to be reviewed before submitting another.');
 
         $outstanding = $fee->outstandingBalance();
         $payAmount = $amount !== null ? round($amount, 2) : $outstanding;
@@ -1039,31 +1071,37 @@ class FestSchoolEventFeeService
 
         $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
 
-        FeeReceipt::supersedePriorForFeeable($fee);
+        return DB::transaction(function () use ($fee, $schoolId, $path, $transactionRef, $bankName, $payAmount, $userId, $extraProofs) {
+            // See attachPaymentForHead()'s identical lock for why this is needed.
+            $locked = FestSchoolEventFee::whereKey($fee->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this phase. Wait for it to be reviewed before submitting another.');
 
-        $receipt = FeeReceipt::create([
-            'feeable_type' => FestSchoolEventFee::class,
-            'feeable_id' => $fee->id,
-            'file_path' => $path,
-            'transaction_ref' => $transactionRef,
-            'bank_name' => $bankName,
-            'payment_date' => now()->toDateString(),
-            'amount' => $payAmount,
-            'status' => 'uploaded',
-            'uploaded_by_user_id' => $userId,
-        ]);
+            FeeReceipt::supersedePriorForFeeable($locked);
 
-        if (! empty($extraProofs)) {
-            app(FeeReceiptAttachmentService::class)
-                ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
-        }
+            $receipt = FeeReceipt::create([
+                'feeable_type' => FestSchoolEventFee::class,
+                'feeable_id' => $locked->id,
+                'file_path' => $path,
+                'transaction_ref' => $transactionRef,
+                'bank_name' => $bankName,
+                'payment_date' => now()->toDateString(),
+                'amount' => $payAmount,
+                'status' => 'uploaded',
+                'uploaded_by_user_id' => $userId,
+            ]);
 
-        $fee->update([
-            'fee_receipt_id' => $receipt->id,
-            'status' => 'proof_uploaded',
-        ]);
+            if (! empty($extraProofs)) {
+                app(FeeReceiptAttachmentService::class)
+                    ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
+            }
 
-        return $fee->fresh(['feeReceipt']);
+            $locked->update([
+                'fee_receipt_id' => $receipt->id,
+                'status' => 'proof_uploaded',
+            ]);
+
+            return $locked->fresh(['feeReceipt']);
+        });
     }
 
     public function recalculate(FestEvent $event, string $schoolId): FestSchoolEventFee
@@ -1171,40 +1209,70 @@ class FestSchoolEventFeeService
             $participationFee = max(0, round($total - $schoolRegFee, 2));
         }
 
-        $record = FestSchoolEventFee::firstOrNew([
-            'event_id' => $event->id,
-            'school_id' => $schoolId,
-        ]);
+        return DB::transaction(function () use ($event, $schoolId, $schoolRegFee, $studentRegFee, $participationCount, $participationFee, $extraItemFee, $total, $useComposite, $compositeLines) {
+            // Two concurrent recalculate() calls for a school with no fee row yet (e.g. two
+            // rapid registrations before any FestSchoolEventFee exists) can both firstOrNew()
+            // the same nonexistent record and both insert — the unique index on
+            // (event_id, school_id, head_id, phase_id) doesn't catch this on Postgres, which
+            // never treats NULL as equal to NULL. Locking the row itself doesn't help either,
+            // since there's no row yet to lock. An advisory lock serializes the whole
+            // read-compute-write cycle per (event, school) without needing an existing row.
+            $this->lockFeeRecalculation($event->id, $schoolId);
 
-        // Snapshot before overwriting total_due — see demoteSiblingApprovals() for why.
-        $wasFullyPaidAndApproved = $record->exists && $record->status === 'approved' && $record->isFullyPaid();
+            $record = FestSchoolEventFee::firstOrNew([
+                'event_id' => $event->id,
+                'school_id' => $schoolId,
+            ]);
 
-        $record->fill(array_filter([
-            'school_registration_fee' => $schoolRegFee,
-            'student_registration_fee' => $this->supportsSportsCompositeSchema() ? $studentRegFee : null,
-            'participation_item_count' => $participationCount,
-            'participation_fee' => $participationFee,
-            'extra_item_fee' => $this->supportsSportsCompositeSchema() ? $extraItemFee : null,
-            'total_due' => $total,
-        ], fn ($value) => $value !== null));
-        $record->save();
+            // Snapshot before overwriting total_due — see demoteSiblingApprovals() for why.
+            $wasFullyPaidAndApproved = $record->exists && $record->status === 'approved' && $record->isFullyPaid();
 
-        // Derive status from the actual receipt state rather than preserving whatever
-        // was stored — see recalculateForSportsEvent() for the incident this fixes.
-        $record->refreshPaidState();
-        $this->applyAvailableCredit($record, $event);
+            $record->fill(array_filter([
+                'school_registration_fee' => $schoolRegFee,
+                'student_registration_fee' => $this->supportsSportsCompositeSchema() ? $studentRegFee : null,
+                'participation_item_count' => $participationCount,
+                'participation_fee' => $participationFee,
+                'extra_item_fee' => $this->supportsSportsCompositeSchema() ? $extraItemFee : null,
+                'total_due' => $total,
+            ], fn ($value) => $value !== null));
+            $record->save();
 
-        if ($wasFullyPaidAndApproved && ! $record->isFullyPaid()) {
-            $this->demoteSiblingApprovals($event, $schoolId, $record);
+            // Derive status from the actual receipt state rather than preserving whatever
+            // was stored — see recalculateForSportsEvent() for the incident this fixes.
+            $record->refreshPaidState();
+            $this->applyAvailableCredit($record, $event);
+
+            if ($wasFullyPaidAndApproved && ! $record->isFullyPaid()) {
+                $this->demoteSiblingApprovals($event, $schoolId, $record);
+            }
+
+            if ($useComposite && $this->supportsFeeLines()) {
+                $this->syncFeeLines($record, $compositeLines);
+            } elseif ($this->supportsFeeLines()) {
+                $record->lines()->delete();
+            }
+
+            return $record;
+        });
+    }
+
+    /**
+     * Advisory lock keyed by an arbitrary string rather than a row — used wherever a
+     * FestSchoolEventFee (or per-head/per-phase variant) might not exist yet, so a
+     * firstOrNew()+save() race can't create duplicate rows for the same key. Held for the
+     * duration of the enclosing transaction (pg_advisory_xact_lock auto-releases on
+     * commit/rollback, no explicit unlock needed). No-op on non-Postgres connections
+     * (local sqlite test/dev setups) — best-effort there, same as this app's other
+     * Postgres-only duplicate guards (see fest_reg_active_unique).
+     */
+    private function lockFeeRecalculation(string $eventId, string $schoolId, ?int $headId = null, ?int $phaseId = null): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
         }
 
-        if ($useComposite && $this->supportsFeeLines()) {
-            $this->syncFeeLines($record, $compositeLines);
-        } elseif ($this->supportsFeeLines()) {
-            $record->lines()->delete();
-        }
-
-        return $record;
+        $key = 'fest_school_event_fee:'.$eventId.':'.$schoolId.':'.($headId ?? 'null').':'.($phaseId ?? 'null');
+        DB::select('select pg_advisory_xact_lock(hashtext(?))', [$key]);
     }
 
     /**
@@ -1249,22 +1317,30 @@ class FestSchoolEventFeeService
         $itemCount = (int) $headFees->sum('participation_item_count');
         $allApproved = $headFees->isNotEmpty() && $headFees->every(fn (FestSchoolEventFee $f) => $f->isFullyPaid());
 
-        $record = FestSchoolEventFee::firstOrNew([
-            'event_id' => $event->id,
-            'school_id' => $schoolId,
-            'head_id' => null,
-        ]);
+        $record = DB::transaction(function () use ($event, $schoolId, $schoolRegFee, $studentRegFee, $itemCount, $totalDue, $totalPaid, $allApproved) {
+            // See recalculate()'s lockFeeRecalculation() call for why this is needed —
+            // same firstOrNew()-race risk, same fix.
+            $this->lockFeeRecalculation($event->id, $schoolId, headId: null);
 
-        $record->fill([
-            'school_registration_fee' => $schoolRegFee,
-            'student_registration_fee' => $this->supportsSportsCompositeSchema() ? $studentRegFee : null,
-            'participation_item_count' => $itemCount,
-            'participation_fee' => round($totalDue - $schoolRegFee, 2),
-            'total_due' => $totalDue,
-            'amount_paid' => $totalPaid,
-            'status' => $allApproved ? 'approved' : ($totalPaid > 0 ? 'partial' : 'pending'),
-        ]);
-        $record->save();
+            $record = FestSchoolEventFee::firstOrNew([
+                'event_id' => $event->id,
+                'school_id' => $schoolId,
+                'head_id' => null,
+            ]);
+
+            $record->fill([
+                'school_registration_fee' => $schoolRegFee,
+                'student_registration_fee' => $this->supportsSportsCompositeSchema() ? $studentRegFee : null,
+                'participation_item_count' => $itemCount,
+                'participation_fee' => round($totalDue - $schoolRegFee, 2),
+                'total_due' => $totalDue,
+                'amount_paid' => $totalPaid,
+                'status' => $allApproved ? 'approved' : ($totalPaid > 0 ? 'partial' : 'pending'),
+            ]);
+            $record->save();
+
+            return $record;
+        });
 
         // Deliberately NOT wired into applyAvailableCredit(): this rollup's amount_paid is a
         // manual sum of child per-head records, not driven by this record's own receipts() —
@@ -1297,21 +1373,29 @@ class FestSchoolEventFeeService
         $itemCount = (int) $phaseFees->sum('participation_item_count');
         $allApproved = $phaseFees->isNotEmpty() && $phaseFees->every(fn (FestSchoolEventFee $f) => $f->isFullyPaid());
 
-        $record = FestSchoolEventFee::firstOrNew([
-            'event_id' => $event->id,
-            'school_id' => $schoolId,
-            'phase_id' => null,
-        ]);
+        $record = DB::transaction(function () use ($event, $schoolId, $schoolRegFee, $itemCount, $totalDue, $totalPaid, $allApproved) {
+            // See recalculate()'s lockFeeRecalculation() call for why this is needed —
+            // same firstOrNew()-race risk, same fix.
+            $this->lockFeeRecalculation($event->id, $schoolId, phaseId: null);
 
-        $record->fill([
-            'school_registration_fee' => $schoolRegFee,
-            'participation_item_count' => $itemCount,
-            'participation_fee' => round($totalDue - $schoolRegFee, 2),
-            'total_due' => $totalDue,
-            'amount_paid' => $totalPaid,
-            'status' => $allApproved ? 'approved' : ($totalPaid > 0 ? 'partial' : 'pending'),
-        ]);
-        $record->save();
+            $record = FestSchoolEventFee::firstOrNew([
+                'event_id' => $event->id,
+                'school_id' => $schoolId,
+                'phase_id' => null,
+            ]);
+
+            $record->fill([
+                'school_registration_fee' => $schoolRegFee,
+                'participation_item_count' => $itemCount,
+                'participation_fee' => round($totalDue - $schoolRegFee, 2),
+                'total_due' => $totalDue,
+                'amount_paid' => $totalPaid,
+                'status' => $allApproved ? 'approved' : ($totalPaid > 0 ? 'partial' : 'pending'),
+            ]);
+            $record->save();
+
+            return $record;
+        });
 
         // Same reasoning as recalculateAggregateForPerHeadEvent()'s rollup: this record's
         // amount_paid is a manual sum of per-phase children, not driven by its own receipts,
@@ -1552,6 +1636,7 @@ class FestSchoolEventFeeService
         $fee = $this->recalculate($event, $schoolId);
         abort_if($fee->total_due <= 0, 422, 'No fee due for this event.');
         abort_if($fee->isFullyPaid(), 422, 'Fee already fully paid.');
+        abort_if($fee->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this event. Wait for it to be reviewed before submitting another.');
 
         $outstanding = $fee->outstandingBalance();
         $payAmount = $amount !== null ? round($amount, 2) : $outstanding;
@@ -1560,33 +1645,39 @@ class FestSchoolEventFeeService
 
         $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
 
-        FeeReceipt::supersedePriorForFeeable($fee);
+        return DB::transaction(function () use ($fee, $schoolId, $path, $transactionRef, $bankName, $payAmount, $userId, $extraProofs) {
+            // See attachPaymentForHead()'s identical lock for why this is needed.
+            $locked = FestSchoolEventFee::whereKey($fee->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->status === 'proof_uploaded', 422, 'A payment proof is already awaiting review for this event. Wait for it to be reviewed before submitting another.');
 
-        $receipt = FeeReceipt::create([
-            'feeable_type' => FestSchoolEventFee::class,
-            'feeable_id' => $fee->id,
-            'file_path' => $path,
-            'transaction_ref' => $transactionRef,
-            'bank_name' => $bankName,
-            'payment_date' => now()->toDateString(),
-            'amount' => $payAmount,
-            'status' => 'uploaded',
-            'uploaded_by_user_id' => $userId,
-        ]);
+            FeeReceipt::supersedePriorForFeeable($locked);
 
-        // See attachPaymentForHead() above for why this exists — same additive, no-new-
-        // receipt behavior.
-        if (! empty($extraProofs)) {
-            app(FeeReceiptAttachmentService::class)
-                ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
-        }
+            $receipt = FeeReceipt::create([
+                'feeable_type' => FestSchoolEventFee::class,
+                'feeable_id' => $locked->id,
+                'file_path' => $path,
+                'transaction_ref' => $transactionRef,
+                'bank_name' => $bankName,
+                'payment_date' => now()->toDateString(),
+                'amount' => $payAmount,
+                'status' => 'uploaded',
+                'uploaded_by_user_id' => $userId,
+            ]);
 
-        $fee->update([
-            'fee_receipt_id' => $receipt->id,
-            'status' => 'proof_uploaded',
-        ]);
+            // See attachPaymentForHead() above for why this exists — same additive, no-new-
+            // receipt behavior.
+            if (! empty($extraProofs)) {
+                app(FeeReceiptAttachmentService::class)
+                    ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
+            }
 
-        return $fee->fresh(['feeReceipt']);
+            $locked->update([
+                'fee_receipt_id' => $receipt->id,
+                'status' => 'proof_uploaded',
+            ]);
+
+            return $locked->fresh(['feeReceipt']);
+        });
     }
 
     public function isPaid(FestEvent $event, string $schoolId): bool
@@ -1882,11 +1973,27 @@ class FestSchoolEventFeeService
      * Product decision confirmed 24 Jul 2026: always demote (no exception for results
      * already published) — see docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §5.
      */
-    private function demoteSiblingApprovals(FestEvent $event, string $schoolId, FestSchoolEventFee $fee): void
+    /**
+     * Demote this school's 'approved' registrations back to 'submitted' once their fee is no
+     * longer fully paid — the inverse of FestRegistrationApprovalService::approveSchoolEvent(),
+     * which auto-approved them when the fee was settled. Idempotent: only touches rows
+     * currently 'approved', so it's safe to call any time a fee's paid state might have
+     * dropped, not just when it's known to have just changed.
+     *
+     * Previously only called from recalculate() (new items pushing total_due back above
+     * amount_paid) — approving/rejecting/reversing a payment never called it at all, so
+     * rejecting a bounced or fraudulent proof left the school's registrations sitting
+     * 'approved' (chest numbers and all) even though the fee correctly flipped to 'rejected'.
+     * $headId scopes the demotion to one Event Head's registrations for per-head billing
+     * (mirrors approveSchoolEvent()'s own $headId scoping) — omit it for the single
+     * whole-event fee record, where every registration shares one pot.
+     */
+    public function demoteSiblingApprovals(FestEvent $event, string $schoolId, FestSchoolEventFee $fee, ?int $headId = null, string $reason = 'new items were added'): void
     {
         $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->where('status', 'approved')
+            ->when($headId !== null, fn ($q) => $q->whereHas('item', fn ($qq) => $qq->where('head_id', $headId)))
             ->get(['id']);
 
         if ($registrations->isEmpty()) {
@@ -1898,11 +2005,12 @@ class FestSchoolEventFeeService
 
         app(PlatformAuditLogger::class)->log(
             action: 'fest.registration.demoted_unpaid',
-            description: "{$registrations->count()} approved registration(s) demoted back to submitted — school's balance for \"{$event->title}\" is unpaid again after new items were added",
+            description: "{$registrations->count()} approved registration(s) demoted back to submitted — school's balance for \"{$event->title}\" is unpaid again after {$reason}",
             subject: $fee,
             properties: [
                 'event_id' => $event->id,
                 'school_id' => $schoolId,
+                'head_id' => $headId,
                 'registration_ids' => $registrations->pluck('id')->all(),
                 'total_due' => (float) $fee->total_due,
                 'amount_paid' => (float) $fee->amount_paid,

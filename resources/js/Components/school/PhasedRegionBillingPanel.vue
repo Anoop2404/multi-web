@@ -166,7 +166,7 @@
                    class="btn-secondary text-xs font-semibold inline-flex items-center gap-1 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100">
                     <span>🧾 Official Receipt</span>
                 </a>
-                <button v-if="Number(fee.outstanding) > 0 && paymentBatch?.registration_batch_id !== fee.registration_batch_id"
+                <button v-if="Number(fee.outstanding) > 0 && ['pending', 'partial', 'rejected'].includes(fee.status) && paymentBatch?.registration_batch_id !== fee.registration_batch_id"
                         type="button"
                         class="btn-primary text-xs font-semibold inline-flex items-center gap-1 shadow-xs"
                         @click="openPayment(fee)">

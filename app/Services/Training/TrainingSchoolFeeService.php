@@ -30,6 +30,26 @@ class TrainingSchoolFeeService
         ?int $cancelledByUserId = null,
         ?int $sourceRegistrationId = null,
     ): TrainingSchoolFee {
+        return DB::transaction(function () use ($program, $school, $cancellationReason, $cancelledByUserId, $sourceRegistrationId) {
+            // Same race as McqSchoolFeeService::syncForSchool() (see its lockFeeSync() for the
+            // full explanation): two concurrent cancellations can both snapshot the same stale
+            // dueBefore/paidBefore and each issue their own credit, double-crediting the
+            // school. Advisory lock rather than row lock since the row may not exist yet.
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('select pg_advisory_xact_lock(hashtext(?))', ["training_school_fee:{$program->id}:{$school->id}"]);
+            }
+
+            return $this->syncForSchoolLocked($program, $school, $cancellationReason, $cancelledByUserId, $sourceRegistrationId);
+        });
+    }
+
+    private function syncForSchoolLocked(
+        TrainingProgram $program,
+        Tenant $school,
+        ?string $cancellationReason,
+        ?int $cancelledByUserId,
+        ?int $sourceRegistrationId,
+    ): TrainingSchoolFee {
         // Snapshot before recalculating so a cancellation-triggered drop in total_due can
         // be measured against what was already paid.
         $existingFee = TrainingSchoolFee::where('program_id', $program->id)->where('school_id', $school->id)->first();

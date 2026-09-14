@@ -12,7 +12,9 @@ use App\Services\Mcq\McqRegistrationGateService;
 use App\Services\Mcq\McqSchoolFeeService;
 use App\Services\Membership\SchoolMembershipGate;
 use App\Support\Mcq\McqExamEligibilityConfig;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TeacherMcqRegistrationController extends Controller
 {
@@ -110,35 +112,61 @@ class TeacherMcqRegistrationController extends Controller
 
         app(McqRegistrationGateService::class)->assertCanRegisterTeacher($exam, $school, $teacher);
 
-        $existing = McqRegistration::where('exam_id', $exam->id)
-            ->where('teacher_id', $teacher->id)
-            ->first();
-
-        if ($existing && ! $existing->isCancelled()) {
-            return back()->with('success', 'You are already registered for this exam.');
-        }
-
         $approvalStatus = app(McqRegistrationApprovalService::class)->initialApprovalStatus($exam);
 
-        if ($existing) {
-            $existing->update([
-                'school_id' => $school->id,
-                'student_id' => null,
-                'status' => 'registered',
-                'approval_status' => $approvalStatus,
-                'cancelled_at' => null,
-                'cancelled_by_user_id' => null,
-            ]);
-            $registration = $existing->fresh();
-        } else {
-            $registration = McqRegistration::create([
-                'exam_id' => $exam->id,
-                'teacher_id' => $teacher->id,
-                'student_id' => null,
-                'school_id' => $school->id,
-                'status' => 'registered',
-                'approval_status' => $approvalStatus,
-            ]);
+        // Same WF-04 fix as McqRegistrationController::store() (student self-registration) —
+        // this was a plain check-then-create with no transaction or lock, so a double-click
+        // or duplicate tab could both pass the "already registered" check before either had
+        // written its row. The unique(exam_id, teacher_id) DB constraint already existed
+        // (migration 2026_10_01_000001_mcq_registration_teacher_exam_unique) and would have
+        // caught the duplicate at the DB level either way, but with no transaction/lock and
+        // no catch here, a lost race surfaced as a raw 500 instead of the graceful "already
+        // registered" message students get.
+        try {
+            [$registration, $alreadyRegistered] = DB::transaction(function () use ($exam, $teacher, $school, $approvalStatus) {
+                $existing = McqRegistration::where('exam_id', $exam->id)
+                    ->where('teacher_id', $teacher->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existing && ! $existing->isCancelled()) {
+                    return [$existing, true];
+                }
+
+                if ($existing) {
+                    $existing->update([
+                        'school_id' => $school->id,
+                        'student_id' => null,
+                        'status' => 'registered',
+                        'approval_status' => $approvalStatus,
+                        'cancelled_at' => null,
+                        'cancelled_by_user_id' => null,
+                    ]);
+
+                    return [$existing->fresh(), false];
+                }
+
+                $created = McqRegistration::create([
+                    'exam_id' => $exam->id,
+                    'teacher_id' => $teacher->id,
+                    'student_id' => null,
+                    'school_id' => $school->id,
+                    'status' => 'registered',
+                    'approval_status' => $approvalStatus,
+                ]);
+
+                return [$created, false];
+            });
+        } catch (QueryException $e) {
+            if (str_contains(strtolower($e->getMessage()), 'unique')) {
+                return back()->with('success', 'You are already registered for this exam.');
+            }
+
+            throw $e;
+        }
+
+        if ($alreadyRegistered) {
+            return back()->with('success', 'You are already registered for this exam.');
         }
 
         app(McqSchoolFeeService::class)->syncForSchool($exam, $school);

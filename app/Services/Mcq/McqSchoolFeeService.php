@@ -21,6 +21,36 @@ class McqSchoolFeeService
         ?int $cancelledByUserId = null,
         ?int $sourceRegistrationId = null,
     ): McqSchoolFee {
+        return DB::transaction(function () use ($exam, $school, $cancellationReason, $cancelledByUserId, $sourceRegistrationId) {
+            // Two concurrent cancellations (e.g. a school cancelling two students in quick
+            // succession) can both snapshot the same stale dueBefore/paidBefore before either
+            // writes its recalculated total_due — each then sees the same reduction and issues
+            // its own credit, double-crediting the school. Locking the row itself doesn't fully
+            // close this (it may not exist yet on the very first sync), so an advisory lock
+            // keyed by (exam, school) serializes the whole snapshot-recalculate-credit cycle —
+            // same fix and reasoning as FestSchoolEventFeeService::lockFeeRecalculation().
+            $this->lockFeeSync($exam->id, $school->id);
+
+            return $this->syncForSchoolLocked($exam, $school, $cancellationReason, $cancelledByUserId, $sourceRegistrationId);
+        });
+    }
+
+    private function lockFeeSync(int $examId, string $schoolId): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        DB::select('select pg_advisory_xact_lock(hashtext(?))', ["mcq_school_fee:{$examId}:{$schoolId}"]);
+    }
+
+    private function syncForSchoolLocked(
+        McqExam $exam,
+        Tenant $school,
+        ?string $cancellationReason,
+        ?int $cancelledByUserId,
+        ?int $sourceRegistrationId,
+    ): McqSchoolFee {
         // Snapshot before recalculating so we can measure the delta caused by a cancellation.
         $existingFee = McqSchoolFee::where('exam_id', $exam->id)->where('school_id', $school->id)->first();
         $dueBefore   = (float) ($existingFee?->total_due ?? 0);
@@ -97,6 +127,8 @@ class McqSchoolFeeService
     {
         $receipt = $this->pendingReceipt($schoolFee);
         abort_unless($receipt && $receipt->status === 'uploaded', 422, 'No uploaded proof to approve.');
+
+        $this->assertExamNotLocked($schoolFee->exam);
 
         return DB::transaction(function () use ($schoolFee, $receipt, $userId) {
             $lockedReceipt = \App\Models\FeeReceipt::query()->whereKey($receipt->id)->lockForUpdate()->firstOrFail();
@@ -256,5 +288,29 @@ class McqSchoolFeeService
             'payable_total'       => round($count * $payable, 2),
             'by_class'            => $byClass,
         ];
+    }
+
+    /**
+     * MCQ never had a Fest-EventLifecycleGate equivalent — approving a fee here confirms
+     * registrations and mints a fresh hall ticket number (McqHallTicketService::
+     * issueForRegistration(), via McqRegistrationApprovalService::approveSchoolBatch()) with
+     * no check that the exam hasn't already happened. A late fee approval after results were
+     * published, or after the exam is completed/cancelled, silently produced a hall ticket
+     * for an exam that's already over. Deliberately checked here rather than only at the
+     * controller, so it applies to every caller of approve(), not just the two admin routes.
+     */
+    private function assertExamNotLocked(?McqExam $exam): void
+    {
+        if (! $exam) {
+            return;
+        }
+
+        if ($exam->results_published) {
+            abort(422, 'Results are already published for this exam — fee approval is closed.');
+        }
+
+        if (in_array($exam->status, ['completed', 'cancelled'], true)) {
+            abort(422, "This exam is already {$exam->status} — fee approval is closed.");
+        }
     }
 }

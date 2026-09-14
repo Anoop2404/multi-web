@@ -56,7 +56,32 @@ class FestRegistrationBulkService
                 }
             }
 
-            $approvalService->approve($registration);
+            // Locks the registration row for the duration of the status flip, matching
+            // rejectMany()'s locking discipline — without it, this bulk action racing a
+            // concurrent single-registration approve() (or another overlapping bulk call) on
+            // the same row can both pass the earlier 'submitted' filter and both run the
+            // approval side effects (chest-number/participant-number assignment), since
+            // neither has committed yet when the other reads. Re-checks status inside the
+            // lock so a row already claimed by a concurrent action is skipped, not
+            // double-approved. Notifier/audit calls stay outside the lock/transaction, same
+            // reasoning as rejectMany()'s comment on that.
+            $stillPending = DB::transaction(function () use ($registration, $approvalService) {
+                $locked = FestRegistration::whereKey($registration->id)->lockForUpdate()->first();
+                if (! $locked || $locked->status !== 'submitted') {
+                    return false;
+                }
+
+                $approvalService->approve($registration);
+
+                return true;
+            });
+
+            if (! $stillPending) {
+                $skipped++;
+
+                continue;
+            }
+
             $notifier->registrationApproved($registration);
             $audit->festRegistrationApproved($registration);
             $approved++;

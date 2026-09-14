@@ -306,28 +306,57 @@ class McqRegistrationController extends SchoolAdminController
                 continue;
             }
 
-            $existing = $existingByStudent->get($student->id);
+            // $existingByStudent is a batch-fetched hint only (fast pre-filter to skip an
+            // obviously-already-registered student without a query) — the authoritative
+            // check happens per student inside the lock below. This loop previously did a
+            // plain check-then-create per student with no transaction or lock, same WF-04
+            // race as the single-student store() above but worse here: since bulkStore()
+            // has no try/catch around the whole loop, a lost race on ONE student's unique
+            // constraint threw and aborted the REST of the batch too, leaving a partially
+            // registered class. Locking + catching per student means one collision is
+            // silently skipped (that student is already registered, which is the correct
+            // outcome anyway) and the loop continues for everyone else.
+            try {
+                $wasRegistered = DB::transaction(function () use ($exam, $student, $approvalStatus) {
+                    $existing = McqRegistration::where('exam_id', $exam->id)
+                        ->where('student_id', $student->id)
+                        ->lockForUpdate()
+                        ->first();
 
-            if ($existing && ! $existing->isCancelled()) {
-                continue;
+                    if ($existing && ! $existing->isCancelled()) {
+                        return false;
+                    }
+
+                    if ($existing) {
+                        $existing->update([
+                            'school_id'            => $this->school->id,
+                            'status'               => 'registered',
+                            'approval_status'      => $approvalStatus,
+                            'cancelled_at'         => null,
+                            'cancelled_by_user_id' => null,
+                        ]);
+                    } else {
+                        McqRegistration::create([
+                            'exam_id'         => $exam->id,
+                            'student_id'      => $student->id,
+                            'school_id'       => $this->school->id,
+                            'status'          => 'registered',
+                            'approval_status' => $approvalStatus,
+                        ]);
+                    }
+
+                    return true;
+                });
+            } catch (QueryException $e) {
+                if (str_contains(strtolower($e->getMessage()), 'unique')) {
+                    continue;
+                }
+
+                throw $e;
             }
 
-            if ($existing) {
-                $existing->update([
-                    'school_id'            => $this->school->id,
-                    'status'               => 'registered',
-                    'approval_status'      => $approvalStatus,
-                    'cancelled_at'         => null,
-                    'cancelled_by_user_id' => null,
-                ]);
-            } else {
-                McqRegistration::create([
-                    'exam_id'         => $exam->id,
-                    'student_id'      => $student->id,
-                    'school_id'       => $this->school->id,
-                    'status'          => 'registered',
-                    'approval_status' => $approvalStatus,
-                ]);
+            if (! $wasRegistered) {
+                continue;
             }
 
             $registered++;
@@ -368,33 +397,53 @@ class McqRegistrationController extends SchoolAdminController
 
         $approvalStatus = app(McqRegistrationApprovalService::class)->initialApprovalStatus($exam);
 
-        $existing = McqRegistration::where('exam_id', $exam->id)
-            ->where('teacher_id', $teacher->id)
-            ->first();
+        // Same WF-04 fix as store() above (student registration) — see that method's comment
+        // and TeacherMcqRegistrationController::register()'s identical fix.
+        try {
+            [$registration, $alreadyRegistered] = DB::transaction(function () use ($exam, $teacher, $approvalStatus) {
+                $existing = McqRegistration::where('exam_id', $exam->id)
+                    ->where('teacher_id', $teacher->id)
+                    ->lockForUpdate()
+                    ->first();
 
-        if ($existing && ! $existing->isCancelled()) {
-            return back()->with('success', 'Teacher is already registered for this exam.');
+                if ($existing && ! $existing->isCancelled()) {
+                    return [$existing, true];
+                }
+
+                if ($existing) {
+                    $existing->update([
+                        'school_id'            => $this->school->id,
+                        'student_id'           => null,
+                        'status'               => 'registered',
+                        'approval_status'      => $approvalStatus,
+                        'cancelled_at'         => null,
+                        'cancelled_by_user_id' => null,
+                    ]);
+
+                    return [$existing->fresh(), false];
+                }
+
+                $created = McqRegistration::create([
+                    'exam_id'         => $exam->id,
+                    'teacher_id'      => $teacher->id,
+                    'student_id'      => null,
+                    'school_id'       => $this->school->id,
+                    'status'          => 'registered',
+                    'approval_status' => $approvalStatus,
+                ]);
+
+                return [$created, false];
+            });
+        } catch (QueryException $e) {
+            if (str_contains(strtolower($e->getMessage()), 'unique')) {
+                return back()->with('success', 'Teacher is already registered for this exam.');
+            }
+
+            throw $e;
         }
 
-        if ($existing) {
-            $existing->update([
-                'school_id'            => $this->school->id,
-                'student_id'           => null,
-                'status'               => 'registered',
-                'approval_status'      => $approvalStatus,
-                'cancelled_at'         => null,
-                'cancelled_by_user_id' => null,
-            ]);
-            $registration = $existing->fresh();
-        } else {
-            $registration = McqRegistration::create([
-                'exam_id'         => $exam->id,
-                'teacher_id'      => $teacher->id,
-                'student_id'      => null,
-                'school_id'       => $this->school->id,
-                'status'          => 'registered',
-                'approval_status' => $approvalStatus,
-            ]);
+        if ($alreadyRegistered) {
+            return back()->with('success', 'Teacher is already registered for this exam.');
         }
 
         app(McqSchoolFeeService::class)->syncForSchool($exam, $this->school);
