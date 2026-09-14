@@ -628,13 +628,11 @@
                                         <span v-else>—</span>
                                     </td>
                                     <td class="px-3 py-2">
-                                        <div class="flex flex-wrap gap-2">
-                                            <a v-if="receipt.proof_url" :href="receipt.proof_url" target="_blank" rel="noopener"
-                                               class="text-indigo-600 hover:text-indigo-800 font-semibold underline">View</a>
-                                            <a v-for="(att, idx) in receipt.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener"
-                                               class="text-indigo-600 hover:text-indigo-800 font-semibold underline">+{{ idx + 1 }}</a>
-                                            <span v-if="!receipt.proof_url" class="text-slate-400">—</span>
-                                        </div>
+                                        <button v-if="receipt.proof_url" type="button" @click="openGallery(receiptImages(receipt))"
+                                                class="text-indigo-600 hover:text-indigo-800 font-semibold underline">
+                                            View{{ receipt.attachments?.length ? ` (${1 + receipt.attachments.length})` : '' }}
+                                        </button>
+                                        <span v-else class="text-slate-400">—</span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -1237,6 +1235,8 @@
                 </div>
             </div>
         </div>
+
+        <ProofGallery :show="galleryOpen" :images="galleryImages" @close="galleryOpen = false" />
     </SchoolAdminLayout>
 </template>
 
@@ -1249,9 +1249,20 @@ import McqSchoolWorkflowStepper from '@/Components/school/McqSchoolWorkflowStepp
 import { TALENT_SEARCH_EXAMS_LABEL } from '@/support/mcqSchoolLabels.js';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import ProofGallery from '@/Components/ui/ProofGallery.vue';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 import { useConfirm } from '@/composables/useConfirm';
 const { confirm, prompt } = useConfirm();
+
+const galleryOpen = ref(false);
+const galleryImages = ref([]);
+function receiptImages(receipt) {
+    return [receipt.proof_url, ...(receipt.attachments ?? []).map(a => a.url)].filter(Boolean);
+}
+function openGallery(images) {
+    galleryImages.value = images;
+    galleryOpen.value = true;
+}
 
 const props = defineProps({
     school: Object,

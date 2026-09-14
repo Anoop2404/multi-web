@@ -85,8 +85,10 @@
                                             <span v-if="r.reviewed_by" class="text-slate-400 ml-2">— reviewed by {{ r.reviewed_by }}</span>
                                             <div v-if="r.rejection_reason" class="text-red-600 mt-0.5 font-medium">Rejected: {{ r.rejection_reason }}</div>
                                         </div>
-                                        <a v-if="r.proof_url" :href="r.proof_url" target="_blank" rel="noopener" class="text-slate-600 font-semibold hover:underline">Proof ↗</a>
-                                        <a v-for="(att, idx) in r.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener" class="text-slate-600 font-semibold hover:underline ml-2">+{{ idx + 1 }}</a>
+                                        <button v-if="r.proof_url" type="button" @click="openGallery(receiptImages(r))"
+                                                class="text-slate-600 font-semibold hover:underline">
+                                            Proof{{ r.attachments?.length ? ` (${1 + r.attachments.length})` : ' ↗' }}
+                                        </button>
                                     </div>
                                 </div>
                             </td>
@@ -101,6 +103,8 @@
             <Link v-for="link in fees.links" :key="link.label" :href="link.url || '#'" v-html="link.label"
                   :class="['px-3 py-1 text-sm rounded', link.active ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100', !link.url ? 'opacity-40 pointer-events-none' : '']" />
         </div>
+
+        <ProofGallery :show="galleryOpen" :images="galleryImages" @close="galleryOpen = false" />
     </SahodayaAdminLayout>
 </template>
 
@@ -108,6 +112,7 @@
 import { ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import ProofGallery from '@/Components/ui/ProofGallery.vue';
 import { formatDateTime } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -127,6 +132,16 @@ const { confirm, prompt } = useConfirm();
 const expanded = ref({});
 function toggleExpand(id) {
     expanded.value = { ...expanded.value, [id]: !expanded.value[id] };
+}
+
+const galleryOpen = ref(false);
+const galleryImages = ref([]);
+function receiptImages(receipt) {
+    return [receipt.proof_url, ...(receipt.attachments ?? []).map(a => a.url)].filter(Boolean);
+}
+function openGallery(images) {
+    galleryImages.value = images;
+    galleryOpen.value = true;
 }
 
 function statusClass(status) {

@@ -210,13 +210,11 @@
                                     <span v-else>—</span>
                                 </td>
                                 <td class="px-3 py-2">
-                                    <div class="flex flex-wrap gap-2">
-                                        <a v-if="receipt.proof_url" :href="receipt.proof_url" target="_blank" rel="noopener"
-                                           class="text-indigo-600 hover:text-indigo-800 font-semibold underline">View</a>
-                                        <a v-for="(att, idx) in receipt.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener"
-                                           class="text-indigo-600 hover:text-indigo-800 font-semibold underline">+{{ idx + 1 }}</a>
-                                        <span v-if="!receipt.proof_url" class="text-slate-400">—</span>
-                                    </div>
+                                    <button v-if="receipt.proof_url" type="button" @click="openGallery(receipt)"
+                                            class="text-indigo-600 hover:text-indigo-800 font-semibold underline">
+                                        View{{ receipt.attachments?.length ? ` (${1 + receipt.attachments.length})` : '' }}
+                                    </button>
+                                    <span v-else class="text-slate-400">—</span>
                                 </td>
                             </tr>
                         </tbody>
@@ -320,6 +318,8 @@
                 </div>
             </form>
         </Modal>
+
+        <ProofGallery :show="galleryOpen" :images="galleryImages" @close="galleryOpen = false" />
     </section>
 </template>
 
@@ -327,6 +327,7 @@
 import { computed, reactive, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import Modal from '@/Components/ui/Modal.vue';
+import ProofGallery from '@/Components/ui/ProofGallery.vue';
 
 const props = defineProps({
     event: { type: Object, required: true },
@@ -394,6 +395,13 @@ const totalItemFeesSubtotal = computed(() => {
 const paymentBatch = ref(null);
 const paymentFiles = ref([]);
 const paymentForm = useForm({ transaction_ref: '', bank_name: '', amount: null });
+
+const galleryOpen = ref(false);
+const galleryImages = ref([]);
+function openGallery(receipt) {
+    galleryImages.value = [receipt.proof_url, ...(receipt.attachments ?? []).map(a => a.url)].filter(Boolean);
+    galleryOpen.value = true;
+}
 
 const activePaymentDetails = computed(() => {
     return paymentBatch.value?.payment_details_text

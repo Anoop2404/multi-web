@@ -18,9 +18,10 @@
                     Uploaded {{ formatDateTime(row.uploaded_at) }}
                     <span v-if="row.transaction_ref"> · Ref {{ row.transaction_ref }}</span>
                 </div>
-                <div v-if="row.proof_url || row.attachments?.length" class="mt-0.5 flex flex-wrap gap-1.5">
-                    <a v-if="row.proof_url" :href="row.proof_url" target="_blank" rel="noopener" class="text-indigo-700 underline font-semibold">View proof</a>
-                    <a v-for="(att, idx) in row.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener" class="text-indigo-700 underline font-semibold">+{{ idx + 1 }}</a>
+                <div v-if="row.proof_url" class="mt-0.5">
+                    <button type="button" @click="openGallery(row)" class="text-indigo-700 underline font-semibold">
+                        View proof{{ row.attachments?.length ? ` (${1 + row.attachments.length})` : '' }}
+                    </button>
                 </div>
                 <div v-if="row.reviewed_at" class="text-slate-500">
                     Reviewed {{ formatDateTime(row.reviewed_at) }}
@@ -51,17 +52,27 @@
                 </template>
             </li>
         </ul>
+
+        <ProofGallery :show="galleryOpen" :images="galleryImages" @close="galleryOpen = false" />
     </div>
 </template>
 
 <script setup>
 import { ref } from 'vue';
+import ProofGallery from '@/Components/ui/ProofGallery.vue';
 
 defineProps({
     history: { type: Array, default: () => [] },
 });
 
 const open = ref(false);
+
+const galleryOpen = ref(false);
+const galleryImages = ref([]);
+function openGallery(row) {
+    galleryImages.value = [row.proof_url, ...(row.attachments ?? []).map(a => a.url)].filter(Boolean);
+    galleryOpen.value = true;
+}
 
 function formatMoney(val) {
     const n = Number(val ?? 0);
