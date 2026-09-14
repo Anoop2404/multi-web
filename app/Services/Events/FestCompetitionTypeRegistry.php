@@ -133,14 +133,24 @@ class FestCompetitionTypeRegistry
             ->all();
     }
 
-    public function validationRule(): \Illuminate\Validation\Rules\In
+    /**
+     * $allowLegacyAliases keeps a pre-existing event whose event_type is still the old
+     * 'kalotsav'/'kalotsavam' spelling (see fest:unify-event-types) valid to re-save
+     * without forcing a type change first. It must stay false for NEW event creation
+     * (FestEventController::store()) — otherwise, since 'kalolsavam' is always in
+     * activeKeys() via ensureDefaults(), this shim is permanently active and a brand
+     * new event can be created with the legacy spelling, silently losing every
+     * capability gated on the exact string 'kalolsavam'
+     * (resources/js/support/sahodayaEventCapabilities.js) such as the Championship menu.
+     */
+    public function validationRule(bool $allowLegacyAliases = true): \Illuminate\Validation\Rules\In
     {
         $keys = $this->activeKeys();
         if ($keys === []) {
             $keys = array_keys(config('fest_competition_types', []));
         }
 
-        if (array_intersect(['kalotsav', 'kalotsavam', 'kalolsavam'], $keys)) {
+        if ($allowLegacyAliases && array_intersect(['kalotsav', 'kalotsavam', 'kalolsavam'], $keys)) {
             $keys = array_unique(array_merge($keys, ['kalotsav', 'kalotsavam', 'kalolsavam']));
         }
 

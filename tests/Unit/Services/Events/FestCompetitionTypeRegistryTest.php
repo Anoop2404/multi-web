@@ -91,6 +91,34 @@ class FestCompetitionTypeRegistryTest extends TestCase
         $this->assertContains('robotics', $registry->activeKeys());
     }
 
+    /**
+     * Regression: validationRule() used to always accept 'kalotsav'/'kalotsavam' as
+     * soon as the tenant's canonical 'kalolsavam' type existed (which ensureDefaults()
+     * guarantees for every tenant) — letting a brand new event be created with the
+     * legacy spelling and silently lose every feature gated on the exact string
+     * 'kalolsavam' (e.g. the Championship menu in sahodayaEventCapabilities.js).
+     * validationRule(false), used for event creation, must reject the legacy aliases
+     * even though 'kalolsavam' is present; validationRule(true) (event update, the
+     * default) must keep accepting them so an existing legacy-typed event can still be
+     * re-saved without forcing a type change first.
+     */
+    public function test_validation_rule_excludes_legacy_kalotsavam_aliases_unless_allowed(): void
+    {
+        $tenant = $this->sahodaya();
+        $registry = app(FestCompetitionTypeRegistry::class)->forTenant($tenant->id);
+        $registry->ensureDefaults();
+
+        $strict = $registry->validationRule(false);
+        $this->assertTrue((new \Illuminate\Validation\Validator(
+            app('translator'), ['event_type' => 'kalotsavam'], ['event_type' => [$strict]]
+        ))->fails(), 'A brand-new event must not validate with the legacy "kalotsavam" spelling.');
+
+        $lenient = $registry->validationRule();
+        $this->assertFalse((new \Illuminate\Validation\Validator(
+            app('translator'), ['event_type' => 'kalotsavam'], ['event_type' => [$lenient]]
+        ))->fails(), 'Re-saving an existing legacy-typed event must still validate.');
+    }
+
     public function test_catalog_sections_seed_from_config_into_taxonomy(): void
     {
         if (! Schema::hasTable('fest_taxonomy_masters')) {

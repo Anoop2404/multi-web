@@ -10,6 +10,21 @@ use Illuminate\Validation\Rule;
 
 class FestCompetitionTypeController extends SahodayaAdminController
 {
+    /**
+     * The canonical type keys (config/fest_competition_types.php) plus the legacy
+     * spellings fest:unify-event-types normalizes away ('kalotsav', 'kalotsavam',
+     * 'art_fest', 'co_curricular' -> 'kalolsavam'; 'sports_meet', 'athletics' ->
+     * 'sports'). A custom type sharing any of these keys would be indistinguishable
+     * from — or silently mistaken for — a canonical type: resources/js/support/
+     * sahodayaEventCapabilities.js gates real features (e.g. the Championship menu)
+     * on an exact string match against 'kalolsavam', so a new event accidentally
+     * created with 'kalotsavam' loses that feature with no error shown anywhere.
+     */
+    private const RESERVED_TYPE_KEYS = [
+        'kalolsavam', 'sports', 'kids_fest', 'teacher_fest', 'english_fest', 'science_fest', 'custom',
+        'kalotsav', 'kalotsavam', 'art_fest', 'co_curricular', 'sports_meet', 'athletics',
+    ];
+
     public function index(FestCompetitionTypeRegistry $registry)
     {
         $registry->forTenant($this->sahodaya->id)->ensureDefaults();
@@ -27,6 +42,7 @@ class FestCompetitionTypeController extends SahodayaAdminController
         $data = $request->validate([
             'type_key' => [
                 'required', 'string', 'max:40', 'regex:/^[a-z][a-z0-9_]*$/',
+                Rule::notIn(self::RESERVED_TYPE_KEYS),
                 Rule::unique('fest_competition_types', 'type_key')->where('tenant_id', $this->sahodaya->id),
             ],
             'label' => 'required|string|max:120',

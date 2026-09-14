@@ -194,7 +194,10 @@ class FestEventController extends SahodayaAdminController
     {
         $data = $request->validate([
             'title'              => 'required|string|max:255',
-            'event_type'         => ['required', app(\App\Services\Events\FestCompetitionTypeRegistry::class)->forTenant($this->sahodaya->id)->validationRule()],
+            // false: a brand new event must use the canonical type key. The legacy
+            // kalotsav/kalotsavam aliases stay accepted on update() below only, so an
+            // existing event with that old spelling can still be re-saved.
+            'event_type'         => ['required', app(\App\Services\Events\FestCompetitionTypeRegistry::class)->forTenant($this->sahodaya->id)->validationRule(false)],
             'level_round'        => 'nullable|in:state,sahodaya,school',
             'conduct_levels'     => 'nullable|array',
             'conduct_levels.*'   => 'in:state,sahodaya,school',
