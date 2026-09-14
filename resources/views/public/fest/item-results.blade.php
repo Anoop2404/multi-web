@@ -46,9 +46,6 @@
                         <p class="font-bold text-sm leading-snug text-white uppercase break-words">{{ $row['school'] ?? '—' }}</p>
                         @if(count($roster) > 1)<p class="text-[11px] text-white/40 mt-0.5">{{ count($roster) }} members</p>@endif
                     </div>
-                    @if($row['poster_url'] ?? null)
-                    <a href="{{ $row['poster_url'] }}" class="shrink-0 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-bold text-amber-300 hover:bg-white/10" target="_blank" rel="noopener">Poster</a>
-                    @endif
                 </div>
                 <div class="p-4 grid {{ $isLargeTeam ? 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1' }} gap-3">
                     @foreach($roster as $member)
