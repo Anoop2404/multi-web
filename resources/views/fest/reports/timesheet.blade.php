@@ -15,7 +15,7 @@
             font-size: 11.5px;
             color: #0f172a;
             margin: 0;
-            padding: 0;
+            padding: @if(!empty($isPreview)) 24px 38px @else 0 @endif;
         }
         .report-header {
             border-bottom: 2px solid #0f172a;
@@ -298,7 +298,7 @@
             <span>{{ $cleanTitle }}</span>
             @if(!empty($metaBadges))
                 <span style="font-weight: normal; font-size: 10px; color: #94a3b8; margin-left: 8px; text-transform: none;">
-                    &bull; {{ implode(' &bull; ', $metaBadges) }}
+                    • {{ implode(' • ', $metaBadges) }}
                 </span>
             @endif
             <span class="count-badge">{!! $countLabel !!}</span>
