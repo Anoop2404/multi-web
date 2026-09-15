@@ -6,6 +6,7 @@ use App\Models\FeeReceipt;
 use App\Models\FestFeeCredit;
 use App\Models\FestSchoolEventFee;
 use App\Models\LedgerJournalEntry;
+use App\Models\Tenant;
 use App\Services\Events\FestSchoolEventFeeService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,9 @@ class PurgeFestCancellationFeeCredits extends Command
      *
      * @var string
      */
-    protected $signature = 'fest:purge-cancellation-fee-credits {--event= : Optional event ID to scope the purge}';
+    protected $signature = 'fest:purge-cancellation-fee-credits 
+        {--sahodaya= : Sahodaya tenant id or subdomain (omit to run across all Sahodayas)}
+        {--event= : Optional event ID to scope the purge}';
 
     /**
      * The console command description.
@@ -31,12 +34,56 @@ class PurgeFestCancellationFeeCredits extends Command
      */
     public function handle(): int
     {
+        $sahodayaOpt = $this->option('sahodaya');
         $eventId = $this->option('event');
 
-        $this->info('Starting purge of cancellation fee credits and system credit receipts...');
+        if ($sahodayaOpt) {
+            $tenants = Tenant::where('type', 'sahodaya')
+                ->where(function ($q) use ($sahodayaOpt) {
+                    $q->where('id', $sahodayaOpt)->orWhere('subdomain', $sahodayaOpt);
+                })
+                ->get();
 
-        DB::transaction(function () use ($eventId) {
-            // Find system credit receipts
+            if ($tenants->isEmpty()) {
+                $this->error("No matching Sahodaya tenant found for '{$sahodayaOpt}'.");
+
+                return Command::FAILURE;
+            }
+        } else {
+            $tenants = Tenant::where('type', 'sahodaya')->get();
+        }
+
+        $this->info("Starting purge across {$tenants->count()} Sahodaya tenant(s)...");
+
+        // First run on current connection (for central/single DB)
+        $this->purgeTenant($eventId, 'Central Connection');
+
+        // Loop over each Sahodaya tenant database
+        foreach ($tenants as $tenant) {
+            try {
+                $tenant->run(fn () => $this->purgeTenant($eventId, "Sahodaya: {$tenant->name} ({$tenant->id})"));
+            } catch (\Throwable $e) {
+                $this->error("Failed processing tenant {$tenant->id}: " . $e->getMessage());
+            } finally {
+                if (function_exists('tenancy') && tenancy()->initialized) {
+                    tenancy()->end();
+                }
+            }
+        }
+
+        $this->info('Completed purge across all environments.');
+
+        return Command::SUCCESS;
+    }
+
+    private function purgeTenant(?string $eventId, string $label): void
+    {
+        $this->line("--- Processing {$label} ---");
+
+        $deletedReceipts = 0;
+        $deletedCredits = 0;
+
+        DB::transaction(function () use ($eventId, &$deletedReceipts, &$deletedCredits) {
             $systemReceiptQuery = FeeReceipt::query()
                 ->where(function ($q) {
                     $q->where('is_system_credit', true)
@@ -52,7 +99,6 @@ class PurgeFestCancellationFeeCredits extends Command
 
             $systemReceiptIds = $systemReceiptQuery->pluck('id');
 
-            // Delete ledger journal entries for these receipts & credits
             if ($systemReceiptIds->isNotEmpty()) {
                 LedgerJournalEntry::whereIn('receipt_id', $systemReceiptIds)->delete();
             }
@@ -73,8 +119,6 @@ class PurgeFestCancellationFeeCredits extends Command
             $deletedReceipts = $systemReceiptQuery->delete();
             $deletedCredits = $creditQuery->delete();
 
-            $this->info("Deleted {$deletedReceipts} system credit receipts and {$deletedCredits} fee credit records.");
-
             // Reset fee_receipt_id on FestSchoolEventFee if it pointed to a deleted receipt
             FestSchoolEventFee::query()
                 ->whereNotNull('fee_receipt_id')
@@ -82,30 +126,29 @@ class PurgeFestCancellationFeeCredits extends Command
                 ->update(['fee_receipt_id' => null]);
         });
 
-        // Recalculate fee balances and refresh paid state for all school event fees
+        $this->info("Deleted {$deletedReceipts} system credit receipts and {$deletedCredits} fee credit records.");
+
         $feeQuery = FestSchoolEventFee::query();
         if ($eventId) {
             $feeQuery->where('event_id', $eventId);
         }
 
         $fees = $feeQuery->get();
-        $this->info("Recalculating fees for {$fees->count()} school event fee records...");
+        if ($fees->isNotEmpty()) {
+            $this->info("Recalculating fees for {$fees->count()} school event fee records...");
 
-        $feeService = app(FestSchoolEventFeeService::class);
-        foreach ($fees as $fee) {
-            if ($fee->event) {
-                try {
-                    $feeService->recalculate($fee->event, $fee->school_id);
-                } catch (\Throwable $e) {
+            $feeService = app(FestSchoolEventFeeService::class);
+            foreach ($fees as $fee) {
+                if ($fee->event) {
+                    try {
+                        $feeService->recalculate($fee->event, $fee->school_id);
+                    } catch (\Throwable $e) {
+                        $fee->refreshPaidState();
+                    }
+                } else {
                     $fee->refreshPaidState();
                 }
-            } else {
-                $fee->refreshPaidState();
             }
         }
-
-        $this->info('Successfully purged cancellation fee credits and refreshed fee balances.');
-
-        return Command::SUCCESS;
     }
 }
