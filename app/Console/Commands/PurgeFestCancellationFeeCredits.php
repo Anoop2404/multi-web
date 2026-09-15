@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Models\FeeReceipt;
 use App\Models\FestFeeCredit;
 use App\Models\FestSchoolEventFee;
-use App\Models\LedgerJournalEntry;
+use App\Models\LedgerTransaction;
 use App\Models\Tenant;
 use App\Services\Events\FestSchoolEventFeeService;
 use Illuminate\Console\Command;
@@ -20,7 +20,8 @@ class PurgeFestCancellationFeeCredits extends Command
      */
     protected $signature = 'fest:purge-cancellation-fee-credits 
         {--sahodaya= : Sahodaya tenant id or subdomain (omit to run across all Sahodayas)}
-        {--event= : Optional event ID to scope the purge}';
+        {--event= : Optional event ID to scope the purge}
+        {--dry-run : Run in inspection mode without deleting or modifying data}';
 
     /**
      * The console command description.
@@ -36,6 +37,11 @@ class PurgeFestCancellationFeeCredits extends Command
     {
         $sahodayaOpt = $this->option('sahodaya');
         $eventId = $this->option('event');
+        $isDryRun = (bool) $this->option('dry-run');
+
+        if ($isDryRun) {
+            $this->warn('*** DRY RUN MODE ENABLED — No database changes will be saved. ***');
+        }
 
         if ($sahodayaOpt) {
             $tenants = Tenant::where('type', 'sahodaya')
@@ -53,15 +59,12 @@ class PurgeFestCancellationFeeCredits extends Command
             $tenants = Tenant::where('type', 'sahodaya')->get();
         }
 
-        $this->info("Starting purge across {$tenants->count()} Sahodaya tenant(s)...");
-
-        // First run on current connection (for central/single DB)
-        $this->purgeTenant($eventId, 'Central Connection');
+        $this->info("Starting purge process across {$tenants->count()} Sahodaya tenant(s)...");
 
         // Loop over each Sahodaya tenant database
         foreach ($tenants as $tenant) {
             try {
-                $tenant->run(fn () => $this->purgeTenant($eventId, "Sahodaya: {$tenant->name} ({$tenant->id})"));
+                $tenant->run(fn () => $this->purgeTenant($eventId, $isDryRun, "Sahodaya: {$tenant->name} ({$tenant->id})"));
             } catch (\Throwable $e) {
                 $this->error("Failed processing tenant {$tenant->id}: " . $e->getMessage());
             } finally {
@@ -76,48 +79,71 @@ class PurgeFestCancellationFeeCredits extends Command
         return Command::SUCCESS;
     }
 
-    private function purgeTenant(?string $eventId, string $label): void
+    private function purgeTenant(?string $eventId, bool $isDryRun, string $label): void
     {
         $this->line("--- Processing {$label} ---");
 
-        $deletedReceipts = 0;
-        $deletedCredits = 0;
+        $systemReceiptQuery = FeeReceipt::query()
+            ->where(function ($q) {
+                $q->where('is_system_credit', true)
+                  ->orWhere('transaction_ref', 'CREDIT-OFFSET')
+                  ->orWhere('file_path', 'system://fee-credit-adjustment');
+            });
 
-        DB::transaction(function () use ($eventId, &$deletedReceipts, &$deletedCredits) {
-            $systemReceiptQuery = FeeReceipt::query()
-                ->where(function ($q) {
-                    $q->where('is_system_credit', true)
-                      ->orWhere('transaction_ref', 'CREDIT-OFFSET')
-                      ->orWhere('file_path', 'system://fee-credit-adjustment');
-                });
+        if ($eventId) {
+            $feeIds = FestSchoolEventFee::where('event_id', $eventId)->pluck('id');
+            $systemReceiptQuery->where('feeable_type', FestSchoolEventFee::class)
+                ->whereIn('feeable_id', $feeIds);
+        }
 
-            if ($eventId) {
-                $feeIds = FestSchoolEventFee::where('event_id', $eventId)->pluck('id');
-                $systemReceiptQuery->where('feeable_type', FestSchoolEventFee::class)
-                    ->whereIn('feeable_id', $feeIds);
-            }
+        $systemReceiptIds = $systemReceiptQuery->pluck('id');
 
-            $systemReceiptIds = $systemReceiptQuery->pluck('id');
+        $creditQuery = FestFeeCredit::query();
+        if ($eventId) {
+            $feeIds = FestSchoolEventFee::where('event_id', $eventId)->pluck('id');
+            $creditQuery->whereIn('fest_school_event_fee_id', $feeIds);
+        }
+        $creditIds = $creditQuery->pluck('id');
 
+        $receiptCount = $systemReceiptIds->count();
+        $creditCount = $creditIds->count();
+
+        $feeQuery = FestSchoolEventFee::query();
+        if ($eventId) {
+            $feeQuery->where('event_id', $eventId);
+        }
+        $fees = $feeQuery->get();
+
+        if ($isDryRun) {
+            $this->warn("[DRY-RUN] Would delete {$receiptCount} system credit receipts and {$creditCount} fee credit records.");
+            $this->warn("[DRY-RUN] Would recalculate fee balances for {$fees->count()} school event fee records.");
+
+            return;
+        }
+
+        DB::transaction(function () use ($systemReceiptQuery, $creditQuery, $systemReceiptIds, $creditIds) {
             if ($systemReceiptIds->isNotEmpty()) {
-                LedgerJournalEntry::whereIn('receipt_id', $systemReceiptIds)->delete();
+                LedgerTransaction::whereIn('reference_id', $systemReceiptIds)
+                    ->where(function ($q) {
+                        $q->where('reference_type', (new FeeReceipt)->getMorphClass())
+                          ->orWhere('reference_type', FeeReceipt::class);
+                    })
+                    ->delete();
             }
-
-            $creditQuery = FestFeeCredit::query();
-            if ($eventId) {
-                $feeIds = FestSchoolEventFee::where('event_id', $eventId)->pluck('id');
-                $creditQuery->whereIn('fest_school_event_fee_id', $feeIds);
-            }
-            $creditIds = $creditQuery->pluck('id');
 
             if ($creditIds->isNotEmpty()) {
-                LedgerJournalEntry::where('creditable_type', FestFeeCredit::class)
-                    ->whereIn('creditable_id', $creditIds)
+                LedgerTransaction::whereIn('reference_id', $creditIds)
+                    ->where(function ($q) {
+                        $q->where('reference_type', (new FestFeeCredit)->getMorphClass())
+                          ->orWhere('reference_type', FestFeeCredit::class);
+                    })
                     ->delete();
             }
 
             $deletedReceipts = $systemReceiptQuery->delete();
             $deletedCredits = $creditQuery->delete();
+
+            $this->info("Deleted {$deletedReceipts} system credit receipts and {$deletedCredits} fee credit records.");
 
             // Reset fee_receipt_id on FestSchoolEventFee if it pointed to a deleted receipt
             FestSchoolEventFee::query()
@@ -126,14 +152,6 @@ class PurgeFestCancellationFeeCredits extends Command
                 ->update(['fee_receipt_id' => null]);
         });
 
-        $this->info("Deleted {$deletedReceipts} system credit receipts and {$deletedCredits} fee credit records.");
-
-        $feeQuery = FestSchoolEventFee::query();
-        if ($eventId) {
-            $feeQuery->where('event_id', $eventId);
-        }
-
-        $fees = $feeQuery->get();
         if ($fees->isNotEmpty()) {
             $this->info("Recalculating fees for {$fees->count()} school event fee records...");
 
