@@ -593,6 +593,7 @@ class FestReportService
             'day-wise' => $this->dayWisePdf($request),
             'attendance-sheet' => $this->attendanceSheetPdf($request),
             'attendance-sheet-school' => $this->attendanceSheetSchoolPdf($request),
+            'timesheet' => $this->timesheetPdf($request),
             'mark-entry-status' => $this->markEntryStatusCsv(),
             'results-pending' => $this->resultsPendingCsv(),
             'absent-report' => $analytics()->exportAbsentReport($request->input('school_id')),
@@ -1219,6 +1220,146 @@ class FestReportService
                         </div>
                     </div>
                     <div style="background:#0f172a; color:#fff; padding:4px 10px; border-radius:4px; font-size:8px; font-weight:bold; letter-spacing:0.4px; white-space:nowrap;">ATTENDANCE SHEET</div>
+                </div>
+                <div style="margin-top:5px; padding-top:4px; border-top:1px solid #e2e8f0;">
+                    <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.3px;">{$eventTitle}</div>
+                    {$itemLine}
+                </div>
+            </div>
+            HTML;
+
+        $footer = <<<HTML
+            <div style="width:100%; font-family:Arial,sans-serif; font-size:7px; color:#64748b; padding:0 38px; box-sizing:border-box; display:flex; justify-content:space-between; border-top:1px solid #cbd5e1; padding-top:4px;">
+                <span>{$orgName} &bull; {$eventTitle} &bull; Generated {$generated}</span>
+                <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+            </div>
+            HTML;
+
+        return [$header, $footer];
+    }
+
+    /**
+     * Blank hand-fill sheet for on-ground timing officials — Sl.No / Chest / Fest ID / Name
+     * / Starting / Finishing / Signature, one row per participant. Distinct from
+     * attendanceSheetPdf() (which records who showed up) — this records each participant's
+     * actual clock time for a timed item, to be transcribed into Mark Entry's Time/Distance
+     * field afterward. Deliberately no photo/DOB/class/school columns (not requested, and
+     * this sheet is meant to print compactly for a stopwatch table, not a check-in desk).
+     */
+    private function timesheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $participants = $this->participantsFlat(
+            $request->integer('item_id') ?: null,
+            $request->input('class_group'),
+            $request->input('school_id'),
+            null,
+            null,
+            false,
+        )
+            ->filter(fn ($p) => $p->participant_role !== 'standby' && ($p->student_id || $p->teacher_id))
+            ->values();
+
+        $audience = $this->reportAudience($request);
+        $isPreview = $this->preview;
+        $isDomPdf = empty(config('services.pdf_converter.url'));
+
+        $rows = $this->participantReportRows($participants, $audience);
+
+        $rowsByItem = collect($rows)->groupBy(fn ($r) => $r['item'] ?? 'Item')->sortKeys();
+
+        // Same chest-number-first ordering as attendanceSheetPdf(), so the two sheets line
+        // participants up identically for a ground team using both together.
+        $rowsByItem = $rowsByItem->map(fn ($itemRows) => $itemRows->sortBy([
+            fn ($a, $b) => ((int) preg_replace('/[^0-9]/', '', (string) ($a['reference'] ?? '999999')))
+                <=> ((int) preg_replace('/[^0-9]/', '', (string) ($b['reference'] ?? '999999'))),
+            fn ($a, $b) => ($a['group_id'] ?? 0) <=> ($b['group_id'] ?? 0),
+            fn ($a, $b) => ($a['school'] ?? '') <=> ($b['school'] ?? ''),
+        ])->values()->all());
+
+        $sahodaya = Tenant::find($this->event->tenant_id);
+        $logo = $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null;
+
+        $singleItemName = null;
+        $singleItemMetaStr = null;
+        if ($rowsByItem->count() === 1) {
+            $singleItemName = str_replace('_', ' ', (string) $rowsByItem->keys()->first());
+            $firstItemRow = $rowsByItem->first()[0] ?? null;
+            if ($firstItemRow) {
+                $catLabel = $firstItemRow['item_category'] ?? null;
+                $typeLabel = $firstItemRow['item_type'] ?? null;
+                $genderLabel = $firstItemRow['item_gender'] ?? null;
+                $singleItemMetaStr = implode(' • ', array_filter([$singleItemName, $catLabel, $typeLabel, $genderLabel]));
+            }
+        }
+
+        $bladeData = [
+            'event'             => $this->event,
+            'sahodaya'          => $sahodaya,
+            'logo'              => $logo,
+            'rowsByItem'        => $rowsByItem,
+            'audience'          => $audience,
+            'isPreview'         => $isPreview,
+            'singleItemName'    => $singleItemName,
+            'singleItemMetaStr' => $singleItemMetaStr,
+            'isDomPdf'          => $isDomPdf,
+        ];
+
+        if ($isPreview) {
+            return response(view('fest.reports.timesheet', $bladeData)->render())
+                ->header('Content-Type', 'text/html');
+        }
+
+        [$headerTemplate, $footerTemplate] = $this->timesheetHeaderFooterTemplates($sahodaya, $logo, $singleItemName, $singleItemMetaStr);
+        $filename = ReportFilename::build(
+            'timesheet',
+            $sahodaya?->name ?? 'Sahodaya',
+            $this->event->event_start,
+            [$this->event->title, $singleItemName ?? 'all-items'],
+        );
+
+        return $this->renderPdf(
+            'fest.reports.timesheet',
+            $bladeData,
+            $filename,
+            false,
+            $headerTemplate,
+            $footerTemplate,
+            ['top' => '112px', 'right' => '38px', 'bottom' => '55px', 'left' => '38px'],
+        );
+    }
+
+    /**
+     * Puppeteer header/footer for the timesheet — see attendanceSheetHeaderFooterTemplates()
+     * for why these have to be self-contained inline HTML (Chromium renders them isolated
+     * from the page's own stylesheet).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function timesheetHeaderFooterTemplates(?Tenant $sahodaya, ?string $logo, ?string $singleItemName, ?string $singleItemMetaStr = null): array
+    {
+        $orgName = e($sahodaya->name ?? 'SAHODAYA');
+        $eventTitle = e($this->event->title);
+        $generated = e(now()->format('d M Y, h:i A'));
+        $itemMetaLabel = $singleItemMetaStr ?: ($singleItemName ? e($singleItemName) : null);
+        $itemLine = $itemMetaLabel
+            ? '<div style="font-size:11px; font-weight:800; color:#0f172a; margin-top:2px;">'.$itemMetaLabel.'</div>'
+            : '';
+
+        $logoImg = $logo
+            ? '<img src="'.e($logo).'" style="width:34px;height:34px;object-fit:contain;margin-right:10px;">'
+            : '';
+
+        $header = <<<HTML
+            <div style="width:100%; font-family:Arial,sans-serif; padding:0 38px; box-sizing:border-box; border-bottom:2px solid #0f172a; padding-bottom:6px;">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <div style="display:flex; align-items:center;">
+                        {$logoImg}
+                        <div>
+                            <div style="font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase; letter-spacing:0.3px;">{$orgName}</div>
+                            <div style="font-size:8px; font-weight:600; color:#475569; margin-top:2px;">CBSE Sahodaya Inter-School Competitions &amp; Events</div>
+                        </div>
+                    </div>
+                    <div style="background:#0f172a; color:#fff; padding:4px 10px; border-radius:4px; font-size:8px; font-weight:bold; letter-spacing:0.4px; white-space:nowrap;">TIMESHEET</div>
                 </div>
                 <div style="margin-top:5px; padding-top:4px; border-top:1px solid #e2e8f0;">
                     <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.3px;">{$eventTitle}</div>

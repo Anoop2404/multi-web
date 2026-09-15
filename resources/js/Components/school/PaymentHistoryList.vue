@@ -7,14 +7,24 @@
         </button>
         <ul v-if="open" class="mt-1.5 text-xs space-y-1.5">
             <li v-for="row in history" :key="row.id"
-                class="rounded-lg border border-indigo-100 bg-white/60 px-2 py-1.5">
+                class="rounded-lg border px-2 py-1.5"
+                :class="row.is_system_credit ? 'border-amber-200 bg-amber-50/60' : 'border-indigo-100 bg-white/60'">
                 <div class="flex flex-wrap justify-between gap-2">
-                    <span class="font-semibold" :class="statusClass(row.status)">
-                        {{ statusLabel(row.status) }}
+                    <span class="font-semibold flex items-center gap-1" :class="row.is_system_credit ? 'text-amber-700' : statusClass(row.status)">
+                        <span v-if="row.is_system_credit">↺ Credit applied</span>
+                        <span v-else>{{ statusLabel(row.status) }}</span>
                     </span>
                     <span class="font-semibold text-indigo-900">₹{{ formatMoney(row.amount) }}</span>
                 </div>
-                <div class="text-slate-500 mt-0.5">
+                <!-- A system credit isn't something the school uploaded or paid — it's an
+                     earlier cancelled/rejected registration's refund automatically offset
+                     against this balance. Rendered with its own explanation instead of the
+                     generic "Uploaded ... Ref CREDIT-OFFSET" line, which read as an
+                     unexplained duplicate payment. -->
+                <div v-if="row.is_system_credit" class="text-amber-700 mt-0.5">
+                    Refund credit from an item registration cancellation — automatically applied here, not a payment you made.
+                </div>
+                <div v-else class="text-slate-500 mt-0.5">
                     Uploaded {{ formatDateTime(row.uploaded_at) }}
                     <span v-if="row.transaction_ref"> · Ref {{ row.transaction_ref }}</span>
                 </div>
@@ -24,8 +34,8 @@
                     </button>
                 </div>
                 <div v-if="row.reviewed_at" class="text-slate-500">
-                    Reviewed {{ formatDateTime(row.reviewed_at) }}
-                    <span v-if="row.reviewed_by"> by {{ row.reviewed_by }}</span>
+                    {{ row.is_system_credit ? 'Applied' : 'Reviewed' }} {{ formatDateTime(row.reviewed_at) }}
+                    <span v-if="row.reviewed_by && !row.is_system_credit"> by {{ row.reviewed_by }}</span>
                 </div>
                 <div v-if="row.status === 'rejected' && row.rejection_reason" class="text-red-600 mt-0.5">
                     Reason: {{ row.rejection_reason }}

@@ -207,6 +207,7 @@ class McqPaymentsController extends SahodayaAdminController
             'reviewed_by'      => $r->reviewedBy?->name,
             'rejection_reason' => $r->rejection_reason,
             'reversal_reason'  => $r->reversal_reason,
+            'is_system_credit' => $r->isSystemCredit(),
             'proof_url'        => ($r->file_path && ! $r->isSystemCredit())
                 ? "/sahodaya-admin/{$this->sahodaya->id}/finance/payments/receipts/{$r->id}/proof"
                 : null,

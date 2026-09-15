@@ -342,6 +342,10 @@ class McqController extends SchoolAdminController
                     'reviewed_by'      => $r->reviewedBy?->name,
                     'rejection_reason' => $r->rejection_reason,
                     'reversal_reason'  => $r->reversal_reason,
+                    // See FestRegistrationController::receiptHistoryPayload()'s identical
+                    // field for why this is needed — lets the frontend label a system-applied
+                    // credit distinctly instead of an indistinguishable "Approved" entry.
+                    'is_system_credit' => $r->isSystemCredit(),
                     'proof_url'        => ($r->file_path && ! $r->isSystemCredit())
                         ? route('school.payments.program.proof', ['tenantId' => $this->school->id, 'feeReceipt' => $r->id])
                         : null,

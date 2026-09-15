@@ -1499,10 +1499,22 @@ class FestRegistrationController extends SchoolAdminController
                 'reviewed_by'      => $r->reviewedBy?->name,
                 'rejection_reason' => $r->rejection_reason,
                 'receipt_number'   => $r->receipt_number,
+                // A system-generated entry (FestSchoolEventFeeService::applyAvailableCredit())
+                // recording a fee credit — from a different, earlier cancelled/rejected
+                // registration — automatically offset against this balance. It's a real,
+                // approved amount, but not a payment the school made, and rendering it
+                // identically to an uploaded proof (see PaymentHistoryList.vue) reads as a
+                // confusing run of duplicate "Approved" entries with a bare "Ref CREDIT-OFFSET"
+                // and no explanation. isSystemCredit() lets the frontend label it distinctly.
+                'is_system_credit' => $r->isSystemCredit(),
                 // The primary proof file plus any extra images/PDFs attached to the same
                 // submission (FeeReceiptAttachmentService::attachExtra()) — the school
                 // should be able to review what it actually sent, not just re-type-in data.
-                'proof_url'        => $r->file_path
+                // is_system_credit's file_path is a synthetic marker ('system://fee-credit-
+                // adjustment'), not a real upload — without this guard "View proof" showed up
+                // and linked to a file that doesn't exist. Matches the same guard McqController
+                // ::index()'s receipt_history already has.
+                'proof_url'        => ($r->file_path && ! $r->isSystemCredit())
                     ? route('school.payments.program.proof', ['tenantId' => $this->school->id, 'feeReceipt' => $r->id])
                     : null,
                 'attachments'      => $r->attachments->map(fn (\App\Models\FeeReceiptAttachment $a) => [

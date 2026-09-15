@@ -20,11 +20,19 @@
                     </label>
                     <a :href="attendanceSheetPreviewHref" target="_blank" rel="noopener"
                        class="btn-secondary text-xs flex items-center gap-1">
-                        <span>Preview PDF ↗</span>
+                        <span>Preview Attendance Sheet ↗</span>
                     </a>
                     <a :href="attendanceSheetPdfHref"
                        class="btn-primary text-xs flex items-center gap-1">
-                        <span>Download PDF ↓</span>
+                        <span>Download Attendance Sheet ↓</span>
+                    </a>
+                    <a :href="timesheetPreviewHref" target="_blank" rel="noopener"
+                       class="btn-secondary text-xs flex items-center gap-1">
+                        <span>Preview Timesheet ↗</span>
+                    </a>
+                    <a :href="timesheetPdfHref"
+                       class="btn-primary text-xs flex items-center gap-1">
+                        <span>Download Timesheet ↓</span>
                     </a>
                 </div>
             </template>
@@ -404,6 +412,18 @@ const attendanceSheetPreviewHref = computed(() => {
     let href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet?preview=1`;
     if (itemFilter.value) href += `&item_id=${itemFilter.value}`;
     if (showChestOnSheet.value) href += '&show_chest=1';
+    return href;
+});
+
+const timesheetPdfHref = computed(() => {
+    let href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/timesheet?download=1`;
+    if (itemFilter.value) href += `&item_id=${itemFilter.value}`;
+    return href;
+});
+
+const timesheetPreviewHref = computed(() => {
+    let href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/timesheet?preview=1`;
+    if (itemFilter.value) href += `&item_id=${itemFilter.value}`;
     return href;
 });
 
