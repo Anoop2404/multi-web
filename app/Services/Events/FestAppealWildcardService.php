@@ -180,34 +180,8 @@ class FestAppealWildcardService
         return $outbox->fresh();
     }
 
-    /**
-     * Find-or-create the one placeholder "Appeal School" tenant this Sahodaya
-     * files wildcard registrations under. A school-type tenant whose parent is a
-     * Sahodaya shares that Sahodaya's own database (TenantObserver::creating()) —
-     * no new database is provisioned, so this is cheap and side-effect-free.
-     */
     private function appealPoolSchool(string $sahodayaId): Tenant
     {
-        $id = "appeal-school-{$sahodayaId}";
-
-        $existing = Tenant::find($id);
-        if ($existing) {
-            return $existing;
-        }
-
-        try {
-            return Tenant::create([
-                'id'             => $id,
-                'type'           => 'school',
-                'name'           => 'Appeal School',
-                'parent_id'      => $sahodayaId,
-                'is_active'      => true,
-                'is_appeal_pool' => true,
-            ]);
-        } catch (\Illuminate\Database\QueryException $e) {
-            // Lost a create race against a concurrent appeal approval for the same
-            // Sahodaya — the row now exists, so just return it.
-            return Tenant::findOrFail($id);
-        }
+        return Tenant::ensureAppealPoolSchool($sahodayaId);
     }
 }

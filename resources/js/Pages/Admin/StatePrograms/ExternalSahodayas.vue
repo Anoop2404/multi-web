@@ -25,6 +25,7 @@
                         <div>
                             <p class="font-medium text-gray-800">
                                 {{ s.name }}
+                                <span v-if="s.is_appeal_pool" class="ml-1 text-xs font-semibold text-amber-600">(Appeal pool)</span>
                                 <span v-if="s.status !== 'active'" class="ml-1 text-xs text-gray-400">(disabled)</span>
                             </p>
                             <p class="text-xs text-gray-500 mt-0.5">

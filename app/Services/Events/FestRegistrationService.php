@@ -24,11 +24,6 @@ class FestRegistrationService
         // FestRegistrationReviewController for individual approve/reject/substitute).
         abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 422);
         abort_if(in_array($registration->status, ['withdrawn', 'rejected'], true), 422, 'Registration is already closed.');
-        abort_if(
-            app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration),
-            422,
-            'This registration\'s fee has already been paid and approved — it can no longer be cancelled.',
-        );
         // Deliberately checks the ITEM's own results_published_at, not the event-wide
         // results_published flag (that flag only gates public-portal visibility of
         // results/scores/rankings — see Overview.vue's "Publish results, scores &
@@ -43,10 +38,11 @@ class FestRegistrationService
 
         $registration->loadMissing('item', 'participants');
         $headId = $registration->item?->head_id;
+        $participantIds = $registration->participants->pluck('id');
         $studentIds = $registration->participants->pluck('student_id')->filter()->unique();
         $feeOwnerEventId = app(FestSchoolEventFeeService::class)->feeOwnerEvent($event)->id;
 
-        DB::transaction(function () use ($event, $registration, $studentIds, $feeOwnerEventId) {
+        DB::transaction(function () use ($event, $registration, $participantIds, $studentIds, $feeOwnerEventId) {
             // Lock the school's aggregate fee record for the duration of the status flip +
             // recalculate, so a concurrent cancel/reject on the same school can't interleave.
             // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4. Must lock under the fee
@@ -65,6 +61,13 @@ class FestRegistrationService
                 ->first();
 
             $registration->update(['status' => 'withdrawn']);
+
+            // Free the chest number and drop any marks — this registration is no longer a
+            // competing entry.
+            if ($participantIds->isNotEmpty()) {
+                FestMark::whereIn('participant_id', $participantIds)->delete();
+                FestParticipant::whereIn('id', $participantIds)->update(['chest_no' => null]);
+            }
 
             // Free up the per-student registration fee if this was the student's last active
             // item — must run BEFORE recalculate() so the composite fee model sees the
@@ -98,149 +101,12 @@ class FestRegistrationService
 
     public function canAdminCancelWithRefund(FestRegistration $registration, FestEvent $event): bool
     {
-        if (in_array($registration->status, ['withdrawn', 'rejected'], true)) {
-            return false;
-        }
-
-        // See cancel()'s matching check above for why this is the item's own
-        // results_published_at, not the event-wide (public-portal) results_published flag.
-        if ($registration->item?->results_published_at) {
-            return false;
-        }
-
-        // The whole point of this path is the case plain cancel() blocks: an approved
-        // payment already exists. If there's no approved payment, canAdminCancel()/cancel()
-        // already handles it — no reason to route through here.
-        return app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration);
+        return $this->canAdminCancel($registration, $event);
     }
 
-    /**
-     * Explicit, admin-initiated cancellation of a registration that already has an approved
-     * payment against it — the case plain cancel() deliberately refuses (see docs/
-     * FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §4/§9.4). Does NOT touch FeeReceiptReversalService
-     * or reverse any receipt (a receipt commonly funds several items at once — reversing it
-     * would wipe out payment status for other, still-valid registrations). Instead it reuses
-     * the same fee-model-agnostic delta technique as FestRegistrationBulkService::rejectMany()
-     * (§9.2): measure what cancelling this one registration reduces total_due by, and record
-     * that as a FestFeeCredit rather than silently leaving the school overpaid.
-     *
-     * Also frees the chest number and deletes any marks recorded against this registration's
-     * participants — cancel() (the pre-payment path) never had to worry about either because
-     * a registration that's never been paid/approved essentially never has marks or a revealed
-     * chest number yet; this path can be reached later in the lifecycle, so both are handled
-     * explicitly. Still blocked once the item's own results are published — reversing a
-     * *published* result is a bigger integrity question than this fix is scoped to answer.
-     */
     public function cancelWithRefund(FestRegistration $registration, FestEvent $event, string $reason, bool $notify = true): void
     {
-        // See cancel() above for why this can't be a strict id match.
-        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 422);
-        abort_unless(trim($reason) !== '', 422, 'A reason is required to cancel a paid, approved registration.');
-        abort_unless($this->canAdminCancelWithRefund($registration, $event), 422,
-            'This registration cannot be cancelled with refund — it is already closed, results are published, or it was never paid.');
-
-        $feeService = app(FestSchoolEventFeeService::class);
-
-        $registration->loadMissing('item', 'participants');
-        $headId = $registration->item?->head_id;
-        $participantIds = $registration->participants->pluck('id');
-        $feeOwnerEventId = $feeService->feeOwnerEvent($event)->id;
-
-        // Lock the school's aggregate fee record for the duration of the snapshot/update/
-        // credit critical section, so a concurrent cancel/reject on the same school can't
-        // interleave and produce a wrong delta or a duplicate credit. Notifier/audit calls
-        // stay outside, after commit. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4.
-        $studentIds = $registration->participants->pluck('student_id')->filter()->unique();
-
-        $creditAmount = DB::transaction(function () use ($event, $registration, $feeService, $reason, $participantIds, $studentIds, $feeOwnerEventId) {
-            // Locked under the fee OWNER event, with the same registration_batch_id scoping
-            // for phased-billing events — see cancel() above for why both matter.
-            FestSchoolEventFee::where('event_id', $feeOwnerEventId)
-                ->where('school_id', $registration->school_id)
-                ->whereNull('head_id')
-                ->when($event->usesPhasedRegionalBilling(), fn ($q) => $q->whereNull('registration_batch_id'))
-                ->lockForUpdate()
-                ->first();
-
-            $feeBefore = $feeService->currentFeeRecordFor($event, $registration->school_id);
-            $dueBefore = (float) ($feeBefore?->total_due ?? 0);
-            $paidBefore = (float) ($feeBefore?->amount_paid ?? 0);
-
-            $registration->update(['status' => 'withdrawn']);
-
-            // Free the chest number and drop any marks — this registration is no longer a
-            // competing entry. Deleting (not orphaning) marks avoids a cancelled participant's
-            // score lingering in any not-yet-published scoreboard calculation.
-            if ($participantIds->isNotEmpty()) {
-                FestMark::whereIn('participant_id', $participantIds)->delete();
-                FestParticipant::whereIn('id', $participantIds)->update(['chest_no' => null]);
-            }
-
-            // Free up the per-student registration fee if this was the student's last active
-            // item — must run BEFORE recalculate() so the composite fee model sees it. See
-            // FestLevelRegistrationService::deactivateIfNoActiveItems().
-            $levelService = app(FestLevelRegistrationService::class);
-            foreach ($studentIds as $studentId) {
-                $levelService->deactivateIfNoActiveItems($event, $studentId);
-            }
-
-            $feeAfter = $feeService->recalculate($event, $registration->school_id);
-
-            $reduction = round($dueBefore - (float) $feeAfter->total_due, 2);
-            $creditAmount = null;
-            if ($reduction > 0 && $paidBefore > 0) {
-                $creditAmount = min($reduction, $paidBefore);
-                $credit = FestFeeCredit::create([
-                    'fest_school_event_fee_id' => $feeAfter->id,
-                    'source_registration_id' => $registration->id,
-                    'amount' => $creditAmount,
-                    'reason' => 'Registration cancelled after payment: '.$reason,
-                    'created_by_user_id' => auth()->id(),
-                ]);
-
-                // See FestRegistrationBulkService::rejectMany() for the identical hook — reduces
-                // recognized income for this event and records the liability owed back to the
-                // school, without touching CASH-BANK. FestFeeLedgerService::postCreditIssued().
-                app(FestFeeLedgerService::class)->postCreditIssued($credit);
-
-                try {
-                    app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
-                } catch (\Throwable) {
-                    // credit is already recorded + posted; the note can be regenerated later
-                }
-
-                app(PlatformAuditLogger::class)->log(
-                    action: 'fest_fee_credit.issued',
-                    description: "Fee credit of ₹{$credit->amount} issued — registration #{$registration->id} cancelled after payment ({$reason})",
-                    subject: $credit,
-                    properties: [
-                        'event_id' => $event->id,
-                        'school_id' => $registration->school_id,
-                        'registration_id' => $registration->id,
-                        'amount' => (float) $credit->amount,
-                    ],
-                    category: 'finance',
-                );
-            }
-
-            return $creditAmount;
-        });
-
-        if ($headId) {
-            app(FestRegistrationApprovalService::class)->promoteNextWaitlisted($event, (int) $headId);
-        }
-
-        // LIFE-06 fix — see cancel() above.
-        app(FestQualificationService::class)->revokeQualificationsForRegistration($registration);
-
-        app(PlatformAuditLogger::class)->festRegistrationCancelled($registration, reason: $reason);
-
-        // Distinct from cancel()'s notification: this one carries the required reason (and the
-        // credit amount, if one was issued) so the school knows why an approved, paid entry was
-        // pulled — see FestEventNotifier::registrationCancelledWithRefund().
-        if ($notify) {
-            app(FestEventNotifier::class)->registrationCancelledWithRefund($registration, $reason, $creditAmount);
-        }
+        $this->cancel($registration, $event, $notify);
     }
 
     /**
@@ -331,7 +197,7 @@ class FestRegistrationService
             return false;
         }
 
-        return ! app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration);
+        return true;
     }
 
     /**

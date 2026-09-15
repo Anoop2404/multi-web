@@ -22,9 +22,16 @@ class ExternalSahodaya extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'state_program_id', 'name', 'contact_name', 'contact_phone', 'contact_email',
-        'access_code', 'status',
+        'state_program_id', 'name', 'district', 'contact_name', 'contact_phone', 'contact_email',
+        'access_code', 'status', 'is_appeal_pool', 'source',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_appeal_pool' => 'boolean',
+        ];
+    }
 
     public function program(): BelongsTo
     {
@@ -39,6 +46,12 @@ class ExternalSahodaya extends Model
     public function isActive(): bool
     {
         return $this->status === 'active';
+    }
+
+    /** The Appeal Sahodaya (one per state program) never pays a registration fee. */
+    public function requiresFee(): bool
+    {
+        return ! $this->is_appeal_pool;
     }
 
     public static function generateAccessCode(): string

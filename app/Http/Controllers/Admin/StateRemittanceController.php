@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ExternalSahodaya;
 use App\Models\StateRemittance;
 use App\Models\Tenant;
 use App\Services\Ledger\StateRemittanceLedgerService;
@@ -22,6 +23,19 @@ class StateRemittanceController extends Controller
             ->orderByDesc('created_at')
             ->paginate(50)
             ->withQueryString();
+
+        // External (non-tenant) Sahodayas' remittances carry sahodaya_id="external:<uuid>",
+        // which the ->sahodaya() belongsToCentralTenant relation can't resolve — look those
+        // names up separately so the list doesn't just show the raw id.
+        $externalIds = $remittances->getCollection()
+            ->filter(fn (StateRemittance $r) => str_starts_with($r->sahodaya_id, 'external:'))
+            ->map(fn (StateRemittance $r) => substr($r->sahodaya_id, strlen('external:')));
+        $externalNames = ExternalSahodaya::whereIn('id', $externalIds)->pluck('name', 'id');
+        $remittances->getCollection()->each(function (StateRemittance $r) use ($externalNames) {
+            if (str_starts_with($r->sahodaya_id, 'external:')) {
+                $r->setAttribute('sahodaya_display_name', $externalNames->get(substr($r->sahodaya_id, strlen('external:'))) ?? $r->sahodaya_id);
+            }
+        });
 
         $sahodayas = Tenant::where('type', 'sahodaya')->orderBy('name')->get(['id', 'name']);
 

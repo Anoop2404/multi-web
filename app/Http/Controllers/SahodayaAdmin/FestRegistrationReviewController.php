@@ -559,9 +559,9 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'Cannot cancel — this item\'s results are already published, the registration is already closed, or it was never paid (use the regular cancel action instead).'
         );
 
-        app(FestRegistrationService::class)->cancelWithRefund($registration, $event, $data['reason']);
+        app(FestRegistrationService::class)->cancel($registration, $event);
 
-        return back()->with('success', 'Registration cancelled and any applicable fee credit recorded.');
+        return back()->with('success', 'Registration cancelled.');
     }
 
     public function substitute(string $tenantId, FestEvent $event, FestRegistration $registration, FestParticipant $performer, FestParticipant $standby)

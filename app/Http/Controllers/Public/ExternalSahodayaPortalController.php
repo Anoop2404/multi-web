@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\ExternalSahodaya;
+use App\Models\FestStateProgramItem;
+use App\Models\State\StateQualifierEntry;
+use App\Models\StateRemittance;
 use App\Services\State\ExternalIntakeService;
 use Illuminate\Http\Request;
 
@@ -19,9 +22,14 @@ class ExternalSahodayaPortalController extends Controller
         $sahodaya = $this->resolve($code);
 
         return view('external.sahodaya-portal', [
-            'sahodaya' => $sahodaya->load('program'),
-            'schools'  => $sahodaya->schools()->orderBy('name')->get(),
-            'entries'  => $service->entriesForReview($sahodaya),
+            'sahodaya'  => $sahodaya->load('program'),
+            'schools'   => $sahodaya->schools()->orderBy('name')->get(),
+            'entries'   => $service->entriesForReview($sahodaya),
+            'unassigned'=> $service->unassignedRoster($sahodaya),
+            'items'     => FestStateProgramItem::where('state_program_id', $sahodaya->state_program_id)
+                ->orderBy('display_order')
+                ->get(['id', 'item_code', 'title', 'class_group']),
+            'fee'       => StateRemittance::where('sahodaya_id', "external:{$sahodaya->id}")->first(),
         ]);
     }
 
@@ -50,6 +58,63 @@ class ExternalSahodayaPortalController extends Controller
         $service->submit($sahodaya);
 
         return back()->with('success', 'Submitted to State. Your entries are now with the State Kalolsavam office for review.');
+    }
+
+    /** Bulk winner-list upload — one spreadsheet for every school under this Sahodaya at once. */
+    public function importWinners(Request $request, string $code, ExternalIntakeService $service)
+    {
+        $sahodaya = $this->resolve($code);
+
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120',
+        ]);
+
+        $result = $service->importWinnersFromSpreadsheet($sahodaya, $request->file('file')->getRealPath());
+
+        $message = "Imported {$result['imported']} student(s).";
+        if ($result['skipped'] > 0) {
+            $message .= " {$result['skipped']} row(s) skipped — see details below.";
+        }
+
+        return back()->with($result['skipped'] > 0 ? 'warning' : 'success', $message)
+            ->with('importErrors', $result['errors']);
+    }
+
+    /**
+     * The coordinator registers one uploaded roster student to a state-level item — the
+     * separate step after importWinners(), mirroring the current school-level
+     * "Student Registry, then register to items" flow.
+     */
+    public function registerItem(Request $request, string $code, ExternalIntakeService $service)
+    {
+        $sahodaya = $this->resolve($code);
+
+        $data = $request->validate([
+            'entry_id'  => 'required|integer',
+            'item_code' => 'required|string|max:20',
+            'position'  => 'nullable|integer|min:1|max:3',
+            'grade'     => 'nullable|string|max:8',
+        ]);
+
+        $entry = StateQualifierEntry::findOrFail($data['entry_id']);
+        $service->registerToItem($sahodaya, $entry, $data['item_code'], $data['position'] ?? null, $data['grade'] ?? null);
+
+        return back()->with('success', "Registered {$entry->student_name} for the selected item.");
+    }
+
+    /** Custom-amount registration fee + one proof upload — no calculated fee schedule. */
+    public function storeFee(Request $request, string $code, ExternalIntakeService $service)
+    {
+        $sahodaya = $this->resolve($code);
+
+        $data = $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'proof'  => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+        ]);
+
+        $service->submitFee($sahodaya, (float) $data['amount'], $request->file('proof'));
+
+        return back()->with('success', 'Payment proof submitted for state verification.');
     }
 
     /** Lookup + active check. Used by every portal action — access code only, no OTP gate. */

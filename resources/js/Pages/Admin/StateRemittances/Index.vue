@@ -68,7 +68,7 @@
                                         {{ expandedId === r.id ? '▾' : '▸' }}
                                     </button>
                                 </td>
-                                <td class="p-3 text-xs">{{ r.sahodaya?.name }}</td>
+                                <td class="p-3 text-xs">{{ r.sahodaya?.name ?? r.sahodaya_display_name }}</td>
                                 <td class="p-3">
                                     <p>{{ r.title }}</p>
                                     <p v-if="r.academic_year" class="text-xs text-gray-400">{{ r.academic_year }}</p>

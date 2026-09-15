@@ -22,7 +22,7 @@ class ExternalSchool extends Model
 
     protected $fillable = [
         'external_sahodaya_id', 'name', 'username', 'contact_name', 'contact_phone',
-        'access_code', 'password', 'plain_password', 'status',
+        'access_code', 'password', 'plain_password', 'status', 'is_appeal_pool',
     ];
 
     protected $hidden = ['password'];
@@ -31,6 +31,7 @@ class ExternalSchool extends Model
     {
         return [
             'password' => 'hashed',
+            'is_appeal_pool' => 'boolean',
         ];
     }
 

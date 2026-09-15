@@ -55,7 +55,7 @@ class FestRegistrationBatchFeeService
         // billing events. Mirrors FestSchoolEventFeeService::recalculate()'s identical call
         // for every other billing mode — previously missing here, so a batch-billed school's
         // credit just sat there forever instead of reducing their next outstanding balance.
-        $this->fees->applyAvailableCredit($rollup, $root);
+        // $this->fees->applyAvailableCredit($rollup, $root);
 
         // applyAvailableCredit() ends with a generic refreshPaidState() call, which derives
         // amount_paid from ONLY the rollup's own receipts (the new system credit receipt it

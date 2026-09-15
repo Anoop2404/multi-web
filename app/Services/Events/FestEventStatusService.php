@@ -42,39 +42,8 @@ class FestEventStatusService
                 ]);
             }
 
-            $issuedCredits = collect();
-            
             foreach ($paidFees as $fee) {
-                $feeAfter = app(FestSchoolEventFeeService::class)->recalculate($event, $fee->school_id);
-                $reduction = round((float)$fee->total_due - (float)$feeAfter->total_due, 2);
-                $paidBefore = (float)$fee->amount_paid;
-                
-                $creditAmount = min($reduction, $paidBefore);
-                
-                if ($creditAmount > 0) {
-                    $credit = FestFeeCredit::create([
-                        'fest_school_event_fee_id' => $feeAfter->id,
-                        'source_registration_id'   => null,
-                        'amount'                   => $creditAmount,
-                        'reason'                   => 'Event cancelled after payment',
-                        'created_by_user_id'       => auth()->id(),
-                    ]);
-                    // Every other FestFeeCredit-creation site (FestSchoolEventFeeController::
-                    // approve()'s overpayment reconciliation, FestRegistrationBulkService::
-                    // rejectMany(), FestRegistrationService::cancelWithRefund()) posts this to
-                    // the ledger — this site was the one gap where a credit could exist
-                    // without the corresponding liability ever showing in Financial
-                    // Statements. See docs/FLOW_GAP_FIX_PLAN.md Phase 3b / 4.3.
-                    app(\App\Services\Events\FestFeeLedgerService::class)->postCreditIssued($credit);
-
-                    try {
-                        app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
-                    } catch (\Throwable) {
-                        // credit is already recorded + posted; the note can be regenerated later
-                    }
-
-                    $issuedCredits->push($credit);
-                }
+                app(FestSchoolEventFeeService::class)->recalculate($event, $fee->school_id);
             }
 
             $event->update(['status' => 'cancelled']);

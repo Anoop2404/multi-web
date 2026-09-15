@@ -206,6 +206,37 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             ->flip()->map(fn () => true)->all();
     }
 
+    /**
+     * Find-or-create the one placeholder "Appeal School" tenant a Sahodaya files
+     * wildcard/court-order registrations under. A school-type tenant whose parent is a
+     * Sahodaya shares that Sahodaya's own database (TenantObserver::creating()) — no new
+     * database is provisioned, so this is cheap and side-effect-free.
+     */
+    public static function ensureAppealPoolSchool(string $sahodayaId): self
+    {
+        $id = "appeal-school-{$sahodayaId}";
+
+        $existing = self::find($id);
+        if ($existing) {
+            return $existing;
+        }
+
+        try {
+            return self::create([
+                'id'             => $id,
+                'type'           => 'school',
+                'name'           => 'Appeal School',
+                'parent_id'      => $sahodayaId,
+                'is_active'      => true,
+                'is_appeal_pool' => true,
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Lost a create race against a concurrent caller for the same Sahodaya —
+            // the row now exists, so just return it.
+            return self::findOrFail($id);
+        }
+    }
+
     public function payments(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(MembershipPayment::class, 'school_id');

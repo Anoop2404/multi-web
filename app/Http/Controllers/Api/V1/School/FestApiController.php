@@ -96,11 +96,7 @@ class FestApiController extends SchoolApiController
         // Same routing as SchoolAdmin\FestRegistrationController::withdraw() — canSchoolCancel()
         // allows an already-paid/approved registration too, but the plain cancel() still hard-
         // blocks that case, so route it through cancelWithRefund() to get a proper FestFeeCredit.
-        if (app(\App\Services\Events\FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration)) {
-            $registrationService->cancelWithRefund($registration, $event, 'Cancelled by school after payment.');
-        } else {
-            $registrationService->cancel($registration, $event);
-        }
+        $registrationService->cancel($registration, $event);
 
         return response()->json(['data' => ['cancelled' => true]]);
     }

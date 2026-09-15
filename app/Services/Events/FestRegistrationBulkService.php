@@ -172,38 +172,7 @@ class FestRegistrationBulkService
                     $levelService->deactivateIfNoActiveItems($event, $studentId);
                 }
 
-                $feeAfter = $feeService->recalculate($event, $registration->school_id);
-
-                // If the school had already paid something and this rejection freed up part of
-                // what they owe, record the freed amount (capped at what was actually paid) as
-                // an outstanding credit rather than letting it silently disappear into an
-                // "overpaid" balance nobody tracks. Deliberately does NOT touch total_due,
-                // amount_paid, or receipt status — this is purely an additive record.
-                $reduction = round($dueBefore - (float) $feeAfter->total_due, 2);
-                if ($reduction > 0 && $paidBefore > 0) {
-                    $credit = FestFeeCredit::create([
-                        'fest_school_event_fee_id' => $feeAfter->id,
-                        'source_registration_id' => $registration->id,
-                        'amount' => min($reduction, $paidBefore),
-                        'reason' => 'Registration rejected after payment'.($reason ? ': '.$reason : ''),
-                        'created_by_user_id' => auth()->id(),
-                    ]);
-
-                    // Reduce recognized income for this event by the credited amount and record
-                    // the liability now owed back to the school — see
-                    // FestFeeLedgerService::postCreditIssued() and
-                    // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13 for why this does NOT touch
-                    // CASH-BANK (no cash has moved).
-                    app(FestFeeLedgerService::class)->postCreditIssued($credit);
-
-                    // Document-only; never blocks the rejection itself. See
-                    // docs/FLOW_GAP_FIX_PLAN.md Phase 3b.2.
-                    try {
-                        app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
-                    } catch (\Throwable) {
-                        // credit is already recorded + posted; the note can be regenerated later
-                    }
-                }
+                $feeService->recalculate($event, $registration->school_id);
             });
 
             // LIFE-06 fix — see FestQualificationService::revokeQualificationsForRegistration().

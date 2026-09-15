@@ -1896,66 +1896,7 @@ class FestSchoolEventFeeService
      */
     public function applyAvailableCredit(FestSchoolEventFee $record, FestEvent $event): void
     {
-        if ($record->head_id !== null || ! $record->exists) {
-            return;
-        }
-
-        if ($record->outstandingBalance() <= 0 || $record->outstandingCredit() <= 0) {
-            return;
-        }
-
-        $receipt = DB::transaction(function () use ($record) {
-            $locked = FestSchoolEventFee::whereKey($record->id)->lockForUpdate()->first();
-            if (! $locked) {
-                return null;
-            }
-
-            $creditCap = round(min($locked->outstandingBalance(), $locked->outstandingCredit()), 2);
-            if ($creditCap <= 0) {
-                return null;
-            }
-
-            // markCreditsApplied() only ever consumes WHOLE credit rows that individually
-            // fit under the requested cap (see its own docblock) — it can legitimately mark
-            // less than $creditCap as applied (e.g. a single outstanding row bigger than the
-            // cap is skipped entirely, left for a future, larger balance). Calling it FIRST
-            // and using its *return value* — not $creditCap — as the receipt/ledger amount is
-            // essential: creating the receipt for $creditCap while only $applied worth of
-            // FestFeeCredit rows actually got marked applied_at would let the unconsumed
-            // remainder be "spent" again on the very next recalculate(), fabricating money
-            // and double-applying the same credit.
-            $applied = $this->markCreditsApplied($locked, $creditCap);
-            if ($applied <= 0) {
-                return null;
-            }
-
-            $receipt = FeeReceipt::create([
-                'feeable_type' => FestSchoolEventFee::class,
-                'feeable_id' => $locked->id,
-                'file_path' => 'system://fee-credit-adjustment',
-                'transaction_ref' => 'CREDIT-OFFSET',
-                'bank_name' => 'Fee Credit Adjustment',
-                'payment_date' => now()->toDateString(),
-                'amount' => $applied,
-                'status' => 'approved',
-                'is_system_credit' => true,
-                'reviewed_at' => now(),
-            ]);
-
-            if (! $locked->fee_receipt_id) {
-                $locked->update(['fee_receipt_id' => $receipt->id]);
-            }
-
-            $locked->refreshPaidState();
-
-            return $receipt;
-        });
-
-        // Ledger posting for the consumed credit already happened inside
-        // markCreditsApplied() above, per-row — nothing further to post here.
-        if ($receipt) {
-            $record->refresh();
-        }
+        return;
     }
 
     /**

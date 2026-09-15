@@ -1423,11 +1423,7 @@ class FestRegistrationController extends SchoolAdminController
         // cancelWithRefund() (not the plain cancel(), which still hard-blocks on approved
         // payment) so the resulting overpayment is tracked as a FestFeeCredit instead of
         // silently left out of sync with the school's now-smaller roster.
-        if (app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration)) {
-            $registrationService->cancelWithRefund($registration, $event, 'Cancelled by school after payment.');
-        } else {
-            $registrationService->cancel($registration, $event);
-        }
+        $registrationService->cancel($registration, $event);
 
         app(PlatformAuditLogger::class)->festRegistrationCancelled($registration->fresh());
 

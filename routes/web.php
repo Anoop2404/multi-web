@@ -1972,6 +1972,9 @@ Route::prefix('state/external')->name('state.external.')->middleware(['web', 'th
     Route::get('/{code}', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'show'])->name('sahodaya.show');
     Route::post('/{code}/schools', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'storeSchool'])->name('sahodaya.schools.store');
     Route::post('/{code}/submit', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'submit'])->name('sahodaya.submit');
+    Route::post('/{code}/import-winners', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'importWinners'])->name('sahodaya.import-winners');
+    Route::post('/{code}/register-item', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'registerItem'])->name('sahodaya.register-item');
+    Route::post('/{code}/fee', [\App\Http\Controllers\Public\ExternalSahodayaPortalController::class, 'storeFee'])->name('sahodaya.fee.store');
 
     Route::get('/school/login', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'showLogin'])->name('school.login');
     Route::post('/school/login', [\App\Http\Controllers\Public\ExternalSchoolPortalController::class, 'login'])->name('school.login.submit');
