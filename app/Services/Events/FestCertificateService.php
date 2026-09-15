@@ -1500,9 +1500,15 @@ class FestCertificateService
                 return null;
             }
 
+            // "Individual" is the overwhelming default and, spelled out on every folder,
+            // is exactly the kind of extra length that pushes a Windows extraction over
+            // its 260-char path limit (see the Windows "destination path is too long"
+            // extraction error this caused in practice) — only the less-common types are
+            // worth stating.
+            $typeLabel = FestItemCategoryLabel::typeLabel($item->participant_type);
             $meta = array_filter([
                 FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
-                FestItemCategoryLabel::typeLabel($item->participant_type),
+                $typeLabel !== 'Individual' ? $typeLabel : null,
                 FestItemCategoryLabel::genderLabel($item->gender),
             ]);
 
@@ -1516,5 +1522,18 @@ class FestCertificateService
     public static function sanitizeArchiveSegment(string $value): string
     {
         return trim(preg_replace('/[\/\\\\:*?"<>|]+/', ' ', $value) ?? $value);
+    }
+
+    /**
+     * One certificate's filename inside a ZIP export. The full 36-char UUID was
+     * overkill for on-disk uniqueness within a single folder (it exists so two same-
+     * named participants never collide) and, combined with a grouped export's folder
+     * name, pushed Windows' default Explorer extractor over its 260-char path limit —
+     * an 8-char prefix keeps collisions astronomically unlikely at the scale of one
+     * item/school's worth of certificates while cutting ~28 characters per file.
+     */
+    public static function archiveFileName(?string $studentName, string $verificationUuid): string
+    {
+        return str($studentName ?? 'participant')->slug().'-'.substr($verificationUuid, 0, 8).'.pdf';
     }
 }

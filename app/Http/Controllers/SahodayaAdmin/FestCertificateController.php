@@ -383,7 +383,7 @@ class FestCertificateController extends SahodayaAdminController
             // still gets us the shared cache-check + orientation-correct render on a miss.
             $pdf = $service->cachedOrFreshPdf($certificate, fn () => $payload, $plain);
 
-            $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.pdf';
+            $name = FestCertificateService::archiveFileName($payload['student']?->name, $certificate->verification_uuid);
             if ($groupBy) {
                 $folder = $service->archiveGroupFolder($payload, $groupBy, $classGroupLabels, $artsCategoryLabels) ?? 'Other';
                 $name = FestCertificateService::sanitizeArchiveSegment($folder).'/'.$name;

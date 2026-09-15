@@ -118,7 +118,7 @@ class BuildCertificateZipChunkJob implements ShouldQueue
 
             try {
                 $pdf = $service->cachedOrFreshPdf($certificate, fn () => $payload, $this->plain);
-                $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.pdf';
+                $name = FestCertificateService::archiveFileName($payload['student']?->name, $certificate->verification_uuid);
                 if ($this->groupBy) {
                     $folder = $service->archiveGroupFolder($payload, $this->groupBy, $classGroupLabels, $artsCategoryLabels) ?? 'Other';
                     $name = FestCertificateService::sanitizeArchiveSegment($folder).'/'.$name;
