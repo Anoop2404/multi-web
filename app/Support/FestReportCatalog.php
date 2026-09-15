@@ -41,8 +41,10 @@ class FestReportCatalog
      * admit-cards, id-cards-by-head, numbering-register, pending-approvals,
      * assignment-completeness, head-wise-participants, area-wise-participants,
      * team-squad-sheets, catering-by-school, attendance-sheet, attendance-sheet-school,
-     * clashes-school, age-group-matrix — none of these were confirmed to filter by school
-     * in this pass; re-verify and move up when they are.
+     * clashes-school, age-group-matrix, timesheet (added alongside attendance-sheet,
+     * its sibling — same participantsFlat() data source, same unverified status) —
+     * none of these were confirmed to filter by school in this pass; re-verify and
+     * move up when they are.
      *
      * @var list<string>
      */
@@ -126,6 +128,7 @@ class FestReportCatalog
             ['id' => 'green-room-list', 'label' => 'Green Room List (staff)', 'format' => 'pdf', 'params' => ['item_id'], 'phase' => 'during', 'audience' => 'staff'],
             ['id' => 'attendance-sheet', 'label' => 'Attendance Sheet (by item)', 'format' => 'pdf', 'params' => ['item_id', 'class_group', 'audience'], 'phase' => 'before', 'audience' => 'both'],
             ['id' => 'attendance-sheet-school', 'label' => 'Attendance Sheet (school pivot)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'timesheet', 'label' => 'Timesheet (Sl.No / Chest / Fest ID / Starting / Finishing / Signature)', 'format' => 'pdf', 'params' => ['item_id', 'class_group', 'audience'], 'phase' => 'before', 'audience' => 'both'],
             ['id' => 'mark-entry-status', 'label' => 'Mark Entry Status', 'format' => 'csv', 'params' => [], 'phase' => 'during', 'audience' => 'staff'],
             ['id' => 'results-pending', 'label' => 'Results Pending (marks entered, not published)', 'format' => 'csv', 'params' => [], 'phase' => 'during', 'audience' => 'staff'],
             ['id' => 'absent-report', 'label' => 'Absent Participants', 'format' => 'csv', 'params' => ['school_id'], 'phase' => 'during', 'audience' => 'staff'],
@@ -222,6 +225,7 @@ class FestReportCatalog
         'green-room-list'                => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => true],
         'attendance-sheet'               => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'attendance-sheet-school'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'region'], 'supports_competition_phase' => true],
+        'timesheet'                      => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'mark-entry-status'             => ['dataset' => 'schedule', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'results-pending'               => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'absent-report'                 => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
@@ -343,7 +347,7 @@ class FestReportCatalog
         // FestEventOpsController / a dedicated attendance controller, not this file; its
         // own reportAwareTargetEvent()-equivalent fix is applied there — see
         // FestAttendanceController).
-        'attendance', 'attendance-sheet', 'attendance-sheet-school',
+        'attendance', 'attendance-sheet', 'attendance-sheet-school', 'timesheet',
         // Second retrofit pass (2026-08-14): same reportableEventIds()/reportableItemIds()
         // issue found in the remaining FestReportController interactive pages and their
         // catalog-driven exports. Both the interactivePages() id and the exports() id are
@@ -449,7 +453,7 @@ class FestReportCatalog
             'assignment-completeness' => 'assignment-completeness',
             'numbering-register' => 'numbering-register',
             'pending-approvals' => 'pending-approvals',
-            'attendance-sheet', 'attendance-sheet-school' => 'attendance',
+            'attendance-sheet', 'attendance-sheet-school', 'timesheet' => 'attendance',
             'id-cards-by-head', 'admit-cards' => 'id-cards',
             default => null,
         };
