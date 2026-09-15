@@ -237,6 +237,22 @@ class FestRegistrationItemLockTest extends TestCase
         $this->assertTrue(app(FestRegistrationService::class)->canSchoolEditRoster($f['registration']->fresh(), $f['event']->fresh()));
     }
 
+    /**
+     * Same regression as canSchoolEditRoster() above, for canSchoolCancel() — it was the
+     * one guard in this class that never got the fix: a real event run without phases
+     * (some items conducted and results published, registration then reopened for the
+     * rest) left every school unable to cancel a registration for ANY item, including
+     * ones still fully open, because canSchoolCancel() still checked the event-wide
+     * results_published flag on top of the item-level one.
+     */
+    public function test_can_school_cancel_allows_when_the_event_is_published_but_this_item_is_not(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['results_published' => true]);
+
+        $this->assertTrue(app(FestRegistrationService::class)->canSchoolCancel($f['registration']->fresh(), $f['event']->fresh()));
+    }
+
     public function test_allow_registration_for_item_aborts_once_item_results_are_published(): void
     {
         $f = $this->fixture();

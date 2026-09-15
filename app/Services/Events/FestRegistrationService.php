@@ -260,10 +260,15 @@ class FestRegistrationService
             return false;
         }
 
-        if ($event->results_published) {
-            return false;
-        }
-
+        // Gate purely on THIS item's own results_published_at, not the event-wide
+        // results_published flag — matching every sibling guard in this class
+        // (canSchoolEditRoster, canAdminCancel, substitutePerformer, addParticipant,
+        // removeParticipant). This one was missed when those were fixed: once ANY item in
+        // the event had its results published, a school could no longer cancel a
+        // registration for a completely different, still-open item — exactly the report
+        // that surfaced this (event run without phases, some items conducted and
+        // published, registration reopened for the rest, and cancel silently stopped
+        // working event-wide).
         if ($registration->item?->results_published_at) {
             return false;
         }
