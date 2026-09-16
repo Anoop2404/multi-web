@@ -26,41 +26,49 @@
                 <table class="w-full text-xs border-collapse">
                     <thead>
                         <tr>
-                            <th rowspan="2" class="sticky left-0 z-20 bg-slate-900 text-white p-2.5 text-left border-r border-slate-700 min-w-[11rem]">School</th>
-                            <th v-for="cat in categories" :key="cat.key" :colspan="cat.items.length + 1"
-                                class="bg-slate-800 text-white p-2 text-center border-l border-slate-700 font-bold">
-                                {{ cat.label }}
+                            <th class="sticky left-0 z-20 bg-slate-900 text-white p-2.5 text-left border-r border-slate-700 min-w-[13rem]">Item</th>
+                            <th v-for="school in schools" :key="school.school_id"
+                                class="bg-slate-800 text-white p-2 text-center border-l border-slate-700 font-bold whitespace-nowrap">
+                                {{ school.school_name.toUpperCase() }}
                             </th>
-                            <th rowspan="2" class="sticky right-0 z-20 bg-indigo-900 text-white p-2.5 text-center border-l border-slate-700 min-w-[5rem]">OVERALL</th>
-                        </tr>
-                        <tr>
-                            <!-- Deliberately no per-item category label here — the parent <th> above
-                                 already groups every item column under its category (cat.label), so
-                                 repeating it on each item cell would just add noise. -->
-                            <template v-for="cat in categories" :key="`${cat.key}-items`">
-                                <th v-for="item in cat.items" :key="item.id" :title="item.title"
-                                    class="bg-slate-700 text-white p-1.5 text-center border-l border-slate-600 font-medium whitespace-nowrap max-w-[6rem] overflow-hidden text-ellipsis">
-                                    {{ item.item_code || item.title }}
-                                </th>
-                                <th class="bg-indigo-800 text-white p-1.5 text-center border-l border-slate-600 font-bold">Sub</th>
-                            </template>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-for="(school, idx) in schools" :key="school.school_id" :class="idx % 2 ? 'bg-slate-50/60' : 'bg-white'">
-                            <td class="sticky left-0 z-10 p-2.5 font-bold text-slate-800 border-r border-slate-200"
-                                :class="idx % 2 ? 'bg-slate-50' : 'bg-white'">
-                                {{ school.school_name.toUpperCase() }}
-                            </td>
-                            <template v-for="cat in categories" :key="`${cat.key}-${school.school_id}`">
-                                <td v-for="item in cat.items" :key="item.id" class="p-1.5 text-center tabular-nums border-l border-slate-100 text-slate-600">
-                                    {{ school.points_by_item[item.id] ?? 0 }}
+                        <template v-for="cat in categories" :key="cat.key">
+                            <tr>
+                                <td :colspan="schools.length + 1" class="sticky left-0 z-10 bg-slate-800 text-white p-2 text-left font-bold">
+                                    {{ cat.label }}
                                 </td>
-                                <td class="p-1.5 text-center tabular-nums border-l border-slate-100 bg-indigo-50 font-bold text-indigo-900">
+                            </tr>
+                            <template v-for="head in cat.heads" :key="`${cat.key}-${head.head_label}`">
+                                <tr>
+                                    <td :colspan="schools.length + 1" class="sticky left-0 z-10 bg-slate-600 text-white p-1.5 pl-4 text-left font-semibold">
+                                        {{ head.head_label }}
+                                    </td>
+                                </tr>
+                                <tr v-for="(item, idx) in head.items" :key="item.id" :class="idx % 2 ? 'bg-slate-50/60' : 'bg-white'">
+                                    <td class="sticky left-0 z-10 p-2 text-slate-700 border-r border-slate-200 whitespace-nowrap overflow-hidden text-ellipsis max-w-[13rem]"
+                                        :class="idx % 2 ? 'bg-slate-50' : 'bg-white'" :title="item.title">
+                                        {{ item.item_code ? `${item.item_code} — ${item.title}` : item.title }}
+                                    </td>
+                                    <td v-for="school in schools" :key="school.school_id" class="p-1.5 text-center tabular-nums border-l border-slate-100 text-slate-600"
+                                        :title="cellBreakdownLabel(school, item.id)">
+                                        {{ cellDisplay(school, item.id) }}
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr>
+                                <td class="sticky left-0 z-10 p-2 text-left font-bold bg-indigo-50 text-indigo-900 border-r border-slate-200">
+                                    {{ cat.label }} — Subtotal
+                                </td>
+                                <td v-for="school in schools" :key="school.school_id" class="p-1.5 text-center tabular-nums border-l border-slate-100 bg-indigo-50 font-bold text-indigo-900">
                                     {{ school.category_totals[cat.key] ?? 0 }}
                                 </td>
-                            </template>
-                            <td class="sticky right-0 z-10 p-2.5 text-center tabular-nums border-l border-slate-200 bg-indigo-100 font-black text-indigo-900">
+                            </tr>
+                        </template>
+                        <tr>
+                            <td class="sticky left-0 z-10 p-2.5 text-left font-black bg-indigo-900 text-white border-r border-slate-700">OVERALL</td>
+                            <td v-for="school in schools" :key="school.school_id" class="p-2.5 text-center tabular-nums border-l border-slate-700 bg-indigo-900 font-black text-white">
                                 {{ school.overall }}
                             </td>
                         </tr>
@@ -98,6 +106,26 @@ const regionOptions = computed(() => props.childEvents.map(ev => ({
     value: String(ev.id),
     label: ev.short_title || ev.title,
 })));
+
+// A school winning an item's 1st AND 3rd (two separate participants/groups both
+// placing) shows as "5+3" rather than a bare "8", so the sheet shows how the total
+// was actually earned — same formatting FestEventReportAnalyticsService::
+// formatMatrixCell() applies to the PDF/Excel exports.
+function cellDisplay(school, itemId) {
+    const breakdown = school.breakdown_by_item?.[itemId] ?? [];
+    if (breakdown.length > 1) {
+        return breakdown.join('+');
+    }
+    const points = school.points_by_item?.[itemId] ?? 0;
+
+    return points > 0 ? points : '';
+}
+
+function cellBreakdownLabel(school, itemId) {
+    const breakdown = school.breakdown_by_item?.[itemId] ?? [];
+
+    return breakdown.length > 1 ? `${breakdown.length} results: ${breakdown.join(' + ')}` : '';
+}
 
 function switchEvent(value) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/reports/category-item-matrix`);

@@ -4,13 +4,13 @@
 body{font-family:DejaVu Sans,sans-serif;font-size:9px}
 table{width:100%;border-collapse:collapse;margin-top:10px}
 th,td{border:1px solid #ccc;padding:3px 4px;text-align:center}
-th{background:#1d3557;color:#fff;font-size:8px;font-weight:bold}
-.school-col{text-align:left;min-width:120px}
-.subtotal-col{background:#eef2f8;font-weight:bold}
-.overall-col{background:#1d3557;color:#fff;font-weight:bold}
-tbody tr:nth-child(even){background:#f7f9fc}
-tbody td.subtotal-col{background:#dde6f2}
-tbody td.overall-col{background:#c8d6ea;color:#1d3557}
+th{background:#1d3557;color:#fff;font-size:8px;font-weight:bold;white-space:nowrap}
+.item-col{text-align:left;min-width:140px}
+.category-row td{background:#1d3557;color:#fff;font-weight:bold;text-align:left;font-size:9.5px}
+.head-row td{background:#3d5a80;color:#fff;font-weight:600;text-align:left;font-size:8.5px;padding-left:14px}
+.subtotal-row td{background:#dde6f2;font-weight:bold}
+.overall-row td{background:#1d3557;color:#fff;font-weight:bold}
+tbody tr.item-row:nth-child(even){background:#f7f9fc}
 </style>
 </head><body>
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
@@ -21,36 +21,43 @@ tbody td.overall-col{background:#c8d6ea;color:#1d3557}
 <table>
     <thead>
         <tr>
-            <th class="school-col" rowspan="2">School</th>
-            @foreach($categories as $category)
-                <th colspan="{{ count($category['items']) + 1 }}">{{ $category['label'] }}</th>
-            @endforeach
-            <th rowspan="2" class="overall-col">OVERALL</th>
-        </tr>
-        <tr>
-            @foreach($categories as $category)
-                @foreach($category['items'] as $item)
-                    <th title="{{ $item['title'] }}">{{ $item['item_code'] ?: $item['title'] }}</th>
-                @endforeach
-                <th class="subtotal-col">Sub</th>
+            <th class="item-col">Item</th>
+            @foreach($schools as $school)
+                <th>{{ strtoupper($school['school_name']) }}</th>
             @endforeach
         </tr>
     </thead>
     <tbody>
-        @forelse($schools as $school)
-        <tr>
-            <td class="school-col">{{ strtoupper($school['school_name']) }}</td>
-            @foreach($categories as $category)
-                @foreach($category['items'] as $item)
-                    <td>{{ $school['points_by_item'][$item['id']] ?? 0 }}</td>
+        @forelse($categories as $category)
+            <tr class="category-row"><td colspan="{{ count($schools) + 1 }}">{{ $category['label'] }}</td></tr>
+            @foreach($category['heads'] as $head)
+                <tr class="head-row"><td colspan="{{ count($schools) + 1 }}">{{ $head['head_label'] }}</td></tr>
+                @foreach($head['items'] as $item)
+                <tr class="item-row">
+                    <td class="item-col" title="{{ $item['title'] }}">{{ $item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title'] }}</td>
+                    @foreach($schools as $school)
+                        <td>{{ $analytics->formatMatrixCell($school, $item['id']) }}</td>
+                    @endforeach
+                </tr>
                 @endforeach
-                <td class="subtotal-col">{{ $school['category_totals'][$category['key']] ?? 0 }}</td>
             @endforeach
-            <td class="overall-col">{{ $school['overall'] }}</td>
-        </tr>
+            <tr class="subtotal-row">
+                <td class="item-col">{{ $category['label'] }} — Subtotal</td>
+                @foreach($schools as $school)
+                    <td>{{ $school['category_totals'][$category['key']] ?? 0 }}</td>
+                @endforeach
+            </tr>
         @empty
         <tr><td colspan="100%">No results recorded yet.</td></tr>
         @endforelse
+        @if(count($schools))
+        <tr class="overall-row">
+            <td class="item-col">OVERALL</td>
+            @foreach($schools as $school)
+                <td>{{ $school['overall'] }}</td>
+            @endforeach
+        </tr>
+        @endif
     </tbody>
 </table>
 </body></html>

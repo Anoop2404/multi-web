@@ -891,31 +891,40 @@ class FestReportService
     {
         $matrix = $analytics->schoolItemPointsMatrix();
         $categories = $matrix['categories'];
+        $schools = $matrix['schools'];
+        $blankRow = array_fill(0, count($schools), '');
 
-        // Flat single-row header ("CAT 1: Item Name") — a true two-tier merged header
-        // needs an ExcelExport extension; this ships the same data immediately and is
-        // still fully readable in Excel/Sheets. See Documents/Fest_Improvements_Proposal.md §6.
-        $headers = ['School'];
+        // Items run down the page (rows), schools run across (columns) — there are
+        // usually far more items than schools, so this reads far better on paper than
+        // the reverse. Category/head labels are their own full-width divider rows
+        // rather than a merged header (ExcelExport's headers+rows API has no cell
+        // merging) — a common, perfectly readable Excel convention.
+        $headers = array_merge(['Item'], collect($schools)->map(fn (array $s) => strtoupper($s['school_name']))->all());
+
+        $rows = collect();
         foreach ($categories as $category) {
-            foreach ($category['items'] as $item) {
-                $headers[] = $category['label'].': '.$item['title'];
-            }
-            $headers[] = $category['label'].' — Subtotal';
-        }
-        $headers[] = 'OVERALL';
-
-        $rows = collect($matrix['schools'])->map(function (array $school) use ($categories) {
-            $row = [strtoupper($school['school_name'])];
-            foreach ($categories as $category) {
-                foreach ($category['items'] as $item) {
-                    $row[] = $school['points_by_item'][$item['id']] ?? 0;
+            $rows->push(array_merge([$category['label']], $blankRow));
+            foreach ($category['heads'] as $head) {
+                $rows->push(array_merge(['   '.$head['head_label']], $blankRow));
+                foreach ($head['items'] as $item) {
+                    $row = [$item['item_code'] ?: $item['title']];
+                    foreach ($schools as $school) {
+                        $row[] = $analytics->formatMatrixCell($school, $item['id']);
+                    }
+                    $rows->push($row);
                 }
-                $row[] = $school['category_totals'][$category['key']] ?? 0;
             }
-            $row[] = $school['overall'];
-
-            return $row;
-        });
+            $subtotalRow = [$category['label'].' — Subtotal'];
+            foreach ($schools as $school) {
+                $subtotalRow[] = $school['category_totals'][$category['key']] ?? 0;
+            }
+            $rows->push($subtotalRow);
+        }
+        $overallRow = ['OVERALL'];
+        foreach ($schools as $school) {
+            $overallRow[] = $school['overall'];
+        }
+        $rows->push($overallRow);
 
         return ExcelExport::download($this->slug().'-category-item-matrix', $headers, $rows, ExcelExport::generatedOnNote());
     }
@@ -928,6 +937,7 @@ class FestReportService
             'event'      => $this->event,
             'categories' => $matrix['categories'],
             'schools'    => $matrix['schools'],
+            'analytics'  => $analytics,
             ...$this->brandingData(),
         ], $this->slug().'-category-item-matrix.pdf', true);
     }

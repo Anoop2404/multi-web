@@ -2172,20 +2172,66 @@ class FestEventReportAnalyticsService
     }
 
     /**
-     * School × item pivot with category header bands and a per-school category subtotal
-     * plus overall grand total — the consolidated report matching the printed
-     * "OVERALL RESULT" sheet schools already produce by hand (school rows, item columns
-     * grouped under CAT1-4 headers, category subtotal columns, OVERALL column). Reuses
-     * categoryWiseItemRows() for the item/category grouping and the same points-per-mark
-     * + dedup pattern already proven in EventContext::scoreboardByCategory()/
-     * recalculateSchoolPoints() — cell values always agree with the championship
+     * Same item/category grouping as categoryWiseItemRows(), one level deeper — items
+     * within each category are further grouped by their item head (Off Stage, On
+     * Stage, Music, etc.), for the consolidated matrix's 3-tier header. Kept separate
+     * from categoryWiseItemRows() rather than changing its return shape, since that
+     * method also powers the Category-wise Points interactive report, which expects a
+     * flat item list per category.
+     *
+     * @return array<string, list<array{head_label: string, items: list<array<string, mixed>>}>>
+     */
+    private function categoryHeadItemRows(): array
+    {
+        $root = $this->event->rootEvent();
+        $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
+
+        $items = FestEventItem::whereIn('event_id', $this->eventIds())
+            ->where('is_enabled', true)
+            ->with('head')
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->get(['id', 'title', 'item_code', 'participant_type', 'head_id', $column]);
+
+        return $items
+            ->groupBy(fn (FestEventItem $item) => $item->{$column} ?: 'open')
+            ->map(fn ($group) => $group
+                ->groupBy(fn (FestEventItem $item) => $item->head_id ?: 0)
+                ->map(fn ($headGroup) => [
+                    'head_label' => $headGroup->first()->head?->name ?? 'General',
+                    'items' => $headGroup->map(fn (FestEventItem $item) => [
+                        'id'               => $item->id,
+                        'title'            => $item->title,
+                        'item_code'        => $item->item_code,
+                        'participant_type' => $item->participant_type,
+                    ])->values()->all(),
+                ])
+                ->sortBy('head_label')
+                ->values()
+                ->all())
+            ->all();
+    }
+
+    /**
+     * School × item pivot with category header bands (each further split into item-head
+     * bands) and a per-school category subtotal plus overall grand total — the
+     * consolidated report matching the printed "OVERALL RESULT" sheet schools already
+     * produce by hand (school rows, item columns grouped under CAT1-4 → head headers,
+     * category subtotal columns, OVERALL column). Reuses the same points-per-mark +
+     * dedup pattern already proven in EventContext::scoreboardByCategory()/
+     * recalculateSchoolPoints() — cell totals always agree with the championship
      * leaderboard because they're the exact same computation.
+     *
+     * Each cell also carries the individual point values that were summed into it
+     * (breakdown_by_item) — e.g. a school winning an item's 1st AND 3rd (two separate
+     * participants/groups both placing) shows as "5+3" rather than a bare "8", so a
+     * reader can see how the total was actually earned instead of just the result.
      *
      * @return array{categories: list<array<string, mixed>>, schools: list<array<string, mixed>>}
      */
     public function schoolItemPointsMatrix(): array
     {
-        $itemsByCategory = $this->categoryWiseItemRows();
+        $itemsByCategory = $this->categoryHeadItemRows();
         $gradePointService = app(FestGradePointService::class);
         $scoreboards = app(PublicFestScoreboardService::class);
 
@@ -2198,6 +2244,7 @@ class FestEventReportAnalyticsService
             ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
         $cellPoints = [];
+        $cellBreakdown = [];
         $schoolNames = [];
 
         foreach ($marks as $mark) {
@@ -2211,41 +2258,48 @@ class FestEventReportAnalyticsService
                 continue;
             }
 
+            $points = $gradePointService->pointsForMark($this->event, $mark);
             $schoolNames[$school->id] = $school->name;
-            $cellPoints[$school->id][$mark->item_id] =
-                ($cellPoints[$school->id][$mark->item_id] ?? 0) + $gradePointService->pointsForMark($this->event, $mark);
+            $cellPoints[$school->id][$mark->item_id] = ($cellPoints[$school->id][$mark->item_id] ?? 0) + $points;
+            if ($points > 0) {
+                $cellBreakdown[$school->id][$mark->item_id][] = $points;
+            }
         }
 
         $categories = collect($itemsByCategory)
-            ->map(fn (array $items, string $key) => [
+            ->map(fn (array $heads, string $key) => [
                 'key'   => $key,
                 'label' => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($this->event, $key),
-                'items' => $items,
+                'heads' => $heads,
             ])
             ->sortBy('label')
             ->values();
 
         $schools = collect($schoolNames)
-            ->map(function (string $name, string $schoolId) use ($categories, $cellPoints) {
+            ->map(function (string $name, string $schoolId) use ($categories, $cellPoints, $cellBreakdown) {
                 $points = $cellPoints[$schoolId] ?? [];
+                $breakdown = $cellBreakdown[$schoolId] ?? [];
                 $categoryTotals = [];
                 $overall = 0;
 
                 foreach ($categories as $category) {
                     $subtotal = 0;
-                    foreach ($category['items'] as $item) {
-                        $subtotal += $points[$item['id']] ?? 0;
+                    foreach ($category['heads'] as $head) {
+                        foreach ($head['items'] as $item) {
+                            $subtotal += $points[$item['id']] ?? 0;
+                        }
                     }
                     $categoryTotals[$category['key']] = $subtotal;
                     $overall += $subtotal;
                 }
 
                 return [
-                    'school_id'       => $schoolId,
-                    'school_name'     => $name,
-                    'points_by_item'  => $points,
-                    'category_totals' => $categoryTotals,
-                    'overall'         => $overall,
+                    'school_id'         => $schoolId,
+                    'school_name'       => $name,
+                    'points_by_item'    => $points,
+                    'breakdown_by_item' => $breakdown,
+                    'category_totals'   => $categoryTotals,
+                    'overall'           => $overall,
                 ];
             })
             ->sortByDesc('overall')
@@ -2256,6 +2310,19 @@ class FestEventReportAnalyticsService
             'categories' => $categories->all(),
             'schools'    => $schools,
         ];
+    }
+
+    /** "5+3" when a cell summed 2+ contributions, otherwise the plain total (or blank for 0). */
+    public function formatMatrixCell(array $school, int $itemId): string
+    {
+        $breakdown = $school['breakdown_by_item'][$itemId] ?? [];
+        if (count($breakdown) > 1) {
+            return implode('+', $breakdown);
+        }
+
+        $points = $school['points_by_item'][$itemId] ?? 0;
+
+        return $points > 0 ? (string) $points : '';
     }
 
     /**

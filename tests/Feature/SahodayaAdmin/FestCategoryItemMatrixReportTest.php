@@ -63,7 +63,7 @@ class FestCategoryItemMatrixReportTest extends TestCase
             ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/category-item-matrix")
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Sahodaya/Events/Reports/CategoryItemMatrix', false)
-                ->where('categories.0.items.0.id', $item->id)
+                ->where('categories.0.heads.0.items.0.id', $item->id)
                 ->where('schools.0.school_id', $school->id)
                 ->has('schools.0.points_by_item.'.$item->id)
                 ->has('schools.0.category_totals')
