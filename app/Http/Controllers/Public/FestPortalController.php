@@ -575,35 +575,12 @@ class FestPortalController extends Controller
         }
 
         // This event may be one phase (or one region-partition child of a phase) of a
-        // larger hub — sum this school's ISOLATED points (phaseScoreboard(), not the
-        // running/cumulative championship standing resolveScoreboard() would return) for
-        // every phase of that hub whose own leaf event(s) are publicly visible — or,
-        // same as the single-phase total above, visible via an authorized admin preview.
-        // Gated on each leaf's own results_published, deliberately NOT on FestEventPhase
-        // ::results_published — that is a separate administrative flag an admin can
-        // easily leave off even after the leaf itself is already publicly showing
-        // results, which would make this total silently drop back to the single-phase
-        // number for no visible reason.
-        $hub = $event->rootEvent();
-        $phases = FestEventPhase::where('event_id', $hub->id)->get();
-        $phaseCumulativeTotal = null;
-        if ($phases->isNotEmpty()) {
-            $sum = 0.0;
-            $anyPublished = false;
-            foreach ($phases as $phase) {
-                $leaves = FestEvent::where('parent_event_id', $hub->id)->where('source_phase_id', $phase->id)->get();
-                $leafPublished = $leaves->contains(fn (FestEvent $leaf) => $this->operationalEvents->directScope($leaf)['results_published']
-                    || $this->isAuthorizedAdminPreview($request, $leaf));
-                if (! $leafPublished) {
-                    continue;
-                }
-                $anyPublished = true;
-                $phaseRows = $this->phaseScoreboards->phaseScoreboard($phase, $category);
-                $phaseRow = collect($phaseRows)->firstWhere('school_id', $schoolId);
-                $sum += $phaseRow ? (float) $phaseRow['total_points'] : 0.0;
-            }
-            $phaseCumulativeTotal = $anyPublished ? $sum : null;
-        }
+        // larger hub — show this school's cross-phase combined total instead of just
+        // this one phase's number. See crossPhaseScoreboard()'s docblock.
+        $crossPhaseBoard = $this->crossPhaseScoreboard($event, $category, $request);
+        $phaseCumulativeTotal = $crossPhaseBoard
+            ? collect($crossPhaseBoard)->firstWhere('school_id', $schoolId)['total_points'] ?? null
+            : null;
 
         return $this->renderPublic('public.fest.school-results', $tenant, [
             'event' => $event,
@@ -890,7 +867,7 @@ public function scoreboard(Request $request, int $eventId)
     $categoryLabels = collect($categories)
         ->mapWithKeys(fn (string $key) => [$key => $this->scoreboards->categoryLabel($event, $key)])
         ->all();
-    $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview);
+    $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview, $request);
     $scoreboardTitle = $selectedScope['label'];
     if ($category) {
         $scoreboardTitle .= ' · '.($categoryLabels[$category] ?? strtoupper($category));
@@ -926,7 +903,7 @@ public function scoreboardData(Request $request, int $eventId)
     $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
     $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
-    $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview);
+    $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview, $request);
 
     return response()->json([
         'standingsPublished' => $isPublished,
@@ -1023,7 +1000,7 @@ public function tv(Request $request, int $eventId)
         ->values()
         ->all();
 
-    $dynamic = $this->scoreboardDynamicData($event, $selectedScope, null, $isPublished, $isAdminPreview);
+    $dynamic = $this->scoreboardDynamicData($event, $selectedScope, null, $isPublished, $isAdminPreview, $request);
 
     // Pre-chunked into fixed-size, non-scrolling pages server-side — nobody is at the
     // TV to scroll a tall list, so "Page N of M" slides stand in for scroll the same
@@ -1405,9 +1382,94 @@ public function tv(Request $request, int $eventId)
         return [$scoreboard, $cumulativeStanding];
     }
 
-    private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false): array
+    /**
+     * When $event is one phase (or one region-partition child of a phase) of a larger
+     * hub, every school's points here are that ONE phase's isolated total — a school's
+     * true standing across the whole hub needs every phase summed. Returns a ranked
+     * board of every school's cross-phase total, or null when $event's hub doesn't use
+     * phases at all, or no phase is visible yet (neither published nor an authorized
+     * admin preview) — callers should fall back to their own single-phase/event board
+     * in that case.
+     *
+     * Deliberately sums FestPhaseScoreboardService::phaseScoreboard() (each phase's
+     * ISOLATED points), never resolveScoreboard()'s cumulative-championship standing —
+     * that is already a running total that carries every earlier phase forward, so
+     * summing it across phases would count each earlier phase's points again for every
+     * later phase.
+     *
+     * Gated on each phase's own leaf event(s) results_published, deliberately NOT on
+     * FestEventPhase::results_published — that is a separate administrative flag an
+     * admin can easily leave off even after the leaf itself is already publicly (or, in
+     * preview, visibly) showing results, which would make this total silently drop back
+     * to the single-phase number for no visible reason.
+     *
+     * @return list<array{school_id: string, school_name: string, total_points: float, rank: int}>|null
+     */
+    private function crossPhaseScoreboard(FestEvent $event, ?string $category, Request $request): ?array
+    {
+        $hub = $event->rootEvent();
+        $phases = FestEventPhase::where('event_id', $hub->id)->get();
+        if ($phases->isEmpty()) {
+            return null;
+        }
+
+        $totals = [];
+        $names = [];
+        $anyVisible = false;
+        foreach ($phases as $phase) {
+            $leaves = FestEvent::where('parent_event_id', $hub->id)->where('source_phase_id', $phase->id)->get();
+            $leafVisible = $leaves->contains(fn (FestEvent $leaf) => $this->operationalEvents->directScope($leaf)['results_published']
+                || $this->isAuthorizedAdminPreview($request, $leaf));
+            if (! $leafVisible) {
+                continue;
+            }
+            $anyVisible = true;
+            foreach ($this->phaseScoreboards->phaseScoreboard($phase, $category) as $row) {
+                $sid = $row['school_id'];
+                $totals[$sid] = ($totals[$sid] ?? 0) + (float) $row['total_points'];
+                $names[$sid] = $row['school_name'];
+            }
+        }
+
+        if (! $anyVisible) {
+            return null;
+        }
+
+        $rank = 0;
+        $previousTotal = null;
+        $rows = [];
+        foreach (collect($totals)->sortDesc() as $schoolId => $total) {
+            if ($previousTotal === null || $total < $previousTotal) {
+                $rank++;
+            }
+            $previousTotal = $total;
+            $rows[] = [
+                'school_id' => $schoolId,
+                'school_name' => $names[$schoolId],
+                'total_points' => $total,
+                'rank' => $rank,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false, ?Request $request = null): array
     {
         [$scoreboard, $cumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished, $isAdminPreview);
+
+        // A phase/region-partition scope's own board is isolated to that one phase —
+        // "Leading Schools" should reflect each school's true standing across every
+        // visible phase of the hub instead. Only the plain scoreboard gets replaced;
+        // an existing cumulative-championship $cumulativeStanding (a different,
+        // already-hub-wide running total — see resolveScoreboard()) takes precedence
+        // when present.
+        if ($cumulativeStanding === null && $request) {
+            $crossPhaseBoard = $this->crossPhaseScoreboard($event, $category, $request);
+            if ($crossPhaseBoard !== null) {
+                $scoreboard = $crossPhaseBoard;
+            }
+        }
 
         $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
         $winnerMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
