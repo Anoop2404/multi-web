@@ -162,6 +162,21 @@
                                 </label>
                             </div>
 
+                            <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                                <p class="sm:col-span-2 font-bold text-slate-800 text-xs uppercase tracking-wider">Custom Page Size (mm)</p>
+                                <p class="sm:col-span-2 text-xs text-slate-500 -mt-1">Leave both blank to print/export this template at true A4. Set both to print at a different physical page size instead.</p>
+                                <FormField label="Width (mm)">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.page.width_mm" type="number" step="any" min="1" max="2000" class="field" placeholder="A4 default">
+                                    </template>
+                                </FormField>
+                                <FormField label="Height (mm)">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.page.height_mm" type="number" step="any" min="1" max="2000" class="field" placeholder="A4 default">
+                                    </template>
+                                </FormField>
+                            </div>
+
                             <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
                                 <p class="sm:col-span-2 md:col-span-4 font-bold text-slate-800 text-xs uppercase tracking-wider">Recipient Name Position &amp; Alignment</p>
                                 <FormField label="Top %">
@@ -781,6 +796,11 @@ function layoutDefaults(from = null) {
     const src = from || {};
     return {
         orientation: src.orientation ?? d.orientation ?? 'landscape',
+        // Null (either) means true A4 — see CertificateTemplate::pageDimensionsMm().
+        page: {
+            width_mm: src.page?.width_mm ?? d.page?.width_mm ?? null,
+            height_mm: src.page?.height_mm ?? d.page?.height_mm ?? null,
+        },
         show_recipient_name: src.show_recipient_name ?? d.show_recipient_name ?? false,
         show_participation_label: src.show_participation_label ?? d.show_participation_label ?? true,
         bold_variables: src.bold_variables ?? d.bold_variables ?? true,

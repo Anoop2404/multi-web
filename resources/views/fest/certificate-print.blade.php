@@ -13,13 +13,20 @@
         // Computed ahead of the stylesheet because the static @page rule needs it too.
         $__layout = $overlayLayout ?? (!empty($template) ? $template->overlayLayout() : \App\Models\CertificateTemplate::defaultBackgroundLayout());
         $__orientation = ($__layout['orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape';
+        // True A4 unless the admin declared a custom physical page size for this
+        // template (CertificateTemplate::pageDimensionsMm()) — already oriented to
+        // match $__orientation, so every size below can use it directly without
+        // separately branching per orientation.
+        [$__pageWidthMm, $__pageHeightMm] = \App\Models\CertificateTemplate::pageDimensionsMm($__layout, $__orientation);
+        $__canvasWidthPx = (int) round($__pageWidthMm / 25.4 * 96);
+        $__canvasHeightPx = (int) round($__pageHeightMm / 25.4 * 96);
     @endphp
     <style>
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; background: #e2e8f0; color: #1e293b; font-family: "Times New Roman", Times, serif; }
 
         @page {
-            size: A4 {{ $__orientation }};
+            size: {{ $__pageWidthMm }}mm {{ $__pageHeightMm }}mm;
             margin: 0;
         }
 
@@ -53,9 +60,9 @@
         .page.has-background {
             border: none;
             padding: 0;
-            width: 1123px;
-            height: 794px;
-            min-height: 794px;
+            width: {{ $__canvasWidthPx }}px;
+            height: {{ $__canvasHeightPx }}px;
+            min-height: {{ $__canvasHeightPx }}px;
             background-size: 100% 100%;
             background-position: center;
             background-repeat: no-repeat;
@@ -63,10 +70,15 @@
             background-color: #ffffff;
         }
 
+        {{-- Only one of .page.has-background / .page.has-background.portrait is ever
+             actually applied per render (the blade partial adds the "portrait" class
+             based on this same $__orientation) — both rules carry the same already-
+             oriented $__canvasWidthPx/$__canvasHeightPx pair rather than swapped
+             values, since whichever one matches is already correct. --}}
         .page.has-background.portrait {
-            width: 794px;
-            height: 1123px;
-            min-height: 1123px;
+            width: {{ $__canvasWidthPx }}px;
+            height: {{ $__canvasHeightPx }}px;
+            min-height: {{ $__canvasHeightPx }}px;
         }
 
         body.hide-background .page.has-background,
@@ -135,21 +147,23 @@
                 padding: 0 !important;
                 box-shadow: none !important;
             }
+            {{-- Same one-of-these-ever-applies reasoning as the screen-media rules above
+                 — both carry the same already-oriented $__pageWidthMm/$__pageHeightMm. --}}
             .page.has-background {
-                width: 297mm !important;
-                height: 210mm !important;
-                min-height: 210mm !important;
-                max-width: 297mm !important;
-                max-height: 210mm !important;
+                width: {{ $__pageWidthMm }}mm !important;
+                height: {{ $__pageHeightMm }}mm !important;
+                min-height: {{ $__pageHeightMm }}mm !important;
+                max-width: {{ $__pageWidthMm }}mm !important;
+                max-height: {{ $__pageHeightMm }}mm !important;
                 page-break-after: always;
                 break-after: page;
             }
             .page.has-background.portrait {
-                width: 210mm !important;
-                height: 297mm !important;
-                min-height: 297mm !important;
-                max-width: 210mm !important;
-                max-height: 297mm !important;
+                width: {{ $__pageWidthMm }}mm !important;
+                height: {{ $__pageHeightMm }}mm !important;
+                min-height: {{ $__pageHeightMm }}mm !important;
+                max-width: {{ $__pageWidthMm }}mm !important;
+                max-height: {{ $__pageHeightMm }}mm !important;
                 page-break-after: always;
                 break-after: page;
             }

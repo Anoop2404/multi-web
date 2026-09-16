@@ -193,18 +193,19 @@ class RenderCertificateChunkJob implements ShouldQueue
         $event = $context['event'] ?? null;
         $tenantId = $context['sahodaya']?->id ?? $this->tenantId;
         $isLandscape = ($context['overlayLayout']['orientation'] ?? 'landscape') !== 'portrait';
+        [$pageWidthMm, $pageHeightMm] = FestCertificateService::customPageDimensionsMm($context['overlayLayout'] ?? []);
 
         $directory = 'certificates/'.$tenantId.'/'.($event?->id ?? '0').'/'.$certificate->cert_type;
         $baseName = $certificate->id.'-'.$certificate->verification_uuid;
         $disk = TenantStorage::uploadDisk();
 
         $withBgHtml = view('fest.certificate-print', $context)->render();
-        $withBgPdf = PdfGenerator::render($withBgHtml, $isLandscape);
+        $withBgPdf = PdfGenerator::render($withBgHtml, $isLandscape, pageWidthMm: $pageWidthMm, pageHeightMm: $pageHeightMm);
         $withBgPath = $directory.'/'.$baseName.'.pdf';
         TenantStorage::put($withBgPath, $withBgPdf, $disk);
 
         $plainHtml = view('fest.certificate-print', array_merge($context, ['plainMode' => true]))->render();
-        $plainPdf = PdfGenerator::render($plainHtml, $isLandscape);
+        $plainPdf = PdfGenerator::render($plainHtml, $isLandscape, pageWidthMm: $pageWidthMm, pageHeightMm: $pageHeightMm);
         $plainPath = $directory.'/'.$baseName.'-plain.pdf';
         TenantStorage::put($plainPath, $plainPdf, $disk);
 

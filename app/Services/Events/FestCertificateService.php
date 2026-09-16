@@ -726,9 +726,32 @@ class FestCertificateService
         // mis-renders any portrait template on a cache miss — RenderCertificateChunkJob
         // always derives this from the template instead of relying on the default.
         $isLandscape = ($context['overlayLayout']['orientation'] ?? 'landscape') !== 'portrait';
+        [$pageWidthMm, $pageHeightMm] = self::customPageDimensionsMm($context['overlayLayout'] ?? []);
         $html = view('fest.certificate-print', array_merge($context, $plain ? ['plainMode' => true] : []))->render();
 
-        return PdfGenerator::render($html, $isLandscape);
+        return PdfGenerator::render($html, $isLandscape, pageWidthMm: $pageWidthMm, pageHeightMm: $pageHeightMm);
+    }
+
+    /**
+     * Only the admin's explicit custom size, or [null, null] — unlike
+     * CertificateTemplate::pageDimensionsMm() (which always returns a usable pair for the
+     * blade/live-preview canvas), PdfGenerator's callers should keep using its
+     * historical `format: 'A4'`/`setPaper('A4', ...)` path when no override was set,
+     * rather than switching every certificate to an explicit-mm path that happens to
+     * currently compute the same size.
+     *
+     * @return array{0: ?float, 1: ?float}
+     */
+    public static function customPageDimensionsMm(array $layout): array
+    {
+        $widthMm = $layout['page']['width_mm'] ?? null;
+        $heightMm = $layout['page']['height_mm'] ?? null;
+
+        if (is_numeric($widthMm) && is_numeric($heightMm) && $widthMm > 0 && $heightMm > 0) {
+            return [(float) $widthMm, (float) $heightMm];
+        }
+
+        return [null, null];
     }
 
     /** @param  array<string, ?string>  $cache */

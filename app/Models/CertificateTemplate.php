@@ -53,6 +53,13 @@ class CertificateTemplate extends Model
     {
         return [
             'orientation' => 'landscape',
+            // Null (either) means the historical default: true A4 (297×210mm landscape,
+            // 210×297mm portrait). Set both to print/export this template at a genuinely
+            // different physical page size instead — see pageDimensionsMm().
+            'page' => [
+                'width_mm' => null,
+                'height_mm' => null,
+            ],
             'show_recipient_name' => false,
             'show_participation_label' => true,
             'bold_variables' => true,
@@ -252,13 +259,14 @@ class CertificateTemplate extends Model
 
         $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style', 'align'];
 
-        foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover', 'photo'] as $key) {
+        foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover', 'photo', 'page'] as $key) {
             if (! isset($custom[$key]) || ! is_array($custom[$key])) {
                 continue;
             }
             $allowed = match ($key) {
                 'participation_label_cover' => ['top', 'left', 'width', 'height'],
                 'photo' => ['top', 'left', 'size'],
+                'page' => ['width_mm', 'height_mm'],
                 // Only `body` grows with variable content (achievement text, the
                 // participation items box) — `bottom` marks the artwork's fillable-zone
                 // edge for that field alone (see overlayFieldStyle()).
@@ -281,6 +289,27 @@ class CertificateTemplate extends Model
         }
 
         return $defaults;
+    }
+
+    /**
+     * This template's physical page size in mm — the admin's declared custom size when
+     * both width_mm/height_mm are set (`page` in overlayLayout()), otherwise true A4
+     * oriented to match. Always returns a usable [width, height] pair, so every caller
+     * (the print blade, the live preview canvas, PdfGenerator) can use it unconditionally
+     * instead of separately branching on "is a custom size set."
+     *
+     * @return array{0: float, 1: float}
+     */
+    public static function pageDimensionsMm(array $layout, string $orientation): array
+    {
+        $widthMm = $layout['page']['width_mm'] ?? null;
+        $heightMm = $layout['page']['height_mm'] ?? null;
+
+        if (is_numeric($widthMm) && is_numeric($heightMm) && $widthMm > 0 && $heightMm > 0) {
+            return [(float) $widthMm, (float) $heightMm];
+        }
+
+        return $orientation === 'portrait' ? [210.0, 297.0] : [297.0, 210.0];
     }
 
     /** Default body text with placeholders for training certificates. */

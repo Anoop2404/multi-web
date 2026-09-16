@@ -28,6 +28,12 @@ class PdfGenerator
      *                                    templates when those are supplied — Chromium
      *                                    reserves exactly this much space for them and
      *                                    won't let page content overlap it.
+     * @param  ?float  $pageWidthMm      Custom physical page size — already oriented (the
+     *                                    wider figure for landscape), overriding the A4
+     *                                    default. Both this and $pageHeightMm must be set
+     *                                    together; $isLandscape is ignored when they are,
+     *                                    since the dimensions already encode orientation.
+     * @param  ?float  $pageHeightMm     See $pageWidthMm.
      */
     public static function download(
         string $html,
@@ -37,17 +43,18 @@ class PdfGenerator
         ?string $headerTemplate = null,
         ?string $footerTemplate = null,
         ?array $margin = null,
+        ?float $pageWidthMm = null,
+        ?float $pageHeightMm = null,
     ) {
         $url = config('services.pdf_converter.url');
+        $hasCustomSize = $pageWidthMm && $pageHeightMm;
 
         if ($url) {
             $hasHeaderFooter = $headerTemplate !== null || $footerTemplate !== null;
 
             $payload = [
                 'html'            => $html,
-                'landscape'       => $isLandscape,
                 'printBackground' => true,
-                'format'          => 'A4',
                 'margin'          => $margin ?? [
                     'top'    => '0',
                     'bottom' => '0',
@@ -55,6 +62,14 @@ class PdfGenerator
                     'right'  => '0',
                 ],
             ];
+
+            if ($hasCustomSize) {
+                $payload['width'] = $pageWidthMm.'mm';
+                $payload['height'] = $pageHeightMm.'mm';
+            } else {
+                $payload['landscape'] = $isLandscape;
+                $payload['format'] = 'A4';
+            }
 
             if ($hasHeaderFooter) {
                 $payload['displayHeaderFooter'] = true;
@@ -84,7 +99,9 @@ class PdfGenerator
 
         // Fallback to DomPDF
         $pdf = Pdf::loadHTML($html);
-        if ($isLandscape) {
+        if ($hasCustomSize) {
+            $pdf->setPaper([0, 0, self::mmToPoints($pageWidthMm), self::mmToPoints($pageHeightMm)]);
+        } elseif ($isLandscape) {
             $pdf->setPaper('A4', 'landscape');
         }
 
@@ -123,17 +140,18 @@ class PdfGenerator
         ?string $headerTemplate = null,
         ?string $footerTemplate = null,
         ?array $margin = null,
+        ?float $pageWidthMm = null,
+        ?float $pageHeightMm = null,
     ): string {
         $url = config('services.pdf_converter.url');
+        $hasCustomSize = $pageWidthMm && $pageHeightMm;
 
         if ($url) {
             $hasHeaderFooter = $headerTemplate !== null || $footerTemplate !== null;
 
             $payload = [
                 'html'            => $html,
-                'landscape'       => $isLandscape,
                 'printBackground' => true,
-                'format'          => 'A4',
                 'margin'          => $margin ?? [
                     'top'    => '0',
                     'bottom' => '0',
@@ -141,6 +159,14 @@ class PdfGenerator
                     'right'  => '0',
                 ],
             ];
+
+            if ($hasCustomSize) {
+                $payload['width'] = $pageWidthMm.'mm';
+                $payload['height'] = $pageHeightMm.'mm';
+            } else {
+                $payload['landscape'] = $isLandscape;
+                $payload['format'] = 'A4';
+            }
 
             if ($hasHeaderFooter) {
                 $payload['displayHeaderFooter'] = true;
@@ -159,7 +185,9 @@ class PdfGenerator
 
         // Fallback to DomPDF
         $pdf = Pdf::loadHTML($html);
-        if ($isLandscape) {
+        if ($hasCustomSize) {
+            $pdf->setPaper([0, 0, self::mmToPoints($pageWidthMm), self::mmToPoints($pageHeightMm)]);
+        } elseif ($isLandscape) {
             $pdf->setPaper('A4', 'landscape');
         }
 
@@ -184,5 +212,11 @@ class PdfGenerator
         }
 
         return $pdf->output();
+    }
+
+    /** DomPDF's setPaper() takes a custom size as points (72/inch), not mm. */
+    private static function mmToPoints(float $mm): float
+    {
+        return $mm * 72 / 25.4;
     }
 }

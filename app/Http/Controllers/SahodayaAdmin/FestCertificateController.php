@@ -782,9 +782,10 @@ class FestCertificateController extends SahodayaAdminController
         // (downloadZip(), RenderCertificateChunkJob) already does.
         $context = $this->buildPreviewContext($request, $event, embedAssets: true);
         $isLandscape = ($context['overlayLayout']['orientation'] ?? 'landscape') !== 'portrait';
+        [$pageWidthMm, $pageHeightMm] = FestCertificateService::customPageDimensionsMm($context['overlayLayout'] ?? []);
         $html = view('fest.certificate-print', $context)->render();
 
-        return PdfGenerator::download($html, 'certificate-preview.pdf', true, $isLandscape);
+        return PdfGenerator::download($html, 'certificate-preview.pdf', true, $isLandscape, pageWidthMm: $pageWidthMm, pageHeightMm: $pageHeightMm);
     }
 
     /**

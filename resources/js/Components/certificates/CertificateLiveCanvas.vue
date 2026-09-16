@@ -99,7 +99,7 @@
         <div class="bg-slate-950 px-4 py-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800">
             <span class="flex items-center gap-1.5 text-emerald-400 font-semibold">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                100% Pixel-Match Canvas ({{ canvasWidth }} × {{ canvasHeight }} A4 {{ isPortrait ? 'Portrait' : 'Landscape' }})
+                100% Pixel-Match Canvas ({{ canvasWidth }} × {{ canvasHeight }} {{ isCustomPageSize ? `${pageWidthMm}×${pageHeightMm}mm` : 'A4' }} {{ isPortrait ? 'Portrait' : 'Landscape' }})
             </span>
             <span class="font-mono text-slate-500">Scale: {{ (scaleFactor * 100).toFixed(0) }}%</span>
         </div>
@@ -142,8 +142,24 @@ onUnmounted(() => {
 // Mirrors certificate-print.blade.php's own $__orientation logic: portrait swaps the
 // canvas to 794x1123 instead of the default 1123x794 landscape.
 const isPortrait = computed(() => props.layout?.orientation === 'portrait');
-const canvasWidth = computed(() => (isPortrait.value ? 794 : 1123));
-const canvasHeight = computed(() => (isPortrait.value ? 1123 : 794));
+// True A4 (at 96dpi) unless the admin declared a custom page size — mirrors
+// CertificateTemplate::pageDimensionsMm(), so the preview canvas matches the real
+// print/export dimensions exactly instead of always assuming A4.
+const pageWidthMm = computed(() => {
+    const w = Number(props.layout?.page?.width_mm);
+    const h = Number(props.layout?.page?.height_mm);
+    if (w > 0 && h > 0) return w;
+    return isPortrait.value ? 210 : 297;
+});
+const pageHeightMm = computed(() => {
+    const w = Number(props.layout?.page?.width_mm);
+    const h = Number(props.layout?.page?.height_mm);
+    if (w > 0 && h > 0) return h;
+    return isPortrait.value ? 297 : 210;
+});
+const canvasWidth = computed(() => Math.round(pageWidthMm.value / 25.4 * 96));
+const canvasHeight = computed(() => Math.round(pageHeightMm.value / 25.4 * 96));
+const isCustomPageSize = computed(() => Number(props.layout?.page?.width_mm) > 0 && Number(props.layout?.page?.height_mm) > 0);
 const aspectRatioPct = computed(() => (canvasHeight.value / canvasWidth.value) * 100);
 
 const scaleFactor = computed(() => Math.max(0.2, wrapperWidth.value / canvasWidth.value));
