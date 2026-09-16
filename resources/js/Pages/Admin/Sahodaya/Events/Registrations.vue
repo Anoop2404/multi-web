@@ -366,16 +366,23 @@
                     </FormField>
                     <!-- Existing registration warning & details for selected item -->
                     <div v-if="existingRegistrationForItem" class="rounded-lg border border-amber-200 bg-amber-50/90 p-3.5 text-xs space-y-2.5 text-amber-950">
-                        <div class="flex items-center justify-between font-semibold border-b border-amber-200/80 pb-2">
+                        <div class="flex flex-wrap items-center justify-between gap-2 font-semibold border-b border-amber-200/80 pb-2">
                             <span class="flex items-center gap-1.5 text-amber-900">
                                 <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
                                 School already has a registration for this item
                             </span>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-200 text-amber-900">
-                                {{ existingRegistrationForItem.status }}
-                            </span>
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-200 text-amber-900">
+                                    {{ existingRegistrationForItem.status }}
+                                </span>
+                                <button type="button"
+                                        class="btn-primary text-xs !py-1 !px-2.5 bg-amber-800 hover:bg-amber-900 text-white font-semibold shadow-sm"
+                                        @click="addParticipantsToExistingTeam(existingRegistrationForItem)">
+                                    + Add participants to existing team
+                                </button>
+                            </div>
                         </div>
 
                         <div v-if="existingRegistrationForItem.team_name" class="text-amber-900">
@@ -383,7 +390,7 @@
                         </div>
 
                         <div>
-                            <span class="font-semibold text-amber-900">Already Registered Performers:</span>
+                            <span class="font-semibold text-amber-900">Already Registered Performers ({{ existingRegistrationForItem.performers.length }}):</span>
                             <div v-if="existingRegistrationForItem.performers.length" class="flex flex-wrap gap-1 mt-1">
                                 <span v-for="p in existingRegistrationForItem.performers" :key="p.id" class="inline-flex items-center px-2 py-0.5 rounded bg-amber-200/80 text-amber-950 font-medium">
                                     {{ p.reg_no ? p.reg_no + ' · ' + p.name : p.name }}
@@ -393,7 +400,7 @@
                         </div>
 
                         <div>
-                            <span class="font-semibold text-amber-900">Already Registered Standbys:</span>
+                            <span class="font-semibold text-amber-900">Already Registered Standbys ({{ existingRegistrationForItem.standbys.length }}):</span>
                             <div v-if="existingRegistrationForItem.standbys.length" class="flex flex-wrap gap-1 mt-1">
                                 <span v-for="s in existingRegistrationForItem.standbys" :key="s.id" class="inline-flex items-center px-2 py-0.5 rounded bg-amber-300/70 text-amber-950 font-medium">
                                     {{ s.reg_no ? s.reg_no + ' · ' + s.name : s.name }}
@@ -401,6 +408,10 @@
                             </div>
                             <p v-else class="text-amber-700/80 italic mt-0.5">None</p>
                         </div>
+
+                        <p class="pt-1.5 border-t border-amber-200/80 text-[11px] text-amber-900 font-medium">
+                            💡 Submitting this form will append selected performers/standbys to the existing team. Or click above to open the student picker directly.
+                        </p>
                     </div>
 
                     <!-- Summary of all registered items for selected school if no item selected yet -->
@@ -797,6 +808,50 @@ const existingRegistrationForItem = computed(() => {
         r => String(r.item_id) === String(onBehalfForm.item_id)
     ) ?? null;
 });
+
+watch(existingRegistrationForItem, (existing) => {
+    if (existing) {
+        if (existing.team_name) {
+            onBehalfForm.team_name = existing.team_name;
+        } else if (selectedItemIsGroup.value && !onBehalfForm.team_name) {
+            onBehalfForm.team_name = 'Team 1';
+        }
+    } else if (selectedItemIsGroup.value && !onBehalfForm.team_name) {
+        onBehalfForm.team_name = 'Team 1';
+    }
+}, { immediate: true });
+
+watch(selectedItemIsGroup, (isGroup) => {
+    if (isGroup && !onBehalfForm.team_name) {
+        onBehalfForm.team_name = existingRegistrationForItem.value?.team_name || 'Team 1';
+    }
+});
+
+async function addParticipantsToExistingTeam(existingReg) {
+    if (!existingReg) return;
+    const regId = existingReg.id;
+
+    let targetReg = registrationsList.value.find(r => Number(r.id) === Number(regId));
+
+    if (!targetReg) {
+        targetReg = {
+            id: existingReg.id,
+            item_id: existingReg.item_id,
+            school_id: existingReg.school_id || onBehalfForm.school_id,
+            status: existingReg.status,
+            team_name: existingReg.team_name,
+            item: existingReg.item || selectedItem.value,
+            participants: (existingReg.participants || []).length ? existingReg.participants : [
+                ...(existingReg.performers || []).map(p => ({ id: p.id, student_id: p.student_id, participant_role: 'performer', student: { name: p.name, reg_no: p.reg_no } })),
+                ...(existingReg.standbys || []).map(s => ({ id: s.id, student_id: s.student_id, participant_role: 'standby', student: { name: s.name, reg_no: s.reg_no } })),
+            ],
+        };
+    }
+
+    onBehalfOpen.value = false;
+    openManageParticipants(targetReg);
+    await openAddParticipantPicker();
+}
 
 function loadSchoolStudents() {
     onBehalfForm.student_ids = [];
