@@ -1834,14 +1834,14 @@ class FestReportService
                 'school_id'       => $school->id,
                 'school_name'     => $school->name,
                 'school_prefix'   => $school->school_prefix ?? '',
-                'manager_name_1'  => $m?->manager_name_1 ?? '—',
-                'manager_phone_1' => $m?->manager_phone_1 ?? '—',
-                'manager_email_1' => $m?->manager_email_1 ?? '—',
-                'manager_role_1'  => $m?->manager_role_1 ?? 'Primary Manager',
-                'manager_name_2'  => $m?->manager_name_2 ?? '—',
-                'manager_phone_2' => $m?->manager_phone_2 ?? '—',
-                'manager_email_2' => $m?->manager_email_2 ?? '—',
-                'manager_role_2'  => $m?->manager_role_2 ?? 'Secondary Manager',
+                'manager_name_1'  => $m?->manager_name_1 ?? '',
+                'manager_phone_1' => $m?->manager_phone_1 ?? '',
+                'manager_email_1' => $m?->manager_email_1 ?? '',
+                'manager_role_1'  => $m?->manager_role_1 ?? '',
+                'manager_name_2'  => $m?->manager_name_2 ?? '',
+                'manager_phone_2' => $m?->manager_phone_2 ?? '',
+                'manager_email_2' => $m?->manager_email_2 ?? '',
+                'manager_role_2'  => $m?->manager_role_2 ?? '',
                 'notes'           => $m?->notes ?? '',
             ];
         });
@@ -1876,10 +1876,19 @@ class FestReportService
     {
         $data = $this->teamManagersData($request->input('school_id'));
 
-        return $this->renderPdf('fest.reports.team-managers', [
+        $bladeData = [
             'event'   => $this->event,
             'schools' => $data,
             ...$this->brandingData(),
-        ], $this->slug().'-team-managers.pdf');
+        ];
+
+        // Same fast-path as attendanceSheetPdf()/timesheetPdf() — skip the external
+        // Puppeteer round-trip for an on-screen preview, render the Blade view directly.
+        if ($this->preview) {
+            return response(view('fest.reports.team-managers', $bladeData)->render())
+                ->header('Content-Type', 'text/html');
+        }
+
+        return $this->renderPdf('fest.reports.team-managers', $bladeData, $this->slug().'-team-managers.pdf');
     }
 }

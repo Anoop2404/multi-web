@@ -396,6 +396,7 @@ class FestRegistrationController extends SchoolAdminController
                 'focusEventId'     => $event->id,
                 'singleEventMode'  => true,
                 'profile'          => $this->eventPaymentProfileProp(),
+                'teamManagers'     => \App\Models\FestSchoolTeamManager::where('event_id', $event->id)->where('school_id', $this->school->id)->first(),
             ],
         ));
     }
@@ -1715,8 +1716,10 @@ class FestRegistrationController extends SchoolAdminController
         return back()->with('success', "Region assigned to {$region->name}. Venues and event items updated!");
     }
 
-    public function updateTeamManagers(Request $request, string $tenantId, string $program, FestEvent $event)
+    public function updateTeamManagers(Request $request, string $tenantId, FestEvent $event, string $program = 'kalotsav')
     {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
         $data = $request->validate([
             'manager_name_1'  => 'required|string|max:255',
             'manager_phone_1' => 'required|string|max:40',

@@ -727,7 +727,7 @@
             subtitle="Enter details of up to 2 teachers/officers in-charge of your school contingent for this event."
             @close="showTeamManagersModal = false"
         >
-            <form @submit.prevent="submitTeamManagers" class="space-y-4">
+            <form id="team-managers-form" @submit.prevent="submitTeamManagers" class="space-y-4">
                 <!-- Manager 1 -->
                 <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
                     <h5 class="font-bold text-sm text-slate-800 flex items-center gap-2">
@@ -737,19 +737,19 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
-                            <input v-model="teamManagersForm.manager_name_1" type="text" class="input-text text-sm w-full" placeholder="e.g. John Doe" required />
+                            <input v-model="teamManagersForm.manager_name_1" type="text" class="field" placeholder="e.g. John Doe" required autofocus />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number *</label>
-                            <input v-model="teamManagersForm.manager_phone_1" type="tel" class="input-text text-sm w-full" placeholder="e.g. 9876543210" required />
+                            <input v-model="teamManagersForm.manager_phone_1" type="tel" class="field" placeholder="e.g. 9876543210" required />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
-                            <input v-model="teamManagersForm.manager_email_1" type="email" class="input-text text-sm w-full" placeholder="e.g. manager@school.com" />
+                            <input v-model="teamManagersForm.manager_email_1" type="email" class="field" placeholder="e.g. manager@school.com" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Designation / Role</label>
-                            <input v-model="teamManagersForm.manager_role_1" type="text" class="input-text text-sm w-full" placeholder="e.g. Team Manager / Teacher In-Charge" />
+                            <input v-model="teamManagersForm.manager_role_1" type="text" class="field" placeholder="e.g. Team Manager / Teacher In-Charge" />
                         </div>
                     </div>
                 </div>
@@ -763,30 +763,34 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
-                            <input v-model="teamManagersForm.manager_name_2" type="text" class="input-text text-sm w-full" placeholder="e.g. Jane Smith" />
+                            <input v-model="teamManagersForm.manager_name_2" type="text" class="field" placeholder="e.g. Jane Smith" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
-                            <input v-model="teamManagersForm.manager_phone_2" type="tel" class="input-text text-sm w-full" placeholder="e.g. 9876543211" />
+                            <input v-model="teamManagersForm.manager_phone_2" type="tel" class="field" placeholder="e.g. 9876543211" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
-                            <input v-model="teamManagersForm.manager_email_2" type="email" class="input-text text-sm w-full" placeholder="e.g. assistant@school.com" />
+                            <input v-model="teamManagersForm.manager_email_2" type="email" class="field" placeholder="e.g. assistant@school.com" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Designation / Role</label>
-                            <input v-model="teamManagersForm.manager_role_2" type="text" class="input-text text-sm w-full" placeholder="e.g. Assistant Team Manager" />
+                            <input v-model="teamManagersForm.manager_role_2" type="text" class="field" placeholder="e.g. Assistant Team Manager" />
                         </div>
                     </div>
                 </div>
 
-                <div class="flex justify-end gap-3 pt-2 border-t border-slate-100">
-                    <button type="button" class="btn-ghost text-sm" @click="showTeamManagersModal = false">Cancel</button>
-                    <button type="submit" class="btn-primary text-sm" :disabled="teamManagersForm.processing">
-                        {{ teamManagersForm.processing ? 'Saving...' : 'Save Team Managers' }}
-                    </button>
-                </div>
+                <p v-if="teamManagersForm.errors.manager_name_1 || teamManagersForm.errors.manager_phone_1" class="text-xs text-red-600">
+                    {{ teamManagersForm.errors.manager_name_1 || teamManagersForm.errors.manager_phone_1 }}
+                </p>
             </form>
+
+            <template #footer>
+                <button type="button" class="btn-ghost text-sm" @click="showTeamManagersModal = false">Cancel</button>
+                <button type="submit" form="team-managers-form" class="btn-primary text-sm" :disabled="teamManagersForm.processing">
+                    {{ teamManagersForm.processing ? 'Saving...' : 'Save Team Managers' }}
+                </button>
+            </template>
         </Modal>
     </SchoolAdminLayout>
 </template>

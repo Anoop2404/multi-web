@@ -42,16 +42,21 @@
         }
         td {
             border: 1px solid #e2e8f0;
-            padding: 6px 8px;
+            padding: 10px 8px;
             font-size: 11px;
             color: #334155;
             vertical-align: top;
+            line-height: 1.8;
         }
         tr:nth-child(even) {
             background-color: #f8fafc;
         }
         .text-center { text-align: center; }
         .font-bold { font-weight: bold; }
+        .manager-name {
+            display: block;
+            margin-bottom: 5px;
+        }
         .manager-role {
             font-size: 9.5px;
             color: #64748b;
@@ -62,7 +67,7 @@
 <body>
     @include('partials.pdf-branding-header', ['orgName' => $orgName ?? 'Sahodaya', 'logoSrc' => $logoSrc ?? null])
 
-    <h2>School Team Managers & Contingent Officials</h2>
+    <h2>School Team Managers</h2>
     <div class="meta">{{ $event->title }}</div>
 
     <table>
@@ -82,24 +87,20 @@
                         <span class="font-bold">{{ $row->school_name }}</span>
                     </td>
                     <td>
-                        <span class="font-bold">{{ $row->manager_name_1 }}</span>
-                        @if($row->manager_phone_1 !== '—')
-                            <br>📞 {{ $row->manager_phone_1 }}
+                        @if($row->manager_name_1)
+                            <span class="font-bold manager-name">{{ $row->manager_name_1 }}</span>
                         @endif
-                        @if($row->manager_email_1 !== '—')
-                            <br>✉️ {{ $row->manager_email_1 }}
+                        @if($row->manager_phone_1)
+                            <span>📞 {{ $row->manager_phone_1 }}</span>
                         @endif
-                        <span class="manager-role">{{ $row->manager_role_1 }}</span>
                     </td>
                     <td>
-                        <span class="font-bold">{{ $row->manager_name_2 }}</span>
-                        @if($row->manager_phone_2 !== '—')
-                            <br>📞 {{ $row->manager_phone_2 }}
+                        @if($row->manager_name_2)
+                            <span class="font-bold manager-name">{{ $row->manager_name_2 }}</span>
                         @endif
-                        @if($row->manager_email_2 !== '—')
-                            <br>✉️ {{ $row->manager_email_2 }}
+                        @if($row->manager_phone_2)
+                            <span>📞 {{ $row->manager_phone_2 }}</span>
                         @endif
-                        <span class="manager-role">{{ $row->manager_role_2 }}</span>
                     </td>
                 </tr>
             @empty
