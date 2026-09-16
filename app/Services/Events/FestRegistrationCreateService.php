@@ -95,6 +95,39 @@ class FestRegistrationCreateService
         }
 
         if ($event->event_type === 'teacher_fest') {
+            $existingReg = FestRegistration::whereIn('event_id', $event->reportableEventIds())
+                ->where('school_id', $school->id)
+                ->where('item_id', $item->id)
+                ->whereIn('status', ['submitted', 'pending_approval', 'approved', 'waitlisted'])
+                ->with('participants')
+                ->first();
+
+            if ($existingReg) {
+                $existingTeacherIds = $existingReg->participants
+                    ->pluck('teacher_id')
+                    ->filter()
+                    ->all();
+
+                $newTeachers = array_diff($performerIds, $existingTeacherIds);
+                if (empty($newTeachers)) {
+                    throw ValidationException::withMessages([
+                        'student_ids' => 'The selected teacher(s) are already registered for this item.',
+                    ]);
+                }
+
+                $mergedTeacherIds = array_values(array_unique(array_merge($existingTeacherIds, $performerIds)));
+
+                return $this->updateTeacherRegistration(
+                    $existingReg,
+                    $event,
+                    $item,
+                    $school,
+                    $mergedTeacherIds,
+                    app(FestSchoolEventFeeService::class),
+                    (float) (app(FestSchoolEventFeeService::class)->currentFeeRecordFor($event, $school->id)?->total_due ?? 0),
+                );
+            }
+
             return $this->createTeacherRegistration($event, $item, $school, $performerIds);
         }
 
@@ -106,6 +139,53 @@ class FestRegistrationCreateService
         }
 
         $isGroup = FestTeamSquadRules::hasSquadRules($item);
+
+        $existingReg = FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->where('school_id', $school->id)
+            ->where('item_id', $item->id)
+            ->whereIn('status', ['submitted', 'pending_approval', 'approved', 'waitlisted'])
+            ->with(['participants', 'group'])
+            ->first();
+
+        if ($existingReg) {
+            $existingPerformerIds = $existingReg->participants
+                ->where('participant_role', 'performer')
+                ->pluck('student_id')
+                ->filter()
+                ->all();
+
+            $existingStandbyIds = $existingReg->participants
+                ->where('participant_role', 'standby')
+                ->pluck('student_id')
+                ->filter()
+                ->all();
+
+            $newPerformers = array_diff($performerIds, $existingPerformerIds);
+            $newStandbys = array_diff($standbyIds, $existingStandbyIds);
+
+            if (empty($newPerformers) && empty($newStandbys)) {
+                throw ValidationException::withMessages([
+                    'student_ids' => 'The selected participant(s) are already registered for this item.',
+                ]);
+            }
+
+            $mergedPerformerIds = array_values(array_unique(array_merge($existingPerformerIds, $performerIds)));
+            $mergedStandbyIds = array_values(array_unique(array_merge($existingStandbyIds, $standbyIds)));
+            $mergedStandbyIds = array_values(array_diff($mergedStandbyIds, $mergedPerformerIds));
+
+            return $this->updateForSchool(
+                $existingReg,
+                $event,
+                $item,
+                $school,
+                $mergedPerformerIds,
+                $mergedStandbyIds,
+                filled($teamName) ? $teamName : $existingReg->group?->team_name,
+                $teamContacts,
+                $adminOverride,
+            );
+        }
+
         if ($isGroup) {
             if (! filled($teamName)) {
                 $teamName = $this->nextDefaultTeamName($event, $item, $school);
@@ -118,26 +198,6 @@ class FestRegistrationCreateService
             $maxAllowed = (int) ($item->max_per_school ?? 1);
             if (count($performerIds) > $maxAllowed) {
                 throw ValidationException::withMessages(['student_ids' => "Maximum {$maxAllowed} participant".($maxAllowed === 1 ? '' : 's').' allowed for this item.']);
-            }
-
-            $existingReg = FestRegistration::whereIn('event_id', $event->reportableEventIds())
-                ->where('school_id', $school->id)
-                ->where('item_id', $item->id)
-                ->whereIn('status', ['submitted', 'pending_approval', 'approved'])
-                ->first();
-
-            if ($existingReg) {
-                return $this->updateForSchool(
-                    $existingReg,
-                    $event,
-                    $item,
-                    $school,
-                    $performerIds,
-                    $standbyIds,
-                    $teamName,
-                    $teamContacts,
-                    $adminOverride,
-                );
             }
         }
 
@@ -437,14 +497,15 @@ class FestRegistrationCreateService
 
             $groupId = null;
             if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
+                $existingGroup = $registration->group;
                 $group = FestGroup::updateOrCreate(
                     ['registration_id' => $registration->id],
                     [
-                        'team_name'     => $teamName,
-                        'coach_name'    => filled($teamContacts['coach_name'] ?? null) ? trim((string) $teamContacts['coach_name']) : null,
-                        'coach_phone'   => filled($teamContacts['coach_phone'] ?? null) ? trim((string) $teamContacts['coach_phone']) : null,
-                        'manager_name'  => filled($teamContacts['manager_name'] ?? null) ? trim((string) $teamContacts['manager_name']) : null,
-                        'manager_phone' => filled($teamContacts['manager_phone'] ?? null) ? trim((string) $teamContacts['manager_phone']) : null,
+                        'team_name'     => filled($teamName) ? $teamName : ($existingGroup?->team_name ?: $this->nextDefaultTeamName($event, $item, $school, $registration->id)),
+                        'coach_name'    => filled($teamContacts['coach_name'] ?? null) ? trim((string) $teamContacts['coach_name']) : $existingGroup?->coach_name,
+                        'coach_phone'   => filled($teamContacts['coach_phone'] ?? null) ? trim((string) $teamContacts['coach_phone']) : $existingGroup?->coach_phone,
+                        'manager_name'  => filled($teamContacts['manager_name'] ?? null) ? trim((string) $teamContacts['manager_name']) : $existingGroup?->manager_name,
+                        'manager_phone' => filled($teamContacts['manager_phone'] ?? null) ? trim((string) $teamContacts['manager_phone']) : $existingGroup?->manager_phone,
                     ],
                 );
                 $groupId = $group->id;

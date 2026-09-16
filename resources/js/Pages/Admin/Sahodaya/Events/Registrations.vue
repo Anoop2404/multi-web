@@ -694,7 +694,11 @@ const selectedItem = computed(() =>
 );
 
 const selectedItemIsGroup = computed(() =>
-    selectedItem.value && ['team', 'group', 'pair', 'trio'].includes(selectedItem.value.participant_type),
+    selectedItem.value && (
+        ['team', 'group', 'pair', 'trio'].includes(selectedItem.value.participant_type)
+        || Boolean(selectedItem.value.min_group_size)
+        || Boolean(selectedItem.value.max_group_size)
+    ),
 );
 
 const pickerSubtitle = computed(() => {
