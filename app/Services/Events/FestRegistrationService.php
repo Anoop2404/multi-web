@@ -251,8 +251,11 @@ class FestRegistrationService
         if ($item && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
             if ($role === 'performer') {
                 $performerCount = $registration->participants->where('participant_role', '!=', 'standby')->count();
-                $error = $item->validateSquadCount($performerCount + 1);
-                abort_if($error, 422, $error);
+                $rules = $item->squadRules();
+                $maxSquad = $rules?->maxSquad ?? $item->max_group_size;
+                if ($maxSquad && ($performerCount + 1) > $maxSquad) {
+                    abort(422, "This item allows at most {$maxSquad} participant(s) in the squad.");
+                }
             } else {
                 $standbyCount = $registration->participants->where('participant_role', 'standby')->count();
                 $maxStandbys = $item->squadRules()?->standbys ?? 2;
