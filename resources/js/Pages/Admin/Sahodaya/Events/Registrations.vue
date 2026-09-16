@@ -315,7 +315,7 @@
             :subtitle="manageRegItemTitleWithGender"
             :entries="addParticipantEntries"
             v-model:selected-ids="addParticipantSelectedIds"
-            :max-selected="1"
+            :max-selected="addParticipantMaxSelected"
             :allow-ineligible="true"
             confirm-label="Add"
             :show-add-student="false"
@@ -939,6 +939,46 @@ async function fetchEligibleStudents(reg, search = '') {
     }
 }
 
+const addParticipantMaxSelected = computed(() => {
+    if (!manageReg.value) return 1;
+    const item = props.eventItems.find(i => Number(i.id) === Number(manageReg.value.item_id)) || manageReg.value.item;
+    if (!item) return 1;
+
+    const role = addParticipantRole.value;
+
+    if (role === 'standby') {
+        const currentStandbysCount = (manageReg.value.participants || [])
+            .filter(p => p.participant_role === 'standby').length;
+        const maxStandbys = item.criteria_json?.standbys ?? item.squad_rules?.standbys ?? 2;
+        return Math.max(1, maxStandbys - currentStandbysCount);
+    }
+
+    const currentPerformersCount = (manageReg.value.participants || [])
+        .filter(p => p.participant_role !== 'standby').length;
+
+    const isGroup = ['team', 'group', 'pair', 'trio'].includes(item.participant_type)
+        || Boolean(item.min_group_size)
+        || Boolean(item.max_group_size);
+
+    if (isGroup) {
+        const maxSquad = item.max_group_size
+            ?? item.criteria_json?.max_squad
+            ?? item.criteria_json?.max_group_size
+            ?? item.criteria_json?.max_playing
+            ?? item.squad_rules?.maxSquad
+            ?? item.squad_rules?.maxPlaying
+            ?? null;
+
+        if (maxSquad) {
+            return Math.max(1, maxSquad - currentPerformersCount);
+        }
+        return 20;
+    }
+
+    const maxAllowed = Number(item.max_per_school ?? 1);
+    return Math.max(1, maxAllowed - currentPerformersCount);
+});
+
 async function openAddParticipantPicker() {
     if (!manageReg.value) return;
     addParticipantSelectedIds.value = [];
@@ -961,19 +1001,29 @@ async function searchAddParticipantStudents(query) {
 
 async function submitAddParticipant() {
     const reg = manageReg.value;
-    const studentId = addParticipantSelectedIds.value[0];
-    if (!reg || !studentId) return;
+    const studentIds = addParticipantSelectedIds.value;
+    if (!reg || !studentIds || !studentIds.length) return;
     if (reg.item?.results_published_at) {
         const ok = await confirm({
-            message: `Results for "${reg.item?.title}" are already published. Adding a participant now won't automatically appear in the published results until you re-publish. Continue?`,
+            message: `Results for "${reg.item?.title}" are already published. Adding participant(s) now won't automatically appear in the published results until you re-publish. Continue?`,
             destructive: true,
         });
         if (!ok) return;
     }
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${reg.id}/participants`,
-        { student_id: studentId, role: addParticipantRole.value },
-        { preserveScroll: true, onSuccess: () => refreshManageReg(reg.id) },
+        {
+            student_id: studentIds[0],
+            student_ids: studentIds,
+            role: addParticipantRole.value,
+        },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                addParticipantPickerOpen.value = false;
+                refreshManageReg(reg.id);
+            },
+        },
     );
 }
 

@@ -634,15 +634,35 @@ class FestRegistrationReviewController extends SahodayaAdminController
         abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
 
         $data = $request->validate([
-            'student_id' => 'required|integer|exists:students,id',
-            'role'       => 'required|in:performer,standby',
+            'student_id'    => 'nullable|integer|exists:students,id',
+            'student_ids'   => 'nullable|array',
+            'student_ids.*' => 'integer|exists:students,id',
+            'role'          => 'required|in:performer,standby',
         ]);
 
-        $student = Student::where('id', $data['student_id'])->where('tenant_id', $registration->school_id)->firstOrFail();
+        $studentIds = array_values(array_filter(array_unique(array_merge(
+            ! empty($data['student_ids']) ? $data['student_ids'] : [],
+            ! empty($data['student_id']) ? [$data['student_id']] : []
+        ))));
 
-        app(FestRegistrationService::class)->addParticipant($registration, $event, $student, $data['role']);
+        if (empty($studentIds)) {
+            throw ValidationException::withMessages(['student_id' => 'Select at least one student to add.']);
+        }
 
-        return back()->with('success', "Added {$student->name} to the registration.");
+        $students = Student::whereIn('id', $studentIds)->where('tenant_id', $registration->school_id)->get();
+        abort_if($students->count() !== count($studentIds), 403);
+
+        $service = app(FestRegistrationService::class);
+        $addedNames = [];
+        foreach ($students as $student) {
+            $registration->unsetRelation('participants');
+            $service->addParticipant($registration, $event, $student, $data['role']);
+            $addedNames[] = $student->name;
+        }
+
+        $namesStr = implode(', ', $addedNames);
+
+        return back()->with('success', "Added {$namesStr} to the registration.");
     }
 
     public function removeParticipant(string $tenantId, FestEvent $event, FestRegistration $registration, FestParticipant $participant)
