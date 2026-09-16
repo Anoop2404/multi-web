@@ -577,12 +577,13 @@ class FestPortalController extends Controller
         // This event may be one phase (or one region-partition child of a phase) of a
         // larger hub — sum this school's ISOLATED points (phaseScoreboard(), not the
         // running/cumulative championship standing resolveScoreboard() would return) for
-        // every phase of that hub whose own leaf event(s) are publicly visible. Gated on
-        // each leaf's own results_published, deliberately NOT on FestEventPhase::results_
-        // published — that is a separate administrative flag an admin can easily leave
-        // off even after the leaf itself is already publicly showing results, which would
-        // make this total silently drop back to the single-phase number for no visible
-        // reason.
+        // every phase of that hub whose own leaf event(s) are publicly visible — or,
+        // same as the single-phase total above, visible via an authorized admin preview.
+        // Gated on each leaf's own results_published, deliberately NOT on FestEventPhase
+        // ::results_published — that is a separate administrative flag an admin can
+        // easily leave off even after the leaf itself is already publicly showing
+        // results, which would make this total silently drop back to the single-phase
+        // number for no visible reason.
         $hub = $event->rootEvent();
         $phases = FestEventPhase::where('event_id', $hub->id)->get();
         $phaseCumulativeTotal = null;
@@ -591,7 +592,8 @@ class FestPortalController extends Controller
             $anyPublished = false;
             foreach ($phases as $phase) {
                 $leaves = FestEvent::where('parent_event_id', $hub->id)->where('source_phase_id', $phase->id)->get();
-                $leafPublished = $leaves->contains(fn (FestEvent $leaf) => $this->operationalEvents->directScope($leaf)['results_published']);
+                $leafPublished = $leaves->contains(fn (FestEvent $leaf) => $this->operationalEvents->directScope($leaf)['results_published']
+                    || $this->isAuthorizedAdminPreview($request, $leaf));
                 if (! $leafPublished) {
                     continue;
                 }
