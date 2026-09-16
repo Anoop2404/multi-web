@@ -642,7 +642,9 @@ class FestReportService
             'school-participation-xls' => $this->schoolParticipationXls(),
             'student-limits-pdf' => $this->studentLimitsPdf($request),
             'student-limits-xls' => $this->studentLimitsXls($request),
-            default => abort(404, 'Unknown export type'),
+            'team-managers' => $this->teamManagersXls($request),
+            'team-managers-pdf' => $this->teamManagersPdf($request),
+            default => abort(404, "Report type '{$type}' not supported."),
         };
     }
 
@@ -1804,5 +1806,80 @@ class FestReportService
         return ExcelExport::download($this->slug().'-student-participation', [
             'Reg No', 'Name', 'School', 'Item', 'Class Group', 'Chest No', 'Level Reg No',
         ], $rows, ExcelExport::generatedOnNote());
+    }
+
+    public function teamManagersData(?string $schoolId = null): Collection
+    {
+        $schoolId = $this->scopedSchoolId($schoolId);
+
+        $participatingSchoolIds = FestRegistration::whereIn('event_id', $this->eventIds())
+            ->when($this->scope?->isActorRestricted, fn ($q) => $q->whereIn('school_id', $this->scope->schoolIds))
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->active()
+            ->pluck('school_id')
+            ->unique();
+
+        $schools = Tenant::whereIn('id', $participatingSchoolIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'school_prefix']);
+
+        $managers = \App\Models\FestSchoolTeamManager::whereIn('event_id', $this->eventIds())
+            ->get()
+            ->keyBy('school_id');
+
+        return $schools->map(function ($school) use ($managers) {
+            $m = $managers->get($school->id);
+
+            return (object) [
+                'school_id'       => $school->id,
+                'school_name'     => $school->name,
+                'school_prefix'   => $school->school_prefix ?? '',
+                'manager_name_1'  => $m?->manager_name_1 ?? '—',
+                'manager_phone_1' => $m?->manager_phone_1 ?? '—',
+                'manager_email_1' => $m?->manager_email_1 ?? '—',
+                'manager_role_1'  => $m?->manager_role_1 ?? 'Primary Manager',
+                'manager_name_2'  => $m?->manager_name_2 ?? '—',
+                'manager_phone_2' => $m?->manager_phone_2 ?? '—',
+                'manager_email_2' => $m?->manager_email_2 ?? '—',
+                'manager_role_2'  => $m?->manager_role_2 ?? 'Secondary Manager',
+                'notes'           => $m?->notes ?? '',
+            ];
+        });
+    }
+
+    private function teamManagersXls(Request $request): StreamedResponse
+    {
+        $data = $this->teamManagersData($request->input('school_id'));
+
+        $rows = $data->map(fn ($r) => [
+            $r->school_name,
+            $r->manager_name_1,
+            $r->manager_phone_1,
+            $r->manager_email_1,
+            $r->manager_role_1,
+            $r->manager_name_2,
+            $r->manager_phone_2,
+            $r->manager_email_2,
+            $r->manager_role_2,
+            $r->notes,
+        ]);
+
+        return ExcelExport::download($this->slug().'-team-managers', [
+            'School Name',
+            'Manager 1 Name', 'Manager 1 Phone', 'Manager 1 Email', 'Manager 1 Role',
+            'Manager 2 Name', 'Manager 2 Phone', 'Manager 2 Email', 'Manager 2 Role',
+            'Notes',
+        ], $rows, ExcelExport::generatedOnNote());
+    }
+
+    private function teamManagersPdf(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $data = $this->teamManagersData($request->input('school_id'));
+
+        return $this->renderPdf('fest.reports.team-managers', [
+            'event'   => $this->event,
+            'schools' => $data,
+            ...$this->brandingData(),
+        ], $this->slug().'-team-managers.pdf');
     }
 }

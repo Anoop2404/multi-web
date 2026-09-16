@@ -208,6 +208,7 @@ class FestRegistrationController extends SchoolAdminController
             'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
             'focusEventId'    => $focusEventId,
             'profile'         => $this->eventPaymentProfileProp(),
+            'teamManagers'    => $focusEventId ? \App\Models\FestSchoolTeamManager::where('event_id', $focusEventId)->where('school_id', $this->school->id)->first() : null,
         ]);
     }
 
@@ -1712,5 +1713,32 @@ class FestRegistrationController extends SchoolAdminController
         app(\App\Services\Events\FestRegionPartitionService::class)->syncSchoolAcrossHubs($sahodayaId, $this->school->id);
 
         return back()->with('success', "Region assigned to {$region->name}. Venues and event items updated!");
+    }
+
+    public function updateTeamManagers(Request $request, string $tenantId, string $program, FestEvent $event)
+    {
+        $data = $request->validate([
+            'manager_name_1'  => 'required|string|max:255',
+            'manager_phone_1' => 'required|string|max:40',
+            'manager_email_1' => 'nullable|email|max:255',
+            'manager_role_1'  => 'nullable|string|max:100',
+            'manager_name_2'  => 'nullable|string|max:255',
+            'manager_phone_2' => 'nullable|string|max:40',
+            'manager_email_2' => 'nullable|email|max:255',
+            'manager_role_2'  => 'nullable|string|max:100',
+            'notes'           => 'nullable|string|max:1000',
+        ]);
+
+        \App\Models\FestSchoolTeamManager::updateOrCreate(
+            [
+                'event_id'  => $event->id,
+                'school_id' => $this->school->id,
+            ],
+            array_merge($data, [
+                'tenant_id' => $this->school->parent_id,
+            ])
+        );
+
+        return back()->with('success', 'Team managers updated successfully.');
     }
 }

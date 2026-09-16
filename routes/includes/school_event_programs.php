@@ -115,6 +115,9 @@ foreach ($festPrograms as $cfg) {
         Route::post('/events/{event}/payment', [FestRegistrationController::class, 'uploadEventPayment'])
             ->defaults('program', $slug)
             ->name('event.payment');
+        Route::post('/events/{event}/team-managers', [FestRegistrationController::class, 'updateTeamManagers'])
+            ->defaults('program', $slug)
+            ->name('event.team-managers');
         Route::get('/events/{event}/receipt', [FestRegistrationController::class, 'feeReceipt'])
             ->defaults('program', $slug)
             ->name('event.receipt');

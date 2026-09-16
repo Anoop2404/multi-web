@@ -84,6 +84,8 @@ class FestReportCatalog
         'student-participation',
         'certificate-counts',
         'age-group-matrix',
+        'team-managers',
+        'team-managers-pdf',
     ];
 
     public static function isSchoolSafe(string $exportId): bool
@@ -164,6 +166,8 @@ class FestReportCatalog
             ['id' => 'school-participation-xls', 'label' => 'School Participation Counts (Excel)', 'format' => 'xls', 'params' => ['region_id', 'competition_phase_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'student-limits-pdf', 'label' => 'Student Item Limits (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'student-limits-xls', 'label' => 'Student Item Limits (Excel)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'team-managers', 'label' => 'School Team Managers & Contingent Officials (Excel)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'team-managers-pdf', 'label' => 'School Team Managers & Contingent Officials (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
         ];
 
         return array_map(
@@ -263,6 +267,8 @@ class FestReportCatalog
         // unlike every other export above. See FestReportController::studentLimits()'s docblock.
         'student-limits-pdf'            => ['dataset' => 'registration', 'supported_scopes' => ['self'], 'supports_competition_phase' => false],
         'student-limits-xls'            => ['dataset' => 'registration', 'supported_scopes' => ['self'], 'supports_competition_phase' => false],
+        'team-managers'                 => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'team-managers-pdf'             => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
     ];
 
     /** @return list<array<string, string>> */

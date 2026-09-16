@@ -19,6 +19,10 @@
                 <button v-if="events.length" type="button" class="btn-secondary text-sm" @click="showBulkImport = !showBulkImport">
                     Import CSV
                 </button>
+                <button v-if="focusEvent?.id" type="button" class="btn-secondary text-sm flex items-center gap-1.5" @click="openTeamManagersModal">
+                    <span>👔</span>
+                    <span>{{ teamManagers?.manager_name_1 ? 'Edit Team Managers' : 'Team Managers' }}</span>
+                </button>
                 <a :href="`${programBase}/reports`" class="btn-secondary text-sm">All events reports →</a>
             </template>
         </PageHeader>
@@ -56,6 +60,38 @@
                                     :is-sports="isSports"
                                     :current-step="getTab(focusEvent.id) === 'athletes' ? 'event-reg' : (getTab(focusEvent.id) === 'items' ? 'item-reg' : 'payment')"
                                     @select-step="step => setTab(focusEvent.id, step.tab)" />
+
+        <!-- Contingent Team Managers Banner -->
+        <div v-if="focusEvent?.id" class="mb-5 max-w-4xl card p-4 border-indigo-100 bg-white shadow-xs flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg shrink-0">
+                    👔
+                </div>
+                <div>
+                    <h4 class="font-semibold text-slate-900 text-sm">School Contingent Team Managers</h4>
+                    <p v-if="teamManagers?.manager_name_1" class="text-xs text-slate-600 mt-0.5">
+                        <span class="font-medium text-slate-800">Manager 1:</span> {{ teamManagers.manager_name_1 }} ({{ teamManagers.manager_phone_1 || 'No phone' }})
+                        <span v-if="teamManagers.manager_name_2" class="ml-2 pl-2 border-l border-slate-200"><span class="font-medium text-slate-800">Manager 2:</span> {{ teamManagers.manager_name_2 }} ({{ teamManagers.manager_phone_2 || 'No phone' }})</span>
+                    </p>
+                    <p v-else class="text-xs text-amber-700 mt-0.5">
+                        Please enter the Team Manager(s) / In-Charge Teacher(s) details for your school contingent in this event.
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <a v-if="teamManagers?.manager_name_1"
+                   :href="`${programBase}/reports/${focusEvent.id}/export/team-managers-pdf?preview=1`"
+                   target="_blank"
+                   rel="noopener"
+                   class="btn-secondary text-xs flex items-center gap-1">
+                    <span>📄</span>
+                    <span>Preview PDF ↗</span>
+                </a>
+                <button type="button" class="btn-secondary text-xs" @click="openTeamManagersModal">
+                    {{ teamManagers?.manager_name_1 ? 'Edit Team Managers' : '+ Add Team Managers' }}
+                </button>
+            </div>
+        </div>
 
 
 
@@ -683,6 +719,75 @@
             :school-classes="schoolClasses"
             :student-edit-lock="studentEditLock"
         />
+
+        <Modal
+            :show="showTeamManagersModal"
+            size="lg"
+            title="School Contingent Team Managers"
+            subtitle="Enter details of up to 2 teachers/officers in-charge of your school contingent for this event."
+            @close="showTeamManagersModal = false"
+        >
+            <form @submit.prevent="submitTeamManagers" class="space-y-4">
+                <!-- Manager 1 -->
+                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                    <h5 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                        <span class="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+                        <span>Primary Team Manager / In-Charge Teacher</span>
+                    </h5>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
+                            <input v-model="teamManagersForm.manager_name_1" type="text" class="input-text text-sm w-full" placeholder="e.g. John Doe" required />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number *</label>
+                            <input v-model="teamManagersForm.manager_phone_1" type="tel" class="input-text text-sm w-full" placeholder="e.g. 9876543210" required />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+                            <input v-model="teamManagersForm.manager_email_1" type="email" class="input-text text-sm w-full" placeholder="e.g. manager@school.com" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Designation / Role</label>
+                            <input v-model="teamManagersForm.manager_role_1" type="text" class="input-text text-sm w-full" placeholder="e.g. Team Manager / Teacher In-Charge" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manager 2 -->
+                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                    <h5 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                        <span class="w-5 h-5 rounded-full bg-slate-500 text-white text-xs flex items-center justify-center font-bold">2</span>
+                        <span>Secondary Team Manager / Assistant In-Charge (Optional)</span>
+                    </h5>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                            <input v-model="teamManagersForm.manager_name_2" type="text" class="input-text text-sm w-full" placeholder="e.g. Jane Smith" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+                            <input v-model="teamManagersForm.manager_phone_2" type="tel" class="input-text text-sm w-full" placeholder="e.g. 9876543211" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+                            <input v-model="teamManagersForm.manager_email_2" type="email" class="input-text text-sm w-full" placeholder="e.g. assistant@school.com" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Designation / Role</label>
+                            <input v-model="teamManagersForm.manager_role_2" type="text" class="input-text text-sm w-full" placeholder="e.g. Assistant Team Manager" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-2 border-t border-slate-100">
+                    <button type="button" class="btn-ghost text-sm" @click="showTeamManagersModal = false">Cancel</button>
+                    <button type="submit" class="btn-primary text-sm" :disabled="teamManagersForm.processing">
+                        {{ teamManagersForm.processing ? 'Saving...' : 'Save Team Managers' }}
+                    </button>
+                </div>
+            </form>
+        </Modal>
     </SchoolAdminLayout>
 </template>
 
@@ -691,6 +796,7 @@ import { computed, reactive, ref, onMounted, watch } from 'vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import QuickAddStudentModal from '@/Components/school/QuickAddStudentModal.vue';
+import Modal from '@/Components/ui/Modal.vue';
 import FestRegistrationItemRow from '@/Components/school/FestRegistrationItemRow.vue';
 import SportsEventAthletesPanel from '@/Components/school/SportsEventAthletesPanel.vue';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
@@ -729,6 +835,7 @@ const props = defineProps({
     studentEditLock: { type: Object, default: () => ({ locked: false }) },
     schoolRegion: { type: Object, default: null },
     profile: { type: Object, default: null },
+    teamManagers: { type: Object, default: null },
 });
 
 const paymentDetails = computed(() => focusEvent.value?.payment_details_text || props.profile?.payment_details_text || '');
@@ -955,6 +1062,47 @@ const importForm = useForm({ event_id: '', file: null });
 const showAddStudent = ref(false);
 const showBulkImport = ref(false);
 const showBulkAssign = ref(false);
+const showTeamManagersModal = ref(false);
+
+const teamManagersForm = useForm({
+    manager_name_1: props.teamManagers?.manager_name_1 || '',
+    manager_phone_1: props.teamManagers?.manager_phone_1 || '',
+    manager_email_1: props.teamManagers?.manager_email_1 || '',
+    manager_role_1: props.teamManagers?.manager_role_1 || 'Team Manager / Teacher In-Charge',
+    manager_name_2: props.teamManagers?.manager_name_2 || '',
+    manager_phone_2: props.teamManagers?.manager_phone_2 || '',
+    manager_email_2: props.teamManagers?.manager_email_2 || '',
+    manager_role_2: props.teamManagers?.manager_role_2 || 'Assistant Team Manager / Teacher',
+});
+
+watch(() => props.teamManagers, (newVal) => {
+    if (newVal) {
+        teamManagersForm.manager_name_1 = newVal.manager_name_1 || '';
+        teamManagersForm.manager_phone_1 = newVal.manager_phone_1 || '';
+        teamManagersForm.manager_email_1 = newVal.manager_email_1 || '';
+        teamManagersForm.manager_role_1 = newVal.manager_role_1 || 'Team Manager / Teacher In-Charge';
+        teamManagersForm.manager_name_2 = newVal.manager_name_2 || '';
+        teamManagersForm.manager_phone_2 = newVal.manager_phone_2 || '';
+        teamManagersForm.manager_email_2 = newVal.manager_email_2 || '';
+        teamManagersForm.manager_role_2 = newVal.manager_role_2 || 'Assistant Team Manager / Teacher';
+    }
+}, { immediate: true });
+
+function openTeamManagersModal() {
+    showTeamManagersModal.value = true;
+}
+
+function submitTeamManagers() {
+    if (!focusEvent.value?.id) return;
+    teamManagersForm.post(`${programBase.value}/events/${focusEvent.value.id}/team-managers`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showTeamManagersModal.value = false;
+            showSuccess('Team Managers saved successfully!');
+        }
+    });
+}
+
 const bulkAssignEventId = ref('');
 const bulkAssignStudentIds = ref([]);
 const bulkAssignItemIds = ref([]);
