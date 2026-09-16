@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Public\Concerns\RendersPublicPages;
 use App\Models\FestAthleticRecord;
 use App\Models\FestEvent;
+use App\Models\FestEventPhase;
 use App\Models\FestEventItem;
 use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestMark;
@@ -574,14 +575,33 @@ class FestPortalController extends Controller
         }
 
         // This event may be one phase (or one region-partition child of a phase) of a
-        // larger hub — §7.3a's cumulative-overall total sums this school's points across
-        // every published phase of that hub, not just the one this page happens to show.
-        // See FestPhaseScoreboardService's class docblock for why this is a separate axis
-        // from the region-partition combine $schoolRow above already reflects.
+        // larger hub — sum this school's ISOLATED points (phaseScoreboard(), not the
+        // running/cumulative championship standing resolveScoreboard() would return) for
+        // every phase of that hub whose own leaf event(s) are publicly visible. Gated on
+        // each leaf's own results_published, deliberately NOT on FestEventPhase::results_
+        // published — that is a separate administrative flag an admin can easily leave
+        // off even after the leaf itself is already publicly showing results, which would
+        // make this total silently drop back to the single-phase number for no visible
+        // reason.
         $hub = $event->rootEvent();
-        $phaseCumulativeTotal = $this->phaseScoreboards->usesPhases($hub)
-            ? collect($this->phaseScoreboards->cumulativeOverall($hub, $category))->firstWhere('school_id', $schoolId)['total_points'] ?? null
-            : null;
+        $phases = FestEventPhase::where('event_id', $hub->id)->get();
+        $phaseCumulativeTotal = null;
+        if ($phases->isNotEmpty()) {
+            $sum = 0.0;
+            $anyPublished = false;
+            foreach ($phases as $phase) {
+                $leaves = FestEvent::where('parent_event_id', $hub->id)->where('source_phase_id', $phase->id)->get();
+                $leafPublished = $leaves->contains(fn (FestEvent $leaf) => $this->operationalEvents->directScope($leaf)['results_published']);
+                if (! $leafPublished) {
+                    continue;
+                }
+                $anyPublished = true;
+                $phaseRows = $this->phaseScoreboards->phaseScoreboard($phase, $category);
+                $phaseRow = collect($phaseRows)->firstWhere('school_id', $schoolId);
+                $sum += $phaseRow ? (float) $phaseRow['total_points'] : 0.0;
+            }
+            $phaseCumulativeTotal = $anyPublished ? $sum : null;
+        }
 
         return $this->renderPublic('public.fest.school-results', $tenant, [
             'event' => $event,
