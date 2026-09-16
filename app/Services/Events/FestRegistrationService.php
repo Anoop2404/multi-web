@@ -249,8 +249,15 @@ class FestRegistrationService
         $item = $registration->item;
         $groupId = null;
         if ($item && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
-            $error = $item->validateSquadCount($registration->participants->count() + 1);
-            abort_if($error, 422, $error);
+            if ($role === 'performer') {
+                $performerCount = $registration->participants->where('participant_role', '!=', 'standby')->count();
+                $error = $item->validateSquadCount($performerCount + 1);
+                abort_if($error, 422, $error);
+            } else {
+                $standbyCount = $registration->participants->where('participant_role', 'standby')->count();
+                $maxStandbys = $item->squadRules()?->standbys ?? 2;
+                abort_if($standbyCount >= $maxStandbys, 422, "At most {$maxStandbys} standby(s) allowed.");
+            }
 
             // Team/group rows are grouped by group_id everywhere they're displayed (e.g.
             // FestChestNumberController::teamRows()) — without this, a newly-added member

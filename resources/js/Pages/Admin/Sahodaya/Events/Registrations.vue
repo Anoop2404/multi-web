@@ -316,6 +316,7 @@
             :entries="addParticipantEntries"
             v-model:selected-ids="addParticipantSelectedIds"
             :max-selected="1"
+            :allow-ineligible="true"
             confirm-label="Add"
             :show-add-student="false"
             @confirm="submitAddParticipant"

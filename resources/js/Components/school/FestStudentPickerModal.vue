@@ -77,7 +77,7 @@
                         <li v-for="entry in visibleEntries" :key="entry.id">
                             <label
                                 class="flex items-start gap-3 px-5 py-2.5 cursor-pointer transition-colors"
-                                :class="entry.eligible
+                                :class="entry.eligible || allowIneligible
                                     ? 'hover:bg-slate-50'
                                     : 'bg-slate-50/60 cursor-not-allowed opacity-75'"
                             >
@@ -86,7 +86,7 @@
                                     class="rounded mt-1 shrink-0"
                                     :value="entry.id"
                                     :checked="localSelected.includes(entry.id)"
-                                    :disabled="!entry.eligible"
+                                    :disabled="!entry.eligible && !allowIneligible"
                                     @change="toggleId(entry.id)"
                                 >
                                 <span class="min-w-0 flex-1">
@@ -172,6 +172,7 @@ const props = defineProps({
     minSelected: { type: Number, default: null },
     maxSelected: { type: Number, default: null },
     showAddStudent: { type: Boolean, default: true },
+    allowIneligible: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -188,7 +189,7 @@ const emit = defineEmits([
 ]);
 
 const search = ref('');
-const showIneligible = ref(false);
+const showIneligible = ref(props.allowIneligible);
 const eventRegisteredOnly = ref(false);
 const localSelected = ref([]);
 const localTeamName = ref('');
@@ -197,6 +198,10 @@ const localCoachPhone = ref('');
 const localManagerName = ref('');
 const localManagerPhone = ref('');
 const searchInput = ref(null);
+
+watch(() => props.allowIneligible, (val) => {
+    if (val) showIneligible.value = true;
+});
 
 const ineligibleCount = computed(() => props.entries.filter(e => !e.eligible).length);
 const hasIneligible = computed(() => ineligibleCount.value > 0);
@@ -210,7 +215,7 @@ const filteredEligible = computed(() => props.entries.filter(e => e.eligible));
 
 const visibleEntries = computed(() => {
     const q = search.value.trim().toLowerCase();
-    let pool = showIneligible.value ? props.entries : props.entries.filter(e => e.eligible);
+    let pool = (showIneligible.value || props.allowIneligible) ? props.entries : props.entries.filter(e => e.eligible);
 
     if (eventRegisteredOnly.value) {
         pool = pool.filter(e => e.eventRegistered);
