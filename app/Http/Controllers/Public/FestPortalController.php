@@ -573,11 +573,22 @@ class FestPortalController extends Controller
             ];
         }
 
+        // This event may be one phase (or one region-partition child of a phase) of a
+        // larger hub — §7.3a's cumulative-overall total sums this school's points across
+        // every published phase of that hub, not just the one this page happens to show.
+        // See FestPhaseScoreboardService's class docblock for why this is a separate axis
+        // from the region-partition combine $schoolRow above already reflects.
+        $hub = $event->rootEvent();
+        $phaseCumulativeTotal = $this->phaseScoreboards->usesPhases($hub)
+            ? collect($this->phaseScoreboards->cumulativeOverall($hub, $category))->firstWhere('school_id', $schoolId)['total_points'] ?? null
+            : null;
+
         return $this->renderPublic('public.fest.school-results', $tenant, [
             'event' => $event,
             'eventContext' => $this->operationalEvents->publicContext($event),
             'school' => $school,
             'schoolRow' => $schoolRow,
+            'phaseCumulativeTotal' => $phaseCumulativeTotal,
             'roster' => $roster,
             // Named activeCategory*, not category* — the view's own @foreach groups the
             // roster by each row's category LABEL using a loop variable also called

@@ -19,7 +19,7 @@
             @else
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'school']) }}" class="text-sm font-semibold text-amber-400 hover:underline">← Back to all schools</a>
             @endif
-            <span class="text-2xl font-mono font-extrabold text-amber-400">{{ $schoolRow['total_points'] }} <small class="text-xs text-white/40 font-sans font-bold uppercase tracking-wide">pts total</small></span>
+            <span class="text-2xl font-mono font-extrabold text-amber-400">{{ $phaseCumulativeTotal ?? $schoolRow['total_points'] }} <small class="text-xs text-white/40 font-sans font-bold uppercase tracking-wide">pts total</small></span>
         </div>
 
         @if($activeCategory)
