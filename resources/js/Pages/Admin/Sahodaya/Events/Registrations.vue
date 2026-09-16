@@ -318,9 +318,10 @@
             :max-selected="addParticipantMaxSelected"
             :allow-ineligible="true"
             confirm-label="Add"
-            :show-add-student="false"
+            :show-add-student="true"
             @confirm="submitAddParticipant"
             @search="searchAddParticipantStudents"
+            @add-student="handleOpenQuickAddStudent('addParticipant')"
         />
 
         <div v-if="onBehalfOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -498,6 +499,7 @@
             :require-team-name="selectedItemIsGroup"
             confirm-label="Use selection"
             @update:team-name="onBehalfForm.team_name = $event"
+            @add-student="handleOpenQuickAddStudent('performer')"
         />
 
         <FestStudentPickerModal
@@ -507,7 +509,62 @@
             :entries="standbyRosterEntries"
             v-model:selected-ids="onBehalfForm.standby_ids"
             confirm-label="Use selection"
+            @add-student="handleOpenQuickAddStudent('standby')"
         />
+
+        <!-- Quick Add Student Modal -->
+        <div v-if="quickAddStudentOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="cancelQuickAddStudent"></div>
+            <div class="relative modal-shell max-w-md w-full flex flex-col overflow-hidden bg-white shadow-2xl rounded-2xl">
+                <div class="modal-head shrink-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between z-10">
+                    <div>
+                        <h3 class="font-bold text-[#041525] text-base">Quick Add Student</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Add student for <span class="font-semibold text-slate-700">{{ quickAddStudentSchoolName }}</span></p>
+                    </div>
+                    <button type="button" class="text-slate-400 hover:text-slate-600 text-2xl leading-none px-1" @click="cancelQuickAddStudent">&times;</button>
+                </div>
+                <form @submit.prevent="submitQuickAddStudent" class="p-6 space-y-4 overflow-y-auto">
+                    <FormField label="Full Name" required>
+                        <input v-model="quickAddStudentForm.name" type="text" class="field text-sm" placeholder="Full name of student" required autocomplete="off">
+                    </FormField>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <FormField label="Gender" required>
+                            <SearchableSelect
+                                v-model="quickAddStudentForm.gender"
+                                :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
+                                :all-option="false"
+                            />
+                        </FormField>
+
+                        <FormField label="Date of Birth">
+                            <input v-model="quickAddStudentForm.dob" type="date" class="field text-sm">
+                        </FormField>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <FormField label="Class / Grade">
+                            <SearchableSelect
+                                v-model="quickAddStudentForm.school_class_id"
+                                :options="quickAddStudentClasses.map(c => ({ value: c.id, label: c.name }))"
+                                all-label="Select class"
+                            />
+                        </FormField>
+
+                        <FormField label="Admission Number">
+                            <input v-model="quickAddStudentForm.admission_number" type="text" class="field text-sm" placeholder="Admission no (optional)">
+                        </FormField>
+                    </div>
+
+                    <div class="modal-foot shrink-0 border-t border-slate-200 bg-white pt-4 flex items-center justify-end gap-3">
+                        <button type="button" class="btn-ghost text-sm" @click="cancelQuickAddStudent">Cancel</button>
+                        <button type="submit" class="btn-primary text-sm min-w-[140px]" :disabled="quickAddStudentSubmitting || !quickAddStudentForm.name">
+                            {{ quickAddStudentSubmitting ? 'Saving…' : 'Save & Select Student' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>
@@ -522,7 +579,9 @@ import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import FestStudentPickerModal from '@/Components/school/FestStudentPickerModal.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import FormField from '@/Components/ui/FormField.vue';
 import { useConfirm } from '@/composables/useConfirm';
+import { useSweetAlert } from '@/composables/useSweetAlert.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -556,6 +615,194 @@ const filterDescription = computed(() => {
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const { confirm, prompt } = useConfirm();
+const { showSuccess, showError } = useSweetAlert();
+
+const localRegisterStudents = ref([...(props.registerStudents ?? [])]);
+watch(() => props.registerStudents, (val) => {
+    localRegisterStudents.value = [...(val ?? [])];
+}, { deep: true });
+
+const quickAddStudentOpen = ref(false);
+const quickAddStudentSubmitting = ref(false);
+const quickAddStudentSource = ref('addParticipant');
+const quickAddStudentClasses = ref([]);
+const quickAddStudentForm = reactive({
+    school_id: '',
+    name: '',
+    gender: 'male',
+    dob: '',
+    admission_number: '',
+    school_class_id: '',
+});
+
+const quickAddStudentSchoolName = computed(() => {
+    if (!quickAddStudentForm.school_id) return '';
+    return props.schoolNames?.[quickAddStudentForm.school_id]
+        ?? props.schools?.[quickAddStudentForm.school_id]
+        ?? 'School #' + quickAddStudentForm.school_id;
+});
+
+async function handleOpenQuickAddStudent(source) {
+    quickAddStudentSource.value = source;
+    let targetSchoolId = '';
+    if (source === 'addParticipant' && manageReg.value) {
+        targetSchoolId = manageReg.value.school_id;
+    } else {
+        targetSchoolId = onBehalfForm.school_id;
+    }
+
+    if (!targetSchoolId) {
+        showError('Select a school first before adding a student.', 'No School Selected');
+        return;
+    }
+
+    quickAddStudentForm.school_id = targetSchoolId;
+    quickAddStudentForm.name = '';
+    quickAddStudentForm.gender = 'male';
+    quickAddStudentForm.dob = '';
+    quickAddStudentForm.admission_number = '';
+    quickAddStudentForm.school_class_id = '';
+    quickAddStudentClasses.value = [];
+
+    if (source === 'addParticipant') addParticipantPickerOpen.value = false;
+    if (source === 'performer') performerPickerOpen.value = false;
+    if (source === 'standby') standbyPickerOpen.value = false;
+
+    quickAddStudentOpen.value = true;
+
+    try {
+        const res = await fetch(`${base}/school-classes/${targetSchoolId}`, {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+        if (res.ok) {
+            const data = await res.json();
+            quickAddStudentClasses.value = data.classes ?? [];
+        }
+    } catch (e) {
+        console.error('Failed to load school classes:', e);
+    }
+}
+
+function cancelQuickAddStudent() {
+    quickAddStudentOpen.value = false;
+    if (quickAddStudentSource.value === 'addParticipant') addParticipantPickerOpen.value = true;
+    if (quickAddStudentSource.value === 'performer') performerPickerOpen.value = true;
+    if (quickAddStudentSource.value === 'standby') standbyPickerOpen.value = true;
+}
+
+async function submitQuickAddStudent() {
+    if (!quickAddStudentForm.name || !quickAddStudentForm.gender || !quickAddStudentForm.school_id) return;
+
+    quickAddStudentSubmitting.value = true;
+    try {
+        let itemId = null;
+        let registrationId = null;
+        if (quickAddStudentSource.value === 'addParticipant' && manageReg.value) {
+            registrationId = manageReg.value.id;
+            itemId = manageReg.value.item_id;
+        } else if (onBehalfForm.item_id) {
+            itemId = onBehalfForm.item_id;
+        }
+
+        const res = await fetch(`${base}/quick-store-student`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+            body: JSON.stringify({
+                school_id: quickAddStudentForm.school_id,
+                name: quickAddStudentForm.name,
+                gender: quickAddStudentForm.gender,
+                dob: quickAddStudentForm.dob || null,
+                admission_number: quickAddStudentForm.admission_number || null,
+                school_class_id: quickAddStudentForm.school_class_id || null,
+                item_id: itemId,
+                registration_id: registrationId,
+            }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            const errorMsg = data.message || Object.values(data.errors || {}).flat().join(' ') || 'Failed to add student';
+            showError(errorMsg, 'Creation Failed');
+            quickAddStudentSubmitting.value = false;
+            return;
+        }
+
+        const student = data.student;
+        if (student) {
+            if (quickAddStudentSource.value === 'addParticipant') {
+                const entry = studentRowToEntry({
+                    ...student,
+                    eligible: student.eligible !== false,
+                });
+                addParticipantEntries.value = [entry, ...addParticipantEntries.value];
+                if (!addParticipantSelectedIds.value.includes(student.id)) {
+                    addParticipantSelectedIds.value = [...addParticipantSelectedIds.value, student.id];
+                }
+                addParticipantPickerOpen.value = true;
+            } else if (quickAddStudentSource.value === 'performer') {
+                const rawStudent = {
+                    id: student.id,
+                    name: student.name,
+                    reg_no: student.reg_no,
+                    admission_number: student.admission_number,
+                    gender: student.gender,
+                    dob: student.dob,
+                    class_name: student.class_name,
+                    academic_year_id: student.academic_year_id,
+                    eligible_kalolsav: student.eligible_kalolsav,
+                    eligible_kids_fest: student.eligible_kids_fest,
+                    kalolsav_class_group: student.kalolsav_class_group,
+                    kids_fest_band: student.kids_fest_band,
+                    sports_age_group: student.sports_age_group,
+                    eligible_sports_groups: student.eligible_sports_groups,
+                    sports_age_on_cutoff: student.sports_age_on_cutoff,
+                };
+                localRegisterStudents.value = [rawStudent, ...localRegisterStudents.value];
+                if (!onBehalfForm.student_ids.includes(student.id)) {
+                    onBehalfForm.student_ids = [...onBehalfForm.student_ids, student.id];
+                }
+                performerPickerOpen.value = true;
+            } else if (quickAddStudentSource.value === 'standby') {
+                const rawStudent = {
+                    id: student.id,
+                    name: student.name,
+                    reg_no: student.reg_no,
+                    admission_number: student.admission_number,
+                    gender: student.gender,
+                    dob: student.dob,
+                    class_name: student.class_name,
+                    academic_year_id: student.academic_year_id,
+                    eligible_kalolsav: student.eligible_kalolsav,
+                    eligible_kids_fest: student.eligible_kids_fest,
+                    kalolsav_class_group: student.kalolsav_class_group,
+                    kids_fest_band: student.kids_fest_band,
+                    sports_age_group: student.sports_age_group,
+                    eligible_sports_groups: student.eligible_sports_groups,
+                    sports_age_on_cutoff: student.sports_age_on_cutoff,
+                };
+                localRegisterStudents.value = [rawStudent, ...localRegisterStudents.value];
+                if (!onBehalfForm.standby_ids.includes(student.id)) {
+                    onBehalfForm.standby_ids = [...onBehalfForm.standby_ids, student.id];
+                }
+                standbyPickerOpen.value = true;
+            }
+        }
+
+        quickAddStudentOpen.value = false;
+        showSuccess(`Added ${student.name} (${student.reg_no || 'New'}) and selected for registration.`, 'Student Added');
+    } catch (e) {
+        console.error('Error storing student:', e);
+        showError('An error occurred while adding the student.', 'Error');
+    } finally {
+        quickAddStudentSubmitting.value = false;
+    }
+}
 
 function navigateEvent(eventId) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${eventId}/registrations`);
@@ -766,7 +1013,7 @@ function ineligibilityReason(student, item) {
 function buildRosterEntries(excludeIds = []) {
     const item = selectedItem.value;
     if (!item) return [];
-    return (props.registerStudents ?? []).map((student) => {
+    return (localRegisterStudents.value ?? []).map((student) => {
         const eligible = !excludeIds.includes(student.id) && studentMatchesItem(student, item);
         return {
             id: student.id,
@@ -783,7 +1030,7 @@ const rosterEntries = computed(() => buildRosterEntries(onBehalfForm.standby_ids
 const standbyRosterEntries = computed(() => buildRosterEntries(onBehalfForm.student_ids));
 
 function studentLabel(id) {
-    const s = props.registerStudents.find(st => st.id === id);
+    const s = localRegisterStudents.value.find(st => st.id === id);
     if (!s) return `#${id}`;
     return s.reg_no ? `${s.reg_no} · ${s.name}` : s.name;
 }

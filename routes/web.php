@@ -1220,6 +1220,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/registrations', [FestRegistrationReviewController::class, 'index'])->name('registrations.index');
             Route::get('/{event}/registrations/approved-pdf', [FestRegistrationReviewController::class, 'printApproved'])->name('registrations.approved-pdf');
             Route::post('/{event}/registrations/on-behalf', [FestRegistrationReviewController::class, 'storeOnBehalf'])->name('registrations.on-behalf');
+            Route::get('/{event}/school-classes/{schoolId}', [FestRegistrationReviewController::class, 'schoolClasses'])->name('registrations.school-classes');
+            Route::post('/{event}/quick-store-student', [FestRegistrationReviewController::class, 'quickStoreStudent'])->name('registrations.quick-store-student');
             Route::post('/{event}/registrations/bulk-approve', [FestRegistrationReviewController::class, 'bulkApprove'])->name('registrations.bulk-approve');
             Route::post('/{event}/registrations/bulk-reject', [FestRegistrationReviewController::class, 'bulkReject'])->name('registrations.bulk-reject');
             Route::get('/{event}/registrations/import-template', [FestRegistrationReviewController::class, 'importTemplate'])->name('registrations.import-template');

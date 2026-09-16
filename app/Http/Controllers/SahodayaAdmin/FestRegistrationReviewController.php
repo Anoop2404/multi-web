@@ -27,6 +27,8 @@ use App\Services\Events\FestRegistrationEligibilityService;
 use App\Services\Events\FestRegistrationService;
 use App\Services\Events\FestSchoolEventFeeService;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Students\StudentRecordCreator;
+use App\Models\SchoolClass;
 use App\Support\AcademicYear;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -626,6 +628,80 @@ class FestRegistrationReviewController extends SahodayaAdminController
         })->values();
 
         return response()->json(['students' => $rows]);
+    }
+
+    public function schoolClasses(string $tenantId, FestEvent $event, string $schoolId)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $school = Tenant::findOrFail($schoolId);
+        abort_if($school->parent_id !== $this->sahodaya->id, 403);
+
+        $classes = SchoolClass::where('tenant_id', $school->id)
+            ->active()
+            ->orderBy('display_order')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json(['classes' => $classes]);
+    }
+
+    public function quickStoreStudent(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'school_id'        => 'required|exists:central.tenants,id',
+            'name'             => 'required|string|max:255',
+            'gender'           => 'required|in:male,female,other',
+            'dob'              => 'nullable|date|before:today',
+            'admission_number' => 'nullable|string|max:100',
+            'school_class_id'  => 'nullable|integer|exists:school_classes,id',
+            'item_id'          => 'nullable|integer|exists:fest_event_items,id',
+            'registration_id'  => 'nullable|integer|exists:fest_registrations,id',
+        ]);
+
+        $school = Tenant::findOrFail($data['school_id']);
+        abort_if($school->parent_id !== $this->sahodaya->id, 403);
+
+        $creator = app(StudentRecordCreator::class);
+        $student = $creator->create($school, [
+            'name'             => $data['name'],
+            'gender'           => $data['gender'],
+            'dob'              => $data['dob'] ?? null,
+            'admission_number' => $data['admission_number'] ?? null,
+            'school_class_id'  => $data['school_class_id'] ?? null,
+        ]);
+
+        $student->load('schoolClass');
+        $annotated = app(FestRegistrationEligibilityService::class)
+            ->annotateStudents(collect([$student]), $event, $school->id)
+            ->first();
+
+        $item = null;
+        if (! empty($data['item_id'])) {
+            $item = FestEventItem::find($data['item_id']);
+        } elseif (! empty($data['registration_id'])) {
+            $reg = FestRegistration::find($data['registration_id']);
+            $item = $reg?->item;
+        }
+
+        $isEligible = true;
+        if ($item && $annotated) {
+            $eligibleIds = app(FestRegistrationEligibilityService::class)
+                ->filterEligibleForItem(collect([$annotated]), $event, $item)
+                ->pluck('id')
+                ->all();
+            $isEligible = in_array($student->id, $eligibleIds, true);
+        }
+
+        if ($annotated) {
+            $annotated['eligible'] = $isEligible;
+        }
+
+        return response()->json([
+            'student' => $annotated,
+            'message' => "Student {$student->name} added successfully.",
+        ]);
     }
 
     public function addParticipant(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration)
