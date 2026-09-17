@@ -9,7 +9,7 @@
         <!-- Stats cards -->
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6 mt-4">
             <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold text-slate-800">{{ leaderboard.length }}</p>
+                <p class="text-xl font-bold text-slate-800">{{ activeLeaderboard.length }}</p>
                 <p class="text-xs text-slate-500 mt-1">Ranked students</p>
             </div>
             <div class="card card--muted !py-4 text-center">
@@ -23,8 +23,19 @@
         </div>
 
         <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-            <p class="text-sm text-gray-600">IC points leaderboard from published marks.</p>
-            <button @click="recalculate" class="btn-primary text-xs">Recalculate from marks</button>
+            <p class="text-sm text-gray-600">
+                {{ scope === 'cumulative' ? 'Summed across every phase\'s own published leaderboard for this hub.' : 'IC points leaderboard from published marks.' }}
+            </p>
+            <button v-if="scope === 'phase'" @click="recalculate" class="btn-primary text-xs">Recalculate from marks</button>
+        </div>
+
+        <div v-if="usesPhases" class="flex gap-2 mb-4">
+            <button type="button" class="btn-secondary text-xs" :class="{ '!bg-indigo-600 !text-white': scope === 'phase' }" @click="scope = 'phase'">
+                This phase
+            </button>
+            <button type="button" class="btn-secondary text-xs" :class="{ '!bg-indigo-600 !text-white': scope === 'cumulative' }" @click="scope = 'cumulative'">
+                Cumulative — all phases
+            </button>
         </div>
 
         <!-- Filters panel -->
@@ -120,7 +131,7 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b"><tr>
-                        <th class="p-3 text-left">Category rank</th><th class="p-3 text-left">Student</th>
+                        <th class="p-3 text-left">Rank (category · gender)</th><th class="p-3 text-left">Student</th>
                         <th class="p-3 text-left">School</th><th class="p-3 text-left">Category</th>
                         <th class="p-3 text-right">Points</th><th class="p-3 text-right">Overall rank</th>
                     </tr></thead>
@@ -160,14 +171,22 @@ const props = defineProps({
     categoryOptions: { type: Array, default: () => [] },
     categoryMergeGroups: { type: Array, default: () => [] },
     excludedOverallCategories: { type: Array, default: () => [] },
+    usesPhases: { type: Boolean, default: false },
+    cumulativeLeaderboard: { type: Array, default: () => [] },
 });
+
+// 'phase' = this single phase's own leaderboard (the pre-existing view); 'cumulative'
+// = every phase's leaderboard summed per student, only offered at all when this hub
+// actually uses phases.
+const scope = ref('phase');
+const activeLeaderboard = computed(() => (scope.value === 'cumulative' ? props.cumulativeLeaderboard : props.leaderboard));
 
 const filterCategory = ref('');
 const filterGender = ref('');
 
 const categories = computed(() => {
     const set = new Set();
-    for (const row of props.leaderboard ?? []) {
+    for (const row of activeLeaderboard.value ?? []) {
         if (row.category) set.add(row.category.toLowerCase());
     }
     return [...set];
@@ -212,7 +231,7 @@ function saveExcludedCategories() {
 }
 
 const stats = computed(() => {
-    const points = (props.leaderboard ?? []).map(r => Number(r.points || 0));
+    const points = (activeLeaderboard.value ?? []).map(r => Number(r.points || 0));
     return {
         top_points: points.length ? Math.max(...points) : 0,
         total_points: points.reduce((a, b) => a + b, 0),
@@ -220,7 +239,7 @@ const stats = computed(() => {
 });
 
 const filteredLeaderboard = computed(() => {
-    let list = props.leaderboard ?? [];
+    let list = activeLeaderboard.value ?? [];
     if (filterCategory.value) {
         list = list.filter(r => String(r.category).toLowerCase() === filterCategory.value.toLowerCase());
     }

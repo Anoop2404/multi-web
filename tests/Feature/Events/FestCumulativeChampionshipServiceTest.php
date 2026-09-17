@@ -49,14 +49,13 @@ class FestCumulativeChampionshipServiceTest extends TestCase
         $this->assertSame(10.0, $northStanding['rows'][0]['phase_points']);
         $this->assertSame(20.0, $northStanding['rows'][0]['closing_points']);
 
+        // The public scoreboard shows just the plain combined total per school (no
+        // opening/this-event/closing breakdown) — that ledger detail still lives on the
+        // results page's school tab, asserted below.
         $this->get("http://ledger.test/fest/{$north->id}/scoreboard")
             ->assertOk()
-            ->assertSee('Championship standing after Off Stage')
-            ->assertSee('Official snapshot v1')
-            ->assertSee('Opening')
-            ->assertSee('This Event')
-            ->assertSee('Phase Total')
-            ->assertSee('Closing');
+            ->assertSee('Continuity School')
+            ->assertSee('20');
 
         $this->get("http://ledger.test/fest/{$north->id}/results?tab=school")
             ->assertOk()

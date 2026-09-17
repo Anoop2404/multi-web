@@ -2,13 +2,6 @@
     $maxPoints = collect($scoreboard ?? [])->max('total_points') ?: 0;
 @endphp
 
-@if($cumulativeStanding ?? null)
-<div class="mb-6 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-    <div><p class="text-sm font-extrabold text-emerald-200">Championship standing after {{ $cumulativeStanding['phase']->name }}</p><p class="text-xs text-emerald-100/70 mt-0.5">Opening balance is carried forward; every regional contribution is counted exactly once.</p></div>
-    <span class="shrink-0 text-[11px] font-bold uppercase tracking-wider text-emerald-200 border border-emerald-300/20 rounded-full px-3 py-1">Official snapshot v{{ $cumulativeStanding['version'] }}</span>
-</div>
-@endif
-
 @unless($isPublished)
 <div class="rounded-3xl bg-slate-900 border border-slate-800 p-10 sm:p-12 text-center shadow-xl">
     <span class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto mb-4 flex items-center justify-center text-xl font-extrabold text-amber-300" aria-hidden="true">🔒</span>
@@ -24,7 +17,7 @@
 @endif
 <div class="grid lg:grid-cols-[1.2fr_.8fr] gap-6">
     <section class="space-y-4" aria-labelledby="leading-schools-title">
-        <div class="flex items-center justify-between gap-3"><h2 id="leading-schools-title" class="text-lg font-extrabold text-white">Leading Schools</h2><span class="text-xs text-slate-400 font-semibold">{{ ($cumulativeStanding ?? null) ? 'Cumulative Points' : 'Total Points' }}</span></div>
+        <div class="flex items-center justify-between gap-3"><h2 id="leading-schools-title" class="text-lg font-extrabold text-white">Leading Schools</h2><span class="text-xs text-slate-400 font-semibold">Total Points</span></div>
         <ol class="space-y-3">
             @forelse($scoreboard as $row)
             @php
@@ -50,35 +43,14 @@
                         </a>
                     </div>
                 </div>
-                @if($cumulativeStanding ?? null)
-                <dl class="relative grid {{ $showPhasePoints ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3' }} gap-2 mt-4 pt-3 border-t border-slate-700/60 text-center">
-                    <div><dt class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Opening</dt><dd class="font-mono font-bold text-slate-200">{{ $row['opening_points'] }}</dd></div>
-                    <div><dt class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">This Event</dt><dd class="font-mono font-bold text-sky-300">+{{ $row['event_points'] }}</dd></div>
-                    @if($showPhasePoints)<div><dt class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Phase Total</dt><dd class="font-mono font-bold text-indigo-300">+{{ $row['phase_points'] }}</dd></div>@endif
-                    <div><dt class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Closing</dt><dd class="font-mono font-extrabold text-amber-400">{{ $row['closing_points'] }}</dd></div>
-                </dl>
-                @endif
             </li>
             @else
             <li class="relative rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
-                <details class="group">
-                    <summary class="list-none cursor-pointer flex items-center gap-3 px-4 py-3 pr-11 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400">
-                        <span class="shrink-0 w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span>
-                        <span class="font-semibold text-sm text-white flex-1">{{ $row['school_name'] }}</span>
-                        <span class="font-mono font-extrabold text-amber-400">{{ $row['total_points'] }}</span>
-                        @if($cumulativeStanding ?? null)<span class="text-slate-500 group-open:rotate-180 transition" aria-hidden="true">⌄</span>@endif
-                    </summary>
-                    @if($cumulativeStanding ?? null)
-                    <dl class="grid {{ $showPhasePoints ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3' }} gap-2 px-4 pb-4 text-center">
-                        <div><dt class="text-[10px] uppercase text-slate-500 font-bold">Opening</dt><dd class="font-mono font-bold text-slate-200">{{ $row['opening_points'] }}</dd></div>
-                        <div><dt class="text-[10px] uppercase text-slate-500 font-bold">This Event</dt><dd class="font-mono font-bold text-sky-300">+{{ $row['event_points'] }}</dd></div>
-                        @if($showPhasePoints)<div><dt class="text-[10px] uppercase text-slate-500 font-bold">Phase Total</dt><dd class="font-mono font-bold text-indigo-300">+{{ $row['phase_points'] }}</dd></div>@endif
-                        <div><dt class="text-[10px] uppercase text-slate-500 font-bold">Closing</dt><dd class="font-mono font-bold text-amber-400">{{ $row['closing_points'] }}</dd></div>
-                    </dl>
-                    @endif
-                </details>
-                {{-- Sibling of <details>, not nested in <summary> — keeps this click from
-                     also toggling the details open/closed. --}}
+                <div class="flex items-center gap-3 px-4 py-3 pr-11">
+                    <span class="shrink-0 w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span>
+                    <span class="font-semibold text-sm text-white flex-1">{{ $row['school_name'] }}</span>
+                    <span class="font-mono font-extrabold text-amber-400">{{ $row['total_points'] }}</span>
+                </div>
                 <a href="{{ route('tenant.fest.results.school', array_filter(['event' => $event->id, 'school' => $row['school_id'], 'category' => $category ?? null])) }}"
                    title="View {{ $row['school_name'] }}'s {{ ($category ?? null) ? 'roster for this category' : 'full roster' }}"
                    aria-label="View {{ $row['school_name'] }}'s {{ ($category ?? null) ? 'roster for this category' : 'full roster' }}"

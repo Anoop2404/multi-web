@@ -980,12 +980,28 @@ public function tv(Request $request, int $eventId)
         ->values()
         ->all();
 
-    [$overallScoreboard] = $this->resolveScoreboard($event, $selectedScope, null, $isPublished, $isAdminPreview);
+    // Same cross-phase combine as scoreboardDynamicData() (used by the Scoreboard page):
+    // a phase/region-partition scope's own board is isolated to that one phase, so the
+    // TV's standings need the same override or they'd silently show single-phase totals
+    // instead of each school's real combined standing across the hub.
+    [$overallScoreboard, $overallCumulative] = $this->resolveScoreboard($event, $selectedScope, null, $isPublished, $isAdminPreview);
+    if ($overallCumulative === null) {
+        $crossPhaseOverall = $this->crossPhaseScoreboard($event, null, $request);
+        if ($crossPhaseOverall !== null) {
+            $overallScoreboard = $crossPhaseOverall;
+        }
+    }
     $overallBoard = $withMedals($overallScoreboard, $medalTallyFor($marks));
 
     $categoryBoards = collect($categories)
-        ->map(function (string $key) use ($event, $selectedScope, $isPublished, $isAdminPreview, $marks, $categoryColumn, $withMedals, $medalTallyFor) {
-            [$scoreboard] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished, $isAdminPreview);
+        ->map(function (string $key) use ($event, $selectedScope, $isPublished, $isAdminPreview, $marks, $categoryColumn, $withMedals, $medalTallyFor, $request) {
+            [$scoreboard, $cumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished, $isAdminPreview);
+            if ($cumulativeStanding === null) {
+                $crossPhaseBoard = $this->crossPhaseScoreboard($event, $key, $request);
+                if ($crossPhaseBoard !== null) {
+                    $scoreboard = $crossPhaseBoard;
+                }
+            }
 
             return [
                 'key' => $key,
