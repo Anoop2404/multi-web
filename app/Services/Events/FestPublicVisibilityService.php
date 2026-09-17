@@ -22,6 +22,7 @@ class FestPublicVisibilityService
 {
     public function __construct(
         private FestChestNumberService $chestNumbers,
+        private FestGradePointService $gradePoints,
     ) {}
 
     public function isSportsEvent(FestEvent $event): bool
@@ -298,6 +299,11 @@ class FestPublicVisibilityService
                 $showMarks = $this->showIndividualMarks($itemEvent, $isAdminPreview, $item);
                 $itemVisible = $isAdminPreview || app(FestItemResultsService::class)->isItemVisible($item, $itemEvent);
                 $mark = $marksByParticipant->get($p->id);
+                // pointsForMark() recalculates and OVERWRITES $mark->grade in place as a
+                // side effect — capture the judge-entered grade before calling it, or the
+                // 'grade' field below would show the recalculated value instead.
+                $originalGrade = $mark?->grade;
+                $points = $showMarks && $mark ? $this->gradePoints->pointsForMark($itemEvent, $mark) : null;
 
                 return [
                     'item_id'          => $item->id,
@@ -308,7 +314,8 @@ class FestPublicVisibilityService
                     'participant_type' => $item->participant_type ?: 'individual',
                     'is_team_item'     => $item->isTeamItem(),
                     'position'         => $showMarks ? $mark?->position : null,
-                    'grade'            => $showMarks ? $mark?->grade : null,
+                    'grade'            => $showMarks ? $originalGrade : null,
+                    'points'           => $points,
                     'result'           => $showMarks ? trim(($mark?->measurement_value ?? '').' '.($mark?->measurement_unit ?? '')) : null,
                     'disqualified'     => (bool) $p->disqualified_at,
                     'results_url'      => $itemVisible ? route('tenant.fest.item-results', [$itemEvent->id, $item->id]) : null,

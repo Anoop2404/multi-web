@@ -265,6 +265,7 @@ class FestPortalController extends Controller
         $championshipRoot = $event->rootEvent();
         $championshipUsesPhases = $championshipRoot->usesPhasedRegionalBilling();
         $championshipRows = collect();
+        $championshipEventIds = [$selectedScope['event_id'] ?: $event->id];
         if ($isPublished) {
             if ($championshipUsesPhases) {
                 $visibleLeafIds = collect();
@@ -277,37 +278,57 @@ class FestPortalController extends Controller
                     }
                 }
                 $championshipRows = $this->individualChampionship->crossPhaseStandingForVisibleLeaves($championshipRoot, $visibleLeafIds);
+                // A student's ranked row here is a cross-phase total — their own eye-icon
+                // link must resolve against WHICHEVER leaf they're actually registered in
+                // (findParticipantByRef() requires an exact match), not the single leaf
+                // $event happens to be, or every student outside that one leaf silently
+                // loses the icon.
+                $championshipEventIds = $visibleLeafIds->all();
             } else {
                 $championshipRows = $this->individualChampionship->leaderboardForEvent($event);
             }
         }
 
         // Link each championship row through the same typed participant reference used
-        // by search, avoiding collisions between numeric chest and registration numbers —
-        // scoped to this one leaf event, so a student only appearing in a different phase
-        // (cross-phase view) simply has no link, same graceful degrade the view already
-        // handles for a row with no published result at all.
-        $championshipEventId = $selectedScope['event_id'] ?: $event->id;
-        $championshipRefs = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $championshipEventId))
+        // by search, avoiding collisions between numeric chest and registration numbers.
+        // Each ref is paired with the specific leaf event its registration actually
+        // belongs to (not necessarily $event) — the link the view builds must point
+        // there or the participant page's own lookup (scoped to one event) 404s.
+        $championshipRefs = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $championshipEventIds))
             ->whereIn('student_id', $championshipRows->pluck('student.id')->filter()->unique())
+            ->with('registration:id,event_id')
             ->orderBy('id')
             ->get()
             ->unique('student_id')
             ->mapWithKeys(fn (FestParticipant $participant) => [
-                $participant->student_id => $this->visibility->participantLinkRef($participant),
+                $participant->student_id => [
+                    'ref' => $this->visibility->participantLinkRef($participant),
+                    'event_id' => $participant->registration?->event_id ?? $event->id,
+                ],
             ]);
         // FestIndividualChampionshipPoint.category is always one of the fixed lp/up/hs/
         // hss/open keys (App\Http\Controllers\SahodayaAdmin\FestChampionshipController::
-        // INDIVIDUAL_CATEGORY_KEYS), regardless of event_type — the same keys
-        // FestClassGroupScheme::labels() resolves for Kalolsavam class categories, so it
-        // doubles as the label source here too instead of showing the raw "lp"/"hs" slug.
+        // INDIVIDUAL_CATEGORY_KEYS), regardless of event_type. FestClassGroupScheme::
+        // labels() is tried first since it reflects this Sahodaya's own configured class
+        // names, but it's keyed by that event's own scheme (which may not use these exact
+        // five canonical keys at all) — CANONICAL_CATEGORY_LABELS below is the guaranteed
+        // fallback so a scheme mismatch shows a real label, never the raw "hs" slug.
         $championshipCategoryLabels = FestClassGroupScheme::labels(null, $championshipRoot);
+        $canonicalCategoryLabels = [
+            'lp' => 'LP (Lower Primary)',
+            'up' => 'UP (Upper Primary)',
+            'hs' => 'HS (High School)',
+            'hss' => 'HSS (Higher Secondary)',
+            'open' => 'Open',
+        ];
         $championship = $championshipRows
-            ->map(function (array $row) use ($championshipCategoryLabels, $championshipRefs) {
+            ->map(function (array $row) use ($championshipCategoryLabels, $canonicalCategoryLabels, $championshipRefs, $event) {
+                $link = $championshipRefs[$row['student']['id']] ?? null;
+
                 return [
                     'rank' => $row['rank'],
                     'points' => $row['points'],
-                    'category' => $championshipCategoryLabels[$row['category']] ?? $row['category'],
+                    'category' => $championshipCategoryLabels[$row['category']] ?? $canonicalCategoryLabels[$row['category']] ?? strtoupper($row['category']),
                     'category_key' => $row['category'],
                     'gender_key' => $row['gender'],
                     'gender' => \App\Support\FestSportsAgeGroup::genderLabel($row['gender']) ?? $row['gender'],
@@ -315,7 +336,8 @@ class FestPortalController extends Controller
                     'photo' => $row['student']['photo'],
                     'reg_no' => $row['student']['reg_no'],
                     'school' => $row['school'],
-                    'ref' => $championshipRefs[$row['student']['id']] ?? null,
+                    'ref' => $link['ref'] ?? null,
+                    'ref_event_id' => $link['event_id'] ?? $event->id,
                 ];
             })
             ->values()

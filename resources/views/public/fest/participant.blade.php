@@ -3,6 +3,11 @@
 @section('content')
 @php
     $typeLabels = ['individual' => 'Individual', 'pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
+    // Same split FestIndividualChampionshipService uses for the championship
+    // leaderboard: a team/group item's points never count toward the individual
+    // total, so this summary must add them up the same way, not as one combined sum.
+    $individualPoints = collect($items)->filter(fn ($r) => ! $r['is_team_item'])->sum('points');
+    $groupPoints = collect($items)->filter(fn ($r) => $r['is_team_item'])->sum('points');
 @endphp
 <section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
     <div class="max-w-2xl mx-auto">
@@ -44,6 +49,19 @@
         </dl>
         @endif
 
+        @if(count($items) && ($individualPoints > 0 || $groupPoints > 0))
+        <div class="mt-4 grid grid-cols-2 gap-3">
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-center">
+                <p class="text-2xl font-extrabold text-amber-400">{{ $individualPoints }}</p>
+                <p class="text-[11px] uppercase tracking-wide text-white/40 font-bold mt-1">Individual points</p>
+            </div>
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-center">
+                <p class="text-2xl font-extrabold text-sky-400">{{ $groupPoints }}</p>
+                <p class="text-[11px] uppercase tracking-wide text-white/40 font-bold mt-1">Group/team points</p>
+            </div>
+        </div>
+        @endif
+
         <div class="mt-6">
             <p class="text-xs font-bold uppercase tracking-widest text-amber-400 mb-3">Items &amp; results across every phase</p>
             <ul class="space-y-2">
@@ -71,6 +89,7 @@
                         <span class="font-bold text-amber-400">Position #{{ $row['position'] }}</span>
                         @if($row['grade'])<span class="text-white/50">· Grade {{ $row['grade'] }}</span>@endif
                         @if($row['result'])<span class="text-white/50">· {{ $row['result'] }}</span>@endif
+                        @if($row['points'] !== null)<span class="font-mono font-bold {{ $row['is_team_item'] ? 'text-sky-400' : 'text-amber-400' }}">· {{ $row['points'] }} pts</span>@endif
                         @else
                         <span class="text-white/30">Result pending</span>
                         @endif

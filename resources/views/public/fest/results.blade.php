@@ -551,7 +551,7 @@
                                 <td class="p-3 text-right font-mono text-white">{{ $row['points'] }}</td>
                                 <td class="p-3 text-right">
                                     @if($row['ref'])
-                                    <a href="{{ route('tenant.fest.participant', [$event->id, $row['ref']]) }}"
+                                    <a href="{{ route('tenant.fest.participant', [$row['ref_event_id'] ?? $event->id, $row['ref']]) }}"
                                        class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-700 text-white/50 hover:text-white hover:border-slate-500 transition"
                                        title="View this student's item results">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4">

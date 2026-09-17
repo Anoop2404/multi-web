@@ -142,7 +142,7 @@
                                 <span class="text-xs text-gray-400 font-mono ml-2">{{ row.student.reg_no }}</span>
                             </td>
                             <td class="p-3 text-slate-600">{{ row.school }}</td>
-                            <td class="p-3 uppercase text-xs text-indigo-700 font-medium">{{ row.category }} · {{ row.gender }}</td>
+                            <td class="p-3 text-xs text-indigo-700 font-medium">{{ labelFor(row.category) }} · <span class="uppercase">{{ row.gender }}</span></td>
                             <td class="p-3 text-right font-mono font-semibold text-slate-900">{{ row.points }}</td>
                             <td class="p-3 text-right font-mono text-xs text-slate-400">#{{ row.overall_rank }}</td>
                         </tr>
@@ -198,8 +198,22 @@ const addingMergeRule = ref(false);
 const newGroupSources = ref([]);
 const newGroupTarget = ref(null);
 
+// This Sahodaya's own configured class-group scheme may not use these exact five
+// canonical keys at all (fest_individual_championship_points.category is always one
+// of lp/up/hs/hss/open regardless of event_type) — this is the guaranteed fallback so
+// a scheme mismatch still shows a real label instead of the raw "hs" slug.
+const CANONICAL_CATEGORY_LABELS = {
+    lp: 'LP (Lower Primary)',
+    up: 'UP (Upper Primary)',
+    hs: 'HS (High School)',
+    hss: 'HSS (Higher Secondary)',
+    open: 'Open',
+};
+
 function labelFor(key) {
-    return props.categoryOptions.find(o => o.value === key)?.label ?? key;
+    return props.categoryOptions.find(o => o.value === key)?.label
+        ?? CANONICAL_CATEGORY_LABELS[key]
+        ?? key;
 }
 
 function removeMergeGroup(idx) {
