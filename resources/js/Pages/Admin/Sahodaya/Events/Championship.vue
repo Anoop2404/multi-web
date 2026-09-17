@@ -142,7 +142,7 @@
                                 <span class="text-xs text-gray-400 font-mono ml-2">{{ row.student.reg_no }}</span>
                             </td>
                             <td class="p-3 text-slate-600">{{ row.school }}</td>
-                            <td class="p-3 text-xs text-indigo-700 font-medium">{{ labelFor(row.category) }} · <span class="uppercase">{{ row.gender }}</span></td>
+                            <td class="p-3 text-xs text-indigo-700 font-medium">{{ rowCategoryLabel(row.category) }} · <span class="uppercase">{{ row.gender }}</span></td>
                             <td class="p-3 text-right font-mono font-semibold text-slate-900">{{ row.points }}</td>
                             <td class="p-3 text-right font-mono text-xs text-slate-400">#{{ row.overall_rank }}</td>
                         </tr>
@@ -168,6 +168,7 @@ const props = defineProps({
     event: Object, leaderboard: Array,
     activityLogs: { type: Array, default: () => [] },
     categoryOptions: { type: Array, default: () => [] },
+    championshipCategoryLabels: { type: Object, default: () => ({}) },
     categoryMergeGroups: { type: Array, default: () => [] },
     excludedOverallCategories: { type: Array, default: () => [] },
     usesPhases: { type: Boolean, default: false },
@@ -191,29 +192,27 @@ const categories = computed(() => {
     return [...set];
 });
 
-const categoryOptionsFromLeaderboard = computed(() => categories.value.map(cat => ({ value: cat, label: cat.toUpperCase() })));
+const categoryOptionsFromLeaderboard = computed(() => categories.value.map(cat => ({ value: cat, label: rowCategoryLabel(cat) })));
 
 const mergeGroups = ref(props.categoryMergeGroups.map(g => ({ ...g })));
 const addingMergeRule = ref(false);
 const newGroupSources = ref([]);
 const newGroupTarget = ref(null);
 
-// This Sahodaya's own configured class-group scheme may not use these exact five
-// canonical keys at all (fest_individual_championship_points.category is always one
-// of lp/up/hs/hss/open regardless of event_type) — this is the guaranteed fallback so
-// a scheme mismatch still shows a real label instead of the raw "hs" slug.
-const CANONICAL_CATEGORY_LABELS = {
-    lp: 'LP (Lower Primary)',
-    up: 'UP (Upper Primary)',
-    hs: 'HS (High School)',
-    hss: 'HSS (Higher Secondary)',
-    open: 'Open',
-};
-
+// For the merge-rule builder (categoryOptions is this Sahodaya's own raw scheme
+// keys/labels — the merge map itself is keyed by those raw values).
 function labelFor(key) {
-    return props.categoryOptions.find(o => o.value === key)?.label
-        ?? CANONICAL_CATEGORY_LABELS[key]
-        ?? key;
+    return props.categoryOptions.find(o => o.value === key)?.label ?? key;
+}
+
+// For each leaderboard row's own category — always one of the fixed
+// lp/up/hs/hss/open keys (regardless of event_type), which categoryOptions above
+// isn't reliably keyed by. championshipCategoryLabels (from
+// FestClassGroupScheme::canonicalLabels()) already resolves back to this Sahodaya's
+// real configured name with a guaranteed fallback, so no further fallback is needed
+// here.
+function rowCategoryLabel(key) {
+    return props.championshipCategoryLabels[key] ?? key;
 }
 
 function removeMergeGroup(idx) {

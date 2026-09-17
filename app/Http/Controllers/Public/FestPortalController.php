@@ -307,28 +307,19 @@ class FestPortalController extends Controller
                 ],
             ]);
         // FestIndividualChampionshipPoint.category is always one of the fixed lp/up/hs/
-        // hss/open keys (App\Http\Controllers\SahodayaAdmin\FestChampionshipController::
-        // INDIVIDUAL_CATEGORY_KEYS), regardless of event_type. FestClassGroupScheme::
-        // labels() is tried first since it reflects this Sahodaya's own configured class
-        // names, but it's keyed by that event's own scheme (which may not use these exact
-        // five canonical keys at all) — CANONICAL_CATEGORY_LABELS below is the guaranteed
-        // fallback so a scheme mismatch shows a real label, never the raw "hs" slug.
-        $championshipCategoryLabels = FestClassGroupScheme::labels(null, $championshipRoot);
-        $canonicalCategoryLabels = [
-            'lp' => 'LP (Lower Primary)',
-            'up' => 'UP (Upper Primary)',
-            'hs' => 'HS (High School)',
-            'hss' => 'HSS (Higher Secondary)',
-            'open' => 'Open',
-        ];
+        // hss/open keys, regardless of event_type — canonicalLabels() resolves each back
+        // to this Sahodaya's own configured category name (e.g. "Category 3 — Classes 8,
+        // 9 & 10"), the same names the rest of the portal already shows, with a generic
+        // fallback for any key the scheme has no match for.
+        $championshipCategoryLabels = FestClassGroupScheme::canonicalLabels(null, $championshipRoot);
         $championship = $championshipRows
-            ->map(function (array $row) use ($championshipCategoryLabels, $canonicalCategoryLabels, $championshipRefs, $event) {
+            ->map(function (array $row) use ($championshipCategoryLabels, $championshipRefs, $event) {
                 $link = $championshipRefs[$row['student']['id']] ?? null;
 
                 return [
                     'rank' => $row['rank'],
                     'points' => $row['points'],
-                    'category' => $championshipCategoryLabels[$row['category']] ?? $canonicalCategoryLabels[$row['category']] ?? strtoupper($row['category']),
+                    'category' => $championshipCategoryLabels[$row['category']] ?? strtoupper($row['category']),
                     'category_key' => $row['category'],
                     'gender_key' => $row['gender'],
                     'gender' => \App\Support\FestSportsAgeGroup::genderLabel($row['gender']) ?? $row['gender'],

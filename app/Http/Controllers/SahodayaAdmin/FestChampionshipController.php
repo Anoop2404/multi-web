@@ -25,6 +25,12 @@ class FestChampionshipController extends SahodayaAdminController
             'event'       => $event,
             'leaderboard' => $championship->leaderboardForEvent($event),
             'categoryOptions' => collect($categoryLabels)->map(fn ($label, $key) => ['value' => $key, 'label' => $label])->values(),
+            // Each leaderboard row's own category is always one of the fixed
+            // lp/up/hs/hss/open keys, which categoryOptions above (this Sahodaya's raw
+            // scheme keys, needed as-is for the merge-rule builder) doesn't reliably
+            // key by — this resolves back to the real configured label instead of the
+            // raw canonical slug ("hs").
+            'championshipCategoryLabels' => FestClassGroupScheme::canonicalLabels(null, $root),
             'categoryMergeGroups' => $this->mergeGroupsForDisplay($categoryMap),
             'excludedOverallCategories' => \App\Support\FestOverallCategoryExclusion::excluded($root),
             'usesPhases' => $usesPhases,

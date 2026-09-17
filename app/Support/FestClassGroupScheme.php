@@ -139,6 +139,42 @@ class FestClassGroupScheme
     }
 
     /**
+     * The individual championship system stores category as always one of the five
+     * fixed canonical keys (self::KEYS) regardless of event_type — but a Sahodaya's own
+     * configured scheme almost never uses those exact raw keys (e.g. "category_3", not
+     * "hs"), so a naive labels()[canonicalKey] lookup misses and falls back to showing
+     * the raw canonical slug itself ("hs") instead of this Sahodaya's real label
+     * ("Category 3 — Classes 8, 9 & 10"). This resolves each canonical key back to that
+     * scheme's own label by finding whichever raw scheme key canonicalizes to it, so the
+     * championship leaderboard always matches the same category names the rest of the
+     * portal (scoreboard, category-wise results) already shows. Always returns all five
+     * keys — a generic fallback name for any canonical key the scheme has no match for,
+     * so the UI never shows a raw lowercase slug.
+     *
+     * @return array<string, string>
+     */
+    public static function canonicalLabels(?string $scheme = null, ?FestEvent $event = null): array
+    {
+        $raw = self::labels($scheme, $event);
+
+        $resolved = [];
+        foreach ($raw as $rawKey => $label) {
+            $canon = self::canonicalKey($rawKey);
+            if ($canon && in_array($canon, self::KEYS, true) && ! isset($resolved[$canon])) {
+                $resolved[$canon] = $label;
+            }
+        }
+
+        return $resolved + [
+            'lp' => 'LP (Lower Primary)',
+            'up' => 'UP (Upper Primary)',
+            'hs' => 'HS (High School)',
+            'hss' => 'HSS (Higher Secondary)',
+            'open' => 'Open',
+        ];
+    }
+
+    /**
      * Resolve one item's class_group to this (root) event's real configured display label
      * — the shared lookup behind every "which class category is this item in" display
      * (Item-wise report, Student item limits, ...). A named/numeric scheme (e.g. "State
