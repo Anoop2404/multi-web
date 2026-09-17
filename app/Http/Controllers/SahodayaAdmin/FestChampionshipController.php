@@ -8,9 +8,9 @@ use App\Support\FestTeamSquadRules;
 use App\Models\FestEvent;
 use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestMark;
-use App\Models\Tenant;
 use App\Services\Events\EventContext;
 use App\Services\Events\FestGradePointService;
+use App\Services\Events\FestIndividualChampionshipService;
 use Illuminate\Http\Request;
 
 class FestChampionshipController extends SahodayaAdminController
@@ -18,18 +18,9 @@ class FestChampionshipController extends SahodayaAdminController
     /** The only categories fest_individual_championship_points.category may ever hold (native DB enum) — a merge target outside this set is silently ignored rather than raising a constraint violation. */
     private const INDIVIDUAL_CATEGORY_KEYS = ['lp', 'up', 'hs', 'hss', 'open'];
 
-    public function index(string $tenantId, FestEvent $event)
+    public function index(string $tenantId, FestEvent $event, FestIndividualChampionshipService $championship)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-
-        $allRows = FestIndividualChampionshipPoint::where('event_id', $event->id)
-            ->with(['student'])
-            ->orderByDesc('points')
-            ->orderByDesc('group_points')
-            ->orderBy('student_id')
-            ->get();
-
-        $rows = $this->rankAndFormatIndividualRows($allRows);
 
         $root = $event->rootEvent();
         $categoryLabels = FestClassGroupScheme::labels(null, $root);
@@ -38,125 +29,13 @@ class FestChampionshipController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Events/Championship', $this->withEventActivity($event, FestPageActivity::CHAMPIONSHIP, [
             'event'       => $event,
-            'leaderboard' => $rows,
+            'leaderboard' => $championship->leaderboardForEvent($event),
             'categoryOptions' => collect($categoryLabels)->map(fn ($label, $key) => ['value' => $key, 'label' => $label])->values(),
             'categoryMergeGroups' => $this->mergeGroupsForDisplay($categoryMap),
             'excludedOverallCategories' => \App\Support\FestOverallCategoryExclusion::excluded($root),
             'usesPhases' => $usesPhases,
-            'cumulativeLeaderboard' => $usesPhases ? $this->crossPhaseIndividualStanding($root) : [],
+            'cumulativeLeaderboard' => $usesPhases ? $championship->crossPhaseStanding($root) : [],
         ]));
-    }
-
-    /**
-     * Same rank-within-category-and-gender + overall-rank shape index() has always
-     * returned, extracted so crossPhaseIndividualStanding() below can reuse it on a
-     * different row source (summed across phases, not one FestIndividualChampionshipPoint
-     * table scan) without duplicating the ranking logic.
-     *
-     * Ranked within category AND gender together (e.g. "HS Boys" vs "HS Girls" are
-     * separate #1s) — previously grouped by category alone, so a category's "#1" could
-     * silently be whichever gender happened to score higher that round, and the other
-     * gender's real champion showed as "#2" or worse. overall_rank stays a single
-     * global ranking across every category/gender combined — a reference number, not a
-     * title, so it's deliberately not category/gender-scoped the way `rank` now is.
-     *
-     * @param  \Illuminate\Support\Collection<int, object>  $allRows  Each row needs
-     *   student_id, student (relation), category, gender, points, group_points.
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
-     */
-    private function rankAndFormatIndividualRows($allRows)
-    {
-        $rankedByCategoryAndGender = $allRows->groupBy(fn ($row) => $row->category.'|'.$row->gender)
-            ->flatMap(function ($groupRows) {
-                return $groupRows->values()->map(fn ($row, int $index) => [$row, $index + 1]);
-            });
-
-        $overallRankByStudent = $allRows->values()->mapWithKeys(fn ($row, int $index) => [$row->student_id => $index + 1]);
-
-        return $rankedByCategoryAndGender->map(function (array $pair) use ($overallRankByStudent) {
-            [$row, $rank] = $pair;
-            $school = Tenant::find($row->student?->tenant_id);
-
-            return [
-                'rank'         => $rank,
-                'overall_rank' => $overallRankByStudent[$row->student_id] ?? null,
-                'points'       => $row->points,
-                'group_points' => $row->group_points,
-                'category'     => $row->category,
-                'gender'       => $row->gender,
-                'student'      => [
-                    'id'     => $row->student_id,
-                    'name'   => $row->student?->name,
-                    'reg_no' => $row->student?->reg_no,
-                ],
-                'school' => $school?->name,
-            ];
-        })->sortBy([
-            ['category', 'asc'],
-            ['gender', 'asc'],
-            ['rank', 'asc'],
-        ])->values();
-    }
-
-    /**
-     * A hub's individual championship needs a school's/student's total across every
-     * PUBLISHED phase, the same "sum the isolated per-phase numbers, don't use a
-     * running/cumulative total" principle FestPhaseScoreboardService applies for
-     * schools (see its class docblock) — except here there's no isolated-vs-cumulative
-     * distinction to worry about at all: recalculate() already writes one
-     * FestIndividualChampionshipPoint row per (phase leaf event, student), each
-     * already isolated to that one phase, so this just sums those existing rows
-     * per student across every phase leaf under the hub.
-     *
-     * Deliberately NOT gated on any phase-level "published" flag — recalculate() is a
-     * manual, admin-triggered snapshot (see its own docblock), so a phase simply having
-     * no rows yet (nobody has clicked Recalculate for it) naturally contributes zero,
-     * with no separate publish check needed the way the public-facing school total
-     * needed one.
-     *
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
-     */
-    private function crossPhaseIndividualStanding(FestEvent $hub)
-    {
-        $phaseIds = \App\Models\FestEventPhase::where('event_id', $hub->id)->pluck('id');
-        if ($phaseIds->isEmpty()) {
-            return collect();
-        }
-
-        $leafIds = FestEvent::where('parent_event_id', $hub->id)
-            ->whereIn('source_phase_id', $phaseIds)
-            ->pluck('id');
-        if ($leafIds->isEmpty()) {
-            return collect();
-        }
-
-        $summed = FestIndividualChampionshipPoint::whereIn('event_id', $leafIds)
-            ->with('student')
-            ->get()
-            ->groupBy('student_id')
-            ->map(function ($studentRows) {
-                $first = $studentRows->first();
-
-                // A student's category/gender shouldn't change phase to phase (same
-                // student, same age bracket, all within one academic-year event) —
-                // taking the first row's is safe and avoids re-deriving it here.
-                return (object) [
-                    'student_id'   => $first->student_id,
-                    'student'      => $first->student,
-                    'category'     => $first->category,
-                    'gender'       => $first->gender,
-                    'points'       => $studentRows->sum('points'),
-                    'group_points' => $studentRows->sum('group_points'),
-                ];
-            })
-            ->sortBy([
-                [fn ($r) => $r->points, 'desc'],
-                [fn ($r) => $r->group_points, 'desc'],
-                [fn ($r) => $r->student_id, 'asc'],
-            ])
-            ->values();
-
-        return $this->rankAndFormatIndividualRows($summed);
     }
 
     /**

@@ -20,6 +20,7 @@ use App\Services\Events\EventContext;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestCumulativeChampionshipService;
 use App\Services\Events\FestGradePointService;
+use App\Services\Events\FestIndividualChampionshipService;
 use App\Services\Events\FestItemResultsService;
 use App\Services\Events\FestNumberingService;
 use App\Services\Events\FestPhaseScoreboardService;
@@ -46,6 +47,7 @@ class FestPortalController extends Controller
         private PublicOperationalEventService $operationalEvents,
         private FestCumulativeChampionshipService $cumulativeChampionship,
         private FestGradePointService $gradePoints,
+        private FestIndividualChampionshipService $individualChampionship,
     ) {}
 
     public function index()
@@ -911,6 +913,65 @@ public function scoreboardData(Request $request, int $eventId)
         'contentHtml' => view('public.fest.partials.scoreboard-content', $dynamic + compact('event', 'isPublished', 'category', 'isAdminPreview'))->render(),
         'refreshedAt' => now()->toIso8601String(),
     ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+}
+
+/**
+ * Public individual (student) championship leaderboard — category+gender ranked,
+ * combined across every visible phase of the hub. No separate "publish championship"
+ * step: visibility rides entirely on the same results_published/admin-preview gate
+ * scoreboard() already uses, same as the rest of the public portal. Admin's own
+ * Championship page (FestChampionshipController) is never gated by this at all —
+ * it's always visible there regardless of publish state.
+ */
+public function champions(Request $request, int $eventId)
+{
+    $tenant = $this->resolveTenant();
+    $event = $this->findEvent($tenant->id, $eventId);
+    $selectedScope = $this->operationalEvents->directScope($event);
+
+    $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+    $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
+
+    $root = $event->rootEvent();
+    $usesPhases = $root->usesPhasedRegionalBilling();
+    $categoryLabels = FestClassGroupScheme::labels(null, $root);
+
+    $leaderboard = collect();
+    $cumulativeLeaderboard = collect();
+    if ($isPublished) {
+        $leaderboard = $this->individualChampionship->leaderboardForEvent($event);
+
+        if ($usesPhases) {
+            // Same per-leaf visibility gate crossPhaseScoreboard() uses for the school
+            // board — a phase whose own results aren't public yet (or previewable by
+            // this admin) must not leak its points into the combined total just because
+            // a sibling phase already is.
+            $phases = FestEventPhase::where('event_id', $root->id)->get();
+            $visibleLeafIds = collect();
+            foreach ($phases as $phase) {
+                $leaves = FestEvent::where('parent_event_id', $root->id)->where('source_phase_id', $phase->id)->get();
+                foreach ($leaves as $leaf) {
+                    if ($this->operationalEvents->directScope($leaf)['results_published'] || $this->isAuthorizedAdminPreview($request, $leaf)) {
+                        $visibleLeafIds->push($leaf->id);
+                    }
+                }
+            }
+            $cumulativeLeaderboard = $this->individualChampionship->crossPhaseStandingForVisibleLeaves($root, $visibleLeafIds);
+        }
+    }
+
+    return $this->renderPublic('public.fest.champions', $tenant, [
+        'event' => $event,
+        'selectedScope' => $selectedScope,
+        'isPublished' => $isPublished,
+        'isAdminPreview' => $isAdminPreview,
+        'leaderboard' => $leaderboard,
+        'cumulativeLeaderboard' => $cumulativeLeaderboard,
+        'usesPhases' => $usesPhases,
+        'categoryLabels' => $categoryLabels,
+        'eventContext' => $this->operationalEvents->publicContext($event),
+        'pageSeo' => ['title' => $event->title.' — Individual Champions'],
+    ]);
 }
 
 /**
