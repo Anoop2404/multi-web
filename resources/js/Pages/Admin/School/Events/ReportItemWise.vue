@@ -59,7 +59,7 @@
                             <th>Item reg</th>
                             <th>Grade</th>
                             <th>Rank</th>
-                            <th>Score</th>
+                            <th>Points</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -79,7 +79,7 @@
                             <td class="font-mono text-xs">{{ r.item_reg ?? '—' }}</td>
                             <td>{{ r.grade ?? '—' }}</td>
                             <td>{{ r.position ?? '—' }}</td>
-                            <td>{{ r.score ?? '—' }}</td>
+                            <td>{{ r.points ?? '—' }}</td>
                         </tr>
                         <tr v-if="!filteredRows.length"><td colspan="13" class="p-8 text-center text-slate-400">No registrations match the current filters.</td></tr>
                     </tbody>
@@ -132,7 +132,7 @@ const hasAnyRegion = computed(() => regionOptions.value.length > 0);
 const categoryOptions = computed(() => props.categories.map((c) => ({ value: c.key, label: c.label })));
 
 function isMarkPending(row) {
-    return row.grade == null && row.position == null && row.score == null;
+    return row.grade == null && row.position == null && row.points == null;
 }
 
 const filteredRows = computed(() => {

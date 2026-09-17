@@ -130,7 +130,7 @@
                     <th style="width: 8%;" class="text-center">Status</th>
                     <th style="width: 6%;" class="text-center">Grade</th>
                     <th style="width: 6%;" class="text-center">Rank</th>
-                    <th style="width: 8%;" class="text-center">Score</th>
+                    <th style="width: 8%;" class="text-center">{{ ($showPoints ?? false) ? 'Points' : 'Score' }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -144,7 +144,7 @@
                     <td class="text-center" style="text-transform: capitalize;">{{ $r['status'] }}</td>
                     <td class="text-center font-bold">{{ $r['grade'] ?? '—' }}</td>
                     <td class="text-center">{{ $r['position'] ?? '—' }}</td>
-                    <td class="text-center">{{ $r['score'] ?? '—' }}</td>
+                    <td class="text-center">{{ (($showPoints ?? false) ? $r['points'] : $r['score']) ?? '—' }}</td>
                 </tr>
                 @endforeach
             </tbody>

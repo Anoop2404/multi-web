@@ -1970,6 +1970,7 @@ class FestEventReportAnalyticsService
         // actual configured scheme entirely and falls back to the platform default.
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $usesPhasedRegionalBilling = $this->event->rootEvent()->usesPhasedRegionalBilling();
+        $gradePointService = app(FestGradePointService::class);
 
         $rows = FestParticipant::query()
             ->whereHas('registration', function ($q) use ($schoolId) {
@@ -1991,7 +1992,7 @@ class FestEventReportAnalyticsService
             ])
             ->get()
             ->filter(fn (FestParticipant $p) => $p->registration && $p->registration->item)
-            ->map(function (FestParticipant $p) use ($classGroupLabels, $usesPhasedRegionalBilling, $schoolId) {
+            ->map(function (FestParticipant $p) use ($classGroupLabels, $usesPhasedRegionalBilling, $schoolId, $gradePointService) {
                 $registration = $p->registration;
                 $item = $registration->item;
                 $event = $registration->event;
@@ -2007,6 +2008,27 @@ class FestEventReportAnalyticsService
                 // mark-entry-progress view).
                 $itemPublished = $item->results_published_at !== null && ! $item->results_hidden;
                 $showMark = $schoolId === null || $itemPublished;
+                $mark = $p->mark;
+                // Captured before pointsForMark(), which mutates $mark->grade in place —
+                // recalculating it from score against the event's grade-point config (see
+                // its own docblock). When that config has no band covering this score, the
+                // recalculation silently wipes the grade to null; the judge-entered grade
+                // actually on the mark must still be what a school sees, not that mutation.
+                $originalGrade = $mark?->grade;
+
+                $points = null;
+                if ($mark && $showMark) {
+                    $mark->setRelation('item', $item);
+                    $points = $gradePointService->pointsForMark($event, $mark);
+                }
+
+                $position = $mark?->position;
+                if ($schoolId !== null) {
+                    // A school only ever sees a rank inside the podium (1st–3rd) — any
+                    // other placement (and any placement before the item is published at
+                    // all) shows blank rather than a numeric position.
+                    $position = ($showMark && $position !== null && $position <= 3) ? $position : null;
+                }
 
                 return [
                     'id'              => $p->id,
@@ -2028,9 +2050,12 @@ class FestEventReportAnalyticsService
                     'item_reg'        => $p->item_registration_number,
                     'chest_no'        => $p->chest_no,
                     'status'          => $registration->status,
-                    'grade'           => $showMark ? $p->mark?->grade : null,
-                    'position'        => $showMark ? $p->mark?->position : null,
-                    'score'           => $showMark ? $p->mark?->score : null,
+                    'grade'           => $showMark ? $originalGrade : null,
+                    'position'        => $position,
+                    // Raw marks/score are judge-facing working data — a school only ever
+                    // sees the grade and the points it earns, never the underlying score.
+                    'score'           => $schoolId === null ? $mark?->score : null,
+                    'points'          => $points,
                 ];
             });
 

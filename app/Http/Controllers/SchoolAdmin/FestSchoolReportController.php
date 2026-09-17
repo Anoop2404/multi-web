@@ -639,13 +639,13 @@ class FestSchoolReportController extends SchoolAdminController
             $out = fopen('php://output', 'w');
             CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
             CsvSafety::fputcsv($out, []);
-            CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Chest', 'Status', 'Grade', 'Rank', 'Score']);
+            CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Chest', 'Status', 'Grade', 'Rank', 'Points']);
             foreach ($rows as $row) {
                 CsvSafety::fputcsv($out, [
                     $row['category_label'], $row['item_title'], $row['item_code'],
                     $row['phase_name'], $row['region_name'], $row['school_name'],
                     $row['participant'], $row['reg_no'], $row['chest_no'],
-                    $row['status'], $row['grade'], $row['position'], $row['score'],
+                    $row['status'], $row['grade'], $row['position'], $row['points'],
                 ]);
             }
             fclose($out);
@@ -665,6 +665,7 @@ class FestSchoolReportController extends SchoolAdminController
             'rows'        => $rows,
             'showPhase'   => collect($rows)->contains(fn ($r) => $r['phase_name']),
             'showRegion'  => collect($rows)->contains(fn ($r) => $r['region_name']),
+            'showPoints'  => true,
             'generatedBy' => $request->user()->name ?? 'Unknown',
             'generatedAt' => now()->format('d M Y, h:i A'),
             'forWhom'     => trim((string) $request->input('for_whom', '')) ?: null,

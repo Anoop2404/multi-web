@@ -97,6 +97,13 @@ class FestReportController extends SahodayaAdminController
 
         $regionChildren = $event->childrenForRoles(['region'])
             ->load('region:id,name,code')
+            // A "region" child with no region_id at all is a data-integrity gap (an
+            // incompletely set-up child, never a real region) — withRegionParam() below
+            // needs an actual region id to filter by, so there's nothing meaningful to
+            // build a tab for. Previously this crashed the whole reports page with a
+            // TypeError for every region the moment one broken child existed, rather
+            // than just leaving that one child out.
+            ->filter(fn (FestEvent $child) => $child->region_id !== null)
             ->sortBy('sort_order')
             ->map(function (FestEvent $child) use ($tenantId, $event) {
                 $childPages = FestReportCatalog::interactivePages($tenantId, $child->id, $event->event_type);
@@ -1044,6 +1051,7 @@ class FestReportController extends SahodayaAdminController
             'rows'        => $rows,
             'showPhase'   => collect($rows)->contains(fn ($r) => ! empty($r['phase_name'])),
             'showRegion'  => collect($rows)->contains(fn ($r) => ! empty($r['region_name'])),
+            'showPoints'  => false,
             'generatedBy' => $request->user()?->name ?? 'Unknown',
             'generatedAt' => now()->format('d M Y, h:i A'),
             'forWhom'     => trim((string) $request->input('for_whom', '')) ?: null,

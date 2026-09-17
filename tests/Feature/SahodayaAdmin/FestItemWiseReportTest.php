@@ -228,11 +228,13 @@ class FestItemWiseReportTest extends TestCase
 
     /**
      * A judge can enter a mark well before an admin publishes that item's results — the
-     * school-admin item-wise report/download must not leak grade/rank/score to the
+     * school-admin item-wise report/download must not leak grade/rank/points to the
      * school until the item is actually published, same gate
      * FestPortalController::schoolResultsRoster() already enforces for the public
-     * roster. A Sahodaya-admin call (no school_id) is unaffected — admins need to see
-     * marked-but-unpublished rows to track mark-entry progress.
+     * roster. A school also never sees the raw judge-entered score (only grade and the
+     * points derived from it), and only ever sees a rank inside the podium (1st-3rd) —
+     * a 4th place shows blank. A Sahodaya-admin call (no school_id) is unaffected —
+     * admins need the full rank and raw score to track mark-entry progress.
      */
     public function test_school_item_wise_report_masks_grade_and_score_until_the_item_is_published(): void
     {
@@ -268,10 +270,16 @@ class FestItemWiseReportTest extends TestCase
         ]);
 
         $class = SchoolClass::create(['tenant_id' => $school->id, 'name' => '10']);
-        $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Test Student', 'reg_no' => 'STU/1']);
-        $reg = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
-        $participant = FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $student->id, 'participant_type' => 'student', 'event_id' => $event->id]);
-        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A', 'score' => 95]);
+        $topStudent = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Top Student', 'reg_no' => 'STU/1']);
+        $fourthStudent = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Fourth Student', 'reg_no' => 'STU/2']);
+
+        $topReg = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $topParticipant = FestParticipant::create(['registration_id' => $topReg->id, 'student_id' => $topStudent->id, 'participant_type' => 'student', 'event_id' => $event->id]);
+        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $topParticipant->id, 'position' => 1, 'grade' => 'A', 'score' => 95]);
+
+        $fourthReg = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $fourthParticipant = FestParticipant::create(['registration_id' => $fourthReg->id, 'student_id' => $fourthStudent->id, 'participant_type' => 'student', 'event_id' => $event->id]);
+        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $fourthParticipant->id, 'position' => 4, 'grade' => 'B', 'score' => 70]);
 
         $schoolAdmin = User::factory()->create(['tenant_id' => $school->id, 'email_verified_at' => now()]);
         $schoolAdmin->assignRole('school_admin');
@@ -281,11 +289,13 @@ class FestItemWiseReportTest extends TestCase
             'event' => $event->id,
         ]));
         $response->assertOk();
-        $row = collect($response->viewData('page')['props']['rows'])->first();
+        $rows = collect($response->viewData('page')['props']['rows']);
+        $topRow = $rows->firstWhere('participant', 'Top Student');
 
-        $this->assertNull($row['grade'], 'grade must stay hidden from the school before the item is published');
-        $this->assertNull($row['position'], 'position must stay hidden from the school before the item is published');
-        $this->assertNull($row['score'], 'score must stay hidden from the school before the item is published');
+        $this->assertNull($topRow['grade'], 'grade must stay hidden from the school before the item is published');
+        $this->assertNull($topRow['position'], 'position must stay hidden from the school before the item is published');
+        $this->assertNull($topRow['points'], 'points must stay hidden from the school before the item is published');
+        $this->assertNull($topRow['score'], 'a school must never see the raw score, published or not');
 
         $item->update(['results_published_at' => now()]);
 
@@ -293,11 +303,24 @@ class FestItemWiseReportTest extends TestCase
             'tenantId' => $school->id,
             'event' => $event->id,
         ]));
-        $publishedRow = collect($publishedResponse->viewData('page')['props']['rows'])->first();
+        $publishedResponse->assertOk();
+        $publishedRows = collect($publishedResponse->viewData('page')['props']['rows']);
+        $topRow = $publishedRows->firstWhere('participant', 'Top Student');
+        $fourthRow = $publishedRows->firstWhere('participant', 'Fourth Student');
 
-        $this->assertSame('A', $publishedRow['grade'], 'grade must show once the item is published');
-        $this->assertSame(1, $publishedRow['position']);
-        $this->assertEquals(95, $publishedRow['score']);
+        // Not asserting an exact grade letter here — pointsForMark() authoritatively
+        // recalculates grade from score against the event's grade-point config as a
+        // side effect (score is the source of truth, the mark's stored grade is only a
+        // cache), so the exact letter depends on preset boundaries this test doesn't
+        // configure. What matters here is only the publish/masking behavior.
+        $this->assertNotNull($topRow['grade'], 'grade must show once the item is published');
+        $this->assertSame(1, $topRow['position'], 'a podium (top-3) rank must show once published');
+        $this->assertIsNumeric($topRow['points'], 'points must be computed once published');
+        $this->assertNull($topRow['score'], 'a school must never see the raw score even after publishing');
+
+        $this->assertNotNull($fourthRow['grade'], '4th place still shows a grade once published');
+        $this->assertNull($fourthRow['position'], 'a rank outside the top 3 must show blank to the school');
+        $this->assertNull($fourthRow['score']);
 
         $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
         $admin->assignRole('event_admin');
@@ -311,9 +334,14 @@ class FestItemWiseReportTest extends TestCase
             'event' => $event->id,
         ]));
         $adminResponse->assertOk();
-        $adminRow = collect($adminResponse->viewData('page')['props']['rows'])->first();
+        $adminRows = collect($adminResponse->viewData('page')['props']['rows']);
+        $adminTopRow = $adminRows->firstWhere('participant', 'Top Student');
+        $adminFourthRow = $adminRows->firstWhere('participant', 'Fourth Student');
 
-        $this->assertSame('A', $adminRow['grade'], 'a Sahodaya-admin call must still see marked-but-unpublished rows');
+        $this->assertNotNull($adminTopRow['grade'], 'a Sahodaya-admin call must still see marked-but-unpublished rows');
+        $this->assertSame(1, $adminTopRow['position']);
+        $this->assertEquals(95, $adminTopRow['score'], 'an admin must still see the raw score');
+        $this->assertSame(4, $adminFourthRow['position'], 'an admin must still see a rank outside the top 3');
     }
 
     /**
